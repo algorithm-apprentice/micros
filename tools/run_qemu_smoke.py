@@ -14,6 +14,12 @@ from typing import Optional
 
 PANIC_MARKER = "MICROS_PANIC"
 FAILURE_MARKER = "MICROS_TEST_FAILURE"
+TRAP_READY_MARKER = "MICROS_TRAP_READY"
+TRAP_TEST_MARKER = "MICROS_TRAP_TEST"
+TRAP_TEST_PASS = (
+    "MICROS_TRAP_TEST_PASS "
+    "origin=S cause=illegal-instruction registers=preserved"
+)
 FDT_COUNTS_PATTERN = re.compile(
     r"^MICROS_FDT_COUNTS "
     r"memory=0x([0-9a-f]{16}) "
@@ -53,6 +59,16 @@ PANIC_CORE_PATTERNS = (
         r"ra=0x[0-9a-f]{16} "
         r"sp=0x[0-9a-f]{16}$"
     ),
+)
+TRAP_CONTEXT_PATTERN = re.compile(
+    r"^MICROS_TRAP_CONTEXT "
+    r"origin=[SU] "
+    r"sstatus=0x[0-9a-f]{16} "
+    r"scause=0x[0-9a-f]{16} "
+    r"stval=0x[0-9a-f]{16} "
+    r"sepc=0x([0-9a-f]{16}) "
+    r"ra=0x[0-9a-f]{16} "
+    r"sp=0x[0-9a-f]{16}$"
 )
 
 
@@ -95,7 +111,7 @@ def _has_complete_fdt_events(output_lines, require_reservations):
     return tuple(actual_counts) == summaries[0]
 
 
-def _has_complete_panic_report(output):
+def _split_output_records(output):
     records = output.splitlines(keepends=True)
     output_lines = []
     terminated = []
@@ -110,6 +126,11 @@ def _has_complete_panic_report(output):
         else:
             output_lines.append(record)
             terminated.append(False)
+    return output_lines, terminated
+
+
+def _has_complete_panic_report(output):
+    output_lines, terminated = _split_output_records(output)
 
     indices = [
         index
@@ -134,6 +155,112 @@ def _has_complete_panic_report(output):
     return True
 
 
+def _has_complete_trap_ready(output_lines):
+    indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(TRAP_READY_MARKER)
+    ]
+    return (
+        len(indices) == 1
+        and output_lines[indices[0]] == TRAP_READY_MARKER
+    )
+
+
+def _has_complete_trap_test_report(output_lines):
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(TRAP_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(TRAP_TEST_MARKER)
+    ]
+    fdt_ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_FDT_READY")
+    ]
+    return (
+        len(ready_indices) == 1
+        and output_lines[ready_indices[0]] == TRAP_READY_MARKER
+        and len(fdt_ready_indices) == 1
+        and output_lines[fdt_ready_indices[0]] == "MICROS_FDT_READY"
+        and len(test_indices) == 1
+        and output_lines[test_indices[0]] == TRAP_TEST_PASS
+        and ready_indices[0] < fdt_ready_indices[0] < test_indices[0]
+    )
+
+
+def _has_complete_trap_context(output, expected_sepc=None):
+    output_lines, terminated = _split_output_records(output)
+    panic_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(PANIC_MARKER)
+    ]
+    context_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_TRAP_CONTEXT")
+    ]
+    if (
+        len(panic_indices) != len(PANIC_CORE_PATTERNS)
+        or len(context_indices) != 1
+    ):
+        return False
+
+    context_index = context_indices[0]
+    match = TRAP_CONTEXT_PATTERN.fullmatch(output_lines[context_index])
+    if (
+        context_index != panic_indices[-1] + 1
+        or not terminated[context_index]
+        or match is None
+        or TRAP_TEST_PASS in output_lines
+    ):
+        return False
+    return (
+        expected_sepc is None
+        or int(match.group(1), 16) == expected_sepc
+    )
+
+
+def parse_nm_symbol_address(output, symbol):
+    addresses = []
+
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) < 3 or fields[-1] != symbol:
+            continue
+        try:
+            addresses.append(int(fields[0], 16))
+        except ValueError:
+            continue
+    if len(addresses) != 1:
+        raise ValueError(
+            f"expected exactly one defined symbol {symbol!r}, "
+            f"found {len(addresses)}"
+        )
+    return addresses[0]
+
+
+def resolve_symbol_address(nm, kernel, symbol):
+    completed = subprocess.run(
+        [nm, "-n", "--defined-only", str(kernel)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or "no diagnostic"
+        raise RuntimeError(f"symbol inspection failed: {detail}")
+    return parse_nm_symbol_address(completed.stdout, symbol)
+
+
 def _has_required_output(output_lines, markers, patterns):
     if not all(marker in output_lines for marker in markers):
         return False
@@ -153,6 +280,10 @@ def matches_expected_result(
     require_fdt_events=False,
     require_fdt_reservations=False,
     require_panic_report=False,
+    require_trap_ready=False,
+    require_trap_test_report=False,
+    require_trap_context=False,
+    expected_trap_context_sepc=None,
 ):
     output_lines = result.output.splitlines()
 
@@ -173,6 +304,27 @@ def matches_expected_result(
     ):
         return False
     if require_panic_report and not _has_complete_panic_report(result.output):
+        return False
+    if require_trap_ready and not _has_complete_trap_ready(output_lines):
+        return False
+    if (
+        require_trap_test_report
+        and not _has_complete_trap_test_report(output_lines)
+    ):
+        return False
+    has_trap_context = any(
+        line.startswith("MICROS_TRAP_CONTEXT")
+        for line in output_lines
+    )
+    if (
+        require_trap_context
+        and not _has_complete_trap_context(
+            result.output,
+            expected_sepc=expected_trap_context_sepc,
+        )
+    ):
+        return False
+    if not require_trap_context and has_trap_context:
         return False
     return True
 
@@ -321,6 +473,11 @@ def parse_arguments(argv):
         default=os.environ.get("MICROS_QEMU", "qemu-system-riscv64"),
         help="QEMU RISC-V system executable",
     )
+    parser.add_argument(
+        "--nm",
+        default=os.environ.get("MICROS_NM", "llvm-nm"),
+        help="LLVM nm executable used for exact target-symbol checks",
+    )
     parser.add_argument("--kernel", required=True, type=Path)
     parser.add_argument(
         "--marker",
@@ -355,6 +512,25 @@ def parse_arguments(argv):
         action="store_true",
         help="Require the ordered five-record panic report",
     )
+    parser.add_argument(
+        "--require-trap-ready",
+        action="store_true",
+        help="Require exactly one trap-ready record",
+    )
+    parser.add_argument(
+        "--require-trap-test-report",
+        action="store_true",
+        help="Require the ordered trap recovery test records",
+    )
+    parser.add_argument(
+        "--require-trap-context",
+        action="store_true",
+        help="Require one trap context immediately after the panic core",
+    )
+    parser.add_argument(
+        "--trap-context-sepc-symbol",
+        help="ELF symbol whose address must equal trap-context sepc",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
@@ -369,11 +545,31 @@ def parse_arguments(argv):
             parser.error(f"invalid --pattern {pattern!r}: {error}")
     if not arguments.kernel.is_file():
         parser.error(f"kernel image does not exist: {arguments.kernel}")
+    if (
+        arguments.trap_context_sepc_symbol
+        and not arguments.require_trap_context
+    ):
+        parser.error(
+            "--trap-context-sepc-symbol requires "
+            "--require-trap-context"
+        )
     return arguments
 
 
 def main(argv=None):
     arguments = parse_arguments(argv)
+    expected_trap_context_sepc = None
+    if arguments.trap_context_sepc_symbol:
+        try:
+            expected_trap_context_sepc = resolve_symbol_address(
+                arguments.nm,
+                arguments.kernel,
+                arguments.trap_context_sepc_symbol,
+            )
+        except (FileNotFoundError, RuntimeError, ValueError) as error:
+            print(str(error), file=sys.stderr)
+            return 2
+
     command = build_qemu_command(
         qemu=arguments.qemu,
         kernel=str(arguments.kernel.resolve()),
@@ -402,6 +598,10 @@ def main(argv=None):
         require_fdt_events=arguments.require_fdt_events,
         require_fdt_reservations=arguments.require_fdt_reservations,
         require_panic_report=arguments.require_panic_report,
+        require_trap_ready=arguments.require_trap_ready,
+        require_trap_test_report=arguments.require_trap_test_report,
+        require_trap_context=arguments.require_trap_context,
+        expected_trap_context_sepc=expected_trap_context_sepc,
     )
     return print_tap_result(
         outcome,
