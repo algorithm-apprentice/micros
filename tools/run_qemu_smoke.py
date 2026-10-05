@@ -26,6 +26,18 @@ TIMER_TEST_PASS = (
     "ticks=0x0000000000000003 "
     "interval=0x00000000000186a0"
 )
+FRAME_ALLOCATOR_READY_MARKER = "MICROS_FRAME_ALLOCATOR_READY"
+FRAME_ALLOCATOR_TEST_MARKER = "MICROS_FRAME_ALLOCATOR_TEST"
+FRAME_ALLOCATOR_READY_PATTERN = re.compile(
+    r"^MICROS_FRAME_ALLOCATOR_READY "
+    r"managed=0x([0-9a-f]{16}) "
+    r"free=0x([0-9a-f]{16})$"
+)
+FRAME_ALLOCATOR_TEST_PASS = (
+    "MICROS_FRAME_ALLOCATOR_TEST_PASS "
+    "allocations=0x0000000000000004 "
+    "reuse=lowest invariants=preserved"
+)
 FDT_COUNTS_PATTERN = re.compile(
     r"^MICROS_FDT_COUNTS "
     r"memory=0x([0-9a-f]{16}) "
@@ -222,6 +234,89 @@ def _has_complete_timer_test_report(output):
     )
 
 
+def parse_frame_allocator_ready_counts(output):
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_READY_MARKER)
+    ]
+    if (
+        len(ready_indices) != 1
+        or not terminated[ready_indices[0]]
+    ):
+        return None
+
+    match = FRAME_ALLOCATOR_READY_PATTERN.fullmatch(
+        output_lines[ready_indices[0]]
+    )
+    if match is None:
+        return None
+    managed, free = (int(value, 16) for value in match.groups())
+    return managed, free
+
+
+def _has_complete_frame_allocator_ready(output):
+    output_lines = output.splitlines()
+    fdt_ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_FDT_READY")
+    ]
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_READY_MARKER)
+    ]
+    counts = parse_frame_allocator_ready_counts(output)
+    return (
+        len(fdt_ready_indices) == 1
+        and output_lines[fdt_ready_indices[0]] == "MICROS_FDT_READY"
+        and len(ready_indices) == 1
+        and fdt_ready_indices[0] < ready_indices[0]
+        and counts is not None
+        and counts[0] != 0
+        and counts[1] == counts[0]
+    )
+
+
+def has_expected_frame_allocator_growth(outputs, expected_delta):
+    if len(outputs) != 2:
+        return False
+    counts = [
+        parse_frame_allocator_ready_counts(output)
+        for output in outputs
+    ]
+    return (
+        all(value is not None for value in counts)
+        and counts[1][0] >= counts[0][0]
+        and counts[1][0] - counts[0][0] == expected_delta
+    )
+
+
+def _has_complete_frame_allocator_test_report(output):
+    if not _has_complete_frame_allocator_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == FRAME_ALLOCATOR_TEST_PASS
+        and terminated[test_indices[0]]
+        and ready_indices[0] < test_indices[0]
+    )
+
+
 def _has_complete_trap_context(output, expected_sepc=None):
     output_lines, terminated = _split_output_records(output)
     panic_indices = [
@@ -311,6 +406,8 @@ def matches_expected_result(
     require_trap_ready=False,
     require_trap_test_report=False,
     require_timer_test_report=False,
+    require_frame_allocator_ready=False,
+    require_frame_allocator_test_report=False,
     require_trap_context=False,
     expected_trap_context_sepc=None,
 ):
@@ -344,6 +441,16 @@ def matches_expected_result(
     if (
         require_timer_test_report
         and not _has_complete_timer_test_report(result.output)
+    ):
+        return False
+    if (
+        require_frame_allocator_ready
+        and not _has_complete_frame_allocator_ready(result.output)
+    ):
+        return False
+    if (
+        require_frame_allocator_test_report
+        and not _has_complete_frame_allocator_test_report(result.output)
     ):
         return False
     has_trap_context = any(
@@ -396,7 +503,7 @@ def classify_smoke(
     return SmokeOutcome.UNEXPECTED_EXIT
 
 
-def build_qemu_command(*, qemu, kernel):
+def build_qemu_command(*, qemu, kernel, memory="128M"):
     return [
         qemu,
         "-machine",
@@ -406,7 +513,7 @@ def build_qemu_command(*, qemu, kernel):
         "-smp",
         "1",
         "-m",
-        "128M",
+        memory,
         "-display",
         "none",
         "-monitor",
@@ -514,6 +621,17 @@ def parse_arguments(argv):
     )
     parser.add_argument("--kernel", required=True, type=Path)
     parser.add_argument(
+        "--memory",
+        action="append",
+        default=[],
+        help="QEMU guest RAM size; may be repeated for one ELF",
+    )
+    parser.add_argument(
+        "--expected-frame-allocator-managed-delta",
+        type=lambda value: int(value, 0),
+        help="Required managed-frame growth across exactly two memory sizes",
+    )
+    parser.add_argument(
         "--marker",
         action="append",
         required=True,
@@ -562,6 +680,16 @@ def parse_arguments(argv):
         help="Require the ordered timer interrupt test record",
     )
     parser.add_argument(
+        "--require-frame-allocator-ready",
+        action="store_true",
+        help="Require a nonempty frame allocator ready record",
+    )
+    parser.add_argument(
+        "--require-frame-allocator-test-report",
+        action="store_true",
+        help="Require the ordered frame allocator test record",
+    )
+    parser.add_argument(
         "--require-trap-context",
         action="store_true",
         help="Require one trap context immediately after the panic core",
@@ -577,6 +705,22 @@ def parse_arguments(argv):
         parser.error("--timeout must be greater than zero")
     if any(not marker for marker in arguments.marker):
         parser.error("--marker values must not be empty")
+    if not arguments.memory:
+        arguments.memory = ["128M"]
+    if any(not memory for memory in arguments.memory):
+        parser.error("--memory must not be empty")
+    if (
+        arguments.expected_frame_allocator_managed_delta is not None
+        and (
+            len(arguments.memory) != 2
+            or not arguments.require_frame_allocator_ready
+                and not arguments.require_frame_allocator_test_report
+        )
+    ):
+        parser.error(
+            "--expected-frame-allocator-managed-delta requires "
+            "two --memory values and a frame allocator report"
+        )
     for pattern in arguments.pattern:
         try:
             re.compile(pattern)
@@ -609,46 +753,103 @@ def main(argv=None):
             print(str(error), file=sys.stderr)
             return 2
 
-    command = build_qemu_command(
-        qemu=arguments.qemu,
-        kernel=str(arguments.kernel.resolve()),
-    )
-    try:
-        result = run_qemu(command, arguments.timeout)
-    except FileNotFoundError:
-        print(f"QEMU executable not found: {arguments.qemu}", file=sys.stderr)
-        return 2
-
-    outcome = classify_smoke(
-        output=result.output,
-        return_code=result.return_code,
-        timed_out=result.timed_out,
-        markers=arguments.marker,
-        require_fdt_events=arguments.require_fdt_events,
-        require_fdt_reservations=arguments.require_fdt_reservations,
-    )
     expected_outcome = SmokeOutcome(arguments.expect)
-    accepted = matches_expected_result(
-        result=result,
-        observed_outcome=outcome,
-        expected_outcome=expected_outcome,
-        markers=arguments.marker,
-        patterns=arguments.pattern,
-        require_fdt_events=arguments.require_fdt_events,
-        require_fdt_reservations=arguments.require_fdt_reservations,
-        require_panic_report=arguments.require_panic_report,
-        require_trap_ready=arguments.require_trap_ready,
-        require_trap_test_report=arguments.require_trap_test_report,
-        require_timer_test_report=arguments.require_timer_test_report,
-        require_trap_context=arguments.require_trap_context,
-        expected_trap_context_sepc=expected_trap_context_sepc,
-    )
+    successful_runs = []
+    for memory in arguments.memory:
+        command = build_qemu_command(
+            qemu=arguments.qemu,
+            kernel=str(arguments.kernel.resolve()),
+            memory=memory,
+        )
+        try:
+            result = run_qemu(command, arguments.timeout)
+        except FileNotFoundError:
+            print(
+                f"QEMU executable not found: {arguments.qemu}",
+                file=sys.stderr,
+            )
+            return 2
+
+        outcome = classify_smoke(
+            output=result.output,
+            return_code=result.return_code,
+            timed_out=result.timed_out,
+            markers=arguments.marker,
+            require_fdt_events=arguments.require_fdt_events,
+            require_fdt_reservations=arguments.require_fdt_reservations,
+        )
+        accepted = matches_expected_result(
+            result=result,
+            observed_outcome=outcome,
+            expected_outcome=expected_outcome,
+            markers=arguments.marker,
+            patterns=arguments.pattern,
+            require_fdt_events=arguments.require_fdt_events,
+            require_fdt_reservations=arguments.require_fdt_reservations,
+            require_panic_report=arguments.require_panic_report,
+            require_trap_ready=arguments.require_trap_ready,
+            require_trap_test_report=arguments.require_trap_test_report,
+            require_timer_test_report=arguments.require_timer_test_report,
+            require_frame_allocator_ready=(
+                arguments.require_frame_allocator_ready
+            ),
+            require_frame_allocator_test_report=(
+                arguments.require_frame_allocator_test_report
+            ),
+            require_trap_context=arguments.require_trap_context,
+            expected_trap_context_sepc=expected_trap_context_sepc,
+        )
+        if not accepted:
+            return print_tap_result(
+                outcome,
+                result,
+                command,
+                expected_outcome=expected_outcome,
+                accepted=False,
+            )
+        successful_runs.append((memory, result, outcome, command))
+
+    if arguments.expected_frame_allocator_managed_delta is not None:
+        outputs = [run[1].output for run in successful_runs]
+        if not has_expected_frame_allocator_growth(
+            outputs,
+            arguments.expected_frame_allocator_managed_delta,
+        ):
+            print("TAP version 13")
+            print(
+                "not ok 1 - frame allocator managed-frame growth "
+                "did not match"
+            )
+            print(
+                "# expected managed-frame delta: "
+                f"0x{arguments.expected_frame_allocator_managed_delta:016x}"
+            )
+            for memory, result, _, _ in successful_runs:
+                counts = parse_frame_allocator_ready_counts(result.output)
+                print(f"# memory {memory}: counts={counts}")
+            return 3
+
+    if len(successful_runs) > 1:
+        print("TAP version 13")
+        print(
+            "ok 1 - QEMU smoke test observed expected "
+            f"{expected_outcome.value} for every memory size"
+        )
+        for memory, result, outcome, _ in successful_runs:
+            counts = parse_frame_allocator_ready_counts(result.output)
+            print(
+                f"# memory {memory}: outcome={outcome.value} "
+                f"frame-counts={counts}"
+            )
+        return 0
+
+    _, result, outcome, command = successful_runs[0]
     return print_tap_result(
         outcome,
         result,
         command,
         expected_outcome=expected_outcome,
-        accepted=accepted,
+        accepted=True,
     )
 
 

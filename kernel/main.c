@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/platform.h"
+#include "micros/bootstrap_memory.h"
 #include "micros/fdt.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
@@ -51,6 +52,7 @@ static void stop_after_reset_failure(void)
 
 void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 {
+    const struct micros_frame_allocator *frame_allocator;
     struct micros_fdt_memory_map memory_map;
     enum micros_fdt_error error;
     size_t index;
@@ -104,6 +106,23 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     uart_write("MICROS_FDT_READY\n");
     uart_flush();
 
+    if (
+        micros_bootstrap_memory_initialize(&memory_map)
+        != MICROS_FRAME_ALLOCATOR_OK
+    ) {
+        MICROS_PANIC(hart_id, "frame-allocator-init");
+    }
+    frame_allocator = micros_bootstrap_frame_allocator();
+    if (frame_allocator == NULL) {
+        MICROS_PANIC(hart_id, "frame-allocator-state");
+    }
+    uart_write("MICROS_FRAME_ALLOCATOR_READY managed=");
+    uart_write_hex64(frame_allocator->managed_frame_count);
+    uart_write(" free=");
+    uart_write_hex64(frame_allocator->free_frame_count);
+    uart_write("\n");
+    uart_flush();
+
 #ifdef MICROS_BUILD_PANIC_TEST
     MICROS_PANIC(hart_id, "intentional-test");
 #endif
@@ -137,6 +156,18 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     uart_write(" interval=");
     uart_write_hex64(UINT64_C(0x00000000000186a0));
     uart_write("\n");
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_FRAME_ALLOCATOR_TEST
+    if (!micros_bootstrap_memory_run_self_test(&memory_map)) {
+        MICROS_PANIC(hart_id, "frame-allocator-test");
+    }
+    uart_write(
+        "MICROS_FRAME_ALLOCATOR_TEST_PASS "
+        "allocations=0x0000000000000004 "
+        "reuse=lowest invariants=preserved\n"
+    );
     uart_flush();
 #endif
 

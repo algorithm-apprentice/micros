@@ -52,6 +52,7 @@ enum micros_frame_allocator_error {
     MICROS_FRAME_ALLOCATOR_ERROR_UNALIGNED,
     MICROS_FRAME_ALLOCATOR_ERROR_UNMANAGED,
     MICROS_FRAME_ALLOCATOR_ERROR_NOT_ALLOCATED,
+    MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT,
 };
 
 enum micros_frame_allocator_error micros_frame_allocator_initialize(

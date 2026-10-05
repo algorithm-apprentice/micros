@@ -54,6 +54,15 @@
       }
     },
     {
+      "name": "riscv64-frame-allocator-test",
+      "displayName": "RISC-V 64 frame allocator test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-frame-allocator-test",
+      "cacheVariables": {
+        "MICROS_BUILD_FRAME_ALLOCATOR_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-trap-panic-test",
       "displayName": "RISC-V 64 unexpected trap panic test",
       "inherits": "riscv64-debug",
@@ -101,6 +110,13 @@
       "configurePreset": "riscv64-timer-test",
       "targets": [
         "test-qemu-timer"
+      ]
+    },
+    {
+      "name": "test-qemu-frame-allocator",
+      "configurePreset": "riscv64-frame-allocator-test",
+      "targets": [
+        "test-qemu-frame-allocator"
       ]
     },
     {
@@ -193,6 +209,20 @@
         {
           "type": "build",
           "name": "test-qemu-timer"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-frame-allocator",
+      "displayName": "Build and run the frame allocator test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-frame-allocator-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-frame-allocator"
         }
       ]
     },

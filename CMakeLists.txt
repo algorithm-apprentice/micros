@@ -7,6 +7,11 @@ option(MICROS_BUILD_PANIC_TEST "Build the intentional panic image" OFF)
 option(MICROS_BUILD_TRAP_TEST "Build the trap recovery test image" OFF)
 option(MICROS_BUILD_TIMER_TEST "Build the timer interrupt test image" OFF)
 option(
+    MICROS_BUILD_FRAME_ALLOCATOR_TEST
+    "Build the bootstrap frame allocator test image"
+    OFF
+)
+option(
     MICROS_BUILD_TRAP_PANIC_TEST
     "Build the unexpected-trap panic test image"
     OFF
@@ -16,10 +21,17 @@ option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 if(
     (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_TEST)
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TIMER_TEST)
+    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TIMER_TEST)
+    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (
+        MICROS_BUILD_FRAME_ALLOCATOR_TEST
+        AND MICROS_BUILD_TRAP_PANIC_TEST
+    )
 )
     message(FATAL_ERROR "Select at most one target test image")
 endif()
@@ -146,7 +158,9 @@ add_executable(
     arch/riscv64/sbi.c
     arch/riscv64/trap.S
     arch/riscv64/uart.c
+    kernel/bootstrap_memory.c
     kernel/fdt.c
+    kernel/frame_allocator.c
     kernel/main.c
     kernel/panic.c
     kernel/timer.c
@@ -185,6 +199,14 @@ endif()
 
 if(MICROS_BUILD_TIMER_TEST)
     target_compile_definitions(micros PRIVATE MICROS_BUILD_TIMER_TEST=1)
+endif()
+
+if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_FRAME_ALLOCATOR_TEST=1
+    )
 endif()
 
 if(MICROS_BUILD_TRAP_PANIC_TEST)
@@ -252,6 +274,7 @@ add_custom_target(
         --require-fdt-events
         --require-fdt-reservations
         --require-trap-ready
+        --require-frame-allocator-ready
         --timeout
         8
     DEPENDS micros
@@ -294,6 +317,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-fdt-reservations
             --require-panic-report
             --require-trap-ready
+            --require-frame-allocator-ready
             --timeout
             8
         DEPENDS micros
@@ -324,6 +348,7 @@ if(MICROS_BUILD_TRAP_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-test-report
+            --require-frame-allocator-ready
             --timeout
             8
         DEPENDS micros
@@ -355,6 +380,44 @@ if(MICROS_BUILD_TIMER_TEST)
             --require-fdt-reservations
             --require-trap-ready
             --require-timer-test-report
+            --require-frame-allocator-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
+    add_custom_target(
+        test-qemu-frame-allocator
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --memory
+            "128M"
+            --memory
+            "256M"
+            --expected-frame-allocator-managed-delta
+            "0x8000"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest invariants=preserved"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-test-report
             --timeout
             8
         DEPENDS micros
@@ -398,6 +461,7 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-fdt-reservations
             --require-panic-report
             --require-trap-ready
+            --require-frame-allocator-ready
             --require-trap-context
             --nm
             "${CMAKE_NM}"
