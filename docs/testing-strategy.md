@@ -68,9 +68,9 @@ Initial performance budgets are:
 Budgets are review signals, not reasons to hide necessary coverage.
 
 The implemented fast targets are `test-unit`, `test-qemu-smoke`,
-`test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`, and
-`test-qemu-trap-panic`. From a clean checkout, their configure, build, and
-execution gates are:
+`test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
+`test-qemu-frame-allocator`, and `test-qemu-trap-panic`. From a clean checkout,
+their configure, build, and execution gates are:
 
 ```bash
 cmake --workflow --preset test-unit
@@ -78,15 +78,17 @@ cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
+cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 ```
 
-`test-unit` currently runs the FDT parser corpus under ASan and UBSan plus the
-Python host tests. `test-qemu-smoke` verifies the real OpenSBI handoff, FDT
-memory discovery, exact serial markers, agreement between decoded range counts
-and emitted range events, a nonempty firmware reservation result, and clean SBI
-shutdown. The remaining stable targets are added when their dependency-DAG
-layers become implementation-ready.
+`test-unit` currently runs the FDT parser corpus and portable frame allocator
+tests under ASan and UBSan plus the Python host tests. `test-qemu-smoke`
+verifies the real OpenSBI handoff, FDT memory discovery, exact serial markers,
+agreement between decoded range counts and emitted range events, a nonempty
+firmware reservation result, allocator readiness, and clean SBI shutdown. The
+remaining stable targets are added when their dependency-DAG layers become
+implementation-ready.
 
 `test-qemu-panic` builds an isolated test image and verifies ordered source,
 hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
@@ -98,6 +100,9 @@ distinct x1-x31 register patterns, two stacks, an observable status change, and
 an exact expected illegal-instruction label. `test-qemu-timer` verifies three
 accepted supervisor timer expirations, two successful rearms, final disarm,
 and the SIE-clear wait handshake.
+`test-qemu-frame-allocator` verifies production FDT/linker reservation
+integration, deterministic allocation and release, exact bitmap restoration,
+and runtime memory sizing by booting one ELF at 128 MiB and 256 MiB.
 `test-qemu-trap-panic` verifies that an unarmed exception retains a separately
 captured trap frame and that its `sepc` equals the fault symbol in the built
 ELF.

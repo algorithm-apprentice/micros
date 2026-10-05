@@ -102,10 +102,10 @@ uninitialized data, installs the trap vector, and then begins serial output.
 ### Phase 2: kernel bootstrap
 
 The kernel validates the FDT, reads physical memory and reserved ranges,
-reserves firmware, its own image, the FDT, and bootstrap data, initializes a
-temporary physical allocator, creates kernel page tables, enables the MMU, and
-starts timer interrupts. UART and PLIC device addresses remain fixed platform
-constants in v0.1.
+reserves firmware and every physical address through its linker-defined end,
+reclaims the parsed FDT blob, initializes the bootstrap frame allocator,
+creates kernel page tables, enables the MMU, and starts timer interrupts. UART
+and PLIC device addresses remain fixed platform constants in v0.1.
 
 ### Phase 3: process and IPC substrate
 

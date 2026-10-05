@@ -11,12 +11,14 @@ The current implementation provides:
 - structured panic diagnostics with RISC-V machine-state snapshots;
 - direct-mode supervisor trap entry with a complete integer return context;
 - OpenSBI TIME programming and one-hart supervisor timer interrupt handling;
+- a canonicalized bootstrap physical-frame allocator with a 1 GiB supported
+  metadata bound;
 - native FDT parser tests under ASan and UBSan;
+- native frame allocator invariant and seeded model tests under ASan and UBSan;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Physical-memory allocation, page tables, and user mode remain dependency-
-ordered later tasks.
+Page tables and user mode remain dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -133,7 +135,8 @@ A pass requires all of:
 3. a serial line exactly equal to
    `MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000`;
 4. a serial line exactly equal to `MICROS_FDT_READY`;
-5. QEMU exit status zero after the SBI shutdown request.
+5. exactly one valid `MICROS_FRAME_ALLOCATOR_READY` line after FDT readiness;
+6. QEMU exit status zero after the SBI shutdown request.
 
 The kernel emits every decoded range using stable, fixed-width hexadecimal
 events:
@@ -153,6 +156,21 @@ reservation from either FDT reservation source. An empty reservation result or
 an omitted emitted record therefore cannot produce a pass. A parse error emits
 `MICROS_TEST_FAILURE fdt-<error-category>`, flushes the UART, and requests SBI
 shutdown with the system-failure reason.
+
+After parsing, the raw FDT blob is no longer used and its frames are
+reclaimable. The kernel canonicalizes the complete memory union, both FDT
+reservation sources, and `[0, __kernel_end)`. It then emits exactly one
+newline-terminated record after FDT readiness:
+
+```text
+MICROS_FRAME_ALLOCATOR_READY managed=0x... free=0x...
+```
+
+Both values are 16-digit lowercase hexadecimal. Every QEMU gate requires one
+record with equal, nonzero counts. Initialization independently verifies that
+every managed segment is covered by the FDT memory union and intersects
+neither a firmware reservation nor any physical address through the
+linker-defined kernel end.
 
 The harness emits TAP plus a stable outcome field:
 
@@ -177,8 +195,8 @@ cmake --workflow --preset test-qemu-panic
 ```
 
 This uses `build/riscv64-panic-test`, leaving the normal debug image unchanged.
-The test-only image completes FDT discovery and then invokes
-`MICROS_PANIC(hart_id, "intentional-test")`.
+The test-only image completes FDT discovery and allocator initialization, then
+invokes `MICROS_PANIC(hart_id, "intentional-test")`.
 
 Panic atomically disables supervisor interrupts, destructively puts the QEMU
 16550 into a known polled transmit state, and emits exactly five ordered core
@@ -229,8 +247,9 @@ Only a complete round trip emits:
 MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved
 ```
 
-The host gate requires exactly one trap-ready record, then FDT readiness, then
-exactly one pass record. Missing, duplicated, early, or malformed records fail.
+The host gate requires exactly one trap-ready record, then FDT readiness and
+allocator readiness, then exactly one pass record. Missing, duplicated, early,
+or malformed records fail.
 
 ## Supervisor timer interrupt test
 
@@ -259,11 +278,41 @@ Only that complete sequence emits:
 MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0
 ```
 
-The host gate requires normal boot, complete FDT evidence, exactly one
-newline-terminated pass record after `MICROS_FDT_READY`, clean SBI shutdown,
-and no panic, explicit failure, or timeout. Missing, duplicated, early, or
-malformed tick and interval fields fail. The interval is expressed only in
-platform counter ticks; it is not a wall-clock ABI.
+The host gate requires normal boot, complete FDT evidence, allocator readiness,
+exactly one newline-terminated pass record after allocator initialization,
+clean SBI shutdown, and no panic, explicit failure, or timeout. Missing,
+duplicated, early, or malformed tick and interval fields fail. The interval is
+expressed only in platform counter ticks; it is not a wall-clock ABI.
+
+## Bootstrap frame allocator test
+
+Build and run the physical-frame allocator test with:
+
+```bash
+cmake --workflow --preset test-qemu-frame-allocator
+```
+
+The portable allocator aligns memory inward, aligns reservations outward,
+sorts and merges both unions, subtracts reserved frames, and maps the remaining
+segments into a fixed allocation bitmap. It returns the lowest physical frame,
+rejects unmanaged and non-allocated releases, and preserves state on every
+failed operation. The supported metadata ceiling is 262144 frames, or 1 GiB,
+independent from the default launch size.
+
+The native suite covers range normalization, overflow and capacity boundaries,
+exhaustion, invalid release, and a replayable 2,000-step reference-model trace.
+The target image independently rechecks every real managed segment against the
+FDT and linker inputs, allocates four increasing frames, releases them in
+non-LIFO order, verifies exact count restoration, and proves lowest-frame
+reuse. Only then does it emit:
+
+```text
+MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest invariants=preserved
+```
+
+The QEMU workflow boots the same ELF with 128 MiB and 256 MiB. Both runs must
+pass, and the larger guest must expose exactly `0x8000` additional managed
+frames. This rejects a kernel that silently compiles in the default RAM size.
 
 ## Unexpected trap panic test
 
