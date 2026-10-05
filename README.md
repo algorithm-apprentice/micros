@@ -40,13 +40,17 @@ accepted yet.
 - [MINIX dependency analysis](docs/research/minix-dependency-analysis.md)
 - [Roadmap](docs/roadmap.md)
 - [Testing strategy](docs/testing-strategy.md)
+- [AI-native development workflow](docs/development/ai-native-workflow.md)
 - [Architecture decision records](docs/adr/README.md)
+- [Contributing guide](CONTRIBUTING.md)
 
 ## Development workflow
 
 Architecture decisions begin as **Proposed** ADRs. They must be reviewed before
 being marked **Accepted** or used as the basis for an implementation commit.
 Development proceeds through one pull request at a time, in dependency order.
+Humans and AI agents follow the same documentation-first, test-first,
+independently reviewed workflow.
 
 MINIX source is used as an architectural reference. `micros` is an independent
 implementation: source is not copied from MINIX or NetBSD without an explicit

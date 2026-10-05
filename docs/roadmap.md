@@ -5,6 +5,8 @@
 Development proceeds through sequential pull requests. A later milestone does
 not begin until the previous pull request has been reviewed and accepted.
 Architecture or scope changes are recorded in ADRs before implementation.
+Implementation follows the repository's documentation-first, test-first,
+independently reviewed AI-native workflow.
 
 ## v0.1 completion goal
 

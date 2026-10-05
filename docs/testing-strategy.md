@@ -16,6 +16,25 @@ No test suite can prove that a general-purpose kernel is free of defects. The
 Formal models may later be used for small critical protocols. Full-system
 formal verification is outside the MVP.
 
+## Test-first development protocol
+
+Behavior changes use Red-Green-Refactor at the layer that can measure the real
+requirement:
+
+1. write a failing native, QEMU, integration, or end-to-end test;
+2. confirm that it fails for the expected missing behavior rather than a broken
+   harness;
+3. implement the smallest production change that makes it pass;
+4. refactor while the relevant suite remains green;
+5. retain the test as regression coverage.
+
+Privileged and hardware behavior is not forced into a host unit test. Its Red
+step is a failing QEMU component or acceptance test. Documentation-only changes
+do not require an invented runtime test. Exploratory spikes are not merged.
+
+The full task and review loop is defined in
+[the AI-native development workflow](development/ai-native-workflow.md).
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

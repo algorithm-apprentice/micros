@@ -22,6 +22,13 @@ This directory contains the design baseline for `micros`.
 - [Testing strategy](testing-strategy.md) defines the host, QEMU, integration,
   stress, and observability layers.
 
+## Development
+
+- [AI-native development workflow](development/ai-native-workflow.md) defines
+  the shared human/agent task, TDD, review, and merge contract.
+- [Contributing guide](../CONTRIBUTING.md) is the contributor entry point.
+- [Agent contract](../AGENTS.md) is the tool-neutral AI agent entry point.
+
 ## Decisions
 
 - [ADR index](adr/README.md) lists all architecture decisions and their current
