@@ -1,17 +1,19 @@
-# Building and Running the Boot Smoke Test
+# Building and Testing the Boot Foundation
 
 ## Scope
 
-The current implementation is the first Milestone 1 slice. It provides:
+The current implementation provides:
 
 - a freestanding RV64 ELF linked at `0x80200000`;
 - an OpenSBI supervisor-mode entry with a 16 KiB boot stack and cleared BSS;
 - polled output through the QEMU `virt` UART at `0x10000000`;
+- bounded parsing of the OpenSBI-provided FDT memory map;
+- native FDT parser tests under ASan and UBSan;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-FDT parsing, panic diagnostics, traps, timer interrupts, physical-memory
-allocation, page tables, and user mode remain dependency-ordered later tasks.
+Panic diagnostics, traps, timer interrupts, physical-memory allocation, page
+tables, and user mode remain dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -76,6 +78,31 @@ The ELF uses the `rv64imac_zicsr_zifencei` and `lp64` baseline, contains no
 host startup objects or libc, and preserves the OpenSBI boot arguments in `a0`
 and `a1` until `kernel_main`.
 
+## Native unit tests
+
+Configure, build, and run the native suite with:
+
+```bash
+cmake --workflow --preset test-unit
+```
+
+The host graph is separate from the freestanding target graph. It compiles the
+same FDT parser implementation with warnings as errors, ASan, and UBSan, then
+runs its malformed-input corpus and the Python harness tests.
+
+The parser has fixed resource bounds:
+
+- FDT blob size: 1 MiB;
+- node depth: 32;
+- physical-memory ranges: 16;
+- reservation-map ranges: 32;
+- static `/reserved-memory` ranges: 32.
+
+It accepts one- or two-cell addresses and sizes, all `reg` tuples from matching
+root memory nodes, the reservation map, and static `/reserved-memory` children.
+Dynamic reserved-memory allocation requests are rejected explicitly until a
+physical allocator exists.
+
 ## QEMU smoke test
 
 Build and run the acceptance test with:
@@ -94,10 +121,28 @@ The harness launches one RV64 hart with 128 MiB of RAM on
 `virt,aia=none`, disables the monitor and network, uses serial standard I/O,
 and boots through QEMU's default OpenSBI firmware.
 
-A pass requires both:
+A pass requires all of:
 
 1. a serial line exactly equal to `MICROS_BOOT 0.1.0`;
-2. QEMU exit status zero after the SBI shutdown request.
+2. a serial line exactly equal to
+   `MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000`;
+3. a serial line exactly equal to `MICROS_FDT_READY`;
+4. QEMU exit status zero after the SBI shutdown request.
+
+The kernel emits every decoded range using stable, fixed-width hexadecimal
+events:
+
+```text
+MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000
+MICROS_FDT_RESERVATION base=0x... size=0x...
+MICROS_FDT_RESERVED_MEMORY base=0x... size=0x...
+MICROS_FDT_READY
+```
+
+The reservation event kinds are emitted only when the corresponding FDT source
+contains ranges. A parse error emits
+`MICROS_TEST_FAILURE fdt-<error-category>`, flushes the UART, and requests SBI
+shutdown with the system-failure reason.
 
 The harness emits TAP plus a stable outcome field:
 
