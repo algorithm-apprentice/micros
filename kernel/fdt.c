@@ -757,12 +757,6 @@ static enum micros_fdt_error parse_structure(
             if (error != MICROS_FDT_OK) {
                 return error;
             }
-            while (value_end < aligned_end) {
-                if (view->blob[value_end] != 0) {
-                    return MICROS_FDT_ERROR_STRUCTURE;
-                }
-                ++value_end;
-            }
             cursor = aligned_end;
         } else if (token == FDT_NOP) {
             continue;

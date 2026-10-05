@@ -45,6 +45,7 @@ struct fdt_fixture {
     size_t size;
     size_t root_address_cells_value;
     size_t root_size_cells_value;
+    size_t memory_device_type_padding;
     size_t memory_reg_length;
     size_t memory_reg_name;
     size_t memory_reg_value;
@@ -198,6 +199,7 @@ static void build_fixture(
     struct structure_builder builder = {0};
     struct property_location root_address;
     struct property_location root_size;
+    struct property_location memory_device_type = {0};
     struct property_location memory_reg = {0};
     struct property_location reserved_address = {0};
     struct property_location reserved_size = {0};
@@ -266,7 +268,7 @@ static void build_fixture(
             UINT64_C(0x01000000)
         );
         begin_node(&builder, "ram-bank@100000000");
-        (void)append_property(
+        memory_device_type = append_property(
             &builder,
             PROPERTY_DEVICE_TYPE_OFFSET,
             "memory",
@@ -388,6 +390,10 @@ static void build_fixture(
         structure_offset + root_address.value;
     fixture->root_size_cells_value = structure_offset + root_size.value;
     if (options.include_memory) {
+        fixture->memory_device_type_padding =
+            structure_offset
+            + memory_device_type.value
+            + sizeof("memory");
         fixture->memory_reg_length =
             structure_offset + memory_reg.length;
         fixture->memory_reg_name = structure_offset + memory_reg.name;
@@ -497,6 +503,25 @@ static bool test_rejects_null_arguments(void)
             NULL
         )
     );
+    return true;
+}
+
+static bool test_accepts_nonzero_property_padding(void)
+{
+    struct fdt_fixture fixture;
+    struct micros_fdt_memory_map memory_map;
+
+    build_fixture(&fixture, default_options());
+    fixture.bytes[fixture.memory_device_type_padding] = 0xa5;
+    EXPECT_ERROR(
+        MICROS_FDT_OK,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    EXPECT_TRUE(memory_map.memory_range_count == 3);
     return true;
 }
 
@@ -835,6 +860,7 @@ int main(void)
     static const struct test_case tests[] = {
         {"parses memory and reservations", test_parses_memory_and_reservations},
         {"rejects null arguments", test_rejects_null_arguments},
+        {"accepts nonzero property padding", test_accepts_nonzero_property_padding},
         {"rejects truncated header", test_rejects_truncated_header},
         {"rejects bad magic", test_rejects_bad_magic},
         {"rejects incompatible version", test_rejects_incompatible_version},

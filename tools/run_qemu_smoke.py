@@ -30,7 +30,7 @@ class QemuResult:
     timed_out: bool
 
 
-def classify_smoke(*, output, return_code, timed_out, marker):
+def classify_smoke(*, output, return_code, timed_out, markers):
     if PANIC_MARKER in output:
         return SmokeOutcome.PANIC
     if FAILURE_MARKER in output or any(
@@ -39,7 +39,8 @@ def classify_smoke(*, output, return_code, timed_out, marker):
         return SmokeOutcome.FAILURE
     if timed_out:
         return SmokeOutcome.TIMEOUT
-    if return_code == 0 and marker in output.splitlines():
+    output_lines = output.splitlines()
+    if return_code == 0 and all(marker in output_lines for marker in markers):
         return SmokeOutcome.PASS
     return SmokeOutcome.UNEXPECTED_EXIT
 
@@ -139,14 +140,19 @@ def parse_arguments(argv):
         help="QEMU RISC-V system executable",
     )
     parser.add_argument("--kernel", required=True, type=Path)
-    parser.add_argument("--marker", required=True)
+    parser.add_argument(
+        "--marker",
+        action="append",
+        required=True,
+        help="Exact serial line required for success; may be repeated",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
     if arguments.timeout <= 0:
         parser.error("--timeout must be greater than zero")
-    if not arguments.marker:
-        parser.error("--marker must not be empty")
+    if any(not marker for marker in arguments.marker):
+        parser.error("--marker values must not be empty")
     if not arguments.kernel.is_file():
         parser.error(f"kernel image does not exist: {arguments.kernel}")
     return arguments
@@ -168,7 +174,7 @@ def main(argv=None):
         output=result.output,
         return_code=result.return_code,
         timed_out=result.timed_out,
-        marker=arguments.marker,
+        markers=arguments.marker,
     )
     return print_tap_result(outcome, result, command)
 

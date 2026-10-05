@@ -11,7 +11,7 @@ class SmokeClassificationTest(unittest.TestCase):
             output="OpenSBI\nMICROS_BOOT 0.1.0\n",
             return_code=0,
             timed_out=False,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.PASS, outcome)
@@ -21,7 +21,7 @@ class SmokeClassificationTest(unittest.TestCase):
             output="MICROS_TEST_FAILURE boot invariant\n",
             return_code=None,
             timed_out=True,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.FAILURE, outcome)
@@ -31,7 +31,7 @@ class SmokeClassificationTest(unittest.TestCase):
             output="MICROS_PANIC hart=0\n",
             return_code=None,
             timed_out=True,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.PANIC, outcome)
@@ -41,7 +41,7 @@ class SmokeClassificationTest(unittest.TestCase):
             output="OpenSBI only\n",
             return_code=0,
             timed_out=False,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
@@ -51,7 +51,7 @@ class SmokeClassificationTest(unittest.TestCase):
             output="prefix MICROS_BOOT 0.1.0 suffix\n",
             return_code=0,
             timed_out=False,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
@@ -61,10 +61,23 @@ class SmokeClassificationTest(unittest.TestCase):
             output="MICROS_BOOT 0.1.0\n",
             return_code=None,
             timed_out=True,
-            marker="MICROS_BOOT 0.1.0",
+            markers=("MICROS_BOOT 0.1.0",),
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.TIMEOUT, outcome)
+
+    def test_requires_every_expected_marker(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output="MICROS_BOOT 0.1.0\n",
+            return_code=0,
+            timed_out=False,
+            markers=(
+                "MICROS_BOOT 0.1.0",
+                "MICROS_FDT_READY",
+            ),
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
 
 
 class QemuCommandTest(unittest.TestCase):

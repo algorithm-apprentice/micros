@@ -29,6 +29,19 @@ void uart_write(const char *text)
     }
 }
 
+void uart_write_hex64(uint64_t value)
+{
+    static const char digits[] = "0123456789abcdef";
+    int shift;
+
+    uart_write("0x");
+    for (shift = 60; shift >= 0; shift -= 4) {
+        uint8_t digit = (uint8_t)((value >> (unsigned int)shift) & 0xfU);
+
+        uart_write_character(digits[digit]);
+    }
+}
+
 void uart_flush(void)
 {
     while ((uart0[UART_LSR] & UART_LSR_TRANSMITTER_EMPTY) == 0) {

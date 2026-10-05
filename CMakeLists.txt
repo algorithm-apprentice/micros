@@ -92,6 +92,7 @@ add_executable(
     arch/riscv64/boot.S
     arch/riscv64/sbi.c
     arch/riscv64/uart.c
+    kernel/fdt.c
     kernel/main.c
 )
 
@@ -104,7 +105,12 @@ set_target_properties(
         LINK_DEPENDS "${MICROS_LINKER_SCRIPT}"
 )
 
-target_include_directories(micros PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(
+    micros
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
 
 target_compile_definitions(
     micros
@@ -156,6 +162,10 @@ add_custom_target(
         "$<TARGET_FILE:micros>"
         --marker
         "MICROS_BOOT ${PROJECT_VERSION}"
+        --marker
+        "MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000"
+        --marker
+        "MICROS_FDT_READY"
         --timeout
         8
     DEPENDS micros
