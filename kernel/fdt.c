@@ -10,6 +10,7 @@ enum {
     FDT_PROP = 3,
     FDT_NOP = 4,
     FDT_END = 9,
+    FDT_MAX_PROPERTY_NAME_LENGTH = 31,
 };
 
 #define FDT_MAGIC UINT32_C(0xd00dfeed)
@@ -276,21 +277,28 @@ static enum micros_fdt_error read_property_name(
 )
 {
     const uint8_t *strings;
-    size_t cursor;
+    size_t available;
+    size_t length;
 
     if (name_offset >= view->strings_size) {
         return MICROS_FDT_ERROR_STRING;
     }
     strings = view->blob + view->strings_offset;
-    cursor = name_offset;
-    while (cursor < view->strings_size && strings[cursor] != 0) {
-        ++cursor;
+    available = view->strings_size - name_offset;
+    for (
+        length = 0;
+        length < available && length <= FDT_MAX_PROPERTY_NAME_LENGTH;
+        ++length
+    ) {
+        if (strings[name_offset + length] == 0) {
+            if (length == 0) {
+                return MICROS_FDT_ERROR_STRING;
+            }
+            *name = (const char *)(strings + name_offset);
+            return MICROS_FDT_OK;
+        }
     }
-    if (cursor == view->strings_size) {
-        return MICROS_FDT_ERROR_STRING;
-    }
-    *name = (const char *)(strings + name_offset);
-    return MICROS_FDT_OK;
+    return MICROS_FDT_ERROR_STRING;
 }
 
 static enum micros_fdt_error read_cells(

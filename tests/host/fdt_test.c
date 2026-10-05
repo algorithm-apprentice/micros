@@ -45,6 +45,7 @@ struct fdt_fixture {
     size_t size;
     size_t root_address_cells_value;
     size_t root_size_cells_value;
+    size_t strings_offset;
     size_t memory_device_type_padding;
     size_t memory_reg_length;
     size_t memory_reg_name;
@@ -384,6 +385,7 @@ static void build_fixture(
     );
 
     fixture->size = total_size;
+    fixture->strings_offset = strings_offset;
     fixture->first_token = structure_offset;
     fixture->final_token += structure_offset;
     fixture->root_address_cells_value =
@@ -675,6 +677,24 @@ static bool test_rejects_bad_property_name_offset(void)
     return true;
 }
 
+static bool test_rejects_oversized_property_name(void)
+{
+    struct fdt_fixture fixture;
+    struct micros_fdt_memory_map memory_map;
+
+    build_fixture(&fixture, default_options());
+    memset(&fixture.bytes[fixture.strings_offset], 'a', 32);
+    EXPECT_ERROR(
+        MICROS_FDT_ERROR_STRING,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    return true;
+}
+
 static bool test_rejects_unsupported_root_cells(void)
 {
     struct fdt_fixture fixture;
@@ -869,6 +889,7 @@ int main(void)
         {"rejects unterminated reservation map", test_rejects_unterminated_reservation_map},
         {"rejects unknown structure token", test_rejects_unknown_structure_token},
         {"rejects bad property name offset", test_rejects_bad_property_name_offset},
+        {"rejects oversized property name", test_rejects_oversized_property_name},
         {"rejects unsupported root cells", test_rejects_unsupported_root_cells},
         {"rejects partial reg tuple", test_rejects_partial_reg_tuple},
         {"rejects range overflow", test_rejects_range_overflow},

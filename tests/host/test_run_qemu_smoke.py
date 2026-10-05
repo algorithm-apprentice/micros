@@ -79,6 +79,98 @@ class SmokeClassificationTest(unittest.TestCase):
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
 
+    def test_accepts_complete_fdt_event_stream(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output=(
+                "MICROS_BOOT 0.1.0\n"
+                "MICROS_FDT_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_RESERVED_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_RESERVED_MEMORY "
+                "base=0x0000000000000001 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_COUNTS "
+                "memory=0x0000000000000001 "
+                "reservation=0x0000000000000000 "
+                "reserved-memory=0x0000000000000002\n"
+                "MICROS_FDT_READY\n"
+            ),
+            return_code=0,
+            timed_out=False,
+            markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
+            require_fdt_events=True,
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.PASS, outcome)
+
+    def test_rejects_incomplete_fdt_event_stream(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output=(
+                "MICROS_BOOT 0.1.0\n"
+                "MICROS_FDT_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_RESERVED_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_COUNTS "
+                "memory=0x0000000000000001 "
+                "reservation=0x0000000000000000 "
+                "reserved-memory=0x0000000000000002\n"
+                "MICROS_FDT_READY\n"
+            ),
+            return_code=0,
+            timed_out=False,
+            markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
+            require_fdt_events=True,
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
+
+    def test_rejects_malformed_fdt_range_event(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output=(
+                "MICROS_BOOT 0.1.0\n"
+                "MICROS_FDT_MEMORY base=0x0 size=0x1\n"
+                "MICROS_FDT_COUNTS "
+                "memory=0x0000000000000001 "
+                "reservation=0x0000000000000000 "
+                "reserved-memory=0x0000000000000000\n"
+                "MICROS_FDT_READY\n"
+            ),
+            return_code=0,
+            timed_out=False,
+            markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
+            require_fdt_events=True,
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
+
+    def test_rejects_malformed_duplicate_fdt_count_summary(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output=(
+                "MICROS_BOOT 0.1.0\n"
+                "MICROS_FDT_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_COUNTS "
+                "memory=0x0000000000000001 "
+                "reservation=0x0000000000000000 "
+                "reserved-memory=0x0000000000000000\n"
+                "MICROS_FDT_COUNTS memory=1\n"
+                "MICROS_FDT_READY\n"
+            ),
+            return_code=0,
+            timed_out=False,
+            markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
+            require_fdt_events=True,
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
+
 
 class QemuCommandTest(unittest.TestCase):
     def test_uses_explicit_single_hart_plic_machine(self):

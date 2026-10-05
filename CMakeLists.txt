@@ -166,6 +166,7 @@ add_custom_target(
         "MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000"
         --marker
         "MICROS_FDT_READY"
+        --require-fdt-events
         --timeout
         8
     DEPENDS micros

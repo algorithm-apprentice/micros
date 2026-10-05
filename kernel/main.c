@@ -22,6 +22,21 @@ static void write_range(
     uart_write("\n");
 }
 
+static void write_fdt_counts(
+    const struct micros_fdt_memory_map *memory_map
+)
+{
+    uart_write("MICROS_FDT_COUNTS memory=");
+    uart_write_hex64((uint64_t)memory_map->memory_range_count);
+    uart_write(" reservation=");
+    uart_write_hex64((uint64_t)memory_map->reservation_range_count);
+    uart_write(" reserved-memory=");
+    uart_write_hex64(
+        (uint64_t)memory_map->reserved_memory_range_count
+    );
+    uart_write("\n");
+}
+
 static void stop_after_reset_failure(void)
 {
     uart_write("MICROS_TEST_FAILURE sbi-system-reset-returned\n");
@@ -81,6 +96,7 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
             &memory_map.reserved_memory_ranges[index]
         );
     }
+    write_fdt_counts(&memory_map);
     uart_write("MICROS_FDT_READY\n");
     uart_flush();
 
