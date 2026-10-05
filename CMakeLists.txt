@@ -16,6 +16,7 @@ option(
     "Build the unexpected-trap panic test image"
     OFF
 )
+option(MICROS_BUILD_MMU_TEST "Build the Sv39 MMU test image" OFF)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 if(
@@ -23,15 +24,23 @@ if(
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TIMER_TEST)
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_MMU_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TIMER_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_MMU_TEST)
     OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
     OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_MMU_TEST)
     OR (
         MICROS_BUILD_FRAME_ALLOCATOR_TEST
         AND MICROS_BUILD_TRAP_PANIC_TEST
     )
+    OR (
+        MICROS_BUILD_FRAME_ALLOCATOR_TEST
+        AND MICROS_BUILD_MMU_TEST
+    )
+    OR (MICROS_BUILD_TRAP_PANIC_TEST AND MICROS_BUILD_MMU_TEST)
 )
     message(FATAL_ERROR "Select at most one target test image")
 endif()
@@ -51,6 +60,11 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         tests/host/frame_allocator_test.c
     )
+    add_executable(
+        sv39_test
+        kernel/sv39.c
+        tests/host/sv39_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -61,8 +75,14 @@ if(MICROS_BUILD_HOST_TESTS)
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
+    target_include_directories(
+        sv39_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
     target_compile_features(fdt_test PRIVATE c_std_17)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
+    target_compile_features(sv39_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -75,6 +95,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         frame_allocator_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        sv39_test
         PRIVATE
             -Wall
             -Wextra
@@ -106,10 +136,18 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            sv39_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(sv39_test PRIVATE -fsanitize=address,undefined)
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
     add_test(NAME frame-allocator COMMAND frame_allocator_test)
+    add_test(NAME sv39-encoding COMMAND sv39_test)
 
     add_custom_target(
         test-unit
@@ -128,7 +166,7 @@ if(MICROS_BUILD_HOST_TESTS)
             tests/host
             -p
             "test_*.py"
-        DEPENDS fdt_test frame_allocator_test
+        DEPENDS fdt_test frame_allocator_test sv39_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -154,15 +192,18 @@ set(MICROS_LINKER_SCRIPT
 add_executable(
     micros
     arch/riscv64/boot.S
+    arch/riscv64/mmu.S
     arch/riscv64/panic.S
     arch/riscv64/sbi.c
     arch/riscv64/trap.S
     arch/riscv64/uart.c
+    kernel/address_space.c
     kernel/bootstrap_memory.c
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/main.c
     kernel/panic.c
+    kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
 )
@@ -173,7 +214,8 @@ set_target_properties(
         OUTPUT_NAME micros
         SUFFIX ".elf"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/kernel"
-        LINK_DEPENDS "${MICROS_LINKER_SCRIPT}"
+        LINK_DEPENDS
+            "${MICROS_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_elf_sections.py"
 )
 
 target_include_directories(
@@ -217,6 +259,16 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
     )
 endif()
 
+if(MICROS_BUILD_MMU_TEST)
+    target_compile_definitions(micros PRIVATE MICROS_BUILD_MMU_TEST=1)
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/mmu_test.S
+            kernel/mmu_test.c
+    )
+endif()
+
 if(MICROS_BUILD_TRAP_TEST OR MICROS_BUILD_TRAP_PANIC_TEST)
     target_sources(micros PRIVATE arch/riscv64/trap_test.S)
 endif()
@@ -253,6 +305,27 @@ target_link_options(
         "-Wl,-Map,${CMAKE_BINARY_DIR}/kernel/micros.map"
 )
 
+if(NOT CMAKE_NM OR NOT CMAKE_READELF)
+    message(FATAL_ERROR "LLVM nm and readelf are required for ELF validation")
+endif()
+
+add_custom_command(
+    TARGET micros
+    POST_BUILD
+    COMMAND
+        "${MICROS_PYTHON}"
+        -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_elf_sections.py"
+        --readelf
+        "${CMAKE_READELF}"
+        --nm
+        "${CMAKE_NM}"
+        --elf
+        "$<TARGET_FILE:micros>"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+)
+
 add_custom_target(
     test-qemu-smoke
     COMMAND
@@ -275,6 +348,7 @@ add_custom_target(
         --require-fdt-reservations
         --require-trap-ready
         --require-frame-allocator-ready
+        --require-mmu-ready
         --timeout
         8
     DEPENDS micros
@@ -318,6 +392,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -349,6 +424,7 @@ if(MICROS_BUILD_TRAP_TEST)
             --require-fdt-reservations
             --require-trap-test-report
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -381,6 +457,7 @@ if(MICROS_BUILD_TIMER_TEST)
             --require-trap-ready
             --require-timer-test-report
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -418,6 +495,7 @@ if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
             --require-fdt-reservations
             --require-trap-ready
             --require-frame-allocator-test-report
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -462,11 +540,45 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
+            --require-mmu-ready
             --require-trap-context
             --nm
             "${CMAKE_NM}"
             --trap-context-sepc-symbol
             "micros_trap_panic_test_fault"
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_MMU_TEST)
+    add_custom_target(
+        test-qemu-mmu
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-mmu-test-report
             --timeout
             8
         DEPENDS micros

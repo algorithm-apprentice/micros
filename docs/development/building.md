@@ -13,12 +13,18 @@ The current implementation provides:
 - OpenSBI TIME programming and one-hart supervisor timer interrupt handling;
 - a canonicalized bootstrap physical-frame allocator with a 1 GiB supported
   metadata bound;
+- an allocator-backed Sv39 kernel address space with page-aligned RX, R, and
+  RW/NX permission ranges;
+- supervisor-only identity mappings for managed RAM and the QEMU UART;
+- mandatory post-link closure checks for every allocatable ELF section;
 - native FDT parser tests under ASan and UBSan;
 - native frame allocator invariant and seeded model tests under ASan and UBSan;
+- native Sv39 encoding and ELF permission-layout tests;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Page tables and user mode remain dependency-ordered later tasks.
+Per-process page-table roots and user mode remain dependency-ordered later
+tasks.
 
 ## Prerequisites
 
@@ -27,7 +33,8 @@ The build requires:
 - CMake 3.25 or newer;
 - Ninja;
 - Python 3.8 or newer;
-- Clang with the `riscv64-unknown-elf` target;
+- Clang with the `riscv64-unknown-elf` target plus `llvm-nm` and
+  `llvm-readelf`;
 - LLD;
 - QEMU 7.0 or newer with `qemu-system-riscv64`, the `virt,aia=none`
   machine option, and default OpenSBI firmware providing SBI TIME and System
@@ -82,7 +89,10 @@ build/riscv64-debug/kernel/micros.map
 
 The ELF uses the `rv64imac_zicsr_zifencei` and `lp64` baseline, contains no
 host startup objects or libc, and preserves the OpenSBI boot arguments in `a0`
-and `a1` until `kernel_main`.
+and `a1` until `kernel_main`. Every target link runs
+`tools/check_elf_sections.py`; the build fails if an allocatable output section
+is unexpected, crosses a permission boundary, lies outside the kernel ranges,
+or has write/execute flags inconsistent with its linker-defined range.
 
 ## Native unit tests
 
@@ -93,8 +103,9 @@ cmake --workflow --preset test-unit
 ```
 
 The host graph is separate from the freestanding target graph. It compiles the
-same FDT parser implementation with warnings as errors, ASan, and UBSan, then
-runs its malformed-input corpus and the Python harness tests.
+same FDT parser, frame allocator, and Sv39 encoding implementations with
+warnings as errors, ASan, and UBSan. It then runs their native tests plus the
+Python QEMU-harness and ELF-layout tests.
 
 The parser has fixed resource bounds:
 
@@ -136,7 +147,8 @@ A pass requires all of:
    `MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000`;
 4. a serial line exactly equal to `MICROS_FDT_READY`;
 5. exactly one valid `MICROS_FRAME_ALLOCATOR_READY` line after FDT readiness;
-6. QEMU exit status zero after the SBI shutdown request.
+6. exactly one valid `MICROS_MMU_READY` line after allocator readiness;
+7. QEMU exit status zero after the SBI shutdown request.
 
 The kernel emits every decoded range using stable, fixed-width hexadecimal
 events:
@@ -172,6 +184,22 @@ every managed segment is covered by the FDT memory union and intersects
 neither a firmware reservation nor any physical address through the
 linker-defined kernel end.
 
+The kernel then allocates the root and intermediate tables from that allocator,
+maps text RX, read-only data R, writable kernel state and managed RAM RW/NX,
+and maps the UART page RW/NX. Every leaf is supervisor-only. Page-table frames
+remain allocated to the kernel, so the live allocator invariant becomes
+`managed - free == tables`. Activation executes one `sfence.vma` before the
+`satp` write and one immediately after it, then verifies the exact readback.
+Every QEMU image emits:
+
+```text
+MICROS_MMU_READY mode=sv39 root=0x... tables=0x...
+```
+
+The root is a nonzero aligned physical address and the table count is nonzero.
+Every target gate requires this newline-terminated record after allocator
+readiness and before its pass or panic outcome.
+
 The harness emits TAP plus a stable outcome field:
 
 ```text
@@ -195,8 +223,8 @@ cmake --workflow --preset test-qemu-panic
 ```
 
 This uses `build/riscv64-panic-test`, leaving the normal debug image unchanged.
-The test-only image completes FDT discovery and allocator initialization, then
-invokes `MICROS_PANIC(hart_id, "intentional-test")`.
+The test-only image completes FDT discovery, allocator initialization, and
+Sv39 activation, then invokes `MICROS_PANIC(hart_id, "intentional-test")`.
 
 Panic atomically disables supervisor interrupts, destructively puts the QEMU
 16550 into a known polled transmit state, and emits exactly five ordered core
@@ -247,9 +275,9 @@ Only a complete round trip emits:
 MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved
 ```
 
-The host gate requires exactly one trap-ready record, then FDT readiness and
-allocator readiness, then exactly one pass record. Missing, duplicated, early,
-or malformed records fail.
+The host gate requires exactly one trap-ready record, then FDT, allocator, and
+MMU readiness, then exactly one pass record. Missing, duplicated, early, or
+malformed records fail.
 
 ## Supervisor timer interrupt test
 
@@ -278,8 +306,8 @@ Only that complete sequence emits:
 MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0
 ```
 
-The host gate requires normal boot, complete FDT evidence, allocator readiness,
-exactly one newline-terminated pass record after allocator initialization,
+The host gate requires normal boot, complete FDT evidence, allocator and MMU
+readiness, exactly one newline-terminated pass record after MMU activation,
 clean SBI shutdown, and no panic, explicit failure, or timeout. Missing,
 duplicated, early, or malformed tick and interval fields fail. The interval is
 expressed only in platform counter ticks; it is not a wall-clock ABI.
@@ -302,9 +330,10 @@ independent from the default launch size.
 The native suite covers range normalization, overflow and capacity boundaries,
 exhaustion, invalid release, and a replayable 2,000-step reference-model trace.
 The target image independently rechecks every real managed segment against the
-FDT and linker inputs, allocates four increasing frames, releases them in
-non-LIFO order, verifies exact count restoration, and proves lowest-frame
-reuse. Only then does it emit:
+FDT and linker inputs. After Sv39 activation it uses the live free count as its
+baseline, leaves every page-table bit allocated, allocates four increasing
+non-table frames, releases them in non-LIFO order, verifies exact baseline
+restoration, and proves lowest-frame reuse. Only then does it emit:
 
 ```text
 MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest invariants=preserved
@@ -313,6 +342,32 @@ MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest inv
 The QEMU workflow boots the same ELF with 128 MiB and 256 MiB. Both runs must
 pass, and the larger guest must expose exactly `0x8000` additional managed
 frames. This rejects a kernel that silently compiles in the default RAM size.
+
+## Sv39 MMU test
+
+Build and run the isolated page-table permission test with:
+
+```bash
+cmake --workflow --preset test-qemu-mmu
+```
+
+The production boot path allocates and validates the complete root, activates
+Sv39, and emits MMU readiness. The test then performs exactly two expected
+supervisor faults. A store to a known text instruction must raise store/AMO
+page-fault cause `15`, and an indirect call into writable kernel data must
+raise instruction page-fault cause `12`. The test trap path verifies the exact
+cause, `sepc`, `stval`, S-mode origin, and order before selecting explicit
+assembly resume labels.
+
+Only both hardware-enforced recoveries emit:
+
+```text
+MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002
+```
+
+The host gate rejects a missing, duplicated, malformed, unterminated, or early
+MMU-ready or test-pass record, plus any panic, explicit failure, timeout, or
+unclean exit.
 
 ## Unexpected trap panic test
 

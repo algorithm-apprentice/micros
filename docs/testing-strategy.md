@@ -69,8 +69,8 @@ Budgets are review signals, not reasons to hide necessary coverage.
 
 The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
-`test-qemu-frame-allocator`, and `test-qemu-trap-panic`. From a clean checkout,
-their configure, build, and execution gates are:
+`test-qemu-frame-allocator`, `test-qemu-trap-panic`, and `test-qemu-mmu`. From a
+clean checkout, their configure, build, and execution gates are:
 
 ```bash
 cmake --workflow --preset test-unit
@@ -80,15 +80,17 @@ cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
+cmake --workflow --preset test-qemu-mmu
 ```
 
-`test-unit` currently runs the FDT parser corpus and portable frame allocator
-tests under ASan and UBSan plus the Python host tests. `test-qemu-smoke`
-verifies the real OpenSBI handoff, FDT memory discovery, exact serial markers,
-agreement between decoded range counts and emitted range events, a nonempty
-firmware reservation result, allocator readiness, and clean SBI shutdown. The
-remaining stable targets are added when their dependency-DAG layers become
-implementation-ready.
+`test-unit` currently runs the FDT parser corpus, portable frame allocator, and
+Sv39 encoding tests under ASan and UBSan plus the Python host tests. The latter
+include ELF allocatable-section closure and machine-readable QEMU record
+regressions. `test-qemu-smoke` verifies the real OpenSBI handoff, FDT memory
+discovery, exact serial markers, agreement between decoded range counts and
+emitted range events, a nonempty firmware reservation result, allocator and
+MMU readiness, and clean SBI shutdown. The remaining stable targets are added
+when their dependency-DAG layers become implementation-ready.
 
 `test-qemu-panic` builds an isolated test image and verifies ordered source,
 hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
@@ -101,11 +103,13 @@ an exact expected illegal-instruction label. `test-qemu-timer` verifies three
 accepted supervisor timer expirations, two successful rearms, final disarm,
 and the SIE-clear wait handshake.
 `test-qemu-frame-allocator` verifies production FDT/linker reservation
-integration, deterministic allocation and release, exact bitmap restoration,
+integration, deterministic allocation and release from the live post-MMU
+baseline, preservation of retained table bits, exact free-count restoration,
 and runtime memory sizing by booting one ELF at 128 MiB and 256 MiB.
 `test-qemu-trap-panic` verifies that an unarmed exception retains a separately
 captured trap frame and that its `sepc` equals the fault symbol in the built
-ELF.
+ELF. `test-qemu-mmu` verifies exact recovery from a store page fault against RX
+text and an instruction page fault from RW/NX kernel data.
 
 ## Native unit tests
 
@@ -127,6 +131,7 @@ Initial native test subjects include:
 - permission masks;
 - grant bounds, direction, lifetime, and overflow checks;
 - page-table index and flag calculations;
+- allocatable ELF section closure against linker permission ranges;
 - ELF header validation;
 - RAMFS directories, inode lifetime, and path traversal;
 - protocol message validation.
@@ -163,6 +168,8 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - timer interrupt and preemption;
 - repeated context switching;
 - page-table activation and invalidation;
+- store rejection on kernel text and instruction-fetch rejection on writable
+  kernel data;
 - executable-frame reuse with different code after `fence.i`;
 - synchronous IPC blocking and wakeup;
 - specific-source and any-source receives;

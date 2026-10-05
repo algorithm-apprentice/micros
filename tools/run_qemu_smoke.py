@@ -38,6 +38,20 @@ FRAME_ALLOCATOR_TEST_PASS = (
     "allocations=0x0000000000000004 "
     "reuse=lowest invariants=preserved"
 )
+MMU_READY_MARKER = "MICROS_MMU_READY"
+MMU_TEST_MARKER = "MICROS_MMU_TEST"
+MMU_READY_PATTERN = re.compile(
+    r"^MICROS_MMU_READY "
+    r"mode=sv39 "
+    r"root=0x([0-9a-f]{16}) "
+    r"tables=0x([0-9a-f]{16})$"
+)
+MMU_TEST_PASS = (
+    "MICROS_MMU_TEST_PASS "
+    "store-fault=text "
+    "execute-fault=writable "
+    "traps=0x0000000000000002"
+)
 FDT_COUNTS_PATTERN = re.compile(
     r"^MICROS_FDT_COUNTS "
     r"memory=0x([0-9a-f]{16}) "
@@ -340,6 +354,96 @@ def _has_complete_frame_allocator_test_report(output):
     )
 
 
+def parse_mmu_ready(output):
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    if (
+        len(ready_indices) != 1
+        or not terminated[ready_indices[0]]
+    ):
+        return None
+
+    match = MMU_READY_PATTERN.fullmatch(output_lines[ready_indices[0]])
+    if match is None:
+        return None
+    return tuple(int(value, 16) for value in match.groups())
+
+
+def _has_complete_mmu_ready(output):
+    output_lines = output.splitlines()
+    allocator_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_READY_MARKER)
+    ]
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    ready = parse_mmu_ready(output)
+    return (
+        len(allocator_indices) == 1
+        and len(ready_indices) == 1
+        and allocator_indices[0] < ready_indices[0]
+        and ready is not None
+        and ready[0] != 0
+        and ready[0] % 4096 == 0
+        and ready[1] != 0
+    )
+
+
+def _mmu_ready_precedes_target_outcome(output):
+    output_lines = output.splitlines()
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    outcome_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if (
+            PANIC_CORE_PATTERNS[0].fullmatch(line) is not None
+            or line == TRAP_TEST_PASS
+            or line == TIMER_TEST_PASS
+            or line == FRAME_ALLOCATOR_TEST_PASS
+            or line == MMU_TEST_PASS
+        )
+    ]
+    return (
+        len(ready_indices) == 1
+        and all(ready_indices[0] < index for index in outcome_indices)
+    )
+
+
+def _has_complete_mmu_test_report(output):
+    if not _has_complete_mmu_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == MMU_TEST_PASS
+        and terminated[test_indices[0]]
+        and ready_indices[0] < test_indices[0]
+    )
+
+
 def _has_complete_trap_context(output, expected_sepc=None):
     output_lines, terminated = _split_output_records(output)
     panic_indices = [
@@ -431,6 +535,8 @@ def matches_expected_result(
     require_timer_test_report=False,
     require_frame_allocator_ready=False,
     require_frame_allocator_test_report=False,
+    require_mmu_ready=False,
+    require_mmu_test_report=False,
     require_trap_context=False,
     expected_trap_context_sepc=None,
 ):
@@ -479,6 +585,19 @@ def matches_expected_result(
     if (
         require_frame_allocator_test_report
         and not _has_complete_frame_allocator_test_report(result.output)
+    ):
+        return False
+    if (
+        require_mmu_ready
+        and (
+            not _has_complete_mmu_ready(result.output)
+            or not _mmu_ready_precedes_target_outcome(result.output)
+        )
+    ):
+        return False
+    if (
+        require_mmu_test_report
+        and not _has_complete_mmu_test_report(result.output)
     ):
         return False
     has_trap_context = any(
@@ -718,6 +837,16 @@ def parse_arguments(argv):
         help="Require the ordered frame allocator test record",
     )
     parser.add_argument(
+        "--require-mmu-ready",
+        action="store_true",
+        help="Require an ordered Sv39 MMU ready record",
+    )
+    parser.add_argument(
+        "--require-mmu-test-report",
+        action="store_true",
+        help="Require the ordered MMU permission test record",
+    )
+    parser.add_argument(
         "--require-trap-context",
         action="store_true",
         help="Require one trap context immediately after the panic core",
@@ -824,6 +953,8 @@ def main(argv=None):
             require_frame_allocator_test_report=(
                 arguments.require_frame_allocator_test_report
             ),
+            require_mmu_ready=arguments.require_mmu_ready,
+            require_mmu_test_report=arguments.require_mmu_test_report,
             require_trap_context=arguments.require_trap_context,
             expected_trap_context_sepc=expected_trap_context_sepc,
         )

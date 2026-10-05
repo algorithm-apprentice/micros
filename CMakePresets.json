@@ -70,6 +70,15 @@
       "cacheVariables": {
         "MICROS_BUILD_TRAP_PANIC_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-mmu-test",
+      "displayName": "RISC-V 64 Sv39 MMU test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-mmu-test",
+      "cacheVariables": {
+        "MICROS_BUILD_MMU_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -124,6 +133,13 @@
       "configurePreset": "riscv64-trap-panic-test",
       "targets": [
         "test-qemu-trap-panic"
+      ]
+    },
+    {
+      "name": "test-qemu-mmu",
+      "configurePreset": "riscv64-mmu-test",
+      "targets": [
+        "test-qemu-mmu"
       ]
     }
   ],
@@ -237,6 +253,20 @@
         {
           "type": "build",
           "name": "test-qemu-trap-panic"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-mmu",
+      "displayName": "Build and run the Sv39 MMU test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-mmu-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-mmu"
         }
       ]
     }
