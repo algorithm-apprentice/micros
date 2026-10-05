@@ -30,3 +30,4 @@ to make the project appear more consistent than it was.
 | [0012](0012-console-and-irq-handoff.md) | Console and IRQ handoff | Accepted |
 | [0013](0013-ai-native-test-first-development.md) | AI-native test-first development | Accepted |
 | [0014](0014-panic-diagnostics.md) | Panic diagnostics | Accepted |
+| [0015](0015-supervisor-trap-entry.md) | Supervisor trap entry | Accepted |
