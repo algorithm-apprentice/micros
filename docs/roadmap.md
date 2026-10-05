@@ -1,0 +1,210 @@
+# Roadmap
+
+## Delivery model
+
+Development proceeds through sequential pull requests. A later milestone does
+not begin until the previous pull request has been reviewed and accepted.
+Architecture or scope changes are recorded in ADRs before implementation.
+Implementation follows the repository's documentation-first, test-first,
+independently reviewed AI-native workflow.
+
+## v0.1 completion goal
+
+`micros` v0.1 is complete when a clean checkout builds with the documented
+LLVM/LLD/CMake/Ninja toolchain, boots under RISC-V64 QEMU `virt` through
+OpenSBI, and reaches a shell that runs `echo`, `cat`, `ls`, and `ps`.
+
+The system must enforce user isolation and preemption and must include
+generation-aware IPC, one-shot reply rights, privilege profiles, direct grants,
+the static launcher, VM, PM, TTY, RAMFS, VFS, ELF spawn, init, and automated
+native/QEMU/end-to-end tests.
+
+Although v0.1 runs one user thread per process on one hart, process, thread,
+endpoint, and hart state must remain distinct. No v0.1 implementation may make
+multithreading or SMP require replacing the process identity, scheduler object
+model, IPC reply model, or global current-execution representation.
+
+## Milestone 0: design baseline
+
+### Deliverables
+
+- architecture overview;
+- MINIX dependency analysis;
+- development DAG;
+- testing strategy;
+- initial ADR set;
+- repository documentation index.
+
+### Exit criteria
+
+- every initial ADR is reviewed and either Accepted, revised, or Rejected;
+- the shell MVP boundary is unambiguous;
+- the implementation order contains no dependency cycle;
+- no implementation files are committed before this gate.
+
+## Milestone 1: reproducible boot
+
+### Deliverables
+
+- RISC-V cross-compilation configuration;
+- linker script and boot image;
+- OpenSBI/QEMU launch command;
+- bounded FDT parser for memory and reserved ranges;
+- UART output;
+- panic path;
+- deterministic test shutdown.
+
+### Exit criteria
+
+- a clean checkout builds with one documented command;
+- QEMU prints a versioned boot marker;
+- an intentional panic prints location and machine state;
+- the smoke test distinguishes success, failure, and timeout.
+
+## Milestone 2: privileged kernel mechanisms
+
+### Deliverables
+
+- trap entry and exception decoding;
+- timer interrupts;
+- bootstrap frame allocator;
+- kernel and user page tables;
+- user-mode entry;
+- separate process, thread, endpoint, and hart objects;
+- thread execution contexts;
+- preemptive round-robin scheduler.
+
+### Exit criteria
+
+- allocator invariants pass randomized host tests;
+- expected exceptions return safely;
+- U-mode cannot access kernel-only pages;
+- two user threads can be preempted repeatedly without register corruption.
+
+## Milestone 3: protected communication
+
+### Deliverables
+
+- process slots and generation-aware endpoints;
+- immutable privilege profiles;
+- one-shot reply tokens bound to caller threads;
+- blocking send, receive, call, reply/receive, and notification;
+- deadlock-chain detection;
+- direct grants and safe-copy operations;
+- freestanding user-service runtime.
+
+### Exit criteria
+
+- stale endpoints and unauthorized IPC are rejected;
+- every blocking transition has a tested wakeup path;
+- deadlock tests terminate deterministically;
+- grant direction, bounds, overflow, endpoint, and lifetime checks pass;
+- no protocol relies on raw pointers crossing an address space.
+
+## Milestone 4: bootstrap and memory service
+
+### Deliverables
+
+- embedded service manifest;
+- bootstrap launcher;
+- service readiness protocol;
+- exact manifest privilege and device assignments;
+- VM server;
+- one-way ownership handoff from bootstrap memory to VM.
+
+### Exit criteria
+
+- launcher order is deterministic;
+- a missing readiness response fails with a useful diagnostic;
+- every usable physical frame has exactly one owner;
+- user mapping changes after handoff require VM authority;
+- VM's complete fault-handling working set remains wired;
+- VM failure is reported as a fatal bootstrap error.
+
+## Milestone 5: core user-space services
+
+### Deliverables
+
+- PM with spawn metadata, exit, and wait;
+- application privilege installation during spawn;
+- interrupt-driven TTY with early-console and PLIC handoff;
+- RAMFS;
+- VFS with descriptors, a synthetic console object, pathname routing, and a
+  root mount.
+
+### Exit criteria
+
+- service protocols reject malformed types and payload lengths;
+- client termination releases server-owned state;
+- terminal data and file data use grants;
+- non-transitive data paths use bounded resident bounce buffers;
+- init receives working descriptors 0, 1, and 2 without RAMFS device nodes;
+- RAMFS operations pass native model tests and QEMU integration tests;
+- VFS resolves absolute and relative paths and enforces descriptor ownership.
+
+## Milestone 6: shell MVP
+
+### Deliverables
+
+- ELF loading;
+- PM/VFS/VM spawn transaction with rollback;
+- RISC-V instruction-fetch synchronization before a child runs;
+- init;
+- interactive shell;
+- `echo`, `cat`, `ls`, and `ps`;
+- automated serial end-to-end scenario.
+
+### Exit criteria
+
+- the complete system boots from a clean build;
+- the required command scenario succeeds without manual timing assumptions;
+- process exit and wait leave no process, frame, descriptor, or inode leak;
+- repeated scenario runs produce the same externally visible result.
+
+## Milestone 7: resilient control plane
+
+### Deliverables
+
+- DS endpoint publication;
+- user-space scheduler policy;
+- RS lifecycle management;
+- service crash injection and restart.
+
+### Exit criteria
+
+- service identity changes invalidate stale endpoints;
+- dependencies observe a controlled restart notification;
+- injected restart tests preserve or explicitly discard state according to the
+  service contract;
+- bootstrap-only authority is not reintroduced.
+
+## Later milestones
+
+These require separate ADRs and are not part of the shell MVP:
+
+- `exec` completion and `fork`;
+- multiple threads per process;
+- copy-on-write;
+- signals;
+- VirtIO block devices;
+- a persistent filesystem;
+- file-backed memory mappings;
+- POSIX conformance expansion;
+- NetBSD userland port evaluation;
+- networking;
+- SMP;
+- physical RISC-V hardware.
+
+## Major risks
+
+| Risk | Consequence | Mitigation |
+| --- | --- | --- |
+| Hidden bootstrap cycle | A service cannot start without one of its successors | Keep bootstrap interfaces explicit and one-way |
+| ABI churn | Every service changes at once | Accept endpoint, message, and grant ADRs before service code |
+| Assembly bugs | Corruption appears far from the cause | Dedicated QEMU context and trap tests with known register patterns |
+| Memory ownership ambiguity | Leaks or double allocation | Central ownership ledger and assertions before/after VM handoff |
+| Slow feedback | Kernel bugs become expensive to isolate | Keep pure logic host-testable and QEMU smoke tests short |
+| Excess MINIX fidelity | MVP expands before producing a shell | Use the documented non-goals and DAG gates |
+| Future concurrency requires redesign | Thread or SMP work replaces process and IPC foundations | Separate process/thread/hart objects and reply rights in v0.1 |
+| Silent service failure | Boot hangs without a diagnosis | Readiness timeouts and structured serial events |
+| Host-only assumptions | macOS build works but CI or target behavior differs | Separate host and target toolchains and test on Linux CI |
