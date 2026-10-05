@@ -72,6 +72,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         kernel_objects_test
+        kernel/kernel_objects.c
         tests/host/kernel_objects_test.c
     )
     target_include_directories(
@@ -242,6 +243,7 @@ add_executable(
     kernel/bootstrap_memory.c
     kernel/fdt.c
     kernel/frame_allocator.c
+    kernel/kernel_objects.c
     kernel/main.c
     kernel/panic.c
     kernel/sv39.c
