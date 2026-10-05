@@ -34,14 +34,35 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/fdt.c
         tests/host/fdt_test.c
     )
+    add_executable(
+        frame_allocator_test
+        kernel/frame_allocator.c
+        tests/host/frame_allocator_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
+    target_include_directories(
+        frame_allocator_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
     target_compile_features(fdt_test PRIVATE c_std_17)
+    target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        frame_allocator_test
         PRIVATE
             -Wall
             -Wextra
@@ -62,9 +83,21 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_link_options(fdt_test PRIVATE -fsanitize=address,undefined)
+        target_compile_options(
+            frame_allocator_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            frame_allocator_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
+    add_test(NAME frame-allocator COMMAND frame_allocator_test)
 
     add_custom_target(
         test-unit
@@ -83,7 +116,7 @@ if(MICROS_BUILD_HOST_TESTS)
             tests/host
             -p
             "test_*.py"
-        DEPENDS fdt_test
+        DEPENDS fdt_test frame_allocator_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
