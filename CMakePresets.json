@@ -21,6 +21,13 @@
     {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
+    },
+    {
+      "name": "test-qemu-smoke",
+      "configurePreset": "riscv64-debug",
+      "targets": [
+        "test-qemu-smoke"
+      ]
     }
   ],
   "workflowPresets": [
@@ -35,6 +42,20 @@
         {
           "type": "build",
           "name": "riscv64-debug"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-smoke",
+      "displayName": "Build and run the QEMU boot smoke test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-smoke"
         }
       ]
     }
