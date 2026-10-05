@@ -12,7 +12,9 @@ through SBI. A direct-mode supervisor trap vector preserves the complete
 integer context and returns safely from an isolated expected exception.
 OpenSBI TIME drives a one-hart supervisor timer that rejects stale pending
 delivery, rearms from the current counter, and preserves caller interrupt
-state.
+state. A bounded bootstrap frame allocator canonicalizes every FDT memory and
+reservation range, excludes all memory through the linker-defined kernel end,
+and tracks kernel-retained allocations with a fixed bitmap.
 
 ## Goals
 
@@ -72,6 +74,7 @@ cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
+cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 ```
 
@@ -79,7 +82,8 @@ These commands run the native suite, verify normal boot through the
 QEMU-bundled OpenSBI firmware, and verify an intentional structured panic with
 clean failure shutdown. They also prove complete register-preserving trap
 return, three accepted supervisor timer expirations with two rearms and a final
-disarm, and captured-context diagnostics for an unexpected exception. See the
+disarm, bootstrap allocation and release against the real FDT at two RAM
+sizes, and captured-context diagnostics for an unexpected exception. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 
