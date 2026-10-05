@@ -67,14 +67,16 @@ Initial performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The implemented fast targets are `test-unit`, `test-qemu-smoke`, and
-`test-qemu-panic`. From a clean checkout, their configure, build, and execution
-gates are:
+The implemented fast targets are `test-unit`, `test-qemu-smoke`,
+`test-qemu-panic`, `test-qemu-trap`, and `test-qemu-trap-panic`. From a clean
+checkout, their configure, build, and execution gates are:
 
 ```bash
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
+cmake --workflow --preset test-qemu-trap
+cmake --workflow --preset test-qemu-trap-panic
 ```
 
 `test-unit` currently runs the FDT parser corpus under ASan and UBSan plus the
@@ -88,6 +90,12 @@ layers become implementation-ready.
 hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
 does not turn a timeout, explicit failure, missing FDT evidence, or malformed
 diagnostic stream into a pass.
+
+`test-qemu-trap` verifies the real direct-mode entry and `sret` paths with two
+distinct x1-x31 register patterns, two stacks, an observable status change, and
+an exact expected illegal-instruction label. `test-qemu-trap-panic` verifies
+that an unarmed exception retains a separately captured trap frame and that
+its `sepc` equals the fault symbol in the built ELF.
 
 ## Native unit tests
 
