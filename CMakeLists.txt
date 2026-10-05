@@ -192,15 +192,18 @@ set(MICROS_LINKER_SCRIPT
 add_executable(
     micros
     arch/riscv64/boot.S
+    arch/riscv64/mmu.S
     arch/riscv64/panic.S
     arch/riscv64/sbi.c
     arch/riscv64/trap.S
     arch/riscv64/uart.c
+    kernel/address_space.c
     kernel/bootstrap_memory.c
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/main.c
     kernel/panic.c
+    kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
 )
@@ -211,7 +214,8 @@ set_target_properties(
         OUTPUT_NAME micros
         SUFFIX ".elf"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/kernel"
-        LINK_DEPENDS "${MICROS_LINKER_SCRIPT}"
+        LINK_DEPENDS
+            "${MICROS_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_elf_sections.py"
 )
 
 target_include_directories(
@@ -257,6 +261,12 @@ endif()
 
 if(MICROS_BUILD_MMU_TEST)
     target_compile_definitions(micros PRIVATE MICROS_BUILD_MMU_TEST=1)
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/mmu_test.S
+            kernel/mmu_test.c
+    )
 endif()
 
 if(MICROS_BUILD_TRAP_TEST OR MICROS_BUILD_TRAP_PANIC_TEST)
@@ -295,6 +305,27 @@ target_link_options(
         "-Wl,-Map,${CMAKE_BINARY_DIR}/kernel/micros.map"
 )
 
+if(NOT CMAKE_NM OR NOT CMAKE_READELF)
+    message(FATAL_ERROR "LLVM nm and readelf are required for ELF validation")
+endif()
+
+add_custom_command(
+    TARGET micros
+    POST_BUILD
+    COMMAND
+        "${MICROS_PYTHON}"
+        -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_elf_sections.py"
+        --readelf
+        "${CMAKE_READELF}"
+        --nm
+        "${CMAKE_NM}"
+        --elf
+        "$<TARGET_FILE:micros>"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+)
+
 add_custom_target(
     test-qemu-smoke
     COMMAND
@@ -317,6 +348,7 @@ add_custom_target(
         --require-fdt-reservations
         --require-trap-ready
         --require-frame-allocator-ready
+        --require-mmu-ready
         --timeout
         8
     DEPENDS micros
@@ -360,6 +392,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -391,6 +424,7 @@ if(MICROS_BUILD_TRAP_TEST)
             --require-fdt-reservations
             --require-trap-test-report
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -423,6 +457,7 @@ if(MICROS_BUILD_TIMER_TEST)
             --require-trap-ready
             --require-timer-test-report
             --require-frame-allocator-ready
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -460,6 +495,7 @@ if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
             --require-fdt-reservations
             --require-trap-ready
             --require-frame-allocator-test-report
+            --require-mmu-ready
             --timeout
             8
         DEPENDS micros
@@ -504,6 +540,7 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
+            --require-mmu-ready
             --require-trap-context
             --nm
             "${CMAKE_NM}"

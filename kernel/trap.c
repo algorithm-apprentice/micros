@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "micros/kernel_address_space.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
 
@@ -201,6 +202,24 @@ static bool trap_panic_test_has_expected_exception(
 void micros_trap_dispatch(struct micros_trap_frame *frame)
 {
     uint64_t cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
+
+#ifdef MICROS_BUILD_MMU_TEST
+    {
+        enum micros_mmu_test_trap_result result =
+            micros_kernel_address_space_handle_test_trap(frame);
+
+        if (result == MICROS_MMU_TEST_TRAP_HANDLED) {
+            return;
+        }
+        if (result == MICROS_MMU_TEST_TRAP_MISMATCH) {
+            MICROS_TRAP_PANIC(
+                micros_trap_hart_id,
+                "mmu-test-mismatch",
+                frame
+            );
+        }
+    }
+#endif
 
 #ifdef MICROS_BUILD_TRAP_TEST
     if (trap_test_state == TRAP_TEST_ARMED) {

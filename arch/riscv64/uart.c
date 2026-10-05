@@ -1,7 +1,6 @@
 #include "arch/riscv64/platform.h"
 
 enum {
-    UART0_BASE = 0x10000000,
     UART_THR = 0,
     UART_IER = 1,
     UART_LCR = 3,
@@ -12,7 +11,7 @@ enum {
 };
 
 static volatile uint8_t *const uart0 =
-    (volatile uint8_t *)(uintptr_t)UART0_BASE;
+    (volatile uint8_t *)(uintptr_t)MICROS_RISCV_UART0_BASE;
 
 static void uart_write_character(char character)
 {

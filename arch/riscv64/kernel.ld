@@ -4,7 +4,9 @@ ENTRY(_start)
 SECTIONS
 {
     . = 0x80200000;
+    . = ALIGN(4096);
     __kernel_start = .;
+    __kernel_text_start = .;
 
     .text : ALIGN(16)
     {
@@ -12,10 +14,18 @@ SECTIONS
         *(.text .text.*)
     }
 
+    . = ALIGN(4096);
+    __kernel_text_end = .;
+    __kernel_rodata_start = .;
+
     .rodata : ALIGN(16)
     {
         *(.rodata .rodata.*)
     }
+
+    . = ALIGN(4096);
+    __kernel_rodata_end = .;
+    __kernel_writable_start = .;
 
     .data : ALIGN(16)
     {
@@ -42,6 +52,8 @@ SECTIONS
         KEEP(*(.trap_emergency_stack))
     }
 
+    . = ALIGN(4096);
+    __kernel_writable_end = .;
     __kernel_end = .;
 
     /DISCARD/ :

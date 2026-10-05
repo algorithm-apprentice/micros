@@ -144,9 +144,11 @@ static bool managed_frame_is_allowed(
 }
 
 static bool bootstrap_state_is_valid(
-    const struct micros_fdt_memory_map *memory_map
+    const struct micros_fdt_memory_map *memory_map,
+    bool require_all_free
 )
 {
+    uint64_t allocated_count = 0;
     uint64_t expected_bitmap_offset = 0;
     uint64_t previous_end = 0;
     uint64_t bitmap_index;
@@ -156,7 +158,7 @@ static bool bootstrap_state_is_valid(
         !bootstrap_allocator.initialized
         || bootstrap_allocator.managed_frame_count == 0
         || bootstrap_allocator.free_frame_count
-            != bootstrap_allocator.managed_frame_count
+            > bootstrap_allocator.managed_frame_count
     ) {
         return false;
     }
@@ -169,8 +171,18 @@ static bool bootstrap_state_is_valid(
         uint64_t bit = UINT64_C(1) << (bitmap_index % 64);
 
         if ((bootstrap_allocator.allocated_bitmap[word_index] & bit) != 0) {
-            return false;
+            ++allocated_count;
         }
+    }
+    if (
+        allocated_count
+            != (
+                bootstrap_allocator.managed_frame_count
+                - bootstrap_allocator.free_frame_count
+            )
+        || (require_all_free && allocated_count != 0)
+    ) {
+        return false;
     }
 
     for (
@@ -307,7 +319,7 @@ enum micros_frame_allocator_error micros_bootstrap_memory_initialize(
     if (error != MICROS_FRAME_ALLOCATOR_OK) {
         return error;
     }
-    if (!bootstrap_state_is_valid(memory_map)) {
+    if (!bootstrap_state_is_valid(memory_map, true)) {
         bootstrap_allocator.initialized = false;
         return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
     }
@@ -355,7 +367,7 @@ bool micros_bootstrap_memory_run_self_test(
 
     if (
         memory_map == NULL
-        || !bootstrap_state_is_valid(memory_map)
+        || !bootstrap_state_is_valid(memory_map, false)
         || bootstrap_allocator.free_frame_count < 4
     ) {
         return false;
@@ -396,6 +408,6 @@ bool micros_bootstrap_memory_run_self_test(
     ) {
         return false;
     }
-    return bootstrap_state_is_valid(memory_map);
+    return bootstrap_state_is_valid(memory_map, false);
 }
 #endif

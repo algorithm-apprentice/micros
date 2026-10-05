@@ -3,6 +3,7 @@
 #include "arch/riscv64/platform.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/fdt.h"
+#include "micros/kernel_address_space.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
 #include "micros/trap.h"
@@ -53,6 +54,7 @@ static void stop_after_reset_failure(void)
 void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 {
     const struct micros_frame_allocator *frame_allocator;
+    const struct micros_kernel_address_space_report *address_space;
     struct micros_fdt_memory_map memory_map;
     enum micros_fdt_error error;
     size_t index;
@@ -123,6 +125,23 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     uart_write("\n");
     uart_flush();
 
+    if (
+        micros_kernel_address_space_initialize()
+        != MICROS_KERNEL_ADDRESS_SPACE_OK
+    ) {
+        MICROS_PANIC(hart_id, "mmu-init");
+    }
+    address_space = micros_kernel_address_space_report();
+    if (address_space == NULL) {
+        MICROS_PANIC(hart_id, "mmu-state");
+    }
+    uart_write("MICROS_MMU_READY mode=sv39 root=");
+    uart_write_hex64(address_space->root_physical_address);
+    uart_write(" tables=");
+    uart_write_hex64(address_space->table_count);
+    uart_write("\n");
+    uart_flush();
+
 #ifdef MICROS_BUILD_PANIC_TEST
     MICROS_PANIC(hart_id, "intentional-test");
 #endif
@@ -167,6 +186,18 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "MICROS_FRAME_ALLOCATOR_TEST_PASS "
         "allocations=0x0000000000000004 "
         "reuse=lowest invariants=preserved\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_MMU_TEST
+    if (!micros_kernel_address_space_run_self_test()) {
+        MICROS_PANIC(hart_id, "mmu-test-failed");
+    }
+    uart_write(
+        "MICROS_MMU_TEST_PASS "
+        "store-fault=text execute-fault=writable "
+        "traps=0x0000000000000002\n"
     );
     uart_flush();
 #endif
