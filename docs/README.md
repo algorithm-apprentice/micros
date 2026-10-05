@@ -24,6 +24,8 @@ This directory contains the design baseline for `micros`.
 
 ## Development
 
+- [Build and smoke-test guide](development/building.md) defines prerequisites,
+  tool discovery, build artifacts, and the deterministic QEMU command.
 - [AI-native development workflow](development/ai-native-workflow.md) defines
   the shared human/agent task, TDD, review, and merge contract.
 - [Contributing guide](../CONTRIBUTING.md) is the contributor entry point.

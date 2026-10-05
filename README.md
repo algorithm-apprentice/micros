@@ -4,8 +4,9 @@
 the architecture of MINIX 3. It is intended to make kernel mechanisms,
 user-space services, and their dependencies small enough to study directly.
 
-The project is currently in the design phase. No implementation has been
-accepted yet.
+Implementation now follows the accepted dependency DAG. The current boot
+foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
+versioned marker through the QEMU `virt` UART, and shuts QEMU down through SBI.
 
 ## Goals
 
@@ -35,6 +36,7 @@ accepted yet.
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Build and smoke-test guide](docs/development/building.md)
 - [System overview](docs/architecture/system-overview.md)
 - [Development dependency DAG](docs/architecture/development-dag.md)
 - [MINIX dependency analysis](docs/research/minix-dependency-analysis.md)
@@ -43,6 +45,30 @@ accepted yet.
 - [AI-native development workflow](docs/development/ai-native-workflow.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Contributing guide](CONTRIBUTING.md)
+
+## Quick start
+
+Install:
+
+- CMake 3.25 or newer;
+- Ninja;
+- Python 3.8 or newer;
+- Clang with the `riscv64-unknown-elf` target;
+- LLD;
+- QEMU 7.0 or newer with `qemu-system-riscv64`, `virt,aia=none`, and default
+  OpenSBI firmware providing SBI System Reset.
+
+Then run:
+
+```bash
+cmake --workflow --preset test-qemu-smoke
+```
+
+This configures and builds the debug image, boots it through the QEMU-bundled
+OpenSBI firmware, requires the exact `MICROS_BOOT 0.1.0` serial marker, and
+requires a clean QEMU shutdown. See the
+[build guide](docs/development/building.md) for tool discovery and separate
+build/test commands.
 
 ## Development workflow
 

@@ -57,7 +57,15 @@ The cached check is the pre-commit whitespace gate after staging. The
 `origin/main...HEAD` check is the post-commit pull-request range gate.
 
 Implementation milestones add their own native and QEMU commands when those
-test targets exist.
+test targets exist. The current boot-foundation gates are:
+
+```bash
+cmake --workflow --preset build-riscv64-debug
+cmake --workflow --preset test-qemu-smoke
+```
+
+The second workflow configures and builds before running the smoke test, so it
+is also the clean-checkout acceptance command for the current implementation.
 
 ## Pull requests
 
