@@ -280,6 +280,29 @@ def _has_complete_frame_allocator_ready(output):
     )
 
 
+def _frame_allocator_ready_precedes_target_outcome(output):
+    output_lines = output.splitlines()
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_ALLOCATOR_READY_MARKER)
+    ]
+    outcome_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if (
+            PANIC_CORE_PATTERNS[0].fullmatch(line) is not None
+            or line == TRAP_TEST_PASS
+            or line == TIMER_TEST_PASS
+            or line == FRAME_ALLOCATOR_TEST_PASS
+        )
+    ]
+    return (
+        len(ready_indices) == 1
+        and all(ready_indices[0] < index for index in outcome_indices)
+    )
+
+
 def has_expected_frame_allocator_growth(outputs, expected_delta):
     if len(outputs) != 2:
         return False
@@ -445,7 +468,12 @@ def matches_expected_result(
         return False
     if (
         require_frame_allocator_ready
-        and not _has_complete_frame_allocator_ready(result.output)
+        and (
+            not _has_complete_frame_allocator_ready(result.output)
+            or not _frame_allocator_ready_precedes_target_outcome(
+                result.output
+            )
+        )
     ):
         return False
     if (

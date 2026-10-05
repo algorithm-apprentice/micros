@@ -821,6 +821,52 @@ class ExpectedOutcomeTest(unittest.TestCase):
                 )
                 self.assertFalse(accepted)
 
+    def test_rejects_frame_allocator_ready_after_target_outcome(self):
+        late_ready = TIMER_TEST_OUTPUT + FRAME_ALLOCATOR_READY_RECORD
+        result = run_qemu_smoke.QemuResult(
+            output=late_ready,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+            require_frame_allocator_ready=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_ignores_unrelated_target_prefix_before_allocator_ready(self):
+        unrelated = FRAME_ALLOCATOR_OUTPUT.replace(
+            "MICROS_FDT_READY\n",
+            "MICROS_FDT_READY\nMICROS_TIMER_TESTING unrelated-record\n",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=unrelated,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+        )
+
+        self.assertTrue(accepted)
+
     def test_accepts_complete_frame_allocator_test_report(self):
         result = run_qemu_smoke.QemuResult(
             output=FRAME_ALLOCATOR_TEST_OUTPUT,
