@@ -3,6 +3,7 @@
 import argparse
 import enum
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -13,6 +14,23 @@ from typing import Optional
 
 PANIC_MARKER = "MICROS_PANIC"
 FAILURE_MARKER = "MICROS_TEST_FAILURE"
+FDT_COUNTS_PATTERN = re.compile(
+    r"^MICROS_FDT_COUNTS "
+    r"memory=0x([0-9a-f]{16}) "
+    r"reservation=0x([0-9a-f]{16}) "
+    r"reserved-memory=0x([0-9a-f]{16})$"
+)
+FDT_EVENT_NAMES = (
+    "MICROS_FDT_MEMORY",
+    "MICROS_FDT_RESERVATION",
+    "MICROS_FDT_RESERVED_MEMORY",
+)
+FDT_RANGE_PATTERN = re.compile(
+    r"^(MICROS_FDT_MEMORY|"
+    r"MICROS_FDT_RESERVATION|"
+    r"MICROS_FDT_RESERVED_MEMORY) "
+    r"base=0x[0-9a-f]{16} size=0x[0-9a-f]{16}$"
+)
 
 
 class SmokeOutcome(enum.Enum):
@@ -30,7 +48,39 @@ class QemuResult:
     timed_out: bool
 
 
-def classify_smoke(*, output, return_code, timed_out, marker):
+def _has_complete_fdt_events(output_lines, require_reservations):
+    summaries = []
+    actual_counts = [0, 0, 0]
+
+    for line in output_lines:
+        if line.startswith("MICROS_FDT_COUNTS"):
+            match = FDT_COUNTS_PATTERN.fullmatch(line)
+            if match is None:
+                return False
+            summaries.append(tuple(int(value, 16) for value in match.groups()))
+            continue
+        if line.startswith(FDT_EVENT_NAMES):
+            match = FDT_RANGE_PATTERN.fullmatch(line)
+            if match is None:
+                return False
+            actual_counts[FDT_EVENT_NAMES.index(match.group(1))] += 1
+    if len(summaries) != 1:
+        return False
+    if require_reservations and summaries[0][1] + summaries[0][2] == 0:
+        return False
+
+    return tuple(actual_counts) == summaries[0]
+
+
+def classify_smoke(
+    *,
+    output,
+    return_code,
+    timed_out,
+    markers,
+    require_fdt_events=False,
+    require_fdt_reservations=False,
+):
     if PANIC_MARKER in output:
         return SmokeOutcome.PANIC
     if FAILURE_MARKER in output or any(
@@ -39,7 +89,18 @@ def classify_smoke(*, output, return_code, timed_out, marker):
         return SmokeOutcome.FAILURE
     if timed_out:
         return SmokeOutcome.TIMEOUT
-    if return_code == 0 and marker in output.splitlines():
+    output_lines = output.splitlines()
+    if (
+        return_code == 0
+        and all(marker in output_lines for marker in markers)
+        and (
+            not (require_fdt_events or require_fdt_reservations)
+            or _has_complete_fdt_events(
+                output_lines,
+                require_reservations=require_fdt_reservations,
+            )
+        )
+    ):
         return SmokeOutcome.PASS
     return SmokeOutcome.UNEXPECTED_EXIT
 
@@ -139,14 +200,29 @@ def parse_arguments(argv):
         help="QEMU RISC-V system executable",
     )
     parser.add_argument("--kernel", required=True, type=Path)
-    parser.add_argument("--marker", required=True)
+    parser.add_argument(
+        "--marker",
+        action="append",
+        required=True,
+        help="Exact serial line required for success; may be repeated",
+    )
+    parser.add_argument(
+        "--require-fdt-events",
+        action="store_true",
+        help="Require FDT range events to match the guest's count summary",
+    )
+    parser.add_argument(
+        "--require-fdt-reservations",
+        action="store_true",
+        help="Require at least one firmware reservation in the FDT events",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
     if arguments.timeout <= 0:
         parser.error("--timeout must be greater than zero")
-    if not arguments.marker:
-        parser.error("--marker must not be empty")
+    if any(not marker for marker in arguments.marker):
+        parser.error("--marker values must not be empty")
     if not arguments.kernel.is_file():
         parser.error(f"kernel image does not exist: {arguments.kernel}")
     return arguments
@@ -168,7 +244,9 @@ def main(argv=None):
         output=result.output,
         return_code=result.return_code,
         timed_out=result.timed_out,
-        marker=arguments.marker,
+        markers=arguments.marker,
+        require_fdt_events=arguments.require_fdt_events,
+        require_fdt_reservations=arguments.require_fdt_reservations,
     )
     return print_tap_result(outcome, result, command)
 

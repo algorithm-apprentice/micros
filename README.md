@@ -6,7 +6,8 @@ user-space services, and their dependencies small enough to study directly.
 
 Implementation now follows the accepted dependency DAG. The current boot
 foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
-versioned marker through the QEMU `virt` UART, and shuts QEMU down through SBI.
+versioned marker through the QEMU `virt` UART, validates the firmware-provided
+FDT memory map, and shuts QEMU down through SBI.
 
 ## Goals
 
@@ -65,8 +66,8 @@ cmake --workflow --preset test-qemu-smoke
 ```
 
 This configures and builds the debug image, boots it through the QEMU-bundled
-OpenSBI firmware, requires the exact `MICROS_BOOT 0.1.0` serial marker, and
-requires a clean QEMU shutdown. See the
+OpenSBI firmware, requires exact boot, physical-memory, and FDT-ready serial
+markers, and requires a clean QEMU shutdown. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 

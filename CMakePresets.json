@@ -7,6 +7,16 @@
   },
   "configurePresets": [
     {
+      "name": "host-debug",
+      "displayName": "Native host tests",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/host-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MICROS_BUILD_HOST_TESTS": "ON"
+      }
+    },
+    {
       "name": "riscv64-debug",
       "displayName": "RISC-V 64 debug",
       "generator": "Ninja",
@@ -18,6 +28,13 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "test-unit",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-unit"
+      ]
+    },
     {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
@@ -31,6 +48,20 @@
     }
   ],
   "workflowPresets": [
+    {
+      "name": "test-unit",
+      "displayName": "Build and run native unit tests",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-unit"
+        }
+      ]
+    },
     {
       "name": "build-riscv64-debug",
       "displayName": "Configure and build the RISC-V 64 debug image",

@@ -32,8 +32,10 @@ launch default, not a kernel ABI.
 
 OpenSBI passes the boot hart ID in `a0` and the FDT address in `a1`. The early parser validates all offsets and lengths and reads only:
 
-- every root child whose node basename is `memory` or whose `device_type`
-  property is `"memory"`, including all valid `reg` tuples;
+- every available root child whose node basename is `memory` or whose
+  `device_type` property is `"memory"`, including all valid `reg` tuples;
+- memory nodes whose `status` is absent, `"ok"`, or `"okay"` are available;
+  other status values are excluded from usable physical memory;
 - the FDT reservation map;
 - `/reserved-memory` child ranges;
 - root address and size cell widths required to decode those ranges.
