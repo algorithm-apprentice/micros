@@ -34,3 +34,4 @@ to make the project appear more consistent than it was.
 | [0016](0016-supervisor-timer-interrupts.md) | Supervisor timer interrupts | Accepted |
 | [0017](0017-bootstrap-physical-frame-allocator.md) | Bootstrap physical frame allocator | Accepted |
 | [0018](0018-sv39-kernel-address-space.md) | Sv39 kernel address space | Accepted |
+| [0019](0019-kernel-object-identity-and-ownership.md) | Kernel object identity and ownership | Accepted |
