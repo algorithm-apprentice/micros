@@ -33,3 +33,4 @@ to make the project appear more consistent than it was.
 | [0015](0015-supervisor-trap-entry.md) | Supervisor trap entry | Accepted |
 | [0016](0016-supervisor-timer-interrupts.md) | Supervisor timer interrupts | Accepted |
 | [0017](0017-bootstrap-physical-frame-allocator.md) | Bootstrap physical frame allocator | Accepted |
+| [0018](0018-sv39-kernel-address-space.md) | Sv39 kernel address space | Accepted |
