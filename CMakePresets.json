@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "riscv64-debug",
+      "displayName": "RISC-V 64 debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/riscv64-debug",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/riscv64-clang.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "riscv64-debug",
+      "configurePreset": "riscv64-debug"
+    },
+    {
+      "name": "test-qemu-smoke",
+      "configurePreset": "riscv64-debug",
+      "targets": [
+        "test-qemu-smoke"
+      ]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "build-riscv64-debug",
+      "displayName": "Configure and build the RISC-V 64 debug image",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-debug"
+        },
+        {
+          "type": "build",
+          "name": "riscv64-debug"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-smoke",
+      "displayName": "Build and run the QEMU boot smoke test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-smoke"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+#ifndef MICROS_ARCH_RISCV64_PLATFORM_H
+#define MICROS_ARCH_RISCV64_PLATFORM_H
+
+#include <stdint.h>
+
+enum {
+    SBI_RESET_TYPE_SHUTDOWN = 0,
+    SBI_RESET_REASON_NONE = 0,
+};
+
+void uart_write(const char *text);
+void uart_flush(void);
+intptr_t sbi_system_reset(uint32_t reset_type, uint32_t reset_reason);
+
+#endif

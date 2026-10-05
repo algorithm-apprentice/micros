@@ -67,6 +67,16 @@ Initial performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
+The first implemented stable target is `test-qemu-smoke`. From a clean
+checkout, its configure, build, and execution gate is:
+
+```bash
+cmake --workflow --preset test-qemu-smoke
+```
+
+The remaining stable targets are added when their dependency-DAG layers become
+implementation-ready.
+
 ## Native unit tests
 
 Code should run natively when its correctness does not depend on actual
