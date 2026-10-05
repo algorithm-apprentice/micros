@@ -5,6 +5,7 @@ project(micros VERSION 0.1.0 LANGUAGES C)
 option(MICROS_BUILD_HOST_TESTS "Build native host tests" OFF)
 option(MICROS_BUILD_PANIC_TEST "Build the intentional panic image" OFF)
 option(MICROS_BUILD_TRAP_TEST "Build the trap recovery test image" OFF)
+option(MICROS_BUILD_TIMER_TEST "Build the timer interrupt test image" OFF)
 option(
     MICROS_BUILD_TRAP_PANIC_TEST
     "Build the unexpected-trap panic test image"
@@ -14,8 +15,11 @@ option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 if(
     (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_TEST)
+    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TIMER_TEST)
     OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TIMER_TEST)
     OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
+    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
 )
     message(FATAL_ERROR "Select at most one target test image")
 endif()
@@ -143,6 +147,10 @@ endif()
 
 if(MICROS_BUILD_TRAP_TEST)
     target_compile_definitions(micros PRIVATE MICROS_BUILD_TRAP_TEST=1)
+endif()
+
+if(MICROS_BUILD_TIMER_TEST)
+    target_compile_definitions(micros PRIVATE MICROS_BUILD_TIMER_TEST=1)
 endif()
 
 if(MICROS_BUILD_TRAP_PANIC_TEST)
@@ -282,6 +290,37 @@ if(MICROS_BUILD_TRAP_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_TIMER_TEST)
+    add_custom_target(
+        test-qemu-timer
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-timer-test-report
             --timeout
             8
         DEPENDS micros

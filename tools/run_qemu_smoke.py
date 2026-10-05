@@ -20,6 +20,12 @@ TRAP_TEST_PASS = (
     "MICROS_TRAP_TEST_PASS "
     "origin=S cause=illegal-instruction registers=preserved"
 )
+TIMER_TEST_MARKER = "MICROS_TIMER_TEST"
+TIMER_TEST_PASS = (
+    "MICROS_TIMER_TEST_PASS "
+    "ticks=0x0000000000000003 "
+    "interval=0x00000000000186a0"
+)
 FDT_COUNTS_PATTERN = re.compile(
     r"^MICROS_FDT_COUNTS "
     r"memory=0x([0-9a-f]{16}) "
@@ -194,6 +200,28 @@ def _has_complete_trap_test_report(output_lines):
     )
 
 
+def _has_complete_timer_test_report(output):
+    output_lines, terminated = _split_output_records(output)
+    fdt_ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_FDT_READY")
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(TIMER_TEST_MARKER)
+    ]
+    return (
+        len(fdt_ready_indices) == 1
+        and output_lines[fdt_ready_indices[0]] == "MICROS_FDT_READY"
+        and len(test_indices) == 1
+        and output_lines[test_indices[0]] == TIMER_TEST_PASS
+        and terminated[test_indices[0]]
+        and fdt_ready_indices[0] < test_indices[0]
+    )
+
+
 def _has_complete_trap_context(output, expected_sepc=None):
     output_lines, terminated = _split_output_records(output)
     panic_indices = [
@@ -282,6 +310,7 @@ def matches_expected_result(
     require_panic_report=False,
     require_trap_ready=False,
     require_trap_test_report=False,
+    require_timer_test_report=False,
     require_trap_context=False,
     expected_trap_context_sepc=None,
 ):
@@ -310,6 +339,11 @@ def matches_expected_result(
     if (
         require_trap_test_report
         and not _has_complete_trap_test_report(output_lines)
+    ):
+        return False
+    if (
+        require_timer_test_report
+        and not _has_complete_timer_test_report(result.output)
     ):
         return False
     has_trap_context = any(
@@ -523,6 +557,11 @@ def parse_arguments(argv):
         help="Require the ordered trap recovery test records",
     )
     parser.add_argument(
+        "--require-timer-test-report",
+        action="store_true",
+        help="Require the ordered timer interrupt test record",
+    )
+    parser.add_argument(
         "--require-trap-context",
         action="store_true",
         help="Require one trap context immediately after the panic core",
@@ -600,6 +639,7 @@ def main(argv=None):
         require_panic_report=arguments.require_panic_report,
         require_trap_ready=arguments.require_trap_ready,
         require_trap_test_report=arguments.require_trap_test_report,
+        require_timer_test_report=arguments.require_timer_test_report,
         require_trap_context=arguments.require_trap_context,
         expected_trap_context_sepc=expected_trap_context_sepc,
     )

@@ -45,6 +45,15 @@
       }
     },
     {
+      "name": "riscv64-timer-test",
+      "displayName": "RISC-V 64 timer interrupt test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-timer-test",
+      "cacheVariables": {
+        "MICROS_BUILD_TIMER_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-trap-panic-test",
       "displayName": "RISC-V 64 unexpected trap panic test",
       "inherits": "riscv64-debug",
@@ -85,6 +94,13 @@
       "configurePreset": "riscv64-trap-test",
       "targets": [
         "test-qemu-trap"
+      ]
+    },
+    {
+      "name": "test-qemu-timer",
+      "configurePreset": "riscv64-timer-test",
+      "targets": [
+        "test-qemu-timer"
       ]
     },
     {
@@ -163,6 +179,20 @@
         {
           "type": "build",
           "name": "test-qemu-trap"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-timer",
+      "displayName": "Build and run the timer interrupt test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-timer-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-timer"
         }
       ]
     },
