@@ -5,6 +5,15 @@
 .type micros_panic_entry, @function
 micros_panic_entry:
     csrrci t0, sstatus, 2
+    li a4, 0
+    j .Lpanic_common
+.size micros_panic_entry, . - micros_panic_entry
+
+.globl micros_trap_panic_entry
+.type micros_trap_panic_entry, @function
+micros_trap_panic_entry:
+    csrrci t0, sstatus, 2
+.Lpanic_common:
     addi sp, sp, -MICROS_PANIC_CONTEXT_SIZE
     sd t0, MICROS_PANIC_CONTEXT_SSTATUS_OFFSET(sp)
 
@@ -19,9 +28,9 @@ micros_panic_entry:
     addi t0, sp, MICROS_PANIC_CONTEXT_SIZE
     sd t0, MICROS_PANIC_CONTEXT_SP_OFFSET(sp)
 
-    mv a4, sp
+    mv a5, sp
     call micros_panic_report
 1:
     wfi
     j 1b
-.size micros_panic_entry, . - micros_panic_entry
+.size micros_trap_panic_entry, . - micros_trap_panic_entry

@@ -36,6 +36,12 @@ SECTIONS
         KEEP(*(.stack))
     }
 
+    .trap_stacks (NOLOAD) : ALIGN(16)
+    {
+        KEEP(*(.trap_stack))
+        KEEP(*(.trap_emergency_stack))
+    }
+
     __kernel_end = .;
 
     /DISCARD/ :
