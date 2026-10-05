@@ -29,3 +29,4 @@ to make the project appear more consistent than it was.
 | [0011](0011-process-thread-and-hart-model.md) | Process, thread, and hart model | Accepted |
 | [0012](0012-console-and-irq-handoff.md) | Console and IRQ handoff | Accepted |
 | [0013](0013-ai-native-test-first-development.md) | AI-native test-first development | Accepted |
+| [0014](0014-panic-diagnostics.md) | Panic diagnostics | Accepted |
