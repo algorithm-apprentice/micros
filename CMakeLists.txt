@@ -17,31 +17,36 @@ option(
     OFF
 )
 option(MICROS_BUILD_MMU_TEST "Build the Sv39 MMU test image" OFF)
+option(
+    MICROS_BUILD_OBJECT_MODEL_TEST
+    "Build the kernel object model test image"
+    OFF
+)
+option(
+    MICROS_BUILD_NESTED_TRAP_TEST
+    "Build the per-hart nested trap test image"
+    OFF
+)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
-if(
-    (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_TEST)
-    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TIMER_TEST)
-    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
-    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
-    OR (MICROS_BUILD_PANIC_TEST AND MICROS_BUILD_MMU_TEST)
-    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TIMER_TEST)
-    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
-    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
-    OR (MICROS_BUILD_TRAP_TEST AND MICROS_BUILD_MMU_TEST)
-    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_FRAME_ALLOCATOR_TEST)
-    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_TRAP_PANIC_TEST)
-    OR (MICROS_BUILD_TIMER_TEST AND MICROS_BUILD_MMU_TEST)
-    OR (
-        MICROS_BUILD_FRAME_ALLOCATOR_TEST
-        AND MICROS_BUILD_TRAP_PANIC_TEST
-    )
-    OR (
-        MICROS_BUILD_FRAME_ALLOCATOR_TEST
-        AND MICROS_BUILD_MMU_TEST
-    )
-    OR (MICROS_BUILD_TRAP_PANIC_TEST AND MICROS_BUILD_MMU_TEST)
+set(
+    MICROS_TARGET_TEST_OPTIONS
+    MICROS_BUILD_PANIC_TEST
+    MICROS_BUILD_TRAP_TEST
+    MICROS_BUILD_TIMER_TEST
+    MICROS_BUILD_FRAME_ALLOCATOR_TEST
+    MICROS_BUILD_TRAP_PANIC_TEST
+    MICROS_BUILD_MMU_TEST
+    MICROS_BUILD_OBJECT_MODEL_TEST
+    MICROS_BUILD_NESTED_TRAP_TEST
 )
+set(MICROS_TARGET_TEST_COUNT 0)
+foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
+    if(${option_name})
+        math(EXPR MICROS_TARGET_TEST_COUNT "${MICROS_TARGET_TEST_COUNT} + 1")
+    endif()
+endforeach()
+if(MICROS_TARGET_TEST_COUNT GREATER 1)
     message(FATAL_ERROR "Select at most one target test image")
 endif()
 
@@ -65,6 +70,10 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/sv39.c
         tests/host/sv39_test.c
     )
+    add_executable(
+        kernel_objects_test
+        tests/host/kernel_objects_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -77,12 +86,18 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         sv39_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        kernel_objects_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_compile_features(fdt_test PRIVATE c_std_17)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_features(sv39_test PRIVATE c_std_17)
+    target_compile_features(kernel_objects_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -105,6 +120,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         sv39_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        kernel_objects_test
         PRIVATE
             -Wall
             -Wextra
@@ -143,11 +168,23 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_link_options(sv39_test PRIVATE -fsanitize=address,undefined)
+        target_compile_options(
+            kernel_objects_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            kernel_objects_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
     add_test(NAME frame-allocator COMMAND frame_allocator_test)
     add_test(NAME sv39-encoding COMMAND sv39_test)
+    add_test(NAME kernel-objects COMMAND kernel_objects_test)
 
     add_custom_target(
         test-unit
@@ -166,7 +203,11 @@ if(MICROS_BUILD_HOST_TESTS)
             tests/host
             -p
             "test_*.py"
-        DEPENDS fdt_test frame_allocator_test sv39_test
+        DEPENDS
+            fdt_test
+            frame_allocator_test
+            sv39_test
+            kernel_objects_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -269,6 +310,90 @@ if(MICROS_BUILD_MMU_TEST)
     )
 endif()
 
+if(MICROS_BUILD_OBJECT_MODEL_TEST)
+    add_custom_target(
+        test-qemu-object-model
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_OBJECT_MODEL_TEST_PASS process-generation=advanced stale=rejected thread-limit=enforced hart-local=preserved"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-objects-ready
+            --require-object-model-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_NESTED_TRAP_TEST)
+    add_custom_target(
+        test-qemu-nested-trap
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_NESTED_TRAP_TEST_PASS hart=routed emergency-stack=selected"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-objects-ready
+            --require-nested-trap-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_OBJECT_MODEL_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_OBJECT_MODEL_TEST=1
+    )
+endif()
+
+if(MICROS_BUILD_NESTED_TRAP_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_NESTED_TRAP_TEST=1
+    )
+endif()
+
 if(MICROS_BUILD_TRAP_TEST OR MICROS_BUILD_TRAP_PANIC_TEST)
     target_sources(micros PRIVATE arch/riscv64/trap_test.S)
 endif()
@@ -349,6 +474,7 @@ add_custom_target(
         --require-trap-ready
         --require-frame-allocator-ready
         --require-mmu-ready
+        --require-objects-ready
         --timeout
         8
     DEPENDS micros
@@ -393,6 +519,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -419,12 +546,13 @@ if(MICROS_BUILD_TRAP_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved"
+            "MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved hart-context=routed primary-stack=selected sscratch=anchor"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-test-report
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -451,13 +579,14 @@ if(MICROS_BUILD_TIMER_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0"
+            "MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0 active=0x0000000000000000 deadline=0xffffffffffffffff owner=hart"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready
             --require-timer-test-report
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -496,6 +625,7 @@ if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
             --require-trap-ready
             --require-frame-allocator-test-report
             --require-mmu-ready
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -541,6 +671,7 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-objects-ready
             --require-trap-context
             --nm
             "${CMAKE_NM}"
@@ -579,6 +710,7 @@ if(MICROS_BUILD_MMU_TEST)
             --require-frame-allocator-ready
             --require-mmu-ready
             --require-mmu-test-report
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros

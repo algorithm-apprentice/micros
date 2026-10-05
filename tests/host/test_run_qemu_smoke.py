@@ -5,8 +5,20 @@ import unittest
 from tools import run_qemu_smoke
 
 
+OBJECTS_READY_RECORD = (
+    "MICROS_OBJECTS_READY "
+    "processes=0x0000000000000000 "
+    "threads=0x0000000000000000 "
+    "harts=0x0000000000000001 "
+    "max-threads=0x0000000000000001 "
+    "max-harts=0x0000000000000001 "
+    "boot-hart=0x0000000000000000\n"
+)
+
 PANIC_OUTPUT = (
     "MICROS_BOOT 0.1.0\n"
+    + OBJECTS_READY_RECORD
+    + "MICROS_TRAP_READY\n"
     "MICROS_FDT_MEMORY "
     "base=0x0000000080000000 "
     "size=0x0000000008000000\n"
@@ -34,7 +46,8 @@ PANIC_OUTPUT = (
 
 TRAP_RECOVERY_OUTPUT = (
     "MICROS_BOOT 0.1.0\n"
-    "MICROS_TRAP_READY\n"
+    + OBJECTS_READY_RECORD
+    + "MICROS_TRAP_READY\n"
     "MICROS_FDT_MEMORY "
     "base=0x0000000080000000 "
     "size=0x0000000008000000\n"
@@ -47,15 +60,19 @@ TRAP_RECOVERY_OUTPUT = (
     "reserved-memory=0x0000000000000001\n"
     "MICROS_FDT_READY\n"
     "MICROS_TRAP_TEST_PASS "
-    "origin=S cause=illegal-instruction registers=preserved\n"
+    "origin=S cause=illegal-instruction registers=preserved "
+    "hart-context=routed primary-stack=selected sscratch=anchor\n"
 )
 
 TIMER_TEST_OUTPUT = TRAP_RECOVERY_OUTPUT.replace(
     "MICROS_TRAP_TEST_PASS "
-    "origin=S cause=illegal-instruction registers=preserved\n",
+    "origin=S cause=illegal-instruction registers=preserved "
+    "hart-context=routed primary-stack=selected sscratch=anchor\n",
     "MICROS_TIMER_TEST_PASS "
     "ticks=0x0000000000000003 "
-    "interval=0x00000000000186a0\n",
+    "interval=0x00000000000186a0 "
+    "active=0x0000000000000000 "
+    "deadline=0xffffffffffffffff owner=hart\n",
 )
 
 FRAME_ALLOCATOR_READY_RECORD = (
@@ -86,7 +103,8 @@ MMU_TEST_PASS = (
 
 FRAME_ALLOCATOR_OUTPUT = TRAP_RECOVERY_OUTPUT.replace(
     "MICROS_TRAP_TEST_PASS "
-    "origin=S cause=illegal-instruction registers=preserved\n",
+    "origin=S cause=illegal-instruction registers=preserved "
+    "hart-context=routed primary-stack=selected sscratch=anchor\n",
     "",
 ).replace(
     "MICROS_FDT_READY\n",
@@ -101,6 +119,23 @@ MMU_OUTPUT = FRAME_ALLOCATOR_OUTPUT + MMU_READY_RECORD
 
 MMU_TEST_OUTPUT = MMU_OUTPUT + MMU_TEST_PASS
 
+OBJECT_MODEL_TEST_PASS = (
+    "MICROS_OBJECT_MODEL_TEST_PASS "
+    "process-generation=advanced "
+    "stale=rejected "
+    "thread-limit=enforced "
+    "hart-local=preserved\n"
+)
+
+NESTED_TRAP_TEST_PASS = (
+    "MICROS_NESTED_TRAP_TEST_PASS "
+    "hart=routed emergency-stack=selected\n"
+)
+
+OBJECT_MODEL_TEST_OUTPUT = MMU_OUTPUT + OBJECT_MODEL_TEST_PASS
+
+NESTED_TRAP_TEST_OUTPUT = MMU_OUTPUT + NESTED_TRAP_TEST_PASS
+
 TRAP_CONTEXT_RECORD = (
     "MICROS_TRAP_CONTEXT "
     "origin=S "
@@ -114,10 +149,6 @@ TRAP_CONTEXT_RECORD = (
 
 TRAP_PANIC_OUTPUT = (
     PANIC_OUTPUT.replace(
-        "MICROS_FDT_READY\n",
-        "MICROS_TRAP_READY\nMICROS_FDT_READY\n",
-    )
-    .replace(
         "MICROS_PANIC reason=intentional-test\n",
         "MICROS_PANIC reason=unexpected-exception\n",
     )
@@ -480,7 +511,9 @@ class ExpectedOutcomeTest(unittest.TestCase):
             output=(
                 TRAP_RECOVERY_OUTPUT
                 + "MICROS_TRAP_TEST_PASS "
-                "origin=S cause=illegal-instruction registers=preserved\n"
+                "origin=S cause=illegal-instruction registers=preserved "
+                "hart-context=routed primary-stack=selected "
+                "sscratch=anchor\n"
             ),
             return_code=0,
             timed_out=False,
@@ -526,7 +559,9 @@ class ExpectedOutcomeTest(unittest.TestCase):
     def test_rejects_trap_pass_before_fdt_ready(self):
         pass_record = (
             "MICROS_TRAP_TEST_PASS "
-            "origin=S cause=illegal-instruction registers=preserved\n"
+            "origin=S cause=illegal-instruction registers=preserved "
+            "hart-context=routed primary-stack=selected "
+            "sscratch=anchor\n"
         )
         too_early = TRAP_RECOVERY_OUTPUT.replace(pass_record, "").replace(
             "MICROS_FDT_READY\n",
@@ -597,7 +632,9 @@ class ExpectedOutcomeTest(unittest.TestCase):
                 TIMER_TEST_OUTPUT
                 + "MICROS_TIMER_TEST_PASS "
                 "ticks=0x0000000000000003 "
-                "interval=0x00000000000186a0\n"
+                "interval=0x00000000000186a0 "
+                "active=0x0000000000000000 "
+                "deadline=0xffffffffffffffff owner=hart\n"
             ),
             return_code=0,
             timed_out=False,
@@ -620,7 +657,9 @@ class ExpectedOutcomeTest(unittest.TestCase):
         pass_record = (
             "MICROS_TIMER_TEST_PASS "
             "ticks=0x0000000000000003 "
-            "interval=0x00000000000186a0\n"
+            "interval=0x00000000000186a0 "
+            "active=0x0000000000000000 "
+            "deadline=0xffffffffffffffff owner=hart\n"
         )
         too_early = TIMER_TEST_OUTPUT.replace(pass_record, "").replace(
             "MICROS_FDT_READY\n",
@@ -1152,6 +1191,207 @@ class ExpectedOutcomeTest(unittest.TestCase):
                         require_frame_allocator_ready=True,
                         require_mmu_ready=True,
                         require_mmu_test_report=True,
+                    )
+                )
+
+    def test_accepts_complete_objects_ready_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=MMU_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_objects_ready=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_objects_ready_report(self):
+        late = MMU_OUTPUT.replace(OBJECTS_READY_RECORD, "").replace(
+            "MICROS_TRAP_READY\n",
+            "MICROS_TRAP_READY\n" + OBJECTS_READY_RECORD,
+        )
+        invalid_outputs = (
+            MMU_OUTPUT.replace(OBJECTS_READY_RECORD, ""),
+            MMU_OUTPUT + OBJECTS_READY_RECORD,
+            MMU_OUTPUT.replace(
+                "max-harts=0x0000000000000001",
+                "max-harts=0x0000000000000002",
+            ),
+            MMU_OUTPUT.replace(
+                "boot-hart=0x0000000000000000",
+                "boot-hart=0x0000000000000001",
+            ),
+            MMU_OUTPUT.replace(
+                "processes=0x0000000000000000",
+                "processes=0x0",
+            ),
+            late,
+            MMU_OUTPUT.replace(
+                OBJECTS_READY_RECORD,
+                OBJECTS_READY_RECORD.rstrip("\n"),
+            ),
+        )
+
+        for invalid in invalid_outputs:
+            with self.subTest(output=invalid):
+                result = run_qemu_smoke.QemuResult(
+                    output=invalid,
+                    return_code=0,
+                    timed_out=False,
+                )
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_objects_ready=True,
+                    )
+                )
+
+    def test_accepts_complete_object_model_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=OBJECT_MODEL_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_objects_ready=True,
+            require_object_model_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_object_model_test_report(self):
+        early = OBJECT_MODEL_TEST_OUTPUT.replace(
+            OBJECT_MODEL_TEST_PASS,
+            "",
+        ).replace(
+            MMU_READY_RECORD,
+            OBJECT_MODEL_TEST_PASS + MMU_READY_RECORD,
+        )
+        invalid_outputs = (
+            MMU_OUTPUT,
+            OBJECT_MODEL_TEST_OUTPUT + OBJECT_MODEL_TEST_PASS,
+            early,
+            OBJECT_MODEL_TEST_OUTPUT.replace(
+                "thread-limit=enforced",
+                "thread-limit=ignored",
+            ),
+            OBJECT_MODEL_TEST_OUTPUT.rstrip("\n"),
+        )
+
+        for invalid in invalid_outputs:
+            with self.subTest(output=invalid):
+                result = run_qemu_smoke.QemuResult(
+                    output=invalid,
+                    return_code=0,
+                    timed_out=False,
+                )
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_objects_ready=True,
+                        require_object_model_test_report=True,
+                    )
+                )
+
+    def test_accepts_complete_nested_trap_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=NESTED_TRAP_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_objects_ready=True,
+            require_nested_trap_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_nested_trap_test_report(self):
+        early = NESTED_TRAP_TEST_OUTPUT.replace(
+            NESTED_TRAP_TEST_PASS,
+            "",
+        ).replace(
+            MMU_READY_RECORD,
+            NESTED_TRAP_TEST_PASS + MMU_READY_RECORD,
+        )
+        invalid_outputs = (
+            MMU_OUTPUT,
+            NESTED_TRAP_TEST_OUTPUT + NESTED_TRAP_TEST_PASS,
+            early,
+            NESTED_TRAP_TEST_OUTPUT.replace(
+                "emergency-stack=selected",
+                "emergency-stack=default",
+            ),
+            NESTED_TRAP_TEST_OUTPUT.rstrip("\n"),
+        )
+
+        for invalid in invalid_outputs:
+            with self.subTest(output=invalid):
+                result = run_qemu_smoke.QemuResult(
+                    output=invalid,
+                    return_code=0,
+                    timed_out=False,
+                )
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_objects_ready=True,
+                        require_nested_trap_test_report=True,
                     )
                 )
 

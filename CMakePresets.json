@@ -79,6 +79,24 @@
       "cacheVariables": {
         "MICROS_BUILD_MMU_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-object-model-test",
+      "displayName": "RISC-V 64 kernel object model test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-object-model-test",
+      "cacheVariables": {
+        "MICROS_BUILD_OBJECT_MODEL_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-nested-trap-test",
+      "displayName": "RISC-V 64 per-hart nested trap test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-nested-trap-test",
+      "cacheVariables": {
+        "MICROS_BUILD_NESTED_TRAP_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -140,6 +158,20 @@
       "configurePreset": "riscv64-mmu-test",
       "targets": [
         "test-qemu-mmu"
+      ]
+    },
+    {
+      "name": "test-qemu-object-model",
+      "configurePreset": "riscv64-object-model-test",
+      "targets": [
+        "test-qemu-object-model"
+      ]
+    },
+    {
+      "name": "test-qemu-nested-trap",
+      "configurePreset": "riscv64-nested-trap-test",
+      "targets": [
+        "test-qemu-nested-trap"
       ]
     }
   ],
@@ -267,6 +299,34 @@
         {
           "type": "build",
           "name": "test-qemu-mmu"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-object-model",
+      "displayName": "Build and run the kernel object model test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-object-model-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-object-model"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-nested-trap",
+      "displayName": "Build and run the per-hart nested trap test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-nested-trap-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-nested-trap"
         }
       ]
     }
