@@ -48,7 +48,7 @@ class QemuResult:
     timed_out: bool
 
 
-def _has_complete_fdt_events(output_lines):
+def _has_complete_fdt_events(output_lines, require_reservations):
     summaries = []
     actual_counts = [0, 0, 0]
 
@@ -66,6 +66,8 @@ def _has_complete_fdt_events(output_lines):
             actual_counts[FDT_EVENT_NAMES.index(match.group(1))] += 1
     if len(summaries) != 1:
         return False
+    if require_reservations and summaries[0][1] + summaries[0][2] == 0:
+        return False
 
     return tuple(actual_counts) == summaries[0]
 
@@ -77,6 +79,7 @@ def classify_smoke(
     timed_out,
     markers,
     require_fdt_events=False,
+    require_fdt_reservations=False,
 ):
     if PANIC_MARKER in output:
         return SmokeOutcome.PANIC
@@ -91,8 +94,11 @@ def classify_smoke(
         return_code == 0
         and all(marker in output_lines for marker in markers)
         and (
-            not require_fdt_events
-            or _has_complete_fdt_events(output_lines)
+            not (require_fdt_events or require_fdt_reservations)
+            or _has_complete_fdt_events(
+                output_lines,
+                require_reservations=require_fdt_reservations,
+            )
         )
     ):
         return SmokeOutcome.PASS
@@ -205,6 +211,11 @@ def parse_arguments(argv):
         action="store_true",
         help="Require FDT range events to match the guest's count summary",
     )
+    parser.add_argument(
+        "--require-fdt-reservations",
+        action="store_true",
+        help="Require at least one firmware reservation in the FDT events",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
@@ -235,6 +246,7 @@ def main(argv=None):
         timed_out=result.timed_out,
         markers=arguments.marker,
         require_fdt_events=arguments.require_fdt_events,
+        require_fdt_reservations=arguments.require_fdt_reservations,
     )
     return print_tap_result(outcome, result, command)
 

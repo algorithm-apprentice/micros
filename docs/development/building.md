@@ -142,8 +142,9 @@ MICROS_FDT_READY
 
 The reservation event kinds are emitted only when the corresponding FDT source
 contains ranges. The smoke harness verifies that each count equals the number
-of emitted events of that kind, so omitted memory or reservation records cannot
-produce a pass. A parse error emits
+of emitted events of that kind and independently requires at least one firmware
+reservation from either FDT reservation source. An empty reservation result or
+an omitted emitted record therefore cannot produce a pass. A parse error emits
 `MICROS_TEST_FAILURE fdt-<error-category>`, flushes the UART, and requests SBI
 shutdown with the system-failure reason.
 

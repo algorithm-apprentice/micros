@@ -102,6 +102,7 @@ class SmokeClassificationTest(unittest.TestCase):
             timed_out=False,
             markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
             require_fdt_events=True,
+            require_fdt_reservations=True,
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.PASS, outcome)
@@ -126,6 +127,28 @@ class SmokeClassificationTest(unittest.TestCase):
             timed_out=False,
             markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
             require_fdt_events=True,
+        )
+
+        self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
+
+    def test_rejects_empty_fdt_reservation_result(self):
+        outcome = run_qemu_smoke.classify_smoke(
+            output=(
+                "MICROS_BOOT 0.1.0\n"
+                "MICROS_FDT_MEMORY "
+                "base=0x0000000000000000 "
+                "size=0x0000000000000001\n"
+                "MICROS_FDT_COUNTS "
+                "memory=0x0000000000000001 "
+                "reservation=0x0000000000000000 "
+                "reserved-memory=0x0000000000000000\n"
+                "MICROS_FDT_READY\n"
+            ),
+            return_code=0,
+            timed_out=False,
+            markers=("MICROS_BOOT 0.1.0", "MICROS_FDT_READY"),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)

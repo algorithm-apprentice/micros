@@ -78,8 +78,9 @@ cmake --workflow --preset test-qemu-smoke
 `test-unit` currently runs the FDT parser corpus under ASan and UBSan plus the
 Python host tests. `test-qemu-smoke` verifies the real OpenSBI handoff, FDT
 memory discovery, exact serial markers, agreement between decoded range counts
-and emitted range events, and clean SBI shutdown. The remaining stable targets
-are added when their dependency-DAG layers become implementation-ready.
+and emitted range events, a nonempty firmware reservation result, and clean SBI
+shutdown. The remaining stable targets are added when their dependency-DAG
+layers become implementation-ready.
 
 ## Native unit tests
 

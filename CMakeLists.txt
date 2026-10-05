@@ -167,6 +167,7 @@ add_custom_target(
         --marker
         "MICROS_FDT_READY"
         --require-fdt-events
+        --require-fdt-reservations
         --timeout
         8
     DEPENDS micros
