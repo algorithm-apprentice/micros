@@ -3,6 +3,7 @@
 #include "arch/riscv64/platform.h"
 #include "micros/fdt.h"
 #include "micros/panic.h"
+#include "micros/trap.h"
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -53,9 +54,10 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     enum micros_fdt_error error;
     size_t index;
 
-    (void)hart_id;
+    micros_trap_install(hart_id);
 
     uart_write("MICROS_BOOT " MICROS_VERSION "\n");
+    uart_write("MICROS_TRAP_READY\n");
     uart_flush();
 
     error = micros_fdt_parse_memory_map(
@@ -103,6 +105,21 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 
 #ifdef MICROS_BUILD_PANIC_TEST
     MICROS_PANIC(hart_id, "intentional-test");
+#endif
+
+#ifdef MICROS_BUILD_TRAP_TEST
+    if (!micros_trap_run_self_test()) {
+        MICROS_PANIC(hart_id, "trap-test-restore");
+    }
+    uart_write(
+        "MICROS_TRAP_TEST_PASS "
+        "origin=S cause=illegal-instruction registers=preserved\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_TRAP_PANIC_TEST
+    micros_trap_run_panic_test();
 #endif
 
     (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);

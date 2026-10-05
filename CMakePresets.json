@@ -34,6 +34,24 @@
       "cacheVariables": {
         "MICROS_BUILD_PANIC_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-trap-test",
+      "displayName": "RISC-V 64 trap recovery test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-trap-test",
+      "cacheVariables": {
+        "MICROS_BUILD_TRAP_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-trap-panic-test",
+      "displayName": "RISC-V 64 unexpected trap panic test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-trap-panic-test",
+      "cacheVariables": {
+        "MICROS_BUILD_TRAP_PANIC_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -60,6 +78,20 @@
       "configurePreset": "riscv64-panic-test",
       "targets": [
         "test-qemu-panic"
+      ]
+    },
+    {
+      "name": "test-qemu-trap",
+      "configurePreset": "riscv64-trap-test",
+      "targets": [
+        "test-qemu-trap"
+      ]
+    },
+    {
+      "name": "test-qemu-trap-panic",
+      "configurePreset": "riscv64-trap-panic-test",
+      "targets": [
+        "test-qemu-trap-panic"
       ]
     }
   ],
@@ -117,6 +149,34 @@
         {
           "type": "build",
           "name": "test-qemu-panic"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-trap",
+      "displayName": "Build and run the trap recovery test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-trap-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-trap"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-trap-panic",
+      "displayName": "Build and run the unexpected trap panic test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-trap-panic-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-trap-panic"
         }
       ]
     }

@@ -8,7 +8,8 @@ Implementation now follows the accepted dependency DAG. The current boot
 foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
 versioned marker through the QEMU `virt` UART, validates the firmware-provided
 FDT memory map, provides structured panic diagnostics, and shuts QEMU down
-through SBI.
+through SBI. A direct-mode supervisor trap vector preserves the complete
+integer context and returns safely from an isolated expected exception.
 
 ## Goals
 
@@ -66,11 +67,14 @@ Then run:
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
+cmake --workflow --preset test-qemu-trap
+cmake --workflow --preset test-qemu-trap-panic
 ```
 
 These commands run the native suite, verify normal boot through the
 QEMU-bundled OpenSBI firmware, and verify an intentional structured panic with
-clean failure shutdown. See the
+clean failure shutdown. They also prove complete register-preserving trap
+return and captured-context diagnostics for an unexpected exception. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 

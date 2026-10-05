@@ -97,7 +97,7 @@ as a thread. See
 
 OpenSBI initializes the machine and enters the kernel in supervisor mode with
 the boot hart ID and FDT address. The kernel establishes a stack, clears
-uninitialized data, initializes serial output, and installs a trap vector.
+uninitialized data, installs the trap vector, and then begins serial output.
 
 ### Phase 2: kernel bootstrap
 

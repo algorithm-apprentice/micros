@@ -32,6 +32,51 @@ PANIC_OUTPUT = (
     "sp=0x0000000080204000\n"
 )
 
+TRAP_RECOVERY_OUTPUT = (
+    "MICROS_BOOT 0.1.0\n"
+    "MICROS_TRAP_READY\n"
+    "MICROS_FDT_MEMORY "
+    "base=0x0000000080000000 "
+    "size=0x0000000008000000\n"
+    "MICROS_FDT_RESERVED_MEMORY "
+    "base=0x0000000080000000 "
+    "size=0x0000000000040000\n"
+    "MICROS_FDT_COUNTS "
+    "memory=0x0000000000000001 "
+    "reservation=0x0000000000000000 "
+    "reserved-memory=0x0000000000000001\n"
+    "MICROS_FDT_READY\n"
+    "MICROS_TRAP_TEST_PASS "
+    "origin=S cause=illegal-instruction registers=preserved\n"
+)
+
+TRAP_CONTEXT_RECORD = (
+    "MICROS_TRAP_CONTEXT "
+    "origin=S "
+    "sstatus=0x0000000200000100 "
+    "scause=0x0000000000000002 "
+    "stval=0x00000000c0001073 "
+    "sepc=0x0000000080202000 "
+    "ra=0x0000000000000101 "
+    "sp=0x0000000080205000\n"
+)
+
+TRAP_PANIC_OUTPUT = (
+    PANIC_OUTPUT.replace(
+        "MICROS_FDT_READY\n",
+        "MICROS_TRAP_READY\nMICROS_FDT_READY\n",
+    )
+    .replace(
+        "MICROS_PANIC reason=intentional-test\n",
+        "MICROS_PANIC reason=unexpected-exception\n",
+    )
+    .replace(
+        "file=kernel/main.c",
+        "file=kernel/trap.c",
+    )
+    + TRAP_CONTEXT_RECORD
+)
+
 
 class SmokeClassificationTest(unittest.TestCase):
     def test_accepts_marker_followed_by_clean_exit(self):
@@ -338,6 +383,228 @@ class ExpectedOutcomeTest(unittest.TestCase):
         )
 
         self.assertFalse(accepted)
+
+    def test_rejects_trap_context_for_direct_panic(self):
+        result = run_qemu_smoke.QemuResult(
+            output=PANIC_OUTPUT + TRAP_CONTEXT_RECORD,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_accepts_complete_trap_recovery(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_RECOVERY_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_trap_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_duplicate_trap_recovery_pass(self):
+        result = run_qemu_smoke.QemuResult(
+            output=(
+                TRAP_RECOVERY_OUTPUT
+                + "MICROS_TRAP_TEST_PASS "
+                "origin=S cause=illegal-instruction registers=preserved\n"
+            ),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_trap_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_out_of_order_trap_recovery_pass(self):
+        out_of_order = (
+            TRAP_RECOVERY_OUTPUT.replace("MICROS_TRAP_READY\n", "")
+            + "MICROS_TRAP_READY\n"
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=out_of_order,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_trap_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_trap_pass_before_fdt_ready(self):
+        pass_record = (
+            "MICROS_TRAP_TEST_PASS "
+            "origin=S cause=illegal-instruction registers=preserved\n"
+        )
+        too_early = TRAP_RECOVERY_OUTPUT.replace(pass_record, "").replace(
+            "MICROS_FDT_READY\n",
+            pass_record + "MICROS_FDT_READY\n",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=too_early,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_trap_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_accepts_complete_trap_panic_context(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_PANIC_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=unexpected-exception",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+            require_trap_context=True,
+            expected_trap_context_sepc=0x0000000080202000,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_duplicate_trap_panic_context(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_PANIC_OUTPUT + TRAP_CONTEXT_RECORD,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=unexpected-exception",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+            require_trap_context=True,
+            expected_trap_context_sepc=0x0000000080202000,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_unterminated_trap_panic_context(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_PANIC_OUTPUT.rstrip("\n"),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=unexpected-exception",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+            require_trap_context=True,
+            expected_trap_context_sepc=0x0000000080202000,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_wrong_trap_context_sepc(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_PANIC_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=unexpected-exception",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+            require_trap_context=True,
+            expected_trap_context_sepc=0xDEADBEEFDEADBEEF,
+        )
+
+        self.assertFalse(accepted)
+
+
+class NmSymbolTest(unittest.TestCase):
+    def test_parses_exact_defined_symbol(self):
+        address = run_qemu_smoke.parse_nm_symbol_address(
+            "0000000080202000 T micros_trap_panic_test_fault\n",
+            "micros_trap_panic_test_fault",
+        )
+
+        self.assertEqual(0x0000000080202000, address)
+
+    def test_rejects_duplicate_defined_symbol(self):
+        with self.assertRaises(ValueError):
+            run_qemu_smoke.parse_nm_symbol_address(
+                "0000000080202000 T trap_fault\n"
+                "0000000080203000 t trap_fault\n",
+                "trap_fault",
+            )
 
 
 class QemuCommandTest(unittest.TestCase):
