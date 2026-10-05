@@ -63,6 +63,7 @@ struct fixture_options {
     size_t nested_depth;
     bool include_memory;
     bool include_reserved_memory;
+    bool reserved_memory_claims_memory;
     bool reserved_ranges_nonempty;
     bool reserved_child_has_reg;
 };
@@ -187,6 +188,7 @@ static struct fixture_options default_options(void)
         .nested_depth = 0,
         .include_memory = true,
         .include_reserved_memory = true,
+        .reserved_memory_claims_memory = false,
         .reserved_ranges_nonempty = false,
         .reserved_child_has_reg = true,
     };
@@ -309,6 +311,26 @@ static void build_fixture(
                 PROPERTY_RANGES_OFFSET,
                 NULL,
                 0
+            );
+        }
+        if (options.reserved_memory_claims_memory) {
+            append_range_cells(
+                reserved_range,
+                0,
+                UINT64_C(0x90000000),
+                UINT64_C(0x1000)
+            );
+            (void)append_property(
+                &builder,
+                PROPERTY_DEVICE_TYPE_OFFSET,
+                "memory",
+                sizeof("memory")
+            );
+            (void)append_property(
+                &builder,
+                PROPERTY_REG_OFFSET,
+                reserved_range,
+                sizeof(reserved_range)
             );
         }
         begin_node(&builder, "firmware-buffer@82000000");
@@ -832,6 +854,25 @@ static bool test_rejects_nonempty_reserved_memory_ranges(void)
     return true;
 }
 
+static bool test_rejects_reserved_memory_as_usable_memory(void)
+{
+    struct fdt_fixture fixture;
+    struct fixture_options options = default_options();
+    struct micros_fdt_memory_map memory_map;
+
+    options.reserved_memory_claims_memory = true;
+    build_fixture(&fixture, options);
+    EXPECT_ERROR(
+        MICROS_FDT_ERROR_PROPERTY,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    return true;
+}
+
 static bool test_rejects_dynamic_reserved_memory(void)
 {
     struct fdt_fixture fixture;
@@ -897,6 +938,7 @@ int main(void)
         {"rejects excessive depth", test_rejects_excessive_tree_depth},
         {"rejects reserved-memory cell mismatch", test_rejects_reserved_memory_cell_mismatch},
         {"rejects nonempty reserved-memory ranges", test_rejects_nonempty_reserved_memory_ranges},
+        {"rejects reserved-memory as usable memory", test_rejects_reserved_memory_as_usable_memory},
         {"rejects dynamic reserved memory", test_rejects_dynamic_reserved_memory},
         {"requires memory range", test_requires_at_least_one_memory_range},
     };

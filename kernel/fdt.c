@@ -483,6 +483,9 @@ static enum micros_fdt_error validate_reserved_memory_node(
     const struct fdt_node *root
 )
 {
+    if (node->device_type_is_memory) {
+        return MICROS_FDT_ERROR_PROPERTY;
+    }
     if (
         !node->has_address_cells
         || !node->has_size_cells
@@ -598,6 +601,15 @@ static enum micros_fdt_error finish_node(struct fdt_parser *parser)
         parser->memory_map->address_cells = node->address_cells;
         parser->memory_map->size_cells = node->size_cells;
         parser->root_closed = true;
+    } else if (node->is_reserved_memory) {
+        enum micros_fdt_error error = validate_reserved_memory_node(
+            node,
+            root
+        );
+
+        if (error != MICROS_FDT_OK) {
+            return error;
+        }
     } else if (node->name_is_memory || node->device_type_is_memory) {
         if (!node->has_reg) {
             return MICROS_FDT_ERROR_PROPERTY;
@@ -616,15 +628,6 @@ static enum micros_fdt_error finish_node(struct fdt_parser *parser)
             if (error != MICROS_FDT_OK) {
                 return error;
             }
-        }
-    } else if (node->is_reserved_memory) {
-        enum micros_fdt_error error = validate_reserved_memory_node(
-            node,
-            root
-        );
-
-        if (error != MICROS_FDT_OK) {
-            return error;
         }
     } else if (node->is_reserved_child) {
         struct fdt_node *reserved_parent = &parser->nodes[1];
