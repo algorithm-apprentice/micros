@@ -10,12 +10,13 @@ The current implementation provides:
 - bounded parsing of the OpenSBI-provided FDT memory map;
 - structured panic diagnostics with RISC-V machine-state snapshots;
 - direct-mode supervisor trap entry with a complete integer return context;
+- OpenSBI TIME programming and one-hart supervisor timer interrupt handling;
 - native FDT parser tests under ASan and UBSan;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Timer interrupts, physical-memory allocation, page tables, and user mode remain
-dependency-ordered later tasks.
+Physical-memory allocation, page tables, and user mode remain dependency-
+ordered later tasks.
 
 ## Prerequisites
 
@@ -27,7 +28,8 @@ The build requires:
 - Clang with the `riscv64-unknown-elf` target;
 - LLD;
 - QEMU 7.0 or newer with `qemu-system-riscv64`, the `virt,aia=none`
-  machine option, and default OpenSBI firmware providing SBI System Reset.
+  machine option, and default OpenSBI firmware providing SBI TIME and System
+  Reset.
 
 On macOS, the supported Homebrew packages are `cmake`, `ninja`, `qemu`, `llvm`,
 and `lld`. Linux installations may provide equivalent packages through their
@@ -229,6 +231,39 @@ MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved
 
 The host gate requires exactly one trap-ready record, then FDT readiness, then
 exactly one pass record. Missing, duplicated, early, or malformed records fail.
+
+## Supervisor timer interrupt test
+
+Build and run the isolated timer test with:
+
+```bash
+cmake --workflow --preset test-qemu-timer
+```
+
+The image initializes the one-hart timer with global SIE clear, programs an
+absolute deadline through SBI TIME, and enables only `sie.STIE`. Its wait loop
+keeps SIE clear while inspecting timer state, executes `wfi`, and briefly opens
+an adjacent set-SIE/clear-SIE delivery window. The trap dispatcher routes
+supervisor timer cause code `5` to the timer module.
+
+Each accepted expiration first verifies that the unsigned `time` counter has
+reached the recorded deadline. A stale pending indication therefore returns
+without incrementing or rearming. Accepted expirations rearm from the current
+counter rather than the previous deadline. The third expiration disables STIE
+and programs `UINT64_MAX`, after which the image verifies clear SIE, clear STIE,
+and exactly three accepted expirations.
+
+Only that complete sequence emits:
+
+```text
+MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0
+```
+
+The host gate requires normal boot, complete FDT evidence, exactly one
+newline-terminated pass record after `MICROS_FDT_READY`, clean SBI shutdown,
+and no panic, explicit failure, or timeout. Missing, duplicated, early, or
+malformed tick and interval fields fail. The interval is expressed only in
+platform counter ticks; it is not a wall-clock ABI.
 
 ## Unexpected trap panic test
 

@@ -4,12 +4,14 @@
 #include <stdint.h>
 
 #include "micros/panic.h"
+#include "micros/timer.h"
 
 #define MICROS_SCAUSE_INTERRUPT (UINT64_C(1) << 63)
 #define MICROS_SCAUSE_CODE_MASK (MICROS_SCAUSE_INTERRUPT - 1)
 
 enum {
     MICROS_EXCEPTION_ILLEGAL_INSTRUCTION = 2,
+    MICROS_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
 uintptr_t micros_trap_hart_id;
@@ -198,6 +200,8 @@ static bool trap_panic_test_has_expected_exception(
 
 void micros_trap_dispatch(struct micros_trap_frame *frame)
 {
+    uint64_t cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
+
 #ifdef MICROS_BUILD_TRAP_TEST
     if (trap_test_state == TRAP_TEST_ARMED) {
         if (
@@ -229,6 +233,39 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 #endif
 
     if ((frame->scause & MICROS_SCAUSE_INTERRUPT) != 0) {
+        if (cause_code == MICROS_INTERRUPT_SUPERVISOR_TIMER) {
+            enum micros_timer_interrupt_result result =
+                micros_timer_handle_interrupt();
+
+            switch (result) {
+            case MICROS_TIMER_INTERRUPT_HANDLED:
+            case MICROS_TIMER_INTERRUPT_HANDLED_SPURIOUS:
+                return;
+            case MICROS_TIMER_INTERRUPT_INACTIVE:
+                MICROS_TRAP_PANIC(
+                    micros_trap_hart_id,
+                    "unexpected-timer",
+                    frame
+                );
+            case MICROS_TIMER_INTERRUPT_TICK_OVERFLOW:
+                MICROS_TRAP_PANIC(
+                    micros_trap_hart_id,
+                    "timer-tick-overflow",
+                    frame
+                );
+            case MICROS_TIMER_INTERRUPT_REARM_FAILED:
+                MICROS_TRAP_PANIC(
+                    micros_trap_hart_id,
+                    "timer-rearm-failed",
+                    frame
+                );
+            }
+            MICROS_TRAP_PANIC(
+                micros_trap_hart_id,
+                "timer-result-invalid",
+                frame
+            );
+        }
         MICROS_TRAP_PANIC(
             micros_trap_hart_id,
             "unexpected-interrupt",

@@ -10,6 +10,9 @@ versioned marker through the QEMU `virt` UART, validates the firmware-provided
 FDT memory map, provides structured panic diagnostics, and shuts QEMU down
 through SBI. A direct-mode supervisor trap vector preserves the complete
 integer context and returns safely from an isolated expected exception.
+OpenSBI TIME drives a one-hart supervisor timer that rejects stale pending
+delivery, rearms from the current counter, and preserves caller interrupt
+state.
 
 ## Goals
 
@@ -59,7 +62,7 @@ Install:
 - Clang with the `riscv64-unknown-elf` target;
 - LLD;
 - QEMU 7.0 or newer with `qemu-system-riscv64`, `virt,aia=none`, and default
-  OpenSBI firmware providing SBI System Reset.
+  OpenSBI firmware providing SBI TIME and System Reset.
 
 Then run:
 
@@ -68,13 +71,15 @@ cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
+cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-trap-panic
 ```
 
 These commands run the native suite, verify normal boot through the
 QEMU-bundled OpenSBI firmware, and verify an intentional structured panic with
 clean failure shutdown. They also prove complete register-preserving trap
-return and captured-context diagnostics for an unexpected exception. See the
+return, three accepted supervisor timer expirations with two rearms and a final
+disarm, and captured-context diagnostics for an unexpected exception. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 

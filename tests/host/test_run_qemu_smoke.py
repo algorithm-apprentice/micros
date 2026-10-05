@@ -50,6 +50,14 @@ TRAP_RECOVERY_OUTPUT = (
     "origin=S cause=illegal-instruction registers=preserved\n"
 )
 
+TIMER_TEST_OUTPUT = TRAP_RECOVERY_OUTPUT.replace(
+    "MICROS_TRAP_TEST_PASS "
+    "origin=S cause=illegal-instruction registers=preserved\n",
+    "MICROS_TIMER_TEST_PASS "
+    "ticks=0x0000000000000003 "
+    "interval=0x00000000000186a0\n",
+)
+
 TRAP_CONTEXT_RECORD = (
     "MICROS_TRAP_CONTEXT "
     "origin=S "
@@ -496,6 +504,168 @@ class ExpectedOutcomeTest(unittest.TestCase):
             require_fdt_events=True,
             require_fdt_reservations=True,
             require_trap_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_accepts_complete_timer_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TIMER_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_missing_timer_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TRAP_RECOVERY_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_duplicate_timer_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=(
+                TIMER_TEST_OUTPUT
+                + "MICROS_TIMER_TEST_PASS "
+                "ticks=0x0000000000000003 "
+                "interval=0x00000000000186a0\n"
+            ),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_timer_test_report_before_fdt_ready(self):
+        pass_record = (
+            "MICROS_TIMER_TEST_PASS "
+            "ticks=0x0000000000000003 "
+            "interval=0x00000000000186a0\n"
+        )
+        too_early = TIMER_TEST_OUTPUT.replace(pass_record, "").replace(
+            "MICROS_FDT_READY\n",
+            pass_record + "MICROS_FDT_READY\n",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=too_early,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_malformed_timer_tick_count(self):
+        malformed = TIMER_TEST_OUTPUT.replace(
+            "ticks=0x0000000000000003",
+            "ticks=0x3",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=malformed,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_malformed_timer_interval(self):
+        malformed = TIMER_TEST_OUTPUT.replace(
+            "interval=0x00000000000186a0",
+            "interval=0x186a0",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=malformed,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_unterminated_timer_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=TIMER_TEST_OUTPUT.rstrip("\n"),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_timer_test_report=True,
         )
 
         self.assertFalse(accepted)

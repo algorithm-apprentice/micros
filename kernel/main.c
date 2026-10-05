@@ -3,6 +3,7 @@
 #include "arch/riscv64/platform.h"
 #include "micros/fdt.h"
 #include "micros/panic.h"
+#include "micros/timer.h"
 #include "micros/trap.h"
 
 #ifndef MICROS_VERSION
@@ -120,6 +121,23 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 
 #ifdef MICROS_BUILD_TRAP_PANIC_TEST
     micros_trap_run_panic_test();
+#endif
+
+#ifdef MICROS_BUILD_TIMER_TEST
+    if (
+        !micros_timer_run_self_test(
+            UINT64_C(0x00000000000186a0),
+            UINT64_C(3)
+        )
+    ) {
+        MICROS_PANIC(hart_id, "timer-test-failed");
+    }
+    uart_write("MICROS_TIMER_TEST_PASS ticks=");
+    uart_write_hex64(micros_timer_ticks());
+    uart_write(" interval=");
+    uart_write_hex64(UINT64_C(0x00000000000186a0));
+    uart_write("\n");
+    uart_flush();
 #endif
 
     (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);

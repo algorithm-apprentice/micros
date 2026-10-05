@@ -188,6 +188,12 @@ the shell MVP.
 
 ### Interrupts
 
+The boot hart timer uses OpenSBI TIME absolute deadlines. The kernel owns
+per-hart timer mechanism state, enables `sie.STIE` independently from global
+`sstatus.SIE`, rejects stale pending delivery before counting a tick, and
+rearms relative to the current counter. Scheduling and preemption policy are
+separate consumers added only after thread and hart objects exist.
+
 Before TTY starts, the kernel owns a polled transmit-only early console. The
 launcher begins handoff by asking the kernel to stop ordinary console output
 before TTY receives its MMIO mapping. TTY initializes the UART, commits

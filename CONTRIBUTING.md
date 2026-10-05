@@ -60,12 +60,17 @@ Implementation milestones add their own native and QEMU commands when those
 test targets exist. The current boot-foundation gates are:
 
 ```bash
-cmake --workflow --preset build-riscv64-debug
+cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
+cmake --workflow --preset test-qemu-panic
+cmake --workflow --preset test-qemu-trap
+cmake --workflow --preset test-qemu-timer
+cmake --workflow --preset test-qemu-trap-panic
 ```
 
-The second workflow configures and builds before running the smoke test, so it
-is also the clean-checkout acceptance command for the current implementation.
+Each workflow configures and builds its own image before running the selected
+gate. `build-riscv64-debug` remains available when only the normal target
+artifact is needed.
 
 ## Pull requests
 
