@@ -67,12 +67,14 @@ Initial performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The implemented stable targets are `test-unit` and `test-qemu-smoke`. From a
-clean checkout, their configure, build, and execution gates are:
+The implemented fast targets are `test-unit`, `test-qemu-smoke`, and
+`test-qemu-panic`. From a clean checkout, their configure, build, and execution
+gates are:
 
 ```bash
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
+cmake --workflow --preset test-qemu-panic
 ```
 
 `test-unit` currently runs the FDT parser corpus under ASan and UBSan plus the
@@ -81,6 +83,11 @@ memory discovery, exact serial markers, agreement between decoded range counts
 and emitted range events, a nonempty firmware reservation result, and clean SBI
 shutdown. The remaining stable targets are added when their dependency-DAG
 layers become implementation-ready.
+
+`test-qemu-panic` builds an isolated test image and verifies ordered source,
+hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
+does not turn a timeout, explicit failure, missing FDT evidence, or malformed
+diagnostic stream into a pass.
 
 ## Native unit tests
 

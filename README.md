@@ -7,7 +7,8 @@ user-space services, and their dependencies small enough to study directly.
 Implementation now follows the accepted dependency DAG. The current boot
 foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
 versioned marker through the QEMU `virt` UART, validates the firmware-provided
-FDT memory map, and shuts QEMU down through SBI.
+FDT memory map, provides structured panic diagnostics, and shuts QEMU down
+through SBI.
 
 ## Goals
 
@@ -62,12 +63,14 @@ Install:
 Then run:
 
 ```bash
+cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
+cmake --workflow --preset test-qemu-panic
 ```
 
-This configures and builds the debug image, boots it through the QEMU-bundled
-OpenSBI firmware, requires exact boot, physical-memory, and FDT-ready serial
-markers, and requires a clean QEMU shutdown. See the
+These commands run the native suite, verify normal boot through the
+QEMU-bundled OpenSBI firmware, and verify an intentional structured panic with
+clean failure shutdown. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 
