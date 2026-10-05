@@ -41,6 +41,24 @@ Accepted decision to change its meaning. Add a new ADR that supersedes it.
 - Do not copy MINIX or NetBSD source into the repository without an explicit
   dependency and license decision.
 
+## Current validation commands
+
+For documentation and repository-instruction changes, run:
+
+```bash
+python3 -m unittest discover -s tests/host -p 'test_*.py'
+python3 tools/check_docs.py
+git add <intended-files>
+git diff --cached --check
+git diff --check origin/main...HEAD
+```
+
+The cached check is the pre-commit whitespace gate after staging. The
+`origin/main...HEAD` check is the post-commit pull-request range gate.
+
+Implementation milestones add their own native and QEMU commands when those
+test targets exist.
+
 ## Pull requests
 
 Use the repository pull request template. A pull request must identify:

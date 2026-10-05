@@ -213,3 +213,16 @@ As implementation begins, the repository will add deterministic build presets,
 test targets, CI checks, and machine-readable test output. Those executable
 interfaces become the preferred agent tools, but they remain governed by the
 same Accepted ADRs and task contract.
+
+The initial reproducible documentation gate is:
+
+```bash
+python3 -m unittest discover -s tests/host -p 'test_*.py'
+python3 tools/check_docs.py
+git add <intended-files>
+git diff --cached --check
+git diff --check origin/main...HEAD
+```
+
+Run the cached check after staging and before committing. Run the range check
+after committing to validate the complete pull-request diff.
