@@ -485,6 +485,18 @@ static bool test_rejects_malformed_entries(void)
     );
     EXPECT_ERROR(
         MICROS_SV39_ERROR_MALFORMED_PTE,
+        micros_sv39_decode_pte(UINT64_C(0x3), &decoded)
+    );
+    EXPECT_ERROR(
+        MICROS_SV39_ERROR_MALFORMED_PTE,
+        micros_sv39_decode_pte(UINT64_C(0x47), &decoded)
+    );
+    EXPECT_ERROR(
+        MICROS_SV39_ERROR_MALFORMED_PTE,
+        micros_sv39_decode_pte(UINT64_C(0xc3), &decoded)
+    );
+    EXPECT_ERROR(
+        MICROS_SV39_ERROR_MALFORMED_PTE,
         micros_sv39_decode_pte(UINT64_C(0x5), &decoded)
     );
     EXPECT_ERROR(

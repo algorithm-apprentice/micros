@@ -81,7 +81,7 @@ class ElfSectionValidationTest(unittest.TestCase):
         self.assertEqual([], self.validate())
 
     def test_rejects_allocatable_orphan(self):
-        orphan = VALID_SECTIONS.replace(".bss", ".unexpected")
+        orphan = VALID_SECTIONS.replace(".bss", "unexpected")
 
         self.assertIn(
             "unexpected allocatable section",
