@@ -26,13 +26,15 @@ enum {
 #define PROPERTY_REG_OFFSET \
     (PROPERTY_DEVICE_TYPE_OFFSET + sizeof("device_type"))
 #define PROPERTY_RANGES_OFFSET (PROPERTY_REG_OFFSET + sizeof("reg"))
+#define PROPERTY_STATUS_OFFSET (PROPERTY_RANGES_OFFSET + sizeof("ranges"))
 
 static const char property_names[] =
     "#address-cells\0"
     "#size-cells\0"
     "device_type\0"
     "reg\0"
-    "ranges\0";
+    "ranges\0"
+    "status\0";
 
 struct property_location {
     size_t length;
@@ -63,6 +65,8 @@ struct fixture_options {
     size_t nested_depth;
     bool include_memory;
     bool memory_name_has_conflicting_type;
+    bool named_memory_is_disabled;
+    bool device_memory_is_disabled;
     bool include_reserved_memory;
     bool reserved_memory_claims_memory;
     bool reserved_memory_overrides_device_type;
@@ -190,6 +194,8 @@ static struct fixture_options default_options(void)
         .nested_depth = 0,
         .include_memory = true,
         .memory_name_has_conflicting_type = false,
+        .named_memory_is_disabled = false,
+        .device_memory_is_disabled = false,
         .include_reserved_memory = true,
         .reserved_memory_claims_memory = false,
         .reserved_memory_overrides_device_type = false,
@@ -261,6 +267,14 @@ static void build_fixture(
                 sizeof("system")
             );
         }
+        if (options.named_memory_is_disabled) {
+            (void)append_property(
+                &builder,
+                PROPERTY_STATUS_OFFSET,
+                "disabled",
+                sizeof("disabled")
+            );
+        }
         if (
             options.memory_reg_trim
             > options.memory_tuple_count * 16
@@ -289,6 +303,14 @@ static void build_fixture(
             "memory",
             sizeof("memory")
         );
+        if (options.device_memory_is_disabled) {
+            (void)append_property(
+                &builder,
+                PROPERTY_STATUS_OFFSET,
+                "disabled",
+                sizeof("disabled")
+            );
+        }
         (void)append_property(
             &builder,
             PROPERTY_REG_OFFSET,
@@ -793,6 +815,55 @@ static bool test_rejects_memory_name_with_conflicting_type(void)
     return true;
 }
 
+static bool test_skips_disabled_named_memory(void)
+{
+    struct fdt_fixture fixture;
+    struct fixture_options options = default_options();
+    struct micros_fdt_memory_map memory_map;
+
+    options.named_memory_is_disabled = true;
+    build_fixture(&fixture, options);
+    EXPECT_ERROR(
+        MICROS_FDT_OK,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    EXPECT_TRUE(memory_map.memory_range_count == 1);
+    EXPECT_TRUE(
+        memory_map.memory_ranges[0].base == UINT64_C(0x100000000)
+    );
+    return true;
+}
+
+static bool test_skips_disabled_device_type_memory(void)
+{
+    struct fdt_fixture fixture;
+    struct fixture_options options = default_options();
+    struct micros_fdt_memory_map memory_map;
+
+    options.device_memory_is_disabled = true;
+    build_fixture(&fixture, options);
+    EXPECT_ERROR(
+        MICROS_FDT_OK,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    EXPECT_TRUE(memory_map.memory_range_count == 2);
+    EXPECT_TRUE(
+        memory_map.memory_ranges[0].base == UINT64_C(0x80000000)
+    );
+    EXPECT_TRUE(
+        memory_map.memory_ranges[1].base == UINT64_C(0x81000000)
+    );
+    return true;
+}
+
 static bool test_rejects_range_overflow(void)
 {
     struct fdt_fixture fixture;
@@ -831,6 +902,29 @@ static bool test_rejects_memory_range_capacity_overflow(void)
             fixture.size,
             &memory_map
         )
+    );
+    return true;
+}
+
+static bool test_disabled_memory_does_not_consume_capacity(void)
+{
+    struct fdt_fixture fixture;
+    struct fixture_options options = default_options();
+    struct micros_fdt_memory_map memory_map;
+
+    options.memory_tuple_count = MICROS_FDT_MAX_MEMORY_RANGES;
+    options.device_memory_is_disabled = true;
+    build_fixture(&fixture, options);
+    EXPECT_ERROR(
+        MICROS_FDT_OK,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    EXPECT_TRUE(
+        memory_map.memory_range_count == MICROS_FDT_MAX_MEMORY_RANGES
     );
     return true;
 }
@@ -993,8 +1087,11 @@ int main(void)
         {"rejects unsupported root cells", test_rejects_unsupported_root_cells},
         {"rejects partial reg tuple", test_rejects_partial_reg_tuple},
         {"rejects conflicting memory device_type", test_rejects_memory_name_with_conflicting_type},
+        {"skips disabled named memory", test_skips_disabled_named_memory},
+        {"skips disabled device_type memory", test_skips_disabled_device_type_memory},
         {"rejects range overflow", test_rejects_range_overflow},
         {"rejects memory capacity overflow", test_rejects_memory_range_capacity_overflow},
+        {"disabled memory preserves capacity", test_disabled_memory_does_not_consume_capacity},
         {"rejects excessive depth", test_rejects_excessive_tree_depth},
         {"rejects reserved-memory cell mismatch", test_rejects_reserved_memory_cell_mismatch},
         {"rejects nonempty reserved-memory ranges", test_rejects_nonempty_reserved_memory_ranges},

@@ -30,6 +30,8 @@ struct fdt_node {
     bool name_is_memory;
     bool has_device_type;
     bool device_type_is_memory;
+    bool has_status;
+    bool status_is_available;
     bool is_reserved_memory;
     bool is_reserved_child;
     bool has_reg;
@@ -326,7 +328,8 @@ static enum micros_fdt_error parse_reg_ranges(
     uint32_t size_cells,
     struct micros_fdt_range *ranges,
     size_t *count,
-    size_t capacity
+    size_t capacity,
+    bool store_ranges
 )
 {
     size_t tuple_cells;
@@ -362,9 +365,13 @@ static enum micros_fdt_error parse_reg_ranges(
         if (error != MICROS_FDT_OK) {
             return error;
         }
-        error = append_range(ranges, count, capacity, base, size);
-        if (error != MICROS_FDT_OK) {
-            return error;
+        if (store_ranges) {
+            error = append_range(ranges, count, capacity, base, size);
+            if (error != MICROS_FDT_OK) {
+                return error;
+            }
+        } else if (size == 0 || size > UINT64_MAX - base) {
+            return MICROS_FDT_ERROR_RANGE;
         }
     }
     return MICROS_FDT_OK;
@@ -433,6 +440,23 @@ static enum micros_fdt_error handle_property(
                 value,
                 length - 1,
                 "memory"
+            );
+        } else if (property_name_equal(name, "status")) {
+            if (node->has_status) {
+                return MICROS_FDT_ERROR_PROPERTY;
+            }
+            if (length == 0 || value[length - 1] != 0) {
+                return MICROS_FDT_ERROR_PROPERTY;
+            }
+            node->has_status = true;
+            node->status_is_available = bytes_equal(
+                value,
+                length - 1,
+                "ok"
+            ) || bytes_equal(
+                value,
+                length - 1,
+                "okay"
             );
         } else if (property_name_equal(name, "reg")) {
             if (node->has_reg) {
@@ -514,6 +538,8 @@ static void initialize_node(struct fdt_node *node)
     node->name_is_memory = false;
     node->has_device_type = false;
     node->device_type_is_memory = false;
+    node->has_status = false;
+    node->status_is_available = true;
     node->is_reserved_memory = false;
     node->is_reserved_child = false;
     node->has_reg = false;
@@ -635,7 +661,8 @@ static enum micros_fdt_error finish_node(struct fdt_parser *parser)
                 root->size_cells,
                 parser->memory_map->memory_ranges,
                 &parser->memory_map->memory_range_count,
-                MICROS_FDT_MAX_MEMORY_RANGES
+                MICROS_FDT_MAX_MEMORY_RANGES,
+                node->status_is_available
             );
 
             if (error != MICROS_FDT_OK) {
@@ -656,7 +683,8 @@ static enum micros_fdt_error finish_node(struct fdt_parser *parser)
                 reserved_parent->size_cells,
                 parser->memory_map->reserved_memory_ranges,
                 &parser->memory_map->reserved_memory_range_count,
-                MICROS_FDT_MAX_RESERVED_MEMORY_RANGES
+                MICROS_FDT_MAX_RESERVED_MEMORY_RANGES,
+                true
             );
 
             if (error != MICROS_FDT_OK) {

@@ -98,10 +98,11 @@ The parser has fixed resource bounds:
 - reservation-map ranges: 32;
 - static `/reserved-memory` ranges: 32.
 
-It accepts one- or two-cell addresses and sizes, all `reg` tuples from matching
-root memory nodes, the reservation map, and static `/reserved-memory` children.
-Dynamic reserved-memory allocation requests are rejected explicitly until a
-physical allocator exists.
+It accepts one- or two-cell addresses and sizes, all `reg` tuples from available
+matching root memory nodes, the reservation map, and static `/reserved-memory`
+children. A memory node is available when `status` is absent, `"ok"`, or
+`"okay"`. Dynamic reserved-memory allocation requests are rejected explicitly
+until a physical allocator exists.
 
 ## QEMU smoke test
 
