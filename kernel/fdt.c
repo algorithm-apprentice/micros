@@ -617,6 +617,13 @@ static enum micros_fdt_error finish_node(struct fdt_parser *parser)
             return error;
         }
     } else if (node->name_is_memory || node->device_type_is_memory) {
+        if (
+            node->name_is_memory
+            && node->has_device_type
+            && !node->device_type_is_memory
+        ) {
+            return MICROS_FDT_ERROR_PROPERTY;
+        }
         if (!node->has_reg) {
             return MICROS_FDT_ERROR_PROPERTY;
         }

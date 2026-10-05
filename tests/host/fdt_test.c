@@ -62,6 +62,7 @@ struct fixture_options {
     size_t memory_reg_trim;
     size_t nested_depth;
     bool include_memory;
+    bool memory_name_has_conflicting_type;
     bool include_reserved_memory;
     bool reserved_memory_claims_memory;
     bool reserved_memory_overrides_device_type;
@@ -188,6 +189,7 @@ static struct fixture_options default_options(void)
         .memory_reg_trim = 0,
         .nested_depth = 0,
         .include_memory = true,
+        .memory_name_has_conflicting_type = false,
         .include_reserved_memory = true,
         .reserved_memory_claims_memory = false,
         .reserved_memory_overrides_device_type = false,
@@ -251,6 +253,14 @@ static void build_fixture(
         }
 
         begin_node(&builder, "memory@80000000");
+        if (options.memory_name_has_conflicting_type) {
+            (void)append_property(
+                &builder,
+                PROPERTY_DEVICE_TYPE_OFFSET,
+                "system",
+                sizeof("system")
+            );
+        }
         if (
             options.memory_reg_trim
             > options.memory_tuple_count * 16
@@ -764,6 +774,25 @@ static bool test_rejects_partial_reg_tuple(void)
     return true;
 }
 
+static bool test_rejects_memory_name_with_conflicting_type(void)
+{
+    struct fdt_fixture fixture;
+    struct fixture_options options = default_options();
+    struct micros_fdt_memory_map memory_map;
+
+    options.memory_name_has_conflicting_type = true;
+    build_fixture(&fixture, options);
+    EXPECT_ERROR(
+        MICROS_FDT_ERROR_PROPERTY,
+        micros_fdt_parse_memory_map(
+            fixture.bytes,
+            fixture.size,
+            &memory_map
+        )
+    );
+    return true;
+}
+
 static bool test_rejects_range_overflow(void)
 {
     struct fdt_fixture fixture;
@@ -963,6 +992,7 @@ int main(void)
         {"rejects oversized property name", test_rejects_oversized_property_name},
         {"rejects unsupported root cells", test_rejects_unsupported_root_cells},
         {"rejects partial reg tuple", test_rejects_partial_reg_tuple},
+        {"rejects conflicting memory device_type", test_rejects_memory_name_with_conflicting_type},
         {"rejects range overflow", test_rejects_range_overflow},
         {"rejects memory capacity overflow", test_rejects_memory_range_capacity_overflow},
         {"rejects excessive depth", test_rejects_excessive_tree_depth},
