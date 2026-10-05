@@ -116,6 +116,7 @@ add_executable(
     kernel/fdt.c
     kernel/main.c
     kernel/panic.c
+    kernel/timer.c
     kernel/trap.c
 )
 
