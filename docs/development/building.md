@@ -8,12 +8,13 @@ The current implementation provides:
 - an OpenSBI supervisor-mode entry with a 16 KiB boot stack and cleared BSS;
 - polled output through the QEMU `virt` UART at `0x10000000`;
 - bounded parsing of the OpenSBI-provided FDT memory map;
+- structured panic diagnostics with RISC-V machine-state snapshots;
 - native FDT parser tests under ASan and UBSan;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Panic diagnostics, traps, timer interrupts, physical-memory allocation, page
-tables, and user mode remain dependency-ordered later tasks.
+Traps, timer interrupts, physical-memory allocation, page tables, and user mode
+remain dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -153,11 +154,43 @@ The harness emits TAP plus a stable outcome field:
 
 ```text
 TAP version 13
-ok 1 - versioned boot marker followed by clean QEMU shutdown
+ok 1 - QEMU smoke test observed expected pass
 # outcome: pass
+# expected outcome: pass
 ```
 
 Non-success outcomes are `failure`, `panic`, `unexpected-exit`, and `timeout`.
 The timeout is eight seconds. A missing or malformed marker, an explicit target
 failure, a panic marker, a non-clean exit, and a guest that does not terminate
 cannot be reported as success.
+
+## Intentional panic test
+
+Build and run the isolated fatal-path acceptance test with:
+
+```bash
+cmake --workflow --preset test-qemu-panic
+```
+
+This uses `build/riscv64-panic-test`, leaving the normal debug image unchanged.
+The test-only image completes FDT discovery and then invokes
+`MICROS_PANIC(hart_id, "intentional-test")`.
+
+Panic atomically disables supervisor interrupts, destructively puts the QEMU
+16550 into a known polled transmit state, and emits exactly five ordered core
+records:
+
+```text
+MICROS_PANIC reason=intentional-test
+MICROS_PANIC_BUILD version=0.1.0
+MICROS_PANIC_SOURCE file=kernel/main.c line=0x...
+MICROS_PANIC_HART mode=S id=0x0000000000000000
+MICROS_PANIC_MACHINE sstatus=0x... scause=0x... stval=0x... sepc=0x... ra=0x... sp=0x...
+```
+
+Every hexadecimal value is fixed-width lowercase. The source path is
+repository-relative. The host gate requires the five records exactly once and
+in order, verifies the source and machine lines with full-line regular
+expressions, independently rechecks the FDT event invariants, rejects any
+`MICROS_TEST_FAILURE`, and requires QEMU status zero without a timeout after
+the SBI system-failure shutdown request.

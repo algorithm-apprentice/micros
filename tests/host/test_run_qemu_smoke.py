@@ -5,6 +5,34 @@ import unittest
 from tools import run_qemu_smoke
 
 
+PANIC_OUTPUT = (
+    "MICROS_BOOT 0.1.0\n"
+    "MICROS_FDT_MEMORY "
+    "base=0x0000000080000000 "
+    "size=0x0000000008000000\n"
+    "MICROS_FDT_RESERVED_MEMORY "
+    "base=0x0000000080000000 "
+    "size=0x0000000000040000\n"
+    "MICROS_FDT_COUNTS "
+    "memory=0x0000000000000001 "
+    "reservation=0x0000000000000000 "
+    "reserved-memory=0x0000000000000001\n"
+    "MICROS_FDT_READY\n"
+    "MICROS_PANIC reason=intentional-test\n"
+    "MICROS_PANIC_BUILD version=0.1.0\n"
+    "MICROS_PANIC_SOURCE "
+    "file=kernel/main.c line=0x0000000000000042\n"
+    "MICROS_PANIC_HART mode=S id=0x0000000000000000\n"
+    "MICROS_PANIC_MACHINE "
+    "sstatus=0x0000000200000000 "
+    "scause=0x0000000000000000 "
+    "stval=0x0000000000000000 "
+    "sepc=0x0000000000000000 "
+    "ra=0x0000000080201234 "
+    "sp=0x0000000080204000\n"
+)
+
+
 class SmokeClassificationTest(unittest.TestCase):
     def test_accepts_marker_followed_by_clean_exit(self):
         outcome = run_qemu_smoke.classify_smoke(
@@ -193,6 +221,123 @@ class SmokeClassificationTest(unittest.TestCase):
         )
 
         self.assertEqual(run_qemu_smoke.SmokeOutcome.UNEXPECTED_EXIT, outcome)
+
+
+class ExpectedOutcomeTest(unittest.TestCase):
+    def test_accepts_complete_clean_panic(self):
+        result = run_qemu_smoke.QemuResult(
+            output=PANIC_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=(
+                "MICROS_FDT_READY",
+                "MICROS_PANIC reason=intentional-test",
+                "MICROS_PANIC_BUILD version=0.1.0",
+            ),
+            patterns=(
+                r"MICROS_PANIC_SOURCE "
+                r"file=kernel/main[.]c line=0x[0-9a-f]{16}",
+            ),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_panic_that_times_out(self):
+        result = run_qemu_smoke.QemuResult(
+            output=PANIC_OUTPUT,
+            return_code=None,
+            timed_out=True,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_duplicate_or_out_of_order_panic_records(self):
+        duplicated = PANIC_OUTPUT.replace(
+            "MICROS_PANIC_BUILD version=0.1.0\n",
+            "MICROS_PANIC_BUILD version=0.1.0\n"
+            "MICROS_PANIC reason=intentional-test\n",
+        )
+        result = run_qemu_smoke.QemuResult(
+            output=duplicated,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_panic_with_explicit_failure(self):
+        result = run_qemu_smoke.QemuResult(
+            output=(
+                PANIC_OUTPUT
+                + "MICROS_TEST_FAILURE sbi-system-reset-returned\n"
+            ),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
+
+    def test_rejects_unterminated_final_panic_record(self):
+        result = run_qemu_smoke.QemuResult(
+            output=PANIC_OUTPUT.rstrip("\n"),
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
 
 
 class QemuCommandTest(unittest.TestCase):

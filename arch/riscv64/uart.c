@@ -3,7 +3,10 @@
 enum {
     UART0_BASE = 0x10000000,
     UART_THR = 0,
+    UART_IER = 1,
+    UART_LCR = 3,
     UART_LSR = 5,
+    UART_LCR_8N1 = 3,
     UART_LSR_THR_EMPTY = 1 << 5,
     UART_LSR_TRANSMITTER_EMPTY = 1 << 6,
 };
@@ -40,6 +43,12 @@ void uart_write_hex64(uint64_t value)
 
         uart_write_character(digits[digit]);
     }
+}
+
+void uart_panic_seize(void)
+{
+    uart0[UART_LCR] = UART_LCR_8N1;
+    uart0[UART_IER] = 0;
 }
 
 void uart_flush(void)

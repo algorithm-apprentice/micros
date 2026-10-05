@@ -25,6 +25,15 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "riscv64-panic-test",
+      "displayName": "RISC-V 64 intentional panic test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-panic-test",
+      "cacheVariables": {
+        "MICROS_BUILD_PANIC_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -44,6 +53,13 @@
       "configurePreset": "riscv64-debug",
       "targets": [
         "test-qemu-smoke"
+      ]
+    },
+    {
+      "name": "test-qemu-panic",
+      "configurePreset": "riscv64-panic-test",
+      "targets": [
+        "test-qemu-panic"
       ]
     }
   ],
@@ -87,6 +103,20 @@
         {
           "type": "build",
           "name": "test-qemu-smoke"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-panic",
+      "displayName": "Build and run the intentional panic test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-panic-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-panic"
         }
       ]
     }

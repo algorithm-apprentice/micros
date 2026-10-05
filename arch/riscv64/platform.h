@@ -12,6 +12,7 @@ enum {
 void uart_write(const char *text);
 void uart_write_hex64(uint64_t value);
 void uart_flush(void);
+void uart_panic_seize(void);
 intptr_t sbi_system_reset(uint32_t reset_type, uint32_t reset_reason);
 
 #endif

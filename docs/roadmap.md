@@ -59,7 +59,8 @@ model, IPC reply model, or global current-execution representation.
 - a clean checkout builds with one documented command;
 - QEMU prints a versioned boot marker;
 - an intentional panic prints location and machine state;
-- the smoke test distinguishes success, failure, and timeout.
+- the host gates distinguish success, explicit failure, panic, unexpected exit,
+  and timeout.
 
 ## Milestone 2: privileged kernel mechanisms
 
