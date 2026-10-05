@@ -14,7 +14,10 @@ OpenSBI TIME drives a one-hart supervisor timer that rejects stale pending
 delivery, rearms from the current counter, and preserves caller interrupt
 state. A bounded bootstrap frame allocator canonicalizes every FDT memory and
 reservation range, excludes all memory through the linker-defined kernel end,
-and tracks kernel-retained allocations with a fixed bitmap.
+and tracks kernel-retained allocations with a fixed bitmap. An allocator-backed
+Sv39 root identity-maps the kernel with RX, R, and RW/NX linker permissions,
+maps managed RAM and UART as supervisor-only RW/NX, and is activated through
+an ordered `sfence.vma`/`satp` transition.
 
 ## Goals
 
@@ -61,7 +64,8 @@ Install:
 - CMake 3.25 or newer;
 - Ninja;
 - Python 3.8 or newer;
-- Clang with the `riscv64-unknown-elf` target;
+- Clang with the `riscv64-unknown-elf` target plus `llvm-nm` and
+  `llvm-readelf`;
 - LLD;
 - QEMU 7.0 or newer with `qemu-system-riscv64`, `virt,aia=none`, and default
   OpenSBI firmware providing SBI TIME and System Reset.
@@ -76,6 +80,7 @@ cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
+cmake --workflow --preset test-qemu-mmu
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -83,7 +88,9 @@ QEMU-bundled OpenSBI firmware, and verify an intentional structured panic with
 clean failure shutdown. They also prove complete register-preserving trap
 return, three accepted supervisor timer expirations with two rearms and a final
 disarm, bootstrap allocation and release against the real FDT at two RAM
-sizes, and captured-context diagnostics for an unexpected exception. See the
+sizes, and captured-context diagnostics for an unexpected exception. The MMU
+gate additionally recovers from a hardware store page fault against text and
+an instruction page fault from writable memory. See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 

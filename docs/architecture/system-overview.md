@@ -104,8 +104,11 @@ uninitialized data, installs the trap vector, and then begins serial output.
 The kernel validates the FDT, reads physical memory and reserved ranges,
 reserves firmware and every physical address through its linker-defined end,
 reclaims the parsed FDT blob, initializes the bootstrap frame allocator,
-creates kernel page tables, enables the MMU, and starts timer interrupts. UART
-and PLIC device addresses remain fixed platform constants in v0.1.
+creates 4 KiB-leaf kernel page tables, verifies exact supervisor-only RX, R,
+and RW/NX mappings, enables Sv39 through an ordered translation fence, and
+starts timer interrupts. Managed RAM is identity-mapped RW/NX, while UART and
+PLIC device addresses remain fixed platform constants in v0.1; only UART is
+mapped during this phase.
 
 ### Phase 3: process and IPC substrate
 
@@ -221,6 +224,10 @@ interrupts disabled.
 - A prepared address space is kernel-sealed; activation revalidates its mapping
   generation, and changes require aborting and repeating load preparation.
 - User-managed frames and kernel-reserved frames never overlap.
+- Kernel text is RX, read-only data is R, writable kernel state and managed RAM
+  are RW/NX, and none of those mappings has the user bit.
+- Every reachable bootstrap page-table frame remains allocated to the kernel
+  and is represented by the live allocator bitmap.
 - Only VM may request user mapping changes after the handoff.
 - VM's fault-handling working set is wired, and a VM-originated fault is fatal.
 - Only PM publishes process lifecycle state.
