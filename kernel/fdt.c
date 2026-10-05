@@ -28,6 +28,7 @@ struct fdt_view {
 struct fdt_node {
     bool children_started;
     bool name_is_memory;
+    bool has_device_type;
     bool device_type_is_memory;
     bool is_reserved_memory;
     bool is_reserved_child;
@@ -421,9 +422,13 @@ static enum micros_fdt_error handle_property(
 
     if (node->name_is_memory || parser->depth == 2) {
         if (property_name_equal(name, "device_type")) {
+            if (node->has_device_type) {
+                return MICROS_FDT_ERROR_PROPERTY;
+            }
             if (length == 0 || value[length - 1] != 0) {
                 return MICROS_FDT_ERROR_PROPERTY;
             }
+            node->has_device_type = true;
             node->device_type_is_memory = bytes_equal(
                 value,
                 length - 1,
@@ -507,6 +512,7 @@ static void initialize_node(struct fdt_node *node)
 {
     node->children_started = false;
     node->name_is_memory = false;
+    node->has_device_type = false;
     node->device_type_is_memory = false;
     node->is_reserved_memory = false;
     node->is_reserved_child = false;
