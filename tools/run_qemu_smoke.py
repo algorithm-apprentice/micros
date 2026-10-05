@@ -31,6 +31,29 @@ FDT_RANGE_PATTERN = re.compile(
     r"MICROS_FDT_RESERVED_MEMORY) "
     r"base=0x[0-9a-f]{16} size=0x[0-9a-f]{16}$"
 )
+PANIC_CORE_PATTERNS = (
+    re.compile(r"^MICROS_PANIC reason=[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    re.compile(
+        r"^MICROS_PANIC_BUILD "
+        r"version=[0-9]+[.][0-9]+[.][0-9]+$"
+    ),
+    re.compile(
+        r"^MICROS_PANIC_SOURCE "
+        r"file=([A-Za-z0-9_./-]+) line=0x[0-9a-f]{16}$"
+    ),
+    re.compile(
+        r"^MICROS_PANIC_HART mode=S id=0x[0-9a-f]{16}$"
+    ),
+    re.compile(
+        r"^MICROS_PANIC_MACHINE "
+        r"sstatus=0x[0-9a-f]{16} "
+        r"scause=0x[0-9a-f]{16} "
+        r"stval=0x[0-9a-f]{16} "
+        r"sepc=0x[0-9a-f]{16} "
+        r"ra=0x[0-9a-f]{16} "
+        r"sp=0x[0-9a-f]{16}$"
+    ),
+)
 
 
 class SmokeOutcome(enum.Enum):
@@ -70,6 +93,88 @@ def _has_complete_fdt_events(output_lines, require_reservations):
         return False
 
     return tuple(actual_counts) == summaries[0]
+
+
+def _has_complete_panic_report(output):
+    records = output.splitlines(keepends=True)
+    output_lines = []
+    terminated = []
+
+    for record in records:
+        if record.endswith("\r\n"):
+            output_lines.append(record[:-2])
+            terminated.append(True)
+        elif record.endswith("\n"):
+            output_lines.append(record[:-1])
+            terminated.append(True)
+        else:
+            output_lines.append(record)
+            terminated.append(False)
+
+    indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(PANIC_MARKER)
+    ]
+    if len(indices) != len(PANIC_CORE_PATTERNS):
+        return False
+    if indices != list(range(indices[0], indices[0] + len(indices))):
+        return False
+    if not all(terminated[index] for index in indices):
+        return False
+
+    for pattern, index in zip(PANIC_CORE_PATTERNS, indices):
+        match = pattern.fullmatch(output_lines[index])
+        if match is None:
+            return False
+        if pattern is PANIC_CORE_PATTERNS[2]:
+            source_path = Path(match.group(1))
+            if source_path.is_absolute() or ".." in source_path.parts:
+                return False
+    return True
+
+
+def _has_required_output(output_lines, markers, patterns):
+    if not all(marker in output_lines for marker in markers):
+        return False
+    return all(
+        any(re.fullmatch(pattern, line) for line in output_lines)
+        for pattern in patterns
+    )
+
+
+def matches_expected_result(
+    *,
+    result,
+    observed_outcome,
+    expected_outcome,
+    markers,
+    patterns,
+    require_fdt_events=False,
+    require_fdt_reservations=False,
+    require_panic_report=False,
+):
+    output_lines = result.output.splitlines()
+
+    if (
+        observed_outcome is not expected_outcome
+        or result.timed_out
+        or result.return_code != 0
+        or FAILURE_MARKER in result.output
+        or any(line.startswith("not ok ") for line in output_lines)
+        or not _has_required_output(output_lines, markers, patterns)
+    ):
+        return False
+    if (
+        require_fdt_events or require_fdt_reservations
+    ) and not _has_complete_fdt_events(
+        output_lines,
+        require_reservations=require_fdt_reservations,
+    ):
+        return False
+    if require_panic_report and not _has_complete_panic_report(result.output):
+        return False
+    return True
 
 
 def classify_smoke(
@@ -165,15 +270,32 @@ def run_qemu(command, timeout_seconds):
     )
 
 
-def print_tap_result(outcome, result, command):
+def print_tap_result(
+    outcome,
+    result,
+    command,
+    expected_outcome=SmokeOutcome.PASS,
+    accepted=None,
+):
+    if accepted is None:
+        accepted = outcome is SmokeOutcome.PASS
+
     print("TAP version 13")
-    if outcome is SmokeOutcome.PASS:
-        print("ok 1 - versioned boot marker followed by clean QEMU shutdown")
-        print("# outcome: pass")
+    if accepted:
+        print(
+            "ok 1 - QEMU smoke test observed expected "
+            f"{expected_outcome.value}"
+        )
+        print(f"# outcome: {outcome.value}")
+        print(f"# expected outcome: {expected_outcome.value}")
         return 0
 
-    print(f"not ok 1 - QEMU smoke test reported {outcome.value}")
+    print(
+        "not ok 1 - QEMU smoke test expected "
+        f"{expected_outcome.value} but reported {outcome.value}"
+    )
     print(f"# outcome: {outcome.value}")
+    print(f"# expected outcome: {expected_outcome.value}")
     print(f"# command: {shlex.join(command)}")
     if result.return_code is None:
         print("# qemu return code: none")
@@ -187,7 +309,7 @@ def print_tap_result(outcome, result, command):
         SmokeOutcome.PANIC: 2,
         SmokeOutcome.UNEXPECTED_EXIT: 3,
         SmokeOutcome.TIMEOUT: 4,
-    }[outcome]
+    }.get(outcome, 3)
 
 
 def parse_arguments(argv):
@@ -207,6 +329,18 @@ def parse_arguments(argv):
         help="Exact serial line required for success; may be repeated",
     )
     parser.add_argument(
+        "--pattern",
+        action="append",
+        default=[],
+        help="Full-line regular expression required in serial output",
+    )
+    parser.add_argument(
+        "--expect",
+        choices=("pass", "panic"),
+        default="pass",
+        help="Observed outcome required for a successful test",
+    )
+    parser.add_argument(
         "--require-fdt-events",
         action="store_true",
         help="Require FDT range events to match the guest's count summary",
@@ -216,6 +350,11 @@ def parse_arguments(argv):
         action="store_true",
         help="Require at least one firmware reservation in the FDT events",
     )
+    parser.add_argument(
+        "--require-panic-report",
+        action="store_true",
+        help="Require the ordered five-record panic report",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
@@ -223,6 +362,11 @@ def parse_arguments(argv):
         parser.error("--timeout must be greater than zero")
     if any(not marker for marker in arguments.marker):
         parser.error("--marker values must not be empty")
+    for pattern in arguments.pattern:
+        try:
+            re.compile(pattern)
+        except re.error as error:
+            parser.error(f"invalid --pattern {pattern!r}: {error}")
     if not arguments.kernel.is_file():
         parser.error(f"kernel image does not exist: {arguments.kernel}")
     return arguments
@@ -248,7 +392,24 @@ def main(argv=None):
         require_fdt_events=arguments.require_fdt_events,
         require_fdt_reservations=arguments.require_fdt_reservations,
     )
-    return print_tap_result(outcome, result, command)
+    expected_outcome = SmokeOutcome(arguments.expect)
+    accepted = matches_expected_result(
+        result=result,
+        observed_outcome=outcome,
+        expected_outcome=expected_outcome,
+        markers=arguments.marker,
+        patterns=arguments.pattern,
+        require_fdt_events=arguments.require_fdt_events,
+        require_fdt_reservations=arguments.require_fdt_reservations,
+        require_panic_report=arguments.require_panic_report,
+    )
+    return print_tap_result(
+        outcome,
+        result,
+        command,
+        expected_outcome=expected_outcome,
+        accepted=accepted,
+    )
 
 
 if __name__ == "__main__":

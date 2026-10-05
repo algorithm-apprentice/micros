@@ -2,6 +2,7 @@
 
 #include "arch/riscv64/platform.h"
 #include "micros/fdt.h"
+#include "micros/panic.h"
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -99,6 +100,10 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     write_fdt_counts(&memory_map);
     uart_write("MICROS_FDT_READY\n");
     uart_flush();
+
+#ifdef MICROS_BUILD_PANIC_TEST
+    MICROS_PANIC(hart_id, "intentional-test");
+#endif
 
     (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);
     stop_after_reset_failure();
