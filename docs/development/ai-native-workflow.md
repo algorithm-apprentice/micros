@@ -41,8 +41,9 @@ does not require preserving a permanently broken commit. When the test alone
 would make history red, commit the test together with the smallest Green
 implementation. Separate later refactoring into another green commit.
 
-Meaningful commit history is preserved at merge. Do not turn a reviewable
-sequence into one large squash commit.
+Meaningful green commits remain visible on the pull-request branch during
+review. The accepted pull request is squash-merged into one task-outcome
+commit on `main`, as defined by ADR-0028.
 
 ### Executable feedback
 
@@ -131,7 +132,7 @@ The required order is:
 9. Run the narrow suite and then the milestone gate.
 10. Independently review the complete change.
 11. Correct justified findings and repeat review.
-12. Merge while preserving meaningful commits and select the next
+12. Squash-merge the reviewed task into one `main` commit and select the next
     dependency-ready task.
 
 ## TDD by layer
@@ -192,9 +193,10 @@ The pull request template is the durable execution record. Exact commands and
 results are included; "tests pass" without commands is insufficient.
 
 After required checks and independent review are clean, the pull request may be
-merged without waiting for an additional manual approval. Use a merge strategy
-that preserves meaningful green commits. Development then moves to the next
-dependency-ready task.
+merged without waiting for an additional manual approval. Squash-merge it into
+one task-outcome commit while retaining Red/Green and review evidence in the
+pull-request description. Development then moves to the next dependency-ready
+task.
 
 ## Preventing stale AI context
 

@@ -87,7 +87,7 @@ behavior.
 11. Obtain an independent review.
 12. Validate every review finding; fix only technically justified issues.
 13. Re-review until no substantive issue remains.
-14. Merge the pull request while preserving meaningful commit history, then
+14. Squash-merge the reviewed pull request into one task-outcome commit, then
     move to the next dependency-ready task.
 
 Do not develop separate tasks in parallel.
