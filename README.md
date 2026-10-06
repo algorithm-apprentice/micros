@@ -1,8 +1,11 @@
 # micros
 
-`micros` is a from-scratch educational microkernel operating system inspired by
-the architecture of MINIX 3. It is intended to make kernel mechanisms,
-user-space services, and their dependencies small enough to study directly.
+`micros` is a from-scratch educational RISC-V64 reimplementation of the
+behavioral architecture of MINIX 3. MINIX provides the subsystem baseline;
+`micros` independently reproduces that behavior with documented target
+adaptations and safety extensions. The system is intended to make kernel
+mechanisms, user-space services, and their dependencies small enough to study
+directly.
 
 Implementation now follows the accepted dependency DAG. The current boot
 foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
@@ -67,6 +70,8 @@ user context, and restore the hart's idle trap stack.
 - [System overview](docs/architecture/system-overview.md)
 - [Development dependency DAG](docs/architecture/development-dag.md)
 - [MINIX dependency analysis](docs/research/minix-dependency-analysis.md)
+- [MINIX baseline parity audit](docs/research/minix-baseline-parity-audit.md)
+- [MINIX scheduler and context-switch study](docs/research/minix-scheduler-and-context-switch.md)
 - [Roadmap](docs/roadmap.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [AI-native development workflow](docs/development/ai-native-workflow.md)
@@ -137,6 +142,9 @@ Development proceeds through one pull request at a time, in dependency order.
 Humans and AI agents follow the same documentation-first, test-first,
 independently reviewed workflow.
 
-MINIX source is used as an architectural reference. `micros` is an independent
-implementation: source is not copied from MINIX or NetBSD without an explicit
-dependency and license decision.
+Each dependency-ready subsystem first traces the fixed MINIX reference
+baseline, then independently implements its behavior and authority boundaries.
+Required RISC-V adaptations and compatible safety extensions are documented;
+optional optimization follows only after the baseline works. Source is not
+copied from MINIX or NetBSD without an explicit dependency and license
+decision.

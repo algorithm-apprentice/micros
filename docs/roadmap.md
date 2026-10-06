@@ -6,7 +6,9 @@ Development proceeds through sequential pull requests. A later milestone does
 not begin until the previous pull request has been reviewed and accepted.
 Architecture or scope changes are recorded in ADRs before implementation.
 Implementation follows the repository's documentation-first, test-first,
-independently reviewed AI-native workflow.
+independently reviewed AI-native workflow. Each dependency-ready subsystem
+first reproduces the documented MINIX behavioral baseline; optional
+optimization follows only after baseline integration passes.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
@@ -217,7 +219,7 @@ These require separate ADRs and are not part of the shell MVP:
 | Assembly bugs | Corruption appears far from the cause | Dedicated QEMU context and trap tests with known register patterns |
 | Memory ownership ambiguity | Leaks or double allocation | Central ownership ledger and assertions before/after VM handoff |
 | Slow feedback | Kernel bugs become expensive to isolate | Keep pure logic host-testable and QEMU smoke tests short |
-| Excess MINIX fidelity | MVP expands before producing a shell | Use the documented non-goals and DAG gates |
+| Unbounded source-level MINIX fidelity | MVP imports unrelated architecture, compatibility, or service breadth | Reproduce documented behavior and authority only, while keeping the DAG and non-goals |
 | Future concurrency requires redesign | Thread or SMP work replaces process and IPC foundations | Separate process/thread/hart objects and reply rights in v0.1 |
 | Silent service failure | Boot hangs without a diagnosis | Readiness timeouts and structured serial events |
 | Host-only assumptions | macOS build works but CI or target behavior differs | Separate host and target toolchains and test on Linux CI |

@@ -39,4 +39,5 @@ to make the project appear more consistent than it was.
 | [0021](0021-generation-safe-user-address-spaces.md) | Generation-safe user address spaces | Accepted |
 | [0022](0022-user-execution-contexts-and-u-mode-entry.md) | User execution contexts and U-mode entry | Accepted |
 | [0023](0023-canonical-user-status-summary-bits.md) | Canonical user status summary bits | Accepted |
-| [0024](0024-preemptive-round-robin-scheduler.md) | Preemptive round-robin scheduler | Accepted |
+| [0024](0024-preemptive-round-robin-scheduler.md) | Preemptive round-robin scheduler | Superseded |
+| [0025](0025-minix-behavioral-baseline-before-optimization.md) | MINIX behavioral baseline before optimization | Accepted |

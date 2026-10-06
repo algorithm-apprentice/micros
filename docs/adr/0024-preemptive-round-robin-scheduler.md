@@ -1,7 +1,8 @@
 # ADR-0024: Preemptive Round-Robin Scheduler
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-06
+- Superseded by: ADR-0025
 
 ## Context
 

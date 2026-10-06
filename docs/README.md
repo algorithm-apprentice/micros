@@ -14,6 +14,12 @@ This directory contains the design baseline for `micros`.
 - [MINIX dependency analysis](research/minix-dependency-analysis.md) records the
   source baseline, component relationships, strongly connected component, and
   bootstrap lessons used to derive the `micros` design.
+- [MINIX baseline parity audit](research/minix-baseline-parity-audit.md)
+  classifies every merged kernel foundation as baseline behavior, required
+  target adaptation, compatible extension, staged substitution, or correction.
+- [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
+  traces runnable queues, accounting, context selection, restore, and
+  user-scheduler authority before scheduler implementation.
 
 ## Planning and verification
 
