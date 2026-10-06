@@ -766,7 +766,11 @@ micros_thread_capture_execution_context(
     }
     if (
         !thread->context_attached
-        || thread->state != MICROS_THREAD_STATE_RUNNING
+        || (
+            thread->scheduler_assigned
+            ? thread->state != MICROS_THREAD_STATE_INACTIVE
+            : thread->state != MICROS_THREAD_STATE_RUNNING
+        )
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }

@@ -340,6 +340,7 @@ add_executable(
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/scheduler_core.c
+    kernel/scheduler.c
     kernel/main.c
     kernel/panic.c
     kernel/sv39.c

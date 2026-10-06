@@ -142,9 +142,10 @@ rejects active/stale/corrupt roots without mutation, atomically tears roots
 down, and verifies every process-root API is revoked after ownership handoff.
 `test-qemu-user-execution` enters a relocation-free payload in U-mode, proves
 user-stack access and kernel-page isolation, captures every integer register
-on a thread-owned supervisor stack, resumes a modified user frame, and returns
-through an interrupt-disabled supervisor continuation while preserving caller
-state.
+on a thread-owned supervisor stack, uses scheduler-owned admission/current
+selection and accounting, resumes a modified user frame through the common
+return plan, and returns through an interrupt-disabled supervisor continuation
+while preserving caller state.
 
 ## Native unit tests
 

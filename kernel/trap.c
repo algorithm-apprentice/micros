@@ -7,6 +7,7 @@
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
+#include "micros/scheduler.h"
 #include "micros/timer.h"
 #include "micros/user_address_space.h"
 #include "micros/user_execution.h"
@@ -366,6 +367,16 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
     cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
 
     if ((frame->sstatus & MICROS_RISCV_SSTATUS_SPP) == 0) {
+        if (
+            micros_scheduler_user_trap_enter(hart, frame)
+                != MICROS_SCHEDULER_OK
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "scheduler-user-entry",
+                frame
+            );
+        }
 #ifdef MICROS_BUILD_USER_EXECUTION_TEST
         enum micros_user_execution_test_trap_result result;
 
@@ -397,14 +408,12 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 == MICROS_USER_EXECUTION_TEST_TRAP_USER_RETURN
         ) {
             if (
-                micros_user_execution_validate_return(
-                    hart,
-                    frame
-                ) != MICROS_USER_EXECUTION_OK
+                micros_scheduler_select_user_return(hart, frame)
+                    != MICROS_SCHEDULER_OK
             ) {
                 MICROS_TRAP_PANIC(
                     hart->hardware_id,
-                    "user-execution-return",
+                    "scheduler-user-return",
                     frame
                 );
             }
