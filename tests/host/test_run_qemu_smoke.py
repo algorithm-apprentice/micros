@@ -180,6 +180,18 @@ SCHEDULER_TEST_OUTPUT = (
     FRAME_OWNERSHIP_OUTPUT + SCHEDULER_TEST_PASS
 )
 
+ENDPOINT_TEST_PASS = (
+    "MICROS_ENDPOINT_TEST_PASS "
+    "generation=validated "
+    "profiles=immutable "
+    "visibility=staged "
+    "authorization=separate\n"
+)
+
+ENDPOINT_TEST_OUTPUT = (
+    FRAME_OWNERSHIP_OUTPUT + ENDPOINT_TEST_PASS
+)
+
 OBJECT_MODEL_TEST_PASS = (
     "MICROS_OBJECT_MODEL_TEST_PASS "
     "process-generation=advanced "
@@ -1660,6 +1672,78 @@ class ExpectedOutcomeTest(unittest.TestCase):
                         require_mmu_ready=True,
                         require_frame_ownership_ready=True,
                         require_scheduler_test_report=True,
+                    )
+                )
+
+    def test_accepts_complete_endpoint_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=ENDPOINT_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_frame_ownership_ready=True,
+            require_objects_ready=True,
+            require_endpoint_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_endpoint_test_report(self):
+        early = ENDPOINT_TEST_OUTPUT.replace(
+            ENDPOINT_TEST_PASS,
+            "",
+        ).replace(
+            FRAME_OWNERSHIP_READY_RECORD,
+            ENDPOINT_TEST_PASS + FRAME_OWNERSHIP_READY_RECORD,
+        )
+        invalid_outputs = (
+            FRAME_OWNERSHIP_OUTPUT,
+            ENDPOINT_TEST_OUTPUT + ENDPOINT_TEST_PASS,
+            early,
+            ENDPOINT_TEST_OUTPUT.replace(
+                "profiles=immutable",
+                "profiles=mutable",
+            ),
+            ENDPOINT_TEST_OUTPUT.rstrip("\n"),
+        )
+
+        for output in invalid_outputs:
+            with self.subTest(output=output):
+                result = run_qemu_smoke.QemuResult(
+                    output=output,
+                    return_code=0,
+                    timed_out=False,
+                )
+
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=(
+                            run_qemu_smoke.SmokeOutcome.PASS
+                        ),
+                        expected_outcome=(
+                            run_qemu_smoke.SmokeOutcome.PASS
+                        ),
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_frame_ownership_ready=True,
+                        require_objects_ready=True,
+                        require_endpoint_test_report=True,
                     )
                 )
 

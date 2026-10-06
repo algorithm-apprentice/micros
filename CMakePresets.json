@@ -90,6 +90,15 @@
       }
     },
     {
+      "name": "riscv64-endpoint-test",
+      "displayName": "RISC-V 64 endpoint and privilege-profile test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-endpoint-test",
+      "cacheVariables": {
+        "MICROS_BUILD_ENDPOINT_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -219,6 +228,13 @@
       "configurePreset": "riscv64-object-model-test",
       "targets": [
         "test-qemu-object-model"
+      ]
+    },
+    {
+      "name": "test-qemu-endpoint",
+      "configurePreset": "riscv64-endpoint-test",
+      "targets": [
+        "test-qemu-endpoint"
       ]
     },
     {
@@ -409,6 +425,20 @@
         {
           "type": "build",
           "name": "test-qemu-object-model"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-endpoint",
+      "displayName": "Build and run the endpoint profile test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-endpoint-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-endpoint"
         }
       ]
     },

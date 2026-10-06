@@ -44,13 +44,15 @@ The current implementation provides:
   thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
   reference model;
 - native endpoint encoding, immutable privilege-profile tables, process-bound
-  lifecycle, stale-generation rejection, and authorization tests;
+  lifecycle, stale-generation rejection, authorization, and replayable seeded
+  model tests;
+- an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-The deterministic generation-aware endpoint and privilege lifecycle is
-native-testable. Its seeded native model and isolated QEMU component gate form
-the next endpoint slice; blocking IPC follows those acceptance gates.
+The generation-aware endpoint and privilege substrate now passes its native
+model and isolated QEMU acceptance gates. Blocking IPC is the next
+dependency-ordered kernel task.
 
 ## Prerequisites
 
@@ -541,6 +543,24 @@ Build and run the first real user round trip with:
 
 ```bash
 cmake --workflow --preset test-qemu-user-execution
+```
+
+## Endpoint and privilege-profile test
+
+Build and run the isolated endpoint/profile lifecycle with:
+
+```bash
+cmake --workflow --preset test-qemu-endpoint
+```
+
+The image creates two process generations with inactive threads, proves
+reserved endpoints remain hidden, installs and activates immutable client and
+server profiles, checks distinct call/send/notify decisions, rejects process
+release while bound, advances one process generation, rejects the stale
+endpoint, and restores the object baseline. Only that complete sequence emits:
+
+```text
+MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate
 ```
 
 ## Scheduler test

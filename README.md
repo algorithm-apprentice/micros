@@ -104,6 +104,7 @@ cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
+cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -122,10 +123,12 @@ sizes, and captured-context diagnostics for an unexpected exception. The MMU
 gate additionally recovers from a hardware store page fault against text and
 an instruction page fault from writable memory. The object-model gate proves
 generation-safe reuse, stale-handle rejection, the checked one-thread policy,
-and hart-local current-thread state. The frame-ownership gate proves exact
-process-generation authority, blocked process release, failure-atomic staged
-handoff, and irreversible sealing. The nested
-trap gate injects a second exception at the first instruction after arming the
+and hart-local current-thread state. The endpoint gate proves generation-safe
+resolution, staged publication, immutable profiles, asymmetric authorization,
+and complete teardown back to the object baseline. The frame-ownership gate
+proves exact process-generation authority, blocked process release,
+failure-atomic staged handoff, and irreversible sealing. The nested trap gate
+injects a second exception at the first instruction after arming the
 `sscratch` sentinel and proves routing to a separately configured per-hart
 emergency stack. The user-address-space gate proves same-VA isolation across
 two roots, exact typed ownership, zeroed reuse, active-root rejection, stale

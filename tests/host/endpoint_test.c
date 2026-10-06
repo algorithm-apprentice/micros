@@ -122,7 +122,7 @@ static bool setup_lifecycle_fixture(void)
             | MICROS_PRIVILEGE_OPERATION_NOTIFY,
         UINT32_C(1) << 2,
         0,
-        UINT32_C(1) << 2,
+        UINT32_C(1) << 1,
         UINT64_C(1) << 3
     );
     profiles[1] = profile(
@@ -131,10 +131,11 @@ static bool setup_lifecycle_fixture(void)
         MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_SEND
             | MICROS_PRIVILEGE_OPERATION_REPLY
-            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
+            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+            | MICROS_PRIVILEGE_OPERATION_NOTIFY,
         0,
         UINT32_C(1) << 1,
-        0,
+        UINT32_C(1) << 2,
         0
     );
     if (
@@ -585,6 +586,22 @@ static bool test_endpoint_lifecycle_and_authorization(void)
             &endpoints[1]
         )
     );
+    EXPECT_OBJECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, threads[0])
+    );
+    EXPECT_OBJECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_release(&objects, processes[0])
+    );
+    EXPECT_OBJECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(
+            &objects,
+            processes[0],
+            &threads[0]
+        )
+    );
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
         micros_endpoint_install_profile(
@@ -639,6 +656,46 @@ static bool test_endpoint_lifecycle_and_authorization(void)
             endpoints[1]
         )
     );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_UNAUTHORIZED,
+        micros_endpoint_authorize_target(
+            &registry,
+            &objects,
+            endpoints[0],
+            MICROS_PRIVILEGE_OPERATION_NOTIFY,
+            endpoints[1]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_authorize_target(
+            &registry,
+            &objects,
+            endpoints[0],
+            MICROS_PRIVILEGE_OPERATION_NOTIFY,
+            endpoints[0]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_UNAUTHORIZED,
+        micros_endpoint_authorize_target(
+            &registry,
+            &objects,
+            endpoints[1],
+            MICROS_PRIVILEGE_OPERATION_NOTIFY,
+            endpoints[0]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_authorize_target(
+            &registry,
+            &objects,
+            endpoints[1],
+            MICROS_PRIVILEGE_OPERATION_NOTIFY,
+            endpoints[1]
+        )
+    );
     stale_target.slot = processes[1].slot;
     stale_target.generation = processes[1].generation + 1;
     EXPECT_ERROR(
@@ -682,6 +739,10 @@ static bool test_endpoint_lifecycle_and_authorization(void)
             endpoints[0],
             3
         )
+    );
+    EXPECT_OBJECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, threads[0])
     );
     EXPECT_OBJECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_STATE,
@@ -995,6 +1056,8 @@ static bool test_relationship_validator_rejects_corruption(void)
     return true;
 }
 
+bool micros_endpoint_model_test_run(void);
+
 int main(void)
 {
     static const struct {
@@ -1036,6 +1099,10 @@ int main(void)
         {
             "relationship validator rejects corruption",
             test_relationship_validator_rejects_corruption,
+        },
+        {
+            "seeded endpoint lifecycle model",
+            micros_endpoint_model_test_run,
         },
     };
     size_t index;

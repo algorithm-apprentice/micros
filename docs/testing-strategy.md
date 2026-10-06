@@ -70,7 +70,8 @@ Budgets are review signals, not reasons to hide necessary coverage.
 The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
-`test-qemu-object-model`, `test-qemu-nested-trap`, and
+`test-qemu-object-model`, `test-qemu-endpoint`,
+`test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
 `test-qemu-user-execution`, `test-qemu-scheduler`,
 `test-qemu-scheduler-invalid-outgoing`, and
@@ -87,6 +88,7 @@ cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
+cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -103,9 +105,9 @@ current-selection, preemption-repair, return-plan, and separate
 thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
 reference model, endpoint encoding, immutable privilege-profile tables,
 process-bound lifecycle, stale-generation rejection, relationship validation,
-and authorization tests under ASan and UBSan. The Python host tests include ELF
-allocatable-section closure, legacy-global rejection, and machine-readable
-QEMU record regressions.
+authorization, and a replayable 4,096-step lifecycle model under ASan and
+UBSan. The Python host tests include ELF allocatable-section closure,
+legacy-global rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
@@ -134,7 +136,11 @@ ELF. `test-qemu-mmu` verifies exact recovery from a store page fault against RX
 text and an instruction page fault from RW/NX kernel data.
 `test-qemu-object-model` exercises the production process/thread/hart registry,
 including generation advance, stale rejection, the one-thread policy, and
-hart-local current-thread state. `test-qemu-nested-trap` injects a second fault
+hart-local current-thread state. `test-qemu-endpoint` exercises reserved versus
+active visibility, immutable profile installation, asymmetric
+call/send/notify authorization, bound-process release rejection, stale
+endpoint rejection after generation advance, and complete baseline
+restoration. `test-qemu-nested-trap` injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
 emergency stack is selected without trusting interrupted `tp`.
 `test-qemu-frame-ownership` exercises the production ledger and object
