@@ -19,7 +19,7 @@ flowchart TD
     B[Toolchain and image layout]
     C[OpenSBI entry FDT and serial]
     D[Traps and timer]
-    E[Bootstrap physical memory]
+    E[Bootstrap physical memory and typed ownership]
     F[Page tables and user mode]
     G[Process thread and hart objects plus kernel scheduler]
     H[IPC endpoints and privileges]
@@ -79,7 +79,7 @@ failures attributable to one coherent change.
 
 | MINIX runtime cycle | Initial `micros` substitution | Later transition |
 | --- | --- | --- |
-| Kernel and VM depend on each other | Kernel bootstrap allocator and static mappings | One-way VM ownership handoff |
+| Kernel and VM depend on each other | Kernel bootstrap allocator, typed ownership ledger, and static mappings | One-way VM ownership handoff |
 | RS coordinates VM, PM, scheduler, and services | Static manifest plus bootstrap launcher | RS adopts the stable service protocol |
 | PM, VFS, and VM coordinate fork/exec | PM-directed `spawn` transaction | Add `exec`, then `fork` and copy-on-write |
 | VFS, filesystem servers, drivers, and DS discover each other | Fixed RAMFS endpoint and static mount | DS publication and dynamic drivers |
@@ -93,7 +93,7 @@ failures attributable to one coherent change.
 | 1 | Documentation and ADR package | Decisions reviewed; DAG and scope internally consistent |
 | 2 | Toolchain, linker layout, QEMU launch | Reproducible ELF build and deterministic QEMU exit |
 | 3 | OpenSBI entry, FDT, UART, panic | Memory and reservations parsed; boot marker and panic diagnostics visible |
-| 4 | Traps, timer, bootstrap allocator | Expected exception recovery, timer ticks, allocator invariants |
+| 4 | Traps, timer, bootstrap allocator, typed frame ownership | Expected exception recovery, timer ticks, allocator/owner invariants, and atomic handoff classification |
 | 5 | Page tables, process/thread/hart objects, user mode | U-mode isolation and repeated thread context switches |
 | 6 | Scheduler, endpoints, IPC | Blocking, wakeup, reply-token, stale endpoint, privilege, and deadlock tests |
 | 7 | Grants and user runtime | Authorized copies succeed; bounds and permission violations fail |

@@ -11,9 +11,10 @@ independently reviewed AI-native workflow.
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
-timer ownership. Per-process address-space roots, U-mode entry, saved execution
-contexts, repeated switching, and preemptive scheduling remain in dependency
-order.
+timer ownership. A typed per-frame ledger now binds allocator geometry to exact
+kernel/process-generation owners and provides the staged one-way VM-handoff
+gate. Per-process address-space roots, U-mode entry, saved execution contexts,
+repeated switching, and preemptive scheduling remain in dependency order.
 
 ## v0.1 completion goal
 
@@ -76,6 +77,7 @@ model, IPC reply model, or global current-execution representation.
 - trap entry and exception decoding;
 - timer interrupts;
 - bootstrap frame allocator;
+- typed bootstrap frame ownership and atomic handoff classification;
 - kernel and user page tables;
 - user-mode entry;
 - separate process, thread, endpoint, and hart objects;
@@ -84,7 +86,7 @@ model, IPC reply model, or global current-execution representation.
 
 ### Exit criteria
 
-- allocator invariants pass randomized host tests;
+- allocator and typed-ownership invariants pass randomized host tests;
 - expected exceptions return safely;
 - U-mode cannot access kernel-only pages;
 - two user threads can be preempted repeatedly without register corruption.

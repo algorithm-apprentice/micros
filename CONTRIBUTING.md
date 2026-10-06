@@ -70,6 +70,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
+cmake --workflow --preset test-qemu-frame-ownership
 ```
 
 Each workflow configures and builds its own image before running the selected
