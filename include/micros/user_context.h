@@ -1,0 +1,90 @@
+#ifndef MICROS_USER_CONTEXT_H
+#define MICROS_USER_CONTEXT_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+struct micros_user_context {
+    uint64_t ra;
+    uint64_t sp;
+    uint64_t gp;
+    uint64_t tp;
+    uint64_t t0;
+    uint64_t t1;
+    uint64_t t2;
+    uint64_t s0;
+    uint64_t s1;
+    uint64_t a0;
+    uint64_t a1;
+    uint64_t a2;
+    uint64_t a3;
+    uint64_t a4;
+    uint64_t a5;
+    uint64_t a6;
+    uint64_t a7;
+    uint64_t s2;
+    uint64_t s3;
+    uint64_t s4;
+    uint64_t s5;
+    uint64_t s6;
+    uint64_t s7;
+    uint64_t s8;
+    uint64_t s9;
+    uint64_t s10;
+    uint64_t s11;
+    uint64_t t3;
+    uint64_t t4;
+    uint64_t t5;
+    uint64_t t6;
+    uint64_t sstatus;
+    uint64_t sepc;
+};
+
+#define MICROS_USER_CONTEXT_ASSERT_OFFSET(field, offset) \
+    _Static_assert( \
+        offsetof(struct micros_user_context, field) == (offset), \
+        "user context " #field " offset mismatch" \
+    )
+
+MICROS_USER_CONTEXT_ASSERT_OFFSET(ra, 0);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(sp, 8);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(gp, 16);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(tp, 24);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t0, 32);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t1, 40);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t2, 48);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s0, 56);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s1, 64);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a0, 72);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a1, 80);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a2, 88);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a3, 96);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a4, 104);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a5, 112);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a6, 120);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(a7, 128);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s2, 136);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s3, 144);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s4, 152);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s5, 160);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s6, 168);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s7, 176);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s8, 184);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s9, 192);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s10, 200);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(s11, 208);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t3, 216);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t4, 224);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t5, 232);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(t6, 240);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(sstatus, 248);
+MICROS_USER_CONTEXT_ASSERT_OFFSET(sepc, 256);
+
+_Static_assert(
+    sizeof(struct micros_user_context) == 264,
+    "user context size mismatch"
+);
+
+#undef MICROS_USER_CONTEXT_ASSERT_OFFSET
+
+#endif
