@@ -110,9 +110,10 @@ diagnostic stream into a pass.
 
 `test-qemu-trap` verifies the real direct-mode entry and `sret` paths with two
 distinct x1-x31 register patterns, two stacks, an observable status change, and
-an exact expected illegal-instruction label. `test-qemu-timer` verifies three
-accepted supervisor timer expirations, two successful rearms, final disarm,
-and the SIE-clear wait handshake.
+an exact expected illegal-instruction label. `test-qemu-timer` verifies
+expired-only return preparation, failure-atomic timer programming, three
+accepted supervisor timer expirations, two successful interrupt rearms, final
+disarm, and the SIE-clear wait handshake.
 `test-qemu-frame-allocator` verifies production FDT/linker reservation
 integration, deterministic allocation and release from the live post-MMU
 baseline, preservation of retained table bits, exact free-count restoration,
