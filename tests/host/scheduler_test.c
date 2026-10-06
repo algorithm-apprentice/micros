@@ -460,6 +460,293 @@ static bool test_legacy_and_scheduler_authority_do_not_overlap(void)
     return true;
 }
 
+static bool test_current_selection_and_preemption_repair(void)
+{
+    struct micros_scheduler_return_plan plan;
+    struct micros_thread_handle current;
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[1], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(
+        plan.action == MICROS_SCHEDULER_RETURN_SELECT_THREAD
+        && handles_equal(plan.selected, threads[0])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_current_thread(&objects, harts[0], &current)
+    );
+    EXPECT_TRUE(
+        handles_equal(current, threads[0])
+        && handles_equal(
+            objects.harts[harts[0].slot].ready_head[7],
+            threads[0]
+        )
+    );
+
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[2], 3, 100, true
+        )
+    );
+    EXPECT_TRUE(
+        (
+            objects.threads[threads[0].slot].runtime_flags
+            & MICROS_THREAD_RTS_PREEMPTED
+        ) != 0
+        && !objects.threads[threads[0].slot].ready_linked
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(
+        plan.repair_preempted
+        && handles_equal(plan.selected, threads[2])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(
+        handles_equal(
+            objects.harts[harts[0].slot].current_thread,
+            threads[2]
+        )
+        && handles_equal(
+            objects.harts[harts[0].slot].ready_head[7],
+            threads[0]
+        )
+        && objects.threads[threads[0].slot].remaining_counter_ticks
+            == 100
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_hold(&objects, threads[2])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(handles_equal(plan.selected, threads[0]));
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_core_validate(&objects)
+    );
+    return true;
+}
+
+static bool test_quantum_rotation_and_nonpreemptible_current(void)
+{
+    struct micros_scheduler_return_plan plan;
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[1], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    objects.threads[threads[0].slot].remaining_counter_ticks = 0;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(
+        plan.renew_quantum
+        && handles_equal(plan.selected, threads[1])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(
+        handles_equal(
+            objects.harts[harts[0].slot].current_thread,
+            threads[1]
+        )
+        && handles_equal(
+            objects.harts[harts[0].slot].ready_tail[7],
+            threads[0]
+        )
+        && objects.threads[threads[0].slot].remaining_counter_ticks
+            == 100
+    );
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, false
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[1], 1, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(
+        plan.action == MICROS_SCHEDULER_RETURN_KEEP_CURRENT
+        && handles_equal(plan.selected, threads[0])
+    );
+    objects.threads[threads[0].slot].remaining_counter_ticks = 0;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(
+        plan.action == MICROS_SCHEDULER_RETURN_KEEP_CURRENT
+        && plan.renew_quantum
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(
+        objects.threads[threads[0].slot].remaining_counter_ticks == 100
+    );
+    return true;
+}
+
+static bool test_current_block_and_stale_plan_are_atomic(void)
+{
+    struct micros_scheduler_return_plan plan;
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_runtime_flags_set(
+            &objects,
+            threads[0],
+            MICROS_THREAD_RTS_INACTIVE
+        )
+    );
+    EXPECT_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_runtime_flags_unset(
+            &objects,
+            threads[0],
+            MICROS_THREAD_RTS_INACTIVE
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_TRUE(plan.action == MICROS_SCHEDULER_RETURN_ENTER_IDLE);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(
+        objects.harts[harts[0].slot].current_thread.generation == 0
+        && objects.harts[harts[0].slot].trap.primary_stack_bottom
+            == objects.harts[harts[0].slot].idle_primary_stack_bottom
+    );
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[1], 7, 100, true
+        )
+    );
+    objects.harts[harts[0].slot].reschedule_pending = true;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_hold(&objects, threads[1])
+    );
+    EXPECT_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(objects.harts[harts[0].slot].reschedule_pending);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_TRUE(!objects.harts[harts[0].slot].reschedule_pending);
+    return true;
+}
+
 static bool test_corrupt_queue_state_is_rejected(void)
 {
     struct micros_kernel_objects snapshot;
@@ -528,9 +815,6 @@ static bool test_corrupt_queue_state_is_rejected(void)
         objects.harts[harts[0].slot].current_thread = threads[0]
     );
     EXPECT_CORRUPTION(
-        objects.harts[harts[0].slot].reschedule_pending = true
-    );
-    EXPECT_CORRUPTION(
         objects.harts[harts[0].slot].accounting_owner =
             MICROS_SCHEDULER_ACCOUNTING_KERNEL
     );
@@ -565,6 +849,18 @@ int main(void)
         {
             "legacy and scheduler authority do not overlap",
             test_legacy_and_scheduler_authority_do_not_overlap,
+        },
+        {
+            "current selection repairs preemption",
+            test_current_selection_and_preemption_repair,
+        },
+        {
+            "quantum rotation retains nonpreemptible current",
+            test_quantum_rotation_and_nonpreemptible_current,
+        },
+        {
+            "current block and stale plan are atomic",
+            test_current_block_and_stale_plan_are_atomic,
         },
         {
             "corrupt queue state is rejected",

@@ -93,10 +93,10 @@ cmake --workflow --preset test-qemu-user-execution
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
 typed frame-ownership ledger, Sv39 encoding, kernel-object lifecycle/model
-tests, and deterministic scheduler admission, RTS, priority-queue, and policy
-tests under ASan and UBSan plus the Python host tests. The latter include ELF
-allocatable-section closure, legacy-global rejection, and machine-readable
-QEMU record regressions.
+tests, and deterministic scheduler admission, RTS, priority-queue, policy,
+current-selection, preemption-repair, and return-plan tests under ASan and
+UBSan plus the Python host tests. The latter include ELF allocatable-section
+closure, legacy-global rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and

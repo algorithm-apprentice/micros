@@ -34,8 +34,8 @@ The current implementation provides:
 - native Sv39 encoding and ELF permission-layout tests;
 - native kernel-object lifecycle, exhaustion, corruption, and seeded
   reference-model tests;
-- native scheduler admission, run-time-flag, priority-queue, and policy
-  transition tests;
+- native scheduler admission, run-time-flag, priority-queue, policy,
+  current-selection, preemption-repair, and return-plan tests;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
