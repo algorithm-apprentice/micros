@@ -685,6 +685,8 @@ micros_user_execution_handle_test_trap(
     }
 
     if (test_state == USER_EXECUTION_TEST_SECOND_ECALL) {
+        struct micros_kernel_objects *objects =
+            micros_kernel_object_runtime_test_registry();
         uint64_t control_mask =
             MICROS_RISCV_SSTATUS_SIE
             | MICROS_RISCV_SSTATUS_SPIE
@@ -707,6 +709,7 @@ micros_user_execution_handle_test_trap(
             )
             || frame->a7 != 2
             || frame->a0 != UINT64_C(0x0000000000000abd)
+            || objects == NULL
             || micros_scheduler_test_prepare_supervisor_return(
                 hart,
                 frame

@@ -562,8 +562,6 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
                         != MICROS_KERNEL_OBJECT_SLOT_LIVE
                     || thread->generation != cursor.generation
                     || !thread->scheduler_assigned
-                    || thread->state
-                        != MICROS_THREAD_STATE_INACTIVE
                     || !hart_handles_equal(
                         thread->scheduler_hart,
                         hart_handle
@@ -609,8 +607,6 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || thread->generation
                     != hart->current_thread.generation
-                || thread->state
-                    != MICROS_THREAD_STATE_INACTIVE
                 || !hart_handles_equal(
                     thread->scheduler_hart,
                     hart_handle
@@ -686,8 +682,7 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
             continue;
         }
         if (
-            thread->state != MICROS_THREAD_STATE_INACTIVE
-            || (
+            (
                 thread->runtime_flags
                 & ~MICROS_THREAD_RTS_DEFINED_MASK
             ) != 0
@@ -765,7 +760,6 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
         )
         || thread->scheduler_assigned
         || !thread->context_attached
-        || thread->state != MICROS_THREAD_STATE_INACTIVE
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread_is_current(objects, thread_handle)
     ) {

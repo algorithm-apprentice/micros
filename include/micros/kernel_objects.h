@@ -57,11 +57,6 @@ enum micros_kernel_object_slot_state {
     MICROS_KERNEL_OBJECT_SLOT_QUARANTINED,
 };
 
-enum micros_thread_state {
-    MICROS_THREAD_STATE_INACTIVE = 0,
-    MICROS_THREAD_STATE_RUNNING,
-};
-
 enum micros_scheduler_accounting_owner {
     MICROS_SCHEDULER_ACCOUNTING_NONE = 0,
     MICROS_SCHEDULER_ACCOUNTING_KERNEL,
@@ -82,7 +77,6 @@ struct micros_thread {
     enum micros_kernel_object_slot_state slot_state;
     uint32_t generation;
     struct micros_process_handle owner;
-    enum micros_thread_state state;
     bool context_attached;
     uintptr_t kernel_stack_bottom;
     uintptr_t kernel_stack_top;
@@ -296,32 +290,6 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
     uintptr_t primary_stack_top,
     uintptr_t emergency_stack_bottom,
     uintptr_t emergency_stack_top
-);
-
-enum micros_kernel_object_error
-micros_hart_select_thread_trap_stack(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle hart,
-    struct micros_thread_handle thread
-);
-
-enum micros_kernel_object_error
-micros_hart_restore_idle_trap_stack(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle hart,
-    struct micros_thread_handle thread
-);
-
-enum micros_kernel_object_error micros_hart_bind_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle hart,
-    struct micros_thread_handle thread
-);
-
-enum micros_kernel_object_error micros_hart_clear_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle hart,
-    struct micros_thread_handle thread
 );
 
 enum micros_kernel_object_error micros_hart_current_thread(

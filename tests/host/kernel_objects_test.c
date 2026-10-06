@@ -1,4 +1,5 @@
 #include "micros/kernel_objects.h"
+#include "micros/scheduler_core.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -72,17 +73,6 @@ static struct micros_kernel_objects objects;
 static void reset_objects(void)
 {
     memset(&objects, 0, sizeof(objects));
-}
-
-static bool handles_equal(
-    struct micros_thread_handle left,
-    struct micros_thread_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.generation == right.generation
-    );
 }
 
 static bool process_handles_equal(
@@ -325,22 +315,6 @@ static bool test_uninitialized_registry_rejects_every_operation(void)
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_hart_register(&objects, 0, &hart_output)
     );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_select_thread_trap_stack(
-            &objects,
-            hart,
-            thread
-        )
-    );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_restore_idle_trap_stack(
-            &objects,
-            hart,
-            thread
-        )
-    );
     EXPECT_TRUE(
         hart_output.slot == UINT16_MAX
         && hart_output.generation == UINT32_MAX
@@ -370,14 +344,6 @@ static bool test_uninitialized_registry_rejects_every_operation(void)
             UINT64_C(0x6000),
             UINT64_C(0x7000)
         )
-    );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_bind_thread(&objects, hart, thread)
-    );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_clear_thread(&objects, hart, thread)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
@@ -855,18 +821,24 @@ static bool test_thread_execution_context_lifecycle_is_exact(void)
             &captured
         )
     );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, hart, first)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_select_thread_trap_stack(
-            &objects,
-            hart,
-            first
-        )
-    );
+    {
+        struct micros_scheduler_return_plan plan;
+
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_thread_scheduler_admit(
+                &objects, hart, first, 7, 100, true
+            )
+        );
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_hart_plan_user_return(&objects, hart, &plan)
+        );
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_hart_commit_user_return(&objects, &plan)
+        );
+    }
     EXPECT_TRUE(
         objects.harts[hart.slot].trap.primary_stack_bottom
             == first_stack_bottom
@@ -911,28 +883,32 @@ static bool test_thread_execution_context_lifecycle_is_exact(void)
         MICROS_KERNEL_OBJECT_ERROR_STATE,
         micros_thread_detach_execution_context(&objects, first)
     );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_clear_thread(&objects, hart, first)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_restore_idle_trap_stack(
-            &objects,
-            hart,
-            first
-        )
-    );
+    {
+        struct micros_scheduler_return_plan plan;
+
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_thread_scheduler_hold(&objects, first)
+        );
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_hart_plan_user_return(&objects, hart, &plan)
+        );
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_hart_commit_user_return(&objects, &plan)
+        );
+        EXPECT_ERROR(
+            MICROS_KERNEL_OBJECT_OK,
+            micros_thread_scheduler_remove(&objects, first)
+        );
+    }
     EXPECT_TRUE(
         objects.harts[hart.slot].trap.primary_stack_bottom
             == idle_bottom
     );
     EXPECT_TRUE(
         objects.harts[hart.slot].trap.primary_stack_top == idle_top
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_clear_thread(&objects, hart, first)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -1037,10 +1013,6 @@ static bool test_thread_slots_reuse_with_new_generations(void)
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_hart_register(&objects, 0, &hart)
-    );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STALE,
-        micros_hart_bind_thread(&objects, hart, first)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -1150,213 +1122,6 @@ static bool test_model_policy_supports_multiple_threads(void)
         micros_thread_create(&objects, owner, &unchanged)
     );
     EXPECT_TRUE(objects.processes[owner.slot].live_thread_count == 4);
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_kernel_objects_validate(&objects)
-    );
-    return true;
-}
-
-static bool test_scheduler_metadata_stays_dormant(void)
-{
-    struct micros_process_handle owner = {0};
-    struct micros_thread_handle thread = {0};
-    struct micros_hart_handle hart = {0};
-    size_t priority;
-
-    reset_objects();
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_kernel_objects_initialize(&objects, 1, 1)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_register(&objects, 0, &hart)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(&objects, &owner)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(&objects, owner, &thread)
-    );
-    EXPECT_TRUE(
-        objects.threads[thread.slot].runtime_flags
-            == MICROS_THREAD_RTS_INACTIVE
-        && !objects.threads[thread.slot].scheduler_assigned
-        && !objects.threads[thread.slot].scheduler_preemptible
-        && objects.threads[thread.slot].scheduler_priority == 0
-        && objects.threads[thread.slot].scheduler_hart.generation == 0
-        && objects.threads[thread.slot].quantum_counter_ticks == 0
-        && objects.threads[thread.slot].remaining_counter_ticks == 0
-        && !objects.threads[thread.slot].ready_linked
-        && objects.threads[thread.slot].ready_next.generation == 0
-    );
-    for (
-        priority = 0;
-        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
-        ++priority
-    ) {
-        EXPECT_TRUE(
-            objects.harts[hart.slot].ready_head[priority].generation == 0
-            && objects.harts[hart.slot]
-                .ready_tail[priority].generation == 0
-        );
-    }
-    EXPECT_TRUE(
-        objects.harts[hart.slot].accounting_owner
-            == MICROS_SCHEDULER_ACCOUNTING_NONE
-        && objects.harts[hart.slot].accounting_started_at == 0
-        && objects.harts[hart.slot].accounted_thread.generation == 0
-        && objects.harts[hart.slot].kernel_counter_ticks == 0
-        && objects.harts[hart.slot].idle_counter_ticks == 0
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_release(&objects, thread)
-    );
-    EXPECT_TRUE(
-        objects.threads[thread.slot].runtime_flags == 0
-        && !objects.threads[thread.slot].scheduler_assigned
-        && objects.threads[thread.slot].scheduler_hart.generation == 0
-        && objects.threads[thread.slot].ready_next.generation == 0
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_kernel_objects_validate(&objects)
-    );
-    return true;
-}
-
-static bool test_harts_route_current_threads_without_overwrite(void)
-{
-    struct micros_hart_handle hart_zero = {0};
-    struct micros_hart_handle hart_one = {0};
-    struct micros_hart_handle unchanged_hart = {
-        UINT16_MAX,
-        UINT32_MAX,
-    };
-    struct micros_process_handle owner = {0};
-    struct micros_thread_handle first = {0};
-    struct micros_thread_handle second = {0};
-    struct micros_thread_handle current = {0};
-    struct micros_kernel_objects snapshot;
-
-    reset_objects();
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_kernel_objects_initialize(&objects, 2, 2)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_register(&objects, 7, &hart_zero)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_register(&objects, 11, &hart_one)
-    );
-    EXPECT_TRUE(hart_zero.slot == 0 && hart_one.slot == 1);
-    snapshot = objects;
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_ERROR_DUPLICATE_HART,
-        micros_hart_register(&objects, 7, &unchanged_hart)
-    );
-    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
-
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_install_trap_stacks(
-            &objects,
-            hart_zero,
-            UINT64_C(0x1000),
-            UINT64_C(0x5000),
-            UINT64_C(0x6000),
-            UINT64_C(0x7000)
-        )
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_install_trap_stacks(
-            &objects,
-            hart_one,
-            UINT64_C(0x8000),
-            UINT64_C(0xc000),
-            UINT64_C(0xd000),
-            UINT64_C(0xe000)
-        )
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(&objects, &owner)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(&objects, owner, &first)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(&objects, owner, &second)
-    );
-
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, hart_zero, first)
-    );
-    EXPECT_TRUE(
-        objects.threads[first.slot].state
-        == MICROS_THREAD_STATE_RUNNING
-    );
-    snapshot = objects;
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_bind_thread(&objects, hart_zero, second)
-    );
-    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_bind_thread(&objects, hart_one, first)
-    );
-    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, hart_one, second)
-    );
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_thread_release(&objects, first)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_current_thread(&objects, hart_zero, &current)
-    );
-    EXPECT_TRUE(handles_equal(current, first));
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_clear_thread(&objects, hart_zero, second)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_clear_thread(&objects, hart_zero, first)
-    );
-    EXPECT_TRUE(
-        objects.threads[first.slot].state
-        == MICROS_THREAD_STATE_INACTIVE
-    );
-    current.slot = UINT16_MAX;
-    current.generation = UINT32_MAX;
-    EXPECT_ERROR_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_current_thread(&objects, hart_zero, &current)
-    );
-    EXPECT_TRUE(
-        current.slot == UINT16_MAX
-        && current.generation == UINT32_MAX
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_clear_thread(&objects, hart_one, second)
-    );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(&objects)
@@ -1723,22 +1488,15 @@ struct lifecycle_model_thread {
     bool live;
     uint32_t generation;
     struct micros_process_handle owner;
-    enum micros_thread_state state;
     bool context_attached;
     uintptr_t kernel_stack_bottom;
     uintptr_t kernel_stack_top;
     struct micros_user_context context;
 };
 
-struct lifecycle_model_hart {
-    bool busy;
-    struct micros_thread_handle current;
-};
-
 struct lifecycle_model {
     struct lifecycle_model_process processes[MICROS_PROCESS_CAPACITY];
     struct lifecycle_model_thread threads[MICROS_THREAD_CAPACITY];
-    struct lifecycle_model_hart harts[2];
     size_t process_count;
     size_t thread_count;
 };
@@ -1887,7 +1645,9 @@ static bool lifecycle_model_matches_registry(
             expected->live
             && (
                 !process_handles_equal(actual->owner, expected->owner)
-                || actual->state != expected->state
+                || actual->runtime_flags
+                    != MICROS_THREAD_RTS_INACTIVE
+                || actual->scheduler_assigned
                 || actual->context_attached
                     != expected->context_attached
                 || actual->kernel_stack_bottom
@@ -1906,7 +1666,8 @@ static bool lifecycle_model_matches_registry(
             !expected->live
             && (
                 actual->owner.generation != 0
-                || actual->state != MICROS_THREAD_STATE_INACTIVE
+                || actual->runtime_flags != 0
+                || actual->scheduler_assigned
                 || actual->context_attached
                 || actual->kernel_stack_bottom != 0
                 || actual->kernel_stack_top != 0
@@ -1924,9 +1685,6 @@ static bool lifecycle_model_matches_registry(
         const struct micros_hart *actual = &objects.harts[index];
 
         if (index < 2) {
-            const struct lifecycle_model_hart *expected =
-                &model->harts[index];
-
             if (
                 actual->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || actual->generation != 1
@@ -1937,21 +1695,7 @@ static bool lifecycle_model_matches_registry(
                 || actual->timer.initialized
                 || actual->timer.active
                 || actual->timer.ticks != 0
-            ) {
-                goto mismatch;
-            }
-            if (
-                expected->busy
-                && !handles_equal(
-                    actual->current_thread,
-                    expected->current
-                )
-            ) {
-                goto mismatch;
-            }
-            if (
-                !expected->busy
-                && actual->current_thread.generation != 0
+                || actual->current_thread.generation != 0
             ) {
                 goto mismatch;
             }
@@ -2011,7 +1755,7 @@ static bool test_seeded_lifecycle_model(void)
         enum micros_kernel_object_error expected;
         enum micros_kernel_object_error actual;
 
-        switch (value % 11) {
+        switch (value % 8) {
         case 0: {
             struct micros_process_handle output = {
                 UINT16_MAX,
@@ -2124,8 +1868,6 @@ static bool test_seeded_lifecycle_model(void)
                 ++model.threads[slot].generation;
                 model.threads[slot].live = true;
                 model.threads[slot].owner = owner;
-                model.threads[slot].state =
-                    MICROS_THREAD_STATE_INACTIVE;
                 ++model.processes[owner_slot].thread_count;
                 ++model.thread_count;
                 if (
@@ -2150,11 +1892,7 @@ static bool test_seeded_lifecycle_model(void)
             handle = model_thread_handle(&model, slot);
             if (!model.threads[slot].live) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                model.threads[slot].state
-                    != MICROS_THREAD_STATE_INACTIVE
-                || model.threads[slot].context_attached
-            ) {
+            } else if (model.threads[slot].context_attached) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
             } else {
                 expected = MICROS_KERNEL_OBJECT_OK;
@@ -2191,89 +1929,6 @@ static bool test_seeded_lifecycle_model(void)
             break;
         }
         case 4: {
-            size_t hart_slot = (value >> 8) % 2;
-            struct micros_thread_handle handle;
-
-            slot = (value >> 16) % MICROS_THREAD_CAPACITY;
-            handle = model_thread_handle(&model, slot);
-            if (!model.threads[slot].live) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                model.harts[hart_slot].busy
-                || model.threads[slot].state
-                    != MICROS_THREAD_STATE_INACTIVE
-            ) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
-            } else {
-                expected = MICROS_KERNEL_OBJECT_OK;
-            }
-            actual = micros_hart_bind_thread(
-                &objects,
-                harts[hart_slot],
-                handle
-            );
-            if (
-                !model_reports_expected_error(
-                    expected,
-                    actual,
-                    step,
-                    "hart-bind"
-                )
-            ) {
-                return false;
-            }
-            if (expected == MICROS_KERNEL_OBJECT_OK) {
-                model.harts[hart_slot].busy = true;
-                model.harts[hart_slot].current = handle;
-                model.threads[slot].state =
-                    MICROS_THREAD_STATE_RUNNING;
-            }
-            break;
-        }
-        case 5: {
-            size_t hart_slot = (value >> 8) % 2;
-            struct micros_thread_handle handle;
-
-            slot = (value >> 16) % MICROS_THREAD_CAPACITY;
-            handle = model_thread_handle(&model, slot);
-            if (!model.threads[slot].live) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                !model.harts[hart_slot].busy
-                || !handles_equal(
-                    model.harts[hart_slot].current,
-                    handle
-                )
-            ) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
-            } else {
-                expected = MICROS_KERNEL_OBJECT_OK;
-            }
-            actual = micros_hart_clear_thread(
-                &objects,
-                harts[hart_slot],
-                handle
-            );
-            if (
-                !model_reports_expected_error(
-                    expected,
-                    actual,
-                    step,
-                    "hart-clear"
-                )
-            ) {
-                return false;
-            }
-            if (expected == MICROS_KERNEL_OBJECT_OK) {
-                model.harts[hart_slot].busy = false;
-                model.harts[hart_slot].current.generation = 0;
-                model.harts[hart_slot].current.slot = 0;
-                model.threads[slot].state =
-                    MICROS_THREAD_STATE_INACTIVE;
-            }
-            break;
-        }
-        case 6: {
             struct micros_process_handle handle;
             uintptr_t root;
 
@@ -2309,7 +1964,7 @@ static bool test_seeded_lifecycle_model(void)
             }
             break;
         }
-        case 7: {
+        case 5: {
             struct micros_process_handle handle;
             uintptr_t expected_root;
 
@@ -2352,7 +2007,7 @@ static bool test_seeded_lifecycle_model(void)
             }
             break;
         }
-        case 8: {
+        case 6: {
             struct micros_thread_handle handle;
             struct micros_user_context context =
                 context_pattern(UINT64_C(0x30000000) + step);
@@ -2367,11 +2022,7 @@ static bool test_seeded_lifecycle_model(void)
                 + MICROS_THREAD_KERNEL_STACK_SIZE;
             if (!model.threads[slot].live) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                model.threads[slot].context_attached
-                || model.threads[slot].state
-                    != MICROS_THREAD_STATE_INACTIVE
-            ) {
+            } else if (model.threads[slot].context_attached) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
             } else {
                 expected = MICROS_KERNEL_OBJECT_OK;
@@ -2402,56 +2053,14 @@ static bool test_seeded_lifecycle_model(void)
             }
             break;
         }
-        case 9: {
-            struct micros_thread_handle handle;
-            struct micros_user_context context =
-                context_pattern(UINT64_C(0x40000000) + step);
-
-            slot = (value >> 8) % MICROS_THREAD_CAPACITY;
-            handle = model_thread_handle(&model, slot);
-            if (!model.threads[slot].live) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                !model.threads[slot].context_attached
-                || model.threads[slot].state
-                    != MICROS_THREAD_STATE_RUNNING
-            ) {
-                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
-            } else {
-                expected = MICROS_KERNEL_OBJECT_OK;
-            }
-            actual = micros_thread_capture_execution_context(
-                &objects,
-                handle,
-                &context
-            );
-            if (
-                !model_reports_expected_error(
-                    expected,
-                    actual,
-                    step,
-                    "context-capture"
-                )
-            ) {
-                return false;
-            }
-            if (expected == MICROS_KERNEL_OBJECT_OK) {
-                model.threads[slot].context = context;
-            }
-            break;
-        }
-        case 10: {
+        case 7: {
             struct micros_thread_handle handle;
 
             slot = (value >> 8) % MICROS_THREAD_CAPACITY;
             handle = model_thread_handle(&model, slot);
             if (!model.threads[slot].live) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (
-                !model.threads[slot].context_attached
-                || model.threads[slot].state
-                    != MICROS_THREAD_STATE_INACTIVE
-            ) {
+            } else if (!model.threads[slot].context_attached) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
             } else {
                 expected = MICROS_KERNEL_OBJECT_OK;
@@ -2537,10 +2146,6 @@ static bool test_validator_rejects_corrupt_relationships(void)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, hart_zero, first)
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(&objects)
     );
     snapshot = objects;
@@ -2553,35 +2158,6 @@ static bool test_validator_rejects_corrupt_relationships(void)
     );
     EXPECT_CORRUPTION(objects.live_process_count = 0);
     EXPECT_CORRUPTION(objects.live_thread_count = 0);
-    EXPECT_CORRUPTION(
-        objects.harts[hart_zero.slot].current_thread.generation = 0
-    );
-    EXPECT_CORRUPTION(
-        objects.threads[second.slot].state =
-            MICROS_THREAD_STATE_RUNNING
-    );
-    EXPECT_CORRUPTION(
-        objects.threads[second.slot].scheduler_assigned = true
-    );
-    EXPECT_CORRUPTION(
-        objects.threads[second.slot].runtime_flags =
-            UINT32_C(0x80000000)
-    );
-    EXPECT_CORRUPTION(
-        objects.harts[hart_one.slot].ready_head[0] = second;
-        objects.harts[hart_one.slot].ready_tail[0] = second
-    );
-    EXPECT_CORRUPTION(
-        objects.harts[hart_one.slot].accounting_owner =
-            MICROS_SCHEDULER_ACCOUNTING_THREAD;
-        objects.harts[hart_one.slot].accounted_thread = second
-    );
-    EXPECT_CORRUPTION(
-        objects.harts[hart_one.slot].current_thread = first
-    );
-    EXPECT_CORRUPTION(
-        objects.harts[hart_zero.slot].current_thread = second
-    );
     EXPECT_CORRUPTION(
         objects.harts[hart_one.slot].hardware_id =
             objects.harts[hart_zero.slot].hardware_id
@@ -2684,14 +2260,6 @@ int main(void)
         {
             "model policy supports multiple threads",
             test_model_policy_supports_multiple_threads,
-        },
-        {
-            "scheduler metadata stays dormant",
-            test_scheduler_metadata_stays_dormant,
-        },
-        {
-            "harts route current threads without overwrite",
-            test_harts_route_current_threads_without_overwrite,
         },
         {
             "hart policy and stack validation are atomic",
