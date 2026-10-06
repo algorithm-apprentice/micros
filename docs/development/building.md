@@ -20,6 +20,8 @@ The current implementation provides:
 - supervisor-only identity mappings for managed RAM and the QEMU UART;
 - fixed-capacity process, thread, and hart identity tables with generation-safe
   handles and checked one-thread/one-hart production policies;
+- generation-safe per-process Sv39 roots with one private one-GiB user window,
+  shared immutable kernel subtrees, typed anonymous pages, and atomic teardown;
 - a per-hart trap anchor carried through every trap frame, plus hart-owned
   timer mechanism state;
 - mandatory post-link closure checks for every allocatable ELF section;
@@ -33,8 +35,8 @@ The current implementation provides:
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Per-process page-table roots, saved user contexts, user mode, and scheduling
-remain dependency-ordered later tasks.
+Saved user contexts, U-mode entry, context switching, and scheduling remain
+dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -477,6 +479,47 @@ MICROS_FRAME_OWNERSHIP_TEST_PASS stale=rejected release=blocked handoff=atomic i
 
 The host gate also requires the exact ownership-readiness record, clean SBI
 shutdown, no panic or explicit failure, and no timeout.
+
+## Generation-safe user address-space test
+
+Build and run the isolated process-root test with:
+
+```bash
+cmake --workflow --preset test-qemu-user-address-space
+```
+
+Each live process generation owns one private root frame. Root index 1 covers
+`[0x40000000, 0x80000000)` and contains only process-owned page tables and
+user leaves; every other root entry exactly matches the immutable kernel root.
+All roots use ASID zero, so activation performs and verifies the complete
+pre-write/post-write `sfence.vma` sequence.
+
+The target scenario creates two roots, maps the same virtual address to
+distinct `PROCESS_USER` frames, preloads different physical values, and
+switches between the roots with SUM-enabled load-only probes. It verifies the
+complete `satp` value after every switch, including ASID zero and kernel-root
+restoration. A SUM-clear access faults as expected, while trap entry preserves
+the interrupted bit in the frame and clears live SUM before C or the nested
+sentinel.
+
+Negative cases cover stale process generations; addresses below, unaligned
+within, and at the end of the user window; invalid permissions; duplicate
+mapping; deterministic failure after partial table allocation; active-root
+mutation; malformed PTEs; foreign user frames; page-table leaves; duplicate
+reachability; orphan owners; and destruction while a thread remains live.
+Every rejected operation preserves outputs, full `satp`, object/ledger/
+allocator state, page tables, and all mapped user-page bytes.
+
+The test dirties and reuses complete user and root frames to prove all 4096
+bytes are cleared before publication. Teardown uses one preflighted atomic
+release-set commit and returns the allocator and ledger to the kernel-table
+baseline. It then commits the one-way ownership handoff and proves every
+process-root API returns `PHASE` without mutation while kernel-root activation
+still succeeds. Only that complete sequence emits:
+
+```text
+MICROS_USER_ADDRESS_SPACE_TEST_PASS roots=isolated reuse=zeroed active=guarded ownership=validated sum=cleared
+```
 
 ## Sv39 MMU test
 

@@ -13,8 +13,10 @@ interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
 timer ownership. A typed per-frame ledger now binds allocator geometry to exact
 kernel/process-generation owners and provides the staged one-way VM-handoff
-gate. Per-process address-space roots, U-mode entry, saved execution contexts,
-repeated switching, and preemptive scheduling remain in dependency order.
+gate. Generation-safe per-process Sv39 roots now share immutable kernel
+subtrees while owning private, typed user mappings. U-mode entry, saved
+execution contexts, repeated switching, and preemptive scheduling remain in
+dependency order.
 
 ## v0.1 completion goal
 

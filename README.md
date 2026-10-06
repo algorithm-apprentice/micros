@@ -26,7 +26,11 @@ generation-checked tables. The one-thread and one-hart MVP limits are checked
 policies over structurally independent objects. `sscratch` routes traps through
 the registered hart's stack anchor, the trap frame carries that hart context,
 and timer mechanism state is owned by the same hart rather than standalone
-globals.
+globals. Each live process generation can now own a private Sv39 root whose
+user subtree occupies `[0x40000000, 0x80000000)`, while immutable
+supervisor-only kernel subtrees remain shared. Typed page-table and user-frame
+owners, full ASID-zero activation fences, inactive-root mutation, complete-page
+zeroing, and teardown-before-process-release are enforced and tested.
 
 ## Goals
 
@@ -93,6 +97,7 @@ cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
+cmake --workflow --preset test-qemu-user-address-space
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -109,7 +114,10 @@ process-generation authority, blocked process release, failure-atomic staged
 handoff, and irreversible sealing. The nested
 trap gate injects a second exception at the first instruction after arming the
 `sscratch` sentinel and proves routing to a separately configured per-hart
-emergency stack. See the
+emergency stack. The user-address-space gate proves same-VA isolation across
+two roots, exact typed ownership, zeroed reuse, active-root rejection, stale
+generation rejection, atomic teardown, and live SUM clearing on trap entry.
+See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.
 
