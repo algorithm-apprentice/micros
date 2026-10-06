@@ -548,6 +548,13 @@ Build and run repeated preemption plus idle/wake behavior with:
 cmake --workflow --preset test-qemu-scheduler
 ```
 
+Run the isolated fatal-context gates with:
+
+```bash
+cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
+cmake --workflow --preset test-qemu-scheduler-invalid-next
+```
+
 The kernel reserves one page-aligned 16 KiB supervisor stack for each of the
 128 representable thread slots. Preparation validates an exact live thread and
 process root, executable two-byte-aligned PC, writable 16-byte-aligned user

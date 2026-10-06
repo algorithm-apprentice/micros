@@ -98,4 +98,31 @@ bool micros_scheduler_test_handle_idle_timer(struct micros_hart *hart);
 _Noreturn void micros_scheduler_runtime_run_self_test(void);
 #endif
 
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+bool micros_scheduler_invalid_test_before_user_timer(
+    const struct micros_hart *hart,
+    const struct micros_trap_frame *frame
+);
+
+bool micros_scheduler_invalid_test_after_user_timer(
+    const struct micros_hart *hart,
+    const struct micros_trap_frame *frame
+);
+
+bool micros_scheduler_invalid_test_handle_user_trap(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    bool user_timer
+);
+
+bool micros_scheduler_invalid_test_report(
+    struct micros_hart *hart,
+    const struct micros_trap_frame *frame,
+    bool outgoing
+);
+
+_Noreturn void micros_scheduler_invalid_runtime_run_self_test(void);
+#endif
+
 #endif

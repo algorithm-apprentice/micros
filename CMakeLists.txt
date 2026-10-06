@@ -47,6 +47,16 @@ option(
     "Build the MINIX-baseline scheduler test image"
     OFF
 )
+option(
+    MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST
+    "Build the invalid outgoing scheduler context panic image"
+    OFF
+)
+option(
+    MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST
+    "Build the invalid selected scheduler context panic image"
+    OFF
+)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 set(
@@ -63,6 +73,8 @@ set(
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
     MICROS_BUILD_USER_EXECUTION_TEST
     MICROS_BUILD_SCHEDULER_TEST
+    MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST
+    MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST
 )
 set(MICROS_TARGET_TEST_COUNT 0)
 foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
@@ -628,6 +640,58 @@ if(MICROS_BUILD_SCHEDULER_TEST)
     )
 endif()
 
+if(
+    MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST
+    OR MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST
+)
+    if(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST)
+        set(MICROS_SCHEDULER_INVALID_STATE outgoing)
+    else()
+        set(MICROS_SCHEDULER_INVALID_STATE next)
+    endif()
+    add_custom_target(
+        test-qemu-scheduler-invalid-context
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=invalid-bootstrap-user-context"
+            --marker
+            "MICROS_SCHEDULER_INVALID_CONTEXT state=${MICROS_SCHEDULER_INVALID_STATE} ownership=preserved accounting=kernel"
+            --pattern
+            "MICROS_TRAP_CONTEXT origin=U sstatus=0x[0-9a-f]{16} scause=0x8000000000000005 stval=0x[0-9a-f]{16} sepc=0x[0-9a-f]{16} ra=0x[0-9a-f]{16} sp=0x[0-9a-f]{16}"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --require-trap-context
+            --require-scheduler-invalid-context
+            "${MICROS_SCHEDULER_INVALID_STATE}"
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_OBJECT_MODEL_TEST)
     target_compile_definitions(
         micros
@@ -706,6 +770,34 @@ if(MICROS_BUILD_SCHEDULER_TEST)
         PRIVATE
             arch/riscv64/scheduler_test.S
             kernel/scheduler_test.c
+    )
+endif()
+
+if(
+    MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST
+    OR MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST
+)
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/scheduler_test.S
+            kernel/scheduler_invalid_test.c
+    )
+endif()
+
+if(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST=1
+    )
+endif()
+
+if(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST=1
     )
 endif()
 

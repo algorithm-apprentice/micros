@@ -36,6 +36,11 @@ _Noreturn void micros_user_execution_runtime_run_self_test(void);
 _Noreturn void micros_scheduler_runtime_run_self_test(void);
 #endif
 
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+_Noreturn void micros_scheduler_invalid_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_NESTED_TRAP_TEST
 void micros_nested_trap_test_trigger(void);
 extern unsigned char
@@ -335,6 +340,12 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_SCHEDULER_TEST
     micros_scheduler_runtime_run_self_test();
     MICROS_PANIC(hart_id, "scheduler-test-returned");
+#endif
+
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+    micros_scheduler_invalid_runtime_run_self_test();
+    MICROS_PANIC(hart_id, "scheduler-invalid-test-returned");
 #endif
 
 #ifdef MICROS_BUILD_OBJECT_MODEL_TEST

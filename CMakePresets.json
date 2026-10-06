@@ -133,6 +133,24 @@
       "cacheVariables": {
         "MICROS_BUILD_SCHEDULER_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-scheduler-invalid-outgoing-test",
+      "displayName": "RISC-V 64 invalid outgoing scheduler test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-scheduler-invalid-outgoing-test",
+      "cacheVariables": {
+        "MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-scheduler-invalid-next-test",
+      "displayName": "RISC-V 64 invalid selected scheduler test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-scheduler-invalid-next-test",
+      "cacheVariables": {
+        "MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -236,6 +254,20 @@
       "configurePreset": "riscv64-scheduler-test",
       "targets": [
         "test-qemu-scheduler"
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-invalid-outgoing",
+      "configurePreset": "riscv64-scheduler-invalid-outgoing-test",
+      "targets": [
+        "test-qemu-scheduler-invalid-context"
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-invalid-next",
+      "configurePreset": "riscv64-scheduler-invalid-next-test",
+      "targets": [
+        "test-qemu-scheduler-invalid-context"
       ]
     }
   ],
@@ -447,6 +479,34 @@
         {
           "type": "build",
           "name": "test-qemu-scheduler"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-invalid-outgoing",
+      "displayName": "Build and run invalid outgoing scheduler panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-scheduler-invalid-outgoing-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-scheduler-invalid-outgoing"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-invalid-next",
+      "displayName": "Build and run invalid selected scheduler panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-scheduler-invalid-next-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-scheduler-invalid-next"
         }
       ]
     }

@@ -440,13 +440,58 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             );
         }
         if (user_timer) {
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+            if (
+                !micros_scheduler_invalid_test_before_user_timer(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "scheduler-invalid-timer-snapshot",
+                    frame
+                );
+            }
+#endif
             handle_scheduler_timer_error(
                 hart,
                 frame,
                 micros_scheduler_handle_user_timer(hart)
             );
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+            if (
+                !micros_scheduler_invalid_test_after_user_timer(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "scheduler-invalid-timer-mutation",
+                    frame
+                );
+            }
+#endif
         }
-#ifdef MICROS_BUILD_SCHEDULER_TEST
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+        if (
+            !micros_scheduler_invalid_test_handle_user_trap(
+                hart,
+                frame,
+                user_timer
+            )
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "scheduler-invalid-test-mismatch",
+                frame
+            );
+        }
+#elif defined(MICROS_BUILD_SCHEDULER_TEST)
         {
             enum micros_scheduler_test_trap_action action =
                 micros_scheduler_test_handle_user_trap(
