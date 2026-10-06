@@ -59,6 +59,96 @@ static bool thread_handles_equal(
     );
 }
 
+static bool thread_handle_is_zero(
+    struct micros_thread_handle handle
+)
+{
+    return handle.slot == 0 && handle.generation == 0;
+}
+
+static bool hart_handle_is_zero(struct micros_hart_handle handle)
+{
+    return handle.slot == 0 && handle.generation == 0;
+}
+
+static bool thread_scheduler_metadata_is_zero(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread->runtime_flags == 0
+        && !thread->scheduler_assigned
+        && !thread->scheduler_preemptible
+        && thread->scheduler_priority == 0
+        && hart_handle_is_zero(thread->scheduler_hart)
+        && thread->quantum_counter_ticks == 0
+        && thread->remaining_counter_ticks == 0
+        && !thread->ready_linked
+        && thread_handle_is_zero(thread->ready_next)
+    );
+}
+
+static bool thread_scheduler_metadata_is_dormant(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread->runtime_flags == MICROS_THREAD_RTS_INACTIVE
+        && !thread->scheduler_assigned
+        && !thread->scheduler_preemptible
+        && thread->scheduler_priority == 0
+        && hart_handle_is_zero(thread->scheduler_hart)
+        && thread->quantum_counter_ticks == 0
+        && thread->remaining_counter_ticks == 0
+        && !thread->ready_linked
+        && thread_handle_is_zero(thread->ready_next)
+    );
+}
+
+static void clear_thread_scheduler_metadata(
+    struct micros_thread *thread
+)
+{
+    thread->runtime_flags = 0;
+    thread->scheduler_assigned = false;
+    thread->scheduler_preemptible = false;
+    thread->scheduler_priority = 0;
+    thread->scheduler_hart.slot = 0;
+    thread->scheduler_hart.generation = 0;
+    thread->quantum_counter_ticks = 0;
+    thread->remaining_counter_ticks = 0;
+    thread->ready_linked = false;
+    thread->ready_next.slot = 0;
+    thread->ready_next.generation = 0;
+}
+
+static bool hart_scheduler_metadata_is_zero(
+    const struct micros_hart *hart
+)
+{
+    size_t priority;
+
+    for (
+        priority = 0;
+        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
+        ++priority
+    ) {
+        if (
+            !thread_handle_is_zero(hart->ready_head[priority])
+            || !thread_handle_is_zero(hart->ready_tail[priority])
+        ) {
+            return false;
+        }
+    }
+    return (
+        hart->accounting_owner == MICROS_SCHEDULER_ACCOUNTING_NONE
+        && hart->accounting_started_at == 0
+        && thread_handle_is_zero(hart->accounted_thread)
+        && hart->kernel_counter_ticks == 0
+        && hart->idle_counter_ticks == 0
+    );
+}
+
 static bool stack_range_is_valid(
     uintptr_t bottom,
     uintptr_t top,
@@ -874,6 +964,8 @@ enum micros_kernel_object_error micros_thread_create(
         thread->generation = generation;
         thread->owner = owner;
         thread->state = MICROS_THREAD_STATE_INACTIVE;
+        clear_thread_scheduler_metadata(thread);
+        thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
         ++process->live_thread_count;
         ++objects->live_thread_count;
         handle->slot = (uint16_t)index;
@@ -947,6 +1039,7 @@ enum micros_kernel_object_error micros_thread_release(
     thread->owner.slot = 0;
     thread->owner.generation = 0;
     thread->state = MICROS_THREAD_STATE_INACTIVE;
+    clear_thread_scheduler_metadata(thread);
     thread->context_attached = false;
     thread->kernel_stack_bottom = 0;
     thread->kernel_stack_top = 0;
@@ -1343,6 +1436,7 @@ enum micros_kernel_object_error micros_hart_bind_thread(
     if (
         hart->current_thread.generation != 0
         || thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->scheduler_assigned
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -1539,6 +1633,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
             if (
                 thread->owner.generation != 0
                 || thread->state != MICROS_THREAD_STATE_INACTIVE
+                || !thread_scheduler_metadata_is_zero(thread)
                 || thread->context_attached
                 || thread->kernel_stack_bottom != 0
                 || thread->kernel_stack_top != 0
@@ -1563,6 +1658,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || objects->processes[thread->owner.slot].generation
                     != thread->owner.generation
+                || !thread_scheduler_metadata_is_dormant(thread)
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
@@ -1643,6 +1739,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                 thread->generation == 0
                 || thread->owner.generation != 0
                 || thread->state != MICROS_THREAD_STATE_INACTIVE
+                || !thread_scheduler_metadata_is_zero(thread)
                 || thread->context_attached
                 || thread->kernel_stack_bottom != 0
                 || thread->kernel_stack_top != 0
@@ -1682,6 +1779,9 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
         const struct micros_hart *hart = &objects->harts[index];
         size_t other_index;
 
+        if (!hart_scheduler_metadata_is_zero(hart)) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
         if (hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_FREE) {
             if (
                 hart->generation != 0

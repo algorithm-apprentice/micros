@@ -17,11 +17,24 @@ enum {
     MICROS_PRIMARY_TRAP_STACK_MIN_SIZE = 16 * 1024,
     MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE = 4 * 1024,
     MICROS_THREAD_KERNEL_STACK_SIZE = 16 * 1024,
+    MICROS_SCHEDULER_PRIORITY_COUNT = 16,
+    MICROS_SCHEDULER_PRIORITY_HIGHEST = 0,
+    MICROS_SCHEDULER_PRIORITY_DEFAULT_USER = 7,
+    MICROS_SCHEDULER_PRIORITY_LOWEST = 15,
 };
 
 #define MICROS_PROCESS_GENERATION_MAX UINT32_C(0x000fffff)
 #define MICROS_PROCESS_ENDPOINT_NONE UINT32_C(0xfffffffe)
 #define MICROS_PROCESS_ENDPOINT_ANY UINT32_C(0xffffffff)
+#define MICROS_THREAD_RTS_INACTIVE UINT32_C(0x00000001)
+#define MICROS_THREAD_RTS_NO_QUANTUM UINT32_C(0x00000002)
+#define MICROS_THREAD_RTS_PREEMPTED UINT32_C(0x00000004)
+#define MICROS_THREAD_RTS_DEFINED_MASK \
+    ( \
+        MICROS_THREAD_RTS_INACTIVE \
+        | MICROS_THREAD_RTS_NO_QUANTUM \
+        | MICROS_THREAD_RTS_PREEMPTED \
+    )
 
 struct micros_process_handle {
     uint16_t slot;
@@ -49,6 +62,13 @@ enum micros_thread_state {
     MICROS_THREAD_STATE_RUNNING,
 };
 
+enum micros_scheduler_accounting_owner {
+    MICROS_SCHEDULER_ACCOUNTING_NONE = 0,
+    MICROS_SCHEDULER_ACCOUNTING_KERNEL,
+    MICROS_SCHEDULER_ACCOUNTING_THREAD,
+    MICROS_SCHEDULER_ACCOUNTING_IDLE,
+};
+
 struct micros_process {
     enum micros_kernel_object_slot_state slot_state;
     uint32_t generation;
@@ -67,6 +87,15 @@ struct micros_thread {
     uintptr_t kernel_stack_bottom;
     uintptr_t kernel_stack_top;
     struct micros_user_context user_context;
+    uint32_t runtime_flags;
+    bool scheduler_assigned;
+    bool scheduler_preemptible;
+    uint8_t scheduler_priority;
+    struct micros_hart_handle scheduler_hart;
+    uint64_t quantum_counter_ticks;
+    uint64_t remaining_counter_ticks;
+    bool ready_linked;
+    struct micros_thread_handle ready_next;
 };
 
 struct micros_hart_trap_anchor {
@@ -97,6 +126,15 @@ struct micros_hart {
     uintptr_t idle_primary_stack_bottom;
     uintptr_t idle_primary_stack_top;
     struct micros_thread_handle current_thread;
+    struct micros_thread_handle
+        ready_head[MICROS_SCHEDULER_PRIORITY_COUNT];
+    struct micros_thread_handle
+        ready_tail[MICROS_SCHEDULER_PRIORITY_COUNT];
+    enum micros_scheduler_accounting_owner accounting_owner;
+    uint64_t accounting_started_at;
+    struct micros_thread_handle accounted_thread;
+    uint64_t kernel_counter_ticks;
+    uint64_t idle_counter_ticks;
     uint32_t interrupt_depth;
     uint32_t preempt_disable_count;
     bool reschedule_pending;

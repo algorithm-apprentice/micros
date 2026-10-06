@@ -1157,6 +1157,78 @@ static bool test_model_policy_supports_multiple_threads(void)
     return true;
 }
 
+static bool test_scheduler_metadata_stays_dormant(void)
+{
+    struct micros_process_handle owner = {0};
+    struct micros_thread_handle thread = {0};
+    struct micros_hart_handle hart = {0};
+    size_t priority;
+
+    reset_objects();
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_initialize(&objects, 1, 1)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_register(&objects, 0, &hart)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create(&objects, &owner)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(&objects, owner, &thread)
+    );
+    EXPECT_TRUE(
+        objects.threads[thread.slot].runtime_flags
+            == MICROS_THREAD_RTS_INACTIVE
+        && !objects.threads[thread.slot].scheduler_assigned
+        && !objects.threads[thread.slot].scheduler_preemptible
+        && objects.threads[thread.slot].scheduler_priority == 0
+        && objects.threads[thread.slot].scheduler_hart.generation == 0
+        && objects.threads[thread.slot].quantum_counter_ticks == 0
+        && objects.threads[thread.slot].remaining_counter_ticks == 0
+        && !objects.threads[thread.slot].ready_linked
+        && objects.threads[thread.slot].ready_next.generation == 0
+    );
+    for (
+        priority = 0;
+        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
+        ++priority
+    ) {
+        EXPECT_TRUE(
+            objects.harts[hart.slot].ready_head[priority].generation == 0
+            && objects.harts[hart.slot]
+                .ready_tail[priority].generation == 0
+        );
+    }
+    EXPECT_TRUE(
+        objects.harts[hart.slot].accounting_owner
+            == MICROS_SCHEDULER_ACCOUNTING_NONE
+        && objects.harts[hart.slot].accounting_started_at == 0
+        && objects.harts[hart.slot].accounted_thread.generation == 0
+        && objects.harts[hart.slot].kernel_counter_ticks == 0
+        && objects.harts[hart.slot].idle_counter_ticks == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, thread)
+    );
+    EXPECT_TRUE(
+        objects.threads[thread.slot].runtime_flags == 0
+        && !objects.threads[thread.slot].scheduler_assigned
+        && objects.threads[thread.slot].scheduler_hart.generation == 0
+        && objects.threads[thread.slot].ready_next.generation == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_validate(&objects)
+    );
+    return true;
+}
+
 static bool test_harts_route_current_threads_without_overwrite(void)
 {
     struct micros_hart_handle hart_zero = {0};
@@ -2489,6 +2561,22 @@ static bool test_validator_rejects_corrupt_relationships(void)
             MICROS_THREAD_STATE_RUNNING
     );
     EXPECT_CORRUPTION(
+        objects.threads[second.slot].scheduler_assigned = true
+    );
+    EXPECT_CORRUPTION(
+        objects.threads[second.slot].runtime_flags =
+            UINT32_C(0x80000000)
+    );
+    EXPECT_CORRUPTION(
+        objects.harts[hart_one.slot].ready_head[0] = second;
+        objects.harts[hart_one.slot].ready_tail[0] = second
+    );
+    EXPECT_CORRUPTION(
+        objects.harts[hart_one.slot].accounting_owner =
+            MICROS_SCHEDULER_ACCOUNTING_THREAD;
+        objects.harts[hart_one.slot].accounted_thread = second
+    );
+    EXPECT_CORRUPTION(
         objects.harts[hart_one.slot].current_thread = first
     );
     EXPECT_CORRUPTION(
@@ -2596,6 +2684,10 @@ int main(void)
         {
             "model policy supports multiple threads",
             test_model_policy_supports_multiple_threads,
+        },
+        {
+            "scheduler metadata stays dormant",
+            test_scheduler_metadata_stays_dormant,
         },
         {
             "harts route current threads without overwrite",
