@@ -71,6 +71,7 @@ struct micros_process {
     uintptr_t address_space_root;
     uint32_t primary_endpoint;
     uint32_t privilege_profile;
+    bool endpoint_lifecycle_consumed;
 };
 
 struct micros_thread {

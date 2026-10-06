@@ -467,6 +467,7 @@ enum micros_kernel_object_error micros_process_create(
         process->address_space_root = 0;
         process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
         process->privilege_profile = 0;
+        process->endpoint_lifecycle_consumed = false;
         ++objects->live_process_count;
         handle->slot = (uint16_t)index;
         handle->generation = generation;
@@ -498,6 +499,9 @@ enum micros_kernel_object_error micros_process_release(
     if (
         process->live_thread_count != 0
         || process->address_space_root != 0
+        || process->primary_endpoint
+            != MICROS_PROCESS_ENDPOINT_NONE
+        || process->privilege_profile != 0
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -524,6 +528,7 @@ enum micros_kernel_object_error micros_process_release(
     process->address_space_root = 0;
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;
+    process->endpoint_lifecycle_consumed = false;
     --objects->live_process_count;
     return MICROS_KERNEL_OBJECT_OK;
 }
@@ -1345,12 +1350,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
             &objects->processes[index];
         uint32_t unused_generation;
 
-        if (
-            process->generation > MICROS_PROCESS_GENERATION_MAX
-            || process->primary_endpoint
-                != MICROS_PROCESS_ENDPOINT_NONE
-            || process->privilege_profile != 0
-        ) {
+        if (process->generation > MICROS_PROCESS_GENERATION_MAX) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
         switch (process->slot_state) {
@@ -1358,6 +1358,10 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
             if (
                 process->live_thread_count != 0
                 || process->address_space_root != 0
+                || process->primary_endpoint
+                    != MICROS_PROCESS_ENDPOINT_NONE
+                || process->privilege_profile != 0
+                || process->endpoint_lifecycle_consumed
                 || micros_process_next_generation(
                     (uint16_t)index,
                     process->generation,
@@ -1382,6 +1386,10 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 process->generation == 0
                 || process->live_thread_count != 0
                 || process->address_space_root != 0
+                || process->primary_endpoint
+                    != MICROS_PROCESS_ENDPOINT_NONE
+                || process->privilege_profile != 0
+                || process->endpoint_lifecycle_consumed
                 || micros_process_next_generation(
                     (uint16_t)index,
                     process->generation,

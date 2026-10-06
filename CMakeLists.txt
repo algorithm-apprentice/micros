@@ -129,6 +129,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         endpoint_test
+        kernel/kernel_objects.c
+        kernel/scheduler_core.c
         kernel/endpoint.c
         tests/host/endpoint_test.c
     )

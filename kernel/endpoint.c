@@ -116,6 +116,17 @@ static bool endpoint_record_is_zero(
     );
 }
 
+static bool process_handles_equal(
+    struct micros_process_handle left,
+    struct micros_process_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
 static enum micros_endpoint_error canonicalize_profile(
     const struct micros_privilege_profile *source,
     struct micros_privilege_profile *destination
@@ -439,7 +450,30 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
         }
     }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        if (!endpoint_record_is_zero(&registry->endpoints[index])) {
+        const struct micros_endpoint_record *endpoint =
+            &registry->endpoints[index];
+        micros_endpoint_t expected_value;
+
+        if (endpoint->state == MICROS_ENDPOINT_STATE_FREE) {
+            if (!endpoint_record_is_zero(endpoint)) {
+                return MICROS_ENDPOINT_ERROR_INVARIANT;
+            }
+            continue;
+        }
+        if (
+            endpoint->state != MICROS_ENDPOINT_STATE_RESERVED
+            && endpoint->state != MICROS_ENDPOINT_STATE_ACTIVE
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (endpoint->owner.slot != index) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (
+            micros_endpoint_pack(endpoint->owner, &expected_value)
+                != MICROS_ENDPOINT_OK
+            || endpoint->value != expected_value
+        ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
         }
     }
@@ -594,4 +628,520 @@ enum micros_endpoint_error micros_privilege_profile_allows_kernel_operation(
     ) != 0
         ? MICROS_ENDPOINT_OK
         : MICROS_ENDPOINT_ERROR_UNAUTHORIZED;
+}
+
+static enum micros_endpoint_error process_resolve_error(
+    enum micros_kernel_object_error error
+)
+{
+    if (error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    if (error == MICROS_KERNEL_OBJECT_ERROR_ARGUMENT) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    return MICROS_ENDPOINT_ERROR_INVARIANT;
+}
+
+static enum micros_endpoint_error endpoint_record_resolve_validated(
+    const struct micros_endpoint_registry *registry,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+)
+{
+    struct micros_process_handle owner;
+    const struct micros_endpoint_record *candidate;
+    enum micros_endpoint_error error;
+
+    error = micros_endpoint_unpack(endpoint, &owner);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (owner.slot >= MICROS_PROCESS_CAPACITY) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    candidate = &registry->endpoints[owner.slot];
+    if (
+        candidate->state == MICROS_ENDPOINT_STATE_FREE
+        || candidate->value != endpoint
+        || !process_handles_equal(candidate->owner, owner)
+    ) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    *record = candidate;
+    return MICROS_ENDPOINT_OK;
+}
+
+static bool process_has_current_thread(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+        const struct micros_thread *thread;
+
+        if (
+            hart->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || hart->current_thread.generation == 0
+        ) {
+            continue;
+        }
+        thread = &objects->threads[hart->current_thread.slot];
+        if (process_handles_equal(thread->owner, process)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool process_threads_are_held(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    bool require_unassigned
+)
+{
+    size_t index;
+
+    if (process_has_current_thread(objects, process)) {
+        return false;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !process_handles_equal(thread->owner, process)
+        ) {
+            continue;
+        }
+        if (
+            thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
+            || (require_unassigned && thread->scheduler_assigned)
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+enum micros_endpoint_error micros_endpoint_registry_validate_objects(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    enum micros_endpoint_error endpoint_error;
+    size_t index;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    endpoint_error = micros_endpoint_registry_validate(registry);
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error;
+    }
+    if (
+        micros_kernel_objects_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_endpoint_record *endpoint =
+            &registry->endpoints[index];
+        const struct micros_process *process =
+            &objects->processes[index];
+        const struct micros_privilege_profile *unused_profile;
+
+        if (endpoint->state == MICROS_ENDPOINT_STATE_FREE) {
+            if (
+                process->slot_state
+                    == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                && (
+                    process->primary_endpoint
+                        != MICROS_PROCESS_ENDPOINT_NONE
+                    || process->privilege_profile != 0
+                )
+            ) {
+                return MICROS_ENDPOINT_ERROR_INVARIANT;
+            }
+            continue;
+        }
+        if (
+            process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || process->generation != endpoint->owner.generation
+            || process->primary_endpoint != endpoint->value
+            || !process->endpoint_lifecycle_consumed
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (process->privilege_profile != 0) {
+            if (
+                process->privilege_profile
+                    >= MICROS_PRIVILEGE_PROFILE_CAPACITY
+                || micros_privilege_profile_resolve(
+                    registry,
+                    (uint8_t)process->privilege_profile,
+                    &unused_profile
+                ) != MICROS_ENDPOINT_OK
+            ) {
+                return MICROS_ENDPOINT_ERROR_INVARIANT;
+            }
+        } else if (endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_reserve(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    micros_endpoint_t *endpoint
+)
+{
+    const struct micros_process *resolved_process;
+    struct micros_process *process;
+    struct micros_endpoint_record *record;
+    enum micros_kernel_object_error object_error;
+    enum micros_endpoint_error error;
+    micros_endpoint_t value;
+
+    if (registry == NULL || objects == NULL || endpoint == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    object_error = micros_process_resolve(
+        objects,
+        process_handle,
+        &resolved_process
+    );
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return process_resolve_error(object_error);
+    }
+    (void)resolved_process;
+    process = &objects->processes[process_handle.slot];
+    record = &registry->endpoints[process_handle.slot];
+    if (
+        process->primary_endpoint != MICROS_PROCESS_ENDPOINT_NONE
+        || process->privilege_profile != 0
+        || process->endpoint_lifecycle_consumed
+        || record->state != MICROS_ENDPOINT_STATE_FREE
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    error = micros_endpoint_pack(process_handle, &value);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+
+    record->state = MICROS_ENDPOINT_STATE_RESERVED;
+    record->value = value;
+    record->owner = process_handle;
+    process->primary_endpoint = value;
+    process->endpoint_lifecycle_consumed = true;
+    *endpoint = value;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_install_profile(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    uint8_t profile_id
+)
+{
+    const struct micros_process *resolved_process;
+    const struct micros_privilege_profile *unused_profile;
+    struct micros_process *process;
+    const struct micros_endpoint_record *record;
+    enum micros_kernel_object_error object_error;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    object_error = micros_process_resolve(
+        objects,
+        process_handle,
+        &resolved_process
+    );
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return process_resolve_error(object_error);
+    }
+    (void)resolved_process;
+    process = &objects->processes[process_handle.slot];
+    if (
+        process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
+        || process->privilege_profile != 0
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    record = &registry->endpoints[process_handle.slot];
+    if (
+        record->state != MICROS_ENDPOINT_STATE_RESERVED
+        || record->value != process->primary_endpoint
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    error = micros_privilege_profile_resolve(
+        registry,
+        profile_id,
+        &unused_profile
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (!process_threads_are_held(objects, process_handle, true)) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+
+    process->privilege_profile = profile_id;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_activate(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+)
+{
+    const struct micros_endpoint_record *record;
+    const struct micros_process *process;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = endpoint_record_resolve_validated(
+        registry,
+        endpoint,
+        &record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (record->state != MICROS_ENDPOINT_STATE_RESERVED) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    process = &objects->processes[record->owner.slot];
+    if (process->privilege_profile == 0) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+
+    registry->endpoints[record->owner.slot].state =
+        MICROS_ENDPOINT_STATE_ACTIVE;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_resolve_internal(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+)
+{
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL || record == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    return endpoint_record_resolve_validated(registry, endpoint, record);
+}
+
+enum micros_endpoint_error micros_endpoint_resolve_active(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+)
+{
+    enum micros_endpoint_error error;
+    const struct micros_endpoint_record *resolved_record;
+
+    if (record == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_resolve_internal(
+        registry,
+        objects,
+        endpoint,
+        &resolved_record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (resolved_record->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    *record = resolved_record;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_close(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+)
+{
+    const struct micros_endpoint_record *resolved_record;
+    struct micros_endpoint_record *record;
+    struct micros_process *process;
+    struct micros_process_handle owner;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = endpoint_record_resolve_validated(
+        registry,
+        endpoint,
+        &resolved_record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    owner = resolved_record->owner;
+    if (!process_threads_are_held(objects, owner, false)) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+
+    record = &registry->endpoints[owner.slot];
+    process = &objects->processes[owner.slot];
+    record->state = MICROS_ENDPOINT_STATE_FREE;
+    record->value = 0;
+    record->owner.slot = 0;
+    record->owner.generation = 0;
+    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    process->privilege_profile = 0;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_authorize_operation(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    uint32_t operation
+)
+{
+    const struct micros_endpoint_record *record;
+    const struct micros_process *process;
+    enum micros_endpoint_error error;
+
+    error = micros_endpoint_resolve_active(
+        registry,
+        objects,
+        source,
+        &record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    process = &objects->processes[record->owner.slot];
+    return micros_privilege_profile_allows_operation(
+        registry,
+        (uint8_t)process->privilege_profile,
+        operation
+    );
+}
+
+enum micros_endpoint_error micros_endpoint_authorize_target(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    uint32_t operation,
+    micros_endpoint_t target
+)
+{
+    const struct micros_endpoint_record *source_record;
+    const struct micros_endpoint_record *target_record;
+    const struct micros_process *source_process;
+    const struct micros_process *target_process;
+    enum micros_endpoint_error error;
+
+    if (
+        operation != MICROS_PRIVILEGE_OPERATION_CALL
+        && operation != MICROS_PRIVILEGE_OPERATION_SEND
+        && operation != MICROS_PRIVILEGE_OPERATION_NOTIFY
+    ) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_resolve_active(
+        registry,
+        objects,
+        source,
+        &source_record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = micros_endpoint_resolve_active(
+        registry,
+        objects,
+        target,
+        &target_record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    source_process = &objects->processes[source_record->owner.slot];
+    target_process = &objects->processes[target_record->owner.slot];
+    return micros_privilege_profile_allows_target(
+        registry,
+        (uint8_t)source_process->privilege_profile,
+        operation,
+        (uint8_t)target_process->privilege_profile
+    );
+}
+
+enum micros_endpoint_error
+micros_endpoint_authorize_kernel_operation(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    uint8_t operation
+)
+{
+    const struct micros_endpoint_record *record;
+    const struct micros_process *process;
+    enum micros_endpoint_error error;
+
+    error = micros_endpoint_resolve_active(
+        registry,
+        objects,
+        source,
+        &record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    process = &objects->processes[record->owner.slot];
+    return micros_privilege_profile_allows_kernel_operation(
+        registry,
+        (uint8_t)process->privilege_profile,
+        operation
+    );
 }
