@@ -17,6 +17,7 @@ enum micros_timer_interrupt_result {
 bool micros_timer_initialize(struct micros_hart *hart);
 bool micros_timer_start(struct micros_hart *hart, uint64_t interval);
 bool micros_timer_stop(struct micros_hart *hart);
+bool micros_timer_prepare_return(struct micros_hart *hart);
 uint64_t micros_timer_ticks(const struct micros_hart *hart);
 enum micros_timer_interrupt_result micros_timer_handle_interrupt(
     struct micros_hart *hart

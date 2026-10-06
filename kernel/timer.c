@@ -6,6 +6,23 @@
 #include "arch/riscv64/platform.h"
 #include "micros/kernel_objects.h"
 
+#ifdef MICROS_BUILD_TIMER_TEST
+static bool fail_next_timer_program;
+static uint64_t timer_program_attempts;
+#endif
+
+static intptr_t program_timer(uint64_t deadline)
+{
+#ifdef MICROS_BUILD_TIMER_TEST
+    ++timer_program_attempts;
+    if (fail_next_timer_program) {
+        fail_next_timer_program = false;
+        return -1;
+    }
+#endif
+    return sbi_set_timer(deadline);
+}
+
 bool micros_timer_initialize(struct micros_hart *hart)
 {
     struct micros_hart_timer_state *timer_state;
@@ -19,7 +36,7 @@ bool micros_timer_initialize(struct micros_hart *hart)
     }
     timer_state = &hart->timer;
     riscv_timer_interrupt_disable();
-    if (sbi_set_timer(UINT64_MAX) != 0) {
+    if (program_timer(UINT64_MAX) != 0) {
         if (timer_interrupt_was_enabled) {
             riscv_timer_interrupt_enable();
         }
@@ -65,7 +82,7 @@ bool micros_timer_start(struct micros_hart *hart, uint64_t interval)
         return false;
     }
     deadline = current_time + interval;
-    if (sbi_set_timer(deadline) != 0) {
+    if (program_timer(deadline) != 0) {
         riscv_irq_restore(saved_status);
         return false;
     }
@@ -94,7 +111,7 @@ bool micros_timer_stop(struct micros_hart *hart)
     }
 
     riscv_timer_interrupt_disable();
-    if (sbi_set_timer(UINT64_MAX) != 0) {
+    if (program_timer(UINT64_MAX) != 0) {
         riscv_timer_interrupt_enable();
         riscv_irq_restore(saved_status);
         return false;
@@ -102,6 +119,41 @@ bool micros_timer_stop(struct micros_hart *hart)
 
     timer_state->deadline = UINT64_MAX;
     timer_state->active = false;
+    riscv_irq_restore(saved_status);
+    return true;
+}
+
+bool micros_timer_prepare_return(struct micros_hart *hart)
+{
+    struct micros_hart_timer_state *timer;
+    uintptr_t saved_status = riscv_irq_save();
+    uint64_t counter;
+    uint64_t deadline;
+
+    if (hart == NULL) {
+        riscv_irq_restore(saved_status);
+        return false;
+    }
+    timer = &hart->timer;
+    if (!timer->initialized || !timer->active || timer->interval == 0) {
+        riscv_irq_restore(saved_status);
+        return false;
+    }
+    counter = riscv_read_time();
+    if (counter < timer->deadline) {
+        riscv_irq_restore(saved_status);
+        return true;
+    }
+    if (UINT64_MAX - counter < timer->interval) {
+        riscv_irq_restore(saved_status);
+        return false;
+    }
+    deadline = counter + timer->interval;
+    if (program_timer(deadline) != 0) {
+        riscv_irq_restore(saved_status);
+        return false;
+    }
+    timer->deadline = deadline;
     riscv_irq_restore(saved_status);
     return true;
 }
@@ -154,7 +206,7 @@ enum micros_timer_interrupt_result micros_timer_handle_interrupt(
         && next_ticks == timer_state->test_stop_after
     ) {
         riscv_timer_interrupt_disable();
-        if (sbi_set_timer(UINT64_MAX) != 0) {
+        if (program_timer(UINT64_MAX) != 0) {
             return MICROS_TIMER_INTERRUPT_REARM_FAILED;
         }
         timer_state->deadline = UINT64_MAX;
@@ -167,7 +219,7 @@ enum micros_timer_interrupt_result micros_timer_handle_interrupt(
         return MICROS_TIMER_INTERRUPT_REARM_FAILED;
     }
     next_deadline = current_time + timer_state->interval;
-    if (sbi_set_timer(next_deadline) != 0) {
+    if (program_timer(next_deadline) != 0) {
         return MICROS_TIMER_INTERRUPT_REARM_FAILED;
     }
     timer_state->deadline = next_deadline;
@@ -175,6 +227,72 @@ enum micros_timer_interrupt_result micros_timer_handle_interrupt(
 }
 
 #ifdef MICROS_BUILD_TIMER_TEST
+static bool timer_states_equal(
+    const struct micros_hart_timer_state *left,
+    const struct micros_hart_timer_state *right
+)
+{
+    return (
+        left->initialized == right->initialized
+        && left->active == right->active
+        && left->interval == right->interval
+        && left->deadline == right->deadline
+        && left->ticks == right->ticks
+        && left->test_stop_after == right->test_stop_after
+    );
+}
+
+static bool timer_prepare_return_self_test(
+    struct micros_hart *hart,
+    uint64_t interval
+)
+{
+    const uint64_t future_interval =
+        UINT64_C(0x1000000000000000);
+    struct micros_hart_timer_state snapshot;
+    uint64_t attempts;
+
+    if (!micros_timer_start(hart, future_interval)) {
+        return false;
+    }
+    snapshot = hart->timer;
+    attempts = timer_program_attempts;
+    if (
+        !micros_timer_prepare_return(hart)
+        || !timer_states_equal(&snapshot, &hart->timer)
+        || timer_program_attempts != attempts
+        || riscv_irq_is_enabled()
+        || !riscv_timer_interrupt_is_enabled()
+        || !micros_timer_stop(hart)
+        || !micros_timer_initialize(hart)
+        || !micros_timer_start(hart, interval)
+    ) {
+        return false;
+    }
+
+    hart->timer.deadline = 0;
+    snapshot = hart->timer;
+    attempts = timer_program_attempts;
+    fail_next_timer_program = true;
+    if (
+        micros_timer_prepare_return(hart)
+        || !timer_states_equal(&snapshot, &hart->timer)
+        || timer_program_attempts != attempts + 1
+        || riscv_irq_is_enabled()
+        || !riscv_timer_interrupt_is_enabled()
+        || !micros_timer_prepare_return(hart)
+        || hart->timer.deadline <= riscv_read_time()
+        || hart->timer.interval != snapshot.interval
+        || hart->timer.ticks != snapshot.ticks
+        || timer_program_attempts != attempts + 2
+        || !micros_timer_stop(hart)
+        || !micros_timer_initialize(hart)
+    ) {
+        return false;
+    }
+    return !riscv_irq_is_enabled() && !riscv_timer_interrupt_is_enabled();
+}
+
 bool micros_timer_run_self_test(
     struct micros_hart *hart,
     uint64_t interval,
@@ -192,6 +310,9 @@ bool micros_timer_run_self_test(
         || hart == NULL
         || !micros_timer_initialize(hart)
     ) {
+        return false;
+    }
+    if (!timer_prepare_return_self_test(hart, interval)) {
         return false;
     }
 
