@@ -59,6 +59,7 @@
 #include <stdint.h>
 
 #include "micros/kernel_objects.h"
+#include "micros/user_context.h"
 
 struct micros_trap_frame {
     uint64_t ra;
@@ -151,6 +152,16 @@ MICROS_TRAP_ASSERT_OFFSET(
 _Static_assert(
     sizeof(struct micros_trap_frame) == MICROS_TRAP_CONTEXT_SIZE,
     "trap context size mismatch"
+);
+_Static_assert(
+    offsetof(struct micros_user_context, sstatus)
+        == MICROS_TRAP_CONTEXT_SSTATUS_OFFSET,
+    "user and trap sstatus offsets must match"
+);
+_Static_assert(
+    offsetof(struct micros_user_context, sepc)
+        == MICROS_TRAP_CONTEXT_SEPC_OFFSET,
+    "user and trap sepc offsets must match"
 );
 
 #define MICROS_HART_TRAP_ASSERT_OFFSET(field, offset) \

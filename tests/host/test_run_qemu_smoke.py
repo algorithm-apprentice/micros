@@ -125,6 +125,15 @@ USER_ADDRESS_SPACE_TEST_PASS = (
     "sum=cleared\n"
 )
 
+USER_EXECUTION_TEST_PASS = (
+    "MICROS_USER_EXECUTION_TEST_PASS "
+    "mode=entered "
+    "faults=isolated "
+    "context=preserved "
+    "stack=owned "
+    "return=resumed\n"
+)
+
 FRAME_ALLOCATOR_OUTPUT = TRAP_RECOVERY_OUTPUT.replace(
     "MICROS_TRAP_TEST_PASS "
     "origin=S cause=illegal-instruction registers=preserved "
@@ -151,6 +160,10 @@ FRAME_OWNERSHIP_TEST_OUTPUT = (
 
 USER_ADDRESS_SPACE_TEST_OUTPUT = (
     FRAME_OWNERSHIP_OUTPUT + USER_ADDRESS_SPACE_TEST_PASS
+)
+
+USER_EXECUTION_TEST_OUTPUT = (
+    FRAME_OWNERSHIP_OUTPUT + USER_EXECUTION_TEST_PASS
 )
 
 OBJECT_MODEL_TEST_PASS = (
@@ -1463,6 +1476,80 @@ class ExpectedOutcomeTest(unittest.TestCase):
                         require_mmu_ready=True,
                         require_frame_ownership_ready=True,
                         require_user_address_space_test_report=True,
+                    )
+                )
+
+    def test_accepts_complete_user_execution_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=USER_EXECUTION_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_frame_ownership_ready=True,
+            require_user_execution_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_user_execution_test_report(self):
+        early = USER_EXECUTION_TEST_OUTPUT.replace(
+            USER_EXECUTION_TEST_PASS,
+            "",
+        ).replace(
+            FRAME_OWNERSHIP_READY_RECORD,
+            USER_EXECUTION_TEST_PASS
+            + FRAME_OWNERSHIP_READY_RECORD,
+        )
+        late_trap = USER_EXECUTION_TEST_OUTPUT.replace(
+            "MICROS_TRAP_READY\n",
+            "",
+        ).replace(
+            USER_EXECUTION_TEST_PASS,
+            USER_EXECUTION_TEST_PASS + "MICROS_TRAP_READY\n",
+        )
+        invalid_outputs = (
+            FRAME_OWNERSHIP_OUTPUT,
+            early,
+            late_trap,
+            USER_EXECUTION_TEST_OUTPUT + USER_EXECUTION_TEST_PASS,
+            USER_EXECUTION_TEST_OUTPUT.replace(
+                "context=preserved",
+                "context=lost",
+            ),
+            USER_EXECUTION_TEST_OUTPUT.rstrip("\n"),
+        )
+
+        for invalid in invalid_outputs:
+            with self.subTest(output=invalid):
+                result = run_qemu_smoke.QemuResult(
+                    output=invalid,
+                    return_code=0,
+                    timed_out=False,
+                )
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_frame_ownership_ready=True,
+                        require_user_execution_test_report=True,
                     )
                 )
 

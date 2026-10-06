@@ -15,8 +15,9 @@ timer ownership. A typed per-frame ledger now binds allocator geometry to exact
 kernel/process-generation owners and provides the staged one-way VM-handoff
 gate. Generation-safe per-process Sv39 roots now share immutable kernel
 subtrees while owning private, typed user mappings. U-mode entry, saved
-execution contexts, repeated switching, and preemptive scheduling remain in
-dependency order.
+execution contexts, and thread-owned kernel stacks now complete the first real
+user round trip. Repeated switching, runnable queues, timer preemption, and
+preemptive scheduling remain in dependency order.
 
 ## v0.1 completion goal
 

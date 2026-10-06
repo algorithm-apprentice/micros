@@ -115,6 +115,15 @@
       "cacheVariables": {
         "MICROS_BUILD_USER_ADDRESS_SPACE_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-user-execution-test",
+      "displayName": "RISC-V 64 user execution test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-user-execution-test",
+      "cacheVariables": {
+        "MICROS_BUILD_USER_EXECUTION_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -204,6 +213,13 @@
       "configurePreset": "riscv64-user-address-space-test",
       "targets": [
         "test-qemu-user-address-space"
+      ]
+    },
+    {
+      "name": "test-qemu-user-execution",
+      "configurePreset": "riscv64-user-execution-test",
+      "targets": [
+        "test-qemu-user-execution"
       ]
     }
   ],
@@ -387,6 +403,20 @@
         {
           "type": "build",
           "name": "test-qemu-user-address-space"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-user-execution",
+      "displayName": "Build and run the user execution test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-user-execution-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-user-execution"
         }
       ]
     }

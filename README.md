@@ -30,7 +30,10 @@ globals. Each live process generation can now own a private Sv39 root whose
 user subtree occupies `[0x40000000, 0x80000000)`, while immutable
 supervisor-only kernel subtrees remain shared. Typed page-table and user-frame
 owners, full ASID-zero activation fences, inactive-root mutation, complete-page
-zeroing, and teardown-before-process-release are enforced and tested.
+zeroing, and teardown-before-process-release are enforced and tested. Threads
+now own exact 264-byte user contexts and slot-derived 16 KiB supervisor stacks.
+The kernel can enter U-mode, capture and validate user traps, resume a modified
+user context, and restore the hart's idle trap stack.
 
 ## Goals
 
@@ -98,6 +101,7 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
+cmake --workflow --preset test-qemu-user-execution
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -117,6 +121,10 @@ trap gate injects a second exception at the first instruction after arming the
 emergency stack. The user-address-space gate proves same-VA isolation across
 two roots, exact typed ownership, zeroed reuse, active-root rejection, stale
 generation rejection, atomic teardown, and live SUM clearing on trap entry.
+The user-execution gate performs a real U-mode round trip, enforces kernel-page
+isolation, preserves every integer register, proves thread-stack ownership and
+generation reuse, and validates both user and test-only supervisor `sret`
+returns.
 See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.

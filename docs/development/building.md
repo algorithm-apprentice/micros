@@ -22,6 +22,8 @@ The current implementation provides:
   handles and checked one-thread/one-hart production policies;
 - generation-safe per-process Sv39 roots with one private one-GiB user window,
   shared immutable kernel subtrees, typed anonymous pages, and atomic teardown;
+- exact saved user integer contexts, one static 16 KiB kernel stack per thread
+  slot, hart trap-stack selection, and validated first U-mode entry/resume;
 - a per-hart trap anchor carried through every trap frame, plus hart-owned
   timer mechanism state;
 - mandatory post-link closure checks for every allocatable ELF section;
@@ -35,8 +37,8 @@ The current implementation provides:
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Saved user contexts, U-mode entry, context switching, and scheduling remain
-dependency-ordered later tasks.
+Repeated context switching, runnable queues, timer preemption, and scheduling
+remain dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -519,6 +521,40 @@ still succeeds. Only that complete sequence emits:
 
 ```text
 MICROS_USER_ADDRESS_SPACE_TEST_PASS roots=isolated reuse=zeroed active=guarded ownership=validated sum=cleared
+```
+
+## User execution-context and U-mode test
+
+Build and run the first real user round trip with:
+
+```bash
+cmake --workflow --preset test-qemu-user-execution
+```
+
+The kernel reserves one page-aligned 16 KiB supervisor stack for each of the
+128 representable thread slots. Preparation validates an exact live thread and
+process root, executable two-byte-aligned PC, writable 16-byte-aligned user
+stack, zero caller status, RV64 UXL, little-endian user memory, and disabled
+privileged/extension fields. It clears exactly that slot's complete stack
+before attaching the 264-byte integer context.
+
+The QEMU payload executes from a user RX page, stores and reloads through its
+user RW stack, and attempts to read kernel text. The exact U-origin page fault
+is captured on the selected thread kernel stack and resumed. Two user
+environment calls then prove every x1-x31 value, context capture, handler
+register/PC modification, user `sret` resume, and a test-only interrupt-disabled
+S-mode return with supervisor caller-state restoration.
+
+Negative cases cover stale and reused thread generations, odd/non-executable
+PCs, misaligned/non-writable/unmapped stack pointers, unsafe status fields,
+wrong UXL, derived SD canonicalization, duplicate preparation, stack overlap,
+and cross-slot clearing. The test also prepares a nonzero thread slot and
+proves one slot's clear does not touch another.
+
+Only the complete sequence emits:
+
+```text
+MICROS_USER_EXECUTION_TEST_PASS mode=entered faults=isolated context=preserved stack=owned return=resumed
 ```
 
 ## Sv39 MMU test

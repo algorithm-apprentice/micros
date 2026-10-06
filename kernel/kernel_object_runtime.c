@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
+#include "kernel/kernel_object_runtime_internal.h"
 
 static struct micros_kernel_objects kernel_objects;
 static struct micros_hart_handle boot_hart_handle;
@@ -132,6 +133,15 @@ micros_kernel_object_runtime_validate(void)
     return micros_kernel_objects_validate(&kernel_objects);
 }
 
+struct micros_kernel_objects *
+micros_kernel_object_runtime_authoritative_registry(void)
+{
+    if (!runtime_ready) {
+        return NULL;
+    }
+    return &kernel_objects;
+}
+
 enum micros_kernel_object_error
 micros_kernel_object_runtime_attach_address_space(
     struct micros_process_handle process,
@@ -184,7 +194,8 @@ micros_kernel_object_runtime_detach_address_space(
 
 #if defined(MICROS_BUILD_OBJECT_MODEL_TEST) \
     || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST) \
-    || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
+    || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST) \
+    || defined(MICROS_BUILD_USER_EXECUTION_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void)
 {

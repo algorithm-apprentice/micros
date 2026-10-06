@@ -37,3 +37,5 @@ to make the project appear more consistent than it was.
 | [0019](0019-kernel-object-identity-and-ownership.md) | Kernel object identity and ownership | Accepted |
 | [0020](0020-typed-bootstrap-frame-ownership.md) | Typed bootstrap frame ownership | Accepted |
 | [0021](0021-generation-safe-user-address-spaces.md) | Generation-safe user address spaces | Accepted |
+| [0022](0022-user-execution-contexts-and-u-mode-entry.md) | User execution contexts and U-mode entry | Accepted |
+| [0023](0023-canonical-user-status-summary-bits.md) | Canonical user status summary bits | Accepted |

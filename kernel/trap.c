@@ -9,6 +9,7 @@
 #include "micros/panic.h"
 #include "micros/timer.h"
 #include "micros/user_address_space.h"
+#include "micros/user_execution.h"
 
 #define MICROS_SCAUSE_INTERRUPT (UINT64_C(1) << 63)
 #define MICROS_SCAUSE_CODE_MASK (MICROS_SCAUSE_INTERRUPT - 1)
@@ -363,6 +364,71 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
         );
     }
     cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
+
+    if ((frame->sstatus & MICROS_RISCV_SSTATUS_SPP) == 0) {
+#ifdef MICROS_BUILD_USER_EXECUTION_TEST
+        enum micros_user_execution_test_trap_result result;
+
+        if (!micros_user_execution_test_pre_capture(hart, frame)) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "user-execution-pre-capture",
+                frame
+            );
+        }
+#endif
+        if (
+            micros_user_execution_capture_trap(hart, frame)
+                != MICROS_USER_EXECUTION_OK
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "user-execution-capture",
+                frame
+            );
+        }
+#ifdef MICROS_BUILD_USER_EXECUTION_TEST
+        result = micros_user_execution_handle_test_trap(
+            hart,
+            frame
+        );
+        if (
+            result
+                == MICROS_USER_EXECUTION_TEST_TRAP_USER_RETURN
+        ) {
+            if (
+                micros_user_execution_validate_return(
+                    hart,
+                    frame
+                ) != MICROS_USER_EXECUTION_OK
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "user-execution-return",
+                    frame
+                );
+            }
+            return;
+        }
+        if (
+            result
+                == MICROS_USER_EXECUTION_TEST_TRAP_SUPERVISOR_RETURN
+        ) {
+            return;
+        }
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "user-execution-test-mismatch",
+            frame
+        );
+#else
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "unexpected-user-trap",
+            frame
+        );
+#endif
+    }
 
 #ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
     {

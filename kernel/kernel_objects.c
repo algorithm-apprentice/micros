@@ -84,6 +84,48 @@ static bool ranges_overlap(
     return first_bottom < second_top && second_bottom < first_top;
 }
 
+static void copy_user_context(
+    struct micros_user_context *destination,
+    const struct micros_user_context *source
+)
+{
+    unsigned char *destination_bytes =
+        (unsigned char *)destination;
+    const unsigned char *source_bytes =
+        (const unsigned char *)source;
+    size_t index;
+
+    for (index = 0; index < sizeof(*destination); ++index) {
+        destination_bytes[index] = source_bytes[index];
+    }
+}
+
+static void clear_user_context(struct micros_user_context *context)
+{
+    unsigned char *bytes = (unsigned char *)context;
+    size_t index;
+
+    for (index = 0; index < sizeof(*context); ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static bool user_context_is_zero(
+    const struct micros_user_context *context
+)
+{
+    const unsigned char *bytes =
+        (const unsigned char *)context;
+    size_t index;
+
+    for (index = 0; index < sizeof(*context); ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool trap_anchor_is_zero(
     const struct micros_hart_trap_anchor *trap
 )
@@ -469,6 +511,246 @@ enum micros_kernel_object_error micros_thread_resolve(
 }
 
 enum micros_kernel_object_error
+micros_thread_attach_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    uintptr_t kernel_stack_bottom,
+    uintptr_t kernel_stack_top,
+    const struct micros_user_context *context
+)
+{
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+    size_t index;
+
+    if (objects == NULL || context == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->context_attached
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    if (
+        !stack_range_is_valid(
+            kernel_stack_bottom,
+            kernel_stack_top,
+            MICROS_THREAD_KERNEL_STACK_SIZE
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STACK;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *other =
+            &objects->threads[index];
+
+        if (
+            other == thread
+            || other->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !other->context_attached
+        ) {
+            continue;
+        }
+        if (
+            ranges_overlap(
+                kernel_stack_bottom,
+                kernel_stack_top,
+                other->kernel_stack_bottom,
+                other->kernel_stack_top
+            )
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+        }
+    }
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+
+        if (
+            hart->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !hart->trap_installed
+        ) {
+            continue;
+        }
+        if (
+            ranges_overlap(
+                kernel_stack_bottom,
+                kernel_stack_top,
+                hart->idle_primary_stack_bottom,
+                hart->idle_primary_stack_top
+            )
+            || ranges_overlap(
+                kernel_stack_bottom,
+                kernel_stack_top,
+                hart->trap.emergency_stack_bottom,
+                hart->trap.emergency_stack_top
+            )
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+        }
+    }
+
+    thread->context_attached = true;
+    thread->kernel_stack_bottom = kernel_stack_bottom;
+    thread->kernel_stack_top = kernel_stack_top;
+    copy_user_context(&thread->user_context, context);
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_thread_capture_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    const struct micros_user_context *context
+)
+{
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+    size_t current_count = 0;
+    size_t index;
+
+    if (objects == NULL || context == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        !thread->context_attached
+        || thread->state != MICROS_THREAD_STATE_RUNNING
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+
+        if (
+            hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && thread_handles_equal(
+                hart->current_thread,
+                thread_handle
+            )
+        ) {
+            ++current_count;
+        }
+    }
+    if (current_count != 1) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    copy_user_context(&thread->user_context, context);
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_thread_inspect_execution_context(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    struct micros_user_context *context,
+    uintptr_t *kernel_stack_bottom,
+    uintptr_t *kernel_stack_top
+)
+{
+    const struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+
+    if (
+        objects == NULL
+        || context == NULL
+        || kernel_stack_bottom == NULL
+        || kernel_stack_top == NULL
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = micros_thread_resolve(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (!thread->context_attached) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    copy_user_context(context, &thread->user_context);
+    *kernel_stack_bottom = thread->kernel_stack_bottom;
+    *kernel_stack_top = thread->kernel_stack_top;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_thread_detach_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle
+)
+{
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+    size_t index;
+
+    if (objects == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        !thread->context_attached
+        || thread->state != MICROS_THREAD_STATE_INACTIVE
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+
+        if (
+            hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && thread_handles_equal(
+                hart->current_thread,
+                thread_handle
+            )
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+    }
+    thread->context_attached = false;
+    thread->kernel_stack_bottom = 0;
+    thread->kernel_stack_top = 0;
+    clear_user_context(&thread->user_context);
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
 micros_process_attach_address_space(
     struct micros_kernel_objects *objects,
     struct micros_process_handle process_handle,
@@ -623,7 +905,10 @@ enum micros_kernel_object_error micros_thread_release(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (thread->state != MICROS_THREAD_STATE_INACTIVE) {
+    if (
+        thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->context_attached
+    ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
     for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
@@ -662,6 +947,10 @@ enum micros_kernel_object_error micros_thread_release(
     thread->owner.slot = 0;
     thread->owner.generation = 0;
     thread->state = MICROS_THREAD_STATE_INACTIVE;
+    thread->context_attached = false;
+    thread->kernel_stack_bottom = 0;
+    thread->kernel_stack_top = 0;
+    clear_user_context(&thread->user_context);
     --owner->live_thread_count;
     --objects->live_thread_count;
     return MICROS_KERNEL_OBJECT_OK;
@@ -854,6 +1143,12 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
             || ranges_overlap(
                 primary_stack_bottom,
                 primary_stack_top,
+                other->idle_primary_stack_bottom,
+                other->idle_primary_stack_top
+            )
+            || ranges_overlap(
+                primary_stack_bottom,
+                primary_stack_top,
                 other->trap.emergency_stack_bottom,
                 other->trap.emergency_stack_top
             )
@@ -866,8 +1161,40 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
             || ranges_overlap(
                 emergency_stack_bottom,
                 emergency_stack_top,
+                other->idle_primary_stack_bottom,
+                other->idle_primary_stack_top
+            )
+            || ranges_overlap(
+                emergency_stack_bottom,
+                emergency_stack_top,
                 other->trap.emergency_stack_bottom,
                 other->trap.emergency_stack_top
+            )
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+        }
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !thread->context_attached
+        ) {
+            continue;
+        }
+        if (
+            ranges_overlap(
+                primary_stack_bottom,
+                primary_stack_top,
+                thread->kernel_stack_bottom,
+                thread->kernel_stack_top
+            )
+            || ranges_overlap(
+                emergency_stack_bottom,
+                emergency_stack_top,
+                thread->kernel_stack_bottom,
+                thread->kernel_stack_top
             )
         ) {
             return MICROS_KERNEL_OBJECT_ERROR_STACK;
@@ -881,7 +1208,110 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
     hart->trap.entry_t0 = 0;
     hart->trap.entry_t1 = 0;
     hart->trap.entry_t2 = 0;
+    hart->idle_primary_stack_bottom = primary_stack_bottom;
+    hart->idle_primary_stack_top = primary_stack_top;
     hart->trap_installed = true;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_hart_select_thread_trap_stack(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_thread_handle thread_handle
+)
+{
+    struct micros_hart *hart;
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+
+    if (objects == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        !hart->trap_installed
+        || !thread_handles_equal(
+            hart->current_thread,
+            thread_handle
+        )
+        || thread->state != MICROS_THREAD_STATE_RUNNING
+        || !thread->context_attached
+        || hart->trap.primary_stack_bottom
+            != hart->idle_primary_stack_bottom
+        || hart->trap.primary_stack_top
+            != hart->idle_primary_stack_top
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    hart->trap.primary_stack_bottom = thread->kernel_stack_bottom;
+    hart->trap.primary_stack_top = thread->kernel_stack_top;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_hart_restore_idle_trap_stack(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_thread_handle thread_handle
+)
+{
+    struct micros_hart *hart;
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+
+    if (objects == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(
+        objects,
+        thread_handle,
+        &thread
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        !hart->trap_installed
+        || !thread_handles_equal(
+            hart->current_thread,
+            thread_handle
+        )
+        || thread->state != MICROS_THREAD_STATE_RUNNING
+        || !thread->context_attached
+        || hart->trap.primary_stack_bottom
+            != thread->kernel_stack_bottom
+        || hart->trap.primary_stack_top
+            != thread->kernel_stack_top
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    hart->trap.primary_stack_bottom =
+        hart->idle_primary_stack_bottom;
+    hart->trap.primary_stack_top = hart->idle_primary_stack_top;
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -953,6 +1383,15 @@ enum micros_kernel_object_error micros_hart_clear_thread(
             thread_handle
         )
         || thread->state != MICROS_THREAD_STATE_RUNNING
+        || (
+            hart->trap_installed
+            && (
+                hart->trap.primary_stack_bottom
+                    != hart->idle_primary_stack_bottom
+                || hart->trap.primary_stack_top
+                    != hart->idle_primary_stack_top
+            )
+        )
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -1093,12 +1532,17 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *thread = &objects->threads[index];
         uint32_t unused_generation;
+        size_t other_index;
 
         switch (thread->slot_state) {
         case MICROS_KERNEL_OBJECT_SLOT_FREE:
             if (
                 thread->owner.generation != 0
                 || thread->state != MICROS_THREAD_STATE_INACTIVE
+                || thread->context_attached
+                || thread->kernel_stack_bottom != 0
+                || thread->kernel_stack_top != 0
+                || !user_context_is_zero(&thread->user_context)
                 || micros_thread_next_generation(
                     thread->generation,
                     &unused_generation
@@ -1122,6 +1566,75 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
+            if (thread->context_attached) {
+                if (
+                    !stack_range_is_valid(
+                        thread->kernel_stack_bottom,
+                        thread->kernel_stack_top,
+                        MICROS_THREAD_KERNEL_STACK_SIZE
+                    )
+                ) {
+                    return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                }
+                for (
+                    other_index = 0;
+                    other_index < index;
+                    ++other_index
+                ) {
+                    const struct micros_thread *other =
+                        &objects->threads[other_index];
+
+                    if (
+                        other->slot_state
+                            == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                        && other->context_attached
+                        && ranges_overlap(
+                            thread->kernel_stack_bottom,
+                            thread->kernel_stack_top,
+                            other->kernel_stack_bottom,
+                            other->kernel_stack_top
+                        )
+                    ) {
+                        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                    }
+                }
+                for (
+                    other_index = 0;
+                    other_index < MICROS_HART_CAPACITY;
+                    ++other_index
+                ) {
+                    const struct micros_hart *hart =
+                        &objects->harts[other_index];
+
+                    if (
+                        hart->slot_state
+                            == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                        && hart->trap_installed
+                        && (
+                            ranges_overlap(
+                                thread->kernel_stack_bottom,
+                                thread->kernel_stack_top,
+                                hart->idle_primary_stack_bottom,
+                                hart->idle_primary_stack_top
+                            )
+                            || ranges_overlap(
+                                thread->kernel_stack_bottom,
+                                thread->kernel_stack_top,
+                                hart->trap.emergency_stack_bottom,
+                                hart->trap.emergency_stack_top
+                            )
+                        )
+                    ) {
+                        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                    }
+                }
+            } else if (
+                thread->kernel_stack_bottom != 0
+                || thread->kernel_stack_top != 0
+                || !user_context_is_zero(&thread->user_context)
+            ) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
             ++process_thread_counts[thread->owner.slot];
             ++observed_thread_count;
             break;
@@ -1130,6 +1643,10 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                 thread->generation == 0
                 || thread->owner.generation != 0
                 || thread->state != MICROS_THREAD_STATE_INACTIVE
+                || thread->context_attached
+                || thread->kernel_stack_bottom != 0
+                || thread->kernel_stack_top != 0
+                || !user_context_is_zero(&thread->user_context)
                 || micros_thread_next_generation(
                     thread->generation,
                     &unused_generation
@@ -1170,6 +1687,8 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                 hart->generation != 0
                 || hart->hardware_id != 0
                 || hart->trap_installed
+                || hart->idle_primary_stack_bottom != 0
+                || hart->idle_primary_stack_top != 0
                 || !trap_anchor_is_zero(&hart->trap)
                 || hart->current_thread.generation != 0
                 || hart->interrupt_depth != 0
@@ -1204,6 +1723,17 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
         if (hart->trap_installed) {
             if (
                 !trap_anchor_stacks_are_valid(&hart->trap)
+                || !stack_range_is_valid(
+                    hart->idle_primary_stack_bottom,
+                    hart->idle_primary_stack_top,
+                    MICROS_PRIMARY_TRAP_STACK_MIN_SIZE
+                )
+                || ranges_overlap(
+                    hart->idle_primary_stack_bottom,
+                    hart->idle_primary_stack_top,
+                    hart->trap.emergency_stack_bottom,
+                    hart->trap.emergency_stack_top
+                )
                 || hart->trap.entry_t0 != 0
                 || hart->trap.entry_t1 != 0
                 || hart->trap.entry_t2 != 0
@@ -1243,12 +1773,34 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                             other->trap.emergency_stack_bottom,
                             other->trap.emergency_stack_top
                         )
+                        || ranges_overlap(
+                            hart->idle_primary_stack_bottom,
+                            hart->idle_primary_stack_top,
+                            other->idle_primary_stack_bottom,
+                            other->idle_primary_stack_top
+                        )
+                        || ranges_overlap(
+                            hart->idle_primary_stack_bottom,
+                            hart->idle_primary_stack_top,
+                            other->trap.emergency_stack_bottom,
+                            other->trap.emergency_stack_top
+                        )
+                        || ranges_overlap(
+                            hart->trap.emergency_stack_bottom,
+                            hart->trap.emergency_stack_top,
+                            other->idle_primary_stack_bottom,
+                            other->idle_primary_stack_top
+                        )
                     )
                 ) {
                     return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
                 }
             }
-        } else if (!trap_anchor_is_zero(&hart->trap)) {
+        } else if (
+            !trap_anchor_is_zero(&hart->trap)
+            || hart->idle_primary_stack_bottom != 0
+            || hart->idle_primary_stack_top != 0
+        ) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
         if (!hart->timer.initialized) {
@@ -1267,6 +1819,8 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
 
         if (hart->current_thread.generation != 0) {
             const struct micros_thread *thread;
+            bool primary_is_idle;
+            bool primary_is_thread;
 
             if (
                 !thread_handle_is_valid(hart->current_thread)
@@ -1283,7 +1837,33 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
+            primary_is_idle = (
+                hart->trap.primary_stack_bottom
+                    == hart->idle_primary_stack_bottom
+                && hart->trap.primary_stack_top
+                    == hart->idle_primary_stack_top
+            );
+            primary_is_thread = (
+                thread->context_attached
+                && hart->trap.primary_stack_bottom
+                    == thread->kernel_stack_bottom
+                && hart->trap.primary_stack_top
+                    == thread->kernel_stack_top
+            );
+            if (!primary_is_idle && !primary_is_thread) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
             current_threads[hart->current_thread.slot] = true;
+        } else if (
+            hart->trap_installed
+            && (
+                hart->trap.primary_stack_bottom
+                    != hart->idle_primary_stack_bottom
+                || hart->trap.primary_stack_top
+                    != hart->idle_primary_stack_top
+            )
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
         ++observed_hart_count;
     }

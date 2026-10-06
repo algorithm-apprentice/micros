@@ -46,6 +46,13 @@ SECTIONS
         KEEP(*(.stack))
     }
 
+    .thread_kernel_stacks (NOLOAD) : ALIGN(4096)
+    {
+        __thread_kernel_stacks_start = .;
+        KEEP(*(.thread_kernel_stacks))
+        __thread_kernel_stacks_end = .;
+    }
+
     .trap_stacks (NOLOAD) : ALIGN(16)
     {
         KEEP(*(.trap_stack))

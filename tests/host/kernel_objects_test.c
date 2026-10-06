@@ -96,6 +96,33 @@ static bool process_handles_equal(
     );
 }
 
+static struct micros_user_context context_pattern(uint64_t base)
+{
+    struct micros_user_context context;
+    uint64_t words[
+        sizeof(struct micros_user_context) / sizeof(uint64_t)
+    ];
+    size_t index;
+
+    for (
+        index = 0;
+        index < sizeof(words) / sizeof(words[0]);
+        ++index
+    ) {
+        words[index] = base + index;
+    }
+    memcpy(&context, words, sizeof(context));
+    return context;
+}
+
+static bool contexts_equal(
+    const struct micros_user_context *left,
+    const struct micros_user_context *right
+)
+{
+    return memcmp(left, right, sizeof(*left)) == 0;
+}
+
 static bool test_initialization_is_checked_and_one_shot(void)
 {
     struct micros_kernel_objects snapshot;
@@ -186,6 +213,13 @@ static bool test_uninitialized_registry_rejects_every_operation(void)
         (const struct micros_thread *)(uintptr_t)1;
     const struct micros_hart *resolved_hart =
         (const struct micros_hart *)(uintptr_t)1;
+    struct micros_user_context context =
+        context_pattern(UINT64_C(0x1000));
+    struct micros_user_context context_output =
+        context_pattern(UINT64_C(0x2000));
+    struct micros_user_context context_before = context_output;
+    uintptr_t stack_bottom = UINTPTR_MAX;
+    uintptr_t stack_top = UINTPTR_MAX;
 
     reset_objects();
     EXPECT_ERROR(
@@ -254,7 +288,58 @@ static bool test_uninitialized_registry_rejects_every_operation(void)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_thread_attach_execution_context(
+            &objects,
+            thread,
+            UINT64_C(0x100000),
+            UINT64_C(0x104000),
+            &context
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_thread_capture_execution_context(
+            &objects,
+            thread,
+            &context
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_thread_inspect_execution_context(
+            &objects,
+            thread,
+            &context_output,
+            &stack_bottom,
+            &stack_top
+        )
+    );
+    EXPECT_TRUE(contexts_equal(&context_output, &context_before));
+    EXPECT_TRUE(stack_bottom == UINTPTR_MAX);
+    EXPECT_TRUE(stack_top == UINTPTR_MAX);
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_thread_detach_execution_context(&objects, thread)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_hart_register(&objects, 0, &hart_output)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_hart_select_thread_trap_stack(
+            &objects,
+            hart,
+            thread
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_hart_restore_idle_trap_stack(
+            &objects,
+            hart,
+            thread
+        )
     );
     EXPECT_TRUE(
         hart_output.slot == UINT16_MAX
@@ -577,6 +662,335 @@ static bool test_process_address_space_lifecycle_is_exact(void)
         micros_process_detach_address_space(&objects, stale, root)
     );
     EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
+    return true;
+}
+
+static bool test_thread_execution_context_lifecycle_is_exact(void)
+{
+    const uintptr_t idle_bottom = UINT64_C(0x0000000000100000);
+    const uintptr_t idle_top =
+        idle_bottom + MICROS_PRIMARY_TRAP_STACK_MIN_SIZE;
+    const uintptr_t emergency_bottom =
+        UINT64_C(0x0000000000200000);
+    const uintptr_t emergency_top =
+        emergency_bottom + MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE;
+    const uintptr_t first_stack_bottom =
+        UINT64_C(0x0000000000300000);
+    const uintptr_t first_stack_top =
+        first_stack_bottom + MICROS_THREAD_KERNEL_STACK_SIZE;
+    const uintptr_t second_stack_bottom =
+        UINT64_C(0x0000000000400000);
+    const uintptr_t second_stack_top =
+        second_stack_bottom
+        + (2 * MICROS_THREAD_KERNEL_STACK_SIZE);
+    struct micros_process_handle process = {0};
+    struct micros_thread_handle first = {0};
+    struct micros_thread_handle second = {0};
+    struct micros_thread_handle stale;
+    struct micros_hart_handle hart = {0};
+    struct micros_hart_handle second_hart = {0};
+    struct micros_user_context initial =
+        context_pattern(UINT64_C(0x1000));
+    struct micros_user_context captured =
+        context_pattern(UINT64_C(0x2000));
+    struct micros_user_context observed =
+        context_pattern(UINT64_C(0xdead0000));
+    struct micros_user_context unchanged = observed;
+    uintptr_t observed_bottom = UINTPTR_MAX;
+    uintptr_t observed_top = UINTPTR_MAX;
+    struct micros_kernel_objects snapshot;
+
+    reset_objects();
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_initialize(&objects, 2, 2)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_register(&objects, 0, &hart)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_register(&objects, 1, &second_hart)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_install_trap_stacks(
+            &objects,
+            hart,
+            idle_bottom,
+            idle_top,
+            emergency_bottom,
+            emergency_top
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create(&objects, &process)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(&objects, process, &first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(&objects, process, &second)
+    );
+    stale = first;
+
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
+        micros_thread_attach_execution_context(
+            &objects,
+            first,
+            first_stack_bottom,
+            first_stack_top,
+            NULL
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_thread_attach_execution_context(
+            &objects,
+            first,
+            first_stack_bottom + 1,
+            first_stack_top,
+            &initial
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_thread_attach_execution_context(
+            &objects,
+            first,
+            first_stack_bottom,
+            first_stack_bottom
+                + MICROS_THREAD_KERNEL_STACK_SIZE - 16,
+            &initial
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_attach_execution_context(
+            &objects,
+            first,
+            first_stack_bottom,
+            first_stack_top,
+            &initial
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_inspect_execution_context(
+            &objects,
+            first,
+            &observed,
+            &observed_bottom,
+            &observed_top
+        )
+    );
+    EXPECT_TRUE(contexts_equal(&observed, &initial));
+    EXPECT_TRUE(observed_bottom == first_stack_bottom);
+    EXPECT_TRUE(observed_top == first_stack_top);
+
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_attach_execution_context(
+            &objects,
+            first,
+            second_stack_bottom,
+            second_stack_top,
+            &initial
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_thread_attach_execution_context(
+            &objects,
+            second,
+            first_stack_bottom + 16,
+            first_stack_top + 16,
+            &initial
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_thread_attach_execution_context(
+            &objects,
+            second,
+            idle_bottom,
+            idle_top,
+            &initial
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_thread_attach_execution_context(
+            &objects,
+            second,
+            emergency_bottom,
+            emergency_bottom + MICROS_THREAD_KERNEL_STACK_SIZE,
+            &initial
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_attach_execution_context(
+            &objects,
+            second,
+            second_stack_bottom,
+            second_stack_top,
+            &initial
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_release(&objects, first)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_capture_execution_context(
+            &objects,
+            first,
+            &captured
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_bind_thread(&objects, hart, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_select_thread_trap_stack(
+            &objects,
+            hart,
+            first
+        )
+    );
+    EXPECT_TRUE(
+        objects.harts[hart.slot].trap.primary_stack_bottom
+            == first_stack_bottom
+    );
+    EXPECT_TRUE(
+        objects.harts[hart.slot].trap.primary_stack_top
+            == first_stack_top
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STACK,
+        micros_hart_install_trap_stacks(
+            &objects,
+            second_hart,
+            idle_bottom,
+            idle_top,
+            UINT64_C(0x0000000000500000),
+            UINT64_C(0x0000000000501000)
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_capture_execution_context(
+            &objects,
+            first,
+            &captured
+        )
+    );
+    observed = unchanged;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_inspect_execution_context(
+            &objects,
+            first,
+            &observed,
+            &observed_bottom,
+            &observed_top
+        )
+    );
+    EXPECT_TRUE(contexts_equal(&observed, &captured));
+
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_detach_execution_context(&objects, first)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_hart_clear_thread(&objects, hart, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_restore_idle_trap_stack(
+            &objects,
+            hart,
+            first
+        )
+    );
+    EXPECT_TRUE(
+        objects.harts[hart.slot].trap.primary_stack_bottom
+            == idle_bottom
+    );
+    EXPECT_TRUE(
+        objects.harts[hart.slot].trap.primary_stack_top == idle_top
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_clear_thread(&objects, hart, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_detach_execution_context(&objects, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(&objects, process, &first)
+    );
+    snapshot = objects;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STALE,
+        micros_thread_attach_execution_context(
+            &objects,
+            stale,
+            first_stack_bottom,
+            first_stack_top,
+            &initial
+        )
+    );
+    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
+    observed = unchanged;
+    observed_bottom = UINTPTR_MAX;
+    observed_top = UINTPTR_MAX;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STALE,
+        micros_thread_inspect_execution_context(
+            &objects,
+            stale,
+            &observed,
+            &observed_bottom,
+            &observed_top
+        )
+    );
+    EXPECT_TRUE(contexts_equal(&observed, &unchanged));
+    EXPECT_TRUE(observed_bottom == UINTPTR_MAX);
+    EXPECT_TRUE(observed_top == UINTPTR_MAX);
+
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_detach_execution_context(&objects, second)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, second)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, first)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_release(&objects, process)
+    );
     return true;
 }
 
@@ -1238,6 +1652,10 @@ struct lifecycle_model_thread {
     uint32_t generation;
     struct micros_process_handle owner;
     enum micros_thread_state state;
+    bool context_attached;
+    uintptr_t kernel_stack_bottom;
+    uintptr_t kernel_stack_top;
+    struct micros_user_context context;
 };
 
 struct lifecycle_model_hart {
@@ -1398,6 +1816,16 @@ static bool lifecycle_model_matches_registry(
             && (
                 !process_handles_equal(actual->owner, expected->owner)
                 || actual->state != expected->state
+                || actual->context_attached
+                    != expected->context_attached
+                || actual->kernel_stack_bottom
+                    != expected->kernel_stack_bottom
+                || actual->kernel_stack_top
+                    != expected->kernel_stack_top
+                || !contexts_equal(
+                    &actual->user_context,
+                    &expected->context
+                )
             )
         ) {
             goto mismatch;
@@ -1407,6 +1835,13 @@ static bool lifecycle_model_matches_registry(
             && (
                 actual->owner.generation != 0
                 || actual->state != MICROS_THREAD_STATE_INACTIVE
+                || actual->context_attached
+                || actual->kernel_stack_bottom != 0
+                || actual->kernel_stack_top != 0
+                || !contexts_equal(
+                    &actual->user_context,
+                    &(struct micros_user_context){0}
+                )
             )
         ) {
             goto mismatch;
@@ -1425,6 +1860,8 @@ static bool lifecycle_model_matches_registry(
                 || actual->generation != 1
                 || actual->hardware_id != index
                 || actual->trap_installed
+                || actual->idle_primary_stack_bottom != 0
+                || actual->idle_primary_stack_top != 0
                 || actual->timer.initialized
                 || actual->timer.active
                 || actual->timer.ticks != 0
@@ -1502,7 +1939,7 @@ static bool test_seeded_lifecycle_model(void)
         enum micros_kernel_object_error expected;
         enum micros_kernel_object_error actual;
 
-        switch (value % 8) {
+        switch (value % 11) {
         case 0: {
             struct micros_process_handle output = {
                 UINT16_MAX,
@@ -1643,7 +2080,8 @@ static bool test_seeded_lifecycle_model(void)
                 expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
             } else if (
                 model.threads[slot].state
-                != MICROS_THREAD_STATE_INACTIVE
+                    != MICROS_THREAD_STATE_INACTIVE
+                || model.threads[slot].context_attached
             ) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
             } else {
@@ -1667,6 +2105,14 @@ static bool test_seeded_lifecycle_model(void)
                 model.threads[slot].live = false;
                 model.threads[slot].owner.generation = 0;
                 model.threads[slot].owner.slot = 0;
+                model.threads[slot].context_attached = false;
+                model.threads[slot].kernel_stack_bottom = 0;
+                model.threads[slot].kernel_stack_top = 0;
+                memset(
+                    &model.threads[slot].context,
+                    0,
+                    sizeof(model.threads[slot].context)
+                );
                 --model.processes[owner_slot].thread_count;
                 --model.thread_count;
             }
@@ -1834,6 +2280,136 @@ static bool test_seeded_lifecycle_model(void)
             }
             break;
         }
+        case 8: {
+            struct micros_thread_handle handle;
+            struct micros_user_context context =
+                context_pattern(UINT64_C(0x30000000) + step);
+            uintptr_t stack_bottom;
+            uintptr_t stack_top;
+
+            slot = (value >> 8) % MICROS_THREAD_CAPACITY;
+            handle = model_thread_handle(&model, slot);
+            stack_bottom = UINT64_C(0x01000000)
+                + (slot * UINT64_C(0x00008000));
+            stack_top = stack_bottom
+                + MICROS_THREAD_KERNEL_STACK_SIZE;
+            if (!model.threads[slot].live) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
+            } else if (
+                model.threads[slot].context_attached
+                || model.threads[slot].state
+                    != MICROS_THREAD_STATE_INACTIVE
+            ) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+            } else {
+                expected = MICROS_KERNEL_OBJECT_OK;
+            }
+            actual = micros_thread_attach_execution_context(
+                &objects,
+                handle,
+                stack_bottom,
+                stack_top,
+                &context
+            );
+            if (
+                !model_reports_expected_error(
+                    expected,
+                    actual,
+                    step,
+                    "context-attach"
+                )
+            ) {
+                return false;
+            }
+            if (expected == MICROS_KERNEL_OBJECT_OK) {
+                model.threads[slot].context_attached = true;
+                model.threads[slot].kernel_stack_bottom =
+                    stack_bottom;
+                model.threads[slot].kernel_stack_top = stack_top;
+                model.threads[slot].context = context;
+            }
+            break;
+        }
+        case 9: {
+            struct micros_thread_handle handle;
+            struct micros_user_context context =
+                context_pattern(UINT64_C(0x40000000) + step);
+
+            slot = (value >> 8) % MICROS_THREAD_CAPACITY;
+            handle = model_thread_handle(&model, slot);
+            if (!model.threads[slot].live) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
+            } else if (
+                !model.threads[slot].context_attached
+                || model.threads[slot].state
+                    != MICROS_THREAD_STATE_RUNNING
+            ) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+            } else {
+                expected = MICROS_KERNEL_OBJECT_OK;
+            }
+            actual = micros_thread_capture_execution_context(
+                &objects,
+                handle,
+                &context
+            );
+            if (
+                !model_reports_expected_error(
+                    expected,
+                    actual,
+                    step,
+                    "context-capture"
+                )
+            ) {
+                return false;
+            }
+            if (expected == MICROS_KERNEL_OBJECT_OK) {
+                model.threads[slot].context = context;
+            }
+            break;
+        }
+        case 10: {
+            struct micros_thread_handle handle;
+
+            slot = (value >> 8) % MICROS_THREAD_CAPACITY;
+            handle = model_thread_handle(&model, slot);
+            if (!model.threads[slot].live) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
+            } else if (
+                !model.threads[slot].context_attached
+                || model.threads[slot].state
+                    != MICROS_THREAD_STATE_INACTIVE
+            ) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+            } else {
+                expected = MICROS_KERNEL_OBJECT_OK;
+            }
+            actual = micros_thread_detach_execution_context(
+                &objects,
+                handle
+            );
+            if (
+                !model_reports_expected_error(
+                    expected,
+                    actual,
+                    step,
+                    "context-detach"
+                )
+            ) {
+                return false;
+            }
+            if (expected == MICROS_KERNEL_OBJECT_OK) {
+                model.threads[slot].context_attached = false;
+                model.threads[slot].kernel_stack_bottom = 0;
+                model.threads[slot].kernel_stack_top = 0;
+                memset(
+                    &model.threads[slot].context,
+                    0,
+                    sizeof(model.threads[slot].context)
+                );
+            }
+            break;
+        }
         }
 
         if (!lifecycle_model_matches_registry(&model, step)) {
@@ -1935,6 +2511,16 @@ static bool test_validator_rejects_corrupt_relationships(void)
         objects.threads[2].owner = owner
     );
     EXPECT_CORRUPTION(
+        objects.threads[2].context_attached = true
+    );
+    EXPECT_CORRUPTION(
+        objects.threads[second.slot].context_attached = false;
+        objects.threads[second.slot].kernel_stack_bottom =
+            UINT64_C(0x300000);
+        objects.threads[second.slot].kernel_stack_top =
+            UINT64_C(0x304000)
+    );
+    EXPECT_CORRUPTION(
         objects.processes[1].address_space_root =
             UINT64_C(0x1000)
     );
@@ -1956,6 +2542,10 @@ static bool test_validator_rejects_corrupt_relationships(void)
     );
     EXPECT_CORRUPTION(
         objects.harts[hart_zero.slot].trap_installed = true
+    );
+    EXPECT_CORRUPTION(
+        objects.harts[hart_zero.slot].idle_primary_stack_bottom =
+            UINT64_C(0x1000)
     );
     EXPECT_CORRUPTION(
         objects.harts[hart_one.slot].generation = 0
@@ -1990,6 +2580,10 @@ int main(void)
         {
             "process address-space lifecycle is exact",
             test_process_address_space_lifecycle_is_exact,
+        },
+        {
+            "thread execution-context lifecycle is exact",
+            test_thread_execution_context_lifecycle_is_exact,
         },
         {
             "thread slots reuse with new generations",

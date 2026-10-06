@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "micros/user_context.h"
+
 enum {
     MICROS_PROCESS_CAPACITY = 64,
     MICROS_THREAD_CAPACITY = 128,
@@ -14,6 +16,7 @@ enum {
     MICROS_TRAP_STACK_ALIGNMENT = 16,
     MICROS_PRIMARY_TRAP_STACK_MIN_SIZE = 16 * 1024,
     MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE = 4 * 1024,
+    MICROS_THREAD_KERNEL_STACK_SIZE = 16 * 1024,
 };
 
 #define MICROS_PROCESS_GENERATION_MAX UINT32_C(0x000fffff)
@@ -60,6 +63,10 @@ struct micros_thread {
     uint32_t generation;
     struct micros_process_handle owner;
     enum micros_thread_state state;
+    bool context_attached;
+    uintptr_t kernel_stack_bottom;
+    uintptr_t kernel_stack_top;
+    struct micros_user_context user_context;
 };
 
 struct micros_hart_trap_anchor {
@@ -87,6 +94,8 @@ struct micros_hart {
     uint32_t generation;
     uintptr_t hardware_id;
     bool trap_installed;
+    uintptr_t idle_primary_stack_bottom;
+    uintptr_t idle_primary_stack_top;
     struct micros_thread_handle current_thread;
     uint32_t interrupt_depth;
     uint32_t preempt_disable_count;
@@ -191,6 +200,37 @@ enum micros_kernel_object_error micros_thread_resolve(
     const struct micros_thread **thread
 );
 
+enum micros_kernel_object_error
+micros_thread_attach_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    uintptr_t kernel_stack_bottom,
+    uintptr_t kernel_stack_top,
+    const struct micros_user_context *context
+);
+
+enum micros_kernel_object_error
+micros_thread_capture_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    const struct micros_user_context *context
+);
+
+enum micros_kernel_object_error
+micros_thread_inspect_execution_context(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    struct micros_user_context *context,
+    uintptr_t *kernel_stack_bottom,
+    uintptr_t *kernel_stack_top
+);
+
+enum micros_kernel_object_error
+micros_thread_detach_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread
+);
+
 enum micros_kernel_object_error micros_hart_register(
     struct micros_kernel_objects *objects,
     uintptr_t hardware_id,
@@ -216,6 +256,20 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
     uintptr_t primary_stack_top,
     uintptr_t emergency_stack_bottom,
     uintptr_t emergency_stack_top
+);
+
+enum micros_kernel_object_error
+micros_hart_select_thread_trap_stack(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_thread_handle thread
+);
+
+enum micros_kernel_object_error
+micros_hart_restore_idle_trap_stack(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_thread_handle thread
 );
 
 enum micros_kernel_object_error micros_hart_bind_thread(

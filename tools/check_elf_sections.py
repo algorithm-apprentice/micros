@@ -33,6 +33,7 @@ ALLOWED_SECTION_RANGES = {
     ".data": "writable",
     ".bss": "writable",
     ".stack": "writable",
+    ".thread_kernel_stacks": "writable",
     ".trap_stacks": "writable",
 }
 SECTION_ROW_START = re.compile(
