@@ -20,6 +20,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
+- [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
+  traces endpoint validation, privilege checks, send/receive queues,
+  request/reply blocking, notifications, deadlock detection, and exit cleanup.
 
 ## Planning and verification
 
