@@ -35,3 +35,4 @@ to make the project appear more consistent than it was.
 | [0017](0017-bootstrap-physical-frame-allocator.md) | Bootstrap physical frame allocator | Accepted |
 | [0018](0018-sv39-kernel-address-space.md) | Sv39 kernel address space | Accepted |
 | [0019](0019-kernel-object-identity-and-ownership.md) | Kernel object identity and ownership | Accepted |
+| [0020](0020-typed-bootstrap-frame-ownership.md) | Typed bootstrap frame ownership | Accepted |

@@ -55,7 +55,8 @@ that cannot safely be delegated:
 - trap and interrupt entry;
 - thread execution contexts and context switching;
 - page-table activation and validated map/unmap operations;
-- physical frame reservations required by the kernel itself;
+- physical-frame availability plus typed bootstrap ownership and reservations
+  required by the kernel itself;
 - endpoint identity and IPC queues;
 - IPC permission enforcement;
 - direct memory grants and checked cross-address-space copies;
@@ -111,11 +112,13 @@ vector, and then begins serial output.
 The kernel validates the FDT, reads physical memory and reserved ranges,
 reserves firmware and every physical address through its linker-defined end,
 reclaims the parsed FDT blob, initializes the bootstrap frame allocator,
-creates 4 KiB-leaf kernel page tables, verifies exact supervisor-only RX, R,
-and RW/NX mappings, enables Sv39 through an ordered translation fence, and
-starts timer interrupts. Managed RAM is identity-mapped RW/NX, while UART and
-PLIC device addresses remain fixed platform constants in v0.1; only UART is
-mapped during this phase.
+binds a static typed ownership ledger to that allocator's exact geometry,
+creates 4 KiB-leaf kernel page tables through the `KERNEL_PAGE_TABLE` class,
+verifies agreement among the reachable table tree, allocator bitmap, and
+ledger, verifies exact supervisor-only RX, R, and RW/NX mappings, enables Sv39
+through an ordered translation fence, and starts timer interrupts. Managed RAM
+is identity-mapped RW/NX, while UART and PLIC device addresses remain fixed
+platform constants in v0.1; only UART is mapped during this phase.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
@@ -135,10 +138,13 @@ and install their exact manifest privilege profiles.
 
 The VM server starts with a kernel-provided memory map and reservation list.
 Its code, data, stack, frame database, IPC buffers, and grant buffers are wired
-before it completes a one-way handoff. After that point, VM decides user-memory
-policy while the kernel continues to validate and apply page-table operations.
-A page fault originating from VM is fatal in v0.1 because VM cannot resolve its
-own fault.
+before it completes a one-way handoff. The kernel stages exact
+`VM_WIRED`/`VM_TRANSFERABLE` targets separately from current owners, validates
+the complete plan while mutation is quiesced, then installs every class and
+the irreversible handed-off phase in one non-failing pass. After that point,
+VM decides user-memory policy while the kernel continues to validate and apply
+page-table operations. A page fault originating from VM is fatal in v0.1
+because VM cannot resolve its own fault.
 
 ### Phase 5: core user services
 
@@ -242,11 +248,18 @@ interrupts disabled.
   PM may consume it to prepare and activate that spawn transaction.
 - A prepared address space is kernel-sealed; activation revalidates its mapping
   generation, and changes require aborting and repeating load preparation.
+- The allocator bitmap answers availability, while the typed frame ledger is
+  the authoritative semantic owner for every allocated managed frame.
+- Process-bound frame owners carry the exact live process slot and generation;
+  stale generations cannot release or reclassify them.
 - User-managed frames and kernel-reserved frames never overlap.
 - Kernel text is RX, read-only data is R, writable kernel state and managed RAM
   are RW/NX, and none of those mappings has the user bit.
-- Every reachable bootstrap page-table frame remains allocated to the kernel
-  and is represented by the live allocator bitmap.
+- Every reachable bootstrap page-table frame remains allocated, is represented
+  by the live allocator bitmap, and has exact `KERNEL_PAGE_TABLE` ownership;
+  all three independent counts agree.
+- Bootstrap ownership handoff is staged, failure-atomic, and irreversible;
+  allocation, release, and plan mutation are rejected after sealing.
 - Only VM may request user mapping changes after the handoff.
 - VM's fault-handling working set is wired, and a VM-originated fault is fatal.
 - Only PM publishes process lifecycle state.

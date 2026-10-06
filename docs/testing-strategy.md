@@ -70,7 +70,8 @@ Budgets are review signals, not reasons to hide necessary coverage.
 The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
-`test-qemu-object-model`, and `test-qemu-nested-trap`. From a clean checkout,
+`test-qemu-object-model`, `test-qemu-nested-trap`, and
+`test-qemu-frame-ownership`. From a clean checkout,
 the implemented configure, build, and execution gates are:
 
 ```bash
@@ -84,17 +85,20 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
+cmake --workflow --preset test-qemu-frame-ownership
 ```
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
-Sv39 encoding, and kernel-object lifecycle/model tests under ASan and UBSan
-plus the Python host tests. The latter include ELF allocatable-section closure,
-legacy-global rejection, and machine-readable QEMU record regressions.
+typed frame-ownership ledger, Sv39 encoding, and kernel-object
+lifecycle/model tests under ASan and UBSan plus the Python host tests. The
+latter include ELF allocatable-section closure, legacy-global rejection, and
+machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
-MMU readiness, and clean SBI shutdown. The remaining stable targets are added
-when their dependency-DAG layers become implementation-ready.
+MMU readiness, exact agreement between reachable kernel page tables and typed
+ownership, and clean SBI shutdown. The remaining stable targets are added when
+their dependency-DAG layers become implementation-ready.
 
 `test-qemu-panic` builds an isolated test image and verifies ordered source,
 hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
@@ -119,6 +123,11 @@ including generation advance, stale rejection, the one-thread policy, and
 hart-local current-thread state. `test-qemu-nested-trap` injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
 emergency stack is selected without trusting interrupted `tp`.
+`test-qemu-frame-ownership` exercises the production ledger and object
+registry together: stale and cross-process owners are rejected, process
+release remains blocked while exact owners exist, forbidden handoff plans are
+failure-atomic, and one complete plan seals bootstrap mutation in a single
+transition.
 
 ## Native unit tests
 
@@ -162,6 +171,12 @@ Examples of required properties:
   thread is current on none;
 - failed object-table operations preserve both registry state and output
   arguments;
+- an allocator bit is set exactly when the corresponding typed owner is not
+  free;
+- stale process generations cannot release, adopt, or reclassify frames;
+- a failed ownership or handoff operation preserves allocator, ledger, plan,
+  counts, and output arguments;
+- the ownership handoff changes every planned class and the phase atomically;
 - a reply token wakes exactly one blocked caller thread and cannot be reused;
 - an IPC transition preserves exactly one blocked or runnable state;
 - a grant cannot authorize bytes outside its declared range;
@@ -181,6 +196,8 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - timer interrupt and preemption;
 - repeated context switching;
 - page-table activation and invalidation;
+- exact agreement between the reachable page-table tree, allocator bits, and
+  typed frame owners;
 - store rejection on kernel text and instruction-fetch rejection on writable
   kernel data;
 - executable-frame reuse with different code after `fence.i`;

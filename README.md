@@ -14,8 +14,11 @@ OpenSBI TIME drives a one-hart supervisor timer that rejects stale pending
 delivery, rearms from the current counter, and preserves caller interrupt
 state. A bounded bootstrap frame allocator canonicalizes every FDT memory and
 reservation range, excludes all memory through the linker-defined kernel end,
-and tracks kernel-retained allocations with a fixed bitmap. An allocator-backed
-Sv39 root identity-maps the kernel with RX, R, and RW/NX linker permissions,
+and tracks availability with a fixed bitmap. A typed ownership ledger binds
+that allocator geometry to exact kernel or process-generation owners and
+stages the later one-way VM handoff. An allocator-backed Sv39 root requests
+every table frame through that ledger, identity-maps the kernel with RX, R,
+and RW/NX linker permissions,
 maps managed RAM and UART as supervisor-only RW/NX, and is activated through
 an ordered `sfence.vma`/`satp` transition.
 The kernel now allocates process, thread, and hart identities from bounded
@@ -89,6 +92,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
+cmake --workflow --preset test-qemu-frame-ownership
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -100,7 +104,9 @@ sizes, and captured-context diagnostics for an unexpected exception. The MMU
 gate additionally recovers from a hardware store page fault against text and
 an instruction page fault from writable memory. The object-model gate proves
 generation-safe reuse, stale-handle rejection, the checked one-thread policy,
-and hart-local current-thread state. The nested
+and hart-local current-thread state. The frame-ownership gate proves exact
+process-generation authority, blocked process release, failure-atomic staged
+handoff, and irreversible sealing. The nested
 trap gate injects a second exception at the first instruction after arming the
 `sscratch` sentinel and proves routing to a separately configured per-hart
 emergency stack. See the

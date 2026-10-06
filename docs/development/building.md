@@ -13,6 +13,8 @@ The current implementation provides:
 - OpenSBI TIME programming and one-hart supervisor timer interrupt handling;
 - a canonicalized bootstrap physical-frame allocator with a 1 GiB supported
   metadata bound;
+- a dense typed frame-ownership ledger with exact process generations,
+  allocator-geometry binding, and staged atomic VM-handoff classes;
 - an allocator-backed Sv39 kernel address space with page-aligned RX, R, and
   RW/NX permission ranges;
 - supervisor-only identity mappings for managed RAM and the QEMU UART;
@@ -23,6 +25,8 @@ The current implementation provides:
 - mandatory post-link closure checks for every allocatable ELF section;
 - native FDT parser tests under ASan and UBSan;
 - native frame allocator invariant and seeded model tests under ASan and UBSan;
+- native typed frame-owner, geometry, handoff, corruption, capacity, and
+  seeded reference-model tests under ASan and UBSan;
 - native Sv39 encoding and ELF permission-layout tests;
 - native kernel-object lifecycle, exhaustion, corruption, and seeded
   reference-model tests;
@@ -111,9 +115,10 @@ cmake --workflow --preset test-unit
 ```
 
 The host graph is separate from the freestanding target graph. It compiles the
-same FDT parser, frame allocator, Sv39 encoding, and kernel-object
-implementations with warnings as errors, ASan, and UBSan. It then runs their
-native tests plus the Python QEMU-harness and ELF-layout tests.
+same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
+and kernel-object implementations with warnings as errors, ASan, and UBSan.
+It then runs their native tests plus the Python QEMU-harness and ELF-layout
+tests.
 
 The parser has fixed resource bounds:
 
@@ -157,7 +162,10 @@ A pass requires all of:
 5. a serial line exactly equal to `MICROS_FDT_READY`;
 6. exactly one valid `MICROS_FRAME_ALLOCATOR_READY` line after FDT readiness;
 7. exactly one valid `MICROS_MMU_READY` line after allocator readiness;
-8. QEMU exit status zero after the SBI shutdown request.
+8. exactly one valid `MICROS_FRAME_OWNERSHIP_READY` line after MMU readiness,
+   with the ownership table count equal to the independently emitted MMU table
+   count;
+9. QEMU exit status zero after the SBI shutdown request.
 
 The object record occurs after the boot marker and before trap readiness:
 
@@ -219,6 +227,22 @@ MICROS_MMU_READY mode=sv39 root=0x... tables=0x...
 The root is a nonzero aligned physical address and the table count is nonzero.
 Every target gate requires this newline-terminated record after allocator
 readiness and before its pass or panic outcome.
+
+Before the first page-table allocation, the kernel binds a zeroed static
+ownership ledger to the exact allocator pointer, range count, managed count,
+and active range tuples. Every root and intermediate Sv39 table then requests
+the `KERNEL_PAGE_TABLE` class through the typed wrapper. After activation the
+kernel cross-checks the reachable table list, allocator bitmap, ledger owners,
+and independent counts, then emits:
+
+```text
+MICROS_FRAME_OWNERSHIP_READY owned=0x... kernel-tables=0x... phase=bootstrap
+```
+
+Both counts are nonzero, equal to each other, and equal to the preceding
+`MICROS_MMU_READY tables` field. Every target workflow requires exactly one
+newline-terminated record after MMU readiness and before its pass or panic
+outcome.
 
 The harness emits TAP plus a stable outcome field:
 
@@ -406,10 +430,12 @@ independent from the default launch size.
 The native suite covers range normalization, overflow and capacity boundaries,
 exhaustion, invalid release, and a replayable 2,000-step reference-model trace.
 The target image independently rechecks every real managed segment against the
-FDT and linker inputs. After Sv39 activation it uses the live free count as its
-baseline, leaves every page-table bit allocated, allocates four increasing
-non-table frames, releases them in non-LIFO order, verifies exact baseline
-restoration, and proves lowest-frame reuse. Only then does it emit:
+FDT and linker inputs. After Sv39 activation it uses the live allocator and
+ownership counts as its baseline, leaves every page-table frame typed and
+allocated, requests four increasing `KERNEL_TEMPORARY` frames, releases them
+with the same exact owner in non-LIFO order, verifies exact baseline
+restoration in both mechanisms, and proves lowest-frame reuse. Only then does
+it emit:
 
 ```text
 MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest invariants=preserved
@@ -418,6 +444,39 @@ MICROS_FRAME_ALLOCATOR_TEST_PASS allocations=0x0000000000000004 reuse=lowest inv
 The QEMU workflow boots the same ELF with 128 MiB and 256 MiB. Both runs must
 pass, and the larger guest must expose exactly `0x8000` additional managed
 frames. This rejects a kernel that silently compiles in the default RAM size.
+
+## Typed frame ownership test
+
+Build and run the isolated ownership transaction with:
+
+```bash
+cmake --workflow --preset test-qemu-frame-ownership
+```
+
+The portable ledger keeps allocator availability separate from semantic
+authority. Each managed frame has an exact eight-byte owner record, and the
+ledger snapshots the allocator pointer and complete managed-range geometry.
+Native tests cover every owner encoding, deterministic allocation and exact
+release, geometry corruption on both mutation directions, state preservation,
+maximum-capacity operation at frame index 262143, staged handoff rejection and
+commit, and a replayable 4,096-step independent model.
+
+The target image starts from the live kernel-page-table baseline, obtains a
+real stale process generation through release and reuse, creates a second
+process, and allocates private table and user classes for both. It rejects
+stale and cross-process release, blocks process release while exact owners
+remain, and proves that forbidden page-table or cross-process handoff plans do
+not mutate the ledger, allocator, or object registry. It then converts one
+user frame to `VM_WIRED`, one to `VM_TRANSFERABLE`, commits the complete plan
+with supervisor interrupts clear, and proves that every later bootstrap
+mutation is rejected without state change. Only that complete sequence emits:
+
+```text
+MICROS_FRAME_OWNERSHIP_TEST_PASS stale=rejected release=blocked handoff=atomic invariants=preserved
+```
+
+The host gate also requires the exact ownership-readiness record, clean SBI
+shutdown, no panic or explicit failure, and no timeout.
 
 ## Sv39 MMU test
 

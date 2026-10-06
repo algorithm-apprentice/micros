@@ -97,6 +97,15 @@
       "cacheVariables": {
         "MICROS_BUILD_NESTED_TRAP_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-frame-ownership-test",
+      "displayName": "RISC-V 64 typed frame ownership test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-frame-ownership-test",
+      "cacheVariables": {
+        "MICROS_BUILD_FRAME_OWNERSHIP_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -172,6 +181,13 @@
       "configurePreset": "riscv64-nested-trap-test",
       "targets": [
         "test-qemu-nested-trap"
+      ]
+    },
+    {
+      "name": "test-qemu-frame-ownership",
+      "configurePreset": "riscv64-frame-ownership-test",
+      "targets": [
+        "test-qemu-frame-ownership"
       ]
     }
   ],
@@ -327,6 +343,20 @@
         {
           "type": "build",
           "name": "test-qemu-nested-trap"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-frame-ownership",
+      "displayName": "Build and run the typed frame ownership test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-frame-ownership-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-frame-ownership"
         }
       ]
     }

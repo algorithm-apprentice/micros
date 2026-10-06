@@ -55,6 +55,21 @@ MMU_TEST_PASS = (
     "execute-fault=writable "
     "traps=0x0000000000000002"
 )
+FRAME_OWNERSHIP_READY_MARKER = "MICROS_FRAME_OWNERSHIP_READY"
+FRAME_OWNERSHIP_TEST_MARKER = "MICROS_FRAME_OWNERSHIP_TEST"
+FRAME_OWNERSHIP_READY_PATTERN = re.compile(
+    r"^MICROS_FRAME_OWNERSHIP_READY "
+    r"owned=0x([0-9a-f]{16}) "
+    r"kernel-tables=0x([0-9a-f]{16}) "
+    r"phase=bootstrap$"
+)
+FRAME_OWNERSHIP_TEST_PASS = (
+    "MICROS_FRAME_OWNERSHIP_TEST_PASS "
+    "stale=rejected "
+    "release=blocked "
+    "handoff=atomic "
+    "invariants=preserved"
+)
 OBJECTS_READY_MARKER = "MICROS_OBJECTS_READY"
 OBJECT_MODEL_TEST_MARKER = "MICROS_OBJECT_MODEL_TEST"
 NESTED_TRAP_TEST_MARKER = "MICROS_NESTED_TRAP_TEST"
@@ -379,6 +394,7 @@ def _frame_allocator_ready_precedes_target_outcome(output):
             or line == TRAP_TEST_PASS
             or line == TIMER_TEST_PASS
             or line == FRAME_ALLOCATOR_TEST_PASS
+            or line == FRAME_OWNERSHIP_TEST_PASS
         )
     ]
     return (
@@ -485,6 +501,7 @@ def _mmu_ready_precedes_target_outcome(output):
             or line == MMU_TEST_PASS
             or line == OBJECT_MODEL_TEST_PASS
             or line == NESTED_TRAP_TEST_PASS
+            or line == FRAME_OWNERSHIP_TEST_PASS
         )
     ]
     return (
@@ -516,6 +533,100 @@ def _has_complete_mmu_test_report(output):
     )
 
 
+def parse_frame_ownership_ready(output):
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    if len(ready_indices) != 1 or not terminated[ready_indices[0]]:
+        return None
+
+    match = FRAME_OWNERSHIP_READY_PATTERN.fullmatch(
+        output_lines[ready_indices[0]]
+    )
+    if match is None:
+        return None
+    return tuple(int(value, 16) for value in match.groups())
+
+
+def _has_complete_frame_ownership_ready(output):
+    output_lines = output.splitlines()
+    mmu_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    mmu_ready = parse_mmu_ready(output)
+    ready = parse_frame_ownership_ready(output)
+    return (
+        len(mmu_indices) == 1
+        and len(ready_indices) == 1
+        and mmu_indices[0] < ready_indices[0]
+        and mmu_ready is not None
+        and ready is not None
+        and ready[0] != 0
+        and ready[0] == ready[1]
+        and ready[1] == mmu_ready[1]
+    )
+
+
+def _frame_ownership_ready_precedes_target_outcome(output):
+    output_lines = output.splitlines()
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    outcome_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if (
+            PANIC_CORE_PATTERNS[0].fullmatch(line) is not None
+            or line == TRAP_TEST_PASS
+            or line == TIMER_TEST_PASS
+            or line == FRAME_ALLOCATOR_TEST_PASS
+            or line == MMU_TEST_PASS
+            or line == OBJECT_MODEL_TEST_PASS
+            or line == NESTED_TRAP_TEST_PASS
+            or line == FRAME_OWNERSHIP_TEST_PASS
+        )
+    ]
+    return (
+        len(ready_indices) == 1
+        and all(ready_indices[0] < index for index in outcome_indices)
+    )
+
+
+def _has_complete_frame_ownership_test_report(output):
+    if not _has_complete_frame_ownership_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == FRAME_OWNERSHIP_TEST_PASS
+        and terminated[test_indices[0]]
+        and ready_indices[0] < test_indices[0]
+    )
+
+
 def _objects_ready_precedes_target_outcome(output):
     output_lines = output.splitlines()
     ready_indices = [
@@ -534,6 +645,7 @@ def _objects_ready_precedes_target_outcome(output):
             or line == MMU_TEST_PASS
             or line == OBJECT_MODEL_TEST_PASS
             or line == NESTED_TRAP_TEST_PASS
+            or line == FRAME_OWNERSHIP_TEST_PASS
         )
     ]
     return (
@@ -681,6 +793,8 @@ def matches_expected_result(
     require_frame_allocator_test_report=False,
     require_mmu_ready=False,
     require_mmu_test_report=False,
+    require_frame_ownership_ready=False,
+    require_frame_ownership_test_report=False,
     require_objects_ready=False,
     require_object_model_test_report=False,
     require_nested_trap_test_report=False,
@@ -745,6 +859,21 @@ def matches_expected_result(
     if (
         require_mmu_test_report
         and not _has_complete_mmu_test_report(result.output)
+    ):
+        return False
+    if (
+        require_frame_ownership_ready
+        and (
+            not _has_complete_frame_ownership_ready(result.output)
+            or not _frame_ownership_ready_precedes_target_outcome(
+                result.output
+            )
+        )
+    ):
+        return False
+    if (
+        require_frame_ownership_test_report
+        and not _has_complete_frame_ownership_test_report(result.output)
     ):
         return False
     if (
@@ -1012,6 +1141,16 @@ def parse_arguments(argv):
         help="Require the ordered MMU permission test record",
     )
     parser.add_argument(
+        "--require-frame-ownership-ready",
+        action="store_true",
+        help="Require the ordered typed frame ownership record",
+    )
+    parser.add_argument(
+        "--require-frame-ownership-test-report",
+        action="store_true",
+        help="Require the ordered frame ownership test record",
+    )
+    parser.add_argument(
         "--require-objects-ready",
         action="store_true",
         help="Require the ordered kernel-object readiness record",
@@ -1135,6 +1274,12 @@ def main(argv=None):
             ),
             require_mmu_ready=arguments.require_mmu_ready,
             require_mmu_test_report=arguments.require_mmu_test_report,
+            require_frame_ownership_ready=(
+                arguments.require_frame_ownership_ready
+            ),
+            require_frame_ownership_test_report=(
+                arguments.require_frame_ownership_test_report
+            ),
             require_objects_ready=arguments.require_objects_ready,
             require_object_model_test_report=(
                 arguments.require_object_model_test_report
