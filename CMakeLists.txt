@@ -32,6 +32,11 @@ option(
     "Build the typed frame ownership test image"
     OFF
 )
+option(
+    MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    "Build the generation-safe user address-space test image"
+    OFF
+)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 set(
@@ -45,6 +50,7 @@ set(
     MICROS_BUILD_OBJECT_MODEL_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
+    MICROS_BUILD_USER_ADDRESS_SPACE_TEST
 )
 set(MICROS_TARGET_TEST_COUNT 0)
 foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
@@ -293,6 +299,7 @@ add_executable(
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
+    kernel/user_address_space.c
 )
 
 set_target_properties(
@@ -461,6 +468,41 @@ if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
     )
 endif()
 
+if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
+    add_custom_target(
+        test-qemu-user-address-space
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_USER_ADDRESS_SPACE_TEST_PASS roots=isolated reuse=zeroed active=guarded ownership=validated sum=cleared"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-user-address-space-test-report
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_OBJECT_MODEL_TEST)
     target_compile_definitions(
         micros
@@ -497,6 +539,20 @@ if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
         micros
         PRIVATE
             kernel/frame_ownership_test.c
+    )
+endif()
+
+if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/user_address_space_test.S
+            kernel/user_address_space_test.c
     )
 endif()
 

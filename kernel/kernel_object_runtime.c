@@ -132,8 +132,59 @@ micros_kernel_object_runtime_validate(void)
     return micros_kernel_objects_validate(&kernel_objects);
 }
 
+enum micros_kernel_object_error
+micros_kernel_object_runtime_attach_address_space(
+    struct micros_process_handle process,
+    uintptr_t root
+)
+{
+    enum micros_kernel_object_error error;
+    uintptr_t saved_status;
+
+    if (!runtime_ready) {
+        return MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED;
+    }
+    saved_status = riscv_irq_save();
+    error = micros_process_attach_address_space(
+        &kernel_objects,
+        process,
+        root
+    );
+    if (error == MICROS_KERNEL_OBJECT_OK) {
+        error = micros_kernel_objects_validate(&kernel_objects);
+    }
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+enum micros_kernel_object_error
+micros_kernel_object_runtime_detach_address_space(
+    struct micros_process_handle process,
+    uintptr_t expected_root
+)
+{
+    enum micros_kernel_object_error error;
+    uintptr_t saved_status;
+
+    if (!runtime_ready) {
+        return MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED;
+    }
+    saved_status = riscv_irq_save();
+    error = micros_process_detach_address_space(
+        &kernel_objects,
+        process,
+        expected_root
+    );
+    if (error == MICROS_KERNEL_OBJECT_OK) {
+        error = micros_kernel_objects_validate(&kernel_objects);
+    }
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
 #if defined(MICROS_BUILD_OBJECT_MODEL_TEST) \
-    || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
+    || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST) \
+    || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void)
 {

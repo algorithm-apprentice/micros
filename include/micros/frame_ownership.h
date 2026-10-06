@@ -142,6 +142,14 @@ micros_frame_ownership_count_process(
 );
 
 enum micros_frame_ownership_error
+micros_frame_ownership_release_process_set(
+    struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *release_bitmap,
+    size_t release_word_count
+);
+
+enum micros_frame_ownership_error
 micros_frame_ownership_complete_handoff(
     struct micros_frame_ownership *ownership
 );

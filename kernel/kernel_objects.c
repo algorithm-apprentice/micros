@@ -405,7 +405,10 @@ enum micros_kernel_object_error micros_process_release(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (process->live_thread_count != 0) {
+    if (
+        process->live_thread_count != 0
+        || process->address_space_root != 0
+    ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
     if (objects->live_process_count == 0) {
@@ -462,6 +465,74 @@ enum micros_kernel_object_error micros_thread_resolve(
         return MICROS_KERNEL_OBJECT_ERROR_STALE;
     }
     *thread = candidate;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_process_attach_address_space(
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    uintptr_t root
+)
+{
+    struct micros_process *process;
+    enum micros_kernel_object_error error;
+
+    if (objects == NULL || root == 0) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_process_mutable(
+        objects,
+        process_handle,
+        &process
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (process->address_space_root != 0) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    process->address_space_root = root;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error
+micros_process_detach_address_space(
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    uintptr_t expected_root
+)
+{
+    struct micros_process *process;
+    enum micros_kernel_object_error error;
+
+    if (objects == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_process_mutable(
+        objects,
+        process_handle,
+        &process
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        expected_root == 0
+        || process->live_thread_count != 0
+        || process->address_space_root != expected_root
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    process->address_space_root = 0;
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -969,7 +1040,6 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
 
         if (
             process->generation > MICROS_PROCESS_GENERATION_MAX
-            || process->address_space_root != 0
             || process->primary_endpoint
                 != MICROS_PROCESS_ENDPOINT_NONE
             || process->privilege_profile != 0
@@ -980,6 +1050,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
         case MICROS_KERNEL_OBJECT_SLOT_FREE:
             if (
                 process->live_thread_count != 0
+                || process->address_space_root != 0
                 || micros_process_next_generation(
                     (uint16_t)index,
                     process->generation,
@@ -1003,6 +1074,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
             if (
                 process->generation == 0
                 || process->live_thread_count != 0
+                || process->address_space_root != 0
                 || micros_process_next_generation(
                     (uint16_t)index,
                     process->generation,

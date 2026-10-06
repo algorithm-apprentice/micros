@@ -8,6 +8,7 @@
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
+#include "micros/user_address_space.h"
 
 #define MICROS_SCAUSE_INTERRUPT (UINT64_C(1) << 63)
 #define MICROS_SCAUSE_CODE_MASK (MICROS_SCAUSE_INTERRUPT - 1)
@@ -48,6 +49,17 @@ static uintptr_t read_tp(void)
     __asm__ volatile("mv %0, tp" : "=r"(value));
     return value;
 }
+
+#if defined(MICROS_BUILD_TRAP_TEST) \
+    || defined(MICROS_BUILD_NESTED_TRAP_TEST)
+static uintptr_t read_sstatus(void)
+{
+    uintptr_t value;
+
+    __asm__ volatile("csrr %0, sstatus" : "=r"(value));
+    return value;
+}
+#endif
 
 static bool frame_is_on_primary_stack(
     const struct micros_hart *hart,
@@ -126,14 +138,21 @@ extern const unsigned char micros_trap_panic_test_fault[];
 #endif
 
 #ifdef MICROS_BUILD_TRAP_TEST
+void micros_trap_sum_restore_test_trigger(void);
+
 extern const unsigned char micros_trap_test_entry_stack_top[];
 extern const unsigned char micros_trap_test_return_sp[];
 extern const uint64_t micros_trap_test_snapshot[32];
+extern const unsigned char micros_trap_sum_restore_test_fault[];
+extern const unsigned char micros_trap_sum_restore_test_resume[];
+extern const uint64_t micros_trap_sum_restore_observed_status;
 
 enum trap_test_state {
     TRAP_TEST_IDLE,
     TRAP_TEST_ARMED,
     TRAP_TEST_HANDLED,
+    TRAP_TEST_SUM_RESTORE_ARMED,
+    TRAP_TEST_SUM_RESTORE_HANDLED,
 };
 
 static volatile enum trap_test_state trap_test_state;
@@ -201,6 +220,26 @@ static bool trap_test_has_expected_exception(
         && frame->sepc == (uintptr_t)micros_trap_test_fault
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SIE) == 0
+        && (frame->sstatus & MICROS_RISCV_SSTATUS_SUM) != 0
+        && (read_sstatus() & MICROS_RISCV_SSTATUS_SUM) == 0
+        && frame->hart_context != 0
+    );
+}
+
+static bool trap_test_has_sum_restore_exception(
+    const struct micros_trap_frame *frame
+)
+{
+    return (
+        (frame->scause & MICROS_SCAUSE_INTERRUPT) == 0
+        && (frame->scause & MICROS_SCAUSE_CODE_MASK)
+            == MICROS_EXCEPTION_ILLEGAL_INSTRUCTION
+        && frame->sepc
+            == (uintptr_t)micros_trap_sum_restore_test_fault
+        && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
+        && (frame->sstatus & MICROS_RISCV_SSTATUS_SIE) == 0
+        && (frame->sstatus & MICROS_RISCV_SSTATUS_SUM) == 0
+        && (read_sstatus() & MICROS_RISCV_SSTATUS_SUM) == 0
         && frame->hart_context != 0
     );
 }
@@ -279,6 +318,15 @@ static bool trap_test_has_return_registers(void)
         && (observed_status & MICROS_RISCV_SSTATUS_SPP) == 0
     );
 }
+
+static void trap_test_prepare_sum_restore_return(
+    struct micros_trap_frame *frame
+)
+{
+    frame->sstatus |= MICROS_RISCV_SSTATUS_SUM;
+    frame->sstatus &= ~MICROS_RISCV_SSTATUS_SIE;
+    frame->sepc = (uintptr_t)micros_trap_sum_restore_test_resume;
+}
 #endif
 
 #ifdef MICROS_BUILD_TRAP_PANIC_TEST
@@ -316,6 +364,30 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
     }
     cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
 
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    {
+        enum micros_user_address_space_test_trap_result result =
+            micros_user_address_space_handle_test_trap(frame);
+
+        if (
+            result
+                == MICROS_USER_ADDRESS_SPACE_TEST_TRAP_HANDLED
+        ) {
+            return;
+        }
+        if (
+            result
+                == MICROS_USER_ADDRESS_SPACE_TEST_TRAP_MISMATCH
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "user-address-space-test-mismatch",
+                frame
+            );
+        }
+    }
+#endif
+
 #ifdef MICROS_BUILD_MMU_TEST
     {
         enum micros_mmu_test_trap_result result =
@@ -350,6 +422,19 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
         ++trap_test_count;
         trap_test_state = TRAP_TEST_HANDLED;
         trap_test_prepare_return(frame);
+        return;
+    }
+    if (trap_test_state == TRAP_TEST_SUM_RESTORE_ARMED) {
+        if (!trap_test_has_sum_restore_exception(frame)) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "trap-test-sum-capture",
+                frame
+            );
+        }
+        ++trap_test_count;
+        trap_test_state = TRAP_TEST_SUM_RESTORE_HANDLED;
+        trap_test_prepare_sum_restore_return(frame);
         return;
     }
 #endif
@@ -431,6 +516,11 @@ _Noreturn void micros_trap_nested_panic(
         || !frame_is_on_primary_stack(resolved, outer_frame)
         || outer_frame->hart_context != (uintptr_t)resolved
         || outer_frame->tp != poison_tp
+        || (
+            outer_frame->sstatus
+            & MICROS_RISCV_SSTATUS_SUM
+        ) == 0
+        || (read_sstatus() & MICROS_RISCV_SSTATUS_SUM) != 0
         || stack_probe < resolved->trap.emergency_stack_bottom
         || stack_probe >= resolved->trap.emergency_stack_top
         || read_sscratch() != 0
@@ -495,6 +585,25 @@ bool micros_trap_run_self_test(void)
         trap_test_state == TRAP_TEST_HANDLED
         && trap_test_count == 1
         && trap_test_has_return_registers()
+    );
+    if (passed) {
+        trap_test_state = TRAP_TEST_SUM_RESTORE_ARMED;
+        micros_trap_sum_restore_test_trigger();
+        passed = (
+            trap_test_state == TRAP_TEST_SUM_RESTORE_HANDLED
+            && trap_test_count == 2
+            && (
+                micros_trap_sum_restore_observed_status
+                & MICROS_RISCV_SSTATUS_SUM
+            ) != 0
+            && (
+                micros_trap_sum_restore_observed_status
+                & MICROS_RISCV_SSTATUS_SIE
+            ) == 0
+        );
+    }
+    passed = (
+        passed
         && read_sscratch() == (uintptr_t)hart
         && read_tp() == (uintptr_t)hart
         && micros_kernel_object_runtime_validate()

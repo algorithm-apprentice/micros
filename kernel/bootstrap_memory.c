@@ -498,6 +498,27 @@ micros_frame_ownership_runtime_prepare_handoff(
 }
 
 enum micros_frame_ownership_error
+micros_frame_ownership_runtime_release_process_set(
+    struct micros_process_handle process,
+    const uint64_t *release_bitmap,
+    size_t release_word_count
+)
+{
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (!ownership_mutation_is_allowed()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    return micros_frame_ownership_release_process_set(
+        &bootstrap_ownership,
+        process,
+        release_bitmap,
+        release_word_count
+    );
+}
+
+enum micros_frame_ownership_error
 micros_frame_ownership_runtime_complete_handoff(
     const struct micros_kernel_objects *objects
 )

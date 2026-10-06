@@ -204,6 +204,22 @@ static bool test_uninitialized_registry_rejects_every_operation(void)
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_process_release(&objects, process)
     );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_process_attach_address_space(
+            &objects,
+            process,
+            UINT64_C(0x1000)
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_process_detach_address_space(
+            &objects,
+            process,
+            UINT64_C(0x1000)
+        )
+    );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_process_resolve(
@@ -455,6 +471,112 @@ static bool test_process_slots_reuse_with_new_generations(void)
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(&objects)
     );
+    return true;
+}
+
+static bool test_process_address_space_lifecycle_is_exact(void)
+{
+    const uintptr_t root = UINT64_C(0x0000000081000000);
+    struct micros_process_handle process = {0};
+    struct micros_process_handle stale;
+    struct micros_thread_handle thread = {0};
+    struct micros_kernel_objects snapshot;
+
+    reset_objects();
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_initialize(&objects, 1, 1)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create(&objects, &process)
+    );
+    stale = process;
+
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
+        micros_process_attach_address_space(NULL, process, root)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
+        micros_process_detach_address_space(NULL, process, root)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
+        micros_process_attach_address_space(&objects, process, 0)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_attach_address_space(&objects, process, root)
+    );
+    EXPECT_TRUE(
+        objects.processes[process.slot].address_space_root == root
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_validate(&objects)
+    );
+
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_attach_address_space(
+            &objects,
+            process,
+            root + UINT64_C(0x1000)
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_detach_address_space(
+            &objects,
+            process,
+            root + UINT64_C(0x1000)
+        )
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_release(&objects, process)
+    );
+
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_create(&objects, process, &thread)
+    );
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_detach_address_space(&objects, process, root)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_release(&objects, thread)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_detach_address_space(&objects, process, root)
+    );
+    EXPECT_TRUE(
+        objects.processes[process.slot].address_space_root == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_release(&objects, process)
+    );
+
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create(&objects, &process)
+    );
+    snapshot = objects;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STALE,
+        micros_process_attach_address_space(&objects, stale, root)
+    );
+    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STALE,
+        micros_process_detach_address_space(&objects, stale, root)
+    );
+    EXPECT_TRUE(memcmp(&objects, &snapshot, sizeof(objects)) == 0);
     return true;
 }
 
@@ -1108,6 +1230,7 @@ struct lifecycle_model_process {
     bool live;
     uint32_t generation;
     size_t thread_count;
+    uintptr_t address_space_root;
 };
 
 struct lifecycle_model_thread {
@@ -1244,7 +1367,8 @@ static bool lifecycle_model_matches_registry(
                 )
             || actual->generation != expected->generation
             || actual->live_thread_count != expected->thread_count
-            || actual->address_space_root != 0
+            || actual->address_space_root
+                != expected->address_space_root
             || actual->primary_endpoint
                 != MICROS_PROCESS_ENDPOINT_NONE
             || actual->privilege_profile != 0
@@ -1378,7 +1502,7 @@ static bool test_seeded_lifecycle_model(void)
         enum micros_kernel_object_error expected;
         enum micros_kernel_object_error actual;
 
-        switch (value % 6) {
+        switch (value % 8) {
         case 0: {
             struct micros_process_handle output = {
                 UINT16_MAX,
@@ -1428,7 +1552,10 @@ static bool test_seeded_lifecycle_model(void)
             handle = model_process_handle(&model, slot);
             if (!model.processes[slot].live) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
-            } else if (model.processes[slot].thread_count != 0) {
+            } else if (
+                model.processes[slot].thread_count != 0
+                || model.processes[slot].address_space_root != 0
+            ) {
                 expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
             } else {
                 expected = MICROS_KERNEL_OBJECT_OK;
@@ -1446,6 +1573,7 @@ static bool test_seeded_lifecycle_model(void)
             }
             if (expected == MICROS_KERNEL_OBJECT_OK) {
                 model.processes[slot].live = false;
+                model.processes[slot].address_space_root = 0;
                 --model.process_count;
             }
             break;
@@ -1627,6 +1755,85 @@ static bool test_seeded_lifecycle_model(void)
             }
             break;
         }
+        case 6: {
+            struct micros_process_handle handle;
+            uintptr_t root;
+
+            slot = (value >> 8) % MICROS_PROCESS_CAPACITY;
+            handle = model_process_handle(&model, slot);
+            root = ((uintptr_t)slot + 1) * UINT64_C(0x1000);
+            if (!model.processes[slot].live) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
+            } else if (
+                model.processes[slot].address_space_root != 0
+            ) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+            } else {
+                expected = MICROS_KERNEL_OBJECT_OK;
+            }
+            actual = micros_process_attach_address_space(
+                &objects,
+                handle,
+                root
+            );
+            if (
+                !model_reports_expected_error(
+                    expected,
+                    actual,
+                    step,
+                    "address-space-attach"
+                )
+            ) {
+                return false;
+            }
+            if (expected == MICROS_KERNEL_OBJECT_OK) {
+                model.processes[slot].address_space_root = root;
+            }
+            break;
+        }
+        case 7: {
+            struct micros_process_handle handle;
+            uintptr_t expected_root;
+
+            slot = (value >> 8) % MICROS_PROCESS_CAPACITY;
+            handle = model_process_handle(&model, slot);
+            expected_root =
+                model.processes[slot].address_space_root;
+            if (!model.processes[slot].live) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STALE;
+            } else if (
+                expected_root == 0
+                || model.processes[slot].thread_count != 0
+            ) {
+                expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+            } else {
+                if (((value >> 16) & 1U) != 0) {
+                    ++expected_root;
+                    expected = MICROS_KERNEL_OBJECT_ERROR_STATE;
+                } else {
+                    expected = MICROS_KERNEL_OBJECT_OK;
+                }
+            }
+            actual = micros_process_detach_address_space(
+                &objects,
+                handle,
+                expected_root
+            );
+            if (
+                !model_reports_expected_error(
+                    expected,
+                    actual,
+                    step,
+                    "address-space-detach"
+                )
+            ) {
+                return false;
+            }
+            if (expected == MICROS_KERNEL_OBJECT_OK) {
+                model.processes[slot].address_space_root = 0;
+            }
+            break;
+        }
         }
 
         if (!lifecycle_model_matches_registry(&model, step)) {
@@ -1728,10 +1935,15 @@ static bool test_validator_rejects_corrupt_relationships(void)
         objects.threads[2].owner = owner
     );
     EXPECT_CORRUPTION(
+        objects.processes[1].address_space_root =
+            UINT64_C(0x1000)
+    );
+    EXPECT_CORRUPTION(
         objects.processes[1].slot_state =
             MICROS_KERNEL_OBJECT_SLOT_QUARANTINED;
         objects.processes[1].generation = 1;
-        objects.processes[1].live_thread_count = 1
+        objects.processes[1].address_space_root =
+            UINT64_C(0x1000)
     );
     EXPECT_CORRUPTION(
         objects.threads[2].slot_state =
@@ -1774,6 +1986,10 @@ int main(void)
         {
             "process slots reuse with new generations",
             test_process_slots_reuse_with_new_generations,
+        },
+        {
+            "process address-space lifecycle is exact",
+            test_process_address_space_lifecycle_is_exact,
         },
         {
             "thread slots reuse with new generations",

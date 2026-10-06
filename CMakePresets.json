@@ -106,6 +106,15 @@
       "cacheVariables": {
         "MICROS_BUILD_FRAME_OWNERSHIP_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-user-address-space-test",
+      "displayName": "RISC-V 64 user address-space test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-user-address-space-test",
+      "cacheVariables": {
+        "MICROS_BUILD_USER_ADDRESS_SPACE_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -188,6 +197,13 @@
       "configurePreset": "riscv64-frame-ownership-test",
       "targets": [
         "test-qemu-frame-ownership"
+      ]
+    },
+    {
+      "name": "test-qemu-user-address-space",
+      "configurePreset": "riscv64-user-address-space-test",
+      "targets": [
+        "test-qemu-user-address-space"
       ]
     }
   ],
@@ -357,6 +373,20 @@
         {
           "type": "build",
           "name": "test-qemu-frame-ownership"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-user-address-space",
+      "displayName": "Build and run the user address-space test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-user-address-space-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-user-address-space"
         }
       ]
     }

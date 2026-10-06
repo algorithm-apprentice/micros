@@ -31,9 +31,22 @@ micros_kernel_object_runtime_hart_from_context(uintptr_t hart_context);
 enum micros_kernel_object_error
 micros_kernel_object_runtime_validate(void);
 
+enum micros_kernel_object_error
+micros_kernel_object_runtime_attach_address_space(
+    struct micros_process_handle process,
+    uintptr_t root
+);
+
+enum micros_kernel_object_error
+micros_kernel_object_runtime_detach_address_space(
+    struct micros_process_handle process,
+    uintptr_t expected_root
+);
+
 #if \
     defined(MICROS_BUILD_OBJECT_MODEL_TEST) \
-    || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
+    || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST) \
+    || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void);
 #endif

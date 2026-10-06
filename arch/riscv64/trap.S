@@ -26,6 +26,10 @@ micros_trap_entry:
     sd tp, MICROS_TRAP_CONTEXT_TP_OFFSET(sp)
     sd t2, MICROS_TRAP_CONTEXT_HART_CONTEXT_OFFSET(sp)
     mv tp, t2
+    csrr t0, sstatus
+    sd t0, MICROS_TRAP_CONTEXT_SSTATUS_OFFSET(sp)
+    li t0, MICROS_RISCV_SSTATUS_SUM
+    csrc sstatus, t0
     csrw sscratch, zero
 
 #ifdef MICROS_BUILD_NESTED_TRAP_TEST
@@ -64,8 +68,6 @@ micros_nested_trap_injected_fault:
     sd t5, MICROS_TRAP_CONTEXT_T5_OFFSET(sp)
     sd t6, MICROS_TRAP_CONTEXT_T6_OFFSET(sp)
 
-    csrr t0, sstatus
-    sd t0, MICROS_TRAP_CONTEXT_SSTATUS_OFFSET(sp)
     csrr t0, sepc
     sd t0, MICROS_TRAP_CONTEXT_SEPC_OFFSET(sp)
     csrr t0, scause

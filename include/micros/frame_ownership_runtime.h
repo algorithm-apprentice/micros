@@ -1,6 +1,7 @@
 #ifndef MICROS_FRAME_OWNERSHIP_RUNTIME_H
 #define MICROS_FRAME_OWNERSHIP_RUNTIME_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "micros/frame_ownership.h"
@@ -28,6 +29,13 @@ micros_frame_ownership_runtime_prepare_handoff(
     uint64_t physical_address,
     struct micros_frame_owner expected_owner,
     enum micros_frame_handoff_target target
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_release_process_set(
+    struct micros_process_handle process,
+    const uint64_t *release_bitmap,
+    size_t release_word_count
 );
 
 enum micros_frame_ownership_error

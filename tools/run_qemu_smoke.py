@@ -70,6 +70,15 @@ FRAME_OWNERSHIP_TEST_PASS = (
     "handoff=atomic "
     "invariants=preserved"
 )
+USER_ADDRESS_SPACE_TEST_MARKER = "MICROS_USER_ADDRESS_SPACE_TEST"
+USER_ADDRESS_SPACE_TEST_PASS = (
+    "MICROS_USER_ADDRESS_SPACE_TEST_PASS "
+    "roots=isolated "
+    "reuse=zeroed "
+    "active=guarded "
+    "ownership=validated "
+    "sum=cleared"
+)
 OBJECTS_READY_MARKER = "MICROS_OBJECTS_READY"
 OBJECT_MODEL_TEST_MARKER = "MICROS_OBJECT_MODEL_TEST"
 NESTED_TRAP_TEST_MARKER = "MICROS_NESTED_TRAP_TEST"
@@ -395,6 +404,7 @@ def _frame_allocator_ready_precedes_target_outcome(output):
             or line == TIMER_TEST_PASS
             or line == FRAME_ALLOCATOR_TEST_PASS
             or line == FRAME_OWNERSHIP_TEST_PASS
+            or line == USER_ADDRESS_SPACE_TEST_PASS
         )
     ]
     return (
@@ -502,6 +512,7 @@ def _mmu_ready_precedes_target_outcome(output):
             or line == OBJECT_MODEL_TEST_PASS
             or line == NESTED_TRAP_TEST_PASS
             or line == FRAME_OWNERSHIP_TEST_PASS
+            or line == USER_ADDRESS_SPACE_TEST_PASS
         )
     ]
     return (
@@ -596,6 +607,7 @@ def _frame_ownership_ready_precedes_target_outcome(output):
             or line == OBJECT_MODEL_TEST_PASS
             or line == NESTED_TRAP_TEST_PASS
             or line == FRAME_OWNERSHIP_TEST_PASS
+            or line == USER_ADDRESS_SPACE_TEST_PASS
         )
     ]
     return (
@@ -627,6 +639,29 @@ def _has_complete_frame_ownership_test_report(output):
     )
 
 
+def _has_complete_user_address_space_test_report(output):
+    if not _has_complete_frame_ownership_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(USER_ADDRESS_SPACE_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == USER_ADDRESS_SPACE_TEST_PASS
+        and terminated[test_indices[0]]
+        and ready_indices[0] < test_indices[0]
+    )
+
+
 def _objects_ready_precedes_target_outcome(output):
     output_lines = output.splitlines()
     ready_indices = [
@@ -646,6 +681,7 @@ def _objects_ready_precedes_target_outcome(output):
             or line == OBJECT_MODEL_TEST_PASS
             or line == NESTED_TRAP_TEST_PASS
             or line == FRAME_OWNERSHIP_TEST_PASS
+            or line == USER_ADDRESS_SPACE_TEST_PASS
         )
     ]
     return (
@@ -795,6 +831,7 @@ def matches_expected_result(
     require_mmu_test_report=False,
     require_frame_ownership_ready=False,
     require_frame_ownership_test_report=False,
+    require_user_address_space_test_report=False,
     require_objects_ready=False,
     require_object_model_test_report=False,
     require_nested_trap_test_report=False,
@@ -874,6 +911,13 @@ def matches_expected_result(
     if (
         require_frame_ownership_test_report
         and not _has_complete_frame_ownership_test_report(result.output)
+    ):
+        return False
+    if (
+        require_user_address_space_test_report
+        and not _has_complete_user_address_space_test_report(
+            result.output
+        )
     ):
         return False
     if (
@@ -1151,6 +1195,11 @@ def parse_arguments(argv):
         help="Require the ordered frame ownership test record",
     )
     parser.add_argument(
+        "--require-user-address-space-test-report",
+        action="store_true",
+        help="Require the ordered user address-space test record",
+    )
+    parser.add_argument(
         "--require-objects-ready",
         action="store_true",
         help="Require the ordered kernel-object readiness record",
@@ -1279,6 +1328,9 @@ def main(argv=None):
             ),
             require_frame_ownership_test_report=(
                 arguments.require_frame_ownership_test_report
+            ),
+            require_user_address_space_test_report=(
+                arguments.require_user_address_space_test_report
             ),
             require_objects_ready=arguments.require_objects_ready,
             require_object_model_test_report=(

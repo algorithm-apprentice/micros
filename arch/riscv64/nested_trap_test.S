@@ -1,7 +1,11 @@
+#include "arch/riscv64/trap_context.h"
+
 .section .text, "ax", @progbits
 .globl micros_nested_trap_test_trigger
 .type micros_nested_trap_test_trigger, @function
 micros_nested_trap_test_trigger:
+    li t0, MICROS_RISCV_SSTATUS_SUM
+    csrs sstatus, t0
     li tp, 0x4e45535445445450
 .globl micros_nested_trap_test_outer_fault
 micros_nested_trap_test_outer_fault:
