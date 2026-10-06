@@ -72,6 +72,7 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
+cmake --workflow --preset test-qemu-user-execution
 ```
 
 Each workflow configures and builds its own image before running the selected

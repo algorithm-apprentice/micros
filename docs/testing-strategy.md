@@ -71,8 +71,8 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-nested-trap`, and
-`test-qemu-frame-ownership`, and `test-qemu-user-address-space`. From a clean
-checkout,
+`test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
+`test-qemu-user-execution`. From a clean checkout,
 the implemented configure, build, and execution gates are:
 
 ```bash
@@ -88,6 +88,7 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
+cmake --workflow --preset test-qemu-user-execution
 ```
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
@@ -135,6 +136,11 @@ same virtual page to distinct typed frames, switches ASID-zero roots with exact
 fences, checks SUM-gated hardware access, proves full-page zeroing on reuse,
 rejects active/stale/corrupt roots without mutation, atomically tears roots
 down, and verifies every process-root API is revoked after ownership handoff.
+`test-qemu-user-execution` enters a relocation-free payload in U-mode, proves
+user-stack access and kernel-page isolation, captures every integer register
+on a thread-owned supervisor stack, resumes a modified user frame, and returns
+through an interrupt-disabled supervisor continuation while preserving caller
+state.
 
 ## Native unit tests
 
@@ -176,6 +182,8 @@ Examples of required properties:
 - a stale generation never resolves to a reused process slot;
 - a stale generation never validates, activates, mutates, or destroys a reused
   process address space;
+- a stale thread generation never prepares, inspects, detaches, or enters a
+  reused execution-context slot;
 - every running thread is current on exactly one hart, while every inactive
   thread is current on none;
 - failed object-table operations preserve both registry state and output
@@ -211,6 +219,10 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
   user-frame owners;
 - inactive-root mutation plus complete ASID-zero activation flushes prevent
   stale cross-root translations;
+- every attached thread stack is pairwise disjoint, bound to its exact slot,
+  and selected only for that hart's exact current thread;
+- user return status, PC, and stack mappings are revalidated before every
+  `sret`;
 - store rejection on kernel text and instruction-fetch rejection on writable
   kernel data;
 - executable-frame reuse with different code after `fence.i`;

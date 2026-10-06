@@ -135,9 +135,14 @@ shares the immutable supervisor-only kernel entries and owns a private user
 subtree at root index 1. Bootstrap anonymous user pages are fully zeroed,
 typed to the exact process generation, and may be mutated only while their
 root is inactive. One thread per process, saved contexts, and U-mode entry are
-added by the following execution-context slice. Only the bootstrap launcher
-receives the temporary authority to release boot services and install their
-exact manifest privilege profiles.
+represented explicitly: each thread owns a saved integer context and one
+slot-derived 16 KiB supervisor stack, and the boot hart switches its trap
+anchor from the idle stack to that thread stack before `sret` enters U-mode.
+User-origin traps capture the exact current thread before any test or future
+syscall handling. Runnable queues, repeated switching, and preemption remain
+the following scheduler slice. Only the bootstrap launcher receives the
+temporary authority to release boot services and install their exact manifest
+privilege profiles.
 
 ### Phase 4: VM handoff
 
@@ -266,6 +271,14 @@ interrupts disabled.
   process-owned table or user frame is reachable in the matching role.
 - Trap entry preserves interrupted SUM in the saved frame but clears live SUM
   before arming the nested sentinel or entering C.
+- Every attached thread context uses the exact 264-byte integer ABI shared with
+  the trap frame and one pairwise-disjoint slot-derived kernel stack.
+- A hart running U-mode names exactly one `RUNNING` thread, selects that
+  thread's stack in its stable trap anchor, and activates the matching process
+  root before entry.
+- U-mode return status fixes SPP/SIE/SUM/MXR/UBE and extension state, requires
+  RV64 UXL, canonicalizes the derived SD summary, and revalidates executable
+  PC plus writable aligned stack mappings.
 - User-managed frames and kernel-reserved frames never overlap.
 - Kernel text is RX, read-only data is R, writable kernel state and managed RAM
   are RW/NX, and none of those mappings has the user bit.
