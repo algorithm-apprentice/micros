@@ -45,3 +45,4 @@ to make the project appear more consistent than it was.
 | [0027](0027-return-boundary-timer-rearming.md) | Return-boundary timer rearming | Accepted |
 | [0028](0028-squash-merge-task-pull-requests.md) | Squash-merge task pull requests | Accepted |
 | [0029](0029-endpoint-and-privilege-substrate.md) | Endpoint and privilege substrate | Accepted |
+| [0030](0030-minix-baseline-blocking-ipc.md) | MINIX-baseline blocking IPC | Accepted |
