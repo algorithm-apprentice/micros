@@ -126,12 +126,12 @@
       }
     },
     {
-      "name": "riscv64-scheduler-switch-test",
-      "displayName": "RISC-V 64 scheduler switching test",
+      "name": "riscv64-scheduler-test",
+      "displayName": "RISC-V 64 scheduler test",
       "inherits": "riscv64-debug",
-      "binaryDir": "${sourceDir}/build/riscv64-scheduler-switch-test",
+      "binaryDir": "${sourceDir}/build/riscv64-scheduler-test",
       "cacheVariables": {
-        "MICROS_BUILD_SCHEDULER_SWITCH_TEST": "ON"
+        "MICROS_BUILD_SCHEDULER_TEST": "ON"
       }
     }
   ],
@@ -232,10 +232,10 @@
       ]
     },
     {
-      "name": "test-qemu-scheduler-switch",
-      "configurePreset": "riscv64-scheduler-switch-test",
+      "name": "test-qemu-scheduler",
+      "configurePreset": "riscv64-scheduler-test",
       "targets": [
-        "test-qemu-scheduler-switch"
+        "test-qemu-scheduler"
       ]
     }
   ],
@@ -437,16 +437,16 @@
       ]
     },
     {
-      "name": "test-qemu-scheduler-switch",
-      "displayName": "Build and run scheduler switching test",
+      "name": "test-qemu-scheduler",
+      "displayName": "Build and run the scheduler test",
       "steps": [
         {
           "type": "configure",
-          "name": "riscv64-scheduler-switch-test"
+          "name": "riscv64-scheduler-test"
         },
         {
           "type": "build",
-          "name": "test-qemu-scheduler-switch"
+          "name": "test-qemu-scheduler"
         }
       ]
     }

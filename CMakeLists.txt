@@ -43,8 +43,8 @@ option(
     OFF
 )
 option(
-    MICROS_BUILD_SCHEDULER_SWITCH_TEST
-    "Build the timer-driven scheduler switching test image"
+    MICROS_BUILD_SCHEDULER_TEST
+    "Build the MINIX-baseline scheduler test image"
     OFF
 )
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
@@ -62,7 +62,7 @@ set(
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
     MICROS_BUILD_USER_EXECUTION_TEST
-    MICROS_BUILD_SCHEDULER_SWITCH_TEST
+    MICROS_BUILD_SCHEDULER_TEST
 )
 set(MICROS_TARGET_TEST_COUNT 0)
 foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
@@ -334,6 +334,7 @@ add_executable(
     arch/riscv64/boot.S
     arch/riscv64/mmu.S
     arch/riscv64/panic.S
+    arch/riscv64/scheduler.S
     arch/riscv64/sbi.c
     arch/riscv64/trap.S
     arch/riscv64/uart.c
@@ -592,9 +593,9 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
     )
 endif()
 
-if(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+if(MICROS_BUILD_SCHEDULER_TEST)
     add_custom_target(
-        test-qemu-scheduler-switch
+        test-qemu-scheduler
         COMMAND
             "${MICROS_PYTHON}"
             -B
@@ -610,13 +611,14 @@ if(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_SCHEDULER_SWITCH_TEST_PASS current=reachable accounting=separate switches=alternating registers=preserved"
+            "MICROS_SCHEDULER_TEST_PASS queues=minix-priority current=reachable accounting=separate switches=alternating idle=resumed registers=preserved"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
             --require-frame-ownership-ready
+            --require-scheduler-test-report
             --require-objects-ready
             --timeout
             8
@@ -693,17 +695,17 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
     )
 endif()
 
-if(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+if(MICROS_BUILD_SCHEDULER_TEST)
     target_compile_definitions(
         micros
         PRIVATE
-            MICROS_BUILD_SCHEDULER_SWITCH_TEST=1
+            MICROS_BUILD_SCHEDULER_TEST=1
     )
     target_sources(
         micros
         PRIVATE
             arch/riscv64/scheduler_test.S
-            kernel/scheduler_switch_test.c
+            kernel/scheduler_test.c
     )
 endif()
 

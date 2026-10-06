@@ -72,7 +72,7 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
-`test-qemu-user-execution`, and `test-qemu-scheduler-switch`. From a clean checkout,
+`test-qemu-user-execution`, and `test-qemu-scheduler`. From a clean checkout,
 the implemented configure, build, and execution gates are:
 
 ```bash
@@ -89,7 +89,7 @@ cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-user-execution
-cmake --workflow --preset test-qemu-scheduler-switch
+cmake --workflow --preset test-qemu-scheduler
 ```
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
@@ -147,11 +147,12 @@ on a thread-owned supervisor stack, uses scheduler-owned admission/current
 selection and accounting, resumes a modified user frame through the common
 return plan, and returns through an interrupt-disabled supervisor continuation
 while preserving caller state.
-`test-qemu-scheduler-switch` runs two private address spaces under real
+`test-qemu-scheduler` runs two private address spaces under real
 supervisor timer delivery. It proves failure-atomic timer start,
 return-boundary timer preparation, queue-reachable current ownership, separate
-thread/kernel accounting, repeated equal-priority alternation, and complete
-integer-register preservation.
+thread/kernel/idle accounting, repeated equal-priority alternation, complete
+integer-register preservation, a forced spurious idle iteration, and a later
+real timer wake.
 
 ## Native unit tests
 

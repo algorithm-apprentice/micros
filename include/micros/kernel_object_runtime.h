@@ -48,7 +48,7 @@ micros_kernel_object_runtime_detach_address_space(
     || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST) \
     || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST) \
     || defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void);
 #endif

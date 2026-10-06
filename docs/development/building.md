@@ -27,6 +27,8 @@ The current implementation provides:
   entry/resume through the common return plan;
 - repeated two-address-space U-mode switching under real OpenSBI timer
   delivery, with queue-reachable current ownership and separate accounting;
+- a real no-runnable kernel-root/idle-stack transition with spurious-wait
+  rejection and timer-driven resume;
 - a per-hart trap anchor carried through every trap frame, plus hart-owned
   timer mechanism state;
 - mandatory post-link closure checks for every allocatable ELF section;
@@ -44,7 +46,8 @@ The current implementation provides:
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-The no-runnable idle stack/root transition remains the next scheduler task.
+Generation-aware endpoints, privilege enforcement, and blocking IPC remain
+the next dependency-ordered kernel tasks.
 
 ## Prerequisites
 
@@ -537,12 +540,12 @@ Build and run the first real user round trip with:
 cmake --workflow --preset test-qemu-user-execution
 ```
 
-## Timer-driven scheduler switching test
+## Scheduler test
 
-Build and run repeated two-address-space preemption with:
+Build and run repeated preemption plus idle/wake behavior with:
 
 ```bash
-cmake --workflow --preset test-qemu-scheduler-switch
+cmake --workflow --preset test-qemu-scheduler
 ```
 
 The kernel reserves one page-aligned 16 KiB supervisor stack for each of the

@@ -683,7 +683,7 @@ void micros_user_execution_install_return_frame(
 }
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
