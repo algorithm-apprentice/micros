@@ -43,3 +43,4 @@ to make the project appear more consistent than it was.
 | [0025](0025-minix-behavioral-baseline-before-optimization.md) | MINIX behavioral baseline before optimization | Accepted |
 | [0026](0026-minix-baseline-kernel-scheduler.md) | MINIX-baseline kernel scheduler | Accepted |
 | [0027](0027-return-boundary-timer-rearming.md) | Return-boundary timer rearming | Accepted |
+| [0028](0028-squash-merge-task-pull-requests.md) | Squash-merge task pull requests | Accepted |

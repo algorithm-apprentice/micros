@@ -92,7 +92,7 @@ Use the repository pull request template. A pull request must identify:
 - effects on documented extension boundaries.
 
 After an independent review, apply only findings that are technically
-justified. Preserve meaningful green commits when merging; do not squash a
-reviewable sequence into one opaque change. Merge when no substantive issue
-remains and all required checks pass. Then begin the next dependency-ready
-task.
+justified. Keep meaningful green commits on the pull-request branch for
+review, then squash-merge the accepted task into one outcome commit on
+`main`. Merge when no substantive issue remains and all required checks pass.
+Then begin the next dependency-ready task.
