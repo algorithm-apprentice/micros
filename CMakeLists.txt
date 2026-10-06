@@ -274,7 +274,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME sv39-encoding COMMAND sv39_test)
     add_test(NAME kernel-objects COMMAND kernel_objects_test)
     add_test(NAME frame-ownership COMMAND frame_ownership_test)
-    add_test(NAME scheduler-queues COMMAND scheduler_test)
+    add_test(NAME scheduler-core COMMAND scheduler_test)
 
     add_custom_target(
         test-unit

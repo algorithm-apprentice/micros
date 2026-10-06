@@ -747,6 +747,286 @@ static bool test_current_block_and_stale_plan_are_atomic(void)
     return true;
 }
 
+static bool test_accounting_owners_are_separate(void)
+{
+    struct micros_scheduler_return_plan plan;
+    struct micros_scheduler_return_plan rejected_plan;
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[1], 3, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_hold(&objects, threads[1])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_accounting_initialize(
+            &objects, harts[0], 100
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_thread(
+            &objects, harts[0], threads[0], 120
+        )
+    );
+    rejected_plan = plan;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_hart_plan_user_return(
+            &objects,
+            harts[0],
+            &rejected_plan
+        )
+    );
+    EXPECT_TRUE(memcmp(&rejected_plan, &plan, sizeof(plan)) == 0);
+    EXPECT_TRUE(objects.harts[harts[0].slot].kernel_counter_ticks == 20);
+    EXPECT_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_scheduler_hold(&objects, threads[0])
+    );
+    EXPECT_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_runtime_flags_set(
+            &objects,
+            threads[0],
+            MICROS_THREAD_RTS_INACTIVE
+        )
+    );
+    EXPECT_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_thread_runtime_flags_unset(
+            &objects,
+            threads[1],
+            MICROS_THREAD_RTS_INACTIVE
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_user_trap(
+            &objects, harts[0], 170
+        )
+    );
+    EXPECT_TRUE(
+        objects.threads[threads[0].slot].remaining_counter_ticks == 50
+        && objects.harts[harts[0].slot].accounting_owner
+            == MICROS_SCHEDULER_ACCOUNTING_KERNEL
+        && objects.harts[harts[0].slot].kernel_counter_ticks == 20
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_thread(
+            &objects, harts[0], threads[0], 200
+        )
+    );
+    EXPECT_TRUE(objects.harts[harts[0].slot].kernel_counter_ticks == 50);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_user_trap(
+            &objects, harts[0], 300
+        )
+    );
+    EXPECT_TRUE(
+        objects.threads[threads[0].slot].remaining_counter_ticks == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_hold(&objects, threads[0])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_idle(
+            &objects, harts[0], 330
+        )
+    );
+    EXPECT_TRUE(objects.harts[harts[0].slot].kernel_counter_ticks == 80);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_idle_trap(
+            &objects, harts[0], 380
+        )
+    );
+    EXPECT_TRUE(
+        objects.harts[harts[0].slot].idle_counter_ticks == 50
+        && objects.harts[harts[0].slot].accounting_owner
+            == MICROS_SCHEDULER_ACCOUNTING_KERNEL
+    );
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 30, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_accounting_initialize(
+            &objects,
+            harts[0],
+            UINT64_MAX - UINT64_C(29)
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_thread(
+            &objects,
+            harts[0],
+            threads[0],
+            UINT64_MAX - UINT64_C(9)
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_user_trap(
+            &objects, harts[0], 10
+        )
+    );
+    EXPECT_TRUE(
+        objects.threads[threads[0].slot].remaining_counter_ticks == 10
+        && objects.harts[harts[0].slot].kernel_counter_ticks == 20
+    );
+    return true;
+}
+
+static bool test_trap_accounting_uses_minimal_route(void)
+{
+    struct micros_scheduler_return_plan plan;
+    uint32_t unrelated_flags;
+
+    EXPECT_TRUE(setup_fixture());
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_admit(
+            &objects, harts[0], threads[0], 7, 100, true
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_accounting_initialize(
+            &objects, harts[0], 100
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_thread(
+            &objects, harts[0], threads[0], 120
+        )
+    );
+
+    unrelated_flags =
+        objects.threads[threads[1].slot].runtime_flags;
+    objects.threads[threads[1].slot].runtime_flags |=
+        UINT32_C(0x80000000);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_INVARIANT,
+        micros_scheduler_core_validate(&objects)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_user_trap(
+            &objects, harts[0], 170
+        )
+    );
+    EXPECT_TRUE(
+        objects.threads[threads[0].slot].remaining_counter_ticks == 50
+        && objects.harts[harts[0].slot].accounting_owner
+            == MICROS_SCHEDULER_ACCOUNTING_KERNEL
+    );
+    objects.threads[threads[1].slot].runtime_flags =
+        unrelated_flags;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_core_validate(&objects)
+    );
+
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_thread_scheduler_hold(&objects, threads[0])
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_plan_user_return(&objects, harts[0], &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_hart_commit_user_return(&objects, &plan)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_enter_idle(
+            &objects, harts[0], 200
+        )
+    );
+    objects.threads[threads[1].slot].runtime_flags |=
+        UINT32_C(0x80000000);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_INVARIANT,
+        micros_scheduler_core_validate(&objects)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_account_idle_trap(
+            &objects, harts[0], 230
+        )
+    );
+    EXPECT_TRUE(
+        objects.harts[harts[0].slot].idle_counter_ticks == 30
+        && objects.harts[harts[0].slot].accounting_owner
+            == MICROS_SCHEDULER_ACCOUNTING_KERNEL
+    );
+    objects.threads[threads[1].slot].runtime_flags =
+        unrelated_flags;
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_scheduler_core_validate(&objects)
+    );
+    return true;
+}
+
 static bool test_corrupt_queue_state_is_rejected(void)
 {
     struct micros_kernel_objects snapshot;
@@ -816,7 +1096,7 @@ static bool test_corrupt_queue_state_is_rejected(void)
     );
     EXPECT_CORRUPTION(
         objects.harts[harts[0].slot].accounting_owner =
-            MICROS_SCHEDULER_ACCOUNTING_KERNEL
+            MICROS_SCHEDULER_ACCOUNTING_THREAD
     );
 
 #undef EXPECT_CORRUPTION
@@ -861,6 +1141,14 @@ int main(void)
         {
             "current block and stale plan are atomic",
             test_current_block_and_stale_plan_are_atomic,
+        },
+        {
+            "accounting owners are separate",
+            test_accounting_owners_are_separate,
+        },
+        {
+            "trap accounting uses minimal route",
+            test_trap_accounting_uses_minimal_route,
         },
         {
             "corrupt queue state is rejected",

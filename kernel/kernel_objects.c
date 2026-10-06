@@ -186,19 +186,6 @@ static bool hart_scheduler_metadata_is_zero(
     );
 }
 
-static bool hart_accounting_metadata_is_zero(
-    const struct micros_hart *hart
-)
-{
-    return (
-        hart->accounting_owner == MICROS_SCHEDULER_ACCOUNTING_NONE
-        && hart->accounting_started_at == 0
-        && thread_handle_is_zero(hart->accounted_thread)
-        && hart->kernel_counter_ticks == 0
-        && hart->idle_counter_ticks == 0
-    );
-}
-
 static bool stack_range_is_valid(
     uintptr_t bottom,
     uintptr_t top,
@@ -1870,9 +1857,6 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
             continue;
-        }
-        if (!hart_accounting_metadata_is_zero(hart)) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
         if (
             hart->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
