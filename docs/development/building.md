@@ -35,7 +35,8 @@ The current implementation provides:
 - native kernel-object lifecycle, exhaustion, corruption, and seeded
   reference-model tests;
 - native scheduler admission, run-time-flag, priority-queue, policy,
-  current-selection, preemption-repair, and return-plan tests;
+  current-selection, preemption-repair, return-plan, and separate
+  thread/kernel/idle accounting tests;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 

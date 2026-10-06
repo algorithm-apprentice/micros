@@ -90,4 +90,35 @@ enum micros_kernel_object_error micros_hart_commit_user_return(
     const struct micros_scheduler_return_plan *plan
 );
 
+enum micros_kernel_object_error micros_scheduler_accounting_initialize(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint64_t counter
+);
+
+enum micros_kernel_object_error micros_scheduler_account_user_trap(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint64_t counter
+);
+
+enum micros_kernel_object_error micros_scheduler_account_idle_trap(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint64_t counter
+);
+
+enum micros_kernel_object_error micros_scheduler_account_enter_thread(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_thread_handle thread,
+    uint64_t counter
+);
+
+enum micros_kernel_object_error micros_scheduler_account_enter_idle(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint64_t counter
+);
+
 #endif
