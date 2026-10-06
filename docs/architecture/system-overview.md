@@ -283,7 +283,7 @@ interrupts disabled.
   before arming the nested sentinel or entering C.
 - Every attached thread context uses the exact 264-byte integer ABI shared with
   the trap frame and one pairwise-disjoint slot-derived kernel stack.
-- A hart running U-mode names exactly one `RUNNING` thread, selects that
+- A hart running U-mode names exactly one runnable current thread, selects that
   thread's stack in its stable trap anchor, and activates the matching process
   root before entry.
 - U-mode return status fixes SPP/SIE/SUM/MXR/UBE and extension state, requires

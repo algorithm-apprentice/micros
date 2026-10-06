@@ -301,8 +301,7 @@ enum micros_user_execution_error micros_user_execution_prepare(
         goto done;
     }
     if (
-        thread->state != MICROS_THREAD_STATE_INACTIVE
-        || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
+        thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread->scheduler_assigned
         || thread->context_attached
     ) {
@@ -479,11 +478,6 @@ micros_user_execution_capture_trap(
             &thread
         ) != MICROS_KERNEL_OBJECT_OK
         || !thread->context_attached
-        || (
-            thread->scheduler_assigned
-            ? thread->state != MICROS_THREAD_STATE_INACTIVE
-            : thread->state != MICROS_THREAD_STATE_RUNNING
-        )
         || hart->trap.primary_stack_bottom
             != thread->kernel_stack_bottom
         || hart->trap.primary_stack_top
@@ -549,11 +543,6 @@ micros_user_execution_validate_return(
             &thread
         ) != MICROS_KERNEL_OBJECT_OK
         || !thread->context_attached
-        || (
-            thread->scheduler_assigned
-            ? thread->state != MICROS_THREAD_STATE_INACTIVE
-            : thread->state != MICROS_THREAD_STATE_RUNNING
-        )
         || frame->hart_context != (uintptr_t)hart
         || frame_address < thread->kernel_stack_bottom
         || frame_address >= thread->kernel_stack_top
@@ -683,7 +672,6 @@ void micros_user_execution_install_return_frame(
 }
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)

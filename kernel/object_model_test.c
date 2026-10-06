@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
+#include "micros/scheduler_core.h"
 
 bool micros_kernel_object_runtime_run_self_test(void);
 
@@ -20,10 +21,15 @@ bool micros_kernel_object_runtime_run_self_test(void)
         UINT32_MAX,
     };
     struct micros_thread_handle current;
+    struct micros_scheduler_return_plan plan;
     const struct micros_process *resolved_process = NULL;
     enum micros_kernel_object_error error;
     uintptr_t saved_status;
     bool passed = false;
+    static unsigned char thread_stack[
+        MICROS_THREAD_KERNEL_STACK_SIZE
+    ] __attribute__((aligned(MICROS_TRAP_STACK_ALIGNMENT)));
+    static struct micros_user_context context;
 
     saved_status = riscv_irq_save();
     objects = micros_kernel_object_runtime_test_registry();
@@ -69,15 +75,33 @@ bool micros_kernel_object_runtime_run_self_test(void)
     ) {
         goto done;
     }
-    error = micros_hart_bind_thread(
+    error = micros_thread_attach_execution_context(
+        objects,
+        thread,
+        (uintptr_t)thread_stack,
+        (uintptr_t)thread_stack + sizeof(thread_stack),
+        &context
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        goto done;
+    }
+    error = micros_thread_scheduler_admit(
         objects,
         hart_handle,
-        thread
+        thread,
+        MICROS_SCHEDULER_PRIORITY_DEFAULT_USER,
+        100,
+        true
     );
     if (
         error != MICROS_KERNEL_OBJECT_OK
-        || objects->threads[thread.slot].state
-            != MICROS_THREAD_STATE_RUNNING
+        || micros_hart_plan_user_return(
+            objects,
+            hart_handle,
+            &plan
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_hart_commit_user_return(objects, &plan)
+            != MICROS_KERNEL_OBJECT_OK
     ) {
         goto done;
     }
@@ -100,10 +124,20 @@ bool micros_kernel_object_runtime_run_self_test(void)
         goto done;
     }
     if (
-        micros_hart_clear_thread(objects, hart_handle, thread)
+        micros_thread_scheduler_hold(objects, thread)
             != MICROS_KERNEL_OBJECT_OK
-        || objects->threads[thread.slot].state
-            != MICROS_THREAD_STATE_INACTIVE
+        || micros_hart_plan_user_return(
+            objects,
+            hart_handle,
+            &plan
+        ) != MICROS_KERNEL_OBJECT_OK
+        || plan.action != MICROS_SCHEDULER_RETURN_ENTER_IDLE
+        || micros_hart_commit_user_return(objects, &plan)
+            != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_scheduler_remove(objects, thread)
+            != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_detach_execution_context(objects, thread)
+            != MICROS_KERNEL_OBJECT_OK
         || micros_thread_release(objects, thread)
             != MICROS_KERNEL_OBJECT_OK
         || micros_process_release(objects, first_process)

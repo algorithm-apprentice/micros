@@ -404,62 +404,6 @@ static bool test_policy_replacement_is_atomic(void)
     return true;
 }
 
-static bool test_legacy_and_scheduler_authority_do_not_overlap(void)
-{
-    struct micros_thread_handle stale;
-
-    EXPECT_TRUE(setup_fixture());
-    stale = threads[0];
-    --stale.generation;
-    EXPECT_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STALE,
-        micros_thread_scheduler_admit(
-            &objects, harts[0], stale, 7, 100, true
-        )
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, harts[0], threads[0])
-    );
-    EXPECT_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_thread_scheduler_admit(
-            &objects, harts[0], threads[1], 7, 100, true
-        )
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_clear_thread(&objects, harts[0], threads[0])
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_scheduler_admit(
-            &objects, harts[0], threads[1], 7, 100, true
-        )
-    );
-    EXPECT_UNCHANGED(
-        MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_hart_bind_thread(&objects, harts[0], threads[0])
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_scheduler_hold(&objects, threads[1])
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_thread_scheduler_remove(&objects, threads[1])
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_bind_thread(&objects, harts[0], threads[0])
-    );
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_OK,
-        micros_hart_clear_thread(&objects, harts[0], threads[0])
-    );
-    return true;
-}
-
 static bool test_current_selection_and_preemption_repair(void)
 {
     struct micros_scheduler_return_plan plan;
@@ -1127,10 +1071,6 @@ int main(void)
         {
             "policy replacement is atomic",
             test_policy_replacement_is_atomic,
-        },
-        {
-            "legacy and scheduler authority do not overlap",
-            test_legacy_and_scheduler_authority_do_not_overlap,
         },
         {
             "current selection repairs preemption",
