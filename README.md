@@ -108,6 +108,8 @@ cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-user-execution
 cmake --workflow --preset test-qemu-scheduler
+cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
+cmake --workflow --preset test-qemu-scheduler-invalid-next
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -136,6 +138,8 @@ timer delivery, preserves every integer register, keeps current
 queue-reachable, charges thread, kernel, and idle time separately, proves
 repeated equal-priority alternation, rejects a spurious idle iteration, and
 resumes a held thread after a real timer wake.
+The isolated fatal-context gates prove that invalid outgoing or selected user
+contexts panic before return-plan ownership changes.
 See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.

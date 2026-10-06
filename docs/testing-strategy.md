@@ -72,7 +72,9 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
-`test-qemu-user-execution`, and `test-qemu-scheduler`. From a clean checkout,
+`test-qemu-user-execution`, `test-qemu-scheduler`,
+`test-qemu-scheduler-invalid-outgoing`, and
+`test-qemu-scheduler-invalid-next`. From a clean checkout,
 the implemented configure, build, and execution gates are:
 
 ```bash
@@ -90,6 +92,8 @@ cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-user-execution
 cmake --workflow --preset test-qemu-scheduler
+cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
+cmake --workflow --preset test-qemu-scheduler-invalid-next
 ```
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
@@ -153,6 +157,9 @@ return-boundary timer preparation, queue-reachable current ownership, separate
 thread/kernel/idle accounting, repeated equal-priority alternation, complete
 integer-register preservation, a forced spurious idle iteration, and a later
 real timer wake.
+The two isolated invalid-context gates require a U-origin timer panic with
+exact diagnostics proving the outgoing or selected context failed before any
+return-plan mutation.
 
 ## Native unit tests
 

@@ -123,6 +123,48 @@ static enum micros_scheduler_error validate_selected_thread(
     return MICROS_SCHEDULER_OK;
 }
 
+static _Noreturn void panic_invalid_context(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    bool outgoing
+)
+{
+#if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+    if (!micros_scheduler_invalid_test_report(
+        hart,
+        frame,
+        outgoing
+    )) {
+        MICROS_TRAP_PANIC(
+            hart == NULL ? 0 : hart->hardware_id,
+            "scheduler-invalid-context-diagnostic",
+            frame
+        );
+    }
+#else
+    (void)outgoing;
+#endif
+    MICROS_TRAP_PANIC(
+        hart == NULL ? 0 : hart->hardware_id,
+        "invalid-bootstrap-user-context",
+        frame
+    );
+}
+
+static _Noreturn void panic_scheduler_invariant(
+    struct micros_hart *hart,
+    const char *reason,
+    struct micros_trap_frame *frame
+)
+{
+    MICROS_TRAP_PANIC(
+        hart == NULL ? 0 : hart->hardware_id,
+        reason,
+        frame
+    );
+}
+
 static enum micros_scheduler_error preflight_kernel_interval(
     const struct micros_hart *hart,
     struct scheduler_accounting_commit *accounting
@@ -486,10 +528,18 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
     if (
         micros_user_execution_validate_context(current, &outgoing)
             != MICROS_USER_EXECUTION_OK
-        || micros_user_execution_store_context(current, &outgoing)
+    ) {
+        panic_invalid_context(hart, frame, true);
+    }
+    if (
+        micros_user_execution_store_context(current, &outgoing)
             != MICROS_USER_EXECUTION_OK
     ) {
-        return MICROS_SCHEDULER_ERROR_CONTEXT;
+        panic_scheduler_invariant(
+            hart,
+            "scheduler-outgoing-store",
+            frame
+        );
     }
     error = micros_hart_plan_user_return(
         objects,
@@ -533,7 +583,7 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
         plan.selected
     );
     if (scheduler_error != MICROS_SCHEDULER_OK) {
-        return scheduler_error;
+        panic_invalid_context(hart, frame, false);
     }
     if (
         scheduler_timer_enabled
