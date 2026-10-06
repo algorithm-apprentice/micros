@@ -1581,7 +1581,13 @@ enum micros_kernel_object_error micros_hart_current_thread(
     );
     if (
         error != MICROS_KERNEL_OBJECT_OK
-        || resolved_thread->state != MICROS_THREAD_STATE_RUNNING
+        || (
+            resolved_thread->scheduler_assigned
+            ? resolved_thread->state
+                != MICROS_THREAD_STATE_INACTIVE
+            : resolved_thread->state
+                != MICROS_THREAD_STATE_RUNNING
+        )
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
