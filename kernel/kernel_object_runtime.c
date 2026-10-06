@@ -132,7 +132,8 @@ micros_kernel_object_runtime_validate(void)
     return micros_kernel_objects_validate(&kernel_objects);
 }
 
-#ifdef MICROS_BUILD_OBJECT_MODEL_TEST
+#if defined(MICROS_BUILD_OBJECT_MODEL_TEST) \
+    || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void)
 {

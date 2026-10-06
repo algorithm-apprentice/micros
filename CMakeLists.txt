@@ -27,6 +27,11 @@ option(
     "Build the per-hart nested trap test image"
     OFF
 )
+option(
+    MICROS_BUILD_FRAME_OWNERSHIP_TEST
+    "Build the typed frame ownership test image"
+    OFF
+)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 set(
@@ -39,6 +44,7 @@ set(
     MICROS_BUILD_MMU_TEST
     MICROS_BUILD_OBJECT_MODEL_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
+    MICROS_BUILD_FRAME_OWNERSHIP_TEST
 )
 set(MICROS_TARGET_TEST_COUNT 0)
 foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
@@ -75,6 +81,13 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         tests/host/kernel_objects_test.c
     )
+    add_executable(
+        frame_ownership_test
+        kernel/frame_allocator.c
+        kernel/frame_ownership.c
+        kernel/kernel_objects.c
+        tests/host/frame_ownership_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -92,6 +105,11 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         kernel_objects_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        frame_ownership_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
@@ -99,6 +117,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_features(sv39_test PRIVATE c_std_17)
     target_compile_features(kernel_objects_test PRIVATE c_std_17)
+    target_compile_features(frame_ownership_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -131,6 +150,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         kernel_objects_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        frame_ownership_test
         PRIVATE
             -Wall
             -Wextra
@@ -180,12 +209,24 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            frame_ownership_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            frame_ownership_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
     add_test(NAME frame-allocator COMMAND frame_allocator_test)
     add_test(NAME sv39-encoding COMMAND sv39_test)
     add_test(NAME kernel-objects COMMAND kernel_objects_test)
+    add_test(NAME frame-ownership COMMAND frame_ownership_test)
 
     add_custom_target(
         test-unit
@@ -209,6 +250,7 @@ if(MICROS_BUILD_HOST_TESTS)
             frame_allocator_test
             sv39_test
             kernel_objects_test
+            frame_ownership_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -243,6 +285,7 @@ add_executable(
     kernel/bootstrap_memory.c
     kernel/fdt.c
     kernel/frame_allocator.c
+    kernel/frame_ownership.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/main.c
@@ -337,6 +380,7 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --require-object-model-test-report
             --timeout
@@ -371,8 +415,44 @@ if(MICROS_BUILD_NESTED_TRAP_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --require-nested-trap-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
+    add_custom_target(
+        test-qemu-frame-ownership
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_FRAME_OWNERSHIP_TEST_PASS stale=rejected release=blocked handoff=atomic invariants=preserved"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-frame-ownership-test-report
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -404,6 +484,19 @@ if(MICROS_BUILD_NESTED_TRAP_TEST)
         micros
         PRIVATE
             arch/riscv64/nested_trap_test.S
+    )
+endif()
+
+if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_FRAME_OWNERSHIP_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/frame_ownership_test.c
     )
 endif()
 
@@ -487,6 +580,7 @@ add_custom_target(
         --require-trap-ready
         --require-frame-allocator-ready
         --require-mmu-ready
+        --require-frame-ownership-ready
         --require-objects-ready
         --timeout
         8
@@ -532,6 +626,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --timeout
             8
@@ -565,6 +660,7 @@ if(MICROS_BUILD_TRAP_TEST)
             --require-trap-test-report
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --timeout
             8
@@ -599,6 +695,7 @@ if(MICROS_BUILD_TIMER_TEST)
             --require-timer-test-report
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --timeout
             8
@@ -638,6 +735,7 @@ if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
             --require-trap-ready
             --require-frame-allocator-test-report
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --timeout
             8
@@ -684,6 +782,7 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-objects-ready
             --require-trap-context
             --nm
@@ -722,6 +821,7 @@ if(MICROS_BUILD_MMU_TEST)
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
+            --require-frame-ownership-ready
             --require-mmu-test-report
             --require-objects-ready
             --timeout

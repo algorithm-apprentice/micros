@@ -8,6 +8,7 @@
 #include "arch/riscv64/platform.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_allocator.h"
+#include "micros/frame_ownership_runtime.h"
 #include "micros/sv39.h"
 
 enum {
@@ -196,8 +197,10 @@ static enum micros_kernel_address_space_error allocate_table(
     uint64_t *physical_address
 )
 {
+    struct micros_frame_owner owner;
     struct kernel_page_table *table;
     uint64_t validation_pte;
+    enum micros_frame_ownership_error ownership_error;
     size_t index;
 
     if (physical_address == NULL) {
@@ -210,10 +213,22 @@ static enum micros_kernel_address_space_error allocate_table(
         return MICROS_KERNEL_ADDRESS_SPACE_ERROR_CAPACITY;
     }
     if (
-        micros_bootstrap_frame_allocate(physical_address)
-            != MICROS_FRAME_ALLOCATOR_OK
+        micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE,
+            &owner
+        ) != MICROS_FRAME_OWNERSHIP_OK
     ) {
+        return MICROS_KERNEL_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    ownership_error = micros_frame_ownership_runtime_allocate(
+        owner,
+        physical_address
+    );
+    if (ownership_error == MICROS_FRAME_OWNERSHIP_ERROR_EXHAUSTED) {
         return MICROS_KERNEL_ADDRESS_SPACE_ERROR_ALLOCATION;
+    }
+    if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_KERNEL_ADDRESS_SPACE_ERROR_INVARIANT;
     }
     if (
         micros_sv39_make_table_pte(
@@ -221,6 +236,14 @@ static enum micros_kernel_address_space_error allocate_table(
             &validation_pte
         ) != MICROS_SV39_OK
     ) {
+        if (
+            micros_frame_ownership_runtime_release(
+                owner,
+                *physical_address
+            ) != MICROS_FRAME_OWNERSHIP_OK
+        ) {
+            return MICROS_KERNEL_ADDRESS_SPACE_ERROR_INVARIANT;
+        }
         return MICROS_KERNEL_ADDRESS_SPACE_ERROR_RANGE;
     }
 
@@ -478,6 +501,9 @@ static bool tree_and_table_ownership_are_valid(
 )
 {
     bool reachable[KERNEL_PAGE_TABLE_MAX_FRAMES];
+    const struct micros_frame_ownership *ownership =
+        micros_frame_ownership_runtime_ledger();
+    struct micros_frame_owner expected_owner;
     const struct kernel_page_table *root;
     uint64_t observed_leaf_count = 0;
     uint64_t allocated_count;
@@ -494,7 +520,22 @@ static bool tree_and_table_ownership_are_valid(
     }
     if (
         allocator == NULL
+        || ownership == NULL
         || allocator->free_frame_count > allocator->managed_frame_count
+        || micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE,
+            &expected_owner
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_ownership_validate(ownership)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || ownership->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        || ownership->allocator != allocator
+        || ownership->owned_frame_count
+            != kernel_address_space.table_count
+        || ownership->owner_counts[
+            MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE
+        ] != kernel_address_space.table_count
     ) {
         return false;
     }
@@ -512,11 +553,23 @@ static bool tree_and_table_ownership_are_valid(
         table_index < (size_t)kernel_address_space.table_count;
         ++table_index
     ) {
+        struct micros_frame_owner observed_owner;
+
         if (
             !allocator_frame_is_allocated(
                 allocator,
                 kernel_address_space.table_frames[table_index]
             )
+            || micros_frame_ownership_lookup(
+                ownership,
+                kernel_address_space.table_frames[table_index],
+                &observed_owner
+            ) != MICROS_FRAME_OWNERSHIP_OK
+            || observed_owner.generation
+                != expected_owner.generation
+            || observed_owner.slot != expected_owner.slot
+            || observed_owner.kind != expected_owner.kind
+            || observed_owner.reserved != expected_owner.reserved
         ) {
             return false;
         }
