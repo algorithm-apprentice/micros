@@ -52,6 +52,12 @@ Before planning or editing:
 Do not infer architecture from MINIX when an Accepted `micros` ADR defines a
 different choice.
 
+Before designing a dependency-ready subsystem, apply
+[ADR-0025](docs/adr/0025-minix-behavioral-baseline-before-optimization.md):
+trace the fixed MINIX behavioral baseline, classify every difference, and
+document required adaptations before implementation. Existing Accepted ADRs
+remain authoritative until explicitly superseded.
+
 ## Source-of-truth order
 
 When documents disagree, use this order:
@@ -68,19 +74,20 @@ behavior.
 ## Authoring work loop
 
 1. Select exactly one dependency-ready task.
-2. Confirm its goal, non-goals, affected invariants, and acceptance tests.
-3. Plan a sequence of small commits, each with one explainable outcome.
-4. Revise a Proposed ADR when needed. Changing an Accepted decision requires a
+2. Trace and document the corresponding MINIX behavioral baseline.
+3. Confirm the goal, non-goals, affected invariants, and acceptance tests.
+4. Plan a sequence of small commits, each with one explainable outcome.
+5. Revise a Proposed ADR when needed. Changing an Accepted decision requires a
    new ADR that explicitly supersedes it before implementation.
-5. Write the smallest failing test at the correct layer.
-6. Implement the minimum behavior that makes the test pass.
-7. Commit a coherent green slice; do not make permanent broken commits.
-8. Refactor in another green commit when separation improves reviewability.
-9. Run the narrow required checks, then the milestone gate.
-10. Obtain an independent review.
-11. Validate every review finding; fix only technically justified issues.
-12. Re-review until no substantive issue remains.
-13. Merge the pull request while preserving meaningful commit history, then
+6. Write the smallest failing test at the correct layer.
+7. Implement the minimum behavior that makes the test pass.
+8. Commit a coherent green slice; do not make permanent broken commits.
+9. Refactor in another green commit when separation improves reviewability.
+10. Run the narrow required checks, then the milestone gate.
+11. Obtain an independent review.
+12. Validate every review finding; fix only technically justified issues.
+13. Re-review until no substantive issue remains.
+14. Merge the pull request while preserving meaningful commit history, then
     move to the next dependency-ready task.
 
 Do not develop separate tasks in parallel.

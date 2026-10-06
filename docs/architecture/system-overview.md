@@ -3,9 +3,9 @@
 ## Purpose
 
 `micros` is an educational operating system that uses a small privileged
-kernel and isolated user-space services. It borrows the architectural lesson
-of MINIX 3 without attempting source compatibility, binary compatibility, or a
-line-by-line reimplementation.
+kernel and isolated user-space services. It independently reimplements the
+verified behavioral architecture of MINIX 3 without attempting source
+compatibility, binary compatibility, or a line-by-line translation.
 
 The first complete product increment is a shell-capable system running under
 QEMU. It should be small enough that one developer can trace a process from a
@@ -19,13 +19,20 @@ user request through IPC, memory management, filesystem lookup, and back.
 3. Prefer explicit protocols and ownership over shared writable state.
 4. Make stale identities, invalid transitions, and ownership violations fail
    immediately.
-5. Use the smallest mechanism needed for the current milestone.
+5. Use the smallest mechanism that reproduces the dependency-ready MINIX
+   baseline.
 6. Defer compatibility, migration, and recovery machinery until a working
    system creates a concrete need for them.
-7. Keep implementation provenance clear: MINIX is a reference, not a source
-   code donor.
+7. Keep implementation provenance clear: MINIX defines behavioral evidence,
+   not source to copy.
 8. Preserve explicit extension boundaries for foreseeable features without
    implementing those features before they are needed.
+9. Optimize or redesign semantics only after the corresponding baseline works
+   end to end.
+
+The classification and research gate are defined by
+[ADR-0025](../adr/0025-minix-behavioral-baseline-before-optimization.md).
+Accepted subsystem ADRs remain authoritative until explicitly superseded.
 
 ## Target environment
 

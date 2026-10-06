@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-05
+- Superseded in part by: ADR-0025 scheduling-quantum interpretation
 
 ## Context
 

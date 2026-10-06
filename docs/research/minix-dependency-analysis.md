@@ -7,6 +7,13 @@ identify the architectural dependencies that matter when constructing a
 smaller system from scratch, find the cycles in the stable runtime, and derive
 explicit bootstrap substitutions for `micros`.
 
+This dependency analysis predates
+[ADR-0025](../adr/0025-minix-behavioral-baseline-before-optimization.md).
+Its substitutions define development order, not permission to replace MINIX
+subsystem behavior without a parity analysis. The current merged-foundation
+assessment is
+[the MINIX baseline parity audit](minix-baseline-parity-audit.md).
+
 ## Source baseline
 
 - Repository: MINIX 3 source tree.
@@ -259,5 +266,6 @@ kernel-managed direct grants only.
 - This is a component-level architecture analysis, not a complete call graph.
 - Physical line counts do not represent logical complexity or executable size.
 - Optional MINIX configurations may add or remove edges.
-- The derived DAG is optimized for `micros` learning value and MVP scope, not
-  for reproducing MINIX behavior exactly.
+- The derived DAG changes implementation order and bootstrap ownership. Each
+  dependency-ready subsystem still reproduces the documented MINIX behavioral
+  baseline unless an Accepted ADR records a required adaptation or correction.
