@@ -11,6 +11,7 @@
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
+#include "micros/scheduler.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
 
@@ -684,10 +685,6 @@ micros_user_execution_handle_test_trap(
     }
 
     if (test_state == USER_EXECUTION_TEST_SECOND_ECALL) {
-        struct micros_kernel_objects *objects =
-            micros_kernel_object_runtime_test_registry();
-        struct micros_hart_handle hart_handle =
-            micros_kernel_object_runtime_boot_hart_handle();
         uint64_t control_mask =
             MICROS_RISCV_SSTATUS_SIE
             | MICROS_RISCV_SSTATUS_SPIE
@@ -710,19 +707,10 @@ micros_user_execution_handle_test_trap(
             )
             || frame->a7 != 2
             || frame->a0 != UINT64_C(0x0000000000000abd)
-            || objects == NULL
-            || micros_user_address_space_activate_kernel()
-                != MICROS_USER_ADDRESS_SPACE_OK
-            || micros_hart_restore_idle_trap_stack(
-                objects,
-                hart_handle,
-                test_thread
-            ) != MICROS_KERNEL_OBJECT_OK
-            || micros_hart_clear_thread(
-                objects,
-                hart_handle,
-                test_thread
-            ) != MICROS_KERNEL_OBJECT_OK
+            || micros_scheduler_test_prepare_supervisor_return(
+                hart,
+                frame
+            ) != MICROS_SCHEDULER_OK
         ) {
             return MICROS_USER_EXECUTION_TEST_TRAP_MISMATCH;
         }
@@ -747,7 +735,7 @@ _Noreturn void micros_user_execution_test_enter_production(
         (uint32_t)thread_generation,
     };
 
-    micros_user_execution_enter(thread);
+    micros_scheduler_test_enter_without_timer(thread);
 }
 
 static _Noreturn void micros_user_execution_test_finish(void)
@@ -772,6 +760,8 @@ static _Noreturn void micros_user_execution_test_finish(void)
         || observed.sepc != user_address_of(
             micros_user_execution_payload_second_ecall
         )
+        || micros_thread_scheduler_remove(objects, test_thread)
+            != MICROS_KERNEL_OBJECT_OK
         || micros_user_execution_detach(test_thread)
             != MICROS_USER_EXECUTION_OK
         || micros_thread_release(objects, test_thread)

@@ -23,7 +23,8 @@ The current implementation provides:
 - generation-safe per-process Sv39 roots with one private one-GiB user window,
   shared immutable kernel subtrees, typed anonymous pages, and atomic teardown;
 - exact saved user integer contexts, one static 16 KiB kernel stack per thread
-  slot, hart trap-stack selection, and validated first U-mode entry/resume;
+  slot, scheduler-owned hart trap-stack selection, and validated first U-mode
+  entry/resume through the common return plan;
 - a per-hart trap anchor carried through every trap frame, plus hart-owned
   timer mechanism state;
 - mandatory post-link closure checks for every allocatable ELF section;
