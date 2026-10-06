@@ -18,8 +18,9 @@ kernel/process-generation owners and provides the staged one-way VM-handoff
 gate. Generation-safe per-process Sv39 roots now share immutable kernel
 subtrees while owning private, typed user mappings. U-mode entry, saved
 execution contexts, and thread-owned kernel stacks now complete the first real
-user round trip. Repeated switching, runnable queues, timer preemption, and
-preemptive scheduling remain in dependency order.
+user round trip. The portable MINIX-style queues and accounting model now drive
+repeated two-address-space switching under real timer interrupts. The
+no-runnable idle transition remains before the scheduler task is complete.
 
 ## v0.1 completion goal
 

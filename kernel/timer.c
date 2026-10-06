@@ -6,21 +6,42 @@
 #include "arch/riscv64/platform.h"
 #include "micros/kernel_objects.h"
 
-#ifdef MICROS_BUILD_TIMER_TEST
+#if defined(MICROS_BUILD_TIMER_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
 static bool fail_next_timer_program;
 static uint64_t timer_program_attempts;
 #endif
 
+#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+static uint64_t delay_next_timer_program;
+static uint64_t timer_last_program_counter;
+#endif
+
 static intptr_t program_timer(uint64_t deadline)
 {
-#ifdef MICROS_BUILD_TIMER_TEST
+    intptr_t result;
+
+#if defined(MICROS_BUILD_TIMER_TEST) \
+    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
     ++timer_program_attempts;
     if (fail_next_timer_program) {
         fail_next_timer_program = false;
         return -1;
     }
 #endif
-    return sbi_set_timer(deadline);
+    result = sbi_set_timer(deadline);
+#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+    if (result == 0) {
+        uint64_t delay = delay_next_timer_program;
+        uint64_t started_at = riscv_read_time();
+
+        delay_next_timer_program = 0;
+        while (riscv_read_time() - started_at < delay) {
+        }
+        timer_last_program_counter = riscv_read_time();
+    }
+#endif
+    return result;
 }
 
 bool micros_timer_initialize(struct micros_hart *hart)
@@ -336,5 +357,27 @@ bool micros_timer_run_self_test(
         && !riscv_timer_interrupt_is_enabled()
         && micros_timer_ticks(hart) == stop_after
     );
+}
+#endif
+
+#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+void micros_timer_test_fail_next_program(void)
+{
+    fail_next_timer_program = true;
+}
+
+void micros_timer_test_delay_next_program(uint64_t counter_ticks)
+{
+    delay_next_timer_program = counter_ticks;
+}
+
+uint64_t micros_timer_test_program_attempts(void)
+{
+    return timer_program_attempts;
+}
+
+uint64_t micros_timer_test_last_program_counter(void)
+{
+    return timer_last_program_counter;
 }
 #endif
