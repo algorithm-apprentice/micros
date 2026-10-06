@@ -127,6 +127,11 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/scheduler_model_test.c
         tests/host/scheduler_test.c
     )
+    add_executable(
+        endpoint_test
+        kernel/endpoint.c
+        tests/host/endpoint_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -154,6 +159,11 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         scheduler_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        endpoint_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
@@ -163,6 +173,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(kernel_objects_test PRIVATE c_std_17)
     target_compile_features(frame_ownership_test PRIVATE c_std_17)
     target_compile_features(scheduler_test PRIVATE c_std_17)
+    target_compile_features(endpoint_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -215,6 +226,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         scheduler_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        endpoint_test
         PRIVATE
             -Wall
             -Wextra
@@ -286,6 +307,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            endpoint_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            endpoint_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -294,6 +326,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME kernel-objects COMMAND kernel_objects_test)
     add_test(NAME frame-ownership COMMAND frame_ownership_test)
     add_test(NAME scheduler-core COMMAND scheduler_test)
+    add_test(NAME endpoint-profile COMMAND endpoint_test)
 
     add_custom_target(
         test-unit
@@ -319,6 +352,7 @@ if(MICROS_BUILD_HOST_TESTS)
             kernel_objects_test
             frame_ownership_test
             scheduler_test
+            endpoint_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -353,6 +387,7 @@ add_executable(
     arch/riscv64/user_entry.S
     kernel/address_space.c
     kernel/bootstrap_memory.c
+    kernel/endpoint.c
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/frame_ownership.c

@@ -43,6 +43,7 @@ The current implementation provides:
   current-selection, preemption-repair, return-plan, and separate
   thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
   reference model;
+- native endpoint encoding and immutable privilege-profile table tests;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
