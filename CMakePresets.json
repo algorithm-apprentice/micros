@@ -124,6 +124,15 @@
       "cacheVariables": {
         "MICROS_BUILD_USER_EXECUTION_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-scheduler-switch-test",
+      "displayName": "RISC-V 64 scheduler switching test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-scheduler-switch-test",
+      "cacheVariables": {
+        "MICROS_BUILD_SCHEDULER_SWITCH_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -220,6 +229,13 @@
       "configurePreset": "riscv64-user-execution-test",
       "targets": [
         "test-qemu-user-execution"
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-switch",
+      "configurePreset": "riscv64-scheduler-switch-test",
+      "targets": [
+        "test-qemu-scheduler-switch"
       ]
     }
   ],
@@ -417,6 +433,20 @@
         {
           "type": "build",
           "name": "test-qemu-user-execution"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-scheduler-switch",
+      "displayName": "Build and run scheduler switching test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-scheduler-switch-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-scheduler-switch"
         }
       ]
     }

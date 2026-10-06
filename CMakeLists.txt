@@ -42,6 +42,11 @@ option(
     "Build the user execution-context and U-mode entry test image"
     OFF
 )
+option(
+    MICROS_BUILD_SCHEDULER_SWITCH_TEST
+    "Build the timer-driven scheduler switching test image"
+    OFF
+)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 set(
@@ -57,6 +62,7 @@ set(
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
     MICROS_BUILD_USER_EXECUTION_TEST
+    MICROS_BUILD_SCHEDULER_SWITCH_TEST
 )
 set(MICROS_TARGET_TEST_COUNT 0)
 foreach(option_name IN LISTS MICROS_TARGET_TEST_OPTIONS)
@@ -586,6 +592,40 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
     )
 endif()
 
+if(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    add_custom_target(
+        test-qemu-scheduler-switch
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_SCHEDULER_SWITCH_TEST_PASS current=reachable accounting=separate switches=alternating registers=preserved"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_OBJECT_MODEL_TEST)
     target_compile_definitions(
         micros
@@ -650,6 +690,20 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
         PRIVATE
             arch/riscv64/user_execution_test.S
             kernel/user_execution_test.c
+    )
+endif()
+
+if(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_SCHEDULER_SWITCH_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/scheduler_test.S
+            kernel/scheduler_switch_test.c
     )
 endif()
 

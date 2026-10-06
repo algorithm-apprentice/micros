@@ -107,6 +107,7 @@ cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-user-execution
+cmake --workflow --preset test-qemu-scheduler-switch
 ```
 
 These commands run the native suite, verify normal boot through the
@@ -130,6 +131,11 @@ The user-execution gate performs a real U-mode round trip, enforces kernel-page
 isolation, preserves every integer register, proves thread-stack ownership and
 generation reuse, and validates both user and test-only supervisor `sret`
 returns.
+The scheduler-switch gate runs two isolated address spaces under real
+supervisor timer delivery, preserves every integer register, keeps current
+queue-reachable, charges thread and kernel time separately, and proves repeated
+equal-priority alternation. The no-runnable idle transition remains the next
+scheduler slice.
 See the
 [build guide](docs/development/building.md) for tool discovery and separate
 build/test commands.

@@ -146,7 +146,9 @@ represented explicitly: each thread owns a saved integer context and one
 slot-derived 16 KiB supervisor stack, and the boot hart switches its trap
 anchor from the idle stack to that thread stack before `sret` enters U-mode.
 User-origin traps capture the exact current thread before any test or future
-syscall handling. Runnable queues, repeated switching, and preemption remain
+syscall handling. Independent run-time flags, 16 priority queues, a
+queue-reachable current thread, separate accounting, and repeated timer-driven
+switching are implemented. The no-runnable idle stack/root transition remains
 the following scheduler slice. Only the bootstrap launcher receives the
 temporary authority to release boot services and install their exact manifest
 privilege profiles.
