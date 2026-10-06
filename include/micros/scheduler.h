@@ -46,6 +46,10 @@ enum micros_scheduler_error micros_scheduler_handle_user_timer(
     struct micros_hart *hart
 );
 
+enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
+    struct micros_hart *hart
+);
+
 enum micros_scheduler_error micros_scheduler_select_user_return(
     struct micros_hart *hart,
     struct micros_trap_frame *frame
@@ -58,37 +62,40 @@ _Noreturn void micros_scheduler_test_enter_without_timer(
 #endif
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST)
 enum micros_scheduler_error micros_scheduler_test_prepare_supervisor_return(
     struct micros_hart *hart,
     struct micros_trap_frame *frame
 );
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
-enum micros_scheduler_switch_test_trap_action {
-    MICROS_SCHEDULER_SWITCH_TEST_CONTINUE = 0,
-    MICROS_SCHEDULER_SWITCH_TEST_RETURN_SUPERVISOR,
-    MICROS_SCHEDULER_SWITCH_TEST_MISMATCH,
+#ifdef MICROS_BUILD_SCHEDULER_TEST
+enum micros_scheduler_test_trap_action {
+    MICROS_SCHEDULER_TEST_CONTINUE = 0,
+    MICROS_SCHEDULER_TEST_RETURN_SUPERVISOR,
+    MICROS_SCHEDULER_TEST_MISMATCH,
 };
 
-bool micros_scheduler_switch_test_after_start(
+bool micros_scheduler_test_after_start(
     const struct micros_hart *hart
 );
 
-enum micros_scheduler_switch_test_trap_action
-micros_scheduler_switch_test_handle_user_trap(
+enum micros_scheduler_test_trap_action
+micros_scheduler_test_handle_user_trap(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
     bool user_timer
 );
 
-bool micros_scheduler_switch_test_after_user_return(
+bool micros_scheduler_test_after_user_return(
     const struct micros_hart *hart,
     const struct micros_trap_frame *frame
 );
 
-_Noreturn void micros_scheduler_switch_runtime_run_self_test(void);
+void micros_scheduler_test_note_selector_entry(void);
+bool micros_scheduler_test_handle_idle_timer(struct micros_hart *hart);
+
+_Noreturn void micros_scheduler_runtime_run_self_test(void);
 #endif
 
 #endif

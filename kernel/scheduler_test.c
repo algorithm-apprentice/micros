@@ -71,12 +71,19 @@ static uint64_t switch_count;
 static size_t last_running = 2;
 static bool supervisor_returned;
 static bool start_boundary_observed;
+static bool idle_requested;
+static bool idle_woke_thread;
+static bool spurious_idle_bypassed;
+static uint64_t selector_entry_count;
+static uint64_t selector_entries_before_spurious;
 static uint64_t kernel_ticks_before_start;
 static struct micros_kernel_objects start_snapshot;
 static uint64_t start_satp_snapshot;
 static bool start_sie_snapshot;
 static bool start_stie_snapshot;
 static uint64_t start_timer_attempts;
+volatile uint64_t micros_scheduler_test_idle_bypass_once;
+volatile uint64_t micros_scheduler_test_idle_bypass_observed;
 
 static bool thread_handles_equal(
     struct micros_thread_handle left,
@@ -268,7 +275,7 @@ static bool start_state_matches(
     );
 }
 
-bool micros_scheduler_switch_test_after_start(
+bool micros_scheduler_test_after_start(
     const struct micros_hart *hart
 )
 {
@@ -294,7 +301,7 @@ bool micros_scheduler_switch_test_after_start(
     return true;
 }
 
-bool micros_scheduler_switch_test_after_user_return(
+bool micros_scheduler_test_after_user_return(
     const struct micros_hart *hart,
     const struct micros_trap_frame *frame
 )
@@ -320,8 +327,8 @@ bool micros_scheduler_switch_test_after_user_return(
     return true;
 }
 
-enum micros_scheduler_switch_test_trap_action
-micros_scheduler_switch_test_handle_user_trap(
+enum micros_scheduler_test_trap_action
+micros_scheduler_test_handle_user_trap(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
     bool user_timer
@@ -342,38 +349,17 @@ micros_scheduler_switch_test_handle_user_trap(
             != MICROS_SCHEDULER_ACCOUNTING_KERNEL
         || !user_registers_match(thread_index, hart, frame)
     ) {
-        return MICROS_SCHEDULER_SWITCH_TEST_MISMATCH;
+        return MICROS_SCHEDULER_TEST_MISMATCH;
     }
     cause_code = frame->scause & TEST_SCAUSE_CODE_MASK;
     counter = *(const volatile uint64_t *)(uintptr_t)
         counter_physical[thread_index];
     if (counter < previous_counter[thread_index]) {
-        return MICROS_SCHEDULER_SWITCH_TEST_MISMATCH;
+        return MICROS_SCHEDULER_TEST_MISMATCH;
     }
     previous_counter[thread_index] = counter;
 
     if (!user_timer) {
-        if (
-            (frame->scause & TEST_SCAUSE_INTERRUPT) != 0
-            || cause_code != TEST_EXCEPTION_USER_ECALL
-            || frame->sepc
-                != user_address_of(micros_scheduler_payload_ecall)
-        ) {
-            return MICROS_SCHEDULER_SWITCH_TEST_MISMATCH;
-        }
-        ++ecall_count[thread_index];
-        frame->sepc += 4;
-        return MICROS_SCHEDULER_SWITCH_TEST_CONTINUE;
-    }
-    if (
-        (frame->scause & TEST_SCAUSE_INTERRUPT) == 0
-        || cause_code != TEST_INTERRUPT_SUPERVISOR_TIMER
-    ) {
-        return MICROS_SCHEDULER_SWITCH_TEST_MISMATCH;
-    }
-    ++timer_trap_count;
-    if (switch_count >= 6) {
-        size_t other = thread_index == 0 ? 1 : 0;
         uint64_t control_mask =
             MICROS_RISCV_SSTATUS_SIE
             | MICROS_RISCV_SSTATUS_SPIE
@@ -387,26 +373,105 @@ micros_scheduler_switch_test_handle_user_trap(
             | TEST_SSTATUS_SD;
 
         if (
+            (frame->scause & TEST_SCAUSE_INTERRUPT) != 0
+            || cause_code != TEST_EXCEPTION_USER_ECALL
+            || frame->sepc
+                != user_address_of(micros_scheduler_payload_ecall)
+        ) {
+            return MICROS_SCHEDULER_TEST_MISMATCH;
+        }
+        ++ecall_count[thread_index];
+        if (idle_woke_thread) {
+            if (
+                thread_index != 0
+                || !spurious_idle_bypassed
+                || selector_entry_count
+                    != selector_entries_before_spurious + 1
+                || micros_scheduler_test_prepare_supervisor_return(
+                    hart,
+                    frame
+                ) != MICROS_SCHEDULER_OK
+            ) {
+                return MICROS_SCHEDULER_TEST_MISMATCH;
+            }
+            frame->sp = micros_scheduler_test_saved_state[1];
+            frame->sepc =
+                (uintptr_t)micros_scheduler_test_supervisor_resume;
+            frame->sstatus &= ~control_mask;
+            frame->sstatus |= MICROS_RISCV_SSTATUS_SPP;
+            supervisor_returned = true;
+            return MICROS_SCHEDULER_TEST_RETURN_SUPERVISOR;
+        }
+        frame->sepc += 4;
+        return MICROS_SCHEDULER_TEST_CONTINUE;
+    }
+    if (
+        (frame->scause & TEST_SCAUSE_INTERRUPT) == 0
+        || cause_code != TEST_INTERRUPT_SUPERVISOR_TIMER
+    ) {
+        return MICROS_SCHEDULER_TEST_MISMATCH;
+    }
+    ++timer_trap_count;
+    if (switch_count >= 6 && !idle_requested) {
+        size_t other = thread_index == 0 ? 1 : 0;
+
+        if (
             micros_thread_scheduler_hold(
+                objects,
+                threads[thread_index]
+            ) != MICROS_KERNEL_OBJECT_OK
+            || micros_thread_scheduler_hold(
                 objects,
                 threads[other]
             ) != MICROS_KERNEL_OBJECT_OK
-            || micros_scheduler_test_prepare_supervisor_return(
-                hart,
-                frame
-            ) != MICROS_SCHEDULER_OK
         ) {
-            return MICROS_SCHEDULER_SWITCH_TEST_MISMATCH;
+            return MICROS_SCHEDULER_TEST_MISMATCH;
         }
-        frame->sp = micros_scheduler_test_saved_state[1];
-        frame->sepc =
-            (uintptr_t)micros_scheduler_test_supervisor_resume;
-        frame->sstatus &= ~control_mask;
-        frame->sstatus |= MICROS_RISCV_SSTATUS_SPP;
-        supervisor_returned = true;
-        return MICROS_SCHEDULER_SWITCH_TEST_RETURN_SUPERVISOR;
+        idle_requested = true;
+        selector_entries_before_spurious = selector_entry_count;
+        micros_scheduler_test_idle_bypass_once = 1;
     }
-    return MICROS_SCHEDULER_SWITCH_TEST_CONTINUE;
+    return MICROS_SCHEDULER_TEST_CONTINUE;
+}
+
+void micros_scheduler_test_note_selector_entry(void)
+{
+    ++selector_entry_count;
+}
+
+bool micros_scheduler_test_handle_idle_timer(struct micros_hart *hart)
+{
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
+
+    if (
+        objects == NULL
+        || hart == NULL
+        || !idle_requested
+        || idle_woke_thread
+        || micros_scheduler_test_idle_bypass_observed != 1
+        || selector_entry_count != selector_entries_before_spurious
+        || !hart->reschedule_pending
+        || hart->accounting_owner
+            != MICROS_SCHEDULER_ACCOUNTING_KERNEL
+    ) {
+        return false;
+    }
+    spurious_idle_bypassed = true;
+    objects->threads[threads[0].slot].user_context.sepc =
+        user_address_of(micros_scheduler_payload_ecall);
+    objects->threads[threads[0].slot].user_context.s1 = 0;
+    if (
+        micros_thread_runtime_flags_unset(
+            objects,
+            threads[0],
+            MICROS_THREAD_RTS_INACTIVE
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return false;
+    }
+    idle_woke_thread = true;
+    return true;
 }
 
 void micros_scheduler_test_start_production(void)
@@ -440,6 +505,11 @@ static _Noreturn void finish_test(void)
         || !start_boundary_observed
         || timer_trap_count == 0
         || switch_count < 6
+        || !idle_requested
+        || !spurious_idle_bypassed
+        || !idle_woke_thread
+        || selector_entry_count
+            != selector_entries_before_spurious + 1
         || ledger == NULL
         || objects == NULL
         || previous_counter[0] == 0
@@ -512,9 +582,10 @@ static _Noreturn void finish_test(void)
         goto failure;
     }
     uart_write(
-        "MICROS_SCHEDULER_SWITCH_TEST_PASS "
-        "current=reachable accounting=separate "
-        "switches=alternating registers=preserved\n"
+        "MICROS_SCHEDULER_TEST_PASS "
+        "queues=minix-priority current=reachable "
+        "accounting=separate switches=alternating "
+        "idle=resumed registers=preserved\n"
     );
     uart_flush();
     (void)sbi_system_reset(
@@ -523,7 +594,7 @@ static _Noreturn void finish_test(void)
     );
 
 failure:
-    uart_write("MICROS_TEST_FAILURE scheduler-switch-test\n");
+    uart_write("MICROS_TEST_FAILURE scheduler-test\n");
     uart_flush();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
@@ -534,7 +605,7 @@ failure:
     }
 }
 
-_Noreturn void micros_scheduler_switch_runtime_run_self_test(void)
+_Noreturn void micros_scheduler_runtime_run_self_test(void)
 {
     const uint32_t code_permissions =
         MICROS_SV39_PERMISSION_READ
@@ -668,7 +739,7 @@ _Noreturn void micros_scheduler_switch_runtime_run_self_test(void)
 
 failure:
     riscv_irq_restore(saved_status);
-    uart_write("MICROS_TEST_FAILURE scheduler-switch-setup\n");
+    uart_write("MICROS_TEST_FAILURE scheduler-setup\n");
     uart_flush();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,

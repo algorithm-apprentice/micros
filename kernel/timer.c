@@ -7,12 +7,12 @@
 #include "micros/kernel_objects.h"
 
 #if defined(MICROS_BUILD_TIMER_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST)
 static bool fail_next_timer_program;
 static uint64_t timer_program_attempts;
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+#ifdef MICROS_BUILD_SCHEDULER_TEST
 static uint64_t delay_next_timer_program;
 static uint64_t timer_last_program_counter;
 #endif
@@ -22,7 +22,7 @@ static intptr_t program_timer(uint64_t deadline)
     intptr_t result;
 
 #if defined(MICROS_BUILD_TIMER_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_SWITCH_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST)
     ++timer_program_attempts;
     if (fail_next_timer_program) {
         fail_next_timer_program = false;
@@ -30,7 +30,7 @@ static intptr_t program_timer(uint64_t deadline)
     }
 #endif
     result = sbi_set_timer(deadline);
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+#ifdef MICROS_BUILD_SCHEDULER_TEST
     if (result == 0) {
         uint64_t delay = delay_next_timer_program;
         uint64_t started_at = riscv_read_time();
@@ -360,7 +360,7 @@ bool micros_timer_run_self_test(
 }
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+#ifdef MICROS_BUILD_SCHEDULER_TEST
 void micros_timer_test_fail_next_program(void)
 {
     fail_next_timer_program = true;

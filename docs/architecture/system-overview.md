@@ -148,8 +148,9 @@ anchor from the idle stack to that thread stack before `sret` enters U-mode.
 User-origin traps capture the exact current thread before any test or future
 syscall handling. Independent run-time flags, 16 priority queues, a
 queue-reachable current thread, separate accounting, and repeated timer-driven
-switching are implemented. The no-runnable idle stack/root transition remains
-the following scheduler slice. Only the bootstrap launcher receives the
+switching are implemented. A no-runnable return restores the kernel root and
+idle stack, waits through the race-free interrupt window, and resumes a newly
+runnable thread after a real wake. Only the bootstrap launcher receives the
 temporary authority to release boot services and install their exact manifest
 privilege profiles.
 

@@ -446,10 +446,10 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 micros_scheduler_handle_user_timer(hart)
             );
         }
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+#ifdef MICROS_BUILD_SCHEDULER_TEST
         {
-            enum micros_scheduler_switch_test_trap_action action =
-                micros_scheduler_switch_test_handle_user_trap(
+            enum micros_scheduler_test_trap_action action =
+                micros_scheduler_test_handle_user_trap(
                     hart,
                     frame,
                     user_timer
@@ -457,16 +457,16 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 
             if (
                 action
-                    == MICROS_SCHEDULER_SWITCH_TEST_RETURN_SUPERVISOR
+                    == MICROS_SCHEDULER_TEST_RETURN_SUPERVISOR
             ) {
                 return;
             }
             if (
-                action != MICROS_SCHEDULER_SWITCH_TEST_CONTINUE
+                action != MICROS_SCHEDULER_TEST_CONTINUE
             ) {
                 MICROS_TRAP_PANIC(
                     hart->hardware_id,
-                    "scheduler-switch-test-mismatch",
+                    "scheduler-test-mismatch",
                     frame
                 );
             }
@@ -614,6 +614,14 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 
     if ((frame->scause & MICROS_SCAUSE_INTERRUPT) != 0) {
         if (cause_code == MICROS_INTERRUPT_SUPERVISOR_TIMER) {
+            if (micros_scheduler_is_initialized()) {
+                handle_scheduler_timer_error(
+                    hart,
+                    frame,
+                    micros_scheduler_handle_supervisor_timer(hart)
+                );
+                return;
+            }
             enum micros_timer_interrupt_result result =
                 micros_timer_handle_interrupt(hart);
 

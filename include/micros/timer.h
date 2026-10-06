@@ -31,7 +31,7 @@ bool micros_timer_run_self_test(
 );
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
+#ifdef MICROS_BUILD_SCHEDULER_TEST
 void micros_timer_test_fail_next_program(void);
 void micros_timer_test_delay_next_program(uint64_t counter_ticks);
 uint64_t micros_timer_test_program_attempts(void);

@@ -32,8 +32,8 @@ bool micros_user_address_space_runtime_run_self_test(void);
 _Noreturn void micros_user_execution_runtime_run_self_test(void);
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
-_Noreturn void micros_scheduler_switch_runtime_run_self_test(void);
+#ifdef MICROS_BUILD_SCHEDULER_TEST
+_Noreturn void micros_scheduler_runtime_run_self_test(void);
 #endif
 
 #ifdef MICROS_BUILD_NESTED_TRAP_TEST
@@ -332,9 +332,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     MICROS_PANIC(hart_id, "user-execution-test-returned");
 #endif
 
-#ifdef MICROS_BUILD_SCHEDULER_SWITCH_TEST
-    micros_scheduler_switch_runtime_run_self_test();
-    MICROS_PANIC(hart_id, "scheduler-switch-test-returned");
+#ifdef MICROS_BUILD_SCHEDULER_TEST
+    micros_scheduler_runtime_run_self_test();
+    MICROS_PANIC(hart_id, "scheduler-test-returned");
 #endif
 
 #ifdef MICROS_BUILD_OBJECT_MODEL_TEST
