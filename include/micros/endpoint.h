@@ -74,6 +74,7 @@ enum micros_endpoint_error {
     MICROS_ENDPOINT_ERROR_CAPACITY,
     MICROS_ENDPOINT_ERROR_ENDPOINT,
     MICROS_ENDPOINT_ERROR_STALE,
+    MICROS_ENDPOINT_ERROR_STATE,
     MICROS_ENDPOINT_ERROR_PROFILE,
     MICROS_ENDPOINT_ERROR_UNAUTHORIZED,
     MICROS_ENDPOINT_ERROR_INVARIANT,
@@ -99,6 +100,51 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
     const struct micros_endpoint_registry *registry
 );
 
+enum micros_endpoint_error micros_endpoint_registry_validate_objects(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+);
+
+enum micros_endpoint_error micros_endpoint_reserve(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    micros_endpoint_t *endpoint
+);
+
+enum micros_endpoint_error micros_endpoint_install_profile(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    uint8_t profile_id
+);
+
+enum micros_endpoint_error micros_endpoint_activate(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+);
+
+enum micros_endpoint_error micros_endpoint_resolve_internal(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+);
+
+enum micros_endpoint_error micros_endpoint_resolve_active(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+);
+
+enum micros_endpoint_error micros_endpoint_close(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+);
+
 enum micros_endpoint_error micros_privilege_profile_resolve(
     const struct micros_endpoint_registry *registry,
     uint8_t profile_id,
@@ -121,6 +167,28 @@ enum micros_endpoint_error micros_privilege_profile_allows_target(
 enum micros_endpoint_error micros_privilege_profile_allows_kernel_operation(
     const struct micros_endpoint_registry *registry,
     uint8_t profile_id,
+    uint8_t operation
+);
+
+enum micros_endpoint_error micros_endpoint_authorize_operation(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    uint32_t operation
+);
+
+enum micros_endpoint_error micros_endpoint_authorize_target(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    uint32_t operation,
+    micros_endpoint_t destination
+);
+
+enum micros_endpoint_error micros_endpoint_authorize_kernel_operation(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
     uint8_t operation
 );
 
