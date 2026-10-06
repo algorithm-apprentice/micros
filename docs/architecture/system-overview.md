@@ -89,7 +89,12 @@ distinct objects. PM represents semantic process relationships. VM represents
 address-space policy. v0.1 enforces one thread per process and one hart, but the
 scheduler and blocking paths operate on threads rather than treating a process
 as a thread. See
-[ADR-0011](../adr/0011-process-thread-and-hart-model.md).
+[ADR-0011](../adr/0011-process-thread-and-hart-model.md). The implemented
+identity substrate uses fixed-capacity process, thread, and hart tables with
+typed slot/generation handles, deterministic reuse, stale-reference rejection,
+and quarantine before a generation can wrap or become an endpoint-reserved
+value. Production configures one thread per process and one registered hart;
+native models exercise larger policies.
 
 ## Boot sequence
 
@@ -97,7 +102,9 @@ as a thread. See
 
 OpenSBI initializes the machine and enters the kernel in supervisor mode with
 the boot hart ID and FDT address. The kernel establishes a stack, clears
-uninitialized data, installs the trap vector, and then begins serial output.
+uninitialized data, initializes the kernel-object registry, registers the boot
+hart, installs that hart's primary and emergency trap stacks, installs the trap
+vector, and then begins serial output.
 
 ### Phase 2: kernel bootstrap
 
@@ -109,6 +116,13 @@ and RW/NX mappings, enables Sv39 through an ordered translation fence, and
 starts timer interrupts. Managed RAM is identity-mapped RW/NX, while UART and
 PLIC device addresses remain fixed platform constants in v0.1; only UART is
 mapped during this phase.
+
+Every delivered trap frame carries the registered hart context. Outside
+dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
+zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A
+nested fault therefore selects that hart's emergency stack without a global
+hart ID. The OpenSBI timer's initialized, active, interval, deadline, and tick
+state are embedded in the hart object.
 
 ### Phase 3: process and IPC substrate
 
@@ -211,8 +225,13 @@ interrupts disabled.
 - An endpoint is valid only while both its slot and generation match.
 - Every thread belongs to exactly one process.
 - v0.1 permits at most one live thread in a process.
+- Process and thread slot reuse advances a nonzero generation; stale handles
+  never resolve, and exhausted generations quarantine the slot.
 - A thread is present in at most one run queue and at most one IPC wait queue.
-- The current thread is hart-local state, never a single global process value.
+- A running thread is current on exactly one hart, and an inactive thread is
+  current on none.
+- The current thread, trap stacks, nested-trap route, and timer mechanism state
+  are hart-local, never standalone global execution state.
 - IPC payloads never authorize memory access by themselves.
 - A reply token is one-shot and resolves to exactly one blocked caller thread.
 - Every cross-address-space copy is bounded by an active grant.

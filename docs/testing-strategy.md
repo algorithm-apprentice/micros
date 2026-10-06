@@ -69,8 +69,9 @@ Budgets are review signals, not reasons to hide necessary coverage.
 
 The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
-`test-qemu-frame-allocator`, `test-qemu-trap-panic`, and `test-qemu-mmu`. From a
-clean checkout, their configure, build, and execution gates are:
+`test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
+`test-qemu-object-model`, and `test-qemu-nested-trap`. From a clean checkout,
+the implemented configure, build, and execution gates are:
 
 ```bash
 cmake --workflow --preset test-unit
@@ -81,13 +82,16 @@ cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
+cmake --workflow --preset test-qemu-object-model
+cmake --workflow --preset test-qemu-nested-trap
 ```
 
-`test-unit` currently runs the FDT parser corpus, portable frame allocator, and
-Sv39 encoding tests under ASan and UBSan plus the Python host tests. The latter
-include ELF allocatable-section closure and machine-readable QEMU record
-regressions. `test-qemu-smoke` verifies the real OpenSBI handoff, FDT memory
-discovery, exact serial markers, agreement between decoded range counts and
+`test-unit` currently runs the FDT parser corpus, portable frame allocator,
+Sv39 encoding, and kernel-object lifecycle/model tests under ASan and UBSan
+plus the Python host tests. The latter include ELF allocatable-section closure,
+legacy-global rejection, and machine-readable QEMU record regressions.
+`test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
+readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
 MMU readiness, and clean SBI shutdown. The remaining stable targets are added
 when their dependency-DAG layers become implementation-ready.
@@ -110,6 +114,11 @@ and runtime memory sizing by booting one ELF at 128 MiB and 256 MiB.
 captured trap frame and that its `sepc` equals the fault symbol in the built
 ELF. `test-qemu-mmu` verifies exact recovery from a store page fault against RX
 text and an instruction page fault from RW/NX kernel data.
+`test-qemu-object-model` exercises the production process/thread/hart registry,
+including generation advance, stale rejection, the one-thread policy, and
+hart-local current-thread state. `test-qemu-nested-trap` injects a second fault
+after the per-hart `sscratch` sentinel is armed and proves that the registered
+emergency stack is selected without trusting interrupted `tp`.
 
 ## Native unit tests
 
@@ -149,6 +158,10 @@ Examples of required properties:
 - every thread has exactly one owning process;
 - every current-thread pointer belongs to one hart-local object;
 - a stale generation never resolves to a reused process slot;
+- every running thread is current on exactly one hart, while every inactive
+  thread is current on none;
+- failed object-table operations preserve both registry state and output
+  arguments;
 - a reply token wakes exactly one blocked caller thread and cannot be reused;
 - an IPC transition preserves exactly one blocked or runnable state;
 - a grant cannot authorize bytes outside its declared range;

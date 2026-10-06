@@ -16,15 +16,21 @@ The current implementation provides:
 - an allocator-backed Sv39 kernel address space with page-aligned RX, R, and
   RW/NX permission ranges;
 - supervisor-only identity mappings for managed RAM and the QEMU UART;
+- fixed-capacity process, thread, and hart identity tables with generation-safe
+  handles and checked one-thread/one-hart production policies;
+- a per-hart trap anchor carried through every trap frame, plus hart-owned
+  timer mechanism state;
 - mandatory post-link closure checks for every allocatable ELF section;
 - native FDT parser tests under ASan and UBSan;
 - native frame allocator invariant and seeded model tests under ASan and UBSan;
 - native Sv39 encoding and ELF permission-layout tests;
+- native kernel-object lifecycle, exhaustion, corruption, and seeded
+  reference-model tests;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
-Per-process page-table roots and user mode remain dependency-ordered later
-tasks.
+Per-process page-table roots, saved user contexts, user mode, and scheduling
+remain dependency-ordered later tasks.
 
 ## Prerequisites
 
@@ -93,6 +99,8 @@ and `a1` until `kernel_main`. Every target link runs
 `tools/check_elf_sections.py`; the build fails if an allocatable output section
 is unexpected, crosses a permission boundary, lies outside the kernel ranges,
 or has write/execute flags inconsistent with its linker-defined range.
+It also rejects the superseded standalone `micros_trap_hart_id` and
+`timer_state` symbols.
 
 ## Native unit tests
 
@@ -103,9 +111,9 @@ cmake --workflow --preset test-unit
 ```
 
 The host graph is separate from the freestanding target graph. It compiles the
-same FDT parser, frame allocator, and Sv39 encoding implementations with
-warnings as errors, ASan, and UBSan. It then runs their native tests plus the
-Python QEMU-harness and ELF-layout tests.
+same FDT parser, frame allocator, Sv39 encoding, and kernel-object
+implementations with warnings as errors, ASan, and UBSan. It then runs their
+native tests plus the Python QEMU-harness and ELF-layout tests.
 
 The parser has fixed resource bounds:
 
@@ -142,13 +150,25 @@ and boots through QEMU's default OpenSBI firmware.
 A pass requires all of:
 
 1. a serial line exactly equal to `MICROS_BOOT 0.1.0`;
-2. exactly one serial line equal to `MICROS_TRAP_READY`;
-3. a serial line exactly equal to
+2. exactly one valid `MICROS_OBJECTS_READY` line;
+3. exactly one serial line equal to `MICROS_TRAP_READY`;
+4. a serial line exactly equal to
    `MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000`;
-4. a serial line exactly equal to `MICROS_FDT_READY`;
-5. exactly one valid `MICROS_FRAME_ALLOCATOR_READY` line after FDT readiness;
-6. exactly one valid `MICROS_MMU_READY` line after allocator readiness;
-7. QEMU exit status zero after the SBI shutdown request.
+5. a serial line exactly equal to `MICROS_FDT_READY`;
+6. exactly one valid `MICROS_FRAME_ALLOCATOR_READY` line after FDT readiness;
+7. exactly one valid `MICROS_MMU_READY` line after allocator readiness;
+8. QEMU exit status zero after the SBI shutdown request.
+
+The object record occurs after the boot marker and before trap readiness:
+
+```text
+MICROS_OBJECTS_READY processes=0x0000000000000000 threads=0x0000000000000000 harts=0x0000000000000001 max-threads=0x0000000000000001 max-harts=0x0000000000000001 boot-hart=0x0000000000000000
+```
+
+It proves that the zeroed fixed-capacity registry was initialized once, the
+OpenSBI boot hart was registered, and the production one-thread/one-hart
+policies are active before traps can be delivered. Every QEMU workflow requires
+the record exactly once and validates all six values.
 
 The kernel emits every decoded range using stable, fixed-width hexadecimal
 events:
@@ -269,10 +289,11 @@ continuation that is not `fault + 4`. The assembly exit masks SIE, restores the
 mutable frame, and executes `sret`. The continuation snapshots every restored
 register before calling C.
 
-Only a complete round trip emits:
+Only a complete round trip through the registered hart's primary trap stack
+emits:
 
 ```text
-MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved
+MICROS_TRAP_TEST_PASS origin=S cause=illegal-instruction registers=preserved hart-context=routed primary-stack=selected sscratch=anchor
 ```
 
 The host gate requires exactly one trap-ready record, then FDT, allocator, and
@@ -300,10 +321,10 @@ counter rather than the previous deadline. The third expiration disables STIE
 and programs `UINT64_MAX`, after which the image verifies clear SIE, clear STIE,
 and exactly three accepted expirations.
 
-Only that complete sequence emits:
+Only that complete sequence, including final hart-owned timer state, emits:
 
 ```text
-MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0
+MICROS_TIMER_TEST_PASS ticks=0x0000000000000003 interval=0x00000000000186a0 active=0x0000000000000000 deadline=0xffffffffffffffff owner=hart
 ```
 
 The host gate requires normal boot, complete FDT evidence, allocator and MMU
@@ -311,6 +332,61 @@ readiness, exactly one newline-terminated pass record after MMU activation,
 clean SBI shutdown, and no panic, explicit failure, or timeout. Missing,
 duplicated, early, or malformed tick and interval fields fail. The interval is
 expressed only in platform counter ticks; it is not a wall-clock ABI.
+
+## Kernel object model test
+
+Build and run the target lifecycle test with:
+
+```bash
+cmake --workflow --preset test-qemu-object-model
+```
+
+The portable implementation uses 64 process slots, 128 thread slots, and
+eight hart slots. Process and thread handles contain a nonzero generation;
+release followed by reuse advances it, and stale handles no longer resolve.
+Process generations also reject endpoint-reserved encodings, and a slot is
+quarantined rather than wrapping into an invalid identity. Allocation is
+deterministic and chooses the lowest available slot.
+
+The isolated target image exercises the production registry rather than a test
+copy. It proves successful generation advance and stale rejection, enforces
+the production one-thread-per-process policy, binds and clears a running thread
+through the boot hart's current-thread field, directly checks the relevant
+intermediate states, and validates the complete final table. Only then does it
+emit:
+
+```text
+MICROS_OBJECT_MODEL_TEST_PASS process-generation=advanced stale=rejected thread-limit=enforced hart-local=preserved
+```
+
+Native ASan/UBSan coverage additionally exercises complete capacities,
+generation exhaustion and quarantine, failure atomicity, larger multi-thread
+and multi-hart policies, deliberately corrupted invariants, and a replayable
+4,096-operation independent reference model.
+
+## Per-hart nested trap test
+
+Build and run the isolated nested-fault test with:
+
+```bash
+cmake --workflow --preset test-qemu-nested-trap
+```
+
+Outside trap dispatch, `sscratch` contains the current hart's trap-anchor
+address. Entry saves interrupted `t0`-`t2` through that anchor, switches to the
+hart's primary stack, stores the hart context in the 288-byte frame, installs
+kernel `tp`, and clears `sscratch`. A second trap observes the zero sentinel
+and uses kernel `tp` to select the same hart's emergency stack.
+
+The test registers a distinct emergency stack, poisons interrupted `tp`, takes
+an initial exception, and injects another illegal instruction immediately
+after sentinel arming. It verifies hart identity, primary- and emergency-stack
+bounds, outer-frame context, and preservation of the poisoned interrupted
+`tp`. Only that route emits:
+
+```text
+MICROS_NESTED_TRAP_TEST_PASS hart=routed emergency-stack=selected
+```
 
 ## Bootstrap frame allocator test
 

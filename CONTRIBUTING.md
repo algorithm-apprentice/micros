@@ -68,6 +68,8 @@ cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
+cmake --workflow --preset test-qemu-object-model
+cmake --workflow --preset test-qemu-nested-trap
 ```
 
 Each workflow configures and builds its own image before running the selected

@@ -8,6 +8,13 @@ Architecture or scope changes are recorded in ADRs before implementation.
 Implementation follows the repository's documentation-first, test-first,
 independently reviewed AI-native workflow.
 
+Current Milestone 2 progress includes trap recovery, supervisor timer
+interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
+generation-safe process/thread/hart identity tables with per-hart trap and
+timer ownership. Per-process address-space roots, U-mode entry, saved execution
+contexts, repeated switching, and preemptive scheduling remain in dependency
+order.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
