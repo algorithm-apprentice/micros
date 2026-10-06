@@ -69,6 +69,15 @@ class ElfSectionParsingTest(unittest.TestCase):
                 + "0000000080201000 T __kernel_text_start\n"
             )
 
+    def test_parses_all_defined_symbol_names(self):
+        symbols = check_elf_sections.parse_defined_symbol_names(
+            VALID_SYMBOLS
+            + "0000000080208000 b timer_state\n"
+        )
+
+        self.assertIn("__kernel_start", symbols)
+        self.assertIn("timer_state", symbols)
+
 
 class ElfSectionValidationTest(unittest.TestCase):
     def validate(self, sections=VALID_SECTIONS, symbols=VALID_SYMBOLS):
@@ -178,6 +187,23 @@ class ElfSectionValidationTest(unittest.TestCase):
                     "must be page-aligned",
                     "\n".join(self.validate(symbols=unaligned)),
                 )
+
+    def test_rejects_legacy_hart_and_timer_storage_symbols(self):
+        errors = check_elf_sections.validate_forbidden_symbols(
+            {
+                "ordinary_symbol",
+                "micros_trap_hart_id",
+                "timer_state",
+            }
+        )
+
+        self.assertEqual(
+            [
+                "forbidden legacy symbol micros_trap_hart_id",
+                "forbidden legacy symbol timer_state",
+            ],
+            errors,
+        )
 
 
 if __name__ == "__main__":

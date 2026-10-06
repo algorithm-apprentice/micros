@@ -36,8 +36,17 @@
 #define MICROS_TRAP_CONTEXT_SEPC_OFFSET 256
 #define MICROS_TRAP_CONTEXT_SCAUSE_OFFSET 264
 #define MICROS_TRAP_CONTEXT_STVAL_OFFSET 272
-#define MICROS_TRAP_CONTEXT_RESERVED_OFFSET 280
+#define MICROS_TRAP_CONTEXT_HART_CONTEXT_OFFSET 280
 #define MICROS_TRAP_CONTEXT_SIZE 288
+
+#define MICROS_HART_TRAP_PRIMARY_TOP_OFFSET 0
+#define MICROS_HART_TRAP_PRIMARY_BOTTOM_OFFSET 8
+#define MICROS_HART_TRAP_EMERGENCY_TOP_OFFSET 16
+#define MICROS_HART_TRAP_EMERGENCY_BOTTOM_OFFSET 24
+#define MICROS_HART_TRAP_ENTRY_T0_OFFSET 32
+#define MICROS_HART_TRAP_ENTRY_T1_OFFSET 40
+#define MICROS_HART_TRAP_ENTRY_T2_OFFSET 48
+#define MICROS_HART_TRAP_ANCHOR_SIZE 56
 
 #define MICROS_RISCV_SSTATUS_SIE (1 << 1)
 #define MICROS_RISCV_SSTATUS_SPIE (1 << 5)
@@ -48,6 +57,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+#include "micros/kernel_objects.h"
 
 struct micros_trap_frame {
     uint64_t ra;
@@ -85,7 +96,7 @@ struct micros_trap_frame {
     uint64_t sepc;
     uint64_t scause;
     uint64_t stval;
-    uint64_t reserved;
+    uint64_t hart_context;
 };
 
 #define MICROS_TRAP_ASSERT_OFFSET(field, offset) \
@@ -133,8 +144,8 @@ MICROS_TRAP_ASSERT_OFFSET(sepc, MICROS_TRAP_CONTEXT_SEPC_OFFSET);
 MICROS_TRAP_ASSERT_OFFSET(scause, MICROS_TRAP_CONTEXT_SCAUSE_OFFSET);
 MICROS_TRAP_ASSERT_OFFSET(stval, MICROS_TRAP_CONTEXT_STVAL_OFFSET);
 MICROS_TRAP_ASSERT_OFFSET(
-    reserved,
-    MICROS_TRAP_CONTEXT_RESERVED_OFFSET
+    hart_context,
+    MICROS_TRAP_CONTEXT_HART_CONTEXT_OFFSET
 );
 
 _Static_assert(
@@ -142,7 +153,53 @@ _Static_assert(
     "trap context size mismatch"
 );
 
+#define MICROS_HART_TRAP_ASSERT_OFFSET(field, offset) \
+    _Static_assert( \
+        offsetof(struct micros_hart_trap_anchor, field) == (offset), \
+        "hart trap " #field " offset mismatch" \
+    )
+
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    primary_stack_top,
+    MICROS_HART_TRAP_PRIMARY_TOP_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    primary_stack_bottom,
+    MICROS_HART_TRAP_PRIMARY_BOTTOM_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    emergency_stack_top,
+    MICROS_HART_TRAP_EMERGENCY_TOP_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    emergency_stack_bottom,
+    MICROS_HART_TRAP_EMERGENCY_BOTTOM_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    entry_t0,
+    MICROS_HART_TRAP_ENTRY_T0_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    entry_t1,
+    MICROS_HART_TRAP_ENTRY_T1_OFFSET
+);
+MICROS_HART_TRAP_ASSERT_OFFSET(
+    entry_t2,
+    MICROS_HART_TRAP_ENTRY_T2_OFFSET
+);
+
+_Static_assert(
+    sizeof(struct micros_hart_trap_anchor)
+        == MICROS_HART_TRAP_ANCHOR_SIZE,
+    "hart trap anchor size mismatch"
+);
+_Static_assert(
+    offsetof(struct micros_hart, trap) == 0,
+    "hart trap anchor must be the first hart field"
+);
+
 #undef MICROS_TRAP_ASSERT_OFFSET
+#undef MICROS_HART_TRAP_ASSERT_OFFSET
 
 #endif
 

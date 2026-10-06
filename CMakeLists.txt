@@ -243,6 +243,7 @@ add_executable(
     kernel/bootstrap_memory.c
     kernel/fdt.c
     kernel/frame_allocator.c
+    kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/main.c
     kernel/panic.c
@@ -386,6 +387,11 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
         PRIVATE
             MICROS_BUILD_OBJECT_MODEL_TEST=1
     )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/object_model_test.c
+    )
 endif()
 
 if(MICROS_BUILD_NESTED_TRAP_TEST)
@@ -393,6 +399,11 @@ if(MICROS_BUILD_NESTED_TRAP_TEST)
         micros
         PRIVATE
             MICROS_BUILD_NESTED_TRAP_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/nested_trap_test.S
     )
 endif()
 
