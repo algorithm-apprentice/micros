@@ -18,13 +18,16 @@ TRAP_READY_MARKER = "MICROS_TRAP_READY"
 TRAP_TEST_MARKER = "MICROS_TRAP_TEST"
 TRAP_TEST_PASS = (
     "MICROS_TRAP_TEST_PASS "
-    "origin=S cause=illegal-instruction registers=preserved"
+    "origin=S cause=illegal-instruction registers=preserved "
+    "hart-context=routed primary-stack=selected sscratch=anchor"
 )
 TIMER_TEST_MARKER = "MICROS_TIMER_TEST"
 TIMER_TEST_PASS = (
     "MICROS_TIMER_TEST_PASS "
     "ticks=0x0000000000000003 "
-    "interval=0x00000000000186a0"
+    "interval=0x00000000000186a0 "
+    "active=0x0000000000000000 "
+    "deadline=0xffffffffffffffff owner=hart"
 )
 FRAME_ALLOCATOR_READY_MARKER = "MICROS_FRAME_ALLOCATOR_READY"
 FRAME_ALLOCATOR_TEST_MARKER = "MICROS_FRAME_ALLOCATOR_TEST"
@@ -51,6 +54,29 @@ MMU_TEST_PASS = (
     "store-fault=text "
     "execute-fault=writable "
     "traps=0x0000000000000002"
+)
+OBJECTS_READY_MARKER = "MICROS_OBJECTS_READY"
+OBJECT_MODEL_TEST_MARKER = "MICROS_OBJECT_MODEL_TEST"
+NESTED_TRAP_TEST_MARKER = "MICROS_NESTED_TRAP_TEST"
+OBJECTS_READY_PATTERN = re.compile(
+    r"^MICROS_OBJECTS_READY "
+    r"processes=0x([0-9a-f]{16}) "
+    r"threads=0x([0-9a-f]{16}) "
+    r"harts=0x([0-9a-f]{16}) "
+    r"max-threads=0x([0-9a-f]{16}) "
+    r"max-harts=0x([0-9a-f]{16}) "
+    r"boot-hart=0x([0-9a-f]{16})$"
+)
+OBJECT_MODEL_TEST_PASS = (
+    "MICROS_OBJECT_MODEL_TEST_PASS "
+    "process-generation=advanced "
+    "stale=rejected "
+    "thread-limit=enforced "
+    "hart-local=preserved"
+)
+NESTED_TRAP_TEST_PASS = (
+    "MICROS_NESTED_TRAP_TEST_PASS "
+    "hart=routed emergency-stack=selected"
 )
 FDT_COUNTS_PATTERN = re.compile(
     r"^MICROS_FDT_COUNTS "
@@ -196,6 +222,50 @@ def _has_complete_trap_ready(output_lines):
     return (
         len(indices) == 1
         and output_lines[indices[0]] == TRAP_READY_MARKER
+    )
+
+
+def parse_objects_ready(output):
+    output_lines, terminated = _split_output_records(output)
+    indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(OBJECTS_READY_MARKER)
+    ]
+    if len(indices) != 1 or not terminated[indices[0]]:
+        return None
+
+    match = OBJECTS_READY_PATTERN.fullmatch(output_lines[indices[0]])
+    if match is None:
+        return None
+    return tuple(int(value, 16) for value in match.groups())
+
+
+def _has_complete_objects_ready(output):
+    output_lines = output.splitlines()
+    boot_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_BOOT ")
+    ]
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(OBJECTS_READY_MARKER)
+    ]
+    trap_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(TRAP_READY_MARKER)
+    ]
+    ready = parse_objects_ready(output)
+    return (
+        len(boot_indices) == 1
+        and len(ready_indices) == 1
+        and len(trap_indices) == 1
+        and boot_indices[0] < ready_indices[0] < trap_indices[0]
+        and ready is not None
+        and ready == (0, 0, 1, 1, 1, 0)
     )
 
 
@@ -413,6 +483,8 @@ def _mmu_ready_precedes_target_outcome(output):
             or line == TIMER_TEST_PASS
             or line == FRAME_ALLOCATOR_TEST_PASS
             or line == MMU_TEST_PASS
+            or line == OBJECT_MODEL_TEST_PASS
+            or line == NESTED_TRAP_TEST_PASS
         )
     ]
     return (
@@ -441,6 +513,78 @@ def _has_complete_mmu_test_report(output):
         and output_lines[test_indices[0]] == MMU_TEST_PASS
         and terminated[test_indices[0]]
         and ready_indices[0] < test_indices[0]
+    )
+
+
+def _objects_ready_precedes_target_outcome(output):
+    output_lines = output.splitlines()
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(OBJECTS_READY_MARKER)
+    ]
+    outcome_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if (
+            PANIC_CORE_PATTERNS[0].fullmatch(line) is not None
+            or line == TRAP_TEST_PASS
+            or line == TIMER_TEST_PASS
+            or line == FRAME_ALLOCATOR_TEST_PASS
+            or line == MMU_TEST_PASS
+            or line == OBJECT_MODEL_TEST_PASS
+            or line == NESTED_TRAP_TEST_PASS
+        )
+    ]
+    return (
+        len(ready_indices) == 1
+        and all(ready_indices[0] < index for index in outcome_indices)
+    )
+
+
+def _has_complete_object_model_test_report(output):
+    if not _has_complete_mmu_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    mmu_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(OBJECT_MODEL_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == OBJECT_MODEL_TEST_PASS
+        and terminated[test_indices[0]]
+        and mmu_indices[0] < test_indices[0]
+    )
+
+
+def _has_complete_nested_trap_test_report(output):
+    if not _has_complete_mmu_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    mmu_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(MMU_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(NESTED_TRAP_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == NESTED_TRAP_TEST_PASS
+        and terminated[test_indices[0]]
+        and mmu_indices[0] < test_indices[0]
     )
 
 
@@ -537,6 +681,9 @@ def matches_expected_result(
     require_frame_allocator_test_report=False,
     require_mmu_ready=False,
     require_mmu_test_report=False,
+    require_objects_ready=False,
+    require_object_model_test_report=False,
+    require_nested_trap_test_report=False,
     require_trap_context=False,
     expected_trap_context_sepc=None,
 ):
@@ -598,6 +745,24 @@ def matches_expected_result(
     if (
         require_mmu_test_report
         and not _has_complete_mmu_test_report(result.output)
+    ):
+        return False
+    if (
+        require_objects_ready
+        and (
+            not _has_complete_objects_ready(result.output)
+            or not _objects_ready_precedes_target_outcome(result.output)
+        )
+    ):
+        return False
+    if (
+        require_object_model_test_report
+        and not _has_complete_object_model_test_report(result.output)
+    ):
+        return False
+    if (
+        require_nested_trap_test_report
+        and not _has_complete_nested_trap_test_report(result.output)
     ):
         return False
     has_trap_context = any(
@@ -847,6 +1012,21 @@ def parse_arguments(argv):
         help="Require the ordered MMU permission test record",
     )
     parser.add_argument(
+        "--require-objects-ready",
+        action="store_true",
+        help="Require the ordered kernel-object readiness record",
+    )
+    parser.add_argument(
+        "--require-object-model-test-report",
+        action="store_true",
+        help="Require the ordered kernel-object model test record",
+    )
+    parser.add_argument(
+        "--require-nested-trap-test-report",
+        action="store_true",
+        help="Require the ordered per-hart nested-trap test record",
+    )
+    parser.add_argument(
         "--require-trap-context",
         action="store_true",
         help="Require one trap context immediately after the panic core",
@@ -955,6 +1135,13 @@ def main(argv=None):
             ),
             require_mmu_ready=arguments.require_mmu_ready,
             require_mmu_test_report=arguments.require_mmu_test_report,
+            require_objects_ready=arguments.require_objects_ready,
+            require_object_model_test_report=(
+                arguments.require_object_model_test_report
+            ),
+            require_nested_trap_test_report=(
+                arguments.require_nested_trap_test_report
+            ),
             require_trap_context=arguments.require_trap_context,
             expected_trap_context_sepc=expected_trap_context_sepc,
         )

@@ -4,6 +4,7 @@
 #include "micros/bootstrap_memory.h"
 #include "micros/fdt.h"
 #include "micros/kernel_address_space.h"
+#include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
 #include "micros/trap.h"
@@ -13,6 +14,18 @@
 #endif
 
 void kernel_main(uintptr_t hart_id, uintptr_t fdt_address);
+
+#ifdef MICROS_BUILD_OBJECT_MODEL_TEST
+bool micros_kernel_object_runtime_run_self_test(void);
+#endif
+
+#ifdef MICROS_BUILD_NESTED_TRAP_TEST
+void micros_nested_trap_test_trigger(void);
+extern unsigned char
+    micros_nested_trap_test_emergency_stack_bottom[];
+extern unsigned char
+    micros_nested_trap_test_emergency_stack_top[];
+#endif
 
 static void write_range(
     const char *event,
@@ -55,13 +68,41 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 {
     const struct micros_frame_allocator *frame_allocator;
     const struct micros_kernel_address_space_report *address_space;
+    const struct micros_kernel_objects *kernel_objects;
+    struct micros_hart *boot_hart;
     struct micros_fdt_memory_map memory_map;
     enum micros_fdt_error error;
     size_t index;
 
-    micros_trap_install(hart_id);
+    if (
+        micros_kernel_object_runtime_initialize(hart_id)
+        != MICROS_KERNEL_OBJECT_OK
+    ) {
+        MICROS_PANIC(hart_id, "objects-init");
+    }
+    if (!micros_trap_install()) {
+        MICROS_PANIC(hart_id, "trap-install");
+    }
+    kernel_objects = micros_kernel_object_runtime_registry();
+    boot_hart = micros_kernel_object_runtime_boot_hart();
+    if (kernel_objects == NULL || boot_hart == NULL) {
+        MICROS_PANIC(hart_id, "objects-state");
+    }
 
     uart_write("MICROS_BOOT " MICROS_VERSION "\n");
+    uart_write("MICROS_OBJECTS_READY processes=");
+    uart_write_hex64(kernel_objects->live_process_count);
+    uart_write(" threads=");
+    uart_write_hex64(kernel_objects->live_thread_count);
+    uart_write(" harts=");
+    uart_write_hex64(kernel_objects->registered_hart_count);
+    uart_write(" max-threads=");
+    uart_write_hex64(kernel_objects->max_threads_per_process);
+    uart_write(" max-harts=");
+    uart_write_hex64(kernel_objects->max_harts);
+    uart_write(" boot-hart=");
+    uart_write_hex64(boot_hart->hardware_id);
+    uart_write("\n");
     uart_write("MICROS_TRAP_READY\n");
     uart_flush();
 
@@ -152,7 +193,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     }
     uart_write(
         "MICROS_TRAP_TEST_PASS "
-        "origin=S cause=illegal-instruction registers=preserved\n"
+        "origin=S cause=illegal-instruction registers=preserved "
+        "hart-context=routed primary-stack=selected "
+        "sscratch=anchor\n"
     );
     uart_flush();
 #endif
@@ -164,6 +207,7 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_TIMER_TEST
     if (
         !micros_timer_run_self_test(
+            boot_hart,
             UINT64_C(0x00000000000186a0),
             UINT64_C(3)
         )
@@ -171,9 +215,14 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         MICROS_PANIC(hart_id, "timer-test-failed");
     }
     uart_write("MICROS_TIMER_TEST_PASS ticks=");
-    uart_write_hex64(micros_timer_ticks());
+    uart_write_hex64(micros_timer_ticks(boot_hart));
     uart_write(" interval=");
     uart_write_hex64(UINT64_C(0x00000000000186a0));
+    uart_write(" active=");
+    uart_write_hex64(boot_hart->timer.active ? 1 : 0);
+    uart_write(" deadline=");
+    uart_write_hex64(boot_hart->timer.deadline);
+    uart_write(" owner=hart");
     uart_write("\n");
     uart_flush();
 #endif
@@ -200,6 +249,33 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "traps=0x0000000000000002\n"
     );
     uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_OBJECT_MODEL_TEST
+    if (!micros_kernel_object_runtime_run_self_test()) {
+        MICROS_PANIC(hart_id, "object-model-test");
+    }
+    uart_write(
+        "MICROS_OBJECT_MODEL_TEST_PASS "
+        "process-generation=advanced stale=rejected "
+        "thread-limit=enforced hart-local=preserved\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_NESTED_TRAP_TEST
+    if (
+        !micros_kernel_object_runtime_set_test_emergency_stack(
+            (uintptr_t)
+                micros_nested_trap_test_emergency_stack_bottom,
+            (uintptr_t)
+                micros_nested_trap_test_emergency_stack_top
+        )
+    ) {
+        MICROS_PANIC(hart_id, "nested-trap-test-stack");
+    }
+    micros_nested_trap_test_trigger();
+    MICROS_PANIC(hart_id, "nested-trap-test-returned");
 #endif
 
     (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);

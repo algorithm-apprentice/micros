@@ -3,7 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arch/riscv64/platform.h"
 #include "micros/kernel_address_space.h"
+#include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
 
@@ -15,7 +17,103 @@ enum {
     MICROS_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
-uintptr_t micros_trap_hart_id;
+extern unsigned char __trap_stack_bottom[];
+extern unsigned char __trap_stack_top[];
+extern unsigned char __trap_emergency_stack_bottom[];
+extern unsigned char __trap_emergency_stack_top[];
+extern unsigned char micros_trap_entry[];
+
+void micros_riscv_trap_install(struct micros_hart *hart);
+
+static uintptr_t read_sscratch(void)
+{
+    uintptr_t value;
+
+    __asm__ volatile("csrr %0, sscratch" : "=r"(value));
+    return value;
+}
+
+static uintptr_t read_stvec(void)
+{
+    uintptr_t value;
+
+    __asm__ volatile("csrr %0, stvec" : "=r"(value));
+    return value;
+}
+
+static uintptr_t read_tp(void)
+{
+    uintptr_t value;
+
+    __asm__ volatile("mv %0, tp" : "=r"(value));
+    return value;
+}
+
+static bool frame_is_on_primary_stack(
+    const struct micros_hart *hart,
+    const struct micros_trap_frame *frame
+)
+{
+    uintptr_t frame_address = (uintptr_t)frame;
+
+    return (
+        hart != NULL
+        && hart->trap_installed
+        && frame_address >= hart->trap.primary_stack_bottom
+        && frame_address < hart->trap.primary_stack_top
+        && sizeof(*frame)
+            <= hart->trap.primary_stack_top - frame_address
+    );
+}
+
+static struct micros_hart *resolve_trap_hart(
+    const struct micros_trap_frame *frame
+)
+{
+    struct micros_hart *hart;
+
+    if (frame == NULL || frame->hart_context == 0) {
+        return NULL;
+    }
+    hart = micros_kernel_object_runtime_hart_from_context(
+        frame->hart_context
+    );
+    if (
+        hart == NULL
+        || !frame_is_on_primary_stack(hart, frame)
+        || read_sscratch() != 0
+        || read_tp() != (uintptr_t)hart
+    ) {
+        return NULL;
+    }
+    return hart;
+}
+
+bool micros_trap_install(void)
+{
+    struct micros_hart *hart;
+
+    if (
+        micros_kernel_object_runtime_install_trap_stacks(
+            (uintptr_t)__trap_stack_bottom,
+            (uintptr_t)__trap_stack_top,
+            (uintptr_t)__trap_emergency_stack_bottom,
+            (uintptr_t)__trap_emergency_stack_top
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return false;
+    }
+    hart = micros_kernel_object_runtime_boot_hart();
+    if (hart == NULL) {
+        return false;
+    }
+    micros_riscv_trap_install(hart);
+    return (
+        read_sscratch() == (uintptr_t)hart
+        && read_tp() == (uintptr_t)hart
+        && read_stvec() == (uintptr_t)micros_trap_entry
+    );
+}
 
 #if defined(MICROS_BUILD_TRAP_TEST) \
     || defined(MICROS_BUILD_TRAP_PANIC_TEST)
@@ -103,7 +201,7 @@ static bool trap_test_has_expected_exception(
         && frame->sepc == (uintptr_t)micros_trap_test_fault
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SIE) == 0
-        && frame->reserved == 0
+        && frame->hart_context != 0
     );
 }
 
@@ -194,14 +292,29 @@ static bool trap_panic_test_has_expected_exception(
             == MICROS_EXCEPTION_ILLEGAL_INSTRUCTION
         && frame->sepc == (uintptr_t)micros_trap_panic_test_fault
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
-        && frame->reserved == 0
+        && frame->hart_context != 0
     );
 }
 #endif
 
 void micros_trap_dispatch(struct micros_trap_frame *frame)
 {
-    uint64_t cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
+    struct micros_hart *hart = resolve_trap_hart(frame);
+    uint64_t cause_code;
+
+    if (hart == NULL) {
+        struct micros_hart *boot_hart =
+            micros_kernel_object_runtime_boot_hart();
+        uintptr_t hart_id =
+            boot_hart == NULL ? 0 : boot_hart->hardware_id;
+
+        MICROS_TRAP_PANIC(
+            hart_id,
+            "trap-route-invalid",
+            frame
+        );
+    }
+    cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
 
 #ifdef MICROS_BUILD_MMU_TEST
     {
@@ -213,7 +326,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
         }
         if (result == MICROS_MMU_TEST_TRAP_MISMATCH) {
             MICROS_TRAP_PANIC(
-                micros_trap_hart_id,
+                hart->hardware_id,
                 "mmu-test-mismatch",
                 frame
             );
@@ -228,7 +341,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             || !trap_test_has_entry_registers(frame)
         ) {
             MICROS_TRAP_PANIC(
-                micros_trap_hart_id,
+                hart->hardware_id,
                 "trap-test-capture",
                 frame
             );
@@ -244,7 +357,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 #ifdef MICROS_BUILD_TRAP_PANIC_TEST
     if (!trap_panic_test_has_expected_exception(frame)) {
         MICROS_TRAP_PANIC(
-            micros_trap_hart_id,
+            hart->hardware_id,
             "trap-test-mismatch",
             frame
         );
@@ -254,7 +367,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
     if ((frame->scause & MICROS_SCAUSE_INTERRUPT) != 0) {
         if (cause_code == MICROS_INTERRUPT_SUPERVISOR_TIMER) {
             enum micros_timer_interrupt_result result =
-                micros_timer_handle_interrupt();
+                micros_timer_handle_interrupt(hart);
 
             switch (result) {
             case MICROS_TIMER_INTERRUPT_HANDLED:
@@ -262,52 +375,119 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 return;
             case MICROS_TIMER_INTERRUPT_INACTIVE:
                 MICROS_TRAP_PANIC(
-                    micros_trap_hart_id,
+                    hart->hardware_id,
                     "unexpected-timer",
                     frame
                 );
             case MICROS_TIMER_INTERRUPT_TICK_OVERFLOW:
                 MICROS_TRAP_PANIC(
-                    micros_trap_hart_id,
+                    hart->hardware_id,
                     "timer-tick-overflow",
                     frame
                 );
             case MICROS_TIMER_INTERRUPT_REARM_FAILED:
                 MICROS_TRAP_PANIC(
-                    micros_trap_hart_id,
+                    hart->hardware_id,
                     "timer-rearm-failed",
                     frame
                 );
             }
             MICROS_TRAP_PANIC(
-                micros_trap_hart_id,
+                hart->hardware_id,
                 "timer-result-invalid",
                 frame
             );
         }
         MICROS_TRAP_PANIC(
-            micros_trap_hart_id,
+            hart->hardware_id,
             "unexpected-interrupt",
             frame
         );
     }
     MICROS_TRAP_PANIC(
-        micros_trap_hart_id,
+        hart->hardware_id,
         "unexpected-exception",
         frame
     );
 }
 
-_Noreturn void micros_trap_nested_panic(void)
+_Noreturn void micros_trap_nested_panic(
+    struct micros_hart *hart,
+    const struct micros_trap_frame *outer_frame
+)
 {
-    MICROS_PANIC(micros_trap_hart_id, "nested-trap");
+#ifdef MICROS_BUILD_NESTED_TRAP_TEST
+    const uint64_t poison_tp = UINT64_C(0x4e45535445445450);
+    struct micros_hart *resolved =
+        micros_kernel_object_runtime_hart_from_context(
+            (uintptr_t)hart
+        );
+    uintptr_t stack_probe = (uintptr_t)&resolved;
+
+    if (
+        resolved == NULL
+        || resolved != hart
+        || outer_frame == NULL
+        || !frame_is_on_primary_stack(resolved, outer_frame)
+        || outer_frame->hart_context != (uintptr_t)resolved
+        || outer_frame->tp != poison_tp
+        || stack_probe < resolved->trap.emergency_stack_bottom
+        || stack_probe >= resolved->trap.emergency_stack_top
+        || read_sscratch() != 0
+        || read_tp() != (uintptr_t)resolved
+    ) {
+        struct micros_hart *boot_hart =
+            micros_kernel_object_runtime_boot_hart();
+        uintptr_t hart_id =
+            boot_hart == NULL ? 0 : boot_hart->hardware_id;
+
+        MICROS_PANIC(hart_id, "nested-trap-test-route");
+    }
+    uart_write(
+        "MICROS_NESTED_TRAP_TEST_PASS "
+        "hart=routed emergency-stack=selected\n"
+    );
+    uart_flush();
+    (void)sbi_system_reset(
+        SBI_RESET_TYPE_SHUTDOWN,
+        SBI_RESET_REASON_NONE
+    );
+    uart_write("MICROS_TEST_FAILURE sbi-system-reset-returned\n");
+    uart_flush();
+    for (;;) {
+        __asm__ volatile("wfi");
+    }
+#else
+    struct micros_hart *resolved =
+        micros_kernel_object_runtime_hart_from_context(
+            (uintptr_t)hart
+        );
+    struct micros_hart *boot_hart =
+        micros_kernel_object_runtime_boot_hart();
+    uintptr_t hart_id;
+
+    (void)outer_frame;
+    if (resolved != NULL) {
+        hart_id = resolved->hardware_id;
+    } else if (boot_hart != NULL) {
+        hart_id = boot_hart->hardware_id;
+    } else {
+        hart_id = 0;
+    }
+    MICROS_PANIC(hart_id, "nested-trap");
+#endif
 }
 
 #ifdef MICROS_BUILD_TRAP_TEST
 bool micros_trap_run_self_test(void)
 {
+    struct micros_hart *hart =
+        micros_kernel_object_runtime_boot_hart();
     bool passed;
 
+    if (hart == NULL) {
+        return false;
+    }
     trap_test_count = 0;
     trap_test_state = TRAP_TEST_ARMED;
     micros_trap_test_trigger();
@@ -315,6 +495,10 @@ bool micros_trap_run_self_test(void)
         trap_test_state == TRAP_TEST_HANDLED
         && trap_test_count == 1
         && trap_test_has_return_registers()
+        && read_sscratch() == (uintptr_t)hart
+        && read_tp() == (uintptr_t)hart
+        && micros_kernel_object_runtime_validate()
+            == MICROS_KERNEL_OBJECT_OK
     );
     trap_test_state = TRAP_TEST_IDLE;
     return passed;
@@ -324,7 +508,13 @@ bool micros_trap_run_self_test(void)
 #ifdef MICROS_BUILD_TRAP_PANIC_TEST
 _Noreturn void micros_trap_run_panic_test(void)
 {
+    struct micros_hart *hart =
+        micros_kernel_object_runtime_boot_hart();
+
     micros_trap_panic_test_trigger();
-    MICROS_PANIC(micros_trap_hart_id, "trap-test-returned");
+    MICROS_PANIC(
+        hart == NULL ? 0 : hart->hardware_id,
+        "trap-test-returned"
+    );
 }
 #endif

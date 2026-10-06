@@ -8,17 +8,37 @@ micros_trap_entry:
     csrrw sp, sscratch, sp
     beqz sp, .Lnested_trap
 
-    addi sp, sp, -MICROS_TRAP_CONTEXT_SIZE
+    sd t0, MICROS_HART_TRAP_ENTRY_T0_OFFSET(sp)
+    sd t1, MICROS_HART_TRAP_ENTRY_T1_OFFSET(sp)
+    sd t2, MICROS_HART_TRAP_ENTRY_T2_OFFSET(sp)
+    mv t2, sp
+
+    ld t1, MICROS_HART_TRAP_PRIMARY_TOP_OFFSET(t2)
+    addi sp, t1, -MICROS_TRAP_CONTEXT_SIZE
+    ld t0, MICROS_HART_TRAP_ENTRY_T0_OFFSET(t2)
     sd t0, MICROS_TRAP_CONTEXT_T0_OFFSET(sp)
+    ld t0, MICROS_HART_TRAP_ENTRY_T1_OFFSET(t2)
+    sd t0, MICROS_TRAP_CONTEXT_T1_OFFSET(sp)
+    ld t0, MICROS_HART_TRAP_ENTRY_T2_OFFSET(t2)
+    sd t0, MICROS_TRAP_CONTEXT_T2_OFFSET(sp)
     csrr t0, sscratch
     sd t0, MICROS_TRAP_CONTEXT_SP_OFFSET(sp)
+    sd tp, MICROS_TRAP_CONTEXT_TP_OFFSET(sp)
+    sd t2, MICROS_TRAP_CONTEXT_HART_CONTEXT_OFFSET(sp)
+    mv tp, t2
     csrw sscratch, zero
 
+#ifdef MICROS_BUILD_NESTED_TRAP_TEST
+.globl micros_nested_trap_injected_fault
+micros_nested_trap_injected_fault:
+    .4byte 0xc0001073
+#endif
+
+    sd zero, MICROS_HART_TRAP_ENTRY_T0_OFFSET(t2)
+    sd zero, MICROS_HART_TRAP_ENTRY_T1_OFFSET(t2)
+    sd zero, MICROS_HART_TRAP_ENTRY_T2_OFFSET(t2)
     sd ra, MICROS_TRAP_CONTEXT_RA_OFFSET(sp)
     sd gp, MICROS_TRAP_CONTEXT_GP_OFFSET(sp)
-    sd tp, MICROS_TRAP_CONTEXT_TP_OFFSET(sp)
-    sd t1, MICROS_TRAP_CONTEXT_T1_OFFSET(sp)
-    sd t2, MICROS_TRAP_CONTEXT_T2_OFFSET(sp)
     sd s0, MICROS_TRAP_CONTEXT_S0_OFFSET(sp)
     sd s1, MICROS_TRAP_CONTEXT_S1_OFFSET(sp)
     sd a0, MICROS_TRAP_CONTEXT_A0_OFFSET(sp)
@@ -52,7 +72,6 @@ micros_trap_entry:
     sd t0, MICROS_TRAP_CONTEXT_SCAUSE_OFFSET(sp)
     csrr t0, stval
     sd t0, MICROS_TRAP_CONTEXT_STVAL_OFFSET(sp)
-    sd zero, MICROS_TRAP_CONTEXT_RESERVED_OFFSET(sp)
 
     mv a0, sp
     call micros_trap_dispatch
@@ -65,9 +84,6 @@ micros_trap_entry:
 
     ld ra, MICROS_TRAP_CONTEXT_RA_OFFSET(sp)
     ld gp, MICROS_TRAP_CONTEXT_GP_OFFSET(sp)
-    ld tp, MICROS_TRAP_CONTEXT_TP_OFFSET(sp)
-    ld t1, MICROS_TRAP_CONTEXT_T1_OFFSET(sp)
-    ld t2, MICROS_TRAP_CONTEXT_T2_OFFSET(sp)
     ld s0, MICROS_TRAP_CONTEXT_S0_OFFSET(sp)
     ld s1, MICROS_TRAP_CONTEXT_S1_OFFSET(sp)
     ld a0, MICROS_TRAP_CONTEXT_A0_OFFSET(sp)
@@ -93,34 +109,36 @@ micros_trap_entry:
     ld t5, MICROS_TRAP_CONTEXT_T5_OFFSET(sp)
     ld t6, MICROS_TRAP_CONTEXT_T6_OFFSET(sp)
 
-    ld t0, MICROS_TRAP_CONTEXT_SP_OFFSET(sp)
+    ld t0, MICROS_TRAP_CONTEXT_HART_CONTEXT_OFFSET(sp)
     csrw sscratch, t0
     ld t0, MICROS_TRAP_CONTEXT_T0_OFFSET(sp)
-    addi sp, sp, MICROS_TRAP_CONTEXT_SIZE
-    csrrw sp, sscratch, sp
+    ld t1, MICROS_TRAP_CONTEXT_T1_OFFSET(sp)
+    ld t2, MICROS_TRAP_CONTEXT_T2_OFFSET(sp)
+    ld tp, MICROS_TRAP_CONTEXT_TP_OFFSET(sp)
+    ld sp, MICROS_TRAP_CONTEXT_SP_OFFSET(sp)
     sret
 
 .Lnested_trap:
+    csrr a1, sscratch
     csrw sscratch, zero
-    la sp, __trap_emergency_stack_top
+    mv a0, tp
+    ld sp, MICROS_HART_TRAP_EMERGENCY_TOP_OFFSET(tp)
     call micros_trap_nested_panic
 .Lnested_halt:
     wfi
     j .Lnested_halt
 .size micros_trap_entry, . - micros_trap_entry
 
-.globl micros_trap_install
-.type micros_trap_install, @function
-micros_trap_install:
+.globl micros_riscv_trap_install
+.type micros_riscv_trap_install, @function
+micros_riscv_trap_install:
     csrci sstatus, MICROS_RISCV_SSTATUS_SIE
-    la t0, micros_trap_hart_id
-    sd a0, 0(t0)
-    la t0, __trap_stack_top
-    csrw sscratch, t0
+    csrw sscratch, a0
+    mv tp, a0
     la t0, micros_trap_entry
     csrw stvec, t0
     ret
-.size micros_trap_install, . - micros_trap_install
+.size micros_riscv_trap_install, . - micros_riscv_trap_install
 
 .section .trap_stack, "aw", @nobits
 .balign 16

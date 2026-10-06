@@ -21,6 +21,12 @@ REQUIRED_SYMBOLS = (
     "__kernel_writable_end",
     "__kernel_end",
 )
+FORBIDDEN_DEFINED_SYMBOLS = frozenset(
+    (
+        "micros_trap_hart_id",
+        "timer_state",
+    )
+)
 ALLOWED_SECTION_RANGES = {
     ".text": "text",
     ".rodata": "rodata",
@@ -109,6 +115,23 @@ def parse_symbol_addresses(output):
             raise ValueError(f"duplicate symbol {name}")
         symbols[name] = address
     return symbols
+
+
+def parse_defined_symbol_names(output):
+    symbols = set()
+
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) >= 3:
+            symbols.add(fields[-1])
+    return symbols
+
+
+def validate_forbidden_symbols(symbols):
+    return [
+        f"forbidden legacy symbol {name}"
+        for name in sorted(FORBIDDEN_DEFINED_SYMBOLS.intersection(symbols))
+    ]
 
 
 def _permission_ranges(symbols):
@@ -259,22 +282,23 @@ def main(argv=None):
                 "section inspection",
             )
         )
-        symbols = parse_symbol_addresses(
-            _run_tool(
-                [
-                    arguments.nm,
-                    "-n",
-                    "--defined-only",
-                    str(arguments.elf),
-                ],
-                "symbol inspection",
-            )
+        symbol_output = _run_tool(
+            [
+                arguments.nm,
+                "-n",
+                "--defined-only",
+                str(arguments.elf),
+            ],
+            "symbol inspection",
         )
+        symbols = parse_symbol_addresses(symbol_output)
+        defined_symbol_names = parse_defined_symbol_names(symbol_output)
     except (FileNotFoundError, RuntimeError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
 
     errors = validate_allocatable_sections(sections, symbols)
+    errors.extend(validate_forbidden_symbols(defined_symbol_names))
     if errors:
         for error in errors:
             print(error, file=sys.stderr)

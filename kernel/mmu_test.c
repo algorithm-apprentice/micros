@@ -41,7 +41,7 @@ static bool frame_has_common_expected_state(
         && (frame->scause & MICROS_SCAUSE_INTERRUPT) == 0
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
         && (frame->sstatus & MICROS_RISCV_SSTATUS_SIE) == 0
-        && frame->reserved == 0
+        && frame->hart_context != 0
     );
 }
 
