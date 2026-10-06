@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Superseded in part by: ADR-0027 return-boundary timer preparation
 - Replaces: scheduler design invalidated by ADR-0025
 - Supersedes in part:
   - ADR-0016 handled U-origin timer interrupts returning through the unchanged

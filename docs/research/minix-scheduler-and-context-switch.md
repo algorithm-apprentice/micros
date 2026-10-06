@@ -218,6 +218,26 @@ The key boundary is:
 The existing `micros` choice to count one accepted timer expiration as one
 complete quantum is therefore not MINIX baseline behavior.
 
+### Expired-only timer restart at return boundaries
+
+MINIX also prepares the timer immediately before leaving kernel work:
+
+- `switch_to_user()` calls `restart_local_timer()` immediately before user
+  context restore (`minix/kernel/proc.c:466-472`);
+- `idle()` restarts the boot CPU timer before sleeping
+  (`minix/kernel/proc.c:198-204`);
+- x86 delegates to the APIC timer
+  (`minix/kernel/arch/i386/arch_clock.c:168-174`);
+- the APIC restart programs a new one-shot only if the previous counter has
+  reached zero (`minix/kernel/arch/i386/apic.c:574-579`).
+
+The equivalent SBI TIME boundary is a **Required adaptation**: if kernel
+preflight outlasted the programmed deadline, program a future deadline before
+user return or idle wait. This does not count an extra expiration, renew
+thread quantum, or select another thread. It prevents immediate same-PC timer
+retrap from starving actual user execution. The exact contract is defined by
+[ADR-0027](../adr/0027-return-boundary-timer-rearming.md).
+
 ## Kernel and user scheduler split
 
 The SCHED server owns policy fields such as maximum priority, current priority,
