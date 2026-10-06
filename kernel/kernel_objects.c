@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "scheduler_core_internal.h"
+
 #define MICROS_KERNEL_OBJECTS_MAGIC UINT64_C(0x4d4943524f534f42)
 
 static bool storage_is_zero(
@@ -69,6 +71,41 @@ static bool thread_handle_is_zero(
 static bool hart_handle_is_zero(struct micros_hart_handle handle)
 {
     return handle.slot == 0 && handle.generation == 0;
+}
+
+static bool hart_handles_equal(
+    struct micros_hart_handle left,
+    struct micros_hart_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
+static bool hart_has_scheduler_assignment(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && thread->scheduler_assigned
+            && hart_handles_equal(
+                thread->scheduler_hart,
+                hart_handle
+            )
+        ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool thread_scheduler_metadata_is_zero(
@@ -140,6 +177,19 @@ static bool hart_scheduler_metadata_is_zero(
             return false;
         }
     }
+    return (
+        hart->accounting_owner == MICROS_SCHEDULER_ACCOUNTING_NONE
+        && hart->accounting_started_at == 0
+        && thread_handle_is_zero(hart->accounted_thread)
+        && hart->kernel_counter_ticks == 0
+        && hart->idle_counter_ticks == 0
+    );
+}
+
+static bool hart_accounting_metadata_is_zero(
+    const struct micros_hart *hart
+)
+{
     return (
         hart->accounting_owner == MICROS_SCHEDULER_ACCOUNTING_NONE
         && hart->accounting_started_at == 0
@@ -630,6 +680,7 @@ micros_thread_attach_execution_context(
     }
     if (
         thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->scheduler_assigned
         || thread->context_attached
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
@@ -817,6 +868,7 @@ micros_thread_detach_execution_context(
     if (
         !thread->context_attached
         || thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->scheduler_assigned
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -999,6 +1051,7 @@ enum micros_kernel_object_error micros_thread_release(
     }
     if (
         thread->state != MICROS_THREAD_STATE_INACTIVE
+        || thread->scheduler_assigned
         || thread->context_attached
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
@@ -1437,6 +1490,7 @@ enum micros_kernel_object_error micros_hart_bind_thread(
         hart->current_thread.generation != 0
         || thread->state != MICROS_THREAD_STATE_INACTIVE
         || thread->scheduler_assigned
+        || hart_has_scheduler_assignment(objects, hart_handle)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -1536,6 +1590,13 @@ enum micros_kernel_object_error micros_hart_current_thread(
 }
 
 enum micros_kernel_object_error micros_kernel_objects_validate(
+    const struct micros_kernel_objects *objects
+)
+{
+    return micros_scheduler_core_validate(objects);
+}
+
+enum micros_kernel_object_error micros_kernel_objects_validate_base(
     const struct micros_kernel_objects *objects
 )
 {
@@ -1658,7 +1719,12 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || objects->processes[thread->owner.slot].generation
                     != thread->owner.generation
-                || !thread_scheduler_metadata_is_dormant(thread)
+                || (
+                    thread->scheduler_assigned
+                    ? thread->state
+                        != MICROS_THREAD_STATE_INACTIVE
+                    : !thread_scheduler_metadata_is_dormant(thread)
+                )
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
@@ -1779,11 +1845,10 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
         const struct micros_hart *hart = &objects->harts[index];
         size_t other_index;
 
-        if (!hart_scheduler_metadata_is_zero(hart)) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-        }
         if (hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_FREE) {
             if (
+                !hart_scheduler_metadata_is_zero(hart)
+                ||
                 hart->generation != 0
                 || hart->hardware_id != 0
                 || hart->trap_installed
@@ -1800,12 +1865,14 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
             }
             continue;
         }
+        if (!hart_accounting_metadata_is_zero(hart)) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
         if (
             hart->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
             || hart->generation == 0
             || hart->interrupt_depth != 0
             || hart->preempt_disable_count != 0
-            || hart->reschedule_pending
         ) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
@@ -1933,7 +2000,13 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
                 thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || thread->generation
                     != hart->current_thread.generation
-                || thread->state != MICROS_THREAD_STATE_RUNNING
+                || (
+                    thread->scheduler_assigned
+                    ? thread->state
+                        != MICROS_THREAD_STATE_INACTIVE
+                    : thread->state
+                        != MICROS_THREAD_STATE_RUNNING
+                )
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
@@ -1973,6 +2046,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
 
         if (
             thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && !thread->scheduler_assigned
             && (
                 (
                     thread->state == MICROS_THREAD_STATE_RUNNING

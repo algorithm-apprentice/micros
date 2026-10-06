@@ -91,6 +91,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         kernel_objects_test
         kernel/kernel_objects.c
+        kernel/scheduler_core.c
         tests/host/kernel_objects_test.c
     )
     add_executable(
@@ -98,7 +99,14 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         kernel/frame_ownership.c
         kernel/kernel_objects.c
+        kernel/scheduler_core.c
         tests/host/frame_ownership_test.c
+    )
+    add_executable(
+        scheduler_test
+        kernel/kernel_objects.c
+        kernel/scheduler_core.c
+        tests/host/scheduler_test.c
     )
     target_include_directories(
         fdt_test
@@ -122,6 +130,11 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         frame_ownership_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        scheduler_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
@@ -130,6 +143,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(sv39_test PRIVATE c_std_17)
     target_compile_features(kernel_objects_test PRIVATE c_std_17)
     target_compile_features(frame_ownership_test PRIVATE c_std_17)
+    target_compile_features(scheduler_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -172,6 +186,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         frame_ownership_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        scheduler_test
         PRIVATE
             -Wall
             -Wextra
@@ -232,6 +256,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            scheduler_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            scheduler_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -239,6 +274,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME sv39-encoding COMMAND sv39_test)
     add_test(NAME kernel-objects COMMAND kernel_objects_test)
     add_test(NAME frame-ownership COMMAND frame_ownership_test)
+    add_test(NAME scheduler-queues COMMAND scheduler_test)
 
     add_custom_target(
         test-unit
@@ -263,6 +299,7 @@ if(MICROS_BUILD_HOST_TESTS)
             sv39_test
             kernel_objects_test
             frame_ownership_test
+            scheduler_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -301,6 +338,7 @@ add_executable(
     kernel/frame_ownership.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
+    kernel/scheduler_core.c
     kernel/main.c
     kernel/panic.c
     kernel/sv39.c
