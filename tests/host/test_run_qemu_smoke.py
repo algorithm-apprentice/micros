@@ -134,6 +134,16 @@ USER_EXECUTION_TEST_PASS = (
     "return=resumed\n"
 )
 
+SCHEDULER_TEST_PASS = (
+    "MICROS_SCHEDULER_TEST_PASS "
+    "queues=minix-priority "
+    "current=reachable "
+    "accounting=separate "
+    "switches=alternating "
+    "idle=resumed "
+    "registers=preserved\n"
+)
+
 FRAME_ALLOCATOR_OUTPUT = TRAP_RECOVERY_OUTPUT.replace(
     "MICROS_TRAP_TEST_PASS "
     "origin=S cause=illegal-instruction registers=preserved "
@@ -164,6 +174,10 @@ USER_ADDRESS_SPACE_TEST_OUTPUT = (
 
 USER_EXECUTION_TEST_OUTPUT = (
     FRAME_OWNERSHIP_OUTPUT + USER_EXECUTION_TEST_PASS
+)
+
+SCHEDULER_TEST_OUTPUT = (
+    FRAME_OWNERSHIP_OUTPUT + SCHEDULER_TEST_PASS
 )
 
 OBJECT_MODEL_TEST_PASS = (
@@ -204,6 +218,29 @@ TRAP_PANIC_OUTPUT = (
         "file=kernel/trap.c",
     )
     + TRAP_CONTEXT_RECORD
+)
+
+SCHEDULER_INVALID_DIAGNOSTIC = (
+    "MICROS_SCHEDULER_INVALID_CONTEXT "
+    "state=outgoing ownership=preserved accounting=kernel\n"
+)
+SCHEDULER_INVALID_CONTEXT_RECORD = (
+    "MICROS_TRAP_CONTEXT "
+    "origin=U "
+    "sstatus=0x0000000200000020 "
+    "scause=0x8000000000000005 "
+    "stval=0x0000000000000000 "
+    "sepc=0x0000000040000010 "
+    "ra=0x0000000000001001 "
+    "sp=0x0000000040005000\n"
+)
+SCHEDULER_INVALID_OUTPUT = (
+    PANIC_OUTPUT.replace(
+        "MICROS_PANIC reason=intentional-test\n",
+        SCHEDULER_INVALID_DIAGNOSTIC
+        + "MICROS_PANIC reason=invalid-bootstrap-user-context\n",
+    )
+    + SCHEDULER_INVALID_CONTEXT_RECORD
 )
 
 
@@ -1550,6 +1587,134 @@ class ExpectedOutcomeTest(unittest.TestCase):
                         require_mmu_ready=True,
                         require_frame_ownership_ready=True,
                         require_user_execution_test_report=True,
+                    )
+                )
+
+    def test_accepts_complete_scheduler_test_report(self):
+        result = run_qemu_smoke.QemuResult(
+            output=SCHEDULER_TEST_OUTPUT,
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+            markers=("MICROS_FDT_READY",),
+            patterns=(),
+            require_fdt_events=True,
+            require_fdt_reservations=True,
+            require_frame_allocator_ready=True,
+            require_mmu_ready=True,
+            require_frame_ownership_ready=True,
+            require_scheduler_test_report=True,
+        )
+
+        self.assertTrue(accepted)
+
+    def test_rejects_invalid_scheduler_test_report(self):
+        early = SCHEDULER_TEST_OUTPUT.replace(
+            SCHEDULER_TEST_PASS,
+            "",
+        ).replace(
+            FRAME_OWNERSHIP_READY_RECORD,
+            SCHEDULER_TEST_PASS + FRAME_OWNERSHIP_READY_RECORD,
+        )
+        late_trap = SCHEDULER_TEST_OUTPUT.replace(
+            "MICROS_TRAP_READY\n",
+            "",
+        ).replace(
+            SCHEDULER_TEST_PASS,
+            SCHEDULER_TEST_PASS + "MICROS_TRAP_READY\n",
+        )
+        invalid_outputs = (
+            FRAME_OWNERSHIP_OUTPUT,
+            early,
+            late_trap,
+            SCHEDULER_TEST_OUTPUT + SCHEDULER_TEST_PASS,
+            SCHEDULER_TEST_OUTPUT.replace(
+                "accounting=separate",
+                "accounting=combined",
+            ),
+            SCHEDULER_TEST_OUTPUT.rstrip("\n"),
+        )
+
+        for invalid in invalid_outputs:
+            with self.subTest(output=invalid):
+                result = run_qemu_smoke.QemuResult(
+                    output=invalid,
+                    return_code=0,
+                    timed_out=False,
+                )
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=result,
+                        observed_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        expected_outcome=run_qemu_smoke.SmokeOutcome.PASS,
+                        markers=("MICROS_FDT_READY",),
+                        patterns=(),
+                        require_fdt_events=True,
+                        require_fdt_reservations=True,
+                        require_frame_allocator_ready=True,
+                        require_mmu_ready=True,
+                        require_frame_ownership_ready=True,
+                        require_scheduler_test_report=True,
+                    )
+                )
+
+    def test_requires_exact_invalid_scheduler_context_report(self):
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=run_qemu_smoke.QemuResult(
+                output=SCHEDULER_INVALID_OUTPUT,
+                return_code=0,
+                timed_out=False,
+            ),
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=(),
+            patterns=(),
+            require_panic_report=True,
+            require_trap_context=True,
+            require_scheduler_invalid_context="outgoing",
+        )
+        self.assertTrue(accepted)
+
+        invalid_outputs = (
+            SCHEDULER_INVALID_OUTPUT.replace(
+                SCHEDULER_INVALID_DIAGNOSTIC,
+                SCHEDULER_INVALID_DIAGNOSTIC * 2,
+            ),
+            SCHEDULER_INVALID_OUTPUT.replace(
+                "state=outgoing",
+                "state=next",
+            ),
+            SCHEDULER_INVALID_OUTPUT + SCHEDULER_TEST_PASS,
+            SCHEDULER_INVALID_OUTPUT
+            + "MICROS_SCHEDULER_TEST_PASS malformed\n",
+            SCHEDULER_INVALID_OUTPUT
+            + "MICROS_SCHEDULER_TEST_PASS unterminated",
+        )
+        for output in invalid_outputs:
+            with self.subTest(output=output):
+                self.assertFalse(
+                    run_qemu_smoke.matches_expected_result(
+                        result=run_qemu_smoke.QemuResult(
+                            output=output,
+                            return_code=0,
+                            timed_out=False,
+                        ),
+                        observed_outcome=(
+                            run_qemu_smoke.SmokeOutcome.PANIC
+                        ),
+                        expected_outcome=(
+                            run_qemu_smoke.SmokeOutcome.PANIC
+                        ),
+                        markers=(),
+                        patterns=(),
+                        require_panic_report=True,
+                        require_trap_context=True,
+                        require_scheduler_invalid_context="outgoing",
                     )
                 )
 
