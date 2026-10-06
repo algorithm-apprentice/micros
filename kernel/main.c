@@ -24,6 +24,10 @@ bool micros_kernel_object_runtime_run_self_test(void);
 bool micros_frame_ownership_runtime_run_self_test(void);
 #endif
 
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+bool micros_user_address_space_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_NESTED_TRAP_TEST
 void micros_nested_trap_test_trigger(void);
 extern unsigned char
@@ -299,6 +303,18 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "MICROS_FRAME_OWNERSHIP_TEST_PASS "
         "stale=rejected release=blocked "
         "handoff=atomic invariants=preserved\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    if (!micros_user_address_space_runtime_run_self_test()) {
+        MICROS_PANIC(hart_id, "user-address-space-test");
+    }
+    uart_write(
+        "MICROS_USER_ADDRESS_SPACE_TEST_PASS "
+        "roots=isolated reuse=zeroed active=guarded "
+        "ownership=validated sum=cleared\n"
     );
     uart_flush();
 #endif

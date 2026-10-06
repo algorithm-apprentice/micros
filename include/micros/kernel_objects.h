@@ -160,6 +160,20 @@ enum micros_kernel_object_error micros_process_resolve(
     const struct micros_process **process
 );
 
+enum micros_kernel_object_error
+micros_process_attach_address_space(
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    uintptr_t root
+);
+
+enum micros_kernel_object_error
+micros_process_detach_address_space(
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    uintptr_t expected_root
+);
+
 enum micros_kernel_object_error micros_thread_create(
     struct micros_kernel_objects *objects,
     struct micros_process_handle owner,

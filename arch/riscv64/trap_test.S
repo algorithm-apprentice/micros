@@ -1,3 +1,5 @@
+#include "arch/riscv64/trap_context.h"
+
 .section .text, "ax", @progbits
 .globl micros_trap_test_trigger
 .type micros_trap_test_trigger, @function
@@ -19,6 +21,8 @@ micros_trap_test_trigger:
     sd s9, 104(t0)
     sd s10, 112(t0)
     sd s11, 120(t0)
+    csrr t1, sstatus
+    sd t1, 128(t0)
 
     li ra, 0x101
     li gp, 0x103
@@ -49,6 +53,8 @@ micros_trap_test_trigger:
     li t4, 0x11d
     li t5, 0x11e
     li t6, 0x11f
+    li t0, MICROS_RISCV_SSTATUS_SUM
+    csrs sstatus, t0
     li t0, 0x105
     la sp, micros_trap_test_entry_stack_top
 
@@ -94,6 +100,8 @@ micros_trap_test_resume:
     sd t0, -8(sp)
 
     la t0, micros_trap_test_caller_state
+    ld t1, 128(t0)
+    csrw sstatus, t1
     ld ra, 0(t0)
     ld gp, 16(t0)
     ld tp, 24(t0)
@@ -113,6 +121,30 @@ micros_trap_test_resume:
     ret
 .size micros_trap_test_trigger, . - micros_trap_test_trigger
 
+.globl micros_trap_sum_restore_test_trigger
+.type micros_trap_sum_restore_test_trigger, @function
+micros_trap_sum_restore_test_trigger:
+    la t0, micros_trap_sum_restore_caller_state
+    sd ra, 0(t0)
+    csrr t1, sstatus
+    sd t1, 8(t0)
+    li t1, MICROS_RISCV_SSTATUS_SUM
+    csrc sstatus, t1
+.globl micros_trap_sum_restore_test_fault
+micros_trap_sum_restore_test_fault:
+    .4byte 0xc0001073
+.globl micros_trap_sum_restore_test_resume
+micros_trap_sum_restore_test_resume:
+    csrr t1, sstatus
+    la t0, micros_trap_sum_restore_observed_status
+    sd t1, 0(t0)
+    la t0, micros_trap_sum_restore_caller_state
+    ld t1, 8(t0)
+    csrw sstatus, t1
+    ld ra, 0(t0)
+    ret
+.size micros_trap_sum_restore_test_trigger, . - micros_trap_sum_restore_test_trigger
+
 .globl micros_trap_panic_test_trigger
 .type micros_trap_panic_test_trigger, @function
 micros_trap_panic_test_trigger:
@@ -126,7 +158,16 @@ micros_trap_panic_test_fault:
 .balign 16
 .globl micros_trap_test_caller_state
 micros_trap_test_caller_state:
-    .skip 128
+    .skip 136
+
+.balign 16
+.globl micros_trap_sum_restore_caller_state
+micros_trap_sum_restore_caller_state:
+    .skip 16
+
+.globl micros_trap_sum_restore_observed_status
+micros_trap_sum_restore_observed_status:
+    .skip 8
 
 .balign 16
 .globl micros_trap_test_entry_stack_bottom

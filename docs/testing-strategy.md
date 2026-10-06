@@ -71,7 +71,8 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-nested-trap`, and
-`test-qemu-frame-ownership`. From a clean checkout,
+`test-qemu-frame-ownership`, and `test-qemu-user-address-space`. From a clean
+checkout,
 the implemented configure, build, and execution gates are:
 
 ```bash
@@ -86,6 +87,7 @@ cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
+cmake --workflow --preset test-qemu-user-address-space
 ```
 
 `test-unit` currently runs the FDT parser corpus, portable frame allocator,
@@ -128,6 +130,11 @@ registry together: stale and cross-process owners are rejected, process
 release remains blocked while exact owners exist, forbidden handoff plans are
 failure-atomic, and one complete plan seals bootstrap mutation in a single
 transition.
+`test-qemu-user-address-space` constructs two generation-bound roots, maps the
+same virtual page to distinct typed frames, switches ASID-zero roots with exact
+fences, checks SUM-gated hardware access, proves full-page zeroing on reuse,
+rejects active/stale/corrupt roots without mutation, atomically tears roots
+down, and verifies every process-root API is revoked after ownership handoff.
 
 ## Native unit tests
 
@@ -167,6 +174,8 @@ Examples of required properties:
 - every thread has exactly one owning process;
 - every current-thread pointer belongs to one hart-local object;
 - a stale generation never resolves to a reused process slot;
+- a stale generation never validates, activates, mutates, or destroys a reused
+  process address space;
 - every running thread is current on exactly one hart, while every inactive
   thread is current on none;
 - failed object-table operations preserve both registry state and output
@@ -198,6 +207,10 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - page-table activation and invalidation;
 - exact agreement between the reachable page-table tree, allocator bits, and
   typed frame owners;
+- same virtual addresses in distinct process roots resolve distinct exact
+  user-frame owners;
+- inactive-root mutation plus complete ASID-zero activation flushes prevent
+  stale cross-root translations;
 - store rejection on kernel text and instruction-fetch rejection on writable
   kernel data;
 - executable-frame reuse with different code after `fence.i`;

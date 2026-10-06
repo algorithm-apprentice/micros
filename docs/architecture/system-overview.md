@@ -129,10 +129,15 @@ state are embedded in the hart object.
 
 ### Phase 3: process and IPC substrate
 
-The kernel creates statically described initial process slots, one thread per
-process, and isolated address spaces for the bootstrap services. Only the
-bootstrap launcher receives the temporary authority to release boot services
-and install their exact manifest privilege profiles.
+The kernel creates statically described initial process slots and
+generation-bound private Sv39 roots for the bootstrap services. Each root
+shares the immutable supervisor-only kernel entries and owns a private user
+subtree at root index 1. Bootstrap anonymous user pages are fully zeroed,
+typed to the exact process generation, and may be mutated only while their
+root is inactive. One thread per process, saved contexts, and U-mode entry are
+added by the following execution-context slice. Only the bootstrap launcher
+receives the temporary authority to release boot services and install their
+exact manifest privilege profiles.
 
 ### Phase 4: VM handoff
 
@@ -252,6 +257,15 @@ interrupts disabled.
   the authoritative semantic owner for every allocated managed frame.
 - Process-bound frame owners carry the exact live process slot and generation;
   stale generations cannot release or reclassify them.
+- Every process root is a private `PROCESS_PAGE_TABLE` frame. Its user subtree
+  occupies `[0x40000000, 0x80000000)`, while every other root entry exactly
+  matches the immutable kernel root.
+- Process-root mutation and destruction are rejected while that root is
+  active; ASID-zero activation performs complete local invalidation.
+- Every user leaf resolves one distinct exact `PROCESS_USER` owner, and every
+  process-owned table or user frame is reachable in the matching role.
+- Trap entry preserves interrupted SUM in the saved frame but clears live SUM
+  before arming the nested sentinel or entering C.
 - User-managed frames and kernel-reserved frames never overlap.
 - Kernel text is RX, read-only data is R, writable kernel state and managed RAM
   are RW/NX, and none of those mappings has the user bit.

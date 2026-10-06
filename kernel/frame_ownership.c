@@ -761,6 +761,132 @@ micros_frame_ownership_count_process(
 }
 
 enum micros_frame_ownership_error
+micros_frame_ownership_release_process_set(
+    struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *release_bitmap,
+    size_t release_word_count
+)
+{
+    uint64_t release_counts[MICROS_FRAME_OWNER_KIND_COUNT] = {0};
+    uint64_t release_count = 0;
+    uint64_t frame_index;
+    enum micros_frame_ownership_error error;
+
+    error = require_initialized(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
+    }
+    if (
+        release_bitmap == NULL
+        || release_word_count
+            != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    if (!process_handle_is_valid(process)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
+    }
+    error = micros_frame_ownership_validate(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+
+    for (
+        frame_index = 0;
+        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
+        ++frame_index
+    ) {
+        size_t word_index = (size_t)(frame_index / 64);
+        uint64_t bit = UINT64_C(1) << (frame_index % 64);
+        struct micros_frame_owner owner;
+
+        if ((release_bitmap[word_index] & bit) == 0) {
+            continue;
+        }
+        if (frame_index >= ownership->managed_frame_count) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+        }
+        owner = ownership->owners[frame_index];
+        if (owner.kind == MICROS_FRAME_OWNER_FREE) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
+        }
+        if (
+            (
+                owner.kind
+                    != MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+                && owner.kind != MICROS_FRAME_OWNER_PROCESS_USER
+            )
+            || owner.slot != process.slot
+            || owner.generation != process.generation
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+        if (
+            release_count == ownership->managed_frame_count
+            || release_counts[owner.kind]
+                == ownership->managed_frame_count
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+        ++release_count;
+        ++release_counts[owner.kind];
+    }
+    if (
+        release_count > ownership->owned_frame_count
+        || release_count
+            > ownership->managed_frame_count
+                - ownership->allocator->free_frame_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    for (
+        frame_index = 0;
+        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
+        ++frame_index
+    ) {
+        if (
+            release_counts[frame_index]
+                > ownership->owner_counts[frame_index]
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+
+    for (
+        frame_index = 0;
+        frame_index < ownership->managed_frame_count;
+        ++frame_index
+    ) {
+        size_t word_index = (size_t)(frame_index / 64);
+        uint64_t bit = UINT64_C(1) << (frame_index % 64);
+
+        if ((release_bitmap[word_index] & bit) == 0) {
+            continue;
+        }
+        ownership->allocator->allocated_bitmap[word_index] &= ~bit;
+        ownership->owners[frame_index] =
+            (struct micros_frame_owner){0, 0, 0, 0};
+        ownership->handoff_targets[frame_index] =
+            MICROS_FRAME_HANDOFF_NONE;
+    }
+    ownership->allocator->free_frame_count += release_count;
+    ownership->owned_frame_count -= release_count;
+    for (
+        frame_index = 0;
+        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
+        ++frame_index
+    ) {
+        ownership->owner_counts[frame_index] -=
+            release_counts[frame_index];
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+enum micros_frame_ownership_error
 micros_frame_ownership_complete_handoff(
     struct micros_frame_ownership *ownership
 )
