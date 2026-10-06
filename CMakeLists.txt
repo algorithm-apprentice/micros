@@ -23,6 +23,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_ENDPOINT_TEST
+    "Build the endpoint and privilege-profile test image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -68,6 +73,7 @@ set(
     MICROS_BUILD_TRAP_PANIC_TEST
     MICROS_BUILD_MMU_TEST
     MICROS_BUILD_OBJECT_MODEL_TEST
+    MICROS_BUILD_ENDPOINT_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -132,6 +138,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c
     )
     target_include_directories(
@@ -502,6 +509,41 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
     )
 endif()
 
+if(MICROS_BUILD_ENDPOINT_TEST)
+    add_custom_target(
+        test-qemu-endpoint
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --require-endpoint-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_NESTED_TRAP_TEST)
     add_custom_target(
         test-qemu-nested-trap
@@ -739,6 +781,19 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
         micros
         PRIVATE
             kernel/object_model_test.c
+    )
+endif()
+
+if(MICROS_BUILD_ENDPOINT_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_ENDPOINT_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/endpoint_test.c
     )
 endif()
 

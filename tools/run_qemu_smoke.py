@@ -98,6 +98,14 @@ SCHEDULER_TEST_PASS = (
     "idle=resumed "
     "registers=preserved"
 )
+ENDPOINT_TEST_MARKER = "MICROS_ENDPOINT_TEST"
+ENDPOINT_TEST_PASS = (
+    "MICROS_ENDPOINT_TEST_PASS "
+    "generation=validated "
+    "profiles=immutable "
+    "visibility=staged "
+    "authorization=separate"
+)
 OBJECTS_READY_MARKER = "MICROS_OBJECTS_READY"
 OBJECT_MODEL_TEST_MARKER = "MICROS_OBJECT_MODEL_TEST"
 NESTED_TRAP_TEST_MARKER = "MICROS_NESTED_TRAP_TEST"
@@ -426,6 +434,7 @@ def _frame_allocator_ready_precedes_target_outcome(output):
             or line == USER_ADDRESS_SPACE_TEST_PASS
             or line == USER_EXECUTION_TEST_PASS
             or line == SCHEDULER_TEST_PASS
+            or line == ENDPOINT_TEST_PASS
         )
     ]
     return (
@@ -536,6 +545,7 @@ def _mmu_ready_precedes_target_outcome(output):
             or line == USER_ADDRESS_SPACE_TEST_PASS
             or line == USER_EXECUTION_TEST_PASS
             or line == SCHEDULER_TEST_PASS
+            or line == ENDPOINT_TEST_PASS
         )
     ]
     return (
@@ -633,6 +643,7 @@ def _frame_ownership_ready_precedes_target_outcome(output):
             or line == USER_ADDRESS_SPACE_TEST_PASS
             or line == USER_EXECUTION_TEST_PASS
             or line == SCHEDULER_TEST_PASS
+            or line == ENDPOINT_TEST_PASS
         )
     ]
     return (
@@ -747,6 +758,29 @@ def _has_complete_scheduler_test_report(output):
     )
 
 
+def _has_complete_endpoint_test_report(output):
+    if not _has_complete_frame_ownership_ready(output):
+        return False
+
+    output_lines, terminated = _split_output_records(output)
+    ready_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(FRAME_OWNERSHIP_READY_MARKER)
+    ]
+    test_indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith(ENDPOINT_TEST_MARKER)
+    ]
+    return (
+        len(test_indices) == 1
+        and output_lines[test_indices[0]] == ENDPOINT_TEST_PASS
+        and terminated[test_indices[0]]
+        and ready_indices[0] < test_indices[0]
+    )
+
+
 def _objects_ready_precedes_target_outcome(output):
     output_lines = output.splitlines()
     ready_indices = [
@@ -769,6 +803,7 @@ def _objects_ready_precedes_target_outcome(output):
             or line == USER_ADDRESS_SPACE_TEST_PASS
             or line == USER_EXECUTION_TEST_PASS
             or line == SCHEDULER_TEST_PASS
+            or line == ENDPOINT_TEST_PASS
         )
     ]
     return (
@@ -956,6 +991,7 @@ def matches_expected_result(
     require_user_address_space_test_report=False,
     require_user_execution_test_report=False,
     require_scheduler_test_report=False,
+    require_endpoint_test_report=False,
     require_scheduler_invalid_context=None,
     require_objects_ready=False,
     require_object_model_test_report=False,
@@ -1055,6 +1091,11 @@ def matches_expected_result(
     if (
         require_scheduler_test_report
         and not _has_complete_scheduler_test_report(result.output)
+    ):
+        return False
+    if (
+        require_endpoint_test_report
+        and not _has_complete_endpoint_test_report(result.output)
     ):
         return False
     if (
@@ -1355,6 +1396,11 @@ def parse_arguments(argv):
         help="Require the ordered scheduler test record",
     )
     parser.add_argument(
+        "--require-endpoint-test-report",
+        action="store_true",
+        help="Require the ordered endpoint and profile test record",
+    )
+    parser.add_argument(
         "--require-scheduler-invalid-context",
         choices=("outgoing", "next"),
         help="Require one exact invalid scheduler-context diagnostic",
@@ -1497,6 +1543,9 @@ def main(argv=None):
             ),
             require_scheduler_test_report=(
                 arguments.require_scheduler_test_report
+            ),
+            require_endpoint_test_report=(
+                arguments.require_endpoint_test_report
             ),
             require_scheduler_invalid_context=(
                 arguments.require_scheduler_invalid_context
