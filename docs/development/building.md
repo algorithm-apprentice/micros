@@ -36,7 +36,8 @@ The current implementation provides:
   reference-model tests;
 - native scheduler admission, run-time-flag, priority-queue, policy,
   current-selection, preemption-repair, return-plan, and separate
-  thread/kernel/idle accounting tests;
+  thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
+  reference model;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 

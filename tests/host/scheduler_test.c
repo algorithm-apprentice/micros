@@ -1108,6 +1108,8 @@ static bool test_corrupt_queue_state_is_rejected(void)
     return true;
 }
 
+bool micros_scheduler_model_test_run(void);
+
 int main(void)
 {
     static const struct {
@@ -1153,6 +1155,10 @@ int main(void)
         {
             "corrupt queue state is rejected",
             test_corrupt_queue_state_is_rejected,
+        },
+        {
+            "seeded two-hart model",
+            micros_scheduler_model_test_run,
         },
     };
     size_t index;

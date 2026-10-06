@@ -95,9 +95,10 @@ cmake --workflow --preset test-qemu-user-execution
 typed frame-ownership ledger, Sv39 encoding, kernel-object lifecycle/model
 tests, and deterministic scheduler admission, RTS, priority-queue, policy,
 current-selection, preemption-repair, return-plan, and separate
-thread/kernel/idle accounting tests under ASan and UBSan plus the Python host
-tests. The latter include ELF allocatable-section closure, legacy-global
-rejection, and machine-readable QEMU record regressions.
+thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
+reference model under ASan and UBSan. The Python host tests include ELF
+allocatable-section closure, legacy-global rejection, and machine-readable
+QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
