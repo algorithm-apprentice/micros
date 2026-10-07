@@ -57,6 +57,10 @@ The current implementation provides:
 - native failure-atomic matching dequeue and delivery commit tests covering
   head/middle/tail selection, unmatched FIFO preservation, queued-call reply
   wait, ordinary wakeups, exact staged messages, and ready-queue effects;
+- native authorized send/receive operation tests covering exact active
+  endpoints, operation and target-profile policy, canonical message snapshots,
+  immediate matching before blocking, specific/`ANY` FIFO behavior,
+  scheduler-held caller transitions, and byte-exact failure preservation;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -67,10 +71,12 @@ flag positions, and dormant kernel-owned state are present; queue transitions
 now have complete cross-object topology validation. Queue mutation and
 held-thread FIFO enqueue are implemented. Matching dequeue now commits message
 staging, exact FIFO unlink, queued-call reply-wait retention, and scheduler
-wakeup atomically for incoming held senders and receivers. IPC authorization
-integration, deadlock detection, reply-token allocation and consumption,
-notifications, endpoint cancellation, and the syscall ABI remain separate
-later slices.
+wakeup atomically for incoming held senders and receivers. Portable ordinary
+send and receive now authorize exact active endpoints and profile policy,
+snapshot canonical messages, match before blocking, and preserve specific or
+`ANY` FIFO order. They consume scheduler-held non-current callers; the target
+current-thread adapter, deadlock detection, call/reply, notifications,
+endpoint cancellation, and the syscall ABI remain separate later slices.
 
 ## Prerequisites
 

@@ -121,9 +121,14 @@ and no residual queue or reply authority. Matching-delivery regressions cover
 head, middle, and tail dequeue, specific and `ANY` selection, unmatched FIFO
 preservation, ordinary versus call sender wake behavior, exact staged message
 bytes, ready-queue placement, stale and corrupt queues, no-match preservation,
-and byte-exact state and output preservation on every failure. The Python host
-tests include ELF allocatable-section closure, legacy-global rejection, and
-machine-readable QEMU record regressions.
+and byte-exact state and output preservation on every failure. Authorized
+send/receive operation tests add exact active source and destination
+resolution, receive/send operation and target-profile enforcement, one
+canonical message snapshot, immediate matching before blocked enqueue,
+specific and `ANY` FIFO selection, explicit scheduler-held non-current caller
+requirements, and complete state preservation on every rejected transition.
+The Python host tests include ELF allocatable-section closure, legacy-global
+rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
