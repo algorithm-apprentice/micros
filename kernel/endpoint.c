@@ -1059,6 +1059,17 @@ static bool staged_reply_token_binding_is_valid(
             &objects->threads[index];
 
         if (
+            candidate != receiver
+            && candidate->slot_state
+                == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && candidate->ipc_delivery_pending
+            && candidate->ipc_staged_result == MICROS_IPC_OK
+            && candidate->ipc_inbound_message.reply_token
+                == reply_token
+        ) {
+            return false;
+        }
+        if (
             candidate->slot_state
                 != MICROS_KERNEL_OBJECT_SLOT_LIVE
             || candidate->ipc_reply_token != reply_token

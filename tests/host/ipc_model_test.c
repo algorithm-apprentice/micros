@@ -2102,6 +2102,7 @@ static enum micros_ipc_error model_reply_preflight(
 )
 {
     enum micros_ipc_error error;
+    size_t index;
 
     if (
         message == NULL
@@ -2138,6 +2139,19 @@ static enum micros_ipc_error model_reply_preflight(
     );
     if (error != MICROS_IPC_OK) {
         return error;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct model_thread *thread = &model->threads[index];
+
+        if (
+            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && thread->ipc_delivery_pending
+            && thread->ipc_staged_result == MICROS_IPC_OK
+            && thread->ipc_inbound_message.reply_token
+                == reply_token
+        ) {
+            return MICROS_IPC_ERROR_REPLY_TOKEN;
+        }
     }
     model_canonicalize_message(
         snapshot,
@@ -3500,10 +3514,6 @@ static bool run_model_prelude(
         MICROS_IPC_OK
     );
     RUN(
-        receive_action(3, MICROS_ENDPOINT_ANY, *step),
-        MICROS_IPC_OK
-    );
-    RUN(
         call_action(
             0,
             model->processes[1].primary_endpoint,
@@ -3512,6 +3522,23 @@ static bool run_model_prelude(
         MICROS_IPC_OK
     );
     token_one = model->threads[0].ipc_reply_token;
+    RUN(
+        reply_action(3, token_one, *step),
+        MICROS_IPC_ERROR_REPLY_TOKEN
+    );
+    RUN(
+        reply_receive_action(
+            3,
+            token_one,
+            MICROS_ENDPOINT_ANY,
+            *step
+        ),
+        MICROS_IPC_ERROR_REPLY_TOKEN
+    );
+    RUN(
+        receive_action(3, MICROS_ENDPOINT_ANY, *step),
+        MICROS_IPC_OK
+    );
     RUN(
         call_action(
             1,
@@ -3859,6 +3886,34 @@ static bool find_reply_action(
             )
         ) {
             continue;
+        }
+        {
+            size_t staged_offset;
+            bool request_pending = false;
+
+            for (
+                staged_offset = 0;
+                staged_offset < MODEL_THREAD_COUNT;
+                ++staged_offset
+            ) {
+                const struct model_thread *staged =
+                    &model->threads[staged_offset];
+
+                if (
+                    staged->slot_state
+                        == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                    && staged->ipc_delivery_pending
+                    && staged->ipc_staged_result == MICROS_IPC_OK
+                    && staged->ipc_inbound_message.reply_token
+                        == caller->ipc_reply_token
+                ) {
+                    request_pending = true;
+                    break;
+                }
+            }
+            if (request_pending) {
+                continue;
+            }
         }
         for (
             thread_offset = 0;
