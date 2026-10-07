@@ -8,7 +8,12 @@
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
+#include "kernel/ipc_runtime_internal.h"
+#include "micros/endpoint.h"
 #include "micros/frame_ownership_runtime.h"
+#include "micros/ipc_abi.h"
+#include "micros/ipc_core.h"
+#include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/sv39.h"
 #include "micros/timer.h"
@@ -29,10 +34,21 @@ enum {
     TEST_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
+enum test_completion_kind {
+    TEST_COMPLETION_NONE = 0,
+    TEST_COMPLETION_START,
+    TEST_COMPLETION_MESSAGE,
+    TEST_COMPLETION_CAPTURED,
+    TEST_COMPLETION_ERROR,
+    TEST_COMPLETION_IDLE,
+};
+
 static const uint64_t TEST_CODE_VIRTUAL_ADDRESS =
     MICROS_USER_VIRTUAL_BASE;
 static const uint64_t TEST_COUNTER_VIRTUAL_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x00002000);
+static const uint64_t TEST_IPC_BUFFER_VIRTUAL_ADDRESS =
+    MICROS_USER_VIRTUAL_BASE + UINT64_C(0x00002100);
 static const uint64_t TEST_STACK_VIRTUAL_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x00004000);
 static const uint64_t TEST_TIMER_INTERVAL =
@@ -56,6 +72,8 @@ void micros_scheduler_test_start_production(void);
 
 static struct micros_process_handle processes[2];
 static struct micros_thread_handle threads[2];
+static micros_endpoint_t endpoints[2];
+static struct micros_endpoint_registry *registry;
 static struct micros_user_context prepared_contexts[2];
 static uint64_t code_physical[2];
 static uint64_t counter_physical[2];
@@ -71,6 +89,7 @@ static uint64_t switch_count;
 static size_t last_running = 2;
 static bool supervisor_returned;
 static bool start_boundary_observed;
+static bool start_completion_observed;
 static bool idle_requested;
 static bool idle_woke_thread;
 static bool spurious_idle_bypassed;
@@ -82,6 +101,15 @@ static uint64_t start_satp_snapshot;
 static bool start_sie_snapshot;
 static bool start_stie_snapshot;
 static uint64_t start_timer_attempts;
+static enum test_completion_kind expected_completion[2];
+static uint64_t expected_completion_result[2];
+static struct micros_ipc_message expected_message;
+static bool message_completion_deferred;
+static bool message_completion_observed;
+static bool captured_completion_observed;
+static bool error_completion_observed;
+static bool error_completion_staged;
+static bool idle_completion_observed;
 volatile uint64_t micros_scheduler_test_idle_bypass_once;
 volatile uint64_t micros_scheduler_test_idle_bypass_observed;
 
@@ -123,6 +151,196 @@ static bool bytes_equal(
         }
     }
     return true;
+}
+
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static void fill_message(
+    struct micros_ipc_message *message,
+    micros_endpoint_t source,
+    uint32_t type,
+    uint8_t seed
+)
+{
+    size_t index;
+
+    clear_bytes(message, sizeof(*message));
+    message->source = source;
+    message->type = type;
+    for (index = 0; index < sizeof(message->payload); ++index) {
+        message->payload[index] = (uint8_t)(seed + index);
+    }
+}
+
+static bool completion_state_is_clear(
+    const struct micros_thread *thread
+)
+{
+    static const struct micros_ipc_message zero_message;
+
+    return (
+        thread != NULL
+        && thread->ipc_receive_buffer == 0
+        && !thread->ipc_delivery_pending
+        && bytes_equal(
+            &thread->ipc_inbound_message,
+            &zero_message,
+            sizeof(zero_message)
+        )
+        && thread->ipc_staged_result == MICROS_IPC_OK
+    );
+}
+
+static bool observe_completion(
+    const struct micros_kernel_objects *objects,
+    size_t thread_index
+)
+{
+    enum test_completion_kind kind;
+    const struct micros_thread *thread;
+
+    if (objects == NULL || thread_index >= 2) {
+        return false;
+    }
+    kind = expected_completion[thread_index];
+    if (kind == TEST_COMPLETION_NONE) {
+        return true;
+    }
+    thread = &objects->threads[threads[thread_index].slot];
+    if (
+        !completion_state_is_clear(thread)
+        || thread->user_context.a0
+            != expected_completion_result[thread_index]
+    ) {
+        return false;
+    }
+    if (
+        kind == TEST_COMPLETION_MESSAGE
+        && !bytes_equal(
+            (const void *)(uintptr_t)(
+                counter_physical[thread_index] + UINT64_C(0x100)
+            ),
+            &expected_message,
+            sizeof(expected_message)
+        )
+    ) {
+        return false;
+    }
+    switch (kind) {
+    case TEST_COMPLETION_START:
+        start_completion_observed = true;
+        break;
+    case TEST_COMPLETION_MESSAGE:
+        message_completion_observed = true;
+        break;
+    case TEST_COMPLETION_CAPTURED:
+        captured_completion_observed = true;
+        break;
+    case TEST_COMPLETION_ERROR:
+        error_completion_observed = true;
+        break;
+    case TEST_COMPLETION_IDLE:
+        idle_completion_observed = true;
+        break;
+    case TEST_COMPLETION_NONE:
+        return false;
+    }
+    expected_completion[thread_index] = TEST_COMPLETION_NONE;
+    return true;
+}
+
+static bool expect_no_message_completion(
+    struct micros_kernel_objects *objects,
+    size_t thread_index,
+    enum micros_ipc_error result,
+    enum test_completion_kind kind
+)
+{
+    int64_t abi_result;
+
+    if (objects == NULL || thread_index >= 2) {
+        return false;
+    }
+    switch (result) {
+    case MICROS_IPC_OK:
+        abi_result = MICROS_IPC_ABI_OK;
+        break;
+    case MICROS_IPC_ERROR_DEAD_ENDPOINT:
+        abi_result = MICROS_IPC_ABI_DEAD_ENDPOINT;
+        break;
+    default:
+        return false;
+    }
+    if (
+        micros_ipc_stage_no_message_completion(
+            registry,
+            objects,
+            threads[thread_index],
+            result
+        ) != MICROS_IPC_OK
+    ) {
+        return false;
+    }
+    expected_completion[thread_index] = kind;
+    expected_completion_result[thread_index] =
+        (uint64_t)abi_result;
+    prepared_contexts[thread_index].a0 =
+        (uint64_t)abi_result;
+    return true;
+}
+
+static bool expect_message_completion(
+    struct micros_kernel_objects *objects,
+    size_t thread_index,
+    size_t source_index
+)
+{
+    struct micros_thread *thread;
+
+    if (
+        objects == NULL
+        || thread_index >= 2
+        || source_index >= 2
+    ) {
+        return false;
+    }
+    thread = &objects->threads[threads[thread_index].slot];
+    fill_message(
+        &expected_message,
+        endpoints[source_index],
+        UINT32_C(0x7001),
+        UINT8_C(0xa0)
+    );
+    thread->ipc_receive_buffer =
+        TEST_IPC_BUFFER_VIRTUAL_ADDRESS;
+    thread->ipc_delivery_pending = true;
+    thread->ipc_inbound_message = expected_message;
+    thread->ipc_staged_result = MICROS_IPC_OK;
+    expected_completion[thread_index] =
+        TEST_COMPLETION_MESSAGE;
+    expected_completion_result[thread_index] =
+        MICROS_IPC_ABI_OK;
+    prepared_contexts[thread_index].a0 =
+        MICROS_IPC_ABI_OK;
+    return micros_ipc_runtime_validate() == MICROS_ENDPOINT_OK;
+}
+
+static enum micros_scheduler_test_trap_action
+completion_test_mismatch(uint64_t stage)
+{
+    uart_write("MICROS_TEST_FAILURE scheduler-completion-stage=");
+    uart_write_hex64(stage);
+    uart_write("\n");
+    uart_flush();
+    return MICROS_SCHEDULER_TEST_MISMATCH;
 }
 
 static uint64_t read_satp(void)
@@ -294,6 +512,7 @@ bool micros_scheduler_test_after_start(
             < kernel_ticks_before_start + TEST_START_TIMER_DELAY
         || objects->threads[threads[0].slot]
             .remaining_counter_ticks != TEST_QUANTUM
+        || !observe_completion(objects, 0)
     ) {
         return false;
     }
@@ -306,17 +525,33 @@ bool micros_scheduler_test_after_user_return(
     const struct micros_trap_frame *frame
 )
 {
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
     size_t thread_index = current_thread_index(hart);
+    size_t index;
 
     if (
         thread_index >= 2
+        || objects == NULL
         || hart == NULL
         || frame == NULL
         || hart->accounting_owner
             != MICROS_SCHEDULER_ACCOUNTING_THREAD
         || !user_registers_match(thread_index, hart, frame)
+        || !observe_completion(objects, thread_index)
     ) {
         return false;
+    }
+    for (index = 0; index < 2; ++index) {
+        if (
+            index != thread_index
+            && expected_completion[index]
+                == TEST_COMPLETION_MESSAGE
+            && objects->threads[threads[index].slot]
+                .ipc_delivery_pending
+        ) {
+            message_completion_deferred = true;
+        }
     }
     if (last_running == 2) {
         last_running = thread_index;
@@ -348,6 +583,7 @@ micros_scheduler_test_handle_user_trap(
         || hart->accounting_owner
             != MICROS_SCHEDULER_ACCOUNTING_KERNEL
         || !user_registers_match(thread_index, hart, frame)
+        || !observe_completion(objects, thread_index)
     ) {
         return MICROS_SCHEDULER_TEST_MISMATCH;
     }
@@ -385,6 +621,7 @@ micros_scheduler_test_handle_user_trap(
             if (
                 thread_index != 0
                 || !spurious_idle_bypassed
+                || !idle_completion_observed
                 || selector_entry_count
                     != selector_entries_before_spurious + 1
                 || micros_scheduler_test_prepare_supervisor_return(
@@ -402,6 +639,82 @@ micros_scheduler_test_handle_user_trap(
             supervisor_returned = true;
             return MICROS_SCHEDULER_TEST_RETURN_SUPERVISOR;
         }
+        if (!message_completion_observed) {
+            size_t target = thread_index == 0 ? 1 : 0;
+
+            if (
+                expected_completion[target]
+                    != TEST_COMPLETION_NONE
+                || !expect_message_completion(
+                    objects,
+                    target,
+                    thread_index
+                )
+            ) {
+                return completion_test_mismatch(1);
+            }
+            frame->sepc += 4;
+            return MICROS_SCHEDULER_TEST_CONTINUE;
+        }
+        if (!captured_completion_observed) {
+            struct micros_scheduler_current_ipc_guard guard = {0};
+            struct micros_user_context context;
+
+            if (
+                micros_user_execution_inspect(
+                    threads[thread_index],
+                    &context
+                ) != MICROS_USER_EXECUTION_OK
+            ) {
+                return completion_test_mismatch(2);
+            }
+            context.sepc += 4;
+            if (
+                micros_user_execution_store_context(
+                    threads[thread_index],
+                    &context
+                ) != MICROS_USER_EXECUTION_OK
+            ) {
+                return completion_test_mismatch(3);
+            }
+            if (
+                micros_scheduler_begin_current_ipc(
+                    objects,
+                    micros_kernel_object_runtime_boot_hart_handle(),
+                    &guard
+                ) != MICROS_KERNEL_OBJECT_OK
+            ) {
+                return completion_test_mismatch(4);
+            }
+            if (
+                micros_thread_runtime_flags_unset(
+                    objects,
+                    threads[thread_index],
+                    MICROS_THREAD_RTS_INACTIVE
+                ) != MICROS_KERNEL_OBJECT_OK
+            ) {
+                return completion_test_mismatch(5);
+            }
+            if (
+                !expect_no_message_completion(
+                    objects,
+                    thread_index,
+                    MICROS_IPC_OK,
+                    TEST_COMPLETION_CAPTURED
+                )
+            ) {
+                return completion_test_mismatch(6);
+            }
+            if (
+                micros_scheduler_commit_current_ipc(
+                    objects,
+                    &guard
+                ) != MICROS_KERNEL_OBJECT_OK
+            ) {
+                return completion_test_mismatch(7);
+            }
+            return MICROS_SCHEDULER_TEST_CAPTURED_USER_RETURN;
+        }
         frame->sepc += 4;
         return MICROS_SCHEDULER_TEST_CONTINUE;
     }
@@ -412,7 +725,27 @@ micros_scheduler_test_handle_user_trap(
         return MICROS_SCHEDULER_TEST_MISMATCH;
     }
     ++timer_trap_count;
-    if (switch_count >= 6 && !idle_requested) {
+    if (
+        captured_completion_observed
+        && !error_completion_staged
+    ) {
+        if (
+            !expect_no_message_completion(
+                objects,
+                thread_index,
+                MICROS_IPC_ERROR_DEAD_ENDPOINT,
+                TEST_COMPLETION_ERROR
+            )
+        ) {
+            return MICROS_SCHEDULER_TEST_MISMATCH;
+        }
+        error_completion_staged = true;
+    }
+    if (
+        switch_count >= 6
+        && error_completion_observed
+        && !idle_requested
+    ) {
         size_t other = thread_index == 0 ? 1 : 0;
 
         if (
@@ -462,7 +795,13 @@ bool micros_scheduler_test_handle_idle_timer(struct micros_hart *hart)
         user_address_of(micros_scheduler_payload_ecall);
     objects->threads[threads[0].slot].user_context.s1 = 0;
     if (
-        micros_thread_runtime_flags_unset(
+        !expect_no_message_completion(
+            objects,
+            0,
+            MICROS_IPC_OK,
+            TEST_COMPLETION_IDLE
+        )
+        || micros_thread_runtime_flags_unset(
             objects,
             threads[0],
             MICROS_THREAD_RTS_INACTIVE
@@ -503,6 +842,12 @@ static _Noreturn void finish_test(void)
     if (
         !supervisor_returned
         || !start_boundary_observed
+        || !start_completion_observed
+        || !message_completion_deferred
+        || !message_completion_observed
+        || !captured_completion_observed
+        || !error_completion_observed
+        || !idle_completion_observed
         || timer_trap_count == 0
         || switch_count < 6
         || !idle_requested
@@ -543,6 +888,11 @@ static _Noreturn void finish_test(void)
                 != MICROS_USER_EXECUTION_OK
             || micros_thread_release(objects, threads[index])
                 != MICROS_KERNEL_OBJECT_OK
+            || micros_ipc_endpoint_close(
+                registry,
+                objects,
+                endpoints[index]
+            ) != MICROS_IPC_OK
             || micros_user_address_space_release_page(
                 processes[index],
                 TEST_CODE_VIRTUAL_ADDRESS,
@@ -576,11 +926,16 @@ static _Noreturn void finish_test(void)
         || ledger->allocator->free_frame_count != baseline_free
         || micros_kernel_objects_validate(objects)
             != MICROS_KERNEL_OBJECT_OK
+        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
         || micros_frame_ownership_runtime_validate(objects)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         goto failure;
     }
+    uart_write(
+        "MICROS_IPC_RETURN completions=shared "
+        "paths=start,user,captured,idle buffers=bounded\n"
+    );
     uart_write(
         "MICROS_SCHEDULER_TEST_PASS "
         "queues=minix-priority current=reachable "
@@ -607,6 +962,16 @@ failure:
 
 _Noreturn void micros_scheduler_runtime_run_self_test(void)
 {
+    static const struct micros_privilege_profile profiles[] = {
+        {
+            .id = 1,
+            .name = "SCHEDULER_TEST",
+            .operations = MICROS_PRIVILEGE_OPERATION_DEFINED_MASK,
+            .call_targets = UINT32_C(1) << 1,
+            .send_targets = UINT32_C(1) << 1,
+            .notify_targets = UINT32_C(1) << 1,
+        },
+    };
     const uint32_t code_permissions =
         MICROS_SV39_PERMISSION_READ
         | MICROS_SV39_PERMISSION_EXECUTE;
@@ -625,6 +990,18 @@ _Noreturn void micros_scheduler_runtime_run_self_test(void)
     if (ledger == NULL || objects == NULL) {
         goto failure;
     }
+    if (
+        micros_ipc_runtime_initialize(
+            profiles,
+            sizeof(profiles) / sizeof(profiles[0])
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        goto failure;
+    }
+    registry = micros_ipc_runtime_authoritative_registry();
+    if (registry == NULL) {
+        goto failure;
+    }
     baseline_owned = ledger->owned_frame_count;
     baseline_free = ledger->allocator->free_frame_count;
     payload_size =
@@ -638,6 +1015,23 @@ _Noreturn void micros_scheduler_runtime_run_self_test(void)
         if (
             micros_process_create(objects, &processes[index])
                 != MICROS_KERNEL_OBJECT_OK
+            || micros_endpoint_reserve(
+                registry,
+                objects,
+                processes[index],
+                &endpoints[index]
+            ) != MICROS_ENDPOINT_OK
+            || micros_endpoint_install_profile(
+                registry,
+                objects,
+                processes[index],
+                1
+            ) != MICROS_ENDPOINT_OK
+            || micros_endpoint_activate(
+                registry,
+                objects,
+                endpoints[index]
+            ) != MICROS_ENDPOINT_OK
             || micros_user_address_space_create(processes[index])
                 != MICROS_USER_ADDRESS_SPACE_OK
             || micros_user_address_space_allocate_page(
@@ -715,6 +1109,27 @@ _Noreturn void micros_scheduler_runtime_run_self_test(void)
             MICROS_SCHEDULER_PRIORITY_DEFAULT_USER,
             TEST_QUANTUM
         ) != MICROS_SCHEDULER_OK
+    ) {
+        goto failure;
+    }
+    objects->threads[threads[1].slot].ipc_receive_buffer =
+        TEST_IPC_BUFFER_VIRTUAL_ADDRESS;
+    if (
+        !micros_scheduler_test_rejects_malformed_completion(
+            threads[1]
+        )
+    ) {
+        goto failure;
+    }
+    objects->threads[threads[1].slot].ipc_receive_buffer = 0;
+    if (
+        micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
+        || !expect_no_message_completion(
+            objects,
+            0,
+            MICROS_IPC_OK,
+            TEST_COMPLETION_START
+        )
     ) {
         goto failure;
     }

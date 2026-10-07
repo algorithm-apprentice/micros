@@ -55,6 +55,12 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
     struct micros_trap_frame *frame
 );
 
+enum micros_scheduler_error
+micros_scheduler_select_captured_user_return(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+);
+
 #ifdef MICROS_BUILD_USER_EXECUTION_TEST
 _Noreturn void micros_scheduler_test_enter_without_timer(
     struct micros_thread_handle thread
@@ -73,6 +79,7 @@ enum micros_scheduler_error micros_scheduler_test_prepare_supervisor_return(
 enum micros_scheduler_test_trap_action {
     MICROS_SCHEDULER_TEST_CONTINUE = 0,
     MICROS_SCHEDULER_TEST_RETURN_SUPERVISOR,
+    MICROS_SCHEDULER_TEST_CAPTURED_USER_RETURN,
     MICROS_SCHEDULER_TEST_MISMATCH,
 };
 
@@ -90,6 +97,10 @@ micros_scheduler_test_handle_user_trap(
 bool micros_scheduler_test_after_user_return(
     const struct micros_hart *hart,
     const struct micros_trap_frame *frame
+);
+
+bool micros_scheduler_test_rejects_malformed_completion(
+    struct micros_thread_handle thread
 );
 
 void micros_scheduler_test_note_selector_entry(void);

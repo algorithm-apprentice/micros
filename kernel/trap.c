@@ -507,6 +507,24 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 return;
             }
             if (
+                action
+                    == MICROS_SCHEDULER_TEST_CAPTURED_USER_RETURN
+            ) {
+                if (
+                    micros_scheduler_select_captured_user_return(
+                        hart,
+                        frame
+                    ) != MICROS_SCHEDULER_OK
+                ) {
+                    MICROS_TRAP_PANIC(
+                        hart->hardware_id,
+                        "scheduler-captured-return",
+                        frame
+                    );
+                }
+                return;
+            }
+            if (
                 action != MICROS_SCHEDULER_TEST_CONTINUE
             ) {
                 MICROS_TRAP_PANIC(

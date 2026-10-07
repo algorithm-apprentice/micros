@@ -86,10 +86,15 @@ mechanism with three exact process generations and trusted kernel-owned
 messages, then restores the object, endpoint, and scheduler baseline. Target
 endpoint lifecycle and IPC component paths now share one authoritative,
 failure-atomic, one-shot registry runtime. Portable no-message, message, and
-failure completion shapes are now canonical; shared selected-thread return
-consumption remains the next IPC syscall slice.
-Kernel IRQ injection, trap dispatch, and the syscall ABI remain dependency-
-ready follow-up work; they are not
+failure completion shapes are now canonical. One shared selected-thread return
+path preflights and commits them across scheduler start, ordinary U-trap,
+captured IPC return, and idle wake. It performs bounded user-buffer copy,
+retains the exact prevalidated physical chunks through commit, patches stable
+`a0` results, stores the exact selected context, clears the completion, and
+only then commits scheduler selection after timer/accounting preparation.
+Malformed residual non-pending completion state is an invariant failure.
+Kernel IRQ injection, production trap dispatch, and the syscall ABI remain
+dependency-ready follow-up work; they are not
 silently supplied by the acceptance component. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a

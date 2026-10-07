@@ -2,18 +2,9 @@
 
 #include <stddef.h>
 
+#include "kernel/ipc_buffer_internal.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
-
-struct ipc_buffer_chunk {
-    uint64_t physical_address;
-    size_t size;
-};
-
-struct ipc_buffer_plan {
-    struct ipc_buffer_chunk chunks[2];
-    size_t chunk_count;
-};
 
 static enum micros_ipc_buffer_error map_address_error(
     enum micros_user_address_space_error error
@@ -35,7 +26,7 @@ static enum micros_ipc_buffer_error plan_buffer(
     struct micros_process_handle process,
     uint64_t user_address,
     uint32_t access,
-    struct ipc_buffer_plan *plan
+    struct micros_ipc_buffer_plan *plan
 )
 {
     uint64_t current;
@@ -113,7 +104,7 @@ static enum micros_ipc_buffer_error plan_buffer(
 
 static void copy_from_plan(
     void *destination,
-    const struct ipc_buffer_plan *plan
+    const struct micros_ipc_buffer_plan *plan
 )
 {
     unsigned char *output = destination;
@@ -134,7 +125,7 @@ static void copy_from_plan(
 }
 
 static void copy_to_plan(
-    const struct ipc_buffer_plan *plan,
+    const struct micros_ipc_buffer_plan *plan,
     const void *source
 )
 {
@@ -161,7 +152,7 @@ enum micros_ipc_buffer_error micros_ipc_buffer_validate(
     uint32_t access
 )
 {
-    struct ipc_buffer_plan plan;
+    struct micros_ipc_buffer_plan plan;
 
     return plan_buffer(process, user_address, access, &plan);
 }
@@ -173,7 +164,7 @@ enum micros_ipc_buffer_error micros_ipc_buffer_snapshot(
     struct micros_ipc_message *message
 )
 {
-    struct ipc_buffer_plan plan;
+    struct micros_ipc_buffer_plan plan;
     struct micros_ipc_message candidate;
     enum micros_ipc_buffer_error error;
 
@@ -198,21 +189,42 @@ enum micros_ipc_buffer_error micros_ipc_buffer_write(
     const struct micros_ipc_message *message
 )
 {
-    struct ipc_buffer_plan plan;
+    struct micros_ipc_buffer_plan plan;
     enum micros_ipc_buffer_error error;
 
     if (message == NULL) {
         return MICROS_IPC_BUFFER_ERROR_ARGUMENT;
     }
-    error = plan_buffer(
+    error = micros_ipc_buffer_prepare_write(
         process,
         user_address,
-        MICROS_IPC_BUFFER_WRITE,
         &plan
     );
     if (error != MICROS_IPC_BUFFER_OK) {
         return error;
     }
-    copy_to_plan(&plan, message);
+    micros_ipc_buffer_commit_write(&plan, message);
     return MICROS_IPC_BUFFER_OK;
+}
+
+enum micros_ipc_buffer_error micros_ipc_buffer_prepare_write(
+    struct micros_process_handle process,
+    uint64_t user_address,
+    struct micros_ipc_buffer_plan *plan
+)
+{
+    return plan_buffer(
+        process,
+        user_address,
+        MICROS_IPC_BUFFER_WRITE,
+        plan
+    );
+}
+
+void micros_ipc_buffer_commit_write(
+    const struct micros_ipc_buffer_plan *plan,
+    const struct micros_ipc_message *message
+)
+{
+    copy_to_plan(plan, message);
 }
