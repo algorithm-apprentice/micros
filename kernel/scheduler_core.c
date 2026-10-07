@@ -762,6 +762,7 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
         || !thread->context_attached
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread_is_current(objects, thread_handle)
+        || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -857,6 +858,7 @@ enum micros_kernel_object_error micros_thread_scheduler_remove(
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread->ready_linked
         || thread_is_current(objects, thread_handle)
+        || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -885,6 +887,7 @@ enum micros_kernel_object_error micros_thread_runtime_flags_set(
         flags == 0
         || (flags & ~MICROS_THREAD_RTS_DEFINED_MASK) != 0
         || (flags & MICROS_THREAD_RTS_PREEMPTED) != 0
+        || (flags & MICROS_THREAD_RTS_IPC_MASK) != 0
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
@@ -942,6 +945,7 @@ enum micros_kernel_object_error micros_thread_runtime_flags_unset(
         flags == 0
         || (flags & ~MICROS_THREAD_RTS_DEFINED_MASK) != 0
         || (flags & MICROS_THREAD_RTS_PREEMPTED) != 0
+        || (flags & MICROS_THREAD_RTS_IPC_MASK) != 0
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }

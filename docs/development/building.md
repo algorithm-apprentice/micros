@@ -46,13 +46,16 @@ The current implementation provides:
 - native endpoint encoding, immutable privilege-profile tables, process-bound
   lifecycle, stale-generation rejection, authorization, and replayable seeded
   model tests;
+- native 64-byte IPC message-layout and dormant thread/endpoint state
+  invariant tests;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
 The generation-aware endpoint and privilege substrate now passes its native
-model and isolated QEMU acceptance gates. Blocking IPC is the next
-dependency-ordered kernel task.
+model and isolated QEMU acceptance gates. The fixed IPC message ABI, run-time
+flag positions, and dormant kernel-owned state are present; queue transitions
+remain the next dependency-ordered kernel task.
 
 ## Prerequisites
 
