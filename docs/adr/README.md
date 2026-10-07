@@ -47,3 +47,4 @@ to make the project appear more consistent than it was.
 | [0029](0029-endpoint-and-privilege-substrate.md) | Endpoint and privilege substrate | Accepted |
 | [0030](0030-minix-baseline-blocking-ipc.md) | MINIX-baseline blocking IPC | Accepted |
 | [0031](0031-tiered-native-validation.md) | Tiered native validation | Accepted |
+| [0032](0032-fail-closed-change-aware-validation.md) | Fail-closed change-aware validation | Accepted |
