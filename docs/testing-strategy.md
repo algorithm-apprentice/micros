@@ -110,7 +110,10 @@ typed frame-ownership ledger, Sv39 encoding, kernel-object lifecycle/model
 tests, and deterministic scheduler admission, RTS, priority-queue, policy,
 current-selection, preemption-repair, return-plan, and separate
 thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
-reference model, endpoint encoding, immutable privilege-profile tables,
+reference model. They also cover reversible current-thread IPC detach,
+idle/thread trap-stack anchor transitions, exact rollback, same-priority head
+preservation, and higher-priority wakeup selection. Endpoint tests cover
+endpoint encoding, immutable privilege-profile tables,
 process-bound lifecycle, stale-generation rejection, relationship validation,
 authorization, and deterministic endpoint/IPC regressions under ASan and
 UBSan. It also verifies the exact 64-byte IPC message ABI and zero-state

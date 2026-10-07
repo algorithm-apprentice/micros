@@ -136,6 +136,7 @@ if(MICROS_BUILD_HOST_TESTS)
         scheduler_test
         kernel/kernel_objects.c
         kernel/scheduler_core.c
+        tests/host/ipc_current_guard_test.c
         tests/host/scheduler_model_test.c
         tests/host/scheduler_test.c
     )

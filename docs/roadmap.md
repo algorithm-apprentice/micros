@@ -77,11 +77,13 @@ mechanism with three exact process generations and trusted kernel-owned
 messages, then restores the object, endpoint, and scheduler baseline. Target
 endpoint lifecycle and IPC component paths now share one authoritative,
 failure-atomic, one-shot registry runtime.
-Kernel IRQ injection, the target current-thread adapter, completion return,
-and the syscall ABI remain dependency-ready follow-up work; they are not
+Kernel IRQ injection, completion return, trap dispatch, and the syscall ABI
+remain dependency-ready follow-up work; they are not
 silently supplied by the acceptance component. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
-are now implemented for that target boundary.
+are now implemented for that target boundary. The scheduler now provides a
+reversible current-thread IPC guard with exact ready-queue and trap-stack
+rollback plus head-preserving immediate commit.
 
 ## v0.1 completion goal
 
