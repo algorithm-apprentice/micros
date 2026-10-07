@@ -117,23 +117,48 @@ If these fields cannot be stated, the task is not ready to implement.
 
 ## Documentation-first and test-first sequence
 
-The required order is:
+Every implementation-bearing outcome uses two separately reviewed phases.
 
-1. Research the relevant source and platform behavior.
-2. Update design and Proposed ADRs when authority, ownership, ABI,
-   dependencies, or observable behavior changes. To change an Accepted
-   decision, add a new ADR that explicitly supersedes it.
-3. Review the design until no substantive issue remains.
-4. Plan the small green commit sequence.
-5. Write the smallest failing test at the correct layer.
-6. Implement the minimum production behavior that makes it pass.
-7. Commit that coherent green slice.
-8. Refactor in a separate green commit when useful.
-9. Run the narrow suite and then the milestone gate.
-10. Independently review the complete change.
-11. Correct justified findings and repeat review.
-12. Squash-merge the reviewed task into one `main` commit and select the next
-    dependency-ready task.
+### Design phase
+
+1. Create paired design and implementation todos, make implementation depend
+   on design, leave implementation pending, and activate only design.
+2. Research the relevant source and platform behavior.
+3. Define the baseline, goal, non-goals, ownership, state, failure, and
+   acceptance contracts in canonical documents and a Proposed ADR.
+4. Keep production code, executable tests/models/harnesses, build scaffolding,
+   dependencies, and reusable prototypes out of the design pull request.
+5. Independently review the design until no substantive issue remains.
+6. Mark the design Accepted and squash-merge it.
+
+The design pull request records `Phase: Design`, its dependency-ready outcome,
+and the evidence used to make the design implementation-ready.
+
+### Implementation phase
+
+1. Move the dependent implementation todo from pending to in-progress and
+   create its fresh branch only after the design merge.
+2. Reference the merged design pull request and commit.
+3. Plan the small green commit sequence.
+4. Write the smallest failing test at the correct layer.
+5. Implement the minimum production behavior that makes it pass.
+6. Commit that coherent green slice.
+7. Refactor in a separate green commit when useful.
+8. Run the narrow suite and then the milestone gate.
+9. Independently review the complete implementation.
+10. Correct justified findings and repeat review.
+11. Squash-merge the implementation task into one `main` commit.
+
+The implementation pull request records `Phase: Implementation`, its merged
+design reference, Red-Green-Refactor evidence, exact author-run validation,
+and independent review outcome.
+
+If implementation exposes an incomplete accepted design, stop. Mark the
+implementation blocked, close and abandon its pull request/branch, merge a
+corrective design-only pull request, update the implementation design
+reference, return the todo to pending/in-progress, then restart implementation
+from current `main`. The corrective design task is the only active task while
+the implementation is blocked.
 
 ## TDD by layer
 
@@ -161,7 +186,9 @@ target did not respond.
   protocol can be tested.
 - Do not use sleeps as synchronization or correctness evidence.
 - Do not add production generality solely to make a unit test convenient.
-- Exploratory code is allowed only as a disposable spike; it is not merged.
+- Exploratory executable code is allowed only during implementation as a
+  disposable spike; design work may inspect code and run existing probes but
+  does not author executable spikes.
 - Documentation-only changes do not require fictional runtime tests.
 
 ## Review protocol
@@ -189,14 +216,21 @@ Review ends only when no substantive issue remains.
 
 ## Pull request and merge
 
-The pull request template is the durable execution record. Exact commands and
-results are included; "tests pass" without commands is insufficient.
+The pull request template is the durable phase record. Every PR identifies
+`Phase: Design` or `Phase: Implementation`.
+
+A design PR records baseline evidence, completed contracts, ADR status,
+non-goals, acceptance evidence, and independent design review. It does not
+invent Red/Green evidence or contain executable implementation artifacts.
+
+An implementation PR references the merged design and records commit planning,
+Red/Green/Refactor evidence, exact author-run validation, and independent
+implementation review. "Tests pass" without commands is insufficient.
 
 After required checks and independent review are clean, the pull request may be
-merged without waiting for an additional manual approval. Squash-merge it into
-one task-outcome commit while retaining Red/Green and review evidence in the
-pull-request description. Development then moves to the next dependency-ready
-task.
+merged without waiting for an additional manual approval. Squash-merge each
+phase into one outcome commit. The implementation branch is created only after
+the design outcome is on `main`.
 
 ## Preventing stale AI context
 

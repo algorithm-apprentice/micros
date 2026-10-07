@@ -73,22 +73,45 @@ behavior.
 
 ## Authoring work loop
 
-1. Select exactly one dependency-ready task.
+Every implementation-bearing outcome has two sequential tasks and pull
+requests.
+
+### Design phase
+
+1. Create paired design and implementation todos; make implementation depend
+   on design, keep implementation pending, and activate only the design task.
 2. Trace and document the corresponding MINIX behavioral baseline.
-3. Confirm the goal, non-goals, affected invariants, and acceptance tests.
-4. Plan a sequence of small commits, each with one explainable outcome.
-5. Revise a Proposed ADR when needed. Changing an Accepted decision requires a
-   new ADR that explicitly supersedes it before implementation.
-6. Write the smallest failing test at the correct layer.
-7. Implement the minimum behavior that makes the test pass.
-8. Commit a coherent green slice; do not make permanent broken commits.
-9. Refactor in another green commit when separation improves reviewability.
-10. Run the narrow required checks, then the milestone gate.
-11. Obtain an independent review.
-12. Validate every review finding; fix only technically justified issues.
-13. Re-review until no substantive issue remains.
-14. Squash-merge the reviewed pull request into one task-outcome commit, then
-    move to the next dependency-ready task.
+3. Define the goal, non-goals, authority, state transitions, invariants,
+   failure boundaries, and acceptance evidence deeply enough that
+   implementation need not invent a contract.
+4. Record durable decisions in a Proposed ADR and canonical design documents.
+5. Do not commit code, tests, models, harnesses, build scaffolding, or reusable
+   prototypes.
+6. Obtain an independent design review.
+7. Correct justified design findings and re-review until none remain.
+8. Mark the design Accepted and squash-merge the design pull request.
+
+### Implementation phase
+
+1. Move the dependent implementation todo to in-progress only after the design
+   merge.
+2. Create a fresh implementation branch from current `main` and reference the
+   merged design.
+3. Plan a sequence of small commits, each with one explainable outcome.
+4. Write the smallest failing test at the correct layer.
+5. Implement the minimum complete behavior that makes the test pass.
+6. Commit a coherent green slice; do not make permanent broken commits.
+7. Refactor in another green commit when separation improves reviewability.
+8. Run the narrow required checks, then the milestone gate.
+9. Obtain an independent implementation review.
+10. Validate every review finding; fix only technically justified issues.
+11. Re-review until no substantive issue remains.
+12. Squash-merge the implementation pull request into one task-outcome commit.
+
+If implementation reveals a design defect, mark implementation blocked,
+abandon its pull request/branch, merge a corrective design-only pull request,
+then return implementation to pending/in-progress and restart it from current
+`main`.
 
 Do not develop separate tasks in parallel.
 
@@ -108,8 +131,9 @@ Do not develop separate tasks in parallel.
 - The Red state may remain local and be recorded in the pull request. A
   permanent commit should normally contain the test plus the minimum behavior
   needed to keep that commit green and bisectable.
-- Exploratory spikes may be used locally but are not merged until replaced by
-  tested production code.
+- During implementation, exploratory spikes may be used locally but are not
+  merged until replaced by tested production code. Design phase does not
+  author executable spikes.
 
 ## Architectural guardrails
 
