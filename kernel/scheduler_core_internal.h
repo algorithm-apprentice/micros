@@ -26,4 +26,19 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_call_delivery(
     struct micros_thread_handle receiver
 );
 
+enum micros_kernel_object_error
+micros_scheduler_commit_ipc_reply_receive_wait(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle caller,
+    struct micros_thread_handle replier
+);
+
+enum micros_kernel_object_error
+micros_scheduler_commit_ipc_reply_receive_delivery(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle caller,
+    struct micros_thread_handle replier,
+    struct micros_thread_handle sender
+);
+
 #endif

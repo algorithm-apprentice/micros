@@ -60,6 +60,8 @@ struct model_coverage {
     size_t notify_denied;
     size_t reply_allowed;
     size_t reply_denied;
+    size_t reply_receive_allowed;
+    size_t reply_receive_denied;
     size_t stale;
 };
 
@@ -169,6 +171,7 @@ static bool setup_fixture(void)
                 MICROS_PRIVILEGE_OPERATION_RECEIVE
                 | MICROS_PRIVILEGE_OPERATION_SEND
                 | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
                 | MICROS_PRIVILEGE_OPERATION_NOTIFY,
             .send_targets = UINT32_C(1) << 1,
             .notify_targets = UINT32_C(1) << 2,
@@ -496,6 +499,8 @@ bool micros_endpoint_model_test_run(void)
         MODEL_OPERATION_AUTHORIZE,
         MODEL_OPERATION_AUTHORIZE,
         MODEL_OPERATION_AUTHORIZE,
+        MODEL_OPERATION_AUTHORIZE,
+        MODEL_OPERATION_AUTHORIZE,
     };
     static const uint32_t scripted_values[] = {
         0,
@@ -513,6 +518,8 @@ bool micros_endpoint_model_test_run(void)
         (UINT32_C(0) << 16) | 2,
         (UINT32_C(1) << 16) | 4,
         (UINT32_C(0) << 16) | 4,
+        (UINT32_C(1) << 16) | 8,
+        (UINT32_C(0) << 16) | 8,
     };
     struct model_slot model[MODEL_SLOT_COUNT];
     struct model_coverage coverage;
@@ -729,6 +736,49 @@ bool micros_endpoint_model_test_run(void)
             enum micros_endpoint_error error;
 
             slot = find_slot(model, value, slot_has_endpoint);
+            if ((value & 8) != 0) {
+                authorization_operation =
+                    MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+                if (
+                    slot == MODEL_SLOT_COUNT
+                    || model[slot].endpoint_phase
+                        != MODEL_ENDPOINT_ACTIVE
+                ) {
+                    expected = MICROS_ENDPOINT_ERROR_STATE;
+                } else if (model[slot].profile == 2) {
+                    expected = MICROS_ENDPOINT_OK;
+                } else {
+                    expected = MICROS_ENDPOINT_ERROR_UNAUTHORIZED;
+                }
+                if (slot == MODEL_SLOT_COUNT) {
+                    break;
+                }
+                error = micros_endpoint_authorize_operation(
+                    &registry,
+                    &objects,
+                    model[slot].endpoint,
+                    authorization_operation
+                );
+                value = authorization_operation;
+                if (error != expected) {
+                    return model_fail(
+                        step,
+                        operation,
+                        value,
+                        "operation authorization diverged"
+                    );
+                }
+                if (error == MICROS_ENDPOINT_OK) {
+                    ++coverage.reply_receive_allowed;
+                } else if (
+                    error == MICROS_ENDPOINT_ERROR_UNAUTHORIZED
+                ) {
+                    ++coverage.reply_receive_denied;
+                } else {
+                    ++coverage.authorize_state;
+                }
+                break;
+            }
             if ((value & 4) != 0) {
                 authorization_operation =
                     MICROS_PRIVILEGE_OPERATION_REPLY;
@@ -1051,6 +1101,8 @@ bool micros_endpoint_model_test_run(void)
         || coverage.notify_denied == 0
         || coverage.reply_allowed == 0
         || coverage.reply_denied == 0
+        || coverage.reply_receive_allowed == 0
+        || coverage.reply_receive_denied == 0
         || coverage.stale == 0
     ) {
         fprintf(
@@ -1060,7 +1112,9 @@ bool micros_endpoint_model_test_run(void)
             "client=%zu server=%zu invalid=%zu activate=%zu "
             "close=%zu allow=%zu deny=%zu state=%zu "
             "notify-allow=%zu notify-deny=%zu "
-            "reply-allow=%zu reply-deny=%zu stale=%zu\n",
+            "reply-allow=%zu reply-deny=%zu "
+            "reply-receive-allow=%zu "
+            "reply-receive-deny=%zu stale=%zu\n",
             coverage.create,
             coverage.release,
             coverage.reserve,
@@ -1077,6 +1131,8 @@ bool micros_endpoint_model_test_run(void)
             coverage.notify_denied,
             coverage.reply_allowed,
             coverage.reply_denied,
+            coverage.reply_receive_allowed,
+            coverage.reply_receive_denied,
             coverage.stale
         );
         return false;
