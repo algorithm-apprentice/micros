@@ -1505,11 +1505,6 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                     thread->runtime_flags
                     & ~MICROS_THREAD_RTS_DEFINED_MASK
                 ) != 0
-                || (
-                    thread->runtime_flags
-                    & MICROS_THREAD_RTS_IPC_MASK
-                ) != 0
-                || !micros_thread_ipc_state_is_clear(thread)
                 || !process_handle_is_valid(thread->owner)
                 || objects->processes[thread->owner.slot].slot_state
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE

@@ -48,6 +48,8 @@ The current implementation provides:
   model tests;
 - native 64-byte IPC message-layout and dormant thread/endpoint state
   invariant tests;
+- native generation-safe sender/receiver queue topology, FIFO-link, and
+  corruption tests, including queued-call and reply-wait state shapes;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -55,7 +57,9 @@ The current implementation provides:
 The generation-aware endpoint and privilege substrate now passes its native
 model and isolated QEMU acceptance gates. The fixed IPC message ABI, run-time
 flag positions, and dormant kernel-owned state are present; queue transitions
-remain the next dependency-ordered kernel task.
+now have complete cross-object topology validation. Queue mutation and
+send/receive matching remain the next dependency-ordered kernel task; reply
+token allocation and consumption remain separate later slices.
 
 ## Prerequisites
 

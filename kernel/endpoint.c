@@ -71,6 +71,19 @@ static bool bytes_equal(
     return true;
 }
 
+static bool bytes_are_zero(const void *storage, size_t size)
+{
+    const unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool names_equal(
     const char *left,
     const char *right
@@ -162,6 +175,54 @@ static bool endpoint_ipc_state_is_zero(
     return true;
 }
 
+static bool thread_handle_is_zero(
+    struct micros_thread_handle handle
+)
+{
+    return handle.slot == 0 && handle.generation == 0;
+}
+
+static bool thread_handle_is_shallow_valid(
+    struct micros_thread_handle handle
+)
+{
+    return (
+        handle.slot < MICROS_THREAD_CAPACITY
+        && handle.generation != 0
+    );
+}
+
+static bool queue_pair_is_shallow_valid(
+    struct micros_thread_handle head,
+    struct micros_thread_handle tail
+)
+{
+    if (thread_handle_is_zero(head)) {
+        return thread_handle_is_zero(tail);
+    }
+    return (
+        thread_handle_is_shallow_valid(head)
+        && thread_handle_is_shallow_valid(tail)
+    );
+}
+
+static bool pending_notification_state_is_zero(
+    const struct micros_endpoint_record *endpoint
+)
+{
+    size_t index;
+
+    if (endpoint->pending_notification_sources != 0) {
+        return false;
+    }
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (endpoint->pending_events[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static void clear_endpoint_record(
     struct micros_endpoint_record *endpoint
 )
@@ -189,6 +250,17 @@ static void clear_endpoint_record(
 static bool process_handles_equal(
     struct micros_process_handle left,
     struct micros_process_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
+static bool thread_handles_equal(
+    struct micros_thread_handle left,
+    struct micros_thread_handle right
 )
 {
     return (
@@ -541,7 +613,26 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
         ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
         }
-        if (!endpoint_ipc_state_is_zero(endpoint)) {
+        if (
+            endpoint->state == MICROS_ENDPOINT_STATE_RESERVED
+            && !endpoint_ipc_state_is_zero(endpoint)
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (
+            endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+            && (
+                !queue_pair_is_shallow_valid(
+                    endpoint->sender_head,
+                    endpoint->sender_tail
+                )
+                || !queue_pair_is_shallow_valid(
+                    endpoint->receiver_head,
+                    endpoint->receiver_tail
+                )
+                || !pending_notification_state_is_zero(endpoint)
+            )
+        ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
         }
         if (endpoint->owner.slot != index) {
@@ -805,12 +896,290 @@ static bool process_threads_are_held(
     return true;
 }
 
+static bool delivery_state_is_clear(
+    const struct micros_thread *thread
+)
+{
+    return (
+        !thread->ipc_delivery_pending
+        && bytes_are_zero(
+            &thread->ipc_inbound_message,
+            sizeof(thread->ipc_inbound_message)
+        )
+        && thread->ipc_staged_result == MICROS_IPC_OK
+    );
+}
+
+static bool sender_queue_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread,
+    micros_endpoint_t destination
+)
+{
+    const struct micros_endpoint_record *source =
+        &registry->endpoints[thread->owner.slot];
+    bool is_call =
+        (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_REPLY
+        ) != 0;
+
+    if (
+        thread->ipc_queue_kind != MICROS_IPC_QUEUE_SENDER
+        || (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_SEND
+        ) == 0
+        || (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_RECEIVE
+        ) != 0
+        || source->state != MICROS_ENDPOINT_STATE_ACTIVE
+        || !process_handles_equal(source->owner, thread->owner)
+        || thread->ipc_send_destination != destination
+        || thread->ipc_outbound_message.source != source->value
+        || (
+            thread->ipc_outbound_message.type
+            & MICROS_IPC_TYPE_KERNEL_MASK
+        ) != 0
+        || thread->ipc_receive_source != 0
+        || !delivery_state_is_clear(thread)
+    ) {
+        return false;
+    }
+    if (!is_call) {
+        return (
+            thread->ipc_outbound_message.reply_token == 0
+            && thread->ipc_receive_buffer == 0
+            && thread->ipc_reply_token == 0
+            && thread->ipc_reply_callee == 0
+        );
+    }
+    return (
+        thread->ipc_reply_token != 0
+        && thread->ipc_reply_callee == destination
+        && thread->ipc_outbound_message.reply_token
+            == thread->ipc_reply_token
+        && thread->ipc_receive_buffer != 0
+        && thread->ipc_receive_buffer % 8 == 0
+    );
+}
+
+static bool reply_wait_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+)
+{
+    const struct micros_endpoint_record *caller =
+        &registry->endpoints[thread->owner.slot];
+    const struct micros_endpoint_record *callee;
+
+    if (
+        thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+        || !thread_handle_is_zero(thread->ipc_next)
+        || (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) != MICROS_THREAD_RTS_IPC_REPLY
+        || !bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        || thread->ipc_send_destination != 0
+        || thread->ipc_receive_source != 0
+        || thread->ipc_receive_buffer == 0
+        || thread->ipc_receive_buffer % 8 != 0
+        || !delivery_state_is_clear(thread)
+        || thread->ipc_reply_token == 0
+        || caller->state != MICROS_ENDPOINT_STATE_ACTIVE
+        || !process_handles_equal(caller->owner, thread->owner)
+        || endpoint_record_resolve_validated(
+            registry,
+            thread->ipc_reply_callee,
+            &callee
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
+    }
+    return callee->state == MICROS_ENDPOINT_STATE_ACTIVE;
+}
+
+static bool thread_has_no_ipc_flags(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread->runtime_flags
+        & MICROS_THREAD_RTS_IPC_MASK
+    ) == 0;
+}
+
+static bool receiver_queue_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread,
+    const struct micros_endpoint_record *endpoint
+)
+{
+    const struct micros_endpoint_record *source;
+
+    if (
+        thread->ipc_queue_kind != MICROS_IPC_QUEUE_RECEIVER
+        || (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) != MICROS_THREAD_RTS_IPC_RECEIVE
+        || !process_handles_equal(thread->owner, endpoint->owner)
+        || !bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        || thread->ipc_send_destination != 0
+        || thread->ipc_receive_buffer == 0
+        || thread->ipc_receive_buffer % 8 != 0
+        || !delivery_state_is_clear(thread)
+        || thread->ipc_reply_token != 0
+        || thread->ipc_reply_callee != 0
+    ) {
+        return false;
+    }
+    if (thread->ipc_receive_source == MICROS_ENDPOINT_ANY) {
+        return true;
+    }
+    if (
+        endpoint_record_resolve_validated(
+            registry,
+            thread->ipc_receive_source,
+            &source
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
+    }
+    return source->state == MICROS_ENDPOINT_STATE_ACTIVE;
+}
+
+static bool endpoint_queue_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint,
+    struct micros_thread_handle head,
+    struct micros_thread_handle tail,
+    enum micros_ipc_queue_kind kind,
+    bool seen[MICROS_THREAD_CAPACITY]
+)
+{
+    struct micros_thread_handle current = head;
+    size_t steps;
+
+    if (thread_handle_is_zero(head)) {
+        return thread_handle_is_zero(tail);
+    }
+    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
+        const struct micros_thread *thread;
+
+        if (
+            current.slot >= MICROS_THREAD_CAPACITY
+            || current.generation == 0
+            || seen[current.slot]
+            || micros_thread_resolve(objects, current, &thread)
+                != MICROS_KERNEL_OBJECT_OK
+        ) {
+            return false;
+        }
+        seen[current.slot] = true;
+        if (
+            kind == MICROS_IPC_QUEUE_SENDER
+                ? !sender_queue_state_is_valid(
+                    registry,
+                    thread,
+                    endpoint->value
+                )
+                : !receiver_queue_state_is_valid(
+                    registry,
+                    thread,
+                    endpoint
+                )
+        ) {
+            return false;
+        }
+        if (thread_handles_equal(current, tail)) {
+            return thread_handle_is_zero(thread->ipc_next);
+        }
+        if (thread_handle_is_zero(thread->ipc_next)) {
+            return false;
+        }
+        current = thread->ipc_next;
+    }
+    return false;
+}
+
+static bool endpoint_queues_have_match(
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint
+)
+{
+    struct micros_thread_handle receiver_handle =
+        endpoint->receiver_head;
+    size_t receiver_steps;
+
+    if (
+        thread_handle_is_zero(endpoint->sender_head)
+        || thread_handle_is_zero(endpoint->receiver_head)
+    ) {
+        return false;
+    }
+    for (
+        receiver_steps = 0;
+        receiver_steps < MICROS_THREAD_CAPACITY;
+        ++receiver_steps
+    ) {
+        const struct micros_thread *receiver =
+            &objects->threads[receiver_handle.slot];
+        struct micros_thread_handle sender_handle =
+            endpoint->sender_head;
+        size_t sender_steps;
+
+        for (
+            sender_steps = 0;
+            sender_steps < MICROS_THREAD_CAPACITY;
+            ++sender_steps
+        ) {
+            const struct micros_thread *sender =
+                &objects->threads[sender_handle.slot];
+
+            if (
+                receiver->ipc_receive_source
+                    == MICROS_ENDPOINT_ANY
+                || receiver->ipc_receive_source
+                    == sender->ipc_outbound_message.source
+            ) {
+                return true;
+            }
+            if (thread_handles_equal(
+                sender_handle,
+                endpoint->sender_tail
+            )) {
+                break;
+            }
+            sender_handle = sender->ipc_next;
+        }
+        if (thread_handles_equal(
+            receiver_handle,
+            endpoint->receiver_tail
+        )) {
+            break;
+        }
+        receiver_handle = receiver->ipc_next;
+    }
+    return false;
+}
+
 enum micros_endpoint_error micros_endpoint_registry_validate_objects(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects
 )
 {
     enum micros_endpoint_error endpoint_error;
+    bool queued_threads[MICROS_THREAD_CAPACITY];
     size_t index;
 
     if (registry == NULL || objects == NULL) {
@@ -825,6 +1194,9 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
             != MICROS_KERNEL_OBJECT_OK
     ) {
         return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        queued_threads[index] = false;
     }
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
@@ -870,6 +1242,80 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
             }
         } else if (endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (
+            endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+            && (
+                !endpoint_queue_is_valid(
+                    registry,
+                    objects,
+                    endpoint,
+                    endpoint->sender_head,
+                    endpoint->sender_tail,
+                    MICROS_IPC_QUEUE_SENDER,
+                    queued_threads
+                )
+                || !endpoint_queue_is_valid(
+                    registry,
+                    objects,
+                    endpoint,
+                    endpoint->receiver_head,
+                    endpoint->receiver_tail,
+                    MICROS_IPC_QUEUE_RECEIVER,
+                    queued_threads
+                )
+                || endpoint_queues_have_match(objects, endpoint)
+            )
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+        size_t other_index;
+
+        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
+            continue;
+        }
+        if (thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE) {
+            if (
+                queued_threads[index]
+                || (
+                    micros_thread_ipc_state_is_clear(thread)
+                        ? !thread_has_no_ipc_flags(thread)
+                        : !reply_wait_state_is_valid(
+                            registry,
+                            thread
+                        )
+                )
+            ) {
+                return MICROS_ENDPOINT_ERROR_INVARIANT;
+            }
+        } else if (
+            (
+                thread->ipc_queue_kind != MICROS_IPC_QUEUE_SENDER
+                && thread->ipc_queue_kind
+                    != MICROS_IPC_QUEUE_RECEIVER
+            )
+            || !queued_threads[index]
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (thread->ipc_reply_token == 0) {
+            continue;
+        }
+        for (other_index = 0; other_index < index; ++other_index) {
+            const struct micros_thread *other =
+                &objects->threads[other_index];
+
+            if (
+                other->slot_state
+                    == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                && other->ipc_reply_token
+                    == thread->ipc_reply_token
+            ) {
+                return MICROS_ENDPOINT_ERROR_INVARIANT;
+            }
         }
     }
     return MICROS_ENDPOINT_OK;
@@ -1075,6 +1521,36 @@ enum micros_endpoint_error micros_endpoint_resolve_active(
     return MICROS_ENDPOINT_OK;
 }
 
+static bool endpoint_has_foreign_waiters(
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
+            continue;
+        }
+        if (
+            (
+                thread->ipc_queue_kind
+                    == MICROS_IPC_QUEUE_RECEIVER
+                && thread->ipc_receive_source == endpoint
+            )
+            || (
+                thread->ipc_reply_token != 0
+                && thread->ipc_reply_callee == endpoint
+            )
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 enum micros_endpoint_error micros_endpoint_close(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
@@ -1101,6 +1577,12 @@ enum micros_endpoint_error micros_endpoint_close(
     );
     if (error != MICROS_ENDPOINT_OK) {
         return error;
+    }
+    if (!endpoint_ipc_state_is_zero(resolved_record)) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    if (endpoint_has_foreign_waiters(objects, endpoint)) {
+        return MICROS_ENDPOINT_ERROR_STATE;
     }
     owner = resolved_record->owner;
     if (!process_threads_are_held(objects, owner, false)) {
