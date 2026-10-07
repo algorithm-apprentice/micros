@@ -141,6 +141,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/ipc.c
         tests/host/ipc_call_test.c
         tests/host/ipc_delivery_test.c
+        tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
         tests/host/ipc_queue_mutation_test.c

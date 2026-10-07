@@ -43,9 +43,18 @@ operations currently consume scheduler-held non-current callers. Portable
 requires its distinct operation authority, validates a specific source or
 `ANY` plus the receive buffer, and commits the caller reply together with
 either one immediate FIFO sender or one receiver-queue insertion. Scheduler
-and queue failures preserve both the token and complete state. Notifications,
-deadlock detection, endpoint cancellation, the target current-thread adapter,
-and the syscall ABI remain dependency-ready follow-up work.
+and queue failures preserve both the token and complete state. Portable
+notification now requires a nonzero event mask, exact active source and
+destination generations, and notify-profile authority. It never blocks:
+the first compatible specific or `ANY` receiver outside reply wait is staged
+and awakened immediately, while all other events OR-coalesce by source slot.
+Ordinary receive and `reply_receive` select the lowest matching pending source
+before FIFO senders, revalidate its live generation, and stage the canonical
+kernel envelope with a zero token and payload tail. Validators preserve the
+bitmap/event relation and prevent source reuse while an event remains
+pending. Deadlock detection, full endpoint cancellation, kernel IRQ injection,
+the target current-thread adapter, and the syscall ABI remain dependency-ready
+follow-up work.
 
 ## v0.1 completion goal
 

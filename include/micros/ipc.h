@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #define MICROS_IPC_TYPE_KERNEL_MASK UINT32_C(0x80000000)
+#define MICROS_IPC_TYPE_KERNEL_NOTIFICATION \
+    (MICROS_IPC_TYPE_KERNEL_MASK | UINT32_C(0x00000001))
 
 struct micros_ipc_message {
     uint32_t source;

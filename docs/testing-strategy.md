@@ -152,6 +152,17 @@ validator rejection of corrupted final states, later delivery to the blocked
 receiver, and byte-exact token/state preservation for invalid receive
 arguments and late caller or sender scheduler failures. The seeded endpoint
 model exercises allowed and denied reply/receive-operation authorization.
+Authorized notification tests prove nonzero-mask validation, exact active
+source and destination generations, operation and target-profile authority,
+immediate first-compatible receiver wakeup, call-reply exclusion, nonblocking
+notifier return, per-source OR coalescing, and bitmap/event agreement. Receive
+and reply/receive tests require lowest-slot pending selection before blocked
+senders, exact source-generation revalidation, and a canonical reserved kernel
+message containing the little-endian 64-bit event mask with a zero token and
+zero payload tail. Corruption, pending-source close, stale-source, and late
+scheduler failures preserve all state. A replayable 4,096-step notification
+model compares coalescing and specific/`ANY` selection with a compact
+reference.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap

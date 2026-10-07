@@ -12,6 +12,10 @@ _Static_assert(
     MICROS_PROCESS_GENERATION_MAX == MICROS_ENDPOINT_GENERATION_MAX,
     "process and endpoint generation limits must match"
 );
+_Static_assert(
+    MICROS_PROCESS_CAPACITY == 64,
+    "pending notification bitmap requires one bit per endpoint slot"
+);
 
 static bool storage_is_zero(
     const struct micros_endpoint_registry *registry
@@ -206,17 +210,20 @@ static bool queue_pair_is_shallow_valid(
     );
 }
 
-static bool pending_notification_state_is_zero(
+static bool pending_notification_state_is_shallow_valid(
     const struct micros_endpoint_record *endpoint
 )
 {
     size_t index;
 
-    if (endpoint->pending_notification_sources != 0) {
-        return false;
-    }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        if (endpoint->pending_events[index] != 0) {
+        bool source_pending =
+            (
+                endpoint->pending_notification_sources
+                & (UINT64_C(1) << index)
+            ) != 0;
+
+        if (source_pending != (endpoint->pending_events[index] != 0)) {
             return false;
         }
     }
@@ -630,7 +637,9 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
                     endpoint->receiver_head,
                     endpoint->receiver_tail
                 )
-                || !pending_notification_state_is_zero(endpoint)
+                || !pending_notification_state_is_shallow_valid(
+                    endpoint
+                )
             )
         ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
@@ -896,6 +905,29 @@ static bool process_threads_are_held(
     return true;
 }
 
+static bool process_threads_have_clear_ipc_state(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !process_handles_equal(thread->owner, process)
+        ) {
+            continue;
+        }
+        if (!micros_thread_ipc_state_is_clear(thread)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool delivery_state_is_clear(
     const struct micros_thread *thread
 )
@@ -1055,6 +1087,36 @@ static bool staged_reply_token_binding_is_valid(
     );
 }
 
+static bool notification_message_is_valid(
+    const struct micros_ipc_message *message
+)
+{
+    bool event_mask_is_nonzero = false;
+    size_t index;
+
+    if (
+        message->type != MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+        || message->reply_token != 0
+    ) {
+        return false;
+    }
+    for (index = 0; index < sizeof(uint64_t); ++index) {
+        if (message->payload[index] != 0) {
+            event_mask_is_nonzero = true;
+        }
+    }
+    for (
+        index = sizeof(uint64_t);
+        index < sizeof(message->payload);
+        ++index
+    ) {
+        if (message->payload[index] != 0) {
+            return false;
+        }
+    }
+    return event_mask_is_nonzero;
+}
+
 static bool staged_delivery_state_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -1084,10 +1146,6 @@ static bool staged_delivery_state_is_valid(
         || thread->ipc_staged_result != MICROS_IPC_OK
         || thread->ipc_reply_token != 0
         || thread->ipc_reply_callee != 0
-        || (
-            thread->ipc_inbound_message.type
-            & MICROS_IPC_TYPE_KERNEL_MASK
-        ) != 0
         || owner->state != MICROS_ENDPOINT_STATE_ACTIVE
         || !process_handles_equal(owner->owner, thread->owner)
         || endpoint_record_resolve_validated(
@@ -1098,8 +1156,23 @@ static bool staged_delivery_state_is_valid(
     ) {
         return false;
     }
+    if (
+        thread->ipc_inbound_message.type
+        == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+    ) {
+        return (
+            source->state == MICROS_ENDPOINT_STATE_ACTIVE
+            && notification_message_is_valid(
+                &thread->ipc_inbound_message
+            )
+        );
+    }
     return (
         source->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && (
+            thread->ipc_inbound_message.type
+            & MICROS_IPC_TYPE_KERNEL_MASK
+        ) == 0
         && staged_reply_token_binding_is_valid(
             registry,
             objects,
@@ -1217,7 +1290,84 @@ static bool endpoint_queue_is_valid(
     return false;
 }
 
-static bool endpoint_queues_have_match(
+static bool pending_notification_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint
+)
+{
+    size_t index;
+
+    if (!pending_notification_state_is_shallow_valid(endpoint)) {
+        return false;
+    }
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_endpoint_record *source;
+        const struct micros_process *process;
+
+        if (
+            (
+                endpoint->pending_notification_sources
+                & (UINT64_C(1) << index)
+            ) == 0
+        ) {
+            continue;
+        }
+        source = &registry->endpoints[index];
+        process = &objects->processes[index];
+        if (
+            source->state != MICROS_ENDPOINT_STATE_ACTIVE
+            || source->owner.slot != index
+            || process->slot_state
+                != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || process->generation != source->owner.generation
+            || process->primary_endpoint != source->value
+            || process->privilege_profile == 0
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool receiver_matches_pending_notification(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_endpoint_record *endpoint,
+    const struct micros_thread *receiver
+)
+{
+    struct micros_process_handle source;
+
+    if (
+        (
+            receiver->runtime_flags
+            & MICROS_THREAD_RTS_IPC_REPLY
+        ) != 0
+    ) {
+        return false;
+    }
+    if (receiver->ipc_receive_source == MICROS_ENDPOINT_ANY) {
+        return endpoint->pending_notification_sources != 0;
+    }
+    if (
+        micros_endpoint_unpack(
+            receiver->ipc_receive_source,
+            &source
+        ) != MICROS_ENDPOINT_OK
+        || source.slot >= MICROS_PROCESS_CAPACITY
+        || (
+            endpoint->pending_notification_sources
+            & (UINT64_C(1) << source.slot)
+        ) == 0
+    ) {
+        return false;
+    }
+    return registry->endpoints[source.slot].value
+        == receiver->ipc_receive_source;
+}
+
+static bool endpoint_has_matchable_work(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     const struct micros_endpoint_record *endpoint
 )
@@ -1226,10 +1376,7 @@ static bool endpoint_queues_have_match(
         endpoint->receiver_head;
     size_t receiver_steps;
 
-    if (
-        thread_handle_is_zero(endpoint->sender_head)
-        || thread_handle_is_zero(endpoint->receiver_head)
-    ) {
+    if (thread_handle_is_zero(endpoint->receiver_head)) {
         return false;
     }
     for (
@@ -1243,29 +1390,40 @@ static bool endpoint_queues_have_match(
             endpoint->sender_head;
         size_t sender_steps;
 
-        for (
-            sender_steps = 0;
-            sender_steps < MICROS_THREAD_CAPACITY;
-            ++sender_steps
+        if (
+            receiver_matches_pending_notification(
+                registry,
+                endpoint,
+                receiver
+            )
         ) {
-            const struct micros_thread *sender =
-                &objects->threads[sender_handle.slot];
-
-            if (
-                receiver->ipc_receive_source
-                    == MICROS_ENDPOINT_ANY
-                || receiver->ipc_receive_source
-                    == sender->ipc_outbound_message.source
+            return true;
+        }
+        if (!thread_handle_is_zero(sender_handle)) {
+            for (
+                sender_steps = 0;
+                sender_steps < MICROS_THREAD_CAPACITY;
+                ++sender_steps
             ) {
-                return true;
+                const struct micros_thread *sender =
+                    &objects->threads[sender_handle.slot];
+
+                if (
+                    receiver->ipc_receive_source
+                        == MICROS_ENDPOINT_ANY
+                    || receiver->ipc_receive_source
+                        == sender->ipc_outbound_message.source
+                ) {
+                    return true;
+                }
+                if (thread_handles_equal(
+                    sender_handle,
+                    endpoint->sender_tail
+                )) {
+                    break;
+                }
+                sender_handle = sender->ipc_next;
             }
-            if (thread_handles_equal(
-                sender_handle,
-                endpoint->sender_tail
-            )) {
-                break;
-            }
-            sender_handle = sender->ipc_next;
         }
         if (thread_handles_equal(
             receiver_handle,
@@ -1369,7 +1527,16 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                     MICROS_IPC_QUEUE_RECEIVER,
                     queued_threads
                 )
-                || endpoint_queues_have_match(objects, endpoint)
+                || !pending_notification_state_is_valid(
+                    registry,
+                    objects,
+                    endpoint
+                )
+                || endpoint_has_matchable_work(
+                    registry,
+                    objects,
+                    endpoint
+                )
             )
         ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
@@ -1675,6 +1842,31 @@ static bool endpoint_has_foreign_waiters(
     return false;
 }
 
+static bool endpoint_is_pending_notification_source(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_endpoint_record *source
+)
+{
+    uint64_t source_bit = UINT64_C(1) << source->owner.slot;
+    size_t index;
+
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_endpoint_record *destination =
+            &registry->endpoints[index];
+
+        if (
+            destination->state == MICROS_ENDPOINT_STATE_ACTIVE
+            && (
+                destination->pending_notification_sources
+                & source_bit
+            ) != 0
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 enum micros_endpoint_error micros_endpoint_close(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
@@ -1705,11 +1897,22 @@ enum micros_endpoint_error micros_endpoint_close(
     if (!endpoint_ipc_state_is_zero(resolved_record)) {
         return MICROS_ENDPOINT_ERROR_STATE;
     }
+    if (
+        endpoint_is_pending_notification_source(
+            registry,
+            resolved_record
+        )
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
     if (endpoint_has_foreign_waiters(objects, endpoint)) {
         return MICROS_ENDPOINT_ERROR_STATE;
     }
     owner = resolved_record->owner;
-    if (!process_threads_are_held(objects, owner, false)) {
+    if (
+        !process_threads_are_held(objects, owner, false)
+        || !process_threads_have_clear_ipc_state(objects, owner)
+    ) {
         return MICROS_ENDPOINT_ERROR_STATE;
     }
 

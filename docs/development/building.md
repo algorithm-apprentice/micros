@@ -76,6 +76,12 @@ The current implementation provides:
   selection, unmatched FIFO preservation, queued-call reply wait, atomic
   receiver blocking, validator enforcement, and late scheduler-failure
   preservation of every token and state byte;
+- native authorized notification tests covering nonzero event masks, exact
+  active endpoints, notify-profile policy, immediate first-receiver delivery,
+  call-reply exclusion, per-source OR coalescing, lowest-slot pending
+  selection before blocked senders, canonical kernel envelopes,
+  generation-safe validation, close preflight, scheduler-failure atomicity,
+  and a replayable 4,096-step transition model;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -100,11 +106,16 @@ the ordinary send-target mask without bypassing reply-operation policy.
 Portable `reply_receive` applies the same token, callee, canonical-message, and
 retained-buffer checks, requires the distinct combined-operation bit, and
 preflights the receive state after the caller wake. One non-failing commit then
-stages the reply and either consumes the first compatible FIFO sender or queues
-the server as a receiver, with no observable half-transition. These operations
-consume scheduler-held non-current callers; notifications, deadlock detection,
-endpoint cancellation, the target current-thread adapter, and the syscall ABI
-remain separate later slices.
+stages the reply and either consumes the first compatible pending notification
+or FIFO sender, or queues the server as a receiver, with no observable
+half-transition. Portable notify now never blocks: it wakes the first
+compatible specific or `ANY` receiver outside reply wait, otherwise ORs the
+event mask into one generation-protected source slot. Receive paths select the
+lowest matching pending source before blocked senders and stage the reserved
+kernel notification type with a little-endian event mask and zero tail. These
+operations consume scheduler-held non-current callers; deadlock detection,
+endpoint cancellation, kernel IRQ injection, the target current-thread
+adapter, and the syscall ABI remain separate later slices.
 
 ## Prerequisites
 

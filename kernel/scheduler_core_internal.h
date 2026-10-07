@@ -12,6 +12,12 @@ void micros_scheduler_apply_return_plan(
     const struct micros_scheduler_return_plan *plan
 );
 
+enum micros_kernel_object_error micros_scheduler_commit_ipc_wake(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    uint32_t clear_flag
+);
+
 enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle first_thread,

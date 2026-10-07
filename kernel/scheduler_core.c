@@ -410,7 +410,7 @@ static enum micros_kernel_object_error commit_ipc_transitions(
     if (
         objects == NULL
         || requests == NULL
-        || request_count < 2
+        || request_count < 1
         || request_count > 3
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
@@ -516,6 +516,21 @@ static enum micros_kernel_object_error commit_ipc_transitions(
         }
     }
     return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error micros_scheduler_commit_ipc_wake(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    uint32_t clear_flag
+)
+{
+    const struct ipc_transition_request request = {
+        .handle = thread,
+        .clear_flag = clear_flag,
+        .set_flags = 0,
+    };
+
+    return commit_ipc_transitions(objects, &request, 1);
 }
 
 enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
