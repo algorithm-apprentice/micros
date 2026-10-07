@@ -109,6 +109,8 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
+cmake --workflow --preset test-qemu-ipc-syscall
+cmake --workflow --preset test-qemu-ipc-syscall-panic
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -138,7 +140,12 @@ The IPC ecall core gate executes real U-mode `ecall` instructions through the
 production trap route and proves guard commit, rollback, immediate completion,
 stable negative results, upper-endpoint rejection, register preservation, and
 complete baseline restoration. The full six-operation syscall acceptance
-matrix remains the next sequential PR.
+matrix now runs in three real address spaces and proves blocking transitions,
+tokenized calls/replies, atomic `reply_receive`, notification coalescing and
+reply-wait exclusion, stable negative results, priority wakeups, deferred
+completion across a timer-selected peer, register preservation, and teardown.
+An isolated panic gate revokes an accepted receive-buffer mapping before
+return and requires `invalid-bootstrap-ipc-buffer`.
 The frame-ownership gate
 proves exact process-generation authority, blocked process release,
 failure-atomic staged handoff, and irreversible sealing. The nested trap gate

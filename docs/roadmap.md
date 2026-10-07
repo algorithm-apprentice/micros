@@ -99,8 +99,14 @@ current-thread guard transaction, maps stable results, stages immediate
 completion, and selects ordinary or captured return. A focused QEMU gate proves
 real instruction entry, successful notify commit, unauthorized-send rollback,
 upper endpoint rejection, register preservation, and baseline restoration.
-Kernel IRQ injection and the complete multi-process normal/expected-panic
-syscall acceptance matrix remain dependency-ready follow-up work; they are not
+The complete three-address-space syscall gate now executes all six operations,
+blocking/wakeup, token routing, atomic reply/receive, notification coalescing
+and reply-wait exclusion, cross-page request/reply buffers, priority wakeups,
+stable negative results, deferred completion across a timer-selected peer,
+exact register results, and full teardown. An isolated image revokes an
+accepted return buffer and proves the
+exact `invalid-bootstrap-ipc-buffer` panic before scheduler commit. Kernel IRQ
+injection remains dependency-ready follow-up work; it is not
 silently supplied by the acceptance component. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a
