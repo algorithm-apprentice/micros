@@ -54,3 +54,4 @@ to make the project appear more consistent than it was.
 | [0036](0036-reply-authority-begins-at-request-return.md) | Reply authority begins at request return | Accepted |
 | [0037](0037-kernel-origin-ipc-notification-injection.md) | Kernel-origin IPC notification injection | Accepted |
 | [0038](0038-kernel-managed-direct-grant-registry.md) | Kernel-managed direct grant registry | Accepted |
+| [0039](0039-page-bounded-checked-grant-copy.md) | Page-bounded checked grant copy | Accepted |

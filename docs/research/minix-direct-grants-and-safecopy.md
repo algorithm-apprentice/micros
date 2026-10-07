@@ -147,6 +147,7 @@ grants before process-slot reuse.
 | Indirect grants | Authority may traverse a bounded chain | Staged substitution: v0.1 uses non-transitive VFS bounce buffers; reconsider only with a reviewed zero-copy requirement |
 | Magic grants | Trusted services may grant another process's memory | Staged substitution: VM scratch mappings and direct VFS-to-VM grants replace magic authority in the shell MVP |
 | VM fault callback | Ordinary copy may ask VM to resolve faults | Required development-DAG adaptation: resident mappings only until VM-safe fault delivery exists |
+| Mapping authority after VM handoff | MINIX safe copy resolves through its runtime VM-aware copy path | Staged substitution: the first RISC-V implementation uses bootstrap `PROCESS_USER` ownership only; a reviewed post-handoff mapping resolver is required before services use checked copy |
 | `CPF_TRY` marker | Fail-fast copy records a mutable user-table fault bit | Required adaptation: every v0.1 copy is fail-fast and returns an explicit error; no user table exists to mark |
 | Vectored copy | Entries execute sequentially and may partially succeed | Compatible extension: one bounded scalar operation preflights both ranges and is failure-atomic |
 | Copy size | Scalar safe copy accepts an arbitrary verified byte count | Compatible bounded extension: one operation copies at most one page; larger baseline transfers repeat the same checked operation |
@@ -159,6 +160,10 @@ grants before process-slot reuse.
 `micros` already provides:
 
 - exact active endpoint and process-generation resolution;
+- grant token allocation, revoke-time generation advance, quarantine, and
+  stale-token rejection;
+- exact grantor/grantee lifetime tracking and endpoint cancellation plans;
+- one authoritative target grant runtime;
 - fixed-capacity immutable privilege profiles;
 - arbitrary-address user translation with exact process ownership and
   per-page permissions;
@@ -169,12 +174,10 @@ grants before process-slot reuse.
 
 It does not yet provide:
 
-- grant token allocation or stale-token rejection;
-- grantor/grantee lifetime tracking;
 - direction and grant-relative bounds validation;
-- cancellation on endpoint teardown;
 - page-sized cross-address-space copy planning and commit;
-- an authoritative target grant runtime or QEMU grant component.
+- bootstrap-phase grant-copy QEMU evidence;
+- post-handoff mapping authority for runtime checked copy.
 
 ## Derived task sequence
 
@@ -187,11 +190,10 @@ The current ADR-0038 design authorizes only:
 5. arbitrary byte-aligned grant ranges within the user window; and
 6. no indirect grant, magic grant, wildcard grantee, or transitive authority.
 
-After that registry implementation merges, the checked-copy findings in this
-research become inputs to a separate design review. That later design must
-decide and review copy bounds, translation plans, failure atomicity, mapping
-faults, target evidence, and its own implementation PR. This research does not
-authorize those implementation details.
+After the registry implementation merged, ADR-0039 consumed these checked-copy
+findings in a separate design review. That ADR decides copy bounds,
+translation plans, failure atomicity, mapping faults, target evidence, and its
+own implementation PR.
 
 A still later user-runtime design exposes the reviewed mechanisms without
 changing accepted token, direction, bounds, or lifetime rules.
