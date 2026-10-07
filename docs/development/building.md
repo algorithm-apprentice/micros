@@ -48,6 +48,8 @@ The current implementation provides:
   model tests;
 - native 64-byte IPC message-layout and dormant thread/endpoint state
   invariant tests;
+- target arbitrary-address user translation and preflighted one/two-page IPC
+  message snapshot/write tests;
 - native generation-safe sender/receiver queue topology, FIFO-link, and
   corruption tests, including queued-call and reply-wait state shapes;
 - one authoritative target endpoint/IPC registry with failure-atomic one-shot

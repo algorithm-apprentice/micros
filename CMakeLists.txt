@@ -505,6 +505,7 @@ add_executable(
     kernel/frame_allocator.c
     kernel/frame_ownership.c
     kernel/ipc.c
+    kernel/ipc_buffer.c
     kernel/ipc_runtime.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
