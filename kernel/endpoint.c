@@ -143,6 +143,7 @@ static bool endpoint_record_is_zero(
         || endpoint->receiver_tail.slot != 0
         || endpoint->receiver_tail.generation != 0
         || endpoint->pending_notification_sources != 0
+        || endpoint->pending_kernel_events != 0
     ) {
         return false;
     }
@@ -170,6 +171,7 @@ static bool endpoint_ipc_state_is_zero(
         || endpoint->receiver_tail.slot != 0
         || endpoint->receiver_tail.generation != 0
         || endpoint->pending_notification_sources != 0
+        || endpoint->pending_kernel_events != 0
     ) {
         return false;
     }
@@ -251,6 +253,7 @@ static void clear_endpoint_record(
     endpoint->receiver_tail.slot = 0;
     endpoint->receiver_tail.generation = 0;
     endpoint->pending_notification_sources = 0;
+    endpoint->pending_kernel_events = 0;
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         endpoint->pending_events[index] = 0;
     }
@@ -1161,11 +1164,6 @@ static bool staged_delivery_state_is_valid(
         || thread->ipc_reply_callee != 0
         || owner->state != MICROS_ENDPOINT_STATE_ACTIVE
         || !process_handles_equal(owner->owner, thread->owner)
-        || endpoint_record_resolve_validated(
-            registry,
-            thread->ipc_inbound_message.source,
-            &source
-        ) != MICROS_ENDPOINT_OK
     ) {
         return false;
     }
@@ -1173,12 +1171,38 @@ static bool staged_delivery_state_is_valid(
         thread->ipc_inbound_message.type
         == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
     ) {
-        return (
-            source->state == MICROS_ENDPOINT_STATE_ACTIVE
-            && notification_message_is_valid(
+        if (
+            !notification_message_is_valid(
                 &thread->ipc_inbound_message
             )
+        ) {
+            return false;
+        }
+        if (
+            thread->ipc_inbound_message.source
+                == MICROS_ENDPOINT_NONE
+        ) {
+            return true;
+        }
+        return (
+            endpoint_record_resolve_validated(
+                registry,
+                thread->ipc_inbound_message.source,
+                &source
+            ) == MICROS_ENDPOINT_OK
+            && source->state == MICROS_ENDPOINT_STATE_ACTIVE
         );
+    }
+    if (
+        thread->ipc_inbound_message.source
+            == MICROS_ENDPOINT_NONE
+        || endpoint_record_resolve_validated(
+            registry,
+            thread->ipc_inbound_message.source,
+            &source
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
     }
     return (
         source->state == MICROS_ENDPOINT_STATE_ACTIVE
@@ -1431,7 +1455,10 @@ static bool receiver_matches_pending_notification(
         return false;
     }
     if (receiver->ipc_receive_source == MICROS_ENDPOINT_ANY) {
-        return endpoint->pending_notification_sources != 0;
+        return (
+            endpoint->pending_kernel_events != 0
+            || endpoint->pending_notification_sources != 0
+        );
     }
     if (
         micros_endpoint_unpack(

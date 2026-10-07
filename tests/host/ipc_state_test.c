@@ -192,6 +192,7 @@ static bool test_dormant_state_is_zero(void)
         && record->receiver_head.generation == 0
         && record->receiver_tail.generation == 0
         && record->pending_notification_sources == 0
+        && record->pending_kernel_events == 0
         && bytes_are_zero(
             record->pending_events,
             sizeof(record->pending_events)
@@ -282,6 +283,9 @@ static bool test_dormant_validator_rejects_corruption(void)
     EXPECT_CORRUPTION(
         registry.endpoints[process.slot]
             .pending_notification_sources = 1
+    );
+    EXPECT_CORRUPTION(
+        registry.endpoints[process.slot].pending_kernel_events = 1
     );
     EXPECT_CORRUPTION(
         registry.endpoints[process.slot].pending_events[0] = 1

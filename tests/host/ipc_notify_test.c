@@ -23,6 +23,7 @@ enum {
 
 enum notify_model_operation {
     NOTIFY_MODEL_NOTIFY = 0,
+    NOTIFY_MODEL_KERNEL_NOTIFY,
     NOTIFY_MODEL_RECEIVE_ANY,
     NOTIFY_MODEL_RECEIVE_SPECIFIC,
     NOTIFY_MODEL_ZERO_REJECTED,
@@ -41,6 +42,9 @@ struct notify_model_trace_entry {
 struct notify_model_coverage {
     size_t notified;
     size_t coalesced;
+    size_t kernel_notified;
+    size_t kernel_coalesced;
+    size_t kernel_received_any;
     size_t received_any;
     size_t received_specific;
     size_t zero_rejected;
@@ -52,6 +56,7 @@ static const char *const notify_model_operation_names[
     NOTIFY_MODEL_OPERATION_COUNT
 ] = {
     "notify",
+    "kernel-notify",
     "receive-any",
     "receive-specific",
     "zero-rejected",
@@ -400,6 +405,31 @@ static bool expect_notify_failure_unchanged(
     return true;
 }
 
+static bool expect_kernel_notify_failure_unchanged(
+    enum micros_ipc_error expected,
+    micros_endpoint_t destination,
+    uint64_t event_mask
+)
+{
+    struct micros_endpoint_registry registry_snapshot = registry;
+    struct micros_kernel_objects objects_snapshot = objects;
+
+    EXPECT_IPC_ERROR(
+        expected,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            destination,
+            event_mask
+        )
+    );
+    EXPECT_TRUE(state_is_unchanged(
+        &registry_snapshot,
+        &objects_snapshot
+    ));
+    return true;
+}
+
 static uint64_t notification_event_mask(
     const struct micros_ipc_message *message
 )
@@ -699,6 +729,371 @@ static bool test_notify_coalesces_and_never_blocks(void)
     return true;
 }
 
+static bool test_kernel_notify_coalesces_and_any_receives(void)
+{
+    struct micros_endpoint_record *destination;
+    struct micros_thread *receiver;
+    uint64_t zero_events[MICROS_PROCESS_CAPACITY] = {0};
+    const uint64_t first_mask = UINT64_C(0x0000000000000015);
+    const uint64_t second_mask = UINT64_C(0x800000000000002a);
+    const uint64_t combined_mask = first_mask | second_mask;
+
+    EXPECT_TRUE(setup_notify_fixture());
+    destination = &registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    receiver = &objects.threads[
+        primary_threads[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            first_mask
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            second_mask
+        )
+    );
+    EXPECT_TRUE(
+        destination->pending_kernel_events == combined_mask
+        && destination->pending_notification_sources == 0
+        && memcmp(
+            destination->pending_events,
+            zero_events,
+            sizeof(destination->pending_events)
+        ) == 0
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receive(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x6000e000)
+        )
+    );
+    EXPECT_TRUE(
+        destination->pending_kernel_events == 0
+        && receiver->runtime_flags == 0
+        && receiver->ready_linked
+        && receiver->ipc_delivery_pending
+        && notification_message_matches(
+            &receiver->ipc_inbound_message,
+            MICROS_ENDPOINT_NONE,
+            combined_mask
+        )
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
+static bool test_kernel_notify_wakes_only_any_receiver(void)
+{
+    struct micros_endpoint_record *destination;
+    struct micros_thread *receiver;
+    const uint64_t event_mask = UINT64_C(0x0000000000000080);
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x6000f000)
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask
+        )
+    );
+    destination = &registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    receiver = &objects.threads[
+        primary_threads[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    EXPECT_TRUE(
+        destination->pending_kernel_events == 0
+        && thread_handle_is_zero(destination->receiver_head)
+        && thread_handle_is_zero(destination->receiver_tail)
+        && receiver->runtime_flags == 0
+        && receiver->ready_linked
+        && receiver->ipc_delivery_pending
+        && notification_message_matches(
+            &receiver->ipc_inbound_message,
+            MICROS_ENDPOINT_NONE,
+            event_mask
+        )
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receive(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            endpoints[NOTIFY_PROCESS_SOURCE_LOW],
+            UINT64_C(0x60010000)
+        )
+    );
+    destination = &registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    receiver = &objects.threads[
+        primary_threads[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    EXPECT_TRUE(
+        destination->pending_kernel_events == event_mask
+        && thread_handles_equal(
+            destination->receiver_head,
+            primary_threads[NOTIFY_PROCESS_DESTINATION]
+        )
+        && thread_handles_equal(
+            destination->receiver_tail,
+            primary_threads[NOTIFY_PROCESS_DESTINATION]
+        )
+        && receiver->runtime_flags == MICROS_THREAD_RTS_IPC_RECEIVE
+        && !receiver->ipc_delivery_pending
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
+static bool test_kernel_notify_rejections_are_atomic(void)
+{
+    micros_endpoint_t stale_destination;
+
+    EXPECT_TRUE(setup_notify_fixture());
+    stale_destination =
+        endpoints[NOTIFY_PROCESS_DESTINATION]
+        + (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS);
+    EXPECT_TRUE(expect_kernel_notify_failure_unchanged(
+        MICROS_IPC_ERROR_ARGUMENT,
+        endpoints[NOTIFY_PROCESS_DESTINATION],
+        0
+    ));
+    EXPECT_TRUE(expect_kernel_notify_failure_unchanged(
+        MICROS_IPC_ERROR_ARGUMENT,
+        MICROS_ENDPOINT_NONE,
+        1
+    ));
+    EXPECT_TRUE(expect_kernel_notify_failure_unchanged(
+        MICROS_IPC_ERROR_ARGUMENT,
+        MICROS_ENDPOINT_ANY,
+        1
+    ));
+    EXPECT_TRUE(expect_kernel_notify_failure_unchanged(
+        MICROS_IPC_ERROR_STATE,
+        endpoints[NOTIFY_PROCESS_RESERVED],
+        1
+    ));
+    EXPECT_TRUE(expect_kernel_notify_failure_unchanged(
+        MICROS_IPC_ERROR_DEAD_ENDPOINT,
+        stale_destination,
+        1
+    ));
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60011000)
+        )
+    );
+    EXPECT_TRUE(
+        make_single_receiver_current_blocked(
+            primary_threads[NOTIFY_PROCESS_DESTINATION]
+        )
+        && expect_kernel_notify_failure_unchanged(
+            MICROS_IPC_ERROR_STATE,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            UINT64_C(0x100)
+        )
+    );
+    return true;
+}
+
+static bool test_kernel_notify_validation_and_close_rules(void)
+{
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_thread *receiver;
+    const uint64_t event_mask = UINT64_C(0x0000000000000200);
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60012000)
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask
+        )
+    );
+    receiver = &objects.threads[
+        primary_threads[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    receiver->ipc_inbound_message.type = UINT32_C(0x2001);
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_ERROR_INVARIANT,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    registry = registry_snapshot;
+    objects = objects_snapshot;
+    EXPECT_TRUE(
+        hold_runnable_thread(
+            primary_threads[NOTIFY_PROCESS_DESTINATION]
+        )
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_ERROR_STATE,
+        micros_ipc_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION]
+        )
+    );
+    EXPECT_TRUE(state_is_unchanged(
+        &registry_snapshot,
+        &objects_snapshot
+    ));
+    EXPECT_TRUE(
+        clear_staged_delivery(
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            NULL
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION]
+        )
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION]
+        )
+    );
+    EXPECT_TRUE(
+        registry.endpoints[
+            processes[NOTIFY_PROCESS_DESTINATION].slot
+        ].state == MICROS_ENDPOINT_STATE_FREE
+        && registry.endpoints[
+            processes[NOTIFY_PROCESS_DESTINATION].slot
+        ].pending_kernel_events == 0
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    registry.endpoints[
+        processes[NOTIFY_PROCESS_RESERVED].slot
+    ].pending_kernel_events = event_mask;
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_ERROR_INVARIANT,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60013000)
+        )
+    );
+    registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ].pending_kernel_events = event_mask;
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_ERROR_INVARIANT,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    return true;
+}
+
 static bool test_notify_wakes_first_matching_receiver(void)
 {
     struct micros_endpoint_record *destination;
@@ -805,6 +1200,7 @@ static bool test_call_reply_wait_does_not_consume_notification(void)
     struct micros_thread *caller;
     uint64_t source_bit;
     const uint64_t event_mask = UINT64_C(0x0000000000000040);
+    const uint64_t kernel_mask = UINT64_C(0x0000000000000080);
 
     EXPECT_TRUE(setup_notify_fixture());
     EXPECT_IPC_ERROR(
@@ -846,6 +1242,15 @@ static bool test_call_reply_wait_does_not_consume_notification(void)
             event_mask
         )
     );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            kernel_mask
+        )
+    );
     destination = &registry.endpoints[
         processes[NOTIFY_PROCESS_DESTINATION].slot
     ];
@@ -859,6 +1264,7 @@ static bool test_call_reply_wait_does_not_consume_notification(void)
         && destination->pending_events[
             processes[NOTIFY_PROCESS_SOURCE_LOW].slot
         ] == event_mask
+        && destination->pending_kernel_events == kernel_mask
         && micros_endpoint_registry_validate_objects(
             &registry,
             &objects
@@ -879,10 +1285,20 @@ static bool test_receive_prefers_lowest_notification_before_sender(void)
     struct micros_ipc_message expected_sent = sent;
     struct micros_endpoint_record *destination;
     struct micros_thread *sender;
+    const uint64_t kernel_mask = UINT64_C(0x0000000000000100);
     const uint64_t low_mask = UINT64_C(0x0000000000000001);
     const uint64_t high_mask = UINT64_C(0x8000000000000000);
 
     EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            kernel_mask
+        )
+    );
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_notify(
@@ -945,6 +1361,35 @@ static bool test_receive_prefers_lowest_notification_before_sender(void)
         )
         && notification_message_matches(
             &delivered,
+            MICROS_ENDPOINT_NONE,
+            kernel_mask
+        )
+        && destination->pending_kernel_events == 0
+        && sender->runtime_flags == MICROS_THREAD_RTS_IPC_SEND
+        && destination->pending_events[
+            processes[NOTIFY_PROCESS_SOURCE_LOW].slot
+        ] == low_mask
+        && destination->pending_events[
+            processes[NOTIFY_PROCESS_SOURCE_HIGH].slot
+        ] == high_mask
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receive(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60006000)
+        )
+    );
+    EXPECT_TRUE(
+        consume_staged_and_hold(
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            &delivered
+        )
+        && notification_message_matches(
+            &delivered,
             endpoints[NOTIFY_PROCESS_SOURCE_LOW],
             low_mask
         )
@@ -963,7 +1408,7 @@ static bool test_receive_prefers_lowest_notification_before_sender(void)
             &objects,
             primary_threads[NOTIFY_PROCESS_DESTINATION],
             MICROS_ENDPOINT_ANY,
-            UINT64_C(0x60006000)
+            UINT64_C(0x60007000)
         )
     );
     EXPECT_TRUE(
@@ -986,7 +1431,7 @@ static bool test_receive_prefers_lowest_notification_before_sender(void)
             &objects,
             primary_threads[NOTIFY_PROCESS_DESTINATION],
             MICROS_ENDPOINT_ANY,
-            UINT64_C(0x60007000)
+            UINT64_C(0x60008000)
         )
     );
     expected_sent.source = endpoints[NOTIFY_PROCESS_SENDER];
@@ -1038,6 +1483,7 @@ static bool test_reply_receive_prefers_pending_notification(void)
     struct micros_thread *sender;
     uint64_t reply_token;
     const uint64_t event_mask = UINT64_C(0x00000000a5a55a5a);
+    const uint64_t kernel_mask = UINT64_C(0x000000005a5aa5a5);
 
     EXPECT_TRUE(setup_notify_fixture());
     EXPECT_IPC_ERROR(
@@ -1083,6 +1529,15 @@ static bool test_reply_receive_prefers_pending_notification(void)
             primary_threads[NOTIFY_PROCESS_SOURCE_LOW],
             endpoints[NOTIFY_PROCESS_SERVER],
             event_mask
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_SERVER],
+            kernel_mask
         )
     );
     EXPECT_IPC_ERROR(
@@ -1135,10 +1590,18 @@ static bool test_reply_receive_prefers_pending_notification(void)
         && server->ipc_delivery_pending
         && notification_message_matches(
             &server->ipc_inbound_message,
-            endpoints[NOTIFY_PROCESS_SOURCE_LOW],
-            event_mask
+            MICROS_ENDPOINT_NONE,
+            kernel_mask
         )
-        && server_endpoint->pending_notification_sources == 0
+        && server_endpoint->pending_kernel_events == 0
+        && server_endpoint->pending_notification_sources
+            == (
+                UINT64_C(1)
+                << processes[NOTIFY_PROCESS_SOURCE_LOW].slot
+            )
+        && server_endpoint->pending_events[
+            processes[NOTIFY_PROCESS_SOURCE_LOW].slot
+        ] == event_mask
         && sender->runtime_flags == MICROS_THREAD_RTS_IPC_SEND
         && sender->ipc_queue_kind == MICROS_IPC_QUEUE_SENDER
         && thread_handles_equal(
@@ -1621,7 +2084,8 @@ static bool notify_model_fail(
 }
 
 static bool notify_model_pending_matches(
-    const uint64_t expected[2]
+    const uint64_t expected[2],
+    uint64_t expected_kernel
 )
 {
     const struct micros_endpoint_record *destination =
@@ -1645,7 +2109,10 @@ static bool notify_model_pending_matches(
             return false;
         }
     }
-    if (destination->pending_notification_sources != expected_bitmap) {
+    if (
+        destination->pending_notification_sources != expected_bitmap
+        || destination->pending_kernel_events != expected_kernel
+    ) {
         return false;
     }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
@@ -1665,6 +2132,9 @@ static bool test_seeded_notify_model(void)
     static const enum notify_model_operation scripted_operations[] = {
         NOTIFY_MODEL_NOTIFY,
         NOTIFY_MODEL_NOTIFY,
+        NOTIFY_MODEL_KERNEL_NOTIFY,
+        NOTIFY_MODEL_KERNEL_NOTIFY,
+        NOTIFY_MODEL_RECEIVE_ANY,
         NOTIFY_MODEL_NOTIFY,
         NOTIFY_MODEL_RECEIVE_ANY,
         NOTIFY_MODEL_RECEIVE_SPECIFIC,
@@ -1673,6 +2143,9 @@ static bool test_seeded_notify_model(void)
         NOTIFY_MODEL_TARGET_REJECTED,
     };
     static const size_t scripted_sources[] = {
+        0,
+        0,
+        0,
         0,
         0,
         1,
@@ -1684,6 +2157,7 @@ static bool test_seeded_notify_model(void)
     };
     const uint32_t seed = UINT32_C(0x30c0a1e5);
     uint64_t expected[2] = {0, 0};
+    uint64_t expected_kernel = 0;
     struct notify_model_coverage coverage;
     uint32_t random_state = seed;
     size_t step;
@@ -1727,6 +2201,7 @@ static bool test_seeded_notify_model(void)
         }
         if (
             operation == NOTIFY_MODEL_RECEIVE_ANY
+            && expected_kernel == 0
             && expected[0] == 0
             && expected[1] == 0
         ) {
@@ -1773,16 +2248,56 @@ static bool test_seeded_notify_model(void)
             }
             break;
         }
+        case NOTIFY_MODEL_KERNEL_NOTIFY: {
+            bool was_pending = expected_kernel != 0;
+
+            if (
+                micros_ipc_inject_kernel_notification(
+                    &registry,
+                    &objects,
+                    endpoints[NOTIFY_PROCESS_DESTINATION],
+                    event_mask
+                ) != MICROS_IPC_OK
+            ) {
+                return notify_model_fail(
+                    step,
+                    operation,
+                    "kernel notify failed"
+                );
+            }
+            expected_kernel |= event_mask;
+            ++coverage.kernel_notified;
+            if (was_pending) {
+                ++coverage.kernel_coalesced;
+            }
+            break;
+        }
         case NOTIFY_MODEL_RECEIVE_ANY:
         case NOTIFY_MODEL_RECEIVE_SPECIFIC: {
             struct micros_ipc_message delivered;
             size_t selected = source;
             micros_endpoint_t receive_source =
                 endpoints[process_index];
+            micros_endpoint_t expected_source;
+            uint64_t expected_mask;
 
             if (operation == NOTIFY_MODEL_RECEIVE_ANY) {
-                selected = expected[0] != 0 ? 0 : 1;
                 receive_source = MICROS_ENDPOINT_ANY;
+                if (expected_kernel != 0) {
+                    expected_source = MICROS_ENDPOINT_NONE;
+                    expected_mask = expected_kernel;
+                } else {
+                    selected = expected[0] != 0 ? 0 : 1;
+                    expected_source = endpoints[
+                        selected == 0
+                            ? NOTIFY_PROCESS_SOURCE_LOW
+                            : NOTIFY_PROCESS_SOURCE_HIGH
+                    ];
+                    expected_mask = expected[selected];
+                }
+            } else {
+                expected_source = endpoints[process_index];
+                expected_mask = expected[selected];
             }
             if (
                 micros_ipc_receive(
@@ -1799,12 +2314,8 @@ static bool test_seeded_notify_model(void)
                 )
                 || !notification_message_matches(
                     &delivered,
-                    endpoints[
-                        selected == 0
-                            ? NOTIFY_PROCESS_SOURCE_LOW
-                            : NOTIFY_PROCESS_SOURCE_HIGH
-                    ],
-                    expected[selected]
+                    expected_source,
+                    expected_mask
                 )
             ) {
                 return notify_model_fail(
@@ -1813,10 +2324,16 @@ static bool test_seeded_notify_model(void)
                     "receive selection diverged"
                 );
             }
-            expected[selected] = 0;
             if (operation == NOTIFY_MODEL_RECEIVE_ANY) {
+                if (expected_source == MICROS_ENDPOINT_NONE) {
+                    expected_kernel = 0;
+                    ++coverage.kernel_received_any;
+                } else {
+                    expected[selected] = 0;
+                }
                 ++coverage.received_any;
             } else {
+                expected[selected] = 0;
                 ++coverage.received_specific;
             }
             break;
@@ -1909,7 +2426,10 @@ static bool test_seeded_notify_model(void)
             );
         }
         if (
-            !notify_model_pending_matches(expected)
+            !notify_model_pending_matches(
+                expected,
+                expected_kernel
+            )
             || micros_endpoint_registry_validate_objects(
                 &registry,
                 &objects
@@ -1925,6 +2445,9 @@ static bool test_seeded_notify_model(void)
     EXPECT_TRUE(
         coverage.notified != 0
         && coverage.coalesced != 0
+        && coverage.kernel_notified != 0
+        && coverage.kernel_coalesced != 0
+        && coverage.kernel_received_any != 0
         && coverage.received_any != 0
         && coverage.received_specific != 0
         && coverage.zero_rejected != 0
@@ -1943,6 +2466,22 @@ bool micros_ipc_notify_test_run(void)
         {
             "notify coalesces and never blocks",
             test_notify_coalesces_and_never_blocks,
+        },
+        {
+            "kernel notify coalesces and any receives",
+            test_kernel_notify_coalesces_and_any_receives,
+        },
+        {
+            "kernel notify wakes only any receiver",
+            test_kernel_notify_wakes_only_any_receiver,
+        },
+        {
+            "kernel notify rejections are atomic",
+            test_kernel_notify_rejections_are_atomic,
+        },
+        {
+            "kernel notify validation and close rules",
+            test_kernel_notify_validation_and_close_rules,
         },
         {
             "notify wakes first matching receiver",

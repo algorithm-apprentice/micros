@@ -105,11 +105,12 @@ and reply-wait exclusion, cross-page request/reply buffers, priority wakeups,
 stable negative results, deferred completion across a timer-selected peer,
 exact register results, and full teardown. An isolated image revokes an
 accepted return buffer and proves the
-exact `invalid-bootstrap-ipc-buffer` panic before scheduler commit. Kernel IRQ
-injection remains dependency-ready follow-up work; accepted ADR-0037 now
-defines the smaller kernel-origin IPC mechanism without pulling PLIC routing,
-manifest authority, console handoff, or TTY into that implementation.
-Arbitrary-address
+exact `invalid-bootstrap-ipc-buffer` panic before scheduler commit.
+ADR-0037's kernel-origin IPC mechanism now injects source-`NONE` event masks,
+wakes `ANY` receivers without a notifier thread, OR-coalesces deferred masks,
+and returns them through the shared selected-thread completion path. PLIC
+routing, manifest authority, `irq_complete`, console handoff, and TTY remain
+separate later work. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a
 reversible current-thread IPC guard with exact ready-queue and trap-stack

@@ -740,18 +740,21 @@ The sequence proves immediate specific delivery, queued send plus `ANY`
 receive with canonical no-message sender completion drain, exact call/reply
 token routing and one-shot rejection, atomic
 `reply_receive` blocking followed by the next request, source-coalesced
-notifications that cannot satisfy a call reply wait, deterministic two-party
-deadlock rejection, close cancellation of a queued call and specific receiver,
-generation-safe endpoint reuse, stale and unauthorized rejection, and complete
-restoration of endpoint records, live object counts, ready queues, current
-ownership, and the boot-hart state. It also compares every root, saved context,
-and complete stack pattern before teardown.
+notifications that cannot satisfy a call reply wait, source-`NONE`
+kernel-event injection with immediate `ANY` wake and deferred OR coalescing,
+deterministic two-party deadlock rejection, close cancellation of a queued
+call and specific receiver, generation-safe endpoint reuse, stale and
+unauthorized rejection, and complete restoration of endpoint records, live
+object counts, ready queues, current ownership, and the boot-hart state. The
+scheduler gate separately returns a canonical source-`NONE` notification
+through the shared selected-thread completion path. The IPC component also
+compares every root, saved context, and complete stack pattern before teardown.
 
 Only that complete sequence emits the exact newline-terminated records:
 
 ```text
 MICROS_IPC_ADDRESS_SPACES count=three roots=preserved contexts=preserved stacks=preserved scheduler=preserved messages=preserved
-MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced deadlock=rejected
+MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced kernel-events=injected deadlock=rejected
 ```
 
 The host gate rejects missing, duplicated, malformed, unterminated, or early

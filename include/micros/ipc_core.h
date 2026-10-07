@@ -53,6 +53,14 @@ enum micros_ipc_error micros_ipc_notify(
     uint64_t event_mask
 );
 
+/* Kernel-internal pseudo-source; IRQ routing owns destination authority. */
+enum micros_ipc_error micros_ipc_inject_kernel_notification(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t destination,
+    uint64_t event_mask
+);
+
 enum micros_ipc_error micros_ipc_receive(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,

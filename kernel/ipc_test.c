@@ -464,6 +464,7 @@ static bool endpoint_records_are_clear(void)
             || !thread_handle_is_zero(record->receiver_head)
             || !thread_handle_is_zero(record->receiver_tail)
             || record->pending_notification_sources != 0
+            || record->pending_kernel_events != 0
         ) {
             return false;
         }
@@ -1105,6 +1106,80 @@ bool micros_ipc_runtime_run_self_test(void)
         goto done;
     }
     failure_stage = 8;
+
+    if (
+        micros_ipc_inject_kernel_notification(
+            registry,
+            objects,
+            endpoints[IPC_TEST_CLIENT],
+            UINT64_C(0x10)
+        ) != MICROS_IPC_OK
+        || micros_ipc_inject_kernel_notification(
+            registry,
+            objects,
+            endpoints[IPC_TEST_CLIENT],
+            UINT64_C(0x40)
+        ) != MICROS_IPC_OK
+        || registry->endpoints[processes[IPC_TEST_CLIENT].slot]
+            .pending_kernel_events != UINT64_C(0x50)
+        || micros_ipc_receive(
+            registry,
+            objects,
+            threads[IPC_TEST_CLIENT],
+            MICROS_ENDPOINT_ANY,
+            (uintptr_t)&receive_buffers[IPC_TEST_CLIENT]
+        ) != MICROS_IPC_OK
+        || !notification_matches(
+            &objects->threads[
+                threads[IPC_TEST_CLIENT].slot
+            ].ipc_inbound_message,
+            MICROS_ENDPOINT_NONE,
+            UINT64_C(0x50)
+        )
+        || !consume_staged(
+            objects,
+            threads[IPC_TEST_CLIENT],
+            MICROS_IPC_OK,
+            &objects->threads[
+                threads[IPC_TEST_CLIENT].slot
+            ].ipc_inbound_message
+        )
+        || !hold_thread(objects, threads[IPC_TEST_CLIENT])
+        || micros_ipc_receive(
+            registry,
+            objects,
+            threads[IPC_TEST_CLIENT],
+            MICROS_ENDPOINT_ANY,
+            (uintptr_t)&receive_buffers[IPC_TEST_CLIENT]
+        ) != MICROS_IPC_OK
+        || micros_ipc_inject_kernel_notification(
+            registry,
+            objects,
+            endpoints[IPC_TEST_CLIENT],
+            UINT64_C(0x80)
+        ) != MICROS_IPC_OK
+        || registry->endpoints[processes[IPC_TEST_CLIENT].slot]
+            .pending_kernel_events != 0
+        || !notification_matches(
+            &objects->threads[
+                threads[IPC_TEST_CLIENT].slot
+            ].ipc_inbound_message,
+            MICROS_ENDPOINT_NONE,
+            UINT64_C(0x80)
+        )
+        || !consume_staged(
+            objects,
+            threads[IPC_TEST_CLIENT],
+            MICROS_IPC_OK,
+            &objects->threads[
+                threads[IPC_TEST_CLIENT].slot
+            ].ipc_inbound_message
+        )
+        || !hold_thread(objects, threads[IPC_TEST_CLIENT])
+    ) {
+        failure_stage = UINT64_C(0x801);
+        goto done;
+    }
 
     fill_message(&send_messages[6], UINT32_C(0x5001), UINT8_C(0xa0));
     if (

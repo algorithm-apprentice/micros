@@ -163,23 +163,6 @@ static void clear_bytes(void *storage, size_t size)
     }
 }
 
-static void fill_message(
-    struct micros_ipc_message *message,
-    micros_endpoint_t source,
-    uint32_t type,
-    uint8_t seed
-)
-{
-    size_t index;
-
-    clear_bytes(message, sizeof(*message));
-    message->source = source;
-    message->type = type;
-    for (index = 0; index < sizeof(message->payload); ++index) {
-        message->payload[index] = (uint8_t)(seed + index);
-    }
-}
-
 static bool completion_state_is_clear(
     const struct micros_thread *thread
 )
@@ -299,8 +282,7 @@ static bool expect_no_message_completion(
 
 static bool expect_message_completion(
     struct micros_kernel_objects *objects,
-    size_t thread_index,
-    size_t source_index
+    size_t thread_index
 )
 {
     struct micros_thread *thread;
@@ -308,22 +290,42 @@ static bool expect_message_completion(
     if (
         objects == NULL
         || thread_index >= 2
-        || source_index >= 2
     ) {
         return false;
     }
     thread = &objects->threads[threads[thread_index].slot];
-    fill_message(
-        &expected_message,
-        endpoints[source_index],
-        UINT32_C(0x7001),
-        UINT8_C(0xa0)
-    );
-    thread->ipc_receive_buffer =
-        TEST_IPC_BUFFER_VIRTUAL_ADDRESS;
-    thread->ipc_delivery_pending = true;
-    thread->ipc_inbound_message = expected_message;
-    thread->ipc_staged_result = MICROS_IPC_OK;
+    clear_bytes(&expected_message, sizeof(expected_message));
+    expected_message.source = MICROS_ENDPOINT_NONE;
+    expected_message.type =
+        MICROS_IPC_TYPE_KERNEL_NOTIFICATION;
+    expected_message.payload[0] = UINT8_C(0x05);
+    if (
+        micros_thread_scheduler_hold(
+            objects,
+            threads[thread_index]
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_ipc_receive(
+            registry,
+            objects,
+            threads[thread_index],
+            MICROS_ENDPOINT_ANY,
+            TEST_IPC_BUFFER_VIRTUAL_ADDRESS
+        ) != MICROS_IPC_OK
+        || micros_ipc_inject_kernel_notification(
+            registry,
+            objects,
+            endpoints[thread_index],
+            UINT64_C(0x05)
+        ) != MICROS_IPC_OK
+        || !thread->ipc_delivery_pending
+        || !bytes_equal(
+            &thread->ipc_inbound_message,
+            &expected_message,
+            sizeof(expected_message)
+        )
+    ) {
+        return false;
+    }
     expected_completion[thread_index] =
         TEST_COMPLETION_MESSAGE;
     expected_completion_result[thread_index] =
@@ -647,8 +649,7 @@ micros_scheduler_test_handle_user_trap(
                     != TEST_COMPLETION_NONE
                 || !expect_message_completion(
                     objects,
-                    target,
-                    thread_index
+                    target
                 )
             ) {
                 return completion_test_mismatch(1);
