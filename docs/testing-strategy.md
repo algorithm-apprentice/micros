@@ -272,6 +272,9 @@ same virtual page to distinct typed frames, switches ASID-zero roots with exact
 fences, checks SUM-gated hardware access, proves full-page zeroing on reuse,
 rejects active/stale/corrupt roots without mutation, atomically tears roots
 down, and verifies every process-root API is revoked after ownership handoff.
+It also translates arbitrary aligned user addresses and proves failure-atomic
+64-byte IPC snapshot/write across a page boundary, including range, alignment,
+mapping, and read/write permission rejection.
 `test-qemu-user-execution` enters a relocation-free payload in U-mode, proves
 user-stack access and kernel-page isolation, captures every integer register
 on a thread-owned supervisor stack, uses scheduler-owned admission/current

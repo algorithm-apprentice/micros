@@ -244,6 +244,15 @@ static bool user_virtual_address_is_valid(uint64_t virtual_address)
     );
 }
 
+static bool user_virtual_byte_address_is_valid(uint64_t virtual_address)
+{
+    return (
+        virtual_address >= MICROS_USER_VIRTUAL_BASE
+        && virtual_address < MICROS_USER_VIRTUAL_END
+        && micros_sv39_virtual_address_is_canonical(virtual_address)
+    );
+}
+
 static bool user_permissions_are_valid(uint32_t permissions)
 {
     const uint32_t allowed =
@@ -1147,6 +1156,78 @@ micros_user_address_space_lookup(
         *physical_address = leaf_entry.physical_address;
         *permissions = leaf_entry.permissions
             & ~MICROS_SV39_PERMISSION_USER;
+    }
+
+done_with_scratch:
+    release_scratch();
+done:
+    (void)ledger;
+    (void)kernel_report;
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_translate(
+    struct micros_process_handle process,
+    uint64_t user_address,
+    uint64_t *physical_address,
+    uint32_t *permissions,
+    size_t *contiguous_bytes
+)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    struct micros_sv39_decoded_pte leaf_entry;
+    enum micros_user_address_space_error error;
+    uint64_t offset;
+    uintptr_t saved_status;
+
+    if (
+        physical_address == NULL
+        || permissions == NULL
+        || contiguous_bytes == NULL
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = riscv_irq_save();
+    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process(objects, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (!user_virtual_byte_address_is_valid(user_address)) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
+        goto done;
+    }
+    if (!acquire_scratch()) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+        goto done;
+    }
+    error = validate_locked(process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    error = lookup_leaf_locked(
+        resolved,
+        user_address,
+        &leaf_entry,
+        NULL,
+        NULL,
+        NULL
+    );
+    if (error == MICROS_USER_ADDRESS_SPACE_OK) {
+        offset = user_address % MICROS_SV39_PAGE_SIZE;
+        *physical_address = leaf_entry.physical_address + offset;
+        *permissions =
+            leaf_entry.permissions & ~MICROS_SV39_PERMISSION_USER;
+        *contiguous_bytes =
+            (size_t)(MICROS_SV39_PAGE_SIZE - offset);
     }
 
 done_with_scratch:

@@ -61,6 +61,15 @@ micros_user_address_space_lookup(
 );
 
 enum micros_user_address_space_error
+micros_user_address_space_translate(
+    struct micros_process_handle process,
+    uint64_t user_address,
+    uint64_t *physical_address,
+    uint32_t *permissions,
+    size_t *contiguous_bytes
+);
+
+enum micros_user_address_space_error
 micros_user_address_space_activate(
     struct micros_process_handle process
 );

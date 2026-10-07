@@ -8,6 +8,7 @@
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/trap_context.h"
 #include "micros/frame_ownership_runtime.h"
+#include "micros/ipc_buffer.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/sv39.h"
@@ -1069,6 +1070,7 @@ bool micros_user_address_space_runtime_run_self_test(void)
     uint64_t process_one_frame;
     uint64_t process_two_frame;
     uint64_t guard_frame;
+    uint64_t ipc_second_frame;
     uint64_t reused_frame;
     uint64_t released_frame;
     uint64_t unchanged;
@@ -1078,6 +1080,10 @@ bool micros_user_address_space_runtime_run_self_test(void)
     uint64_t original_alias_pte;
     uint64_t corrupted_pte;
     uint32_t lookup_permissions;
+    struct micros_ipc_message ipc_expected;
+    struct micros_ipc_message ipc_observed;
+    struct micros_ipc_message ipc_unchanged;
+    size_t contiguous_bytes;
     uintptr_t saved_status;
     size_t index;
     bool passed = false;
@@ -1403,6 +1409,152 @@ bool micros_user_address_space_runtime_run_self_test(void)
         || lookup_physical != UINT64_C(0xfeedfacefeedface)
         || lookup_permissions != UINT32_MAX
         || !runtime_state_matches_snapshot(ledger, objects)
+    ) {
+        goto done;
+    }
+
+    if (
+        micros_user_address_space_allocate_page(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            user_permissions,
+            &ipc_second_frame
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        goto done;
+    }
+    for (index = 0; index < sizeof(ipc_expected); ++index) {
+        ((unsigned char *)&ipc_expected)[index] =
+            (unsigned char)(UINT8_C(0x40) + index);
+        if (index < 32) {
+            ((unsigned char *)(uintptr_t)process_two_frame)[
+                MICROS_SV39_PAGE_SIZE - 32 + index
+            ] = ((unsigned char *)&ipc_expected)[index];
+        } else {
+            ((unsigned char *)(uintptr_t)ipc_second_frame)[index - 32] =
+                ((unsigned char *)&ipc_expected)[index];
+        }
+    }
+    lookup_physical = 0;
+    lookup_permissions = 0;
+    contiguous_bytes = 0;
+    if (
+        micros_user_address_space_translate(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS - 32,
+            &lookup_physical,
+            &lookup_permissions,
+            &contiguous_bytes
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || lookup_physical
+            != process_two_frame + MICROS_SV39_PAGE_SIZE - 32
+        || lookup_permissions != user_permissions
+        || contiguous_bytes != 32
+        || micros_ipc_buffer_snapshot(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS - 32,
+            MICROS_IPC_BUFFER_READ | MICROS_IPC_BUFFER_WRITE,
+            &ipc_observed
+        ) != MICROS_IPC_BUFFER_OK
+        || !bytes_equal(
+            &ipc_observed,
+            &ipc_expected,
+            sizeof(ipc_expected)
+        )
+    ) {
+        goto done;
+    }
+    for (index = 0; index < sizeof(ipc_expected); ++index) {
+        ((unsigned char *)&ipc_expected)[index] ^=
+            (unsigned char)(UINT8_C(0x80) + index);
+    }
+    if (
+        micros_ipc_buffer_write(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS - 32,
+            &ipc_expected
+        ) != MICROS_IPC_BUFFER_OK
+        || !bytes_equal(
+            (const void *)(uintptr_t)(
+                process_two_frame + MICROS_SV39_PAGE_SIZE - 32
+            ),
+            &ipc_expected,
+            32
+        )
+        || !bytes_equal(
+            (const void *)(uintptr_t)ipc_second_frame,
+            (const unsigned char *)&ipc_expected + 32,
+            32
+        )
+        || micros_ipc_buffer_validate(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS - 31,
+            MICROS_IPC_BUFFER_READ
+        ) != MICROS_IPC_BUFFER_ERROR_ARGUMENT
+        || micros_ipc_buffer_validate(
+            process_two,
+            TEST_ALIAS_VIRTUAL_ADDRESS,
+            MICROS_IPC_BUFFER_READ
+        ) != MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT
+        || micros_user_address_space_release_page(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            &released_frame
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || released_frame != ipc_second_frame
+    ) {
+        goto done;
+    }
+    for (index = 0; index < sizeof(ipc_unchanged); ++index) {
+        ((unsigned char *)&ipc_unchanged)[index] =
+            (unsigned char)(UINT8_C(0xa0) + index);
+    }
+    ipc_observed = ipc_unchanged;
+    if (
+        micros_ipc_buffer_snapshot(
+            process_two,
+            TEST_ALIAS_VIRTUAL_ADDRESS,
+            MICROS_IPC_BUFFER_READ,
+            &ipc_observed
+        ) != MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT
+        || !bytes_equal(
+            &ipc_observed,
+            &ipc_unchanged,
+            sizeof(ipc_unchanged)
+        )
+        || micros_ipc_buffer_snapshot(
+            process_two,
+            TEST_USER_VIRTUAL_ADDRESS,
+            MICROS_IPC_BUFFER_WRITE,
+            &ipc_observed
+        ) != MICROS_IPC_BUFFER_ERROR_ARGUMENT
+        || micros_ipc_buffer_validate(
+            process_two,
+            MICROS_USER_VIRTUAL_END - 32,
+            MICROS_IPC_BUFFER_READ
+        ) != MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT
+        || micros_user_address_space_allocate_page(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            MICROS_SV39_PERMISSION_READ,
+            &ipc_second_frame
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_ipc_buffer_validate(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            MICROS_IPC_BUFFER_WRITE
+        ) != MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT
+        || micros_ipc_buffer_validate(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            MICROS_IPC_BUFFER_READ
+        ) != MICROS_IPC_BUFFER_OK
+        || micros_user_address_space_release_page(
+            process_two,
+            TEST_REUSE_VIRTUAL_ADDRESS,
+            &released_frame
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || released_frame != ipc_second_frame
     ) {
         goto done;
     }
