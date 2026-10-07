@@ -302,6 +302,12 @@ advance, quarantine, exact participant authority, failure-atomic endpoint
 cancellation, stale reuse rejection, and complete
 registry/endpoint/object restoration. Checked-copy ranges, directions,
 mappings, and byte evidence remain a separate design.
+ADR-0039 defines that checked-copy evidence: native authority/bounds
+and chunk-pairing tests, grant-model copy transitions, and a dedicated
+`test-qemu-grant` image proving page-local and cross-page copy in both
+directions, byte-exact failure atomicity, stale authority rejection, and
+complete cleanup. The marker explicitly identifies bootstrap phase; no
+post-handoff copy claim is valid before a separate mapping-authority design.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
