@@ -166,6 +166,18 @@ VM decides user-memory policy while the kernel continues to validate and apply
 page-table operations. A page fault originating from VM is fatal in v0.1
 because VM cannot resolve its own fault.
 
+Before the ownership commit, the address-space handoff path validates every
+live private root and requires every reachable bootstrap user leaf to be
+planned `VM_WIRED` for the same process generation. After commit, read-only
+root validation, lookup, translation, and activation use exact `VM_WIRED`
+leaf ownership, so the launcher and initial services retain IPC-buffer and
+checked-grant access. `VM_TRANSFERABLE` carries no process identity and cannot
+appear in a live user PTE until the later VM mapping protocol installs an
+exact mapping authority. This read boundary does not reopen bootstrap
+execution-context preparation: every live thread is already prepared at
+handoff, and only the later PM transaction may prepare a new executable
+context.
+
 ### Phase 5: core user services
 
 The launcher starts PM, TTY, RAMFS, and VFS in dependency order. Every service
@@ -282,8 +294,9 @@ interrupts disabled.
   matches the immutable kernel root.
 - Process-root mutation and destruction are rejected while that root is
   active; ASID-zero activation performs complete local invalidation.
-- Every user leaf resolves one distinct exact `PROCESS_USER` owner, and every
-  process-owned table or user frame is reachable in the matching role.
+- During `BOOTSTRAP`, every user leaf resolves one distinct exact
+  `PROCESS_USER` owner, and every process-owned table or user frame is
+  reachable in the matching role.
 - Trap entry preserves interrupted SUM in the saved frame but clears live SUM
   before arming the nested sentinel or entering C.
 - Every attached thread context uses the exact 264-byte integer ABI shared with
@@ -302,6 +315,14 @@ interrupts disabled.
   all three independent counts agree.
 - Bootstrap ownership handoff is staged, failure-atomic, and irreversible;
   allocation, release, and plan mutation are rejected after sealing.
+- Every user leaf reachable at handoff has an exact `VM_WIRED` target for the
+  same process generation; after handoff, read-only address resolution
+  requires that exact wired owner.
+- A `VM_TRANSFERABLE` frame is not live user-mapping authority until a reviewed
+  VM mapping transition binds it to an exact process generation.
+- Generic execution-context preparation is unavailable after handoff; existing
+  prepared threads may return, while new preparation requires the PM-only
+  load-complete-token transition.
 - Only VM may request user mapping changes after the handoff.
 - VM's fault-handling working set is wired, and a VM-originated fault is fatal.
 - Only PM publishes process lifecycle state.

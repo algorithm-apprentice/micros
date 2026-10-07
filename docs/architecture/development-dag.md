@@ -23,7 +23,7 @@ flowchart TD
     F[Page tables and user mode]
     G[Process thread and hart objects plus kernel scheduler]
     H[IPC endpoints and privileges]
-    I[Direct grants and user runtime]
+    I[Direct grants wired handoff reads and user runtime]
     J[Static bootstrap launcher]
     K[VM server and one-way handoff]
     L[PM spawn exit and wait]
@@ -96,7 +96,7 @@ failures attributable to one coherent change.
 | 4 | Traps, timer, bootstrap allocator, typed frame ownership | Expected exception recovery, timer ticks, allocator/owner invariants, and atomic handoff classification |
 | 5 | Page tables, process/thread/hart objects, user mode | U-mode isolation and repeated thread context switches |
 | 6 | Scheduler, endpoints, IPC | Blocking, wakeup, reply-token, stale endpoint, privilege, and deadlock tests |
-| 7 | Grants and user runtime | Authorized copies succeed; bounds and permission violations fail |
+| 7 | Grants, wired handoff reads, and user runtime | Authorized copies succeed before and after handoff for wired service pages; bounds, permissions, and non-wired owners fail |
 | 8 | Bootstrap launcher | Manifest order, exact privilege profiles, and readiness gates verified |
 | 9 | VM handoff | Frame ownership is disjoint and the VM working set remains wired |
 | 10 | PM | Spawn metadata, exit, wait, and failure rollback verified |
