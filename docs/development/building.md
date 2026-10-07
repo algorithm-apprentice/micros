@@ -688,11 +688,42 @@ The test dirties and reuses complete user and root frames to prove all 4096
 bytes are cleared before publication. Teardown uses one preflighted atomic
 release-set commit and returns the allocator and ledger to the kernel-table
 baseline. It then commits the one-way ownership handoff and proves every
-process-root API returns `PHASE` without mutation while kernel-root activation
-still succeeds. Only that complete sequence emits:
+mapping mutation API returns `PHASE` without mutation. Read-only lookup,
+validation, and activation remain phase-aware and reject the retained rootless
+process with `STATE`, while kernel-root activation still succeeds. Only that
+complete sequence emits:
 
 ```text
 MICROS_USER_ADDRESS_SPACE_TEST_PASS roots=isolated reuse=zeroed active=guarded ownership=validated sum=cleared
+```
+
+## Post-handoff wired address-space test
+
+Build and run the irreversible wired-resolution component with:
+
+```bash
+cmake --workflow --preset test-qemu-address-space-handoff
+```
+
+The image creates two exact process generations with prepared threads, active
+endpoints, private roots, executable code, stacks, writable cross-page
+buffers, and read-only pages. It first proves bootstrap translation,
+IPC-buffer snapshot, and checked grants. Every reachable user frame is then
+staged `VM_WIRED`; a deliberately transferable live leaf rejects production
+handoff with complete state preservation before the corrected plan commits.
+
+In `HANDED_OFF`, both roots retain exact `PROCESS_PAGE_TABLE` and `VM_WIRED`
+authority. The gate proves validation, lookup, activation, page-local and
+cross-page IPC-buffer access, grant copy in both directions, zero-length copy,
+permission and absent-mapping failure atomicity, transferable/foreign owner
+rejection, and structural-error precedence over an absent requested leaf.
+Create, allocate, release, destroy, and generic execution-context preparation
+remain phase-rejected. An already prepared thread then performs a real U-mode
+round trip through the ordinary scheduler return path. Only that complete
+sequence emits:
+
+```text
+MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
 ```
 
 ## User execution-context and U-mode test
@@ -749,8 +780,9 @@ Only that complete sequence emits:
 MICROS_GRANT_TEST_PASS identity=generation-safe directions=checked bounds=validated copies=atomic phase=bootstrap cleanup=complete
 ```
 
-The phase field is intentional: post-handoff service copy remains blocked on a
-separate mapping-authority design.
+The phase field identifies this gate's bootstrap cleanup contract. The
+separate `test-qemu-address-space-handoff` gate proves the same production
+copy path through exact `VM_WIRED` mappings after handoff.
 
 ## Blocking IPC acceptance test
 

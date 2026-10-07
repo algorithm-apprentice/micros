@@ -32,6 +32,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-nested-trap",
     "test-qemu-frame-ownership",
     "test-qemu-user-address-space",
+    "test-qemu-address-space-handoff",
     "test-qemu-user-execution",
     "test-qemu-scheduler",
     "test-qemu-scheduler-invalid-outgoing",
@@ -66,6 +67,23 @@ SHARED_QEMU_PATHS = (
     "tools/check_elf_sections.py",
     "tools/run_qemu_smoke.py",
     "tests/host/test_run_qemu_smoke.py",
+)
+
+WIRED_HANDOFF_INPUTS = (
+    "arch/riscv64/address_space_handoff_test.S",
+    "kernel/address_space_handoff_test.h",
+    "kernel/address_space_handoff_test.c",
+    "kernel/bootstrap_memory.c",
+    "kernel/frame_ownership.c",
+    "kernel/user_address_space.c",
+    "kernel/user_address_space_core.c",
+    "kernel/user_execution.c",
+    "kernel/ipc_buffer.c",
+    "kernel/grant_copy.c",
+    "kernel/address_space.c",
+    "kernel/sv39.c",
+    "kernel/scheduler.c",
+    "arch/riscv64/mmu.S",
 )
 
 GATE_INPUTS = {
@@ -110,11 +128,12 @@ GATE_INPUTS = {
         "kernel/grant_runtime.c",
         "kernel/grant_test.c",
         "kernel/user_address_space.c",
+        "kernel/user_address_space_core.c",
         "kernel/address_space.c",
         "kernel/sv39.c",
         "kernel/frame_ownership.c",
         "arch/riscv64/mmu.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-ipc": (
         "kernel/ipc.c",
         "kernel/endpoint.c",
@@ -145,7 +164,7 @@ GATE_INPUTS = {
         "kernel/ipc_syscall_test.c",
         "arch/riscv64/mmu.S",
         "arch/riscv64/ipc_syscall_test.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-ipc-syscall-panic": (
         "kernel/ipc_abi.c",
         "kernel/ipc_syscall.c",
@@ -164,13 +183,13 @@ GATE_INPUTS = {
         "kernel/ipc_syscall_panic_test.c",
         "arch/riscv64/mmu.S",
         "arch/riscv64/ipc_syscall_panic_test.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-nested-trap": ("arch/riscv64/nested_trap_test.S",),
     "test-qemu-frame-ownership": (
         "kernel/frame_ownership_test.c",
         "kernel/frame_allocator.c",
         "kernel/kernel_objects.c",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-user-address-space": (
         "kernel/grant.c",
         "kernel/grant_copy.c",
@@ -183,16 +202,17 @@ GATE_INPUTS = {
         "kernel/user_address_space_test.c",
         "arch/riscv64/mmu.S",
         "arch/riscv64/user_address_space_test.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
+    "test-qemu-address-space-handoff": WIRED_HANDOFF_INPUTS,
     "test-qemu-user-execution": (
         "kernel/user_execution_test.c",
         "arch/riscv64/user_execution_test.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-scheduler": (
         "kernel/scheduler_test.c",
         "kernel/kernel_objects.c",
         "arch/riscv64/scheduler_test.S",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-scheduler-invalid-outgoing": (
         "kernel/scheduler_invalid_test.c",
         "arch/riscv64/scheduler_test.S",
@@ -224,11 +244,12 @@ SLOW_MODEL_INPUTS = {
         "tests/host/endpoint_model_test.c",
         "tests/host/grant_test.c",
         "tests/host/grant_copy_test.c",
+        "tests/host/user_address_space_core_test.c",
         "tests/host/ipc_model_test.c",
         "tests/host/ipc_model_main.c",
         "tests/host/ipc_notify_test.c",
         "tests/host/ipc_close_test.c",
-    ),
+    ) + WIRED_HANDOFF_INPUTS,
 }
 
 SLOW_MODEL_CTESTS = {

@@ -50,6 +50,7 @@ micros_kernel_object_runtime_detach_address_space(
     || defined(MICROS_BUILD_IPC_TEST) \
     || defined(MICROS_BUILD_FRAME_OWNERSHIP_TEST) \
     || defined(MICROS_BUILD_USER_ADDRESS_SPACE_TEST) \
+    || defined(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST) \
     || defined(MICROS_BUILD_USER_EXECUTION_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \

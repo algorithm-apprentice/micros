@@ -171,6 +171,15 @@
       }
     },
     {
+      "name": "riscv64-address-space-handoff-test",
+      "displayName": "RISC-V 64 post-handoff wired address-space test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-address-space-handoff-test",
+      "cacheVariables": {
+        "MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-user-execution-test",
       "displayName": "RISC-V 64 user execution test",
       "inherits": "riscv64-debug",
@@ -350,6 +359,13 @@
       "configurePreset": "riscv64-user-address-space-test",
       "targets": [
         "test-qemu-user-address-space"
+      ]
+    },
+    {
+      "name": "test-qemu-address-space-handoff",
+      "configurePreset": "riscv64-address-space-handoff-test",
+      "targets": [
+        "test-qemu-address-space-handoff"
       ]
     },
     {
@@ -673,6 +689,20 @@
         {
           "type": "build",
           "name": "test-qemu-user-address-space"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-address-space-handoff",
+      "displayName": "Build and run the post-handoff wired address-space test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-address-space-handoff-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-address-space-handoff"
         }
       ]
     },

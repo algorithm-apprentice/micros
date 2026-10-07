@@ -780,12 +780,33 @@ static bool post_handoff_operations_are_revoked(
         micros_kernel_address_space_report();
     uint64_t physical_address;
     uint32_t observed_permissions;
+    size_t contiguous_bytes;
     uint64_t expected_satp = read_satp();
 
     if (
         !snapshot_core_state(ledger, objects)
         || micros_user_address_space_create(process)
             != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+        || !runtime_state_matches_snapshot(ledger, objects)
+        || read_satp() != expected_satp
+    ) {
+        return false;
+    }
+    physical_address = UINT64_C(0xfeedfacefeedface);
+    observed_permissions = UINT32_MAX;
+    contiguous_bytes = SIZE_MAX;
+    if (
+        !snapshot_core_state(ledger, objects)
+        || micros_user_address_space_translate(
+            process,
+            MICROS_USER_VIRTUAL_END,
+            &physical_address,
+            &observed_permissions,
+            &contiguous_bytes
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
+        || physical_address != UINT64_C(0xfeedfacefeedface)
+        || observed_permissions != UINT32_MAX
+        || contiguous_bytes != SIZE_MAX
         || !runtime_state_matches_snapshot(ledger, objects)
         || read_satp() != expected_satp
     ) {
@@ -841,7 +862,7 @@ static bool post_handoff_operations_are_revoked(
             TEST_USER_VIRTUAL_ADDRESS,
             &physical_address,
             &observed_permissions
-        ) != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
         || physical_address != UINT64_C(0xfeedfacefeedface)
         || observed_permissions != UINT32_MAX
         || !runtime_state_matches_snapshot(ledger, objects)
@@ -852,7 +873,7 @@ static bool post_handoff_operations_are_revoked(
     if (
         !snapshot_core_state(ledger, objects)
         || micros_user_address_space_validate(process)
-            != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+            != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
         || !runtime_state_matches_snapshot(ledger, objects)
         || read_satp() != expected_satp
     ) {
@@ -861,7 +882,7 @@ static bool post_handoff_operations_are_revoked(
     if (
         !snapshot_core_state(ledger, objects)
         || micros_user_address_space_activate(process)
-            != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+            != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
         || !runtime_state_matches_snapshot(ledger, objects)
         || read_satp() != expected_satp
     ) {

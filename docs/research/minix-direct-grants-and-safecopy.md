@@ -147,7 +147,7 @@ grants before process-slot reuse.
 | Indirect grants | Authority may traverse a bounded chain | Staged substitution: v0.1 uses non-transitive VFS bounce buffers; reconsider only with a reviewed zero-copy requirement |
 | Magic grants | Trusted services may grant another process's memory | Staged substitution: VM scratch mappings and direct VFS-to-VM grants replace magic authority in the shell MVP |
 | VM fault callback | Ordinary copy may ask VM to resolve faults | Required development-DAG adaptation: resident mappings only until VM-safe fault delivery exists |
-| Mapping authority after VM handoff | MINIX safe copy resolves through its runtime VM-aware copy path | Staged substitution: the first RISC-V implementation uses bootstrap `PROCESS_USER` ownership only; a reviewed post-handoff mapping resolver is required before services use checked copy |
+| Mapping authority after VM handoff | MINIX safe copy resolves through its runtime VM-aware copy path | Staged substitution: exact `VM_WIRED` authority now covers resident initial services; dynamic `VM_TRANSFERABLE` mappings still require the later VM mapping protocol |
 | `CPF_TRY` marker | Fail-fast copy records a mutable user-table fault bit | Required adaptation: every v0.1 copy is fail-fast and returns an explicit error; no user table exists to mark |
 | Vectored copy | Entries execute sequentially and may partially succeed | Compatible extension: one bounded scalar operation preflights both ranges and is failure-atomic |
 | Copy size | Scalar safe copy accepts an arbitrary verified byte count | Compatible bounded extension: one operation copies at most one page; larger baseline transfers repeat the same checked operation |
@@ -155,7 +155,7 @@ grants before process-slot reuse.
 | Exit cleanup | Endpoint change makes table authority stale | Compatible extension: bounded cancellation explicitly frees every related active grant |
 | User syscall ABI | Drivers invoke setgrant and safe-copy kernel calls | Staged substitution: portable grant mechanisms and QEMU evidence precede the separately reviewed user-runtime syscall ABI |
 
-## Current substrate and missing mechanism
+## Current substrate and remaining mechanism
 
 `micros` already provides:
 
@@ -170,14 +170,16 @@ grants before process-slot reuse.
 - fully mapped managed RAM in the kernel address space;
 - one-hart SIE-clear serialization;
 - typed user-frame ownership and generation-safe root teardown;
-- bounded two-page message copy as prior art for retained physical plans.
+- bounded two-page message copy;
+- page-bounded, failure-atomic checked grant copy;
+- exact `VM_WIRED` validation, lookup, translation, activation, IPC-buffer
+  access, and checked copy after handoff.
 
 It does not yet provide:
 
-- direction and grant-relative bounds validation;
-- page-sized cross-address-space copy planning and commit;
-- bootstrap-phase grant-copy QEMU evidence;
-- post-handoff mapping authority for runtime checked copy.
+- dynamic mapping authority for `VM_TRANSFERABLE` frames;
+- post-handoff page-table growth, map, unmap, or teardown;
+- VM fault delivery, suspended copy, or retry.
 
 ## Derived task sequence
 

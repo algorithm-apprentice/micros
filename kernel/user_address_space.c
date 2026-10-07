@@ -12,6 +12,8 @@
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/sv39.h"
+#include "micros/user_address_space_core.h"
+#include "micros/user_execution.h"
 
 enum {
     USER_ROOT_INDEX = 1,
@@ -223,6 +225,46 @@ require_bootstrap(
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
+static enum micros_user_address_space_error
+require_read_authority(
+    const struct micros_frame_ownership **ledger,
+    const struct micros_kernel_objects **objects,
+    const struct micros_kernel_address_space_report **kernel_report,
+    enum micros_frame_owner_kind *leaf_owner_kind
+)
+{
+    const struct micros_frame_ownership *observed_ledger =
+        micros_frame_ownership_runtime_ledger();
+    const struct micros_kernel_objects *observed_objects =
+        micros_kernel_object_runtime_registry();
+    const struct micros_kernel_address_space_report *observed_report =
+        micros_kernel_address_space_report();
+    enum micros_frame_owner_kind observed_leaf_owner_kind;
+    enum micros_user_address_space_error error;
+
+    if (
+        observed_ledger == NULL
+        || observed_objects == NULL
+        || observed_report == NULL
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_INITIALIZED;
+    }
+    error = micros_user_address_space_leaf_owner_kind(
+        observed_ledger->phase,
+        &observed_leaf_owner_kind
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (leaf_owner_kind != NULL) {
+        *leaf_owner_kind = observed_leaf_owner_kind;
+    }
+    *ledger = observed_ledger;
+    *objects = observed_objects;
+    *kernel_report = observed_report;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
 static enum micros_user_address_space_error resolve_process(
     const struct micros_kernel_objects *objects,
     struct micros_process_handle process,
@@ -232,6 +274,24 @@ static enum micros_user_address_space_error resolve_process(
     return map_object_error(
         micros_process_resolve(objects, process, resolved)
     );
+}
+
+static enum micros_user_address_space_error resolve_process_with_root(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    const struct micros_process **resolved
+)
+{
+    enum micros_user_address_space_error error =
+        resolve_process(objects, process, resolved);
+
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if ((*resolved)->address_space_root == 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 static bool user_virtual_address_is_valid(uint64_t virtual_address)
@@ -362,29 +422,25 @@ static bool physical_address_for_frame_index(
 static enum micros_user_address_space_error mark_owned_frame(
     const struct micros_frame_ownership *ledger,
     uint64_t physical_address,
-    enum micros_frame_owner_kind expected_kind,
+    enum micros_user_address_space_frame_role role,
     struct micros_process_handle process
 )
 {
     struct micros_frame_owner observed;
-    struct micros_frame_owner expected;
     uint64_t frame_index;
 
     if (
-        micros_frame_owner_make_process(
-            expected_kind,
-            process,
-            &expected
-        ) != MICROS_FRAME_OWNERSHIP_OK
-        || micros_frame_ownership_lookup(
+        micros_frame_ownership_lookup(
             ledger,
             physical_address,
             &observed
         ) != MICROS_FRAME_OWNERSHIP_OK
-        || observed.generation != expected.generation
-        || observed.slot != expected.slot
-        || observed.kind != expected.kind
-        || observed.reserved != expected.reserved
+        || micros_user_address_space_validate_frame_owner(
+            ledger->phase,
+            role,
+            process,
+            observed
+        ) != MICROS_USER_ADDRESS_SPACE_OK
         || !frame_index_for_physical_address(
             ledger,
             physical_address,
@@ -421,12 +477,18 @@ static enum micros_user_address_space_error validate_locked(
     const struct user_page_table *kernel_root;
     const struct user_page_table *root;
     struct micros_sv39_decoded_pte root_entry;
+    enum micros_frame_owner_kind leaf_owner_kind;
     enum micros_user_address_space_error error;
     size_t root_index;
     uint64_t frame_index;
 
     clear_bitmap(reachable_bitmap);
-    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        &leaf_owner_kind
+    );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
@@ -446,7 +508,7 @@ static enum micros_user_address_space_error validate_locked(
     error = mark_owned_frame(
         ledger,
         resolved->address_space_root,
-        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+        MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE,
         process
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -490,7 +552,7 @@ static enum micros_user_address_space_error validate_locked(
         error = mark_owned_frame(
             ledger,
             root_entry.physical_address,
-            MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+            MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE,
             process
         );
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -519,7 +581,7 @@ static enum micros_user_address_space_error validate_locked(
             error = mark_owned_frame(
                 ledger,
                 middle_entry.physical_address,
-                MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+                MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE,
                 process
             );
             if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -560,7 +622,7 @@ static enum micros_user_address_space_error validate_locked(
                     error = mark_owned_frame(
                         ledger,
                         leaf_entry.physical_address,
-                        MICROS_FRAME_OWNER_PROCESS_USER,
+                        MICROS_USER_ADDRESS_SPACE_FRAME_USER_LEAF,
                         process
                     );
                     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -588,7 +650,7 @@ static enum micros_user_address_space_error validate_locked(
             && (
                 owner.kind
                     == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
-                || owner.kind == MICROS_FRAME_OWNER_PROCESS_USER
+                || owner.kind == leaf_owner_kind
             )
         ) {
             if (!bitmap_contains(reachable_bitmap, frame_index)) {
@@ -1124,11 +1186,16 @@ micros_user_address_space_lookup(
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
     saved_status = riscv_irq_save();
-    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = resolve_process(objects, process, &resolved);
+    error = resolve_process_with_root(objects, process, &resolved);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -1193,11 +1260,16 @@ micros_user_address_space_translate(
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
     saved_status = riscv_irq_save();
-    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = resolve_process(objects, process, &resolved);
+    error = resolve_process_with_root(objects, process, &resolved);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -1417,6 +1489,10 @@ micros_user_address_space_destroy(struct micros_process_handle process)
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
+    error = resolve_process_with_root(objects, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
     if (!acquire_scratch()) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
         goto done;
@@ -1491,6 +1567,218 @@ done:
     return error;
 }
 
+static bool process_handles_equal(
+    struct micros_process_handle left,
+    struct micros_process_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
+static bool find_one_prepared_thread(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    struct micros_thread_handle *thread_handle
+)
+{
+    size_t count = 0;
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !process_handles_equal(thread->owner, process)
+        ) {
+            continue;
+        }
+        if (!thread->context_attached) {
+            return false;
+        }
+        *thread_handle = (struct micros_thread_handle){
+            .slot = (uint16_t)index,
+            .generation = thread->generation,
+        };
+        ++count;
+    }
+    return count == 1;
+}
+
+static bool process_has_no_owned_frames(
+    const struct micros_frame_ownership *ledger,
+    struct micros_process_handle process
+)
+{
+    uint64_t frame_index;
+
+    for (
+        frame_index = 0;
+        frame_index < ledger->managed_frame_count;
+        ++frame_index
+    ) {
+        const struct micros_frame_owner *owner =
+            &ledger->owners[frame_index];
+
+        if (
+            owner->slot == process.slot
+            && owner->generation == process.generation
+            && owner->kind != MICROS_FRAME_OWNER_FREE
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool reachable_user_targets_are_wired(
+    const struct micros_frame_ownership *ledger,
+    struct micros_process_handle process
+)
+{
+    uint64_t frame_index;
+
+    for (
+        frame_index = 0;
+        frame_index < ledger->managed_frame_count;
+        ++frame_index
+    ) {
+        const struct micros_frame_owner *owner =
+            &ledger->owners[frame_index];
+
+        if (
+            bitmap_contains(reachable_bitmap, frame_index)
+            && owner->kind == MICROS_FRAME_OWNER_PROCESS_USER
+            && owner->slot == process.slot
+            && owner->generation == process.generation
+            && ledger->handoff_targets[frame_index]
+                != MICROS_FRAME_HANDOFF_VM_WIRED
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_complete_wired_handoff(void)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    enum micros_user_address_space_error error;
+    uintptr_t saved_status;
+    size_t index;
+
+    saved_status = riscv_irq_save();
+    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (
+        micros_frame_ownership_runtime_validate(objects)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || micros_kernel_objects_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done;
+    }
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_process *record =
+            &objects->processes[index];
+        struct micros_process_handle process;
+        struct micros_thread_handle thread_handle;
+        enum micros_user_execution_error execution_error;
+
+        if (record->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
+            continue;
+        }
+        process = (struct micros_process_handle){
+            .slot = (uint16_t)index,
+            .generation = record->generation,
+        };
+        if (record->address_space_root == 0) {
+            if (
+                record->live_thread_count != 0
+                || record->primary_endpoint
+                    != MICROS_PROCESS_ENDPOINT_NONE
+                || !process_has_no_owned_frames(ledger, process)
+            ) {
+                error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+                goto done;
+            }
+            continue;
+        }
+        if (
+            record->live_thread_count != 1
+            || !find_one_prepared_thread(
+                objects,
+                process,
+                &thread_handle
+            )
+        ) {
+            error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+            goto done;
+        }
+        execution_error = micros_user_execution_validate_context(
+            thread_handle,
+            &objects->threads[thread_handle.slot].user_context
+        );
+        if (execution_error != MICROS_USER_EXECUTION_OK) {
+            error = (
+                execution_error == MICROS_USER_EXECUTION_ERROR_STATE
+                || execution_error == MICROS_USER_EXECUTION_ERROR_CONTEXT
+                || execution_error == MICROS_USER_EXECUTION_ERROR_MAPPING
+            )
+                ? MICROS_USER_ADDRESS_SPACE_ERROR_STATE
+                : MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+            goto done;
+        }
+    }
+    if (!acquire_scratch()) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+        goto done;
+    }
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_process *record =
+            &objects->processes[index];
+        struct micros_process_handle process;
+
+        if (
+            record->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || record->address_space_root == 0
+        ) {
+            continue;
+        }
+        process = (struct micros_process_handle){
+            .slot = (uint16_t)index,
+            .generation = record->generation,
+        };
+        error = validate_locked(process, NULL);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            goto done_with_scratch;
+        }
+        if (!reachable_user_targets_are_wired(ledger, process)) {
+            error = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+            goto done_with_scratch;
+        }
+    }
+    error = map_ownership_error(
+        micros_frame_ownership_runtime_complete_handoff(objects)
+    );
+
+done_with_scratch:
+    release_scratch();
+done:
+    (void)kernel_report;
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
 enum micros_user_address_space_error
 micros_user_address_space_validate(
     struct micros_process_handle process
@@ -1499,11 +1787,21 @@ micros_user_address_space_validate(
     const struct micros_frame_ownership *ledger;
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
 
     saved_status = riscv_irq_save();
-    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process_with_root(objects, process, &resolved);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -1518,6 +1816,7 @@ done:
     (void)ledger;
     (void)objects;
     (void)kernel_report;
+    (void)resolved;
     riscv_irq_restore(saved_status);
     return error;
 }
@@ -1536,7 +1835,16 @@ micros_user_address_space_activate(
     uintptr_t saved_status;
 
     saved_status = riscv_irq_save();
-    error = require_bootstrap(&ledger, &objects, &kernel_report);
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process_with_root(objects, process, &resolved);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }

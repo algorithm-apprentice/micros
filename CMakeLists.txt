@@ -68,6 +68,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+    "Build the post-handoff wired address-space test image"
+    OFF
+)
+option(
     MICROS_BUILD_USER_EXECUTION_TEST
     "Build the user execution-context and U-mode entry test image"
     OFF
@@ -107,6 +112,7 @@ set(
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
     MICROS_BUILD_USER_EXECUTION_TEST
     MICROS_BUILD_SCHEDULER_TEST
     MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST
@@ -171,6 +177,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/endpoint.c
         kernel/grant.c
         kernel/grant_copy_core.c
+        kernel/user_address_space_core.c
         kernel/ipc_abi.c
         kernel/ipc.c
         tests/host/ipc_abi_test.c
@@ -180,6 +187,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_delivery_test.c
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
+        tests/host/user_address_space_core_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -558,6 +566,7 @@ add_executable(
     kernel/timer.c
     kernel/trap.c
     kernel/user_address_space.c
+    kernel/user_address_space_core.c
     kernel/user_execution.c
 )
 
@@ -985,6 +994,40 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
     )
 endif()
 
+if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
+    add_custom_target(
+        test-qemu-address-space-handoff
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_USER_EXECUTION_TEST)
     add_custom_target(
         test-qemu-user-execution
@@ -1227,6 +1270,20 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
         PRIVATE
             arch/riscv64/user_address_space_test.S
             kernel/user_address_space_test.c
+    )
+endif()
+
+if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/address_space_handoff_test.S
+            kernel/address_space_handoff_test.c
     )
 endif()
 

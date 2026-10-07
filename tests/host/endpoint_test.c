@@ -1069,6 +1069,7 @@ bool micros_ipc_reply_test_run(void);
 bool micros_ipc_state_test_run(void);
 bool micros_grant_test_run(void);
 bool micros_grant_copy_test_run(void);
+bool micros_user_address_space_core_test_run(void);
 
 int main(void)
 {
@@ -1123,6 +1124,10 @@ int main(void)
         {
             "checked direct grant copy",
             micros_grant_copy_test_run,
+        },
+        {
+            "phase-aware user address-space authority",
+            micros_user_address_space_core_test_run,
         },
         {
             "stable IPC syscall ABI",

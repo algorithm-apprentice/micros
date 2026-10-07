@@ -883,7 +883,7 @@ bool micros_grant_runtime_run_self_test(void)
             0,
             0,
             0
-        ) != MICROS_GRANT_ERROR_PHASE
+        ) != MICROS_GRANT_OK
     ) {
         ((struct micros_frame_ownership *)(uintptr_t)ledger)->phase =
             saved_phase;
