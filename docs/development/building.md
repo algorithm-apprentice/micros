@@ -715,10 +715,14 @@ The image creates two process generations with inactive threads, proves
 reserved endpoints remain hidden, installs and activates immutable client and
 server profiles, checks distinct call/send/notify decisions, rejects process
 release while bound, advances one process generation, rejects the stale
-endpoint, and restores the object baseline. Only that complete sequence emits:
+endpoint, initializes the authoritative grant runtime, proves exact
+read/write grant creation, inspect/revoke authority, prepare-close-commit
+cancellation on either participant, and stale-token rejection after endpoint
+reuse, then restores the grant and object baselines. Only that complete
+sequence emits:
 
 ```text
-MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate
+MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate grants=generation-safe
 ```
 
 ## Blocking IPC acceptance test

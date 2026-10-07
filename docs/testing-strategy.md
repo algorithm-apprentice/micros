@@ -295,13 +295,13 @@ pending-mask coalescing, `ANY`-only consumption, reply-wait exclusion,
 state-preserving failures, selected-thread completion return, and complete
 baseline restoration. That evidence does not claim PLIC routing,
 `irq_complete`, console handoff, or TTY behavior.
-ADR-0038 limits the next grant evidence to a native
-registry/lifecycle model plus target-runtime lifecycle coverage in
-`test-qemu-endpoint`. It must prove token generation, revoke-time advance,
-quarantine, exact participant authority, failure-atomic endpoint cancellation,
-stale reuse rejection, and complete registry/endpoint/object restoration.
-Checked-copy ranges, directions, mappings, and byte evidence receive a separate
-design after the registry implementation merges.
+ADR-0038 grant evidence now includes deterministic native lifecycle tests, a
+replayable 4,096-transition registry model, and target-runtime lifecycle
+coverage in `test-qemu-endpoint`. It proves token generation, revoke-time
+advance, quarantine, exact participant authority, failure-atomic endpoint
+cancellation, stale reuse rejection, and complete
+registry/endpoint/object restoration. Checked-copy ranges, directions,
+mappings, and byte evidence remain a separate design.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered

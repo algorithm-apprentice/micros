@@ -64,6 +64,30 @@ class ValidationPlanTests(unittest.TestCase):
                     commands,
                 )
 
+    def test_grant_paths_own_endpoint_gate(self):
+        for path in (
+            "kernel/grant.c",
+            "kernel/grant_runtime.c",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertIn(
+                    validation_plan.workflow("test-qemu-endpoint"),
+                    commands,
+                )
+                self.assertIn(validation_plan.IPC_MODEL, commands)
+
+        commands = validation_plan.plan(["kernel/ipc.c"], "fast")
+        self.assertIn(
+            validation_plan.workflow("test-qemu-endpoint"),
+            commands,
+        )
+        commands = validation_plan.plan(
+            ["tests/host/grant_test.c"],
+            "fast",
+        )
+        self.assertIn(validation_plan.IPC_MODEL, commands)
+
     def test_fast_full_escalation_runs_complete_qemu(self):
         commands = validation_plan.plan(
             ["kernel/unclassified_target_code.c"],

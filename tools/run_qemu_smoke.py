@@ -104,7 +104,8 @@ ENDPOINT_TEST_PASS = (
     "generation=validated "
     "profiles=immutable "
     "visibility=staged "
-    "authorization=separate"
+    "authorization=separate "
+    "grants=generation-safe"
 )
 IPC_TEST_MARKER = "MICROS_IPC_TEST"
 IPC_ADDRESS_SPACES_MARKER = "MICROS_IPC_ADDRESS_SPACES"

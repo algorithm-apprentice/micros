@@ -5,6 +5,7 @@ bool micros_ipc_model_test_run(void);
 bool micros_endpoint_model_test_run(void);
 bool micros_ipc_close_model_test_run(void);
 bool micros_ipc_notify_model_test_run(void);
+bool micros_grant_model_test_run(void);
 
 int main(void)
 {
@@ -23,6 +24,10 @@ int main(void)
         {
             "endpoint close scenarios",
             micros_ipc_close_model_test_run,
+        },
+        {
+            "direct grant registry model",
+            micros_grant_model_test_run,
         },
         {
             "persistent IPC acceptance model",
