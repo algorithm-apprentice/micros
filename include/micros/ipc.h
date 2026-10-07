@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define MICROS_IPC_TYPE_KERNEL_MASK UINT32_C(0x80000000)
+
 struct micros_ipc_message {
     uint32_t source;
     uint32_t type;

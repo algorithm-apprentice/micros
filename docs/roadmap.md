@@ -22,8 +22,8 @@ user round trip. The portable MINIX-style queues and accounting model now drive
 repeated two-address-space switching under real timer interrupts, including a
 real no-runnable idle transition and timer wake. Endpoint privileges and
 generation-safe lifecycle gates are complete. The fixed message ABI and
-dormant IPC state are present; protected queue transitions are the next
-dependency-ready mechanism.
+dormant IPC state are present, and sender/receiver queue topology is validated.
+Protected queue mutation and matching are the next dependency-ready mechanism.
 
 ## v0.1 completion goal
 
