@@ -47,6 +47,11 @@ List the small green steps in dependency order:
 
 ## Verification
 
+- HEAD commit:
+- Staged tree ID (`git write-tree`):
+- `git diff --quiet`: PASS / FAIL
+- Untracked task-file check: PASS / FAIL
+- Untracked task-file output (must be empty for PASS):
 - [ ] Phase-appropriate evidence is complete
 - [ ] Design PR contains no executable implementation artifacts
 - [ ] Implementation PR references a merged, reviewed design
@@ -57,7 +62,10 @@ List the small green steps in dependency order:
 - [ ] Every permanent commit is buildable/testable at its applicable layer
 - [ ] No required check was skipped without an explanation
 
-List the exact commands and results:
+List each exact command, status (`PASS`, `FAIL`, `NOT RUN`, or `N/A`), staged
+tree ID, and relevant output/record. Required `FAIL` or `NOT RUN` status means
+the PR is not review-ready. A failed worktree or untracked-file check also
+blocks review; explanation records the blocker but does not waive it.
 
 ```text
 
@@ -67,6 +75,8 @@ List the exact commands and results:
 
 - Review type: Design / Implementation
 - Reviewer/persona:
+- Author validation evidence inspected:
+- Reviewer targeted reproduction (command, hypothesis, result, or `None`):
 - Substantive findings:
 - Corrections made:
 - Final result:

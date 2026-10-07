@@ -30,6 +30,10 @@ An independent reviewer is read-only:
   test evidence, and scope;
 - report only substantive findings with evidence and the smallest correction;
 - distinguish correctness issues from optional preferences;
+- inspect the author's exact validation evidence without routinely rerunning
+  suites, builds, models, QEMU workflows, or documentation gates;
+- run only a minimal targeted reproduction for a concrete suspected defect
+  that cannot be established statically, and record why it was needed;
 - never edit, commit, push, merge, or start implementation work;
 - never ask another reviewer to review the review;
 - state explicitly when no substantive issue remains.
@@ -87,9 +91,12 @@ requests.
 4. Record durable decisions in a Proposed ADR and canonical design documents.
 5. Do not commit code, tests, models, harnesses, build scaffolding, or reusable
    prototypes.
-6. Obtain an independent design review.
-7. Correct justified design findings and re-review until none remain.
-8. Mark the design Accepted and squash-merge the design pull request.
+6. Run and record the phase-required documentation, structure, staged,
+   worktree, and branch-range checks against the current staged tree.
+7. Obtain an independent design review.
+8. Correct justified design findings, update evidence, and re-review until none
+   remain.
+9. Mark the design Accepted and squash-merge the design pull request.
 
 ### Implementation phase
 
@@ -103,10 +110,12 @@ requests.
 6. Commit a coherent green slice; do not make permanent broken commits.
 7. Refactor in another green commit when separation improves reviewability.
 8. Run the narrow required checks, then the milestone gate.
-9. Obtain an independent implementation review.
-10. Validate every review finding; fix only technically justified issues.
-11. Re-review until no substantive issue remains.
-12. Squash-merge the implementation pull request into one task-outcome commit.
+9. Stage the complete change, verify a clean tracked worktree and no untracked
+   task files, and record `HEAD`, `git write-tree`, exact commands, and results.
+10. Obtain an independent implementation review.
+11. Validate every review finding; fix only technically justified issues.
+12. Re-review until no substantive issue remains.
+13. Squash-merge the implementation pull request into one task-outcome commit.
 
 If implementation reveals a design defect, mark implementation blocked,
 abandon its pull request/branch, merge a corrective design-only pull request,

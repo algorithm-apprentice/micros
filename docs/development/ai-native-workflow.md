@@ -128,8 +128,12 @@ Every implementation-bearing outcome uses two separately reviewed phases.
    acceptance contracts in canonical documents and a Proposed ADR.
 4. Keep production code, executable tests/models/harnesses, build scaffolding,
    dependencies, and reusable prototypes out of the design pull request.
-5. Independently review the design until no substantive issue remains.
-6. Mark the design Accepted and squash-merge it.
+5. Stage the complete design change, verify no unstaged/untracked task files
+   remain, and record documentation, structure, and three-layer diff evidence
+   against `HEAD` plus the staged tree ID.
+6. Independently review the design until no substantive issue remains.
+7. Update the staged evidence after corrections.
+8. Mark the design Accepted and squash-merge it.
 
 The design pull request records `Phase: Design`, its dependency-ready outcome,
 and the evidence used to make the design implementation-ready.
@@ -145,9 +149,12 @@ and the evidence used to make the design implementation-ready.
 6. Commit that coherent green slice.
 7. Refactor in a separate green commit when useful.
 8. Run the narrow suite and then the milestone gate.
-9. Independently review the complete implementation.
-10. Correct justified findings and repeat review.
-11. Squash-merge the implementation task into one `main` commit.
+9. Stage the complete change, verify `git diff --quiet`, verify no untracked
+   task files remain, and record `HEAD`, `git write-tree`, commands, and
+   results.
+10. Independently review the complete implementation.
+11. Correct justified findings, update the staged evidence, and repeat review.
+12. Squash-merge the implementation task into one `main` commit.
 
 The implementation pull request records `Phase: Implementation`, its merged
 design reference, Red-Green-Refactor evidence, exact author-run validation,
@@ -204,15 +211,26 @@ The independent reviewer receives:
 The reviewer remains read-only and does not commit, merge, implement fixes, or
 request another reviewer.
 
+Before review starts, the author supplies exact current commands and results
+for every phase-required check. Missing or stale evidence blocks review; the
+reviewer does not run the missing suite on the author's behalf.
+
+The reviewer does not routinely repeat native suites, persistent models,
+builds, QEMU workflows, or documentation gates. A minimal targeted
+reproduction is allowed only for a concrete suspected defect that static
+evidence cannot establish. The review records the hypothesis, command, and
+result.
+
 For every finding, the authoring persona:
 
 1. verifies the evidence;
 2. accepts or rejects the finding with technical reasoning;
 3. applies the smallest justified correction;
-4. runs affected checks;
+4. runs affected checks and updates the author evidence;
 5. asks the reviewer to re-read the current files.
 
-Review ends only when no substantive issue remains.
+Re-review inspects the corrected diff and updated evidence without repeating
+the author's suite. Review ends only when no substantive issue remains.
 
 ## Pull request and merge
 
@@ -256,9 +274,16 @@ The initial reproducible documentation gate is:
 python3 -m unittest discover -s tests/host -p 'test_*.py'
 python3 tools/check_docs.py
 git add <intended-files>
+git diff --quiet
+git diff --check
 git diff --cached --check
+git ls-files --others --exclude-standard
+git write-tree
 git diff --check origin/main...HEAD
 ```
 
-Run the cached check after staging and before committing. Run the range check
-after committing to validate the complete pull-request diff.
+After staging, `git diff --quiet` must prove the tracked worktree is clean.
+Then run the worktree and cached whitespace checks before review. Untracked task
+output must be empty, and the tree ID binds the evidence to the staged change.
+Run the range check after committing to validate the complete pull-request
+diff.

@@ -63,12 +63,19 @@ For documentation and repository-instruction changes, run:
 python3 -m unittest discover -s tests/host -p 'test_*.py'
 python3 tools/check_docs.py
 git add <intended-files>
+git diff --quiet
+git diff --check
 git diff --cached --check
+git ls-files --others --exclude-standard
+git write-tree
 git diff --check origin/main...HEAD
 ```
 
-The cached check is the pre-commit whitespace gate after staging. The
-`origin/main...HEAD` check is the post-commit pull-request range gate.
+`git diff --quiet` is the pre-review cleanliness gate and must exit zero.
+Worktree and cached `--check` commands are separate whitespace gates. Untracked
+output must be empty for task files, and `git write-tree` identifies the
+reviewed staged change. The `origin/main...HEAD` check is the post-commit
+pull-request range gate.
 
 Implementation milestones add their own native and QEMU commands when those
 test targets exist. The current boot-foundation gates are:
@@ -113,3 +120,9 @@ justified. A design PR is merged before its dependent implementation branch is
 created. Keep meaningful green commits on an implementation branch for review,
 then squash-merge the accepted task into one outcome commit on `main`. Merge
 when no substantive issue remains and all phase-appropriate checks pass.
+
+Authors run and record required validation before requesting review. Reviewers
+do not repeat complete suites, builds, models, QEMU workflows, or documentation
+gates. They may run one minimal targeted reproduction for a concrete suspected
+defect when static evidence is insufficient, and record the reason and result.
+Missing or stale author evidence blocks review and is returned to the author.

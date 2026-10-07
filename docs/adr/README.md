@@ -49,3 +49,4 @@ to make the project appear more consistent than it was.
 | [0031](0031-tiered-native-validation.md) | Tiered native validation | Accepted |
 | [0032](0032-fail-closed-change-aware-validation.md) | Fail-closed change-aware validation | Accepted |
 | [0033](0033-reviewed-design-before-implementation.md) | Reviewed design before implementation | Accepted |
+| [0034](0034-author-validation-before-review.md) | Author validation before review | Accepted |
