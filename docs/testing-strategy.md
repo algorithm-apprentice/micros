@@ -245,8 +245,10 @@ including generation advance, stale rejection, the one-thread policy, and
 hart-local current-thread state. `test-qemu-endpoint` exercises reserved versus
 active visibility, immutable profile installation, asymmetric
 call/send/notify authorization, bound-process release rejection, stale
-endpoint rejection after generation advance, and complete baseline
-restoration. `test-qemu-ipc` uses three exact production process generations,
+endpoint rejection after generation advance, failed runtime-initialization
+preservation, and complete baseline restoration through the authoritative
+target registry. `test-qemu-ipc` uses that same target registry with three
+exact production process generations,
 three distinct generation-bound Sv39 roots, saved integer contexts, complete
 thread-owned kernel-stack patterns, scheduler state, and trusted kernel-owned
 messages before the syscall ABI exists. It proves immediate and blocked

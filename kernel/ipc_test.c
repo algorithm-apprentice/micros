@@ -6,6 +6,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
+#include "kernel/ipc_runtime_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler_core.h"
@@ -26,7 +27,7 @@ static unsigned char
     ipc_test_stacks[IPC_TEST_PROCESS_COUNT][
         MICROS_THREAD_KERNEL_STACK_SIZE
     ];
-static struct micros_endpoint_registry registry;
+static struct micros_endpoint_registry *registry;
 static struct micros_endpoint_registry registry_snapshot;
 static struct micros_kernel_objects objects_snapshot;
 static struct micros_hart hart_snapshot;
@@ -393,7 +394,7 @@ static bool consume_staged(
 
 static void snapshot_state(const struct micros_kernel_objects *objects)
 {
-    copy_bytes(&registry_snapshot, &registry, sizeof(registry));
+    copy_bytes(&registry_snapshot, registry, sizeof(*registry));
     copy_bytes(&objects_snapshot, objects, sizeof(*objects));
 }
 
@@ -402,7 +403,7 @@ static bool state_matches_snapshot(
 )
 {
     return (
-        bytes_equal(&registry_snapshot, &registry, sizeof(registry))
+        bytes_equal(&registry_snapshot, registry, sizeof(*registry))
         && bytes_equal(&objects_snapshot, objects, sizeof(*objects))
     );
 }
@@ -451,7 +452,7 @@ static bool endpoint_records_are_clear(void)
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_endpoint_record *record =
-            &registry.endpoints[index];
+            &registry->endpoints[index];
 
         if (
             record->state != MICROS_ENDPOINT_STATE_FREE
@@ -579,11 +580,16 @@ bool micros_ipc_runtime_run_self_test(void)
         || baseline_threads != 0
         || baseline_harts != 1
         || !thread_handle_is_zero(boot_hart->current_thread)
-        || micros_endpoint_registry_initialize(
-            &registry,
+        || micros_ipc_runtime_registry() != NULL
+        || micros_ipc_runtime_initialize(
             profiles,
             sizeof(profiles) / sizeof(profiles[0])
         ) != MICROS_ENDPOINT_OK
+        || (
+            registry =
+                micros_ipc_runtime_authoritative_registry()
+        ) == NULL
+        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
     ) {
         goto done;
     }
@@ -594,7 +600,7 @@ bool micros_ipc_runtime_run_self_test(void)
             || micros_user_address_space_create(processes[index])
                 != MICROS_USER_ADDRESS_SPACE_OK
             || micros_endpoint_reserve(
-                &registry,
+                registry,
                 objects,
                 processes[index],
                 &endpoints[index]
@@ -605,13 +611,13 @@ bool micros_ipc_runtime_run_self_test(void)
                 &threads[index]
             ) != MICROS_KERNEL_OBJECT_OK
             || micros_endpoint_install_profile(
-                &registry,
+                registry,
                 objects,
                 processes[index],
                 profile_ids[index]
             ) != MICROS_ENDPOINT_OK
             || micros_endpoint_activate(
-                &registry,
+                registry,
                 objects,
                 endpoints[index]
             ) != MICROS_ENDPOINT_OK
@@ -654,7 +660,7 @@ bool micros_ipc_runtime_run_self_test(void)
         }
     }
     if (
-        micros_endpoint_registry_validate_objects(&registry, objects)
+        micros_endpoint_registry_validate_objects(registry, objects)
             != MICROS_ENDPOINT_OK
         || !ready_queue_matches(objects, hart, NULL, 0)
         || !snapshot_execution_state(objects, processes, threads)
@@ -666,14 +672,14 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[0], UINT32_C(0x1001), UINT8_C(0x10));
     if (
         micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             endpoints[IPC_TEST_CLIENT],
             (uintptr_t)&receive_buffers[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
         || micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -717,7 +723,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[1], UINT32_C(0x1002), UINT8_C(0x20));
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_PEER],
             endpoints[IPC_TEST_SERVER],
@@ -726,12 +732,12 @@ bool micros_ipc_runtime_run_self_test(void)
         || objects->threads[threads[IPC_TEST_PEER].slot].runtime_flags
             != MICROS_THREAD_RTS_IPC_SEND
         || !thread_handles_equal(
-            registry.endpoints[processes[IPC_TEST_SERVER].slot]
+            registry->endpoints[processes[IPC_TEST_SERVER].slot]
                 .sender_head,
             threads[IPC_TEST_PEER]
         )
         || micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             MICROS_ENDPOINT_ANY,
@@ -775,14 +781,14 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[2], UINT32_C(0x2001), UINT8_C(0x30));
     if (
         micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             MICROS_ENDPOINT_ANY,
             (uintptr_t)&receive_buffers[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
         || micros_ipc_call(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -819,7 +825,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&reply, UINT32_C(0x2002), UINT8_C(0x40));
     if (
         micros_ipc_reply(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             reply_token,
@@ -848,7 +854,7 @@ bool micros_ipc_runtime_run_self_test(void)
     snapshot_state(objects);
     if (
         micros_ipc_reply(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             reply_token,
@@ -863,14 +869,14 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[3], UINT32_C(0x3001), UINT8_C(0x50));
     if (
         micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             MICROS_ENDPOINT_ANY,
             (uintptr_t)&receive_buffers[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
         || micros_ipc_call(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -903,7 +909,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&reply, UINT32_C(0x3002), UINT8_C(0x60));
     if (
         micros_ipc_reply_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             reply_token,
@@ -915,7 +921,7 @@ bool micros_ipc_runtime_run_self_test(void)
             threads[IPC_TEST_SERVER].slot
         ].runtime_flags != MICROS_THREAD_RTS_IPC_RECEIVE
         || !thread_handles_equal(
-            registry.endpoints[processes[IPC_TEST_SERVER].slot]
+            registry->endpoints[processes[IPC_TEST_SERVER].slot]
                 .receiver_head,
             threads[IPC_TEST_SERVER]
         )
@@ -925,7 +931,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[4], UINT32_C(0x3003), UINT8_C(0x70));
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_PEER],
             endpoints[IPC_TEST_SERVER],
@@ -972,14 +978,14 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[5], UINT32_C(0x4001), UINT8_C(0x80));
     if (
         micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             MICROS_ENDPOINT_ANY,
             (uintptr_t)&receive_buffers[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
         || micros_ipc_call(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -1006,7 +1012,7 @@ bool micros_ipc_runtime_run_self_test(void)
         )
         || !hold_thread(objects, threads[IPC_TEST_SERVER])
         || micros_ipc_notify(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_PEER],
             endpoints[IPC_TEST_CLIENT],
@@ -1014,7 +1020,7 @@ bool micros_ipc_runtime_run_self_test(void)
         ) != MICROS_IPC_OK
         || !hold_thread(objects, threads[IPC_TEST_PEER])
         || micros_ipc_notify(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_PEER],
             endpoints[IPC_TEST_CLIENT],
@@ -1027,7 +1033,7 @@ bool micros_ipc_runtime_run_self_test(void)
         || objects->threads[
             threads[IPC_TEST_CLIENT].slot
         ].ipc_delivery_pending
-        || registry.endpoints[processes[IPC_TEST_CLIENT].slot]
+        || registry->endpoints[processes[IPC_TEST_CLIENT].slot]
             .pending_events[processes[IPC_TEST_PEER].slot]
             != UINT64_C(0x05)
     ) {
@@ -1036,7 +1042,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&reply, UINT32_C(0x4002), UINT8_C(0x90));
     if (
         micros_ipc_reply(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             reply_token,
@@ -1060,7 +1066,7 @@ bool micros_ipc_runtime_run_self_test(void)
         || !hold_thread(objects, threads[IPC_TEST_SERVER])
         || !hold_thread(objects, threads[IPC_TEST_CLIENT])
         || micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             MICROS_ENDPOINT_ANY,
@@ -1094,7 +1100,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[6], UINT32_C(0x5001), UINT8_C(0xa0));
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -1107,7 +1113,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[7], UINT32_C(0x5002), UINT8_C(0xb0));
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             endpoints[IPC_TEST_CLIENT],
@@ -1115,7 +1121,7 @@ bool micros_ipc_runtime_run_self_test(void)
         ) != MICROS_IPC_ERROR_DEADLOCK
         || !state_matches_snapshot(objects)
         || micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             endpoints[IPC_TEST_CLIENT],
@@ -1145,7 +1151,7 @@ bool micros_ipc_runtime_run_self_test(void)
     fill_message(&send_messages[0], UINT32_C(0x6001), UINT8_C(0xc0));
     if (
         micros_ipc_call(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -1160,14 +1166,14 @@ bool micros_ipc_runtime_run_self_test(void)
     if (
         close_token == 0
         || micros_ipc_receive(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_PEER],
             endpoints[IPC_TEST_SERVER],
             (uintptr_t)&receive_buffers[IPC_TEST_PEER]
         ) != MICROS_IPC_OK
         || micros_ipc_notify(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_SERVER],
             endpoints[IPC_TEST_CLIENT],
@@ -1175,14 +1181,14 @@ bool micros_ipc_runtime_run_self_test(void)
         ) != MICROS_IPC_OK
         || !hold_thread(objects, threads[IPC_TEST_SERVER])
         || micros_ipc_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
         || objects->threads[
             threads[IPC_TEST_CLIENT].slot
         ].ipc_reply_token != 0
-        || registry.endpoints[processes[IPC_TEST_CLIENT].slot]
+        || registry->endpoints[processes[IPC_TEST_CLIENT].slot]
             .pending_events[processes[IPC_TEST_SERVER].slot] != 0
         || !consume_staged(
             objects,
@@ -1222,19 +1228,19 @@ bool micros_ipc_runtime_run_self_test(void)
         || micros_user_address_space_create(replacement_process)
             != MICROS_USER_ADDRESS_SPACE_OK
         || micros_endpoint_reserve(
-            &registry,
+            registry,
             objects,
             replacement_process,
             &replacement_endpoint
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_install_profile(
-            &registry,
+            registry,
             objects,
             replacement_process,
             IPC_TEST_SERVER_PROFILE
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_activate(
-            &registry,
+            registry,
             objects,
             replacement_endpoint
         ) != MICROS_ENDPOINT_OK
@@ -1259,7 +1265,7 @@ bool micros_ipc_runtime_run_self_test(void)
     snapshot_state(objects);
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
@@ -1274,7 +1280,7 @@ bool micros_ipc_runtime_run_self_test(void)
     snapshot_state(objects);
     if (
         micros_ipc_send(
-            &registry,
+            registry,
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_PEER],
@@ -1288,17 +1294,17 @@ bool micros_ipc_runtime_run_self_test(void)
     if (
         !execution_state_matches(objects, processes, threads)
         || micros_ipc_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[IPC_TEST_CLIENT]
         ) != MICROS_IPC_OK
         || micros_ipc_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[IPC_TEST_PEER]
         ) != MICROS_IPC_OK
         || micros_ipc_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[IPC_TEST_SERVER]
         ) != MICROS_IPC_OK
@@ -1327,7 +1333,7 @@ bool micros_ipc_runtime_run_self_test(void)
         failure_stage = UINT64_C(0x1101);
         goto done;
     }
-    if (registry.last_reply_token < close_token) {
+    if (registry->last_reply_token < close_token) {
         failure_stage = UINT64_C(0x1102);
         goto done;
     }
@@ -1361,7 +1367,7 @@ bool micros_ipc_runtime_run_self_test(void)
         goto done;
     }
     if (
-        micros_endpoint_registry_validate_objects(&registry, objects)
+        micros_endpoint_registry_validate_objects(registry, objects)
             != MICROS_ENDPOINT_OK
     ) {
         failure_stage = UINT64_C(0x1107);
