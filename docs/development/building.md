@@ -56,6 +56,8 @@ The current implementation provides:
   profile initialization and shared endpoint/IPC component-test access;
 - native failure-atomic sender/receiver FIFO enqueue tests with canonical
   message ownership, token uniqueness, and ready-peer detection;
+- native reversible current-thread IPC guard tests covering trap-stack anchor
+  pivot, rollback, same-priority head restoration, and higher-priority wakeup;
 - native generation-safe staged inbound-message state validation for runnable
   receivers;
 - native failure-atomic matching dequeue and delivery commit tests covering

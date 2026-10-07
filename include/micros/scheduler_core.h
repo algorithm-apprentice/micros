@@ -31,6 +31,15 @@ struct micros_scheduler_return_plan {
     struct micros_thread_handle ready_next[MICROS_THREAD_CAPACITY];
 };
 
+struct micros_scheduler_current_ipc_guard {
+    bool active;
+    struct micros_hart_handle hart;
+    struct micros_thread_handle thread;
+    uint8_t priority;
+    uintptr_t thread_stack_bottom;
+    uintptr_t thread_stack_top;
+};
+
 enum micros_kernel_object_error micros_scheduler_core_validate(
     const struct micros_kernel_objects *objects
 );
@@ -88,6 +97,22 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
 enum micros_kernel_object_error micros_hart_commit_user_return(
     struct micros_kernel_objects *objects,
     const struct micros_scheduler_return_plan *plan
+);
+
+enum micros_kernel_object_error micros_scheduler_begin_current_ipc(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_scheduler_current_ipc_guard *guard
+);
+
+enum micros_kernel_object_error micros_scheduler_rollback_current_ipc(
+    struct micros_kernel_objects *objects,
+    struct micros_scheduler_current_ipc_guard *guard
+);
+
+enum micros_kernel_object_error micros_scheduler_commit_current_ipc(
+    struct micros_kernel_objects *objects,
+    struct micros_scheduler_current_ipc_guard *guard
 );
 
 enum micros_kernel_object_error micros_scheduler_accounting_initialize(

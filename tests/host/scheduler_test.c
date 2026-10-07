@@ -1054,6 +1054,8 @@ static bool test_corrupt_queue_state_is_rejected(void)
 
 bool micros_scheduler_model_test_run(void);
 
+bool micros_ipc_current_guard_test_run(void);
+
 int main(void)
 {
     static const struct {
@@ -1099,6 +1101,10 @@ int main(void)
         {
             "seeded two-hart model",
             micros_scheduler_model_test_run,
+        },
+        {
+            "current IPC scheduler guard",
+            micros_ipc_current_guard_test_run,
         },
     };
     size_t index;
