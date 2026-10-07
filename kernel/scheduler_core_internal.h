@@ -20,4 +20,10 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
     uint32_t second_clear_flag
 );
 
+enum micros_kernel_object_error micros_scheduler_commit_ipc_call_delivery(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle caller,
+    struct micros_thread_handle receiver
+);
+
 #endif

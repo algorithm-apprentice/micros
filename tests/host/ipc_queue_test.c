@@ -172,6 +172,7 @@ static void construct_valid_queues(void)
     struct micros_endpoint_record *receiver_queue =
         &registry.endpoints[processes[3].slot];
 
+    registry.last_reply_token = 102;
     first_sender->runtime_flags =
         MICROS_THREAD_RTS_IPC_SEND
         | MICROS_THREAD_RTS_IPC_REPLY;
@@ -219,6 +220,19 @@ static bool test_valid_queue_topology(void)
 
     EXPECT_TRUE(setup_queue_fixture());
     construct_valid_queues();
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    EXPECT_TRUE(
+        micros_thread_scheduler_hold(
+            &objects,
+            threads[0]
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
     EXPECT_ENDPOINT_ERROR(
         MICROS_ENDPOINT_OK,
         micros_endpoint_registry_validate_objects(
@@ -483,10 +497,13 @@ static bool test_staged_delivery_state(void)
         objects.threads[threads[0].slot].ipc_receive_buffer += 4
     );
     EXPECT_STAGED_CORRUPTION(
-        (void)micros_thread_scheduler_hold(
-            &objects,
-            threads[0]
-        )
+        registry.last_reply_token = 1;
+        objects.threads[threads[0].slot]
+            .ipc_inbound_message.reply_token = 1
+    );
+    EXPECT_STAGED_CORRUPTION(
+        objects.threads[threads[0].slot].runtime_flags |=
+            MICROS_THREAD_RTS_IPC_RECEIVE
     );
 
 #undef EXPECT_STAGED_CORRUPTION

@@ -550,14 +550,26 @@ enum micros_ipc_error micros_ipc_receive(
         : error;
 }
 
-enum micros_ipc_error micros_ipc_sender_enqueue(
+static enum micros_ipc_error sender_commit_delivery(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
     struct micros_thread_handle sender_handle,
     micros_endpoint_t destination_endpoint,
     const struct micros_ipc_message *message,
     uint64_t reply_token,
-    uintptr_t reply_buffer
+    uintptr_t reply_buffer,
+    struct micros_thread_handle *matched_receiver
+);
+
+static enum micros_ipc_error sender_enqueue(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender_handle,
+    micros_endpoint_t destination_endpoint,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer,
+    bool allocates_reply_token
 )
 {
     const struct micros_endpoint_record *resolved_destination;
@@ -612,6 +624,16 @@ enum micros_ipc_error micros_ipc_sender_enqueue(
     ) {
         return MICROS_IPC_ERROR_STATE;
     }
+    if (
+        reply_token != 0
+        && (
+            !allocates_reply_token
+            || registry->last_reply_token == UINT64_MAX
+            || reply_token != registry->last_reply_token + 1
+        )
+    ) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
+    }
     if (!reply_token_is_available(objects, reply_token)) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
@@ -660,6 +682,28 @@ enum micros_ipc_error micros_ipc_sender_enqueue(
         &destination->sender_tail
     );
     return MICROS_IPC_OK;
+}
+
+enum micros_ipc_error micros_ipc_sender_enqueue(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender_handle,
+    micros_endpoint_t destination_endpoint,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer
+)
+{
+    return sender_enqueue(
+        registry,
+        objects,
+        sender_handle,
+        destination_endpoint,
+        message,
+        reply_token,
+        reply_buffer,
+        false
+    );
 }
 
 enum micros_ipc_error micros_ipc_receiver_commit_delivery(
@@ -759,12 +803,14 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
     return MICROS_IPC_OK;
 }
 
-enum micros_ipc_error micros_ipc_sender_commit_delivery(
+static enum micros_ipc_error sender_commit_delivery(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
     struct micros_thread_handle sender_handle,
     micros_endpoint_t destination_endpoint,
     const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer,
     struct micros_thread_handle *matched_receiver
 )
 {
@@ -790,6 +836,14 @@ enum micros_ipc_error micros_ipc_sender_commit_delivery(
             message->type
             & MICROS_IPC_TYPE_KERNEL_MASK
         ) != 0
+        || (
+            reply_token == 0
+                ? reply_buffer != 0
+                : (
+                    reply_buffer == 0
+                    || reply_buffer % 8 != 0
+                )
+        )
     ) {
         return MICROS_IPC_ERROR_ARGUMENT;
     }
@@ -818,6 +872,18 @@ enum micros_ipc_error micros_ipc_sender_commit_delivery(
     ) {
         return MICROS_IPC_ERROR_STATE;
     }
+    if (
+        reply_token != 0
+        && (
+            registry->last_reply_token == UINT64_MAX
+            || reply_token != registry->last_reply_token + 1
+        )
+    ) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
+    }
+    if (!reply_token_is_available(objects, reply_token)) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
+    }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
     if (
@@ -832,7 +898,12 @@ enum micros_ipc_error micros_ipc_sender_commit_delivery(
     ) {
         return MICROS_IPC_ERROR_NOT_READY;
     }
-    if (receiver->runtime_flags != MICROS_THREAD_RTS_IPC_RECEIVE) {
+    if (
+        (
+            receiver->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) != MICROS_THREAD_RTS_IPC_RECEIVE
+    ) {
         return MICROS_IPC_ERROR_STATE;
     }
     receive_buffer = receiver->ipc_receive_buffer;
@@ -840,15 +911,22 @@ enum micros_ipc_error micros_ipc_sender_commit_delivery(
         &staged_message,
         message,
         source->value,
-        0
+        reply_token
     );
-    scheduler_error = micros_scheduler_commit_ipc_wake_pair(
-        objects,
-        sender_handle,
-        MICROS_THREAD_RTS_INACTIVE,
-        receiver_handle,
-        MICROS_THREAD_RTS_IPC_RECEIVE
-    );
+    scheduler_error =
+        reply_token == 0
+            ? micros_scheduler_commit_ipc_wake_pair(
+                objects,
+                sender_handle,
+                MICROS_THREAD_RTS_INACTIVE,
+                receiver_handle,
+                MICROS_THREAD_RTS_IPC_RECEIVE
+            )
+            : micros_scheduler_commit_ipc_call_delivery(
+                objects,
+                sender_handle,
+                receiver_handle
+            );
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
         return scheduler_error_to_ipc(scheduler_error);
     }
@@ -865,8 +943,131 @@ enum micros_ipc_error micros_ipc_sender_commit_delivery(
     receiver->ipc_next.generation = 0;
     receiver->ipc_receive_source = 0;
     stage_delivery(receiver, receive_buffer, &staged_message);
+    if (reply_token != 0) {
+        sender->ipc_receive_buffer = reply_buffer;
+        sender->ipc_reply_token = reply_token;
+        sender->ipc_reply_callee = destination_endpoint;
+    }
     *matched_receiver = receiver_handle;
     return MICROS_IPC_OK;
+}
+
+enum micros_ipc_error micros_ipc_sender_commit_delivery(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender_handle,
+    micros_endpoint_t destination_endpoint,
+    const struct micros_ipc_message *message,
+    struct micros_thread_handle *matched_receiver
+)
+{
+    return sender_commit_delivery(
+        registry,
+        objects,
+        sender_handle,
+        destination_endpoint,
+        message,
+        0,
+        0,
+        matched_receiver
+    );
+}
+
+enum micros_ipc_error micros_ipc_call(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle caller_handle,
+    micros_endpoint_t destination_endpoint,
+    struct micros_ipc_message *message
+)
+{
+    struct micros_thread_handle matched_receiver = {0, 0};
+    struct micros_ipc_message snapshot;
+    micros_endpoint_t source_endpoint;
+    uint64_t reply_token;
+    enum micros_endpoint_error endpoint_error;
+    enum micros_ipc_error error;
+
+    if (
+        registry == NULL
+        || objects == NULL
+        || message == NULL
+        || (uintptr_t)message % _Alignof(struct micros_ipc_message)
+            != 0
+        || (
+            message->type
+            & MICROS_IPC_TYPE_KERNEL_MASK
+        ) != 0
+    ) {
+        return MICROS_IPC_ERROR_ARGUMENT;
+    }
+    endpoint_error =
+        micros_endpoint_registry_validate_objects(registry, objects);
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error_to_ipc(endpoint_error);
+    }
+    error = resolve_operation_thread(
+        objects,
+        caller_handle,
+        &source_endpoint
+    );
+    if (error != MICROS_IPC_OK) {
+        return error;
+    }
+    endpoint_error = micros_endpoint_authorize_target(
+        registry,
+        objects,
+        source_endpoint,
+        MICROS_PRIVILEGE_OPERATION_CALL,
+        destination_endpoint
+    );
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error_to_ipc(endpoint_error);
+    }
+    if (registry->last_reply_token == UINT64_MAX) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED;
+    }
+    reply_token = registry->last_reply_token + 1;
+    canonicalize_message(
+        &snapshot,
+        message,
+        source_endpoint,
+        reply_token
+    );
+    error = sender_commit_delivery(
+        registry,
+        objects,
+        caller_handle,
+        destination_endpoint,
+        &snapshot,
+        reply_token,
+        (uintptr_t)message,
+        &matched_receiver
+    );
+    if (error == MICROS_IPC_OK) {
+        registry->last_reply_token = reply_token;
+        return MICROS_IPC_OK;
+    }
+    if (error != MICROS_IPC_ERROR_NOT_READY) {
+        return error;
+    }
+    error = sender_enqueue(
+        registry,
+        objects,
+        caller_handle,
+        destination_endpoint,
+        &snapshot,
+        reply_token,
+        (uintptr_t)message,
+        true
+    );
+    if (error == MICROS_IPC_OK) {
+        registry->last_reply_token = reply_token;
+        return MICROS_IPC_OK;
+    }
+    return error == MICROS_IPC_ERROR_NOT_READY
+        ? MICROS_IPC_ERROR_INVARIANT
+        : error;
 }
 
 enum micros_ipc_error micros_ipc_receiver_enqueue(

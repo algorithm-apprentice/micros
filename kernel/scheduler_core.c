@@ -373,12 +373,14 @@ static bool ipc_wake_clear_flag_is_valid(uint32_t flag)
     );
 }
 
-enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
+static enum micros_kernel_object_error commit_ipc_transition_pair(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle first_thread_handle,
     uint32_t first_clear_flag,
+    uint32_t first_set_flags,
     struct micros_thread_handle second_thread_handle,
-    uint32_t second_clear_flag
+    uint32_t second_clear_flag,
+    uint32_t second_set_flags
 )
 {
     struct {
@@ -386,6 +388,7 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
         struct micros_thread *thread;
         struct micros_hart *hart;
         uint32_t clear_flag;
+        uint32_t set_flags;
         uint32_t resulting_flags;
     } transitions[2];
     enum micros_kernel_object_error error;
@@ -395,6 +398,16 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
         objects == NULL
         || !ipc_wake_clear_flag_is_valid(first_clear_flag)
         || !ipc_wake_clear_flag_is_valid(second_clear_flag)
+        || (
+            first_set_flags
+            & ~MICROS_THREAD_RTS_IPC_REPLY
+        ) != 0
+        || (
+            second_set_flags
+            & ~MICROS_THREAD_RTS_IPC_REPLY
+        ) != 0
+        || (first_clear_flag & first_set_flags) != 0
+        || (second_clear_flag & second_set_flags) != 0
         || thread_handles_equal(
             first_thread_handle,
             second_thread_handle
@@ -408,8 +421,10 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
     }
     transitions[0].handle = first_thread_handle;
     transitions[0].clear_flag = first_clear_flag;
+    transitions[0].set_flags = first_set_flags;
     transitions[1].handle = second_thread_handle;
     transitions[1].clear_flag = second_clear_flag;
+    transitions[1].set_flags = second_set_flags;
     for (index = 0; index < 2; ++index) {
         error = resolve_thread_mutable(
             objects,
@@ -425,12 +440,19 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
                 transitions[index].thread->runtime_flags
                 & transitions[index].clear_flag
             ) == 0
+            || (
+                transitions[index].thread->runtime_flags
+                & transitions[index].set_flags
+            ) != 0
         ) {
             return MICROS_KERNEL_OBJECT_ERROR_STATE;
         }
         transitions[index].resulting_flags =
-            transitions[index].thread->runtime_flags
-            & ~transitions[index].clear_flag;
+            (
+                transitions[index].thread->runtime_flags
+                & ~transitions[index].clear_flag
+            )
+            | transitions[index].set_flags;
         transitions[index].hart = NULL;
         if (transitions[index].resulting_flags != 0) {
             continue;
@@ -469,6 +491,42 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
         }
     }
     return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle first_thread_handle,
+    uint32_t first_clear_flag,
+    struct micros_thread_handle second_thread_handle,
+    uint32_t second_clear_flag
+)
+{
+    return commit_ipc_transition_pair(
+        objects,
+        first_thread_handle,
+        first_clear_flag,
+        0,
+        second_thread_handle,
+        second_clear_flag,
+        0
+    );
+}
+
+enum micros_kernel_object_error micros_scheduler_commit_ipc_call_delivery(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle caller,
+    struct micros_thread_handle receiver
+)
+{
+    return commit_ipc_transition_pair(
+        objects,
+        caller,
+        MICROS_THREAD_RTS_INACTIVE,
+        MICROS_THREAD_RTS_IPC_REPLY,
+        receiver,
+        MICROS_THREAD_RTS_IPC_RECEIVE,
+        0
+    );
 }
 
 static bool add_overflows(uint64_t left, uint64_t right)

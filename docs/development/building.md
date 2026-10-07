@@ -61,6 +61,11 @@ The current implementation provides:
   endpoints, operation and target-profile policy, canonical message snapshots,
   immediate matching before blocking, specific/`ANY` FIFO behavior,
   scheduler-held caller transitions, and byte-exact failure preservation;
+- native authorized call tests covering monotonic nonzero reply-token
+  allocation, low-level reuse rejection, exhaustion preflight, exact staged
+  caller/source/callee binding, independent receiver blocking flags, immediate
+  and queued request delivery, reply-only wait, retained reply buffers, and
+  complete failure atomicity;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -74,9 +79,13 @@ staging, exact FIFO unlink, queued-call reply-wait retention, and scheduler
 wakeup atomically for incoming held senders and receivers. Portable ordinary
 send and receive now authorize exact active endpoints and profile policy,
 snapshot canonical messages, match before blocking, and preserve specific or
-`ANY` FIFO order. They consume scheduler-held non-current callers; the target
-current-thread adapter, deadlock detection, call/reply, notifications,
-endpoint cancellation, and the syscall ABI remain separate later slices.
+`ANY` FIFO order. Portable call now allocates nonreused reply tokens from fixed
+kernel state, delivers the canonical token immediately or through the sender
+queue, and leaves the exact caller in reply-only wait with its reply buffer
+retained. These operations consume scheduler-held non-current callers; reply
+consumption, `reply_receive`, notifications, deadlock detection, endpoint
+cancellation, the target current-thread adapter, and the syscall ABI remain
+separate later slices.
 
 ## Prerequisites
 

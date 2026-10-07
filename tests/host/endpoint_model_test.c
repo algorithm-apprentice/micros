@@ -330,12 +330,13 @@ static bool validate_model(
     if (
         micros_endpoint_registry_validate_objects(&registry, &objects)
             != MICROS_ENDPOINT_OK
+        || registry.last_reply_token != 0
     ) {
         return model_fail(
             step,
             operation,
             value,
-            "combined validation failed"
+            "combined validation or token state failed"
         );
     }
     for (index = 0; index < MODEL_SLOT_COUNT; ++index) {

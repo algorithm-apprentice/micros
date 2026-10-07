@@ -127,6 +127,13 @@ resolution, receive/send operation and target-profile enforcement, one
 canonical message snapshot, immediate matching before blocked enqueue,
 specific and `ANY` FIFO selection, explicit scheduler-held non-current caller
 requirements, and complete state preservation on every rejected transition.
+Authorized call tests additionally prove fixed-state monotonic nonzero token
+allocation, low-level mint/reuse rejection, no wrap at exhaustion, exact
+live-caller/source/callee binding for staged nonzero tokens, rejection of
+queued token bindings, preservation of independent receiver run-time flags,
+canonical token delivery through immediate and queued paths, reply-only wait,
+retained reply buffers, and byte-exact failure preservation including
+scheduler-transition rejection.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
