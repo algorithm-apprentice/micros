@@ -24,7 +24,8 @@ real no-runnable idle transition and timer wake. Endpoint privileges and
 generation-safe lifecycle gates are complete. The fixed message ABI and
 dormant IPC state are present, and sender/receiver queue topology is validated.
 Failure-atomic held-thread enqueue is implemented. Matching dequeue, message
-staging, and wakeup are the next dependency-ready mechanisms.
+staging state, and wakeup invariants are defined; their atomic commit is the
+next dependency-ready mechanism.
 
 ## v0.1 completion goal
 

@@ -233,6 +233,22 @@ static bool test_valid_queue_topology(void)
         micros_endpoint_close(
             &registry,
             &objects,
+            endpoints[1]
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_ERROR_STATE,
+        micros_endpoint_close(
+            &registry,
+            &objects,
             endpoints[2]
         )
     );
@@ -407,11 +423,82 @@ static bool test_close_rejects_foreign_waiter(void)
     return true;
 }
 
+static bool test_staged_delivery_state(void)
+{
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_thread *delivered;
+
+    EXPECT_TRUE(setup_queue_fixture());
+    EXPECT_TRUE(
+        micros_thread_runtime_flags_unset(
+            &objects,
+            threads[0],
+            MICROS_THREAD_RTS_INACTIVE
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
+    delivered = &objects.threads[threads[0].slot];
+    delivered->ipc_receive_buffer = UINT64_C(0x40006000);
+    delivered->ipc_delivery_pending = true;
+    delivered->ipc_inbound_message.source = endpoints[1];
+    delivered->ipc_inbound_message.type = 60;
+    delivered->ipc_inbound_message.payload[0] = 6;
+    EXPECT_ENDPOINT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+
+#define EXPECT_STAGED_CORRUPTION(statement) \
+    do { \
+        registry = registry_snapshot; \
+        objects = objects_snapshot; \
+        statement; \
+        EXPECT_ENDPOINT_ERROR( \
+            MICROS_ENDPOINT_ERROR_INVARIANT, \
+            micros_endpoint_registry_validate_objects( \
+                &registry, \
+                &objects \
+            ) \
+        ); \
+    } while (false)
+
+    EXPECT_STAGED_CORRUPTION(
+        objects.threads[threads[0].slot]
+            .ipc_inbound_message.type |= MICROS_IPC_TYPE_KERNEL_MASK
+    );
+    EXPECT_STAGED_CORRUPTION(
+        objects.threads[threads[0].slot]
+            .ipc_inbound_message.source +=
+                UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS
+    );
+    EXPECT_STAGED_CORRUPTION(
+        objects.threads[threads[0].slot].ipc_delivery_pending = false
+    );
+    EXPECT_STAGED_CORRUPTION(
+        objects.threads[threads[0].slot].ipc_receive_buffer += 4
+    );
+    EXPECT_STAGED_CORRUPTION(
+        (void)micros_thread_scheduler_hold(
+            &objects,
+            threads[0]
+        )
+    );
+
+#undef EXPECT_STAGED_CORRUPTION
+    return true;
+}
+
 bool micros_ipc_queue_test_run(void)
 {
     return (
         test_valid_queue_topology()
         && test_queue_validator_rejects_corruption()
         && test_close_rejects_foreign_waiter()
+        && test_staged_delivery_state()
     );
 }
