@@ -56,3 +56,4 @@ to make the project appear more consistent than it was.
 | [0038](0038-kernel-managed-direct-grant-registry.md) | Kernel-managed direct grant registry | Accepted |
 | [0039](0039-page-bounded-checked-grant-copy.md) | Page-bounded checked grant copy | Accepted |
 | [0040](0040-post-handoff-wired-address-space-resolution.md) | Post-handoff wired address-space resolution | Accepted |
+| [0041](0041-unified-risc-v-grant-syscalls.md) | Unified RISC-V grant syscalls | Accepted |

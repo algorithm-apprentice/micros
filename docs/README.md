@@ -32,6 +32,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
   traces safe-copy mapping authority after VM startup and derives the
   wired-only `micros` handoff replacement.
+- [MINIX user grant and safe-copy syscall study](research/minix-user-grant-syscall-boundary.md)
+  traces direct IPC traps, user-managed grant publication, safe-copy kernel
+  calls, and the required unified `micros` register ABI.
 
 ## Planning and verification
 
