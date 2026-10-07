@@ -128,6 +128,15 @@ three-address-space QEMU grant gate. This implementation is
 bootstrap-phase-only; post-handoff service use requires a later reviewed
 mapping-authority replacement. The user syscall/runtime ABI remains outside
 this outcome.
+ADR-0040 defines that replacement for the statically embedded service set:
+every live bootstrap leaf must be staged `VM_WIRED` before ownership commit,
+and read-only root validation, lookup, translation, and activation then use
+exact wired process-generation ownership. Transferable-frame mapping, VM fault
+delivery, and mutation remain later VM work. Its implementation must merge
+before the freestanding user-service runtime exposes checked copy. Generic
+execution-context preparation remains bootstrap-only; all live threads are
+already prepared at handoff, and PM's later tokenized preparation transition
+is the only post-handoff replacement.
 
 ## v0.1 completion goal
 
@@ -214,6 +223,7 @@ model, IPC reply model, or global current-execution representation.
 - blocking send, receive, call, reply/receive, and notification;
 - deadlock-chain detection;
 - direct grants and safe-copy operations;
+- wired post-handoff address resolution for initial services;
 - freestanding user-service runtime.
 
 ### Exit criteria
@@ -222,6 +232,8 @@ model, IPC reply model, or global current-execution representation.
 - every blocking transition has a tested wakeup path;
 - deadlock tests terminate deterministically;
 - grant direction, bounds, overflow, endpoint, and lifetime checks pass;
+- wired service roots retain activation, IPC-buffer, and checked-copy access
+  after the irreversible ownership handoff;
 - no protocol relies on raw pointers crossing an address space.
 
 ## Milestone 4: bootstrap and memory service

@@ -315,6 +315,19 @@ and chunk-pairing tests, grant-model copy transitions, and a dedicated
 directions, byte-exact failure atomicity, stale authority rejection, and
 complete cleanup. The marker explicitly identifies bootstrap phase; no
 post-handoff copy claim is valid before a separate mapping-authority design.
+ADR-0040 defines the required next evidence without claiming that its workflow
+exists yet. Its implementation adds one isolated wired-handoff QEMU component
+that first rejects a reachable leaf planned `VM_TRANSFERABLE` without
+mutation, then commits every live service leaf to exact `VM_WIRED` ownership.
+After the irreversible transition it must prove root validation and activation,
+IPC-buffer snapshot/write, and page-local/cross-page checked copy, while
+bootstrap mapping mutation remains phase-rejected. Foreign wired ownership,
+transferable live leaves, malformed PTEs, absent mappings, and permission
+failures must preserve all affected bytes and prevalidated state. An absent
+target combined with unrelated structural corruption must report the
+structural failure first. Generic execution-context preparation must return
+`PHASE` without changing its thread, saved context, or kernel stack, while an
+already prepared thread still returns through the common scheduler path.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered

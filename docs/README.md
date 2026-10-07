@@ -29,6 +29,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX direct grant and safe-copy study](research/minix-direct-grants-and-safecopy.md)
   traces grant identity, table authority, direction and bounds checks, fault
   behavior, revocation, and checked cross-address-space copy.
+- [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
+  traces safe-copy mapping authority after VM startup and derives the
+  wired-only `micros` handoff replacement.
 
 ## Planning and verification
 
