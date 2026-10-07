@@ -60,6 +60,12 @@ enum micros_ipc_error micros_ipc_receive(
     uintptr_t receive_buffer
 );
 
+enum micros_ipc_error micros_ipc_endpoint_close(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+);
+
 enum micros_ipc_error micros_ipc_sender_enqueue(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
