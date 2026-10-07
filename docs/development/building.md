@@ -247,6 +247,19 @@ The complete native milestone gate remains:
 cmake --workflow --preset test-unit
 ```
 
+Generate a changed-path plan with:
+
+```bash
+python3 tools/validation_plan.py --tier fast
+python3 tools/validation_plan.py --tier pr
+```
+
+Add `--execute` to run the commands. Unknown target paths and shared QEMU
+infrastructure fail closed to complete `test-unit` and the complete QEMU
+matrix. The PR tier always runs complete `test-unit`; fast is an iteration
+tier. Explicit paths are unioned with repository changes, and execution
+requires every untracked file to be staged first.
+
 The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
 and kernel-object implementations with warnings as errors, ASan, and UBSan.
