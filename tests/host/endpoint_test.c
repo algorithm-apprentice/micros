@@ -1057,6 +1057,7 @@ static bool test_relationship_validator_rejects_corruption(void)
 }
 
 bool micros_endpoint_model_test_run(void);
+bool micros_ipc_delivery_test_run(void);
 bool micros_ipc_queue_test_run(void);
 bool micros_ipc_queue_mutation_test_run(void);
 bool micros_ipc_state_test_run(void);
@@ -1118,6 +1119,10 @@ int main(void)
         {
             "IPC sender and receiver enqueue",
             micros_ipc_queue_mutation_test_run,
+        },
+        {
+            "IPC matching delivery commit",
+            micros_ipc_delivery_test_run,
         },
     };
     size_t index;

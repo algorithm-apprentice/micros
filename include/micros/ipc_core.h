@@ -23,4 +23,22 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
     uintptr_t receive_buffer
 );
 
+enum micros_ipc_error micros_ipc_receiver_commit_delivery(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle receiver,
+    micros_endpoint_t source,
+    uintptr_t receive_buffer,
+    struct micros_thread_handle *matched_sender
+);
+
+enum micros_ipc_error micros_ipc_sender_commit_delivery(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender,
+    micros_endpoint_t destination,
+    const struct micros_ipc_message *message,
+    struct micros_thread_handle *matched_receiver
+);
+
 #endif
