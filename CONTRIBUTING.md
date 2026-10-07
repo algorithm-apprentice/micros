@@ -97,16 +97,19 @@ artifact is needed.
 
 Use the repository pull request template. A pull request must identify:
 
+- design or implementation phase;
 - task and dependency position;
 - goal, scope, and non-goals;
 - relevant ADRs;
-- test-first evidence;
+- design-readiness evidence for a design PR;
+- the merged design reference and test-first evidence for an implementation
+  PR;
 - exact verification commands;
 - independent review outcome;
 - effects on documented extension boundaries.
 
 After an independent review, apply only findings that are technically
-justified. Keep meaningful green commits on the pull-request branch for
-review, then squash-merge the accepted task into one outcome commit on
-`main`. Merge when no substantive issue remains and all required checks pass.
-Then begin the next dependency-ready task.
+justified. A design PR is merged before its dependent implementation branch is
+created. Keep meaningful green commits on an implementation branch for review,
+then squash-merge the accepted task into one outcome commit on `main`. Merge
+when no substantive issue remains and all phase-appropriate checks pass.
