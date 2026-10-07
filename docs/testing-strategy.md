@@ -74,6 +74,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
+`test-qemu-grant`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
@@ -96,6 +97,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
+cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -260,7 +262,12 @@ active visibility, immutable profile installation, asymmetric
 call/send/notify authorization, bound-process release rejection, stale
 endpoint rejection after generation advance, failed runtime-initialization
 preservation, and complete baseline restoration through the authoritative
-target registry. `test-qemu-ipc` uses that same target registry with three
+target registry. `test-qemu-grant` creates three exact address spaces and
+proves bootstrap-phase checked copy in both directions across local and
+cross-page ranges, byte/canary preservation on every failure, stale authority
+rejection, revoke/cancel behavior, generation reuse, and complete
+grant/endpoint/root/frame/object cleanup. `test-qemu-ipc` uses that same target
+registry with three
 exact production process generations,
 three distinct generation-bound Sv39 roots, saved integer contexts, complete
 thread-owned kernel-stack patterns, scheduler state, and trusted kernel-owned

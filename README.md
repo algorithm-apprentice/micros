@@ -107,6 +107,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
+cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -132,7 +133,10 @@ generation-safe reuse, stale-handle rejection, the checked one-thread policy,
 and hart-local current-thread state. The endpoint gate proves generation-safe
 resolution, staged publication, immutable profiles, asymmetric authorization,
 generation-safe direct-grant lifecycle, and complete teardown back to the
-object baseline. The IPC gate uses trusted
+object baseline. The grant gate uses three exact address spaces to prove
+page-local and cross-page checked copy in both directions, failure-atomic
+mapping/permission denial, stale authority rejection, and complete cleanup.
+The IPC gate uses trusted
 kernel-owned messages before the syscall ABI exists and proves immediate and
 blocked send/receive, tokenized call/reply, atomic `reply_receive`,
 notification coalescing and reply-wait exclusion, deadlock rejection, close

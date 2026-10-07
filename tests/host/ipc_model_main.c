@@ -26,7 +26,7 @@ int main(void)
             micros_ipc_close_model_test_run,
         },
         {
-            "direct grant registry model",
+            "direct grant and checked copy model",
             micros_grant_model_test_run,
         },
         {

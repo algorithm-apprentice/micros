@@ -1,4 +1,5 @@
 #include "micros/grant.h"
+#include "micros/grant_copy.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -813,5 +814,124 @@ enum micros_grant_error micros_grant_commit_endpoint_cancel(
         }
     }
     registry->active_count -= selected_count;
+    return MICROS_GRANT_OK;
+}
+
+enum micros_grant_error micros_grant_prepare_copy_authority(
+    const struct micros_grant_registry *grant_registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle grantee,
+    micros_endpoint_t grantor_endpoint,
+    micros_grant_t grant,
+    size_t grant_offset,
+    size_t length,
+    uint32_t required_permission,
+    struct micros_grant_copy_authority *authority
+)
+{
+    const struct micros_process *grantee_process;
+    const struct micros_endpoint_record *grantee_record;
+    const struct micros_endpoint_record *grantor_record;
+    const struct micros_grant_record *record;
+    size_t slot;
+    uint32_t generation;
+    enum micros_grant_error error;
+
+    if (
+        grant_registry == NULL
+        || endpoint_registry == NULL
+        || objects == NULL
+        || authority == NULL
+        || (
+            required_permission != MICROS_GRANT_PERMISSION_READ
+            && required_permission != MICROS_GRANT_PERMISSION_WRITE
+        )
+        || grantor_endpoint == MICROS_ENDPOINT_NONE
+        || grantor_endpoint == MICROS_ENDPOINT_ANY
+    ) {
+        return MICROS_GRANT_ERROR_ARGUMENT;
+    }
+    if (
+        length > MICROS_GRANT_COPY_MAX
+        || SIZE_MAX - grant_offset < length
+    ) {
+        return MICROS_GRANT_ERROR_RANGE;
+    }
+    error = micros_grant_unpack(grant, &slot, &generation);
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    error = micros_grant_registry_validate(
+        grant_registry,
+        endpoint_registry,
+        objects
+    );
+    if (error != MICROS_GRANT_OK) {
+        return error == MICROS_GRANT_ERROR_NOT_INITIALIZED
+            ? MICROS_GRANT_ERROR_INVARIANT
+            : error;
+    }
+    error = resolve_active_process_endpoint(
+        endpoint_registry,
+        objects,
+        grantee,
+        MICROS_GRANT_ERROR_DEAD_ENDPOINT,
+        &grantee_process,
+        &grantee_record
+    );
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    record = &grant_registry->grants[slot];
+    if (
+        record->state != MICROS_GRANT_SLOT_ACTIVE
+        || record->generation != generation
+    ) {
+        return MICROS_GRANT_ERROR_STALE_GRANT;
+    }
+    if (record->grantee_endpoint != grantee_process->primary_endpoint) {
+        return MICROS_GRANT_ERROR_UNAUTHORIZED;
+    }
+    error = map_endpoint_error(
+        micros_endpoint_resolve_active(
+            endpoint_registry,
+            objects,
+            grantor_endpoint,
+            &grantor_record
+        )
+    );
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    if (
+        record->grantor_endpoint != grantor_record->value
+        || !process_handles_equal(
+            record->grantor,
+            grantor_record->owner
+        )
+    ) {
+        return MICROS_GRANT_ERROR_UNAUTHORIZED;
+    }
+    if (
+        (record->permissions & required_permission)
+            != required_permission
+    ) {
+        return MICROS_GRANT_ERROR_UNAUTHORIZED;
+    }
+    if (grant_offset + length > record->length) {
+        return MICROS_GRANT_ERROR_RANGE;
+    }
+    if (UINTPTR_MAX - record->base < grant_offset) {
+        return MICROS_GRANT_ERROR_RANGE;
+    }
+    *authority = (struct micros_grant_copy_authority){
+        .grantor = record->grantor,
+        .grantee = grantee,
+        .remote_address = record->base + grant_offset,
+        .length = length,
+        .required_permission = required_permission,
+    };
+    (void)grantee_record;
     return MICROS_GRANT_OK;
 }

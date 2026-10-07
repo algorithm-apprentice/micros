@@ -99,6 +99,15 @@
       }
     },
     {
+      "name": "riscv64-grant-test",
+      "displayName": "RISC-V 64 checked direct-grant copy test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-grant-test",
+      "cacheVariables": {
+        "MICROS_BUILD_GRANT_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-ipc-test",
       "displayName": "RISC-V 64 blocking IPC acceptance test",
       "inherits": "riscv64-debug",
@@ -285,6 +294,13 @@
       "configurePreset": "riscv64-endpoint-test",
       "targets": [
         "test-qemu-endpoint"
+      ]
+    },
+    {
+      "name": "test-qemu-grant",
+      "configurePreset": "riscv64-grant-test",
+      "targets": [
+        "test-qemu-grant"
       ]
     },
     {
@@ -545,6 +561,20 @@
         {
           "type": "build",
           "name": "test-qemu-endpoint"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-grant",
+      "displayName": "Build and run the checked direct-grant copy test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-grant-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-grant"
         }
       ]
     },

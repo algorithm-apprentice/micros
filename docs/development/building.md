@@ -725,6 +725,33 @@ sequence emits:
 MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate grants=generation-safe
 ```
 
+## Checked direct-grant copy test
+
+Build and run the bootstrap-phase checked-copy component with:
+
+```bash
+cmake --workflow --preset test-qemu-grant
+```
+
+The image creates three exact process, endpoint, and Sv39 generations. It maps
+distinct resident pages, creates read and write grants through the
+authoritative grant runtime, and proves page-local plus cross-page
+`copy_from`/`copy_to` with unchanged canaries. Wrong participants, direction,
+stale token and endpoint, overflow, bounds, size, mapping, and permission
+failures preserve all bytes and authority state. Revoke and
+prepare-close-commit cancellation remove authority, generation reuse does not
+resurrect it, and teardown restores frame, root, endpoint, grant, and object
+baselines.
+
+Only that complete sequence emits:
+
+```text
+MICROS_GRANT_TEST_PASS identity=generation-safe directions=checked bounds=validated copies=atomic phase=bootstrap cleanup=complete
+```
+
+The phase field is intentional: post-handoff service copy remains blocked on a
+separate mapping-authority design.
+
 ## Blocking IPC acceptance test
 
 Build and run the isolated pre-syscall IPC component with:

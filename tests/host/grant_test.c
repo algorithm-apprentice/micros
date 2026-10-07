@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "micros/grant_copy.h"
 #include "micros/ipc_core.h"
 #include "micros/scheduler_core.h"
 #include "micros/user_address_space.h"
@@ -17,6 +18,11 @@ enum {
 
 enum grant_model_operation {
     GRANT_MODEL_CREATE = 0,
+    GRANT_MODEL_AUTHORIZE_FROM,
+    GRANT_MODEL_AUTHORIZE_TO,
+    GRANT_MODEL_AUTHORIZE_DENIAL,
+    GRANT_MODEL_AUTHORIZE_STALE,
+    GRANT_MODEL_AUTHORIZE_BOUNDS,
     GRANT_MODEL_REVOKE,
     GRANT_MODEL_INSPECT,
     GRANT_MODEL_CANCEL,
@@ -33,6 +39,9 @@ struct grant_model_trace_entry {
     size_t grantor;
     size_t grantee;
     micros_grant_t grant;
+    size_t offset;
+    size_t length;
+    uint32_t permission;
     enum micros_grant_error result;
 };
 
@@ -1071,6 +1080,11 @@ static const char *model_operation_name(
 {
     static const char *const names[GRANT_MODEL_OPERATION_COUNT] = {
         "create",
+        "authorize-from",
+        "authorize-to",
+        "authorize-denial",
+        "authorize-stale",
+        "authorize-bounds",
         "revoke",
         "inspect",
         "cancel",
@@ -1091,6 +1105,9 @@ static void record_model_trace(
     size_t grantor,
     size_t grantee,
     micros_grant_t grant,
+    size_t offset,
+    size_t length,
+    uint32_t permission,
     enum micros_grant_error result
 )
 {
@@ -1102,6 +1119,9 @@ static void record_model_trace(
         .grantor = grantor,
         .grantee = grantee,
         .grant = grant,
+        .offset = offset,
+        .length = length,
+        .permission = permission,
         .result = result,
     };
     ++model_trace_count;
@@ -1131,12 +1151,16 @@ static bool model_fail(size_t step, const char *reason)
         fprintf(
             stderr,
             "  step=%zu op=%s grantor=%zu grantee=%zu "
-            "grant=0x%08x result=%d\n",
+            "grant=0x%08x offset=%zu length=%zu permission=0x%x "
+            "result=%d\n",
             entry->step,
             model_operation_name(entry->operation),
             entry->grantor,
             entry->grantee,
             entry->grant,
+            entry->offset,
+            entry->length,
+            entry->permission,
             (int)entry->result
         );
     }
@@ -1320,8 +1344,13 @@ static bool test_grant_model(void)
 {
     const uint32_t seed = UINT32_C(0x38a110c5);
     struct micros_grant_registry expected;
+    uint16_t expected_process_slot[GRANT_PROCESS_COUNT];
     uint32_t expected_process_generation[GRANT_PROCESS_COUNT];
     micros_endpoint_t expected_endpoint[GRANT_PROCESS_COUNT];
+    unsigned char grantor_bytes[64];
+    unsigned char grantee_bytes[64];
+    unsigned char expected_grantor_bytes[64];
+    unsigned char expected_grantee_bytes[64];
     uint32_t random_state = seed;
     size_t coverage[GRANT_MODEL_OPERATION_COUNT] = {0};
     size_t step;
@@ -1329,6 +1358,7 @@ static bool test_grant_model(void)
     EXPECT_TRUE(setup_fixture());
     expected = grant_registry;
     for (step = 0; step < GRANT_PROCESS_COUNT; ++step) {
+        expected_process_slot[step] = processes[step].slot;
         expected_process_generation[step] =
             processes[step].generation;
         expected_endpoint[step] = endpoints[step];
@@ -1348,6 +1378,9 @@ static bool test_grant_model(void)
             expected.grants[slot].generation
                 << MICROS_GRANT_SLOT_BITS
         ) | (micros_grant_t)slot;
+        size_t trace_offset = 0;
+        size_t trace_length = 0;
+        uint32_t trace_permission = 0;
         enum micros_grant_error actual;
 
         if (grantee == grantor) {
@@ -1370,9 +1403,16 @@ static bool test_grant_model(void)
                 MICROS_USER_VIRTUAL_BASE
                     + (random & UINT32_C(0xffff)),
                 1 + (random & UINT32_C(0xff)),
-                (random & 1)
-                    ? MICROS_GRANT_PERMISSION_READ
-                    : MICROS_GRANT_PERMISSION_WRITE,
+                step == 0
+                    ? (
+                        MICROS_GRANT_PERMISSION_READ
+                        | MICROS_GRANT_PERMISSION_WRITE
+                    )
+                    : (
+                        (random & 1)
+                            ? MICROS_GRANT_PERMISSION_READ
+                            : MICROS_GRANT_PERMISSION_WRITE
+                    ),
                 &produced
             );
             for (
@@ -1413,11 +1453,306 @@ static bool test_grant_model(void)
                     .base = MICROS_USER_VIRTUAL_BASE
                         + (random & UINT32_C(0xffff)),
                     .length = 1 + (random & UINT32_C(0xff)),
-                    .permissions = (random & 1)
-                        ? MICROS_GRANT_PERMISSION_READ
-                        : MICROS_GRANT_PERMISSION_WRITE,
+                    .permissions = step == 0
+                        ? (
+                            MICROS_GRANT_PERMISSION_READ
+                            | MICROS_GRANT_PERMISSION_WRITE
+                        )
+                        : (
+                            (random & 1)
+                                ? MICROS_GRANT_PERMISSION_READ
+                                : MICROS_GRANT_PERMISSION_WRITE
+                        ),
                 };
                 ++expected.active_count;
+            }
+            break;
+        }
+        case GRANT_MODEL_AUTHORIZE_FROM:
+        case GRANT_MODEL_AUTHORIZE_TO:
+        case GRANT_MODEL_AUTHORIZE_DENIAL:
+        case GRANT_MODEL_AUTHORIZE_STALE:
+        case GRANT_MODEL_AUTHORIZE_BOUNDS: {
+            struct micros_grant_registry snapshot = grant_registry;
+            struct micros_grant_copy_authority authority;
+            struct micros_grant_copy_authority sentinel;
+            struct micros_grant_copy_range_plan source_plan = {0};
+            struct micros_grant_copy_range_plan destination_plan = {0};
+            const struct micros_grant_record *record;
+            struct micros_process_handle candidate_grantee = processes[0];
+            micros_endpoint_t candidate_grantor = endpoints[0];
+            enum micros_grant_error expected_result;
+            size_t selected_slot = MICROS_GRANT_CAPACITY;
+            size_t record_grantor = GRANT_PROCESS_COUNT;
+            size_t record_grantee = GRANT_PROCESS_COUNT;
+            size_t index;
+
+            if (operation == GRANT_MODEL_AUTHORIZE_STALE) {
+                selected_slot = random % MICROS_GRANT_CAPACITY;
+            } else {
+                for (
+                    index = 0;
+                    index < MICROS_GRANT_CAPACITY;
+                    ++index
+                ) {
+                    if (
+                        expected.grants[index].state
+                            == MICROS_GRANT_SLOT_ACTIVE
+                    ) {
+                        selected_slot = index;
+                        break;
+                    }
+                }
+                if (selected_slot == MICROS_GRANT_CAPACITY) {
+                    selected_slot = random % MICROS_GRANT_CAPACITY;
+                }
+            }
+            slot = selected_slot;
+            record = &expected.grants[slot];
+            grant = (
+                record->generation << MICROS_GRANT_SLOT_BITS
+            ) | (micros_grant_t)slot;
+            if (
+                operation == GRANT_MODEL_AUTHORIZE_STALE
+                && record->state == MICROS_GRANT_SLOT_ACTIVE
+            ) {
+                uint32_t stale_generation =
+                    record->generation == 1
+                        ? 2
+                        : record->generation - 1;
+
+                grant = (
+                    stale_generation << MICROS_GRANT_SLOT_BITS
+                ) | (micros_grant_t)slot;
+            }
+            for (index = 0; index < sizeof(grantor_bytes); ++index) {
+                grantor_bytes[index] =
+                    (unsigned char)(random + index);
+                grantee_bytes[index] =
+                    (unsigned char)(UINT8_C(0xc0) - index);
+                expected_grantor_bytes[index] =
+                    grantor_bytes[index];
+                expected_grantee_bytes[index] =
+                    grantee_bytes[index];
+            }
+            if (
+                record->state != MICROS_GRANT_SLOT_ACTIVE
+                || operation == GRANT_MODEL_AUTHORIZE_STALE
+            ) {
+                expected_result = MICROS_GRANT_ERROR_STALE_GRANT;
+                trace_permission = MICROS_GRANT_PERMISSION_READ;
+            } else {
+                size_t limit =
+                    record->length < sizeof(grantor_bytes)
+                        ? record->length
+                        : sizeof(grantor_bytes);
+
+                for (
+                    index = 0;
+                    index < GRANT_PROCESS_COUNT;
+                    ++index
+                ) {
+                    if (process_handles_equal(
+                        record->grantor,
+                        processes[index]
+                    )) {
+                        record_grantor = index;
+                    }
+                    if (
+                        record->grantee_endpoint
+                            == endpoints[index]
+                    ) {
+                        record_grantee = index;
+                    }
+                }
+                if (
+                    record_grantor == GRANT_PROCESS_COUNT
+                    || record_grantee == GRANT_PROCESS_COUNT
+                    || record->grantor_endpoint
+                        != endpoints[record_grantor]
+                ) {
+                    return model_fail(
+                        step,
+                        "active participant reference diverged"
+                    );
+                }
+                grantor = record_grantor;
+                grantee = record_grantee;
+                candidate_grantee = processes[record_grantee];
+                candidate_grantor = record->grantor_endpoint;
+                trace_length = limit == 0
+                    ? 0
+                    : (random >> 16) % (limit + 1);
+                trace_offset =
+                    (random >> 8)
+                    % (record->length - trace_length + 1);
+                switch (operation) {
+                case GRANT_MODEL_AUTHORIZE_FROM:
+                    trace_permission = MICROS_GRANT_PERMISSION_READ;
+                    break;
+                case GRANT_MODEL_AUTHORIZE_TO:
+                    trace_permission = MICROS_GRANT_PERMISSION_WRITE;
+                    break;
+                case GRANT_MODEL_AUTHORIZE_DENIAL:
+                    trace_permission = (
+                        record->permissions
+                            & MICROS_GRANT_PERMISSION_READ
+                    )
+                        ? MICROS_GRANT_PERMISSION_READ
+                        : MICROS_GRANT_PERMISSION_WRITE;
+                    grantee =
+                        (record_grantee + 1) % GRANT_PROCESS_COUNT;
+                    candidate_grantee = processes[grantee];
+                    break;
+                case GRANT_MODEL_AUTHORIZE_BOUNDS:
+                    trace_permission = (
+                        record->permissions
+                            & MICROS_GRANT_PERMISSION_READ
+                    )
+                        ? MICROS_GRANT_PERMISSION_READ
+                        : MICROS_GRANT_PERMISSION_WRITE;
+                    trace_offset = record->length;
+                    trace_length = 1;
+                    break;
+                default:
+                    return model_fail(
+                        step,
+                        "unexpected authorize operation"
+                    );
+                }
+                if (operation == GRANT_MODEL_AUTHORIZE_DENIAL) {
+                    expected_result = MICROS_GRANT_ERROR_UNAUTHORIZED;
+                } else if (
+                    (record->permissions & trace_permission) == 0
+                ) {
+                    expected_result = MICROS_GRANT_ERROR_UNAUTHORIZED;
+                } else if (
+                    operation == GRANT_MODEL_AUTHORIZE_BOUNDS
+                ) {
+                    expected_result = MICROS_GRANT_ERROR_RANGE;
+                } else {
+                    expected_result = MICROS_GRANT_OK;
+                }
+            }
+            memset(&sentinel, 0xa5, sizeof(sentinel));
+            authority = sentinel;
+            actual = micros_grant_prepare_copy_authority(
+                &grant_registry,
+                &endpoint_registry,
+                &objects,
+                candidate_grantee,
+                candidate_grantor,
+                grant,
+                trace_offset,
+                trace_length,
+                trace_permission,
+                &authority
+            );
+            if (
+                actual != expected_result
+                || !registries_equal(&grant_registry, &snapshot)
+            ) {
+                return model_fail(
+                    step,
+                    "copy authorization result diverged"
+                );
+            }
+            if (actual != MICROS_GRANT_OK) {
+                if (
+                    memcmp(&authority, &sentinel, sizeof(authority)) != 0
+                    || memcmp(
+                        grantor_bytes,
+                        expected_grantor_bytes,
+                        sizeof(grantor_bytes)
+                    ) != 0
+                    || memcmp(
+                        grantee_bytes,
+                        expected_grantee_bytes,
+                        sizeof(grantee_bytes)
+                    ) != 0
+                ) {
+                    return model_fail(
+                        step,
+                        "failed authorization changed output or bytes"
+                    );
+                }
+                break;
+            }
+            if (
+                !process_handles_equal(
+                    authority.grantor,
+                    record->grantor
+                )
+                || !process_handles_equal(
+                    authority.grantee,
+                    processes[record_grantee]
+                )
+                || authority.remote_address
+                    != record->base + trace_offset
+                || authority.length != trace_length
+                || authority.required_permission != trace_permission
+            ) {
+                return model_fail(
+                    step,
+                    "copy authority output diverged"
+                );
+            }
+            if (trace_length != 0) {
+                source_plan.chunk_count = 1;
+                destination_plan.chunk_count = 1;
+                source_plan.chunks[0].length = trace_length;
+                destination_plan.chunks[0].length = trace_length;
+                if (
+                    trace_permission == MICROS_GRANT_PERMISSION_READ
+                ) {
+                    source_plan.chunks[0].physical_address =
+                        (uintptr_t)&grantor_bytes[0];
+                    destination_plan.chunks[0].physical_address =
+                        (uintptr_t)&grantee_bytes[0];
+                    memcpy(
+                        expected_grantee_bytes,
+                        expected_grantor_bytes,
+                        trace_length
+                    );
+                } else {
+                    source_plan.chunks[0].physical_address =
+                        (uintptr_t)&grantee_bytes[0];
+                    destination_plan.chunks[0].physical_address =
+                        (uintptr_t)&grantor_bytes[0];
+                    memcpy(
+                        expected_grantor_bytes,
+                        expected_grantee_bytes,
+                        trace_length
+                    );
+                }
+            }
+            if (
+                micros_grant_copy_plan_validate(
+                    &source_plan,
+                    &destination_plan,
+                    trace_length
+                ) != MICROS_GRANT_OK
+            ) {
+                return model_fail(step, "copy plan rejected");
+            }
+            micros_grant_copy_commit(
+                &source_plan,
+                &destination_plan,
+                trace_length
+            );
+            if (
+                memcmp(
+                    grantor_bytes,
+                    expected_grantor_bytes,
+                    sizeof(grantor_bytes)
+                ) != 0
+                || memcmp(
+                    grantee_bytes,
+                    expected_grantee_bytes,
+                    sizeof(grantee_bytes)
+                ) != 0
+            ) {
+                return model_fail(step, "copy bytes diverged");
             }
             break;
         }
@@ -1706,6 +2041,9 @@ static bool test_grant_model(void)
             grantor,
             grantee,
             grant,
+            trace_offset,
+            trace_length,
+            trace_permission,
             actual
         );
         if (
@@ -1719,14 +2057,48 @@ static bool test_grant_model(void)
             return model_fail(step, "registry state diverged");
         }
         for (slot = 0; slot < GRANT_PROCESS_COUNT; ++slot) {
+            struct micros_process_handle expected_owner = {
+                .slot = expected_process_slot[slot],
+                .generation = expected_process_generation[slot],
+            };
+            struct micros_process_handle unpacked_owner;
+            const struct micros_process *process =
+                &objects.processes[expected_process_slot[slot]];
+            const struct micros_endpoint_record *endpoint =
+                &endpoint_registry.endpoints[
+                    expected_process_slot[slot]
+                ];
+
             if (
-                processes[slot].generation
-                    != expected_process_generation[slot]
+                !process_handles_equal(
+                    processes[slot],
+                    expected_owner
+                )
                 || endpoints[slot] != expected_endpoint[slot]
+                || process->slot_state
+                    != MICROS_KERNEL_OBJECT_SLOT_LIVE
+                || process->generation
+                    != expected_process_generation[slot]
+                || process->primary_endpoint
+                    != expected_endpoint[slot]
+                || micros_endpoint_unpack(
+                    expected_endpoint[slot],
+                    &unpacked_owner
+                ) != MICROS_ENDPOINT_OK
+                || !process_handles_equal(
+                    unpacked_owner,
+                    expected_owner
+                )
+                || endpoint->state != MICROS_ENDPOINT_STATE_ACTIVE
+                || !process_handles_equal(
+                    endpoint->owner,
+                    expected_owner
+                )
+                || endpoint->value != expected_endpoint[slot]
             ) {
                 return model_fail(
                     step,
-                    "endpoint generation diverged"
+                    "authoritative participant generation diverged"
                 );
             }
         }
@@ -1740,7 +2112,7 @@ static bool test_grant_model(void)
         }
     }
     printf(
-        "# grant registry model seed=0x%08x transitions=%u\n",
+        "# grant and checked copy model seed=0x%08x transitions=%u\n",
         seed,
         GRANT_MODEL_STEPS
     );

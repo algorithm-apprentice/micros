@@ -75,7 +75,10 @@ class ValidationPlanTests(unittest.TestCase):
                     validation_plan.workflow("test-qemu-endpoint"),
                     commands,
                 )
-                self.assertIn(validation_plan.IPC_MODEL, commands)
+                self.assertIn(
+                    validation_plan.workflow("test-qemu-grant"),
+                    commands,
+                )
 
         commands = validation_plan.plan(["kernel/ipc.c"], "fast")
         self.assertIn(
@@ -84,6 +87,40 @@ class ValidationPlanTests(unittest.TestCase):
         )
         commands = validation_plan.plan(
             ["tests/host/grant_test.c"],
+            "fast",
+        )
+        self.assertIn(validation_plan.IPC_MODEL, commands)
+
+    def test_checked_copy_paths_own_grant_gate(self):
+        for path in (
+            "kernel/grant.c",
+            "kernel/grant_copy.c",
+            "kernel/grant_copy_core.c",
+            "kernel/grant_runtime.c",
+            "kernel/user_address_space.c",
+            "kernel/address_space.c",
+            "kernel/sv39.c",
+            "kernel/frame_ownership.c",
+            "arch/riscv64/mmu.S",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertIn(
+                    validation_plan.workflow("test-qemu-grant"),
+                    commands,
+                )
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-user-address-space"
+                    ),
+                    commands,
+                )
+                self.assertTrue(
+                    validation_plan.IPC_MODEL in commands
+                    or validation_plan.UNIT_FULL in commands
+                )
+        commands = validation_plan.plan(
+            ["tests/host/grant_copy_test.c"],
             "fast",
         )
         self.assertIn(validation_plan.IPC_MODEL, commands)
@@ -236,6 +273,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-mmu": "kernel/mmu_test.c",
             "test-qemu-object-model": "kernel/object_model_test.c",
             "test-qemu-endpoint": "kernel/endpoint_test.c",
+            "test-qemu-grant": "kernel/grant_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
             "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
             "test-qemu-ipc-syscall": "kernel/ipc_syscall_test.c",

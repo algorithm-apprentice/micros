@@ -28,6 +28,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_GRANT_TEST
+    "Build the checked direct-grant copy test image"
+    OFF
+)
+option(
     MICROS_BUILD_IPC_TEST
     "Build the blocking IPC acceptance test image"
     OFF
@@ -94,6 +99,7 @@ set(
     MICROS_BUILD_MMU_TEST
     MICROS_BUILD_OBJECT_MODEL_TEST
     MICROS_BUILD_ENDPOINT_TEST
+    MICROS_BUILD_GRANT_TEST
     MICROS_BUILD_IPC_TEST
     MICROS_BUILD_IPC_ECALL_CORE_TEST
     MICROS_BUILD_IPC_SYSCALL_TEST
@@ -164,6 +170,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler_core.c
         kernel/endpoint.c
         kernel/grant.c
+        kernel/grant_copy_core.c
         kernel/ipc_abi.c
         kernel/ipc.c
         tests/host/ipc_abi_test.c
@@ -172,6 +179,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
         tests/host/grant_test.c
+        tests/host/grant_copy_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -187,9 +195,11 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler_core.c
         kernel/endpoint.c
         kernel/grant.c
+        kernel/grant_copy_core.c
         kernel/ipc.c
         tests/host/endpoint_model_test.c
         tests/host/grant_test.c
+        tests/host/grant_copy_test.c
         tests/host/ipc_close_test.c
         tests/host/ipc_model_main.c
         tests/host/ipc_model_test.c
@@ -530,6 +540,8 @@ add_executable(
     kernel/frame_allocator.c
     kernel/frame_ownership.c
     kernel/grant.c
+    kernel/grant_copy.c
+    kernel/grant_copy_core.c
     kernel/grant_runtime.c
     kernel/ipc_abi.c
     kernel/ipc.c
@@ -677,6 +689,53 @@ if(MICROS_BUILD_ENDPOINT_TEST)
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_GRANT_TEST)
+    add_custom_target(
+        test-qemu-grant
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_GRANT_TEST_PASS identity=generation-safe directions=checked bounds=validated copies=atomic phase=bootstrap cleanup=complete"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_GRANT_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_GRANT_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/grant_test.c
     )
 endif()
 
