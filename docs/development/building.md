@@ -229,7 +229,19 @@ It also rejects the superseded standalone `micros_trap_hart_id` and
 
 ## Native unit tests
 
-Configure, build, and run the native suite with:
+Run the fast native development loop with:
+
+```bash
+cmake --workflow --preset test-unit-fast
+```
+
+Run the persistent IPC and endpoint models separately with:
+
+```bash
+cmake --workflow --preset test-ipc-model
+```
+
+The complete native milestone gate remains:
 
 ```bash
 cmake --workflow --preset test-unit

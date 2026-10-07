@@ -180,6 +180,20 @@
       ]
     },
     {
+      "name": "test-unit-fast",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-unit-fast"
+      ]
+    },
+    {
+      "name": "test-ipc-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-ipc-model"
+      ]
+    },
+    {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
     },
@@ -315,6 +329,34 @@
         {
           "type": "build",
           "name": "test-unit"
+        }
+      ]
+    },
+    {
+      "name": "test-unit-fast",
+      "displayName": "Build and run fast native tests",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-unit-fast"
+        }
+      ]
+    },
+    {
+      "name": "test-ipc-model",
+      "displayName": "Build and run persistent IPC model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-ipc-model"
         }
       ]
     },
