@@ -182,9 +182,10 @@ provides one authoritative registry, bounded user-buffer copy, reversible
 current-thread guard, shared selected-thread completion return, stable IPC
 operation/result numbers, and production U-ecall trap routing. A focused QEMU
 gate proves immediate success, portable failure rollback, target preflight
-failure, register preservation, and cleanup. Kernel IRQ injection and the full
-six-operation normal/expected-panic syscall acceptance matrix remain separate
-later slices.
+failure, register preservation, and cleanup. The complete three-address-space
+gate now drives all six operations through real ecalls, and an isolated image
+proves fatal return-buffer revocation. Kernel IRQ injection remains a separate
+later slice.
 
 ## Prerequisites
 
@@ -779,8 +780,37 @@ space and thread, restores frame/object baselines, and emits:
 MICROS_IPC_ECALL_CORE_TEST_PASS dispatch=production guard=transactional completion=returned errors=stable registers=preserved
 ```
 
-The complete three-address-space six-operation normal and expected-panic
-syscall matrix remains the next dependency-ready acceptance PR.
+## Complete IPC syscall acceptance
+
+Build and run the normal and fatal acceptance images with:
+
+```bash
+cmake --workflow --preset test-qemu-ipc-syscall
+cmake --workflow --preset test-qemu-ipc-syscall-panic
+```
+
+The normal image coordinates client, server, and peer payloads through actual
+production ecalls. It covers blocked send/receive, two call/reply exchanges,
+atomic `reply_receive`, a later peer send, a server call back to the client,
+two notifications coalesced while the server is in reply wait, pending
+notification receive, higher-priority wake selection, exact result/register
+state, page-crossing outbound/call/reply buffers, stable `-3`, `-1`, and `-6`
+failures, and complete teardown. A final timer return selects a
+higher-priority peer first, proves the client completion remains pending, then
+consumes that completion through the same production return selector. Only
+that sequence emits:
+
+```text
+MICROS_IPC_SYSCALL_TEST_PASS spaces=three operations=six blocking=validated calls=tokenized notifications=coalesced errors=stable completion=deferred registers=preserved cleanup=complete
+```
+
+The isolated panic image blocks a client receive, commits a server send, then
+releases the accepted client data page before return preflight. It must panic
+with:
+
+```text
+MICROS_PANIC reason=invalid-bootstrap-ipc-buffer
+```
 
 ## Scheduler test
 

@@ -8,6 +8,12 @@
 #include "kernel/ipc_ecall_test.h"
 #endif
 #include "kernel/ipc_syscall.h"
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+#include "kernel/ipc_syscall_test.h"
+#endif
+#ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
+#include "kernel/ipc_syscall_panic_test.h"
+#endif
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -465,6 +471,19 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 frame,
                 micros_scheduler_handle_user_timer(hart)
             );
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+            if (
+                !micros_ipc_syscall_test_before_timer_return(
+                    hart
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-syscall-test-timer-prepare",
+                    frame
+                );
+            }
+#endif
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
             if (
@@ -510,8 +529,37 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             !user_timer
             && cause_code == MICROS_EXCEPTION_USER_ECALL
         ) {
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+            if (
+                !micros_ipc_syscall_test_before_ecall(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-syscall-test-before",
+                    frame
+                );
+            }
+#endif
             enum micros_ipc_syscall_return ipc_return =
                 micros_ipc_handle_user_ecall(hart, frame);
+#ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
+            if (
+                !micros_ipc_syscall_panic_test_before_return(
+                    hart,
+                    frame,
+                    ipc_return
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-syscall-panic-test",
+                    frame
+                );
+            }
+#endif
             enum micros_scheduler_error scheduler_error =
                 ipc_return == MICROS_IPC_SYSCALL_RETURN_CAPTURED
                     ? micros_scheduler_select_captured_user_return(
@@ -530,6 +578,20 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                     frame
                 );
             }
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+            if (
+                !micros_ipc_syscall_test_after_return(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-syscall-test-after",
+                    frame
+                );
+            }
+#endif
             return;
         }
 #endif
@@ -644,6 +706,21 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 frame
             );
         }
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+        if (
+            user_timer
+            && !micros_ipc_syscall_test_after_timer_return(
+                hart,
+                frame
+            )
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "ipc-syscall-test-timer",
+                frame
+            );
+        }
+#endif
         return;
     }
 

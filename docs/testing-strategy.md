@@ -75,6 +75,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
+`test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
 `test-qemu-user-execution`, `test-qemu-scheduler`,
@@ -97,6 +98,8 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
+cmake --workflow --preset test-qemu-ipc-syscall
+cmake --workflow --preset test-qemu-ipc-syscall-panic
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -274,6 +277,17 @@ non-result registers, target-buffer snapshot before guard begin, immediate
 notify completion through captured return, unauthorized-send rollback through
 ordinary return, upper endpoint-bit rejection before mutation, and complete
 endpoint/object/address-space/frame baseline restoration.
+`test-qemu-ipc-syscall` runs three real address spaces through all six
+operations. It proves blocked and immediate send/receive, two tokenized call
+round trips, atomic `reply_receive` plus later sender wake, notification
+coalescing while the destination is in reply wait, pending notification
+delivery, page-crossing request/reply buffers, higher-priority wake selection,
+stable `-3`, `-1`, and `-6` results, deferred completion across a timer-selected
+peer, exact `sepc + 4`, preserved non-result registers, and complete
+endpoint/thread/root/frame cleanup.
+`test-qemu-ipc-syscall-panic` releases a previously accepted receive-buffer
+page after sender commit but before selected-thread return preflight. It
+requires the exact `invalid-bootstrap-ipc-buffer` panic and trap context.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered

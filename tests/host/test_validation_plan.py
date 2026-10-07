@@ -31,6 +31,38 @@ class ValidationPlanTests(unittest.TestCase):
             validation_plan.workflow("test-qemu-ipc"),
             commands,
         )
+        self.assertIn(
+            validation_plan.workflow("test-qemu-ipc-syscall"),
+            commands,
+        )
+        self.assertIn(
+            validation_plan.workflow("test-qemu-ipc-syscall-panic"),
+            commands,
+        )
+
+    def test_syscall_production_paths_own_acceptance_gates(self):
+        for path in (
+            "kernel/ipc_abi.c",
+            "kernel/ipc_syscall.c",
+            "kernel/ipc.c",
+            "kernel/kernel_objects.c",
+            "kernel/address_space.c",
+            "kernel/sv39.c",
+            "kernel/user_address_space.c",
+            "arch/riscv64/mmu.S",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertIn(
+                    validation_plan.workflow("test-qemu-ipc-syscall"),
+                    commands,
+                )
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-ipc-syscall-panic"
+                    ),
+                    commands,
+                )
 
     def test_fast_full_escalation_runs_complete_qemu(self):
         commands = validation_plan.plan(
@@ -182,6 +214,9 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-endpoint": "kernel/endpoint_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
             "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
+            "test-qemu-ipc-syscall": "kernel/ipc_syscall_test.c",
+            "test-qemu-ipc-syscall-panic":
+                "kernel/ipc_syscall_panic_test.c",
             "test-qemu-nested-trap": "arch/riscv64/nested_trap_test.S",
             "test-qemu-frame-ownership": "kernel/frame_ownership_test.c",
             "test-qemu-user-address-space": "kernel/user_address_space_test.c",

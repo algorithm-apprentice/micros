@@ -117,6 +117,24 @@
       }
     },
     {
+      "name": "riscv64-ipc-syscall-test",
+      "displayName": "RISC-V 64 complete IPC syscall acceptance test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ipc-syscall-test",
+      "cacheVariables": {
+        "MICROS_BUILD_IPC_SYSCALL_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-ipc-syscall-panic-test",
+      "displayName": "RISC-V 64 invalid IPC return-buffer panic test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ipc-syscall-panic-test",
+      "cacheVariables": {
+        "MICROS_BUILD_IPC_SYSCALL_PANIC_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -281,6 +299,20 @@
       "configurePreset": "riscv64-ipc-ecall-core-test",
       "targets": [
         "test-qemu-ipc-ecall-core"
+      ]
+    },
+    {
+      "name": "test-qemu-ipc-syscall",
+      "configurePreset": "riscv64-ipc-syscall-test",
+      "targets": [
+        "test-qemu-ipc-syscall"
+      ]
+    },
+    {
+      "name": "test-qemu-ipc-syscall-panic",
+      "configurePreset": "riscv64-ipc-syscall-panic-test",
+      "targets": [
+        "test-qemu-ipc-syscall-panic"
       ]
     },
     {
@@ -541,6 +573,34 @@
         {
           "type": "build",
           "name": "test-qemu-ipc-ecall-core"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-ipc-syscall",
+      "displayName": "Build and run complete IPC syscall acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ipc-syscall-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-ipc-syscall"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-ipc-syscall-panic",
+      "displayName": "Build and run invalid IPC return-buffer panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ipc-syscall-panic-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-ipc-syscall-panic"
         }
       ]
     },
