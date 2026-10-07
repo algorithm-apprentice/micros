@@ -26,6 +26,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX IRQ notification study](research/minix-irq-notification.md) traces
   interrupt ownership, kernel pseudo-source delivery, event coalescing,
   explicit driver acknowledgment, and endpoint cleanup.
+- [MINIX direct grant and safe-copy study](research/minix-direct-grants-and-safecopy.md)
+  traces grant identity, table authority, direction and bounds checks, fault
+  behavior, revocation, and checked cross-address-space copy.
 
 ## Planning and verification
 

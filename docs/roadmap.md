@@ -115,6 +115,10 @@ generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a
 reversible current-thread IPC guard with exact ready-queue and trap-stack
 rollback plus head-preserving immediate commit.
+Accepted ADR-0038 defines the next Step 7 outcome as one generation-safe kernel
+grant registry/lifecycle implementation. Checked copy receives its own
+design-implementation pair only after that registry merges. The user-runtime
+syscall ABI remains a later reviewed task.
 
 ## v0.1 completion goal
 
