@@ -23,6 +23,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
   traces endpoint validation, privilege checks, send/receive queues,
   request/reply blocking, notifications, deadlock detection, and exit cleanup.
+- [MINIX IRQ notification study](research/minix-irq-notification.md) traces
+  interrupt ownership, kernel pseudo-source delivery, event coalescing,
+  explicit driver acknowledgment, and endpoint cleanup.
 
 ## Planning and verification
 

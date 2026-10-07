@@ -288,6 +288,12 @@ endpoint/thread/root/frame cleanup.
 `test-qemu-ipc-syscall-panic` releases a previously accepted receive-buffer
 page after sender commit but before selected-thread return preflight. It
 requires the exact `invalid-bootstrap-ipc-buffer` panic and trap context.
+The ADR-0037 kernel-origin notification slice extends the native notification
+model and `test-qemu-ipc`. It must prove source-`NONE` immediate delivery,
+pending-mask coalescing, `ANY`-only consumption, reply-wait exclusion,
+state-preserving failures, selected-thread completion return, and complete
+baseline restoration. That evidence does not claim PLIC routing,
+`irq_complete`, console handoff, or TTY behavior.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
