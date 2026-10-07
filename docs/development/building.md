@@ -54,6 +54,9 @@ The current implementation provides:
   message ownership, token uniqueness, and ready-peer detection;
 - native generation-safe staged inbound-message state validation for runnable
   receivers;
+- native failure-atomic matching dequeue and delivery commit tests covering
+  head/middle/tail selection, unmatched FIFO preservation, queued-call reply
+  wait, ordinary wakeups, exact staged messages, and ready-queue effects;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -62,10 +65,12 @@ The generation-aware endpoint and privilege substrate now passes its native
 model and isolated QEMU acceptance gates. The fixed IPC message ABI, run-time
 flag positions, and dormant kernel-owned state are present; queue transitions
 now have complete cross-object topology validation. Queue mutation and
-held-thread FIFO enqueue are implemented. Matching dequeue and message staging
-now have a canonical validated delivery state. Matching dequeue and atomic
-stage/wakeup commit remain the next dependency-ordered kernel task;
-reply-token allocation and consumption remain separate later slices.
+held-thread FIFO enqueue are implemented. Matching dequeue now commits message
+staging, exact FIFO unlink, queued-call reply-wait retention, and scheduler
+wakeup atomically for incoming held senders and receivers. IPC authorization
+integration, deadlock detection, reply-token allocation and consumption,
+notifications, endpoint cancellation, and the syscall ABI remain separate
+later slices.
 
 ## Prerequisites
 

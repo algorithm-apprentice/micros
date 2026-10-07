@@ -23,9 +23,13 @@ repeated two-address-space switching under real timer interrupts, including a
 real no-runnable idle transition and timer wake. Endpoint privileges and
 generation-safe lifecycle gates are complete. The fixed message ABI and
 dormant IPC state are present, and sender/receiver queue topology is validated.
-Failure-atomic held-thread enqueue is implemented. Matching dequeue, message
-staging state, and wakeup invariants are defined; their atomic commit is the
-next dependency-ready mechanism.
+Failure-atomic held-thread enqueue and matching delivery commit are
+implemented. Incoming held senders and receivers consume the first compatible
+FIFO peer, preserve unmatched peers, stage the canonical message, retain call
+senders in reply wait, and make ordinary participants runnable through the
+scheduler. IPC authorization integration, deadlock detection, reply
+consumption, notifications, and the syscall ABI remain dependency-ready
+follow-up work.
 
 ## v0.1 completion goal
 

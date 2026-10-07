@@ -319,6 +319,158 @@ static enum micros_kernel_object_error preflight_tail_enqueue(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
+static void queue_enqueue_tail_prevalidated(
+    struct micros_kernel_objects *objects,
+    struct micros_hart *hart,
+    struct micros_thread_handle thread_handle
+)
+{
+    struct micros_thread *thread =
+        &objects->threads[thread_handle.slot];
+
+    queue_enqueue_tail_raw(objects, hart, thread_handle);
+    if (!thread_handle_is_null(hart->current_thread)) {
+        struct micros_thread *current =
+            &objects->threads[hart->current_thread.slot];
+
+        if (
+            !thread_handles_equal(
+                hart->current_thread,
+                thread_handle
+            )
+            && current->scheduler_assigned
+            && current->runtime_flags == 0
+            && current->scheduler_preemptible
+            && current->scheduler_priority
+                > thread->scheduler_priority
+        ) {
+            uint8_t priority = current->scheduler_priority;
+
+            hart->ready_head[priority] = current->ready_next;
+            if (
+                thread_handles_equal(
+                    hart->ready_tail[priority],
+                    hart->current_thread
+                )
+            ) {
+                hart->ready_tail[priority] =
+                    null_thread_handle();
+            }
+            current->ready_linked = false;
+            current->ready_next = null_thread_handle();
+            current->runtime_flags |=
+                MICROS_THREAD_RTS_PREEMPTED;
+        }
+    }
+}
+
+static bool ipc_wake_clear_flag_is_valid(uint32_t flag)
+{
+    return (
+        flag == MICROS_THREAD_RTS_INACTIVE
+        || flag == MICROS_THREAD_RTS_IPC_SEND
+        || flag == MICROS_THREAD_RTS_IPC_RECEIVE
+    );
+}
+
+enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle first_thread_handle,
+    uint32_t first_clear_flag,
+    struct micros_thread_handle second_thread_handle,
+    uint32_t second_clear_flag
+)
+{
+    struct {
+        struct micros_thread_handle handle;
+        struct micros_thread *thread;
+        struct micros_hart *hart;
+        uint32_t clear_flag;
+        uint32_t resulting_flags;
+    } transitions[2];
+    enum micros_kernel_object_error error;
+    size_t index;
+
+    if (
+        objects == NULL
+        || !ipc_wake_clear_flag_is_valid(first_clear_flag)
+        || !ipc_wake_clear_flag_is_valid(second_clear_flag)
+        || thread_handles_equal(
+            first_thread_handle,
+            second_thread_handle
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = micros_scheduler_core_validate(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    transitions[0].handle = first_thread_handle;
+    transitions[0].clear_flag = first_clear_flag;
+    transitions[1].handle = second_thread_handle;
+    transitions[1].clear_flag = second_clear_flag;
+    for (index = 0; index < 2; ++index) {
+        error = resolve_thread_mutable(
+            objects,
+            transitions[index].handle,
+            &transitions[index].thread
+        );
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+        if (
+            !transitions[index].thread->scheduler_assigned
+            || (
+                transitions[index].thread->runtime_flags
+                & transitions[index].clear_flag
+            ) == 0
+        ) {
+            return MICROS_KERNEL_OBJECT_ERROR_STATE;
+        }
+        transitions[index].resulting_flags =
+            transitions[index].thread->runtime_flags
+            & ~transitions[index].clear_flag;
+        transitions[index].hart = NULL;
+        if (transitions[index].resulting_flags != 0) {
+            continue;
+        }
+        if (thread_is_current(objects, transitions[index].handle)) {
+            return MICROS_KERNEL_OBJECT_ERROR_STATE;
+        }
+        error = resolve_hart_mutable(
+            objects,
+            transitions[index].thread->scheduler_hart,
+            &transitions[index].hart
+        );
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        error = preflight_tail_enqueue(
+            objects,
+            transitions[index].hart,
+            transitions[index].handle,
+            transitions[index].thread->scheduler_priority
+        );
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+    }
+
+    for (index = 0; index < 2; ++index) {
+        transitions[index].thread->runtime_flags =
+            transitions[index].resulting_flags;
+        if (transitions[index].resulting_flags == 0) {
+            queue_enqueue_tail_prevalidated(
+                objects,
+                transitions[index].hart,
+                transitions[index].handle
+            );
+        }
+    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
 static bool add_overflows(uint64_t left, uint64_t right)
 {
     return UINT64_MAX - left < right;

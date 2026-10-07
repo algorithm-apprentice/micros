@@ -107,7 +107,7 @@ reference model, endpoint encoding, immutable privilege-profile tables,
 process-bound lifecycle, stale-generation rejection, relationship validation,
 authorization, and a replayable 4,096-step lifecycle model under ASan and
 UBSan. They also verify the exact 64-byte IPC message ABI and zero-state
-invariants for dormant thread and endpoint IPC storage. The Python host tests
+invariants for dormant thread and endpoint IPC storage. The native host tests
 also cover generation-safe sender/receiver FIFO topology, exact queue
 membership, stale links, cycles, duplicate membership, and close rejection
 while queues or exact-source/reply waiters remain attached. Canonical queued
@@ -117,9 +117,13 @@ Failure-atomic enqueue tests prove canonical source/token overwrite, FIFO tail
 append, duplicate-token rejection, and detection of a matching peer before
 blocking. Staged-delivery tests require an exact active source generation,
 user message type, aligned retained receive buffer, runnable scheduler state,
-and no residual queue or reply authority. The Python host tests include ELF
-allocatable-section closure, legacy-global rejection, and machine-readable
-QEMU record regressions.
+and no residual queue or reply authority. Matching-delivery regressions cover
+head, middle, and tail dequeue, specific and `ANY` selection, unmatched FIFO
+preservation, ordinary versus call sender wake behavior, exact staged message
+bytes, ready-queue placement, stale and corrupt queues, no-match preservation,
+and byte-exact state and output preservation on every failure. The Python host
+tests include ELF allocatable-section closure, legacy-global rejection, and
+machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
