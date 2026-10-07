@@ -58,16 +58,19 @@ ninja test-qemu-integration
 ninja test-stress
 ```
 
-Initial performance budgets are:
+Performance budgets are:
 
-- native unit suite: normally below 2 seconds;
+- incremental `test-unit-fast`: normally below 6 seconds;
+- persistent native models: isolated from the fast loop and run in the PR or
+  milestone tier;
 - QEMU smoke suite: normally below 10 seconds;
 - QEMU integration suite: kept short enough for every applicable pull request;
 - stress suite: unconstrained by the fast feedback budget and run separately.
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The implemented fast targets are `test-unit`, `test-qemu-smoke`,
+The native validation tiers are `test-unit-fast`, `test-ipc-model`, and the
+complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
@@ -80,6 +83,8 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 the implemented configure, build, and execution gates are:
 
 ```bash
+cmake --workflow --preset test-unit-fast
+cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
@@ -100,15 +105,15 @@ cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
 cmake --workflow --preset test-qemu-scheduler-invalid-next
 ```
 
-`test-unit` currently runs the FDT parser corpus, portable frame allocator,
+`test-unit-fast` runs the FDT parser corpus, portable frame allocator,
 typed frame-ownership ledger, Sv39 encoding, kernel-object lifecycle/model
 tests, and deterministic scheduler admission, RTS, priority-queue, policy,
 current-selection, preemption-repair, return-plan, and separate
 thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
 reference model, endpoint encoding, immutable privilege-profile tables,
 process-bound lifecycle, stale-generation rejection, relationship validation,
-authorization, and a replayable 4,096-step lifecycle model under ASan and
-UBSan. They also verify the exact 64-byte IPC message ABI and zero-state
+authorization, and deterministic endpoint/IPC regressions under ASan and
+UBSan. It also verifies the exact 64-byte IPC message ABI and zero-state
 invariants for dormant thread and endpoint IPC storage. The native host tests
 also cover generation-safe sender/receiver FIFO topology, exact queue
 membership, stale links, cycles, duplicate membership, and close rejection
@@ -196,6 +201,9 @@ input, and deadlock, and prints the replayable seed plus a trace hash on
 success and the recent complete operation trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
+`test-ipc-model` contains the replayable endpoint lifecycle, notification,
+close-cancellation, and persistent 8,192-transition IPC models. `test-unit`
+combines both tiers and remains the complete native gate.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and

@@ -66,6 +66,7 @@ static struct close_scenario_trace_entry
 static size_t close_scenario_trace_count;
 
 bool micros_ipc_close_test_run(void);
+bool micros_ipc_close_model_test_run(void);
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -1606,10 +1607,6 @@ bool micros_ipc_close_test_run(void)
             "stale corrupt and late failures are atomic",
             test_close_failures_are_atomic,
         },
-        {
-            "deterministic seeded cancellation scenarios",
-            test_seeded_close_scenarios,
-        },
     };
     size_t index;
 
@@ -1624,4 +1621,9 @@ bool micros_ipc_close_test_run(void)
         }
     }
     return true;
+}
+
+bool micros_ipc_close_model_test_run(void)
+{
+    return test_seeded_close_scenarios();
 }

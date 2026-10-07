@@ -71,6 +71,7 @@ static struct notify_model_trace_entry
 static size_t notify_model_trace_count;
 
 bool micros_ipc_notify_test_run(void);
+bool micros_ipc_notify_model_test_run(void);
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -1972,10 +1973,6 @@ bool micros_ipc_notify_test_run(void)
             "notify scheduler failure is atomic",
             test_notify_scheduler_failure_is_atomic,
         },
-        {
-            "seeded notify model",
-            test_seeded_notify_model,
-        },
     };
     size_t index;
 
@@ -1991,4 +1988,9 @@ bool micros_ipc_notify_test_run(void)
         }
     }
     return true;
+}
+
+bool micros_ipc_notify_model_test_run(void)
+{
+    return test_seeded_notify_model();
 }

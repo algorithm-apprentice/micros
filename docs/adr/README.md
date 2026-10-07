@@ -25,7 +25,7 @@ to make the project appear more consistent than it was.
 | [0007](0007-static-launcher-before-rs.md) | Static launcher before recovery services | Accepted |
 | [0008](0008-ramfs-first-filesystem.md) | RAMFS-first filesystem | Accepted |
 | [0009](0009-spawn-before-fork.md) | Spawn before fork | Accepted |
-| [0010](0010-testing-and-observability.md) | Testing and observability | Accepted |
+| [0010](0010-testing-and-observability.md) | Testing and observability | Superseded |
 | [0011](0011-process-thread-and-hart-model.md) | Process, thread, and hart model | Accepted |
 | [0012](0012-console-and-irq-handoff.md) | Console and IRQ handoff | Accepted |
 | [0013](0013-ai-native-test-first-development.md) | AI-native test-first development | Accepted |
@@ -46,3 +46,4 @@ to make the project appear more consistent than it was.
 | [0028](0028-squash-merge-task-pull-requests.md) | Squash-merge task pull requests | Accepted |
 | [0029](0029-endpoint-and-privilege-substrate.md) | Endpoint and privilege substrate | Accepted |
 | [0030](0030-minix-baseline-blocking-ipc.md) | MINIX-baseline blocking IPC | Accepted |
+| [0031](0031-tiered-native-validation.md) | Tiered native validation | Accepted |

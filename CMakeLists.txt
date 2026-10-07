@@ -149,7 +149,6 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_close_test.c
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
-        tests/host/ipc_model_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -158,6 +157,18 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_state_test.c
         tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c
+    )
+    add_executable(
+        ipc_model_test
+        kernel/kernel_objects.c
+        kernel/scheduler_core.c
+        kernel/endpoint.c
+        kernel/ipc.c
+        tests/host/endpoint_model_test.c
+        tests/host/ipc_close_test.c
+        tests/host/ipc_model_main.c
+        tests/host/ipc_model_test.c
+        tests/host/ipc_notify_test.c
     )
     target_include_directories(
         fdt_test
@@ -191,6 +202,11 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         endpoint_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        ipc_model_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
@@ -201,6 +217,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(frame_ownership_test PRIVATE c_std_17)
     target_compile_features(scheduler_test PRIVATE c_std_17)
     target_compile_features(endpoint_test PRIVATE c_std_17)
+    target_compile_features(ipc_model_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -263,6 +280,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         endpoint_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ipc_model_test
         PRIVATE
             -Wall
             -Wextra
@@ -345,6 +372,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            ipc_model_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ipc_model_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -354,6 +392,53 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME frame-ownership COMMAND frame_ownership_test)
     add_test(NAME scheduler-core COMMAND scheduler_test)
     add_test(NAME endpoint-profile COMMAND endpoint_test)
+    add_test(NAME ipc-model COMMAND ipc_model_test)
+    set_tests_properties(ipc-model PROPERTIES LABELS slow)
+
+    add_custom_target(
+        test-unit-fast
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -LE
+            slow
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            -m
+            unittest
+            discover
+            -s
+            tests/host
+            -p
+            "test_*.py"
+        DEPENDS
+            fdt_test
+            frame_allocator_test
+            sv39_test
+            kernel_objects_test
+            frame_ownership_test
+            scheduler_test
+            endpoint_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
+        test-ipc-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            ipc-model
+        DEPENDS ipc_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
 
     add_custom_target(
         test-unit
@@ -380,6 +465,7 @@ if(MICROS_BUILD_HOST_TESTS)
             frame_ownership_test
             scheduler_test
             endpoint_test
+            ipc_model_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )

@@ -1,7 +1,8 @@
 # ADR-0010: Testing and Observability
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-05
+- Superseded by: ADR-0031
 
 ## Context
 
