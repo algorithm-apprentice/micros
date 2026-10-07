@@ -23,6 +23,7 @@ static struct micros_kernel_objects objects;
 static struct micros_process_handle processes[REPLY_PROCESS_COUNT];
 static struct micros_thread_handle primary_threads[REPLY_PROCESS_COUNT];
 static struct micros_thread_handle client_extra_thread;
+static struct micros_thread_handle server_extra_thread;
 static micros_endpoint_t endpoints[REPLY_PROCESS_COUNT];
 static struct micros_hart_handle hart;
 
@@ -280,6 +281,16 @@ static bool setup_reply_fixture(void)
     );
 }
 
+static bool prepare_server_extra_thread(void)
+{
+    return prepare_thread(
+        processes[REPLY_PROCESS_SERVER],
+        UINT64_C(0x4100),
+        UINT64_C(0x13008000),
+        &server_extra_thread
+    );
+}
+
 static bool clear_staged_request(
     struct micros_thread_handle receiver_handle,
     struct micros_ipc_message *delivered
@@ -317,7 +328,7 @@ static bool clear_staged_request(
     ) == MICROS_ENDPOINT_OK;
 }
 
-static bool prepare_delivered_call(
+static bool stage_delivered_call(
     struct micros_thread_handle caller,
     size_t server_index,
     struct micros_ipc_message *request,
@@ -325,10 +336,12 @@ static bool prepare_delivered_call(
     uint64_t *reply_token
 )
 {
-    struct micros_ipc_message delivered;
+    struct micros_thread *receiver =
+        &objects.threads[primary_threads[server_index].slot];
 
     if (
-        micros_ipc_receiver_enqueue(
+        reply_token == NULL
+        || micros_ipc_receiver_enqueue(
             &registry,
             &objects,
             primary_threads[server_index],
@@ -342,16 +355,49 @@ static bool prepare_delivered_call(
             endpoints[server_index],
             request
         ) != MICROS_IPC_OK
+        || !receiver->ipc_delivery_pending
+        || receiver->ipc_receive_buffer != receive_buffer
+        || receiver->ipc_inbound_message.source
+            != endpoints[REPLY_PROCESS_CLIENT]
+        || receiver->ipc_inbound_message.reply_token == 0
+        || micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
+    }
+    *reply_token = receiver->ipc_inbound_message.reply_token;
+    return true;
+}
+
+static bool prepare_delivered_call(
+    struct micros_thread_handle caller,
+    size_t server_index,
+    struct micros_ipc_message *request,
+    uintptr_t receive_buffer,
+    uint64_t *reply_token
+)
+{
+    struct micros_ipc_message delivered;
+
+    if (
+        !stage_delivered_call(
+            caller,
+            server_index,
+            request,
+            receive_buffer,
+            reply_token
+        )
         || !clear_staged_request(
             primary_threads[server_index],
             &delivered
         )
         || delivered.source != endpoints[REPLY_PROCESS_CLIENT]
-        || delivered.reply_token == 0
+        || delivered.reply_token != *reply_token
     ) {
         return false;
     }
-    *reply_token = delivered.reply_token;
     return true;
 }
 
@@ -471,6 +517,225 @@ static bool expect_send_failure_unchanged(
     ));
     EXPECT_TRUE(
         memcmp(message, &message_snapshot, sizeof(*message)) == 0
+    );
+    return true;
+}
+
+static bool test_reply_requires_request_return(void)
+{
+    struct micros_ipc_message request = message_pattern(
+        UINT32_C(0x11111111),
+        UINT32_C(0x5001),
+        UINT64_C(0x1111111111111111),
+        UINT8_C(0x10)
+    );
+    struct micros_ipc_message reply = message_pattern(
+        UINT32_C(0x22222222),
+        UINT32_C(0x5002),
+        UINT64_C(0x2222222222222222),
+        UINT8_C(0x20)
+    );
+    struct micros_ipc_message reply_snapshot = reply;
+    struct micros_ipc_message staged_request;
+    struct micros_ipc_message delivered_request;
+    struct micros_ipc_message expected_reply;
+    struct micros_thread *caller;
+    struct micros_thread *replier;
+    struct micros_endpoint_record *server_endpoint;
+    uint64_t reply_token;
+
+    EXPECT_TRUE(
+        setup_reply_fixture()
+        && stage_delivered_call(
+            primary_threads[REPLY_PROCESS_CLIENT],
+            REPLY_PROCESS_SERVER,
+            &request,
+            UINT64_C(0x61000000),
+            &reply_token
+        )
+        && prepare_server_extra_thread()
+    );
+    staged_request = objects.threads[
+        primary_threads[REPLY_PROCESS_SERVER].slot
+    ].ipc_inbound_message;
+    EXPECT_TRUE(expect_reply_failure_unchanged(
+        MICROS_IPC_ERROR_REPLY_TOKEN,
+        server_extra_thread,
+        reply_token,
+        &reply
+    ));
+    EXPECT_TRUE(
+        clear_staged_request(
+            primary_threads[REPLY_PROCESS_SERVER],
+            &delivered_request
+        )
+        && memcmp(
+            &delivered_request,
+            &staged_request,
+            sizeof(staged_request)
+        ) == 0
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_reply(
+            &registry,
+            &objects,
+            server_extra_thread,
+            reply_token,
+            &reply
+        )
+    );
+    caller = &objects.threads[
+        primary_threads[REPLY_PROCESS_CLIENT].slot
+    ];
+    replier = &objects.threads[server_extra_thread.slot];
+    expected_reply = canonical_reply(
+        &reply_snapshot,
+        endpoints[REPLY_PROCESS_SERVER]
+    );
+    EXPECT_TRUE(
+        caller->runtime_flags == 0
+        && caller->ready_linked
+        && caller->ipc_delivery_pending
+        && caller->ipc_reply_token == 0
+        && caller->ipc_reply_callee == 0
+        && memcmp(
+            &caller->ipc_inbound_message,
+            &expected_reply,
+            sizeof(expected_reply)
+        ) == 0
+        && replier->runtime_flags == 0
+        && replier->ready_linked
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+        && memcmp(&reply, &reply_snapshot, sizeof(reply)) == 0
+    );
+    EXPECT_TRUE(
+        micros_thread_scheduler_hold(
+            &objects,
+            server_extra_thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && expect_reply_failure_unchanged(
+            MICROS_IPC_ERROR_REPLY_TOKEN,
+            server_extra_thread,
+            reply_token,
+            &reply
+        )
+    );
+
+    EXPECT_TRUE(
+        setup_reply_fixture()
+        && stage_delivered_call(
+            primary_threads[REPLY_PROCESS_CLIENT],
+            REPLY_PROCESS_SERVER,
+            &request,
+            UINT64_C(0x61000800),
+            &reply_token
+        )
+        && prepare_server_extra_thread()
+        && expect_reply_receive_failure_unchanged(
+            MICROS_IPC_ERROR_REPLY_TOKEN,
+            server_extra_thread,
+            reply_token,
+            &reply,
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x61001000)
+        )
+        && clear_staged_request(
+            primary_threads[REPLY_PROCESS_SERVER],
+            &delivered_request
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_reply_receive(
+            &registry,
+            &objects,
+            server_extra_thread,
+            reply_token,
+            &reply,
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x61001000)
+        )
+    );
+    caller = &objects.threads[
+        primary_threads[REPLY_PROCESS_CLIENT].slot
+    ];
+    replier = &objects.threads[server_extra_thread.slot];
+    server_endpoint = &registry.endpoints[REPLY_PROCESS_SERVER];
+    EXPECT_TRUE(
+        caller->runtime_flags == 0
+        && caller->ready_linked
+        && caller->ipc_delivery_pending
+        && caller->ipc_reply_token == 0
+        && caller->ipc_reply_callee == 0
+        && replier->runtime_flags == MICROS_THREAD_RTS_IPC_RECEIVE
+        && !replier->ready_linked
+        && replier->ipc_queue_kind == MICROS_IPC_QUEUE_RECEIVER
+        && replier->ipc_receive_source == MICROS_ENDPOINT_ANY
+        && replier->ipc_receive_buffer == UINT64_C(0x61001000)
+        && server_endpoint->receiver_head.slot
+            == server_extra_thread.slot
+        && server_endpoint->receiver_head.generation
+            == server_extra_thread.generation
+        && server_endpoint->receiver_tail.slot
+            == server_extra_thread.slot
+        && server_endpoint->receiver_tail.generation
+            == server_extra_thread.generation
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+        && memcmp(&reply, &reply_snapshot, sizeof(reply)) == 0
+    );
+    return true;
+}
+
+static bool test_staged_call_tokens_are_unique(void)
+{
+    struct micros_ipc_message request = message_pattern(
+        UINT32_C(0x33333333),
+        UINT32_C(0x5003),
+        UINT64_C(0x3333333333333333),
+        UINT8_C(0x30)
+    );
+    struct micros_thread *receiver;
+    struct micros_thread *duplicate;
+    uint64_t reply_token;
+
+    EXPECT_TRUE(
+        setup_reply_fixture()
+        && stage_delivered_call(
+            primary_threads[REPLY_PROCESS_CLIENT],
+            REPLY_PROCESS_SERVER,
+            &request,
+            UINT64_C(0x61001800),
+            &reply_token
+        )
+        && prepare_server_extra_thread()
+        && reply_token != 0
+        && micros_thread_runtime_flags_unset(
+            &objects,
+            server_extra_thread,
+            MICROS_THREAD_RTS_INACTIVE
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
+    receiver = &objects.threads[
+        primary_threads[REPLY_PROCESS_SERVER].slot
+    ];
+    duplicate = &objects.threads[server_extra_thread.slot];
+    duplicate->ipc_receive_buffer = UINT64_C(0x61002000);
+    duplicate->ipc_delivery_pending = true;
+    duplicate->ipc_inbound_message =
+        receiver->ipc_inbound_message;
+    duplicate->ipc_staged_result = MICROS_IPC_OK;
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_ERROR_INVARIANT
     );
     return true;
 }
@@ -1772,6 +2037,14 @@ bool micros_ipc_reply_test_run(void)
         const char *name;
         bool (*run)(void);
     } tests[] = {
+        {
+            "staged call tokens are unique",
+            test_staged_call_tokens_are_unique,
+        },
+        {
+            "reply requires request return",
+            test_reply_requires_request_return,
+        },
         {
             "reply routes exact tokens without send target",
             test_reply_routes_exact_tokens_without_send_target,

@@ -328,6 +328,29 @@ static enum micros_ipc_error resolve_reply_waiter(
     return MICROS_IPC_OK;
 }
 
+static bool reply_request_is_pending(
+    const struct micros_kernel_objects *objects,
+    uint64_t reply_token
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && thread->ipc_delivery_pending
+            && thread->ipc_staged_result == MICROS_IPC_OK
+            && thread->ipc_inbound_message.reply_token
+                == reply_token
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool thread_is_held_and_clear(
     const struct micros_thread *thread
 )
@@ -711,6 +734,9 @@ static enum micros_ipc_error preflight_reply(
     );
     if (error != MICROS_IPC_OK) {
         return error;
+    }
+    if (reply_request_is_pending(objects, reply_token)) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
     canonicalize_message(
         &snapshot,

@@ -37,8 +37,12 @@ reply buffer while only reply wait remains. Portable reply now resolves an
 opaque token with a bounded thread scan, requires the exact active callee and
 reply operation, stages a canonical token-zero response, consumes the
 one-shot right, and wakes the caller only when no independent run-time flag
-remains. The token bypasses only the ordinary send-target mask. These
-operations currently consume scheduler-held non-current callers. Portable
+remains. Another thread owned by the callee endpoint may use the token only
+after the token-bearing request completion returns; an early attempt preserves
+all state and reports a reply-token error. Validation rejects duplicate staged
+copies carrying one call token. The token bypasses only the ordinary
+send-target mask. These operations currently consume scheduler-held
+non-current callers. Portable
 `reply_receive` now shares reply's complete token and message preflight,
 requires its distinct operation authority, validates a specific source or
 `ANY` plus the receive buffer, and commits the caller reply together with

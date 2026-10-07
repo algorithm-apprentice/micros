@@ -146,11 +146,12 @@ retained reply buffers, and byte-exact failure preservation including
 scheduler-transition rejection.
 Authorized reply tests prove bounded opaque-token lookup, exact caller-thread
 and callee-generation matching, rejection before queued calls enter reply
-wait, active endpoint and reply-operation enforcement, token-authorized bypass
-of an absent ordinary send-target permission, canonical replying source and
-zero delivered token, one-shot consumption, preservation of independent
-caller run-time flags, wakeup only at the zero boundary, validator rejection
-of noncanonical staged replies, and complete state/token preservation on every
+wait or before the token-bearing request completion returns, active endpoint
+and reply-operation enforcement, token-authorized bypass of an absent ordinary
+send-target permission, canonical replying source and zero delivered token,
+one-shot consumption, preservation of independent caller run-time flags,
+wakeup only at the zero boundary, validator rejection of noncanonical or
+duplicate staged call tokens, and complete state/token preservation on every
 failure including a late scheduler preflight rejection. The seeded endpoint
 model also exercises allowed and denied reply-operation authorization.
 Authorized reply/receive tests prove that the combined operation has distinct
@@ -200,8 +201,9 @@ two model threads each, and independently compares complete run-time flags,
 sender/receiver queues, reply tokens, notification masks, staged messages and
 results, plus ready-queue/current scheduler state after every transition.
 Its trace covers all IPC operations, close/reuse, profile denial, malformed
-input, and deadlock, and prints the replayable seed plus a trace hash on
-success and the recent complete operation trace on failure.
+input, reply-before-request-return rejection, and deadlock, and prints the
+replayable seed plus a trace hash on success and the recent complete operation
+trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-ipc-model` contains the replayable endpoint lifecycle, notification,

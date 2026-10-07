@@ -74,7 +74,8 @@ The current implementation provides:
   complete failure atomicity;
 - native authorized reply tests covering bounded opaque-token resolution,
   exact callee generations, active reply-operation authority without ordinary
-  send-target permission, canonical source/token replacement, one-shot
+  send-target permission, request-return gating for sibling callee threads,
+  unique staged call tokens, canonical source/token replacement, one-shot
   consumption, independent caller blocking reasons, scheduler wakeup, and
   byte-exact failure preservation;
 - native failure-atomic reply/receive tests covering distinct combined
@@ -125,8 +126,11 @@ queue, and leaves the exact caller in reply-only wait with its reply buffer
 retained. Portable reply resolves that opaque token through the fixed thread
 table, requires the exact active callee and reply operation, stages a
 token-zero canonical response, consumes the one-shot authority, and wakes the
-caller only when no independent run-time flag remains. Token authority bypasses
-the ordinary send-target mask without bypassing reply-operation policy.
+caller only when no independent run-time flag remains. A sibling callee thread
+cannot present the token until the token-bearing request completion returns;
+failed early reply preserves every byte. Endpoint validation also rejects
+duplicate staged copies carrying one call token. Token authority bypasses the
+ordinary send-target mask without bypassing reply-operation policy.
 Portable `reply_receive` applies the same token, callee, canonical-message, and
 retained-buffer checks, requires the distinct combined-operation bit, and
 preflights the receive state after the caller wake. One non-failing commit then
