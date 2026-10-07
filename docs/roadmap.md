@@ -93,8 +93,14 @@ retains the exact prevalidated physical chunks through commit, patches stable
 `a0` results, stores the exact selected context, clears the completion, and
 only then commits scheduler selection after timer/accounting preparation.
 Malformed residual non-pending completion state is an invariant failure.
-Kernel IRQ injection, production trap dispatch, and the syscall ABI remain
-dependency-ready follow-up work; they are not
+Production U-mode `ecall` routing now captures the six stable operation
+numbers, advances `sepc`, preflights target arguments and buffers, executes the
+current-thread guard transaction, maps stable results, stages immediate
+completion, and selects ordinary or captured return. A focused QEMU gate proves
+real instruction entry, successful notify commit, unauthorized-send rollback,
+upper endpoint rejection, register preservation, and baseline restoration.
+Kernel IRQ injection and the complete multi-process normal/expected-panic
+syscall acceptance matrix remain dependency-ready follow-up work; they are not
 silently supplied by the acceptance component. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a

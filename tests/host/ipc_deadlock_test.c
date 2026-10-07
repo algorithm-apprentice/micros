@@ -318,7 +318,8 @@ static bool expect_call_failure_unchanged(
             &objects,
             caller,
             destination,
-            &message
+            &message,
+            (uintptr_t)&message
         )
     );
     EXPECT_TRUE(state_is_unchanged(
@@ -450,8 +451,9 @@ static bool prepare_delivered_call(
             &objects,
             primary_threads[caller_index],
             endpoints[server_index],
-            &request
-        ) == MICROS_IPC_OK
+            &request,
+            (uintptr_t)&request
+) == MICROS_IPC_OK
         && clear_staged_request(
             primary_threads[server_index],
             reply_token
@@ -643,7 +645,8 @@ static bool test_receive_and_call_cycles(void)
             &objects,
             primary_threads[0],
             endpoints[1],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     EXPECT_TRUE(registry.last_reply_token == 1);
@@ -684,7 +687,8 @@ static bool test_dependency_precedence_and_any_termination(void)
             &objects,
             primary_threads[1],
             endpoints[2],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     queued_call = &objects.threads[primary_threads[1].slot];

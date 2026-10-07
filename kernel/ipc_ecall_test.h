@@ -1,0 +1,17 @@
+#ifndef MICROS_KERNEL_IPC_ECALL_TEST_H
+#define MICROS_KERNEL_IPC_ECALL_TEST_H
+
+#include <stdbool.h>
+
+struct micros_hart;
+struct micros_trap_frame;
+
+bool micros_ipc_ecall_core_test_finish_trap(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+);
+
+_Noreturn void micros_ipc_ecall_core_runtime_run_self_test(void);
+_Noreturn void micros_ipc_ecall_core_test_finish(void);
+
+#endif

@@ -798,8 +798,9 @@ bool micros_ipc_runtime_run_self_test(void)
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
-            &send_messages[2]
-        ) != MICROS_IPC_OK
+            &send_messages[2],
+            (uintptr_t)&send_messages[2]
+) != MICROS_IPC_OK
     ) {
         goto done;
     }
@@ -886,8 +887,9 @@ bool micros_ipc_runtime_run_self_test(void)
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
-            &send_messages[3]
-        ) != MICROS_IPC_OK
+            &send_messages[3],
+            (uintptr_t)&send_messages[3]
+) != MICROS_IPC_OK
     ) {
         goto done;
     }
@@ -995,8 +997,9 @@ bool micros_ipc_runtime_run_self_test(void)
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
-            &send_messages[5]
-        ) != MICROS_IPC_OK
+            &send_messages[5],
+            (uintptr_t)&send_messages[5]
+) != MICROS_IPC_OK
     ) {
         goto done;
     }
@@ -1167,8 +1170,9 @@ bool micros_ipc_runtime_run_self_test(void)
             objects,
             threads[IPC_TEST_CLIENT],
             endpoints[IPC_TEST_SERVER],
-            &send_messages[0]
-        ) != MICROS_IPC_OK
+            &send_messages[0],
+            (uintptr_t)&send_messages[0]
+) != MICROS_IPC_OK
     ) {
         goto done;
     }

@@ -25,6 +25,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-object-model",
     "test-qemu-endpoint",
     "test-qemu-ipc",
+    "test-qemu-ipc-ecall-core",
     "test-qemu-nested-trap",
     "test-qemu-frame-ownership",
     "test-qemu-user-address-space",
@@ -101,6 +102,12 @@ GATE_INPUTS = {
         "kernel/endpoint.c",
         "kernel/kernel_objects.c",
         "kernel/ipc_test.c",
+    ),
+    "test-qemu-ipc-ecall-core": (
+        "kernel/ipc_abi.c",
+        "kernel/ipc_syscall.c",
+        "kernel/ipc_ecall_test.c",
+        "arch/riscv64/ipc_ecall_test.S",
     ),
     "test-qemu-nested-trap": ("arch/riscv64/nested_trap_test.S",),
     "test-qemu-frame-ownership": (

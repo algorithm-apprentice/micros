@@ -23,7 +23,8 @@ enum micros_ipc_error micros_ipc_call(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle caller,
     micros_endpoint_t destination,
-    struct micros_ipc_message *message
+    const struct micros_ipc_message *request,
+    uintptr_t reply_buffer
 );
 
 enum micros_ipc_error micros_ipc_reply(

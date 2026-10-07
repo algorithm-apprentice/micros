@@ -4,6 +4,10 @@
 #include <stdint.h>
 
 #include "arch/riscv64/platform.h"
+#ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
+#include "kernel/ipc_ecall_test.h"
+#endif
+#include "kernel/ipc_syscall.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -17,6 +21,7 @@
 
 enum {
     MICROS_EXCEPTION_ILLEGAL_INSTRUCTION = 2,
+    MICROS_EXCEPTION_USER_ECALL = 8,
     MICROS_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
@@ -476,6 +481,58 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             }
 #endif
         }
+#ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
+        if (
+            !user_timer
+            && cause_code == MICROS_EXCEPTION_USER_ECALL
+            && frame->a7 == UINT64_MAX
+        ) {
+            if (
+                !micros_ipc_ecall_core_test_finish_trap(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-ecall-core-finish",
+                    frame
+                );
+            }
+            return;
+        }
+#endif
+#if !defined(MICROS_BUILD_USER_EXECUTION_TEST) \
+    && !defined(MICROS_BUILD_SCHEDULER_TEST) \
+    && !defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
+    && !defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+        if (
+            !user_timer
+            && cause_code == MICROS_EXCEPTION_USER_ECALL
+        ) {
+            enum micros_ipc_syscall_return ipc_return =
+                micros_ipc_handle_user_ecall(hart, frame);
+            enum micros_scheduler_error scheduler_error =
+                ipc_return == MICROS_IPC_SYSCALL_RETURN_CAPTURED
+                    ? micros_scheduler_select_captured_user_return(
+                        hart,
+                        frame
+                    )
+                    : micros_scheduler_select_user_return(
+                        hart,
+                        frame
+                    );
+
+            if (scheduler_error != MICROS_SCHEDULER_OK) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "ipc-syscall-return",
+                    frame
+                );
+            }
+            return;
+        }
+#endif
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
         if (

@@ -2287,7 +2287,8 @@ enum micros_ipc_error micros_ipc_call(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle caller_handle,
     micros_endpoint_t destination_endpoint,
-    struct micros_ipc_message *message
+    const struct micros_ipc_message *request,
+    uintptr_t reply_buffer
 )
 {
     struct micros_thread_handle matched_receiver = {0, 0};
@@ -2300,11 +2301,13 @@ enum micros_ipc_error micros_ipc_call(
     if (
         registry == NULL
         || objects == NULL
-        || message == NULL
-        || (uintptr_t)message % _Alignof(struct micros_ipc_message)
+        || request == NULL
+        || (uintptr_t)request % _Alignof(struct micros_ipc_message)
             != 0
+        || reply_buffer == 0
+        || reply_buffer % _Alignof(struct micros_ipc_message) != 0
         || (
-            message->type
+            request->type
             & MICROS_IPC_TYPE_KERNEL_MASK
         ) != 0
     ) {
@@ -2339,7 +2342,7 @@ enum micros_ipc_error micros_ipc_call(
     reply_token = registry->last_reply_token + 1;
     canonicalize_message(
         &snapshot,
-        message,
+        request,
         source_endpoint,
         reply_token
     );
@@ -2350,7 +2353,7 @@ enum micros_ipc_error micros_ipc_call(
         destination_endpoint,
         &snapshot,
         reply_token,
-        (uintptr_t)message,
+        reply_buffer,
         &matched_receiver
     );
     if (error == MICROS_IPC_OK) {
@@ -2377,7 +2380,7 @@ enum micros_ipc_error micros_ipc_call(
         destination_endpoint,
         &snapshot,
         reply_token,
-        (uintptr_t)message,
+        reply_buffer,
         true
     );
     if (error == MICROS_IPC_OK) {

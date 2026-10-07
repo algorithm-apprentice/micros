@@ -353,8 +353,9 @@ static bool stage_delivered_call(
             &objects,
             caller,
             endpoints[server_index],
-            request
-        ) != MICROS_IPC_OK
+            request,
+            (uintptr_t)request
+) != MICROS_IPC_OK
         || !receiver->ipc_delivery_pending
         || receiver->ipc_receive_buffer != receive_buffer
         || receiver->ipc_inbound_message.source
@@ -1122,7 +1123,8 @@ static bool test_reply_rejections_are_atomic(void)
             &objects,
             primary_threads[REPLY_PROCESS_CLIENT],
             endpoints[REPLY_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     caller = &objects.threads[
@@ -1583,7 +1585,8 @@ static bool test_reply_receive_selects_specific_sender_atomically(void)
             &objects,
             client_extra_thread,
             endpoints[REPLY_PROCESS_SERVER],
-            &second_request
+            &second_request,
+            (uintptr_t)&second_request
         )
     );
     second_token =

@@ -114,6 +114,9 @@ The current implementation provides:
 - an isolated endpoint/profile QEMU component gate;
 - an isolated blocking IPC QEMU component gate using trusted kernel-owned
   messages before the syscall ABI exists;
+- an isolated production IPC ecall core gate using real U-mode instructions,
+  transactional current-thread guard commit/rollback, completion return,
+  stable errors, and baseline restoration;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
@@ -176,9 +179,12 @@ blocked delivery, token reply, `reply_receive`, notification, deadlock, close,
 reuse, and baseline restoration using trusted kernel-owned buffers. These
 operations still expose a portable scheduler-held boundary. The target now
 provides one authoritative registry, bounded user-buffer copy, reversible
-current-thread guard, and shared selected-thread completion return. Kernel IRQ
-injection, production trap dispatch, and the syscall ABI remain separate later
-slices.
+current-thread guard, shared selected-thread completion return, stable IPC
+operation/result numbers, and production U-ecall trap routing. A focused QEMU
+gate proves immediate success, portable failure rollback, target preflight
+failure, register preservation, and cleanup. Kernel IRQ injection and the full
+six-operation normal/expected-panic syscall acceptance matrix remain separate
+later slices.
 
 ## Prerequisites
 
@@ -750,6 +756,31 @@ MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized n
 The host gate rejects missing, duplicated, malformed, unterminated, or early
 records and independently requires the normal object, trap, FDT, allocator,
 MMU, and frame-ownership readiness evidence plus clean SBI shutdown.
+
+## Production IPC ecall core test
+
+Build and run the focused production trap/adapter gate with:
+
+```bash
+cmake --workflow --preset test-qemu-ipc-ecall-core
+```
+
+The image enters one real U-mode client through the production scheduler and
+executes actual `ecall` instructions. An allowed `notify` proves current-guard
+commit, no-message completion staging, captured-context return, `a0 == 0`, and
+pending-event publication. An unauthorized `send` proves portable failure
+rollback and stable `-3`; a 64-bit endpoint value proves target rejection and
+stable `-1` before guard mutation. Every ecall advances `sepc` exactly four
+bytes and preserves non-result register patterns. The test then returns to a
+supervisor continuation, closes both endpoints, tears down the user address
+space and thread, restores frame/object baselines, and emits:
+
+```text
+MICROS_IPC_ECALL_CORE_TEST_PASS dispatch=production guard=transactional completion=returned errors=stable registers=preserved
+```
+
+The complete three-address-space six-operation normal and expected-panic
+syscall matrix remains the next dependency-ready acceptance PR.
 
 ## Scheduler test
 

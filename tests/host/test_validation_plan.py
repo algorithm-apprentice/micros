@@ -181,6 +181,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-object-model": "kernel/object_model_test.c",
             "test-qemu-endpoint": "kernel/endpoint_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
+            "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
             "test-qemu-nested-trap": "arch/riscv64/nested_trap_test.S",
             "test-qemu-frame-ownership": "kernel/frame_ownership_test.c",
             "test-qemu-user-address-space": "kernel/user_address_space_test.c",

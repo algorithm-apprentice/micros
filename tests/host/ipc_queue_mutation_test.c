@@ -209,7 +209,8 @@ static bool test_sender_and_receiver_enqueue(void)
             &objects,
             threads[1],
             endpoints[2],
-            &call
+            &call,
+            (uintptr_t)&call
         )
     );
     EXPECT_IPC_ERROR(

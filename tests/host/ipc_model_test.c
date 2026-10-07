@@ -3186,8 +3186,9 @@ static enum micros_ipc_error production_execute_action(
             &objects,
             thread,
             action->endpoint,
-            action->message
-        );
+            action->message,
+            (uintptr_t)action->message
+);
     case MODEL_OPERATION_REPLY:
         return micros_ipc_reply(
             &registry,
