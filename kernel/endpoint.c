@@ -1004,8 +1004,60 @@ static bool reply_wait_state_is_valid(
     return callee->state == MICROS_ENDPOINT_STATE_ACTIVE;
 }
 
+static bool staged_reply_token_binding_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_thread *receiver,
+    const struct micros_endpoint_record *receiver_endpoint
+)
+{
+    const struct micros_thread *caller = NULL;
+    const struct micros_endpoint_record *caller_endpoint;
+    uint64_t reply_token =
+        receiver->ipc_inbound_message.reply_token;
+    size_t index;
+
+    if (reply_token == 0) {
+        return true;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *candidate =
+            &objects->threads[index];
+
+        if (
+            candidate->slot_state
+                != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || candidate->ipc_reply_token != reply_token
+        ) {
+            continue;
+        }
+        if (caller != NULL) {
+            return false;
+        }
+        caller = candidate;
+    }
+    if (
+        caller == NULL
+        || !reply_wait_state_is_valid(registry, caller)
+    ) {
+        return false;
+    }
+    caller_endpoint = &registry->endpoints[caller->owner.slot];
+    return (
+        caller_endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && process_handles_equal(
+            caller_endpoint->owner,
+            caller->owner
+        )
+        && receiver->ipc_inbound_message.source
+            == caller_endpoint->value
+        && caller->ipc_reply_callee == receiver_endpoint->value
+    );
+}
+
 static bool staged_delivery_state_is_valid(
     const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     const struct micros_thread *thread
 )
 {
@@ -1016,7 +1068,10 @@ static bool staged_delivery_state_is_valid(
     if (
         thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         || !thread_handle_is_zero(thread->ipc_next)
-        || thread->runtime_flags != 0
+        || (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) != 0
         || !bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
@@ -1043,7 +1098,15 @@ static bool staged_delivery_state_is_valid(
     ) {
         return false;
     }
-    return source->state == MICROS_ENDPOINT_STATE_ACTIVE;
+    return (
+        source->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && staged_reply_token_binding_is_valid(
+            registry,
+            objects,
+            thread,
+            owner
+        )
+    );
 }
 
 static bool thread_has_no_ipc_flags(
@@ -1332,6 +1395,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                             )
                             && !staged_delivery_state_is_valid(
                                 registry,
+                                objects,
                                 thread
                             )
                         )
@@ -1351,6 +1415,13 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
         }
         if (thread->ipc_reply_token == 0) {
             continue;
+        }
+        if (
+            registry->last_reply_token == 0
+            || thread->ipc_reply_token
+                > registry->last_reply_token
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
         }
         for (other_index = 0; other_index < index; ++other_index) {
             const struct micros_thread *other =

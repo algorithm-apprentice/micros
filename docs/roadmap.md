@@ -30,9 +30,13 @@ senders in reply wait, and make ordinary participants runnable through the
 scheduler. Portable ordinary send and receive now enforce exact active
 endpoints, operation and target-profile authorization, canonical snapshots,
 immediate matching before blocking, and specific or `ANY` FIFO selection.
-These operations currently consume scheduler-held non-current callers; the
-target current-thread adapter, deadlock detection, call/reply, notifications,
-endpoint cancellation, and the syscall ABI remain dependency-ready follow-up
+Portable call now allocates monotonic nonzero reply tokens from fixed kernel
+state, binds each token to the exact caller thread and callee generation,
+delivers it through immediate or queued request paths, and retains the caller's
+reply buffer while only reply wait remains. These operations currently consume
+scheduler-held non-current callers; reply consumption, `reply_receive`,
+notifications, deadlock detection, endpoint cancellation, the target
+current-thread adapter, and the syscall ABI remain dependency-ready follow-up
 work.
 
 ## v0.1 completion goal

@@ -66,6 +66,7 @@ struct micros_endpoint_record {
 struct micros_endpoint_registry {
     uint64_t initialization_magic;
     size_t profile_count;
+    uint64_t last_reply_token;
     struct micros_privilege_profile
         profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY];
     struct micros_endpoint_record endpoints[MICROS_PROCESS_CAPACITY];

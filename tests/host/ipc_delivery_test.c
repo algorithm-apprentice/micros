@@ -24,6 +24,8 @@ static struct micros_thread_handle
     destination_threads[DELIVERY_DESTINATION_THREAD_COUNT];
 static struct micros_thread_handle anchor_thread;
 static struct micros_hart_handle hart;
+static struct micros_ipc_message
+    source_messages[DELIVERY_SOURCE_COUNT];
 
 bool micros_ipc_delivery_test_run(void);
 
@@ -162,6 +164,7 @@ static bool setup_delivery_fixture(void)
 
     memset(&registry, 0, sizeof(registry));
     memset(&objects, 0, sizeof(objects));
+    memset(source_messages, 0, sizeof(source_messages));
     if (
         micros_endpoint_registry_initialize(&registry, &profile, 1)
             != MICROS_ENDPOINT_OK
@@ -369,16 +372,24 @@ static bool enqueue_sender(size_t index, bool call)
         (uint8_t)(10 + index)
     );
 
+    if (call) {
+        source_messages[index] = message;
+        return micros_ipc_call(
+            &registry,
+            &objects,
+            source_threads[index],
+            endpoints[DELIVERY_PROCESS_DESTINATION],
+            &source_messages[index]
+        ) == MICROS_IPC_OK;
+    }
     return micros_ipc_sender_enqueue(
         &registry,
         &objects,
         source_threads[index],
         endpoints[DELIVERY_PROCESS_DESTINATION],
         &message,
-        call ? UINT64_C(700) + index : 0,
-        call
-            ? UINT64_C(0x40000000) + index * UINT64_C(0x1000)
-            : 0
+        0,
+        0
     ) == MICROS_IPC_OK;
 }
 
@@ -512,8 +523,9 @@ static bool test_receiver_keeps_call_in_reply_wait(void)
         && caller->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
         && thread_handle_is_zero(caller->ipc_next)
         && caller->ipc_send_destination == 0
-        && caller->ipc_receive_buffer == UINT64_C(0x40001000)
-        && caller->ipc_reply_token == UINT64_C(701)
+        && caller->ipc_receive_buffer
+            == (uintptr_t)&source_messages[1]
+        && caller->ipc_reply_token == 1
         && caller->ipc_reply_callee
             == endpoints[DELIVERY_PROCESS_DESTINATION]
     );
@@ -524,7 +536,7 @@ static bool test_receiver_keeps_call_in_reply_wait(void)
             sizeof(expected_message)
         ) == 0
         && receiver->ipc_inbound_message.reply_token
-            == UINT64_C(701)
+            == 1
     );
     expected_ready[0] = anchor_thread;
     expected_ready[1] = destination_threads[0];
@@ -786,15 +798,12 @@ static bool test_stale_and_corrupt_queues_preserve_state(void)
 
 static bool test_independently_blocked_receiver_is_preserved(void)
 {
-    struct micros_endpoint_registry registry_snapshot;
-    struct micros_kernel_objects objects_snapshot;
-    struct micros_thread_handle output = {
-        UINT16_C(94),
-        UINT32_C(0xddeeff00),
-    };
-    const struct micros_thread_handle output_snapshot = output;
+    struct micros_thread_handle output = {0, 0};
     struct micros_ipc_message message =
         message_pattern(1, 500, 2, 60);
+    struct micros_ipc_message expected = message;
+    const struct micros_thread *sender;
+    const struct micros_thread *receiver;
 
     EXPECT_TRUE(setup_delivery_fixture());
     EXPECT_TRUE(enqueue_receiver(1, MICROS_ENDPOINT_ANY));
@@ -804,10 +813,8 @@ static bool test_independently_blocked_receiver_is_preserved(void)
         micros_endpoint_registry_validate_objects(&registry, &objects)
             == MICROS_ENDPOINT_OK
     );
-    registry_snapshot = registry;
-    objects_snapshot = objects;
     EXPECT_IPC_ERROR(
-        MICROS_IPC_ERROR_STATE,
+        MICROS_IPC_OK,
         micros_ipc_sender_commit_delivery(
             &registry,
             &objects,
@@ -817,13 +824,39 @@ static bool test_independently_blocked_receiver_is_preserved(void)
             &output
         )
     );
+    expected.source = endpoints[0];
+    expected.reply_token = 0;
+    sender = &objects.threads[source_threads[0].slot];
+    receiver = &objects.threads[destination_threads[1].slot];
     EXPECT_TRUE(
-        state_and_output_unchanged(
-            &registry_snapshot,
-            &objects_snapshot,
-            output,
-            output_snapshot
+        thread_handles_equal(output, destination_threads[1])
+        && sender->runtime_flags == 0
+        && sender->ready_linked
+        && receiver->runtime_flags == MICROS_THREAD_RTS_INACTIVE
+        && !receiver->ready_linked
+        && receiver->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread_handle_is_zero(receiver->ipc_next)
+        && receiver->ipc_receive_source == 0
+        && receiver->ipc_delivery_pending
+        && memcmp(
+            &receiver->ipc_inbound_message,
+            &expected,
+            sizeof(expected)
+        ) == 0
+        && thread_handle_is_zero(
+            registry.endpoints[
+                DELIVERY_PROCESS_DESTINATION
+            ].receiver_head
         )
+        && thread_handle_is_zero(
+            registry.endpoints[
+                DELIVERY_PROCESS_DESTINATION
+            ].receiver_tail
+        )
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
     );
     return true;
 }

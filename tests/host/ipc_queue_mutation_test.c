@@ -204,14 +204,12 @@ static bool test_sender_and_receiver_enqueue(void)
     );
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
-        micros_ipc_sender_enqueue(
+        micros_ipc_call(
             &registry,
             &objects,
             threads[1],
             endpoints[2],
-            &call,
-            77,
-            UINT64_C(0x40001000)
+            &call
         )
     );
     EXPECT_IPC_ERROR(
@@ -239,10 +237,10 @@ static bool test_sender_and_receiver_enqueue(void)
         && first->ipc_outbound_message.payload[0] == 1
         && first->runtime_flags == MICROS_THREAD_RTS_IPC_SEND
         && second->ipc_outbound_message.source == endpoints[1]
-        && second->ipc_outbound_message.reply_token == 77
-        && second->ipc_reply_token == 77
+        && second->ipc_outbound_message.reply_token == 1
+        && second->ipc_reply_token == 1
         && second->ipc_reply_callee == endpoints[2]
-        && second->ipc_receive_buffer == UINT64_C(0x40001000)
+        && second->ipc_receive_buffer == (uintptr_t)&call
         && second->runtime_flags
             == (
                 MICROS_THREAD_RTS_IPC_SEND
@@ -304,6 +302,18 @@ static bool test_enqueue_failures_preserve_state(void)
             &message,
             1,
             0
+        )
+    );
+    EXPECT_REJECTED(
+        MICROS_IPC_ERROR_REPLY_TOKEN,
+        micros_ipc_sender_enqueue(
+            &registry,
+            &objects,
+            threads[0],
+            endpoints[2],
+            &message,
+            1,
+            UINT64_C(0x40001000)
         )
     );
     message.type |= MICROS_IPC_TYPE_KERNEL_MASK;
@@ -422,7 +432,7 @@ static bool test_matching_peer_is_not_enqueued(void)
     return true;
 }
 
-static bool test_duplicate_token_and_thread_are_rejected(void)
+static bool test_nonzero_token_and_thread_reuse_are_rejected(void)
 {
     struct micros_ipc_message message =
         message_pattern(0, 50, 0, 5);
@@ -430,8 +440,11 @@ static bool test_duplicate_token_and_thread_are_rejected(void)
     struct micros_kernel_objects objects_snapshot;
 
     EXPECT_TRUE(setup_mutation_fixture());
+    registry.last_reply_token = 77;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
     EXPECT_IPC_ERROR(
-        MICROS_IPC_OK,
+        MICROS_IPC_ERROR_REPLY_TOKEN,
         micros_ipc_sender_enqueue(
             &registry,
             &objects,
@@ -442,17 +455,23 @@ static bool test_duplicate_token_and_thread_are_rejected(void)
             UINT64_C(0x40004000)
         )
     );
-    registry_snapshot = registry;
-    objects_snapshot = objects;
+    EXPECT_TRUE(
+        memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
     EXPECT_IPC_ERROR(
         MICROS_IPC_ERROR_REPLY_TOKEN,
         micros_ipc_sender_enqueue(
             &registry,
             &objects,
-            threads[1],
+            threads[0],
             endpoints[2],
             &message,
-            77,
+            78,
             UINT64_C(0x40005000)
         )
     );
@@ -464,6 +483,20 @@ static bool test_duplicate_token_and_thread_are_rejected(void)
         ) == 0
         && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
     );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_sender_enqueue(
+            &registry,
+            &objects,
+            threads[0],
+            endpoints[2],
+            &message,
+            0,
+            0
+        )
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
     EXPECT_IPC_ERROR(
         MICROS_IPC_ERROR_STATE,
         micros_ipc_sender_enqueue(
@@ -493,6 +526,6 @@ bool micros_ipc_queue_mutation_test_run(void)
         test_sender_and_receiver_enqueue()
         && test_enqueue_failures_preserve_state()
         && test_matching_peer_is_not_enqueued()
-        && test_duplicate_token_and_thread_are_rejected()
+        && test_nonzero_token_and_thread_reuse_are_rejected()
     );
 }
