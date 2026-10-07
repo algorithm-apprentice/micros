@@ -121,12 +121,13 @@ terminal quarantine, failure-atomic endpoint cancellation, an authoritative
 target runtime, a 4,096-transition model, and endpoint QEMU evidence. Checked
 copy is the next separate design-implementation pair. The user-runtime syscall
 ABI remains a later reviewed task.
-Accepted ADR-0039 now defines the next single outcome: one-page-bounded
-failure-atomic checked copies using the merged grant registry, exact
-participant generations, retained physical plans, and a dedicated QEMU grant
-component. This first implementation is bootstrap-phase-only; post-handoff
-service use requires a later reviewed mapping-authority replacement. The user
-syscall/runtime ABI remains outside that implementation.
+ADR-0039's one-page-bounded checked copies are now implemented using exact
+grant participants, retained at-most-two-page physical plans, explicit
+direction and bounds, failure-atomic commit, native/model evidence, and a
+three-address-space QEMU grant gate. This implementation is
+bootstrap-phase-only; post-handoff service use requires a later reviewed
+mapping-authority replacement. The user syscall/runtime ABI remains outside
+this outcome.
 
 ## v0.1 completion goal
 

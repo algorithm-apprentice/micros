@@ -24,6 +24,10 @@ bool micros_kernel_object_runtime_run_self_test(void);
 bool micros_endpoint_runtime_run_self_test(void);
 #endif
 
+#ifdef MICROS_BUILD_GRANT_TEST
+bool micros_grant_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_IPC_TEST
 bool micros_ipc_runtime_run_self_test(void);
 #endif
@@ -404,6 +408,19 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "generation=validated profiles=immutable "
         "visibility=staged authorization=separate "
         "grants=generation-safe\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_GRANT_TEST
+    if (!micros_grant_runtime_run_self_test()) {
+        MICROS_PANIC(hart_id, "grant-test");
+    }
+    uart_write(
+        "MICROS_GRANT_TEST_PASS "
+        "identity=generation-safe directions=checked "
+        "bounds=validated copies=atomic "
+        "phase=bootstrap cleanup=complete\n"
     );
     uart_flush();
 #endif
