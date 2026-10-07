@@ -138,7 +138,9 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        kernel/ipc.c
         tests/host/ipc_queue_test.c
+        tests/host/ipc_queue_mutation_test.c
         tests/host/ipc_state_test.c
         tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c
@@ -402,6 +404,7 @@ add_executable(
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/frame_ownership.c
+    kernel/ipc.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/scheduler_core.c

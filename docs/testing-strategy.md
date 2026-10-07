@@ -112,9 +112,11 @@ also cover generation-safe sender/receiver FIFO topology, exact queue
 membership, stale links, cycles, duplicate membership, and close rejection
 while queues or exact-source/reply waiters remain attached. Canonical queued
 call and queue-less reply-wait shapes, unique token values, reserved message
-types, and impossible already-matchable queue pairs are validated too. The
-Python host tests include ELF allocatable-section closure, legacy-global
-rejection, and machine-readable QEMU record regressions.
+types, and impossible already-matchable queue pairs are validated too.
+Failure-atomic enqueue tests prove canonical source/token overwrite, FIFO tail
+append, duplicate-token rejection, and detection of a matching peer before
+blocking. The Python host tests include ELF allocatable-section closure,
+legacy-global rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
