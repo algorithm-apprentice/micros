@@ -58,6 +58,9 @@ The current implementation provides:
   message ownership, token uniqueness, and ready-peer detection;
 - native reversible current-thread IPC guard tests covering trap-stack anchor
   pivot, rollback, same-priority head restoration, and higher-priority wakeup;
+- target shared selected-thread completion return covering start, ordinary
+  U-trap, captured IPC, and idle-wake paths; deferred message copy; stable
+  result patching; and completion clearing after timer/accounting preparation;
 - native generation-safe staged inbound-message state validation for runnable
   receivers;
 - native canonical no-message completion tests covering zero message/buffer
@@ -171,9 +174,11 @@ and trace evidence. The isolated
 QEMU IPC image runs three production process generations through immediate and
 blocked delivery, token reply, `reply_receive`, notification, deadlock, close,
 reuse, and baseline restoration using trusted kernel-owned buffers. These
-operations still consume scheduler-held non-current callers; kernel IRQ
-injection, user-buffer MMU copying, the target current-thread adapter, and the
-syscall ABI remain separate later slices.
+operations still expose a portable scheduler-held boundary. The target now
+provides one authoritative registry, bounded user-buffer copy, reversible
+current-thread guard, and shared selected-thread completion return. Kernel IRQ
+injection, production trap dispatch, and the syscall ABI remain separate later
+slices.
 
 ## Prerequisites
 
@@ -774,6 +779,19 @@ is captured on the selected thread kernel stack and resumed. Two user
 environment calls then prove every x1-x31 value, context capture, handler
 register/PC modification, user `sret` resume, and a test-only interrupt-disabled
 S-mode return with supervisor caller-state restoration.
+
+The same image initializes exact active endpoints and proves that completion
+handling is shared across scheduler start, ordinary U-return, a captured IPC
+return with no current thread, and idle wake. It defers one message-bearing
+completion behind another runnable thread, retains the exact prevalidated
+one/two-page write plan before timer/accounting preparation, performs only the
+bounded stores during commit, patches stable `a0` success and dead-endpoint
+results, rejects residual non-pending completion state, preserves a completion
+across forced timer-start failure, clears each committed completion, and emits:
+
+```text
+MICROS_IPC_RETURN completions=shared paths=start,user,captured,idle buffers=bounded
+```
 
 Negative cases cover stale and reused thread generations, odd/non-executable
 PCs, misaligned/non-writable/unmapped stack pointers, unsafe status fields,

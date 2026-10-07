@@ -295,7 +295,13 @@ supervisor timer delivery. It proves failure-atomic timer start,
 return-boundary timer preparation, queue-reachable current ownership, separate
 thread/kernel/idle accounting, repeated equal-priority alternation, complete
 integer-register preservation, a forced spurious idle iteration, and a later
-real timer wake.
+real timer wake. The same gate now proves shared IPC completion preflight and
+commit across scheduler start, ordinary U-return, captured IPC return, and idle
+wake; deferred message copy through a validated user buffer; stable success and
+dead-endpoint `a0` results; retained prevalidated physical chunks with no
+post-timer address-space revalidation; rejection of malformed residual
+non-pending state; timer-before-completion ordering; and exact completion
+clearing.
 The two isolated invalid-context gates require a U-origin timer panic with
 exact diagnostics proving the outgoing or selected context failed before any
 return-plan mutation.

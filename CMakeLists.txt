@@ -845,6 +845,8 @@ if(MICROS_BUILD_SCHEDULER_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
+            "MICROS_IPC_RETURN completions=shared paths=start,user,captured,idle buffers=bounded"
+            --marker
             "MICROS_SCHEDULER_TEST_PASS queues=minix-priority current=reachable accounting=separate switches=alternating idle=resumed registers=preserved"
             --require-fdt-events
             --require-fdt-reservations

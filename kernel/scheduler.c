@@ -9,8 +9,12 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/scheduler_context.h"
 #include "arch/riscv64/trap_context.h"
+#include "kernel/ipc_buffer_internal.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
+#include "micros/ipc_abi.h"
+#include "micros/ipc_buffer.h"
+#include "micros/ipc_runtime.h"
 #include "micros/panic.h"
 #include "micros/scheduler_core.h"
 #include "micros/timer.h"
@@ -29,6 +33,22 @@ static uint64_t scheduler_kernel_root;
 struct scheduler_accounting_commit {
     uint64_t counter;
     uint64_t kernel_total;
+};
+
+enum scheduler_completion_error {
+    SCHEDULER_COMPLETION_OK = 0,
+    SCHEDULER_COMPLETION_INVALID_BUFFER,
+    SCHEDULER_COMPLETION_INVARIANT,
+};
+
+struct scheduler_completion_commit {
+    bool pending;
+    struct micros_thread *thread;
+    struct micros_process_handle owner;
+    uintptr_t receive_buffer;
+    struct micros_ipc_message message;
+    struct micros_ipc_buffer_plan buffer_plan;
+    uint64_t abi_result;
 };
 
 _Noreturn void micros_riscv_enter_user(
@@ -83,6 +103,156 @@ static void copy_user_context(
     }
 }
 
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static bool map_completion_result(
+    enum micros_ipc_error result,
+    uint64_t *abi_result
+)
+{
+    int64_t mapped;
+
+    if (abi_result == NULL) {
+        return false;
+    }
+    switch (result) {
+    case MICROS_IPC_OK:
+        mapped = MICROS_IPC_ABI_OK;
+        break;
+    case MICROS_IPC_ERROR_ARGUMENT:
+        mapped = MICROS_IPC_ABI_ARGUMENT;
+        break;
+    case MICROS_IPC_ERROR_DEAD_ENDPOINT:
+        mapped = MICROS_IPC_ABI_DEAD_ENDPOINT;
+        break;
+    case MICROS_IPC_ERROR_UNAUTHORIZED:
+        mapped = MICROS_IPC_ABI_UNAUTHORIZED;
+        break;
+    case MICROS_IPC_ERROR_STATE:
+        mapped = MICROS_IPC_ABI_STATE;
+        break;
+    case MICROS_IPC_ERROR_DEADLOCK:
+        mapped = MICROS_IPC_ABI_DEADLOCK;
+        break;
+    case MICROS_IPC_ERROR_MESSAGE_FAULT:
+        mapped = MICROS_IPC_ABI_MESSAGE_FAULT;
+        break;
+    case MICROS_IPC_ERROR_REPLY_TOKEN:
+        mapped = MICROS_IPC_ABI_REPLY_TOKEN;
+        break;
+    case MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED:
+        mapped = MICROS_IPC_ABI_REPLY_TOKEN_EXHAUSTED;
+        break;
+    case MICROS_IPC_ERROR_ENDPOINT_CLOSING:
+        mapped = MICROS_IPC_ABI_ENDPOINT_CLOSING;
+        break;
+    case MICROS_IPC_ERROR_NOT_READY:
+    case MICROS_IPC_ERROR_INVARIANT:
+        return false;
+    }
+    *abi_result = (uint64_t)mapped;
+    return true;
+}
+
+static enum scheduler_completion_error
+preflight_selected_completion(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle selected,
+    struct scheduler_completion_commit *completion
+)
+{
+    const struct micros_endpoint_registry *registry;
+    const struct micros_thread *resolved;
+    enum micros_ipc_buffer_error buffer_error;
+
+    if (
+        objects == NULL
+        || completion == NULL
+        || micros_thread_resolve(objects, selected, &resolved)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return SCHEDULER_COMPLETION_INVARIANT;
+    }
+    clear_bytes(completion, sizeof(*completion));
+    if (!resolved->ipc_delivery_pending) {
+        return micros_thread_ipc_state_is_clear(resolved)
+            ? SCHEDULER_COMPLETION_OK
+            : SCHEDULER_COMPLETION_INVARIANT;
+    }
+    registry = micros_ipc_runtime_registry();
+    if (
+        registry == NULL
+        || micros_endpoint_registry_validate_objects(
+            registry,
+            objects
+        ) != MICROS_ENDPOINT_OK
+        || !map_completion_result(
+            resolved->ipc_staged_result,
+            &completion->abi_result
+        )
+    ) {
+        return SCHEDULER_COMPLETION_INVARIANT;
+    }
+    completion->pending = true;
+    completion->thread = &objects->threads[selected.slot];
+    completion->owner = resolved->owner;
+    completion->receive_buffer = resolved->ipc_receive_buffer;
+    completion->message = resolved->ipc_inbound_message;
+    if (completion->receive_buffer == 0) {
+        return SCHEDULER_COMPLETION_OK;
+    }
+    buffer_error = micros_ipc_buffer_prepare_write(
+        completion->owner,
+        completion->receive_buffer,
+        &completion->buffer_plan
+    );
+    if (buffer_error == MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT) {
+        return SCHEDULER_COMPLETION_INVALID_BUFFER;
+    }
+    return buffer_error == MICROS_IPC_BUFFER_OK
+        ? SCHEDULER_COMPLETION_OK
+        : SCHEDULER_COMPLETION_INVARIANT;
+}
+
+static enum scheduler_completion_error commit_selected_completion(
+    struct scheduler_completion_commit *completion
+)
+{
+    if (completion == NULL) {
+        return SCHEDULER_COMPLETION_INVARIANT;
+    }
+    if (!completion->pending) {
+        return SCHEDULER_COMPLETION_OK;
+    }
+    if (completion->receive_buffer != 0) {
+        micros_ipc_buffer_commit_write(
+            &completion->buffer_plan,
+            &completion->message
+        );
+    }
+    selected_context.a0 = completion->abi_result;
+    copy_user_context(
+        &completion->thread->user_context,
+        &selected_context
+    );
+    completion->thread->ipc_receive_buffer = 0;
+    completion->thread->ipc_delivery_pending = false;
+    clear_bytes(
+        &completion->thread->ipc_inbound_message,
+        sizeof(completion->thread->ipc_inbound_message)
+    );
+    completion->thread->ipc_staged_result = MICROS_IPC_OK;
+    return SCHEDULER_COMPLETION_OK;
+}
+
 static enum micros_scheduler_error validate_selected_thread(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle thread_handle
@@ -100,14 +270,6 @@ static enum micros_scheduler_error validate_selected_thread(
         ) != MICROS_KERNEL_OBJECT_OK
         || !thread->scheduler_assigned
         || !thread->context_attached
-        || micros_user_execution_inspect(
-            thread_handle,
-            &selected_context
-        ) != MICROS_USER_EXECUTION_OK
-        || micros_user_execution_validate_context(
-            thread_handle,
-            &selected_context
-        ) != MICROS_USER_EXECUTION_OK
         || micros_process_resolve(
             objects,
             thread->owner,
@@ -121,6 +283,24 @@ static enum micros_scheduler_error validate_selected_thread(
     }
     selected_root = process->address_space_root;
     return MICROS_SCHEDULER_OK;
+}
+
+static enum micros_scheduler_error load_selected_context(
+    struct micros_thread_handle thread
+)
+{
+    return (
+        micros_user_execution_inspect(
+            thread,
+            &selected_context
+        ) == MICROS_USER_EXECUTION_OK
+        && micros_user_execution_validate_context(
+            thread,
+            &selected_context
+        ) == MICROS_USER_EXECUTION_OK
+    )
+        ? MICROS_SCHEDULER_OK
+        : MICROS_SCHEDULER_ERROR_CONTEXT;
 }
 
 static _Noreturn void panic_invalid_context(
@@ -163,6 +343,55 @@ static _Noreturn void panic_scheduler_invariant(
         reason,
         frame
     );
+}
+
+static _Noreturn void panic_completion(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    enum scheduler_completion_error error
+)
+{
+    panic_scheduler_invariant(
+        hart,
+        error == SCHEDULER_COMPLETION_INVALID_BUFFER
+            ? "invalid-bootstrap-ipc-buffer"
+            : "scheduler-ipc-completion",
+        frame
+    );
+}
+
+static void preflight_completion_or_panic(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle selected,
+    struct scheduler_completion_commit *completion,
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    enum scheduler_completion_error error =
+        preflight_selected_completion(
+            objects,
+            selected,
+            completion
+        );
+
+    if (error != SCHEDULER_COMPLETION_OK) {
+        panic_completion(hart, frame, error);
+    }
+}
+
+static void commit_completion_or_panic(
+    struct scheduler_completion_commit *completion,
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    enum scheduler_completion_error error =
+        commit_selected_completion(completion);
+
+    if (error != SCHEDULER_COMPLETION_OK) {
+        panic_completion(hart, frame, error);
+    }
 }
 
 static enum micros_scheduler_error preflight_kernel_interval(
@@ -356,6 +585,7 @@ enum micros_scheduler_error micros_scheduler_start(void)
         micros_kernel_object_runtime_boot_hart_handle();
     struct micros_scheduler_return_plan plan;
     struct scheduler_accounting_commit accounting;
+    struct scheduler_completion_commit completion;
     uintptr_t saved_status = riscv_irq_save();
     enum micros_kernel_object_error error;
     enum micros_scheduler_error scheduler_error;
@@ -390,6 +620,18 @@ enum micros_scheduler_error micros_scheduler_start(void)
         riscv_irq_restore(saved_status);
         return scheduler_error;
     }
+    preflight_completion_or_panic(
+        objects,
+        plan.selected,
+        &completion,
+        hart,
+        NULL
+    );
+    scheduler_error = load_selected_context(plan.selected);
+    if (scheduler_error != MICROS_SCHEDULER_OK) {
+        riscv_irq_restore(saved_status);
+        return scheduler_error;
+    }
     scheduler_error = preflight_kernel_interval(hart, &accounting);
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         riscv_irq_restore(saved_status);
@@ -412,6 +654,7 @@ enum micros_scheduler_error micros_scheduler_start(void)
             "scheduler-start-accounting"
         );
     }
+    commit_completion_or_panic(&completion, hart, NULL);
     micros_scheduler_apply_return_plan(objects, &plan);
     enter_selected_thread(
         hart,
@@ -493,9 +736,10 @@ enum micros_scheduler_error micros_scheduler_handle_user_timer(
     );
 }
 
-enum micros_scheduler_error micros_scheduler_select_user_return(
+static enum micros_scheduler_error select_user_return(
     struct micros_hart *hart,
-    struct micros_trap_frame *frame
+    struct micros_trap_frame *frame,
+    bool store_outgoing
 )
 {
     struct micros_kernel_objects *objects = authoritative_objects();
@@ -503,8 +747,9 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
         micros_kernel_object_runtime_boot_hart_handle();
     struct micros_scheduler_return_plan plan;
     struct scheduler_accounting_commit accounting;
+    struct scheduler_completion_commit completion;
     struct micros_user_context outgoing;
-    struct micros_thread_handle current;
+    struct micros_thread_handle current = {0, 0};
     enum micros_kernel_object_error error;
     enum micros_scheduler_error scheduler_error;
 
@@ -513,33 +758,45 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
         || objects == NULL
         || hart == NULL
         || frame == NULL
-        || micros_hart_current_thread(
-            objects,
-            hart_handle,
-            &current
-        ) != MICROS_KERNEL_OBJECT_OK
+        || hart != &objects->harts[hart_handle.slot]
     ) {
         return MICROS_SCHEDULER_ERROR_STATE;
     }
-    copy_user_context(
-        &outgoing,
-        (const struct micros_user_context *)frame
-    );
-    if (
-        micros_user_execution_validate_context(current, &outgoing)
-            != MICROS_USER_EXECUTION_OK
-    ) {
-        panic_invalid_context(hart, frame, true);
-    }
-    if (
-        micros_user_execution_store_context(current, &outgoing)
-            != MICROS_USER_EXECUTION_OK
-    ) {
-        panic_scheduler_invariant(
-            hart,
-            "scheduler-outgoing-store",
-            frame
+    if (store_outgoing) {
+        if (
+            micros_hart_current_thread(
+                objects,
+                hart_handle,
+                &current
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            return MICROS_SCHEDULER_ERROR_STATE;
+        }
+        copy_user_context(
+            &outgoing,
+            (const struct micros_user_context *)frame
         );
+        if (
+            micros_user_execution_validate_context(current, &outgoing)
+                != MICROS_USER_EXECUTION_OK
+        ) {
+            panic_invalid_context(hart, frame, true);
+        }
+        if (
+            micros_user_execution_store_context(current, &outgoing)
+                != MICROS_USER_EXECUTION_OK
+        ) {
+            panic_scheduler_invariant(
+                hart,
+                "scheduler-outgoing-store",
+                frame
+            );
+        }
+    } else if (
+        hart->current_thread.slot != 0
+        || hart->current_thread.generation != 0
+    ) {
+        return MICROS_SCHEDULER_ERROR_STATE;
     }
     error = micros_hart_plan_user_return(
         objects,
@@ -585,6 +842,17 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         panic_invalid_context(hart, frame, false);
     }
+    preflight_completion_or_panic(
+        objects,
+        plan.selected,
+        &completion,
+        hart,
+        frame
+    );
+    scheduler_error = load_selected_context(plan.selected);
+    if (scheduler_error != MICROS_SCHEDULER_OK) {
+        panic_invalid_context(hart, frame, false);
+    }
     if (
         scheduler_timer_enabled
         && !micros_timer_prepare_return(hart)
@@ -595,6 +863,7 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         return scheduler_error;
     }
+    commit_completion_or_panic(&completion, hart, frame);
     micros_scheduler_apply_return_plan(objects, &plan);
     enter_selected_thread(
         hart,
@@ -604,6 +873,42 @@ enum micros_scheduler_error micros_scheduler_select_user_return(
     );
     return MICROS_SCHEDULER_OK;
 }
+
+enum micros_scheduler_error micros_scheduler_select_user_return(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    return select_user_return(hart, frame, true);
+}
+
+enum micros_scheduler_error
+micros_scheduler_select_captured_user_return(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    return select_user_return(hart, frame, false);
+}
+
+#ifdef MICROS_BUILD_SCHEDULER_TEST
+bool micros_scheduler_test_rejects_malformed_completion(
+    struct micros_thread_handle thread
+)
+{
+    struct micros_kernel_objects *objects = authoritative_objects();
+    struct scheduler_completion_commit completion;
+
+    return (
+        objects != NULL
+        && preflight_selected_completion(
+            objects,
+            thread,
+            &completion
+        ) == SCHEDULER_COMPLETION_INVARIANT
+    );
+}
+#endif
 
 enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
     struct micros_hart *hart
@@ -658,6 +963,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
         micros_kernel_object_runtime_boot_hart_handle();
     struct micros_scheduler_return_plan plan;
     struct scheduler_accounting_commit accounting;
+    struct scheduler_completion_commit completion;
     enum micros_kernel_object_error error;
 
 #ifdef MICROS_BUILD_SCHEDULER_TEST
@@ -704,7 +1010,24 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
             objects,
             plan.selected
         ) != MICROS_SCHEDULER_OK
-        || (
+    ) {
+        micros_scheduler_idle_accounting_panic(hart);
+    }
+    preflight_completion_or_panic(
+        objects,
+        plan.selected,
+        &completion,
+        hart,
+        NULL
+    );
+    if (
+        load_selected_context(plan.selected)
+            != MICROS_SCHEDULER_OK
+    ) {
+        micros_scheduler_idle_accounting_panic(hart);
+    }
+    if (
+        (
             scheduler_timer_enabled
             && !micros_timer_prepare_return(hart)
         )
@@ -713,6 +1036,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
     ) {
         micros_scheduler_idle_accounting_panic(hart);
     }
+    commit_completion_or_panic(&completion, hart, NULL);
     micros_scheduler_apply_return_plan(objects, &plan);
     enter_selected_thread(
         hart,
@@ -781,6 +1105,8 @@ _Noreturn void micros_scheduler_test_enter_without_timer(
             objects,
             plan.selected
         ) != MICROS_SCHEDULER_OK
+        || load_selected_context(plan.selected)
+            != MICROS_SCHEDULER_OK
         || preflight_kernel_interval(hart, &accounting)
             != MICROS_SCHEDULER_OK
     ) {
