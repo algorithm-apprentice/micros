@@ -770,6 +770,12 @@ bool micros_ipc_runtime_run_self_test(void)
                 MICROS_IPC_OK,
                 &expected
             )
+            || !consume_staged(
+                objects,
+                threads[IPC_TEST_PEER],
+                MICROS_IPC_OK,
+                NULL
+            )
             || !hold_thread(objects, threads[IPC_TEST_SERVER])
             || !hold_thread(objects, threads[IPC_TEST_PEER])
         ) {
@@ -1141,6 +1147,12 @@ bool micros_ipc_runtime_run_self_test(void)
             threads[IPC_TEST_SERVER],
             MICROS_IPC_OK,
             &expected
+        )
+        || !consume_staged(
+            objects,
+            threads[IPC_TEST_CLIENT],
+            MICROS_IPC_OK,
+            NULL
         )
         || !hold_thread(objects, threads[IPC_TEST_SERVER])
         || !hold_thread(objects, threads[IPC_TEST_CLIENT])

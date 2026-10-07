@@ -1079,7 +1079,6 @@ static enum micros_ipc_error model_hold_thread(
         || !thread->scheduler_assigned
         || thread->runtime_flags != 0
         || !thread->ready_linked
-        || thread->ipc_delivery_pending
     ) {
         return MICROS_IPC_ERROR_STATE;
     }
@@ -1097,10 +1096,18 @@ static void clear_model_message(struct micros_ipc_message *message)
 
 static void model_clear_delivered_sender(struct model_thread *sender)
 {
+    bool completes_send = sender->ipc_reply_token == 0;
+
     sender->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
     sender->ipc_next = null_thread_handle();
     clear_model_message(&sender->ipc_outbound_message);
     sender->ipc_send_destination = 0;
+    if (completes_send) {
+        sender->ipc_receive_buffer = 0;
+        sender->ipc_delivery_pending = true;
+        clear_model_message(&sender->ipc_inbound_message);
+        sender->ipc_staged_result = MICROS_IPC_OK;
+    }
 }
 
 static void model_clear_ipc_state(struct model_thread *thread)
@@ -3507,6 +3514,7 @@ static bool run_model_prelude(
     );
     RUN(thread_action(MODEL_OPERATION_DRAIN, 7), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 7), MICROS_IPC_OK);
+    RUN(thread_action(MODEL_OPERATION_DRAIN, 6), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 6), MICROS_IPC_OK);
 
     RUN(
@@ -3672,6 +3680,7 @@ static bool run_model_prelude(
     );
     RUN(thread_action(MODEL_OPERATION_DRAIN, 7), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 7), MICROS_IPC_OK);
+    RUN(thread_action(MODEL_OPERATION_DRAIN, 6), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 6), MICROS_IPC_OK);
 
     RUN(

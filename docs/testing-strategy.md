@@ -130,8 +130,11 @@ user message type, aligned retained receive buffer, runnable scheduler state,
 and no residual queue or reply authority. Matching-delivery regressions cover
 head, middle, and tail dequeue, specific and `ANY` selection, unmatched FIFO
 preservation, ordinary versus call sender wake behavior, exact staged message
-bytes, ready-queue placement, stale and corrupt queues, no-match preservation,
-and byte-exact state and output preservation on every failure. Authorized
+bytes, canonical no-message `OK` completion for consumed ordinary senders, no
+premature call completion, ready-queue placement, stale and corrupt queues,
+no-match preservation, and byte-exact state and output preservation on every
+failure. Direct completion tests require zero message/buffer state and
+duplicate-staging atomicity. Authorized
 send/receive operation tests add exact active source and destination
 resolution, receive/send operation and target-profile enforcement, one
 canonical message snapshot, immediate matching before blocked enqueue,
@@ -189,21 +192,22 @@ They require one atomic transition to detach the closing process, wake exact
 foreign dependents with `DEAD_ENDPOINT`, preserve unrelated `ANY` receivers,
 cancel caller/callee tokens, and clear notification state in both directions;
 an owned staged `DEAD_ENDPOINT` result is discarded by a later cascading
-close, while successfully staged messages and notifications reject close
-before mutation until drained. Separate stale queue-generation,
-token-generation, notification-source, staged-source, held-thread, and late
-scheduler failures prove byte-exact preservation. A deterministic seeded
-512-case scenario sweep creates a fresh fixture for each selected cancellation
-class and checks staged-delivery preflight plus unrelated-state preservation.
+close, while successfully staged messages, notifications, and no-message
+completions reject close before mutation until drained. Separate stale
+queue-generation, token-generation, notification-source, staged-source,
+held-thread, and late scheduler failures prove byte-exact preservation. A
+deterministic seeded 512-case scenario sweep creates a fresh fixture for each
+selected cancellation class and checks staged-delivery preflight plus
+unrelated-state preservation.
 The final portable acceptance model retains one fixture for 8,192 mixed
 transitions. It uses seven process generations, including three processes with
 two model threads each, and independently compares complete run-time flags,
 sender/receiver queues, reply tokens, notification masks, staged messages and
 results, plus ready-queue/current scheduler state after every transition.
 Its trace covers all IPC operations, close/reuse, profile denial, malformed
-input, reply-before-request-return rejection, and deadlock, and prints the
-replayable seed plus a trace hash on success and the recent complete operation
-trace on failure.
+input, ordinary-send completion drain, reply-before-request-return rejection,
+and deadlock, and prints the replayable seed plus a trace hash on success and
+the recent complete operation trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-ipc-model` contains the replayable endpoint lifecycle, notification,
@@ -257,8 +261,8 @@ exact production process generations,
 three distinct generation-bound Sv39 roots, saved integer contexts, complete
 thread-owned kernel-stack patterns, scheduler state, and trusted kernel-owned
 messages before the syscall ABI exists. It proves immediate and blocked
-send/receive, exact
-call/reply token routing and one-shot use, atomic `reply_receive`,
+send/receive, canonical no-message completion for consumed queued senders,
+exact call/reply token routing and one-shot use, atomic `reply_receive`,
 notification coalescing and call-reply exclusion, deadlock rejection, close
 cancellation, stale generation rejection after reuse, authorization denial,
 and final endpoint/object/hart/frame baseline restoration while roots,

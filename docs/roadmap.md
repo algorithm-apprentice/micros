@@ -27,7 +27,11 @@ Failure-atomic held-thread enqueue and matching delivery commit are
 implemented. Incoming held senders and receivers consume the first compatible
 FIFO peer, preserve unmatched peers, stage the canonical message, retain call
 senders in reply wait, and make ordinary participants runnable through the
-scheduler. Portable ordinary send and receive now enforce exact active
+scheduler. Consuming a queued ordinary sender also stages its canonical
+no-message `OK` completion, while a consumed call remains completion-free in
+reply wait. A failure-atomic portable helper stages canonical no-message
+success or dead-endpoint completion for target integration. Portable ordinary
+send and receive now enforce exact active
 endpoints, operation and target-profile authorization, canonical snapshots,
 immediate matching before blocking, and specific or `ANY` FIFO selection.
 Portable call now allocates monotonic nonzero reply tokens from fixed kernel
@@ -70,9 +74,10 @@ wakes foreign senders, specific receivers, and reply waiters with
 notifications in both directions, and preserves unrelated `ANY` receivers.
 An owned staged `DEAD_ENDPOINT` result from an earlier close is discarded when
 its endpoint later closes, allowing cancellation to cascade. Successfully
-staged messages or notifications must instead be drained before close; their
-rejection is failure-atomic. The final commit finishes through the ADR-0029
-lifecycle close without exposing a partial transition. ADR-0030's portable
+staged messages, notifications, or no-message completions must instead be
+drained before close; their rejection is failure-atomic. The final commit
+finishes through the ADR-0029 lifecycle close without exposing a partial
+transition. ADR-0030's portable
 acceptance evidence now includes one persistent replayable 8,192-transition
 model with three multithreaded model processes. It compares complete IPC and
 scheduler state after every mixed operation, denial, malformed input, close,
@@ -80,9 +85,11 @@ and reuse. An isolated QEMU gate exercises the same production portable
 mechanism with three exact process generations and trusted kernel-owned
 messages, then restores the object, endpoint, and scheduler baseline. Target
 endpoint lifecycle and IPC component paths now share one authoritative,
-failure-atomic, one-shot registry runtime.
-Kernel IRQ injection, completion return, trap dispatch, and the syscall ABI
-remain dependency-ready follow-up work; they are not
+failure-atomic, one-shot registry runtime. Portable no-message, message, and
+failure completion shapes are now canonical; shared selected-thread return
+consumption remains the next IPC syscall slice.
+Kernel IRQ injection, trap dispatch, and the syscall ABI remain dependency-
+ready follow-up work; they are not
 silently supplied by the acceptance component. Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a

@@ -970,6 +970,15 @@ static bool test_successful_staged_deliveries_block_close_atomically(void)
             &message
         )
     );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_stage_no_message_completion(
+            &registry,
+            &objects,
+            primary_threads[CLOSE_PROCESS_CLOSING],
+            MICROS_IPC_OK
+        )
+    );
     EXPECT_TRUE(
         hold_thread_for_close(
             primary_threads[CLOSE_PROCESS_CLOSING]
@@ -980,6 +989,13 @@ static bool test_successful_staged_deliveries_block_close_atomically(void)
         )
         && clear_staged_delivery(
             primary_threads[CLOSE_PROCESS_FOREIGN_SEND]
+        )
+        && expect_close_failure_unchanged(
+            MICROS_IPC_ERROR_STATE,
+            endpoints[CLOSE_PROCESS_CLOSING]
+        )
+        && clear_staged_delivery(
+            primary_threads[CLOSE_PROCESS_CLOSING]
         )
     );
     EXPECT_IPC_ERROR(

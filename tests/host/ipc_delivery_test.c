@@ -505,7 +505,17 @@ static bool test_receiver_dequeues_position(size_t match_index)
     EXPECT_TRUE(
         sender->runtime_flags == 0
         && sender->ready_linked
-        && micros_thread_ipc_state_is_clear(sender)
+        && sender->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread_handle_is_zero(sender->ipc_next)
+        && sender->ipc_send_destination == 0
+        && sender->ipc_receive_buffer == 0
+        && sender->ipc_delivery_pending
+        && sender->ipc_staged_result == MICROS_IPC_OK
+        && memcmp(
+            &sender->ipc_inbound_message,
+            &(struct micros_ipc_message){0},
+            sizeof(sender->ipc_inbound_message)
+        ) == 0
     );
     expected_ready[0] = anchor_thread;
     expected_ready[1] = destination_threads[0];
@@ -557,6 +567,7 @@ static bool test_receiver_keeps_call_in_reply_wait(void)
         && caller->ipc_send_destination == 0
         && caller->ipc_receive_buffer
             == (uintptr_t)&source_messages[1]
+        && !caller->ipc_delivery_pending
         && caller->ipc_reply_token == 1
         && caller->ipc_reply_callee
             == endpoints[DELIVERY_PROCESS_DESTINATION]
@@ -1038,6 +1049,65 @@ static bool test_scheduler_rejection_preserves_delivery(void)
     return true;
 }
 
+static bool test_no_message_completion_is_atomic(void)
+{
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+    const struct micros_thread *thread;
+
+    EXPECT_TRUE(setup_delivery_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_stage_no_message_completion(
+            &registry,
+            &objects,
+            source_threads[0],
+            MICROS_IPC_OK
+        )
+    );
+    thread = &objects.threads[source_threads[0].slot];
+    EXPECT_TRUE(
+        thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread_handle_is_zero(thread->ipc_next)
+        && thread->ipc_send_destination == 0
+        && thread->ipc_receive_source == 0
+        && thread->ipc_receive_buffer == 0
+        && thread->ipc_delivery_pending
+        && thread->ipc_staged_result == MICROS_IPC_OK
+        && memcmp(
+            &thread->ipc_inbound_message,
+            &(struct micros_ipc_message){0},
+            sizeof(thread->ipc_inbound_message)
+        ) == 0
+        && thread->ipc_reply_token == 0
+        && thread->ipc_reply_callee == 0
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_ERROR_STATE,
+        micros_ipc_stage_no_message_completion(
+            &registry,
+            &objects,
+            source_threads[0],
+            MICROS_IPC_OK
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    return true;
+}
+
 bool micros_ipc_delivery_test_run(void)
 {
     return (
@@ -1053,5 +1123,6 @@ bool micros_ipc_delivery_test_run(void)
         && test_independently_blocked_receiver_is_preserved()
         && test_delivery_preempts_through_scheduler()
         && test_scheduler_rejection_preserves_delivery()
+        && test_no_message_completion_is_atomic()
     );
 }
