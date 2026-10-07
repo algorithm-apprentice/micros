@@ -95,7 +95,12 @@ The current implementation provides:
   scheduler failure atomicity, cascading close of an owned staged
   `DEAD_ENDPOINT` result, and a deterministic seeded 512-case scenario sweep
   that creates a fresh fixture for each case;
+- a persistent replayable 8,192-transition IPC reference model with three
+  multithreaded model processes and complete per-transition IPC/scheduler
+  state comparison;
 - an isolated endpoint/profile QEMU component gate;
+- an isolated blocking IPC QEMU component gate using trusted kernel-owned
+  messages before the syscall ABI exists;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
@@ -140,12 +145,17 @@ preserves unrelated `ANY` receivers, and commits the ADR-0029 lifecycle close.
 An owned staged `DEAD_ENDPOINT` completion from an earlier close is discarded
 when its endpoint later closes. An already committed successful message or
 notification rejects close before any mutation and must be drained first. The
-512-case seeded sweep is reset-per-case scenario coverage, not ADR-0030's
-persistent cross-operation model. The required 8,192-transition model and
-QEMU IPC acceptance gate remain follow-up work, so IPC acceptance is not
-complete. These operations consume scheduler-held non-current callers; kernel
-IRQ injection, the target current-thread adapter, and the syscall ABI remain
-separate later slices.
+portable acceptance model now preserves one fixture for 8,192 mixed
+transitions, including all IPC operations, endpoint close/reuse, denial,
+malformed input, and deadlock. It compares complete run-time flags, endpoint
+queues, tokens, notifications, staged state, and scheduler queues/current after
+every transition and prints a replayable seed and trace evidence. The isolated
+QEMU IPC image runs three production process generations through immediate and
+blocked delivery, token reply, `reply_receive`, notification, deadlock, close,
+reuse, and baseline restoration using trusted kernel-owned buffers. These
+operations still consume scheduler-held non-current callers; kernel IRQ
+injection, user-buffer MMU copying, the target current-thread adapter, and the
+syscall ABI remain separate later slices.
 
 ## Prerequisites
 
@@ -655,6 +665,42 @@ endpoint, and restores the object baseline. Only that complete sequence emits:
 ```text
 MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate
 ```
+
+## Blocking IPC acceptance test
+
+Build and run the isolated pre-syscall IPC component with:
+
+```bash
+cmake --workflow --preset test-qemu-ipc
+```
+
+The image creates three exact production process/thread/endpoint generations
+with distinct client, server, and peer profiles, real generation-bound Sv39
+roots, saved integer contexts, and thread-owned kernel stacks. Because the
+current-thread syscall adapter and user-buffer copy path are deliberately
+deferred, the component invokes the portable production IPC transitions with
+trusted kernel-owned messages and receive-buffer identities.
+
+The sequence proves immediate specific delivery, queued send plus `ANY`
+receive, exact call/reply token routing and one-shot rejection, atomic
+`reply_receive` blocking followed by the next request, source-coalesced
+notifications that cannot satisfy a call reply wait, deterministic two-party
+deadlock rejection, close cancellation of a queued call and specific receiver,
+generation-safe endpoint reuse, stale and unauthorized rejection, and complete
+restoration of endpoint records, live object counts, ready queues, current
+ownership, and the boot-hart state. It also compares every root, saved context,
+and complete stack pattern before teardown.
+
+Only that complete sequence emits the exact newline-terminated records:
+
+```text
+MICROS_IPC_ADDRESS_SPACES count=three roots=preserved contexts=preserved stacks=preserved scheduler=preserved messages=preserved
+MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced deadlock=rejected
+```
+
+The host gate rejects missing, duplicated, malformed, unterminated, or early
+records and independently requires the normal object, trap, FDT, allocator,
+MMU, and frame-ownership readiness evidence plus clean SBI shutdown.
 
 ## Scheduler test
 

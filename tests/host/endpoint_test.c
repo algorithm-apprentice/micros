@@ -1061,6 +1061,7 @@ bool micros_ipc_call_test_run(void);
 bool micros_ipc_close_test_run(void);
 bool micros_ipc_deadlock_test_run(void);
 bool micros_ipc_delivery_test_run(void);
+bool micros_ipc_model_test_run(void);
 bool micros_ipc_notify_test_run(void);
 bool micros_ipc_operation_test_run(void);
 bool micros_ipc_queue_test_run(void);
@@ -1153,6 +1154,10 @@ int main(void)
         {
             "atomic IPC endpoint close cancellation",
             micros_ipc_close_test_run,
+        },
+        {
+            "persistent IPC acceptance model",
+            micros_ipc_model_test_run,
         },
     };
     size_t index;

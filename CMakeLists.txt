@@ -28,6 +28,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_IPC_TEST
+    "Build the blocking IPC acceptance test image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -74,6 +79,7 @@ set(
     MICROS_BUILD_MMU_TEST
     MICROS_BUILD_OBJECT_MODEL_TEST
     MICROS_BUILD_ENDPOINT_TEST
+    MICROS_BUILD_IPC_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -143,6 +149,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_close_test.c
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
+        tests/host/ipc_model_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -556,6 +563,41 @@ if(MICROS_BUILD_ENDPOINT_TEST)
     )
 endif()
 
+if(MICROS_BUILD_IPC_TEST)
+    add_custom_target(
+        test-qemu-ipc
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced deadlock=rejected"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --require-ipc-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_NESTED_TRAP_TEST)
     add_custom_target(
         test-qemu-nested-trap
@@ -806,6 +848,19 @@ if(MICROS_BUILD_ENDPOINT_TEST)
         micros
         PRIVATE
             kernel/endpoint_test.c
+    )
+endif()
+
+if(MICROS_BUILD_IPC_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_IPC_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/ipc_test.c
     )
 endif()
 

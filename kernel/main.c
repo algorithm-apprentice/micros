@@ -24,6 +24,10 @@ bool micros_kernel_object_runtime_run_self_test(void);
 bool micros_endpoint_runtime_run_self_test(void);
 #endif
 
+#ifdef MICROS_BUILD_IPC_TEST
+bool micros_ipc_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_FRAME_OWNERSHIP_TEST
 bool micros_frame_ownership_runtime_run_self_test(void);
 #endif
@@ -372,6 +376,24 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "MICROS_ENDPOINT_TEST_PASS "
         "generation=validated profiles=immutable "
         "visibility=staged authorization=separate\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_IPC_TEST
+    if (!micros_ipc_runtime_run_self_test()) {
+        MICROS_PANIC(hart_id, "ipc-test");
+    }
+    uart_write(
+        "MICROS_IPC_ADDRESS_SPACES count=three roots=preserved "
+        "contexts=preserved stacks=preserved scheduler=preserved "
+        "messages=preserved\n"
+    );
+    uart_write(
+        "MICROS_IPC_TEST_PASS "
+        "endpoints=generation-safe queues=blocking "
+        "calls=tokenized notifications=coalesced "
+        "deadlock=rejected\n"
     );
     uart_flush();
 #endif
