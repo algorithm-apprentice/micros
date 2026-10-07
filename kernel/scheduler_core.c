@@ -370,6 +370,7 @@ static bool ipc_wake_clear_flag_is_valid(uint32_t flag)
         flag == MICROS_THREAD_RTS_INACTIVE
         || flag == MICROS_THREAD_RTS_IPC_SEND
         || flag == MICROS_THREAD_RTS_IPC_RECEIVE
+        || flag == MICROS_THREAD_RTS_IPC_REPLY
     );
 }
 

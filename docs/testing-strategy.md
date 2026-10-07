@@ -134,6 +134,15 @@ queued token bindings, preservation of independent receiver run-time flags,
 canonical token delivery through immediate and queued paths, reply-only wait,
 retained reply buffers, and byte-exact failure preservation including
 scheduler-transition rejection.
+Authorized reply tests prove bounded opaque-token lookup, exact caller-thread
+and callee-generation matching, rejection before queued calls enter reply
+wait, active endpoint and reply-operation enforcement, token-authorized bypass
+of an absent ordinary send-target permission, canonical replying source and
+zero delivered token, one-shot consumption, preservation of independent
+caller run-time flags, wakeup only at the zero boundary, validator rejection
+of noncanonical staged replies, and complete state/token preservation on every
+failure including a late scheduler preflight rejection. The seeded endpoint
+model also exercises allowed and denied reply-operation authorization.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap

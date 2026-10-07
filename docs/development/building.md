@@ -66,6 +66,11 @@ The current implementation provides:
   caller/source/callee binding, independent receiver blocking flags, immediate
   and queued request delivery, reply-only wait, retained reply buffers, and
   complete failure atomicity;
+- native authorized reply tests covering bounded opaque-token resolution,
+  exact callee generations, active reply-operation authority without ordinary
+  send-target permission, canonical source/token replacement, one-shot
+  consumption, independent caller blocking reasons, scheduler wakeup, and
+  byte-exact failure preservation;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -82,10 +87,14 @@ snapshot canonical messages, match before blocking, and preserve specific or
 `ANY` FIFO order. Portable call now allocates nonreused reply tokens from fixed
 kernel state, delivers the canonical token immediately or through the sender
 queue, and leaves the exact caller in reply-only wait with its reply buffer
-retained. These operations consume scheduler-held non-current callers; reply
-consumption, `reply_receive`, notifications, deadlock detection, endpoint
-cancellation, the target current-thread adapter, and the syscall ABI remain
-separate later slices.
+retained. Portable reply resolves that opaque token through the fixed thread
+table, requires the exact active callee and reply operation, stages a
+token-zero canonical response, consumes the one-shot authority, and wakes the
+caller only when no independent run-time flag remains. Token authority bypasses
+the ordinary send-target mask without bypassing reply-operation policy. These
+operations consume scheduler-held non-current callers; `reply_receive`,
+notifications, deadlock detection, endpoint cancellation, the target
+current-thread adapter, and the syscall ABI remain separate later slices.
 
 ## Prerequisites
 

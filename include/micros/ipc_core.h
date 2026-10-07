@@ -26,6 +26,14 @@ enum micros_ipc_error micros_ipc_call(
     struct micros_ipc_message *message
 );
 
+enum micros_ipc_error micros_ipc_reply(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle replier,
+    uint64_t reply_token,
+    const struct micros_ipc_message *message
+);
+
 enum micros_ipc_error micros_ipc_receive(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,

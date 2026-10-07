@@ -1062,6 +1062,7 @@ bool micros_ipc_delivery_test_run(void);
 bool micros_ipc_operation_test_run(void);
 bool micros_ipc_queue_test_run(void);
 bool micros_ipc_queue_mutation_test_run(void);
+bool micros_ipc_reply_test_run(void);
 bool micros_ipc_state_test_run(void);
 
 int main(void)
@@ -1133,6 +1134,10 @@ int main(void)
         {
             "authorized IPC call",
             micros_ipc_call_test_run,
+        },
+        {
+            "authorized one-shot IPC reply",
+            micros_ipc_reply_test_run,
         },
     };
     size_t index;
