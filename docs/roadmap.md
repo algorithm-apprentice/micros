@@ -33,11 +33,15 @@ immediate matching before blocking, and specific or `ANY` FIFO selection.
 Portable call now allocates monotonic nonzero reply tokens from fixed kernel
 state, binds each token to the exact caller thread and callee generation,
 delivers it through immediate or queued request paths, and retains the caller's
-reply buffer while only reply wait remains. These operations currently consume
-scheduler-held non-current callers; reply consumption, `reply_receive`,
-notifications, deadlock detection, endpoint cancellation, the target
-current-thread adapter, and the syscall ABI remain dependency-ready follow-up
-work.
+reply buffer while only reply wait remains. Portable reply now resolves an
+opaque token with a bounded thread scan, requires the exact active callee and
+reply operation, stages a canonical token-zero response, consumes the
+one-shot right, and wakes the caller only when no independent run-time flag
+remains. The token bypasses only the ordinary send-target mask. These
+operations currently consume scheduler-held non-current callers;
+`reply_receive`, notifications, deadlock detection, endpoint cancellation,
+the target current-thread adapter, and the syscall ABI remain dependency-ready
+follow-up work.
 
 ## v0.1 completion goal
 

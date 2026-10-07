@@ -144,6 +144,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
         tests/host/ipc_queue_mutation_test.c
+        tests/host/ipc_reply_test.c
         tests/host/ipc_state_test.c
         tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c

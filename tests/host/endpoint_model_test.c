@@ -58,6 +58,8 @@ struct model_coverage {
     size_t authorize_state;
     size_t notify_allowed;
     size_t notify_denied;
+    size_t reply_allowed;
+    size_t reply_denied;
     size_t stale;
 };
 
@@ -492,6 +494,8 @@ bool micros_endpoint_model_test_run(void)
         MODEL_OPERATION_AUTHORIZE,
         MODEL_OPERATION_AUTHORIZE,
         MODEL_OPERATION_AUTHORIZE,
+        MODEL_OPERATION_AUTHORIZE,
+        MODEL_OPERATION_AUTHORIZE,
     };
     static const uint32_t scripted_values[] = {
         0,
@@ -507,6 +511,8 @@ bool micros_endpoint_model_test_run(void)
         (UINT32_C(0) << 16) | 1,
         (UINT32_C(1) << 16) | 1,
         (UINT32_C(0) << 16) | 2,
+        (UINT32_C(1) << 16) | 4,
+        (UINT32_C(0) << 16) | 4,
     };
     struct model_slot model[MODEL_SLOT_COUNT];
     struct model_coverage coverage;
@@ -723,6 +729,49 @@ bool micros_endpoint_model_test_run(void)
             enum micros_endpoint_error error;
 
             slot = find_slot(model, value, slot_has_endpoint);
+            if ((value & 4) != 0) {
+                authorization_operation =
+                    MICROS_PRIVILEGE_OPERATION_REPLY;
+                if (
+                    slot == MODEL_SLOT_COUNT
+                    || model[slot].endpoint_phase
+                        != MODEL_ENDPOINT_ACTIVE
+                ) {
+                    expected = MICROS_ENDPOINT_ERROR_STATE;
+                } else if (model[slot].profile == 2) {
+                    expected = MICROS_ENDPOINT_OK;
+                } else {
+                    expected = MICROS_ENDPOINT_ERROR_UNAUTHORIZED;
+                }
+                if (slot == MODEL_SLOT_COUNT) {
+                    break;
+                }
+                error = micros_endpoint_authorize_operation(
+                    &registry,
+                    &objects,
+                    model[slot].endpoint,
+                    authorization_operation
+                );
+                value = authorization_operation;
+                if (error != expected) {
+                    return model_fail(
+                        step,
+                        operation,
+                        value,
+                        "operation authorization diverged"
+                    );
+                }
+                if (error == MICROS_ENDPOINT_OK) {
+                    ++coverage.reply_allowed;
+                } else if (
+                    error == MICROS_ENDPOINT_ERROR_UNAUTHORIZED
+                ) {
+                    ++coverage.reply_denied;
+                } else {
+                    ++coverage.authorize_state;
+                }
+                break;
+            }
             target = MODEL_SLOT_COUNT;
             if (
                 slot != MODEL_SLOT_COUNT
@@ -1000,6 +1049,8 @@ bool micros_endpoint_model_test_run(void)
         || coverage.authorize_state == 0
         || coverage.notify_allowed == 0
         || coverage.notify_denied == 0
+        || coverage.reply_allowed == 0
+        || coverage.reply_denied == 0
         || coverage.stale == 0
     ) {
         fprintf(
@@ -1008,7 +1059,8 @@ bool micros_endpoint_model_test_run(void)
             "create=%zu release=%zu reserve=%zu reject=%zu "
             "client=%zu server=%zu invalid=%zu activate=%zu "
             "close=%zu allow=%zu deny=%zu state=%zu "
-            "notify-allow=%zu notify-deny=%zu stale=%zu\n",
+            "notify-allow=%zu notify-deny=%zu "
+            "reply-allow=%zu reply-deny=%zu stale=%zu\n",
             coverage.create,
             coverage.release,
             coverage.reserve,
@@ -1023,6 +1075,8 @@ bool micros_endpoint_model_test_run(void)
             coverage.authorize_state,
             coverage.notify_allowed,
             coverage.notify_denied,
+            coverage.reply_allowed,
+            coverage.reply_denied,
             coverage.stale
         );
         return false;

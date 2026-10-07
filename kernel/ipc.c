@@ -135,6 +135,55 @@ static bool reply_token_is_available(
     return true;
 }
 
+static enum micros_ipc_error resolve_reply_waiter(
+    struct micros_kernel_objects *objects,
+    uint64_t reply_token,
+    micros_endpoint_t replying_endpoint,
+    struct micros_thread_handle *caller_handle,
+    struct micros_thread **caller
+)
+{
+    struct micros_thread *matched = NULL;
+    struct micros_thread_handle matched_handle = {0, 0};
+    size_t index;
+
+    if (reply_token == 0) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        struct micros_thread *candidate = &objects->threads[index];
+
+        if (
+            candidate->slot_state
+                != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || candidate->ipc_reply_token != reply_token
+        ) {
+            continue;
+        }
+        if (matched != NULL) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
+        matched = candidate;
+        matched_handle.slot = (uint16_t)index;
+        matched_handle.generation = candidate->generation;
+    }
+    if (
+        matched == NULL
+        || matched->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+        || !thread_handle_is_zero(matched->ipc_next)
+        || (
+            matched->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) != MICROS_THREAD_RTS_IPC_REPLY
+        || matched->ipc_reply_callee != replying_endpoint
+    ) {
+        return MICROS_IPC_ERROR_REPLY_TOKEN;
+    }
+    *caller_handle = matched_handle;
+    *caller = matched;
+    return MICROS_IPC_OK;
+}
+
 static bool thread_is_held_and_clear(
     const struct micros_thread *thread
 )
@@ -1068,6 +1117,92 @@ enum micros_ipc_error micros_ipc_call(
     return error == MICROS_IPC_ERROR_NOT_READY
         ? MICROS_IPC_ERROR_INVARIANT
         : error;
+}
+
+enum micros_ipc_error micros_ipc_reply(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle replier_handle,
+    uint64_t reply_token,
+    const struct micros_ipc_message *message
+)
+{
+    struct micros_thread_handle caller_handle = {0, 0};
+    struct micros_thread *caller;
+    struct micros_ipc_message snapshot;
+    micros_endpoint_t replying_endpoint;
+    uintptr_t reply_buffer;
+    enum micros_endpoint_error endpoint_error;
+    enum micros_kernel_object_error scheduler_error;
+    enum micros_ipc_error error;
+
+    if (
+        registry == NULL
+        || objects == NULL
+        || message == NULL
+        || (uintptr_t)message % _Alignof(struct micros_ipc_message)
+            != 0
+        || (
+            message->type
+            & MICROS_IPC_TYPE_KERNEL_MASK
+        ) != 0
+    ) {
+        return MICROS_IPC_ERROR_ARGUMENT;
+    }
+    endpoint_error =
+        micros_endpoint_registry_validate_objects(registry, objects);
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error_to_ipc(endpoint_error);
+    }
+    error = resolve_operation_thread(
+        objects,
+        replier_handle,
+        &replying_endpoint
+    );
+    if (error != MICROS_IPC_OK) {
+        return error;
+    }
+    endpoint_error = micros_endpoint_authorize_operation(
+        registry,
+        objects,
+        replying_endpoint,
+        MICROS_PRIVILEGE_OPERATION_REPLY
+    );
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error_to_ipc(endpoint_error);
+    }
+    error = resolve_reply_waiter(
+        objects,
+        reply_token,
+        replying_endpoint,
+        &caller_handle,
+        &caller
+    );
+    if (error != MICROS_IPC_OK) {
+        return error;
+    }
+    canonicalize_message(
+        &snapshot,
+        message,
+        replying_endpoint,
+        0
+    );
+    reply_buffer = caller->ipc_receive_buffer;
+    scheduler_error = micros_scheduler_commit_ipc_wake_pair(
+        objects,
+        replier_handle,
+        MICROS_THREAD_RTS_INACTIVE,
+        caller_handle,
+        MICROS_THREAD_RTS_IPC_REPLY
+    );
+    if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
+        return scheduler_error_to_ipc(scheduler_error);
+    }
+
+    stage_delivery(caller, reply_buffer, &snapshot);
+    caller->ipc_reply_token = 0;
+    caller->ipc_reply_callee = 0;
+    return MICROS_IPC_OK;
 }
 
 enum micros_ipc_error micros_ipc_receiver_enqueue(
