@@ -824,7 +824,8 @@ static bool test_call_reply_wait_does_not_consume_notification(void)
             &objects,
             primary_threads[NOTIFY_PROCESS_DESTINATION],
             endpoints[NOTIFY_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     caller = &objects.threads[
@@ -1056,7 +1057,8 @@ static bool test_reply_receive_prefers_pending_notification(void)
             &objects,
             primary_threads[NOTIFY_PROCESS_DESTINATION],
             endpoints[NOTIFY_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     server = &objects.threads[
@@ -1189,7 +1191,8 @@ static bool test_reply_receive_pending_failure_is_atomic(void)
             &objects,
             primary_threads[NOTIFY_PROCESS_DESTINATION],
             endpoints[NOTIFY_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     server = &objects.threads[

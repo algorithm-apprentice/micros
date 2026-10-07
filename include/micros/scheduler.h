@@ -61,14 +61,16 @@ micros_scheduler_select_captured_user_return(
     struct micros_trap_frame *frame
 );
 
-#ifdef MICROS_BUILD_USER_EXECUTION_TEST
+#if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST)
 _Noreturn void micros_scheduler_test_enter_without_timer(
     struct micros_thread_handle thread
 );
 #endif
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST) \
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST)
 enum micros_scheduler_error micros_scheduler_test_prepare_supervisor_return(
     struct micros_hart *hart,
     struct micros_trap_frame *frame

@@ -570,7 +570,8 @@ static bool test_close_cancels_complete_transaction(void)
             &objects,
             primary_threads[CLOSE_PROCESS_FOREIGN_CALL_DELIVERED],
             endpoints[CLOSE_PROCESS_CLOSING],
-            &messages[0]
+            &messages[0],
+            (uintptr_t)&messages[0]
         )
     );
     EXPECT_TRUE(
@@ -603,7 +604,8 @@ static bool test_close_cancels_complete_transaction(void)
             &objects,
             primary_threads[CLOSE_PROCESS_FOREIGN_CALL_QUEUED],
             endpoints[CLOSE_PROCESS_CLOSING],
-            &messages[2]
+            &messages[2],
+            (uintptr_t)&messages[2]
         )
     );
     for (index = 0; index < CLOSE_EXTRA_THREAD_COUNT; ++index) {
@@ -633,7 +635,8 @@ static bool test_close_cancels_complete_transaction(void)
             &objects,
             closing_extra[1],
             endpoints[CLOSE_PROCESS_FOREIGN_DESTINATION],
-            &messages[4]
+            &messages[4],
+            (uintptr_t)&messages[4]
         )
     );
     EXPECT_TRUE(hold_thread_for_close(closing_extra[1]));
@@ -1092,7 +1095,8 @@ static bool test_close_failures_are_atomic(void)
             &objects,
             primary_threads[CLOSE_PROCESS_FOREIGN_SEND],
             endpoints[CLOSE_PROCESS_CLOSING],
-            &message
+            &message,
+            (uintptr_t)&message
         )
     );
     stale_process = processes[CLOSE_PROCESS_CLOSING];
@@ -1332,8 +1336,9 @@ static bool test_seeded_close_scenarios(void)
                     &objects,
                     primary_threads[1],
                     endpoints[0],
-                    &message
-                ) != MICROS_IPC_OK
+                    &message,
+                    (uintptr_t)&message
+) != MICROS_IPC_OK
             ) {
                 return close_scenario_fail(
                     seed,

@@ -28,6 +28,10 @@ bool micros_endpoint_runtime_run_self_test(void);
 bool micros_ipc_runtime_run_self_test(void);
 #endif
 
+#ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
+_Noreturn void micros_ipc_ecall_core_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_FRAME_OWNERSHIP_TEST
 bool micros_frame_ownership_runtime_run_self_test(void);
 #endif
@@ -348,6 +352,11 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_SCHEDULER_TEST
     micros_scheduler_runtime_run_self_test();
     MICROS_PANIC(hart_id, "scheduler-test-returned");
+#endif
+
+#ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
+    micros_ipc_ecall_core_runtime_run_self_test();
+    MICROS_PANIC(hart_id, "ipc-ecall-core-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

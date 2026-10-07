@@ -74,7 +74,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
-`test-qemu-ipc`,
+`test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
 `test-qemu-user-execution`, `test-qemu-scheduler`,
@@ -96,6 +96,7 @@ cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-ipc
+cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -267,6 +268,12 @@ notification coalescing and call-reply exclusion, deadlock rejection, close
 cancellation, stale generation rejection after reuse, authorization denial,
 and final endpoint/object/hart/frame baseline restoration while roots,
 contexts, stacks, scheduler state, and messages remain preserved.
+`test-qemu-ipc-ecall-core` executes the production U-mode ecall route. It
+proves stable operation/result numbering, exact `sepc + 4`, preserved
+non-result registers, target-buffer snapshot before guard begin, immediate
+notify completion through captured return, unauthorized-send rollback through
+ordinary return, upper endpoint-bit rejection before mutation, and complete
+endpoint/object/address-space/frame baseline restoration.
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered

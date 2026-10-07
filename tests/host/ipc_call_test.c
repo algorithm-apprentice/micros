@@ -321,7 +321,8 @@ static bool expect_call_failure_unchanged(
             &objects,
             caller,
             destination,
-            message
+            message,
+            (uintptr_t)message
         )
     );
     EXPECT_TRUE(complete_state_is_unchanged(
@@ -389,7 +390,8 @@ static bool test_call_delivers_to_waiting_receiver(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     expected = canonical_request(
@@ -508,7 +510,8 @@ static bool test_call_preserves_independent_receiver_flags(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     expected = canonical_request(
@@ -583,7 +586,8 @@ static bool test_queued_calls_bind_exact_threads_and_deliver_fifo(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &first_request
+            &first_request,
+            (uintptr_t)&first_request
         )
     );
     EXPECT_IPC_ERROR(
@@ -593,7 +597,8 @@ static bool test_queued_calls_bind_exact_threads_and_deliver_fifo(void)
             &objects,
             client_extra_thread,
             endpoints[CALL_PROCESS_SERVER],
-            &second_request
+            &second_request,
+            (uintptr_t)&second_request
         )
     );
 
@@ -796,7 +801,8 @@ static bool test_token_exhaustion_is_preflighted(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &first_request
+            &first_request,
+            (uintptr_t)&first_request
         )
     );
     first_caller = &objects.threads[
@@ -894,7 +900,8 @@ static bool test_call_rejections_are_atomic(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            (struct micros_ipc_message *)(unaligned_storage + 1)
+            (struct micros_ipc_message *)(unaligned_storage + 1),
+            (uintptr_t)(struct micros_ipc_message *)(unaligned_storage + 1)
         )
     );
     EXPECT_TRUE(complete_state_is_unchanged(
@@ -923,7 +930,8 @@ static bool test_call_rejections_are_atomic(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     EXPECT_TRUE(expect_call_failure_unchanged(
@@ -1004,7 +1012,8 @@ static bool test_call_rejections_are_atomic(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     EXPECT_TRUE(complete_state_is_unchanged(
@@ -1046,7 +1055,8 @@ static bool test_staged_call_token_binding_is_validated(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     EXPECT_TRUE(
@@ -1131,7 +1141,8 @@ static bool test_allocator_validator_rejects_unissued_token(void)
             &objects,
             primary_threads[CALL_PROCESS_CLIENT],
             endpoints[CALL_PROCESS_SERVER],
-            &request
+            &request,
+            (uintptr_t)&request
         )
     );
     caller = &objects.threads[

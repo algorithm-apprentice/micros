@@ -70,7 +70,7 @@ void micros_user_execution_install_return_frame(
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_TEST) \
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
 bool micros_user_execution_test_stack_bounds(

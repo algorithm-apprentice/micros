@@ -113,55 +113,6 @@ static void clear_bytes(void *storage, size_t size)
     }
 }
 
-static bool map_completion_result(
-    enum micros_ipc_error result,
-    uint64_t *abi_result
-)
-{
-    int64_t mapped;
-
-    if (abi_result == NULL) {
-        return false;
-    }
-    switch (result) {
-    case MICROS_IPC_OK:
-        mapped = MICROS_IPC_ABI_OK;
-        break;
-    case MICROS_IPC_ERROR_ARGUMENT:
-        mapped = MICROS_IPC_ABI_ARGUMENT;
-        break;
-    case MICROS_IPC_ERROR_DEAD_ENDPOINT:
-        mapped = MICROS_IPC_ABI_DEAD_ENDPOINT;
-        break;
-    case MICROS_IPC_ERROR_UNAUTHORIZED:
-        mapped = MICROS_IPC_ABI_UNAUTHORIZED;
-        break;
-    case MICROS_IPC_ERROR_STATE:
-        mapped = MICROS_IPC_ABI_STATE;
-        break;
-    case MICROS_IPC_ERROR_DEADLOCK:
-        mapped = MICROS_IPC_ABI_DEADLOCK;
-        break;
-    case MICROS_IPC_ERROR_MESSAGE_FAULT:
-        mapped = MICROS_IPC_ABI_MESSAGE_FAULT;
-        break;
-    case MICROS_IPC_ERROR_REPLY_TOKEN:
-        mapped = MICROS_IPC_ABI_REPLY_TOKEN;
-        break;
-    case MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED:
-        mapped = MICROS_IPC_ABI_REPLY_TOKEN_EXHAUSTED;
-        break;
-    case MICROS_IPC_ERROR_ENDPOINT_CLOSING:
-        mapped = MICROS_IPC_ABI_ENDPOINT_CLOSING;
-        break;
-    case MICROS_IPC_ERROR_NOT_READY:
-    case MICROS_IPC_ERROR_INVARIANT:
-        return false;
-    }
-    *abi_result = (uint64_t)mapped;
-    return true;
-}
-
 static enum scheduler_completion_error
 preflight_selected_completion(
     struct micros_kernel_objects *objects,
@@ -194,7 +145,7 @@ preflight_selected_completion(
             registry,
             objects
         ) != MICROS_ENDPOINT_OK
-        || !map_completion_result(
+        || !micros_ipc_abi_map_error(
             resolved->ipc_staged_result,
             &completion->abi_result
         )
@@ -1057,7 +1008,8 @@ _Noreturn void micros_scheduler_idle_accounting_panic(
     );
 }
 
-#ifdef MICROS_BUILD_USER_EXECUTION_TEST
+#if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST)
 _Noreturn void micros_scheduler_test_enter_without_timer(
     struct micros_thread_handle thread
 )
@@ -1125,7 +1077,8 @@ _Noreturn void micros_scheduler_test_enter_without_timer(
 #endif
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_TEST) \
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST)
 enum micros_scheduler_error
 micros_scheduler_test_prepare_supervisor_return(
     struct micros_hart *hart,

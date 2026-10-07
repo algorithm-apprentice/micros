@@ -33,6 +33,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_IPC_ECALL_CORE_TEST
+    "Build the production IPC ecall core test image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -80,6 +85,7 @@ set(
     MICROS_BUILD_OBJECT_MODEL_TEST
     MICROS_BUILD_ENDPOINT_TEST
     MICROS_BUILD_IPC_TEST
+    MICROS_BUILD_IPC_ECALL_CORE_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -145,7 +151,9 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        kernel/ipc_abi.c
         kernel/ipc.c
+        tests/host/ipc_abi_test.c
         tests/host/ipc_call_test.c
         tests/host/ipc_close_test.c
         tests/host/ipc_deadlock_test.c
@@ -505,9 +513,11 @@ add_executable(
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/frame_ownership.c
+    kernel/ipc_abi.c
     kernel/ipc.c
     kernel/ipc_buffer.c
     kernel/ipc_runtime.c
+    kernel/ipc_syscall.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/scheduler_core.c
@@ -679,6 +689,40 @@ if(MICROS_BUILD_IPC_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --require-ipc-test-report
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_IPC_ECALL_CORE_TEST)
+    add_custom_target(
+        test-qemu-ipc-ecall-core
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_IPC_ECALL_CORE_TEST_PASS dispatch=production guard=transactional completion=returned errors=stable registers=preserved"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
             --timeout
             8
         DEPENDS micros
@@ -952,6 +996,20 @@ if(MICROS_BUILD_IPC_TEST)
         micros
         PRIVATE
             kernel/ipc_test.c
+    )
+endif()
+
+if(MICROS_BUILD_IPC_ECALL_CORE_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_IPC_ECALL_CORE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/ipc_ecall_test.S
+            kernel/ipc_ecall_test.c
     )
 endif()
 
