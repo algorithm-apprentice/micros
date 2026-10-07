@@ -82,6 +82,11 @@ The current implementation provides:
   selection before blocked senders, canonical kernel envelopes,
   generation-safe validation, close preflight, scheduler-failure atomicity,
   and a replayable 4,096-step transition model;
+- native bounded deadlock tests covering every realizable endpoint-chain
+  length, the 128-thread reference bound, `SEND`/`REPLY`/specific-`RECEIVE`
+  precedence, `ANY` termination, exact generation and sole-thread projection,
+  candidate and repeated-intermediate cycles, post-reply `reply_receive`
+  simulation, and byte-exact failure preservation;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -112,8 +117,13 @@ half-transition. Portable notify now never blocks: it wakes the first
 compatible specific or `ANY` receiver outside reply wait, otherwise ORs the
 event mask into one generation-protected source slot. Receive paths select the
 lowest matching pending source before blocked senders and stage the reserved
-kernel notification type with a little-endian event mask and zero tail. These
-operations consume scheduler-held non-current callers; deadlock detection,
+kernel notification type with a little-endian event mask and zero tail.
+Portable deadlock preflight now follows the v0.1 `SEND`, `REPLY`, specific
+`RECEIVE`, then no-dependency order through exact active generations and each
+endpoint owner's checked sole live thread. It rejects a return to the
+candidate, rejects repeated intermediates as corruption, caps the walk at the
+thread-table capacity, and checks `reply_receive` after simulating reply
+completion. These operations consume scheduler-held non-current callers;
 endpoint cancellation, kernel IRQ injection, the target current-thread
 adapter, and the syscall ABI remain separate later slices.
 

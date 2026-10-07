@@ -52,7 +52,13 @@ Ordinary receive and `reply_receive` select the lowest matching pending source
 before FIFO senders, revalidate its live generation, and stage the canonical
 kernel envelope with a zero token and payload tail. Validators preserve the
 bitmap/event relation and prevent source reuse while an event remains
-pending. Deadlock detection, full endpoint cancellation, kernel IRQ injection,
+pending. Bounded v0.1 deadlock detection now runs only after matching fails and
+before send, receive, call, or `reply_receive` blocking mutation. It follows
+`SEND`, then `REPLY`, then specific `RECEIVE`, treats `ANY` as no dependency,
+resolves exact endpoint/process generations through the checked sole-live-
+thread projection, rejects candidate returns as deadlock, and treats repeated
+intermediate threads as corruption. `reply_receive` checks the graph after
+simulating reply completion. Full endpoint cancellation, kernel IRQ injection,
 the target current-thread adapter, and the syscall ABI remain dependency-ready
 follow-up work.
 

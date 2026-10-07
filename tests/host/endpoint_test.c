@@ -1058,6 +1058,7 @@ static bool test_relationship_validator_rejects_corruption(void)
 
 bool micros_endpoint_model_test_run(void);
 bool micros_ipc_call_test_run(void);
+bool micros_ipc_deadlock_test_run(void);
 bool micros_ipc_delivery_test_run(void);
 bool micros_ipc_notify_test_run(void);
 bool micros_ipc_operation_test_run(void);
@@ -1143,6 +1144,10 @@ int main(void)
         {
             "authorized coalesced IPC notify",
             micros_ipc_notify_test_run,
+        },
+        {
+            "bounded IPC deadlock detection",
+            micros_ipc_deadlock_test_run,
         },
     };
     size_t index;
