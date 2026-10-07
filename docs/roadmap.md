@@ -27,9 +27,13 @@ Failure-atomic held-thread enqueue and matching delivery commit are
 implemented. Incoming held senders and receivers consume the first compatible
 FIFO peer, preserve unmatched peers, stage the canonical message, retain call
 senders in reply wait, and make ordinary participants runnable through the
-scheduler. IPC authorization integration, deadlock detection, reply
-consumption, notifications, and the syscall ABI remain dependency-ready
-follow-up work.
+scheduler. Portable ordinary send and receive now enforce exact active
+endpoints, operation and target-profile authorization, canonical snapshots,
+immediate matching before blocking, and specific or `ANY` FIFO selection.
+These operations currently consume scheduler-held non-current callers; the
+target current-thread adapter, deadlock detection, call/reply, notifications,
+endpoint cancellation, and the syscall ABI remain dependency-ready follow-up
+work.
 
 ## v0.1 completion goal
 
