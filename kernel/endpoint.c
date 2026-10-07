@@ -1004,6 +1004,48 @@ static bool reply_wait_state_is_valid(
     return callee->state == MICROS_ENDPOINT_STATE_ACTIVE;
 }
 
+static bool staged_delivery_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+)
+{
+    const struct micros_endpoint_record *owner =
+        &registry->endpoints[thread->owner.slot];
+    const struct micros_endpoint_record *source;
+
+    if (
+        thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+        || !thread_handle_is_zero(thread->ipc_next)
+        || thread->runtime_flags != 0
+        || !bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        || thread->ipc_send_destination != 0
+        || thread->ipc_receive_source != 0
+        || thread->ipc_receive_buffer == 0
+        || thread->ipc_receive_buffer % 8 != 0
+        || !thread->ipc_delivery_pending
+        || thread->ipc_staged_result != MICROS_IPC_OK
+        || thread->ipc_reply_token != 0
+        || thread->ipc_reply_callee != 0
+        || (
+            thread->ipc_inbound_message.type
+            & MICROS_IPC_TYPE_KERNEL_MASK
+        ) != 0
+        || owner->state != MICROS_ENDPOINT_STATE_ACTIVE
+        || !process_handles_equal(owner->owner, thread->owner)
+        || endpoint_record_resolve_validated(
+            registry,
+            thread->ipc_inbound_message.source,
+            &source
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
+    }
+    return source->state == MICROS_ENDPOINT_STATE_ACTIVE;
+}
+
 static bool thread_has_no_ipc_flags(
     const struct micros_thread *thread
 )
@@ -1283,9 +1325,15 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                 || (
                     micros_thread_ipc_state_is_clear(thread)
                         ? !thread_has_no_ipc_flags(thread)
-                        : !reply_wait_state_is_valid(
-                            registry,
-                            thread
+                        : (
+                            !reply_wait_state_is_valid(
+                                registry,
+                                thread
+                            )
+                            && !staged_delivery_state_is_valid(
+                                registry,
+                                thread
+                            )
                         )
                 )
             ) {
@@ -1543,6 +1591,11 @@ static bool endpoint_has_foreign_waiters(
             || (
                 thread->ipc_reply_token != 0
                 && thread->ipc_reply_callee == endpoint
+            )
+            || (
+                thread->ipc_delivery_pending
+                && thread->ipc_staged_result == MICROS_IPC_OK
+                && thread->ipc_inbound_message.source == endpoint
             )
         ) {
             return true;
