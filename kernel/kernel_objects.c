@@ -6,19 +6,34 @@
 
 #define MICROS_KERNEL_OBJECTS_MAGIC UINT64_C(0x4d4943524f534f42)
 
-static bool storage_is_zero(
-    const struct micros_kernel_objects *objects
-)
+static bool bytes_are_zero(const void *storage, size_t size)
 {
-    const unsigned char *bytes = (const unsigned char *)objects;
+    const unsigned char *bytes = storage;
     size_t index;
 
-    for (index = 0; index < sizeof(*objects); ++index) {
+    for (index = 0; index < size; ++index) {
         if (bytes[index] != 0) {
             return false;
         }
     }
     return true;
+}
+
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static bool storage_is_zero(
+    const struct micros_kernel_objects *objects
+)
+{
+    return bytes_are_zero(objects, sizeof(*objects));
 }
 
 static bool process_handle_is_valid(
@@ -105,6 +120,57 @@ static void clear_thread_scheduler_metadata(
     thread->ready_linked = false;
     thread->ready_next.slot = 0;
     thread->ready_next.generation = 0;
+}
+
+bool micros_thread_ipc_state_is_clear(
+    const struct micros_thread *thread
+)
+{
+    if (thread == NULL) {
+        return false;
+    }
+    return (
+        thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread->ipc_next.slot == 0
+        && thread->ipc_next.generation == 0
+        && bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        && thread->ipc_send_destination == 0
+        && thread->ipc_receive_source == 0
+        && thread->ipc_receive_buffer == 0
+        && !thread->ipc_delivery_pending
+        && bytes_are_zero(
+            &thread->ipc_inbound_message,
+            sizeof(thread->ipc_inbound_message)
+        )
+        && thread->ipc_staged_result == MICROS_IPC_OK
+        && thread->ipc_reply_token == 0
+        && thread->ipc_reply_callee == 0
+    );
+}
+
+static void clear_thread_ipc_state(struct micros_thread *thread)
+{
+    thread->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
+    thread->ipc_next.slot = 0;
+    thread->ipc_next.generation = 0;
+    clear_bytes(
+        &thread->ipc_outbound_message,
+        sizeof(thread->ipc_outbound_message)
+    );
+    thread->ipc_send_destination = 0;
+    thread->ipc_receive_source = 0;
+    thread->ipc_receive_buffer = 0;
+    thread->ipc_delivery_pending = false;
+    clear_bytes(
+        &thread->ipc_inbound_message,
+        sizeof(thread->ipc_inbound_message)
+    );
+    thread->ipc_staged_result = MICROS_IPC_OK;
+    thread->ipc_reply_token = 0;
+    thread->ipc_reply_callee = 0;
 }
 
 static bool stack_range_is_valid(
@@ -782,6 +848,7 @@ micros_thread_detach_execution_context(
         !thread->context_attached
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread->scheduler_assigned
+        || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -929,6 +996,7 @@ enum micros_kernel_object_error micros_thread_create(
         thread->generation = generation;
         thread->owner = owner;
         clear_thread_scheduler_metadata(thread);
+        clear_thread_ipc_state(thread);
         thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
         ++process->live_thread_count;
         ++objects->live_thread_count;
@@ -965,6 +1033,7 @@ enum micros_kernel_object_error micros_thread_release(
         thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || thread->scheduler_assigned
         || thread->context_attached
+        || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
@@ -1004,6 +1073,7 @@ enum micros_kernel_object_error micros_thread_release(
     thread->owner.slot = 0;
     thread->owner.generation = 0;
     clear_thread_scheduler_metadata(thread);
+    clear_thread_ipc_state(thread);
     thread->context_attached = false;
     thread->kernel_stack_bottom = 0;
     thread->kernel_stack_top = 0;
@@ -1419,6 +1489,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || thread->kernel_stack_top != 0
                 || !user_context_is_zero(&thread->user_context)
                 || !thread_scheduler_metadata_is_zero(thread)
+                || !micros_thread_ipc_state_is_clear(thread)
                 || micros_thread_next_generation(
                     thread->generation,
                     &unused_generation
@@ -1434,6 +1505,11 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                     thread->runtime_flags
                     & ~MICROS_THREAD_RTS_DEFINED_MASK
                 ) != 0
+                || (
+                    thread->runtime_flags
+                    & MICROS_THREAD_RTS_IPC_MASK
+                ) != 0
+                || !micros_thread_ipc_state_is_clear(thread)
                 || !process_handle_is_valid(thread->owner)
                 || objects->processes[thread->owner.slot].slot_state
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE
@@ -1539,6 +1615,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || thread->kernel_stack_top != 0
                 || !user_context_is_zero(&thread->user_context)
                 || !thread_scheduler_metadata_is_zero(thread)
+                || !micros_thread_ipc_state_is_clear(thread)
                 || micros_thread_next_generation(
                     thread->generation,
                     &unused_generation

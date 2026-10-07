@@ -1057,6 +1057,7 @@ static bool test_relationship_validator_rejects_corruption(void)
 }
 
 bool micros_endpoint_model_test_run(void);
+bool micros_ipc_state_test_run(void);
 
 int main(void)
 {
@@ -1103,6 +1104,10 @@ int main(void)
         {
             "seeded endpoint lifecycle model",
             micros_endpoint_model_test_run,
+        },
+        {
+            "dormant IPC state substrate",
+            micros_ipc_state_test_run,
         },
     };
     size_t index;

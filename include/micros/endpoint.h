@@ -55,6 +55,12 @@ struct micros_endpoint_record {
     enum micros_endpoint_state state;
     struct micros_process_handle owner;
     micros_endpoint_t value;
+    struct micros_thread_handle sender_head;
+    struct micros_thread_handle sender_tail;
+    struct micros_thread_handle receiver_head;
+    struct micros_thread_handle receiver_tail;
+    uint64_t pending_notification_sources;
+    uint64_t pending_events[MICROS_PROCESS_CAPACITY];
 };
 
 struct micros_endpoint_registry {

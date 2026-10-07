@@ -138,6 +138,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        tests/host/ipc_state_test.c
         tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c
     )

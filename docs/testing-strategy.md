@@ -106,8 +106,10 @@ thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
 reference model, endpoint encoding, immutable privilege-profile tables,
 process-bound lifecycle, stale-generation rejection, relationship validation,
 authorization, and a replayable 4,096-step lifecycle model under ASan and
-UBSan. The Python host tests include ELF allocatable-section closure,
-legacy-global rejection, and machine-readable QEMU record regressions.
+UBSan. They also verify the exact 64-byte IPC message ABI and zero-state
+invariants for dormant thread and endpoint IPC storage. The Python host tests
+include ELF allocatable-section closure, legacy-global rejection, and
+machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and

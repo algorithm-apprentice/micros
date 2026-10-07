@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "micros/ipc.h"
 #include "micros/user_context.h"
 
 enum {
@@ -29,11 +30,21 @@ enum {
 #define MICROS_THREAD_RTS_INACTIVE UINT32_C(0x00000001)
 #define MICROS_THREAD_RTS_NO_QUANTUM UINT32_C(0x00000002)
 #define MICROS_THREAD_RTS_PREEMPTED UINT32_C(0x00000004)
+#define MICROS_THREAD_RTS_IPC_SEND UINT32_C(0x00000008)
+#define MICROS_THREAD_RTS_IPC_RECEIVE UINT32_C(0x00000010)
+#define MICROS_THREAD_RTS_IPC_REPLY UINT32_C(0x00000020)
+#define MICROS_THREAD_RTS_IPC_MASK \
+    ( \
+        MICROS_THREAD_RTS_IPC_SEND \
+        | MICROS_THREAD_RTS_IPC_RECEIVE \
+        | MICROS_THREAD_RTS_IPC_REPLY \
+    )
 #define MICROS_THREAD_RTS_DEFINED_MASK \
     ( \
         MICROS_THREAD_RTS_INACTIVE \
         | MICROS_THREAD_RTS_NO_QUANTUM \
         | MICROS_THREAD_RTS_PREEMPTED \
+        | MICROS_THREAD_RTS_IPC_MASK \
     )
 
 struct micros_process_handle {
@@ -91,6 +102,17 @@ struct micros_thread {
     uint64_t remaining_counter_ticks;
     bool ready_linked;
     struct micros_thread_handle ready_next;
+    enum micros_ipc_queue_kind ipc_queue_kind;
+    struct micros_thread_handle ipc_next;
+    struct micros_ipc_message ipc_outbound_message;
+    uint32_t ipc_send_destination;
+    uint32_t ipc_receive_source;
+    uintptr_t ipc_receive_buffer;
+    bool ipc_delivery_pending;
+    struct micros_ipc_message ipc_inbound_message;
+    enum micros_ipc_error ipc_staged_result;
+    uint64_t ipc_reply_token;
+    uint32_t ipc_reply_callee;
 };
 
 struct micros_hart_trap_anchor {
@@ -147,6 +169,10 @@ struct micros_kernel_objects {
     struct micros_thread threads[MICROS_THREAD_CAPACITY];
     struct micros_hart harts[MICROS_HART_CAPACITY];
 };
+
+bool micros_thread_ipc_state_is_clear(
+    const struct micros_thread *thread
+);
 
 enum micros_kernel_object_error {
     MICROS_KERNEL_OBJECT_OK = 0,
