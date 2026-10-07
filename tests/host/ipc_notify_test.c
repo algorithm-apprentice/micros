@@ -332,6 +332,11 @@ static bool setup_notify_fixture(void)
             return false;
         }
     }
+    return true;
+}
+
+static bool prepare_destination_extra_threads(void)
+{
     return (
         prepare_thread(
             processes[NOTIFY_PROCESS_DESTINATION],
@@ -702,6 +707,7 @@ static bool test_notify_wakes_first_matching_receiver(void)
     const uint64_t event_mask = UINT64_C(0x00000000000000a5);
 
     EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_TRUE(prepare_destination_extra_threads());
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_receiver_enqueue(

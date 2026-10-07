@@ -163,6 +163,14 @@ zero payload tail. Corruption, pending-source close, stale-source, and late
 scheduler failures preserve all state. A replayable 4,096-step notification
 model compares coalescing and specific/`ANY` selection with a compact
 reference.
+Deterministic deadlock tests exhaust every realizable chain length across the
+64 endpoint slots and independently exercise the
+`MICROS_THREAD_CAPACITY`-step reference bound. They cover `SEND` before
+`REPLY` before specific `RECEIVE`, `ANY` termination, exact generation
+resolution, zero/multiple-thread projection rejection, candidate-return
+cycles, repeated intermediate corruption, and the post-reply graph used by
+`reply_receive`. Every deadlock or corruption result preserves the complete
+registry, object state, tokens, messages, and outputs.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap

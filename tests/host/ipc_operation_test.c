@@ -246,6 +246,11 @@ static bool setup_operation_fixture(void)
             return false;
         }
     }
+    return true;
+}
+
+static bool prepare_destination_extra_thread(void)
+{
     return prepare_thread(
         processes[OPERATION_PROCESS_DESTINATION],
         UINT64_C(0x2000),
@@ -444,6 +449,7 @@ static bool test_authorized_send_matches_first_receiver(void)
     const struct micros_thread *sender;
 
     EXPECT_TRUE(setup_operation_fixture());
+    EXPECT_TRUE(prepare_destination_extra_thread());
     expected = canonical_message(
         &message,
         endpoints[OPERATION_PROCESS_SOURCE_A]
@@ -571,7 +577,6 @@ static bool test_send_rejections_are_atomic(void)
         endpoints[OPERATION_PROCESS_DESTINATION],
         &kernel_message
     ));
-
     EXPECT_TRUE(setup_operation_fixture());
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
@@ -670,6 +675,7 @@ static bool test_receive_specific_and_any_fifo(void)
     const struct micros_thread *receiver;
 
     EXPECT_TRUE(setup_operation_fixture());
+    EXPECT_TRUE(prepare_destination_extra_thread());
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_sender_enqueue(
@@ -736,6 +742,7 @@ static bool test_receive_specific_and_any_fifo(void)
     );
 
     EXPECT_TRUE(setup_operation_fixture());
+    EXPECT_TRUE(prepare_destination_extra_thread());
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_sender_enqueue(

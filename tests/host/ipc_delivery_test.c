@@ -373,14 +373,46 @@ static bool enqueue_sender(size_t index, bool call)
     );
 
     if (call) {
+        struct micros_endpoint_record *destination =
+            &registry.endpoints[DELIVERY_PROCESS_DESTINATION];
+        struct micros_thread *sender =
+            &objects.threads[source_threads[index].slot];
+        uint64_t reply_token = registry.last_reply_token + 1;
+
+        if (
+            registry.last_reply_token == UINT64_MAX
+            || sender->runtime_flags != MICROS_THREAD_RTS_INACTIVE
+            || sender->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+        ) {
+            return false;
+        }
         source_messages[index] = message;
-        return micros_ipc_call(
+        message.source = endpoints[index];
+        message.reply_token = reply_token;
+        sender->runtime_flags =
+            MICROS_THREAD_RTS_IPC_SEND
+            | MICROS_THREAD_RTS_IPC_REPLY;
+        sender->ipc_queue_kind = MICROS_IPC_QUEUE_SENDER;
+        sender->ipc_outbound_message = message;
+        sender->ipc_send_destination =
+            endpoints[DELIVERY_PROCESS_DESTINATION];
+        sender->ipc_receive_buffer =
+            (uintptr_t)&source_messages[index];
+        sender->ipc_reply_token = reply_token;
+        sender->ipc_reply_callee =
+            endpoints[DELIVERY_PROCESS_DESTINATION];
+        if (thread_handle_is_zero(destination->sender_tail)) {
+            destination->sender_head = source_threads[index];
+        } else {
+            objects.threads[destination->sender_tail.slot].ipc_next =
+                source_threads[index];
+        }
+        destination->sender_tail = source_threads[index];
+        registry.last_reply_token = reply_token;
+        return micros_endpoint_registry_validate_objects(
             &registry,
-            &objects,
-            source_threads[index],
-            endpoints[DELIVERY_PROCESS_DESTINATION],
-            &source_messages[index]
-        ) == MICROS_IPC_OK;
+            &objects
+        ) == MICROS_ENDPOINT_OK;
     }
     return micros_ipc_sender_enqueue(
         &registry,
