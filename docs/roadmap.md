@@ -23,7 +23,8 @@ repeated two-address-space switching under real timer interrupts, including a
 real no-runnable idle transition and timer wake. Endpoint privileges and
 generation-safe lifecycle gates are complete. The fixed message ABI and
 dormant IPC state are present, and sender/receiver queue topology is validated.
-Protected queue mutation and matching are the next dependency-ready mechanism.
+Failure-atomic held-thread enqueue is implemented. Matching dequeue, message
+staging, and wakeup are the next dependency-ready mechanisms.
 
 ## v0.1 completion goal
 
