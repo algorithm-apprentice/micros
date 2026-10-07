@@ -137,6 +137,15 @@ caller thread and callee endpoint generation. This preserves the blocking
 request/reply behavior without granting a server general send authority back
 to every caller, and it remains unambiguous for future multithreaded clients.
 
+MINIX has no separate token-availability transition. The server learns the
+request source through the receive return and then performs its ordinary reply
+send. `micros` preserves that ordering for its token extension: the caller
+binding exists while the request is staged, but no callee thread may consume
+the token until the token-bearing request completion has returned to the
+process. After that return, any authorized thread owned by the process endpoint
+may present the token. This keeps authority process-owned without treating an
+unreturned kernel completion as user-visible token possession.
+
 ## Deadlock detection
 
 Before blocking a send or receive, MINIX follows the blocked-on chain through
@@ -222,7 +231,7 @@ with a dead-peer error.
 | Generation wrap | Eventually reuses a generation | Compatible safety extension: quarantine before reuse |
 | Fixed 64-byte messages | Kernel overwrites source; 56-byte payload | Baseline parity; accepted 48-byte payload/reply-token layout |
 | Send and receive queues | FIFO senders, specific or `ANY` receive | Baseline parity, stored on distinct thread/endpoint objects |
-| Request/reply | `SENDREC` plus ordinary reply send | Compatible extension: one-shot exact-thread reply token |
+| Request/reply | `SENDREC` plus ordinary reply send after receive returns | Compatible extension: one-shot exact-thread token routing; token presentation becomes valid after the request completion returns, then any authorized callee thread may reply |
 | Reply-and-wait | Separate server operations | Compatible extension: failure-atomic `reply_receive` |
 | Notifications | Nonblocking, source-coalesced, delivered before senders | Baseline parity with 64-bit event-mask adaptation |
 | IPC permissions | Trap mask, target mask, symmetric reply permission | Baseline parity with stricter named profiles and token reply authority |

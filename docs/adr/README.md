@@ -51,3 +51,4 @@ to make the project appear more consistent than it was.
 | [0033](0033-reviewed-design-before-implementation.md) | Reviewed design before implementation | Accepted |
 | [0034](0034-author-validation-before-review.md) | Author validation before review | Accepted |
 | [0035](0035-riscv-ipc-syscall-and-bootstrap-buffers.md) | RISC-V IPC syscall and bootstrap buffers | Accepted |
+| [0036](0036-reply-authority-begins-at-request-return.md) | Reply authority begins at request return | Accepted |
