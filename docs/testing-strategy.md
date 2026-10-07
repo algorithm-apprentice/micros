@@ -143,6 +143,15 @@ caller run-time flags, wakeup only at the zero boundary, validator rejection
 of noncanonical staged replies, and complete state/token preservation on every
 failure including a late scheduler preflight rejection. The seeded endpoint
 model also exercises allowed and denied reply-operation authorization.
+Authorized reply/receive tests prove that the combined operation has distinct
+authority, reuses the complete reply token and message preflight, accepts a
+specific active source or `ANY`, preserves unmatched FIFO senders, retains a
+consumed queued call in reply wait, and atomically chooses immediate delivery
+or receiver blocking. They also exercise canonical replies and requests,
+validator rejection of corrupted final states, later delivery to the blocked
+receiver, and byte-exact token/state preservation for invalid receive
+arguments and late caller or sender scheduler failures. The seeded endpoint
+model exercises allowed and denied reply/receive-operation authorization.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap

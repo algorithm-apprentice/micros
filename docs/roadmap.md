@@ -38,10 +38,14 @@ opaque token with a bounded thread scan, requires the exact active callee and
 reply operation, stages a canonical token-zero response, consumes the
 one-shot right, and wakes the caller only when no independent run-time flag
 remains. The token bypasses only the ordinary send-target mask. These
-operations currently consume scheduler-held non-current callers;
-`reply_receive`, notifications, deadlock detection, endpoint cancellation,
-the target current-thread adapter, and the syscall ABI remain dependency-ready
-follow-up work.
+operations currently consume scheduler-held non-current callers. Portable
+`reply_receive` now shares reply's complete token and message preflight,
+requires its distinct operation authority, validates a specific source or
+`ANY` plus the receive buffer, and commits the caller reply together with
+either one immediate FIFO sender or one receiver-queue insertion. Scheduler
+and queue failures preserve both the token and complete state. Notifications,
+deadlock detection, endpoint cancellation, the target current-thread adapter,
+and the syscall ABI remain dependency-ready follow-up work.
 
 ## v0.1 completion goal
 
