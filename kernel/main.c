@@ -402,7 +402,8 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     uart_write(
         "MICROS_ENDPOINT_TEST_PASS "
         "generation=validated profiles=immutable "
-        "visibility=staged authorization=separate\n"
+        "visibility=staged authorization=separate "
+        "grants=generation-safe\n"
     );
     uart_flush();
 #endif

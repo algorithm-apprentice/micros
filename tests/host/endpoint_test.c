@@ -1067,6 +1067,7 @@ bool micros_ipc_queue_test_run(void);
 bool micros_ipc_queue_mutation_test_run(void);
 bool micros_ipc_reply_test_run(void);
 bool micros_ipc_state_test_run(void);
+bool micros_grant_test_run(void);
 
 int main(void)
 {
@@ -1113,6 +1114,10 @@ int main(void)
         {
             "dormant IPC state substrate",
             micros_ipc_state_test_run,
+        },
+        {
+            "direct grant registry lifecycle",
+            micros_grant_test_run,
         },
         {
             "stable IPC syscall ABI",

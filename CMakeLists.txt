@@ -163,6 +163,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        kernel/grant.c
         kernel/ipc_abi.c
         kernel/ipc.c
         tests/host/ipc_abi_test.c
@@ -170,6 +171,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_close_test.c
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
+        tests/host/grant_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -184,8 +186,10 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         kernel/endpoint.c
+        kernel/grant.c
         kernel/ipc.c
         tests/host/endpoint_model_test.c
+        tests/host/grant_test.c
         tests/host/ipc_close_test.c
         tests/host/ipc_model_main.c
         tests/host/ipc_model_test.c
@@ -525,6 +529,8 @@ add_executable(
     kernel/fdt.c
     kernel/frame_allocator.c
     kernel/frame_ownership.c
+    kernel/grant.c
+    kernel/grant_runtime.c
     kernel/ipc_abi.c
     kernel/ipc.c
     kernel/ipc_buffer.c
@@ -657,7 +663,7 @@ if(MICROS_BUILD_ENDPOINT_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate"
+            "MICROS_ENDPOINT_TEST_PASS generation=validated profiles=immutable visibility=staged authorization=separate grants=generation-safe"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

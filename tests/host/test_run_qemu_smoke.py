@@ -185,7 +185,8 @@ ENDPOINT_TEST_PASS = (
     "generation=validated "
     "profiles=immutable "
     "visibility=staged "
-    "authorization=separate\n"
+    "authorization=separate "
+    "grants=generation-safe\n"
 )
 
 ENDPOINT_TEST_OUTPUT = (
