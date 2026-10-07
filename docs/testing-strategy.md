@@ -204,6 +204,16 @@ rejection, and machine-readable QEMU record regressions.
 `test-ipc-model` contains the replayable endpoint lifecycle, notification,
 close-cancellation, and persistent 8,192-transition IPC models. `test-unit`
 combines both tiers and remains the complete native gate.
+
+`tools/validation_plan.py` maps committed, staged, unstaged, and untracked
+paths to `fast`, `pr`, or `full` execution plans. Documentation-only changes
+avoid target builds. Code PR plans always include complete `test-unit`.
+Unknown non-documentation paths, mixed mapped/unmapped changes, and shared
+toolchain, linker, target-entry, conditional multi-image, post-link, public
+header, or QEMU-harness changes run the full tier. Explicit paths are unioned
+with Git discovery; rename discovery classifies both paths. Execution rejects
+remaining untracked files. Every plan ends with separate index, worktree, and
+branch-range diff checks.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and

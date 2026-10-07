@@ -43,6 +43,20 @@ Accepted decision to change its meaning. Add a new ADR that supersedes it.
 
 ## Current validation commands
 
+Generate the validation plan for the current change with:
+
+```bash
+python3 tools/validation_plan.py --tier fast
+python3 tools/validation_plan.py --tier pr
+```
+
+Add `--execute` to run it. Use `--tier full` for `main`, milestone acceptance,
+shared build/boot/harness changes, or any change that should bypass path
+classification. The PR tier always includes complete `test-unit`; the fast
+tier is for iteration only. Explicit `--path` values are added to repository
+discovery rather than replacing it. Stage untracked files before using
+`--execute`.
+
 For documentation and repository-instruction changes, run:
 
 ```bash
