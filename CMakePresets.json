@@ -99,6 +99,15 @@
       }
     },
     {
+      "name": "riscv64-ipc-test",
+      "displayName": "RISC-V 64 blocking IPC acceptance test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ipc-test",
+      "cacheVariables": {
+        "MICROS_BUILD_IPC_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -235,6 +244,13 @@
       "configurePreset": "riscv64-endpoint-test",
       "targets": [
         "test-qemu-endpoint"
+      ]
+    },
+    {
+      "name": "test-qemu-ipc",
+      "configurePreset": "riscv64-ipc-test",
+      "targets": [
+        "test-qemu-ipc"
       ]
     },
     {
@@ -439,6 +455,20 @@
         {
           "type": "build",
           "name": "test-qemu-endpoint"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-ipc",
+      "displayName": "Build and run the blocking IPC acceptance test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ipc-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-ipc"
         }
       ]
     },

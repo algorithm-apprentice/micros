@@ -68,12 +68,16 @@ An owned staged `DEAD_ENDPOINT` result from an earlier close is discarded when
 its endpoint later closes, allowing cancellation to cascade. Successfully
 staged messages or notifications must instead be drained before close; their
 rejection is failure-atomic. The final commit finishes through the ADR-0029
-lifecycle close without exposing a partial transition. The current 512-case
-seeded cancellation sweep resets state for each scenario; it is not
-ADR-0030's persistent 8,192-transition cross-operation model. That model, the
-QEMU IPC acceptance gate, kernel IRQ injection, the target current-thread
-adapter, and the syscall ABI remain dependency-ready follow-up work. IPC
-acceptance is therefore not complete.
+lifecycle close without exposing a partial transition. ADR-0030's portable
+acceptance evidence now includes one persistent replayable 8,192-transition
+model with three multithreaded model processes. It compares complete IPC and
+scheduler state after every mixed operation, denial, malformed input, close,
+and reuse. An isolated QEMU gate exercises the same production portable
+mechanism with three exact process generations and trusted kernel-owned
+messages, then restores the object, endpoint, and scheduler baseline.
+Kernel IRQ injection, the target current-thread adapter, user-buffer copying,
+and the syscall ABI remain dependency-ready follow-up work; they are not
+silently supplied by the acceptance component.
 
 ## v0.1 completion goal
 

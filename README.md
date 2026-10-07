@@ -105,6 +105,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
+cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -125,7 +126,12 @@ an instruction page fault from writable memory. The object-model gate proves
 generation-safe reuse, stale-handle rejection, the checked one-thread policy,
 and hart-local current-thread state. The endpoint gate proves generation-safe
 resolution, staged publication, immutable profiles, asymmetric authorization,
-and complete teardown back to the object baseline. The frame-ownership gate
+and complete teardown back to the object baseline. The IPC gate uses trusted
+kernel-owned messages before the syscall ABI exists and proves immediate and
+blocked send/receive, tokenized call/reply, atomic `reply_receive`,
+notification coalescing and reply-wait exclusion, deadlock rejection, close
+cancellation, generation reuse, and scheduler/object baseline restoration.
+The frame-ownership gate
 proves exact process-generation authority, blocked process release,
 failure-atomic staged handoff, and irreversible sealing. The nested trap gate
 injects a second exception at the first instruction after arming the

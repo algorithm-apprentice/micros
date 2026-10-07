@@ -71,6 +71,7 @@ The implemented fast targets are `test-unit`, `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
+`test-qemu-ipc`,
 `test-qemu-nested-trap`, and
 `test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
 `test-qemu-user-execution`, `test-qemu-scheduler`,
@@ -89,6 +90,7 @@ cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
+cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
@@ -184,8 +186,14 @@ token-generation, notification-source, staged-source, held-thread, and late
 scheduler failures prove byte-exact preservation. A deterministic seeded
 512-case scenario sweep creates a fresh fixture for each selected cancellation
 class and checks staged-delivery preflight plus unrelated-state preservation.
-It is not a persistent cross-operation reference model and does not satisfy
-ADR-0030's required 8,192-transition model.
+The final portable acceptance model retains one fixture for 8,192 mixed
+transitions. It uses seven process generations, including three processes with
+two model threads each, and independently compares complete run-time flags,
+sender/receiver queues, reply tokens, notification masks, staged messages and
+results, plus ready-queue/current scheduler state after every transition.
+Its trace covers all IPC operations, close/reuse, profile denial, malformed
+input, and deadlock, and prints the replayable seed plus a trace hash on
+success and the recent complete operation trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
@@ -220,7 +228,18 @@ hart-local current-thread state. `test-qemu-endpoint` exercises reserved versus
 active visibility, immutable profile installation, asymmetric
 call/send/notify authorization, bound-process release rejection, stale
 endpoint rejection after generation advance, and complete baseline
-restoration. `test-qemu-nested-trap` injects a second fault
+restoration. `test-qemu-ipc` uses three exact production process generations,
+three distinct generation-bound Sv39 roots, saved integer contexts, complete
+thread-owned kernel-stack patterns, scheduler state, and trusted kernel-owned
+messages before the syscall ABI exists. It proves immediate and blocked
+send/receive, exact
+call/reply token routing and one-shot use, atomic `reply_receive`,
+notification coalescing and call-reply exclusion, deadlock rejection, close
+cancellation, stale generation rejection after reuse, authorization denial,
+and final endpoint/object/hart/frame baseline restoration while roots,
+contexts, stacks, scheduler state, and messages remain preserved.
+`test-qemu-nested-trap`
+injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
 emergency stack is selected without trusting interrupted `tp`.
 `test-qemu-frame-ownership` exercises the production ledger and object
