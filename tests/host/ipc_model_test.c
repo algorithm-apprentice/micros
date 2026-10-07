@@ -38,6 +38,7 @@ enum model_operation {
     MODEL_OPERATION_REPLY,
     MODEL_OPERATION_REPLY_RECEIVE,
     MODEL_OPERATION_NOTIFY,
+    MODEL_OPERATION_KERNEL_NOTIFY,
     MODEL_OPERATION_DRAIN,
     MODEL_OPERATION_HOLD,
     MODEL_OPERATION_CLOSE_REUSE,
@@ -91,6 +92,7 @@ struct model_endpoint {
     struct micros_thread_handle receiver_head;
     struct micros_thread_handle receiver_tail;
     uint64_t pending_notification_sources;
+    uint64_t pending_kernel_events;
     uint64_t pending_events[MICROS_PROCESS_CAPACITY];
 };
 
@@ -285,6 +287,7 @@ static const char *model_operation_name(enum model_operation operation)
         "reply",
         "reply_receive",
         "notify",
+        "kernel_notify",
         "drain",
         "hold",
         "close_reuse",
@@ -379,6 +382,8 @@ static void dump_state(const struct model_state *model)
             && actual->state == MICROS_ENDPOINT_STATE_FREE
             && expected->pending_notification_sources == 0
             && actual->pending_notification_sources == 0
+            && expected->pending_kernel_events == 0
+            && actual->pending_kernel_events == 0
         ) {
             continue;
         }
@@ -388,7 +393,8 @@ static void dump_state(const struct model_state *model)
             "model-value=0x%08x actual-value=0x%08x "
             "model-sender=%u/%u actual-sender=%u/%u "
             "model-receiver=%u/%u actual-receiver=%u/%u "
-            "model-pending=0x%016llx actual-pending=0x%016llx\n",
+            "model-pending=0x%016llx actual-pending=0x%016llx "
+            "model-kernel=0x%016llx actual-kernel=0x%016llx\n",
             index,
             (int)expected->state,
             (int)actual->state,
@@ -403,7 +409,9 @@ static void dump_state(const struct model_state *model)
             actual->receiver_head.slot,
             actual->receiver_tail.slot,
             (unsigned long long)expected->pending_notification_sources,
-            (unsigned long long)actual->pending_notification_sources
+            (unsigned long long)actual->pending_notification_sources,
+            (unsigned long long)expected->pending_kernel_events,
+            (unsigned long long)actual->pending_kernel_events
         );
     }
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
@@ -528,6 +536,8 @@ static bool model_matches_production(
             )
             || expected->pending_notification_sources
                 != actual->pending_notification_sources
+            || expected->pending_kernel_events
+                != actual->pending_kernel_events
         ) {
             fprintf(
                 stderr,
@@ -1483,6 +1493,11 @@ static bool model_find_pending_notification(
         *event_mask = destination->pending_events[resolved_slot];
         return true;
     }
+    if (destination->pending_kernel_events != 0) {
+        *source_slot = MICROS_PROCESS_CAPACITY;
+        *event_mask = destination->pending_kernel_events;
+        return true;
+    }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         if (
             (
@@ -1837,16 +1852,24 @@ static enum micros_ipc_error model_receive(
 
         model_canonicalize_notification(
             &incoming,
-            model->endpoints[notification_source_slot].value,
+            notification_source_slot == MICROS_PROCESS_CAPACITY
+                ? MICROS_ENDPOINT_NONE
+                : model->endpoints[
+                    notification_source_slot
+                ].value,
             event_mask
         );
         error = model_apply_transitions(model, &transition, 1);
         if (error != MICROS_IPC_OK) {
             return error;
         }
-        destination->pending_events[notification_source_slot] = 0;
-        destination->pending_notification_sources &=
-            ~(UINT64_C(1) << notification_source_slot);
+        if (notification_source_slot == MICROS_PROCESS_CAPACITY) {
+            destination->pending_kernel_events = 0;
+        } else {
+            destination->pending_events[notification_source_slot] = 0;
+            destination->pending_notification_sources &=
+                ~(UINT64_C(1) << notification_source_slot);
+        }
         model_stage_delivery(receiver, receive_buffer, &incoming);
         return MICROS_IPC_OK;
     }
@@ -2379,12 +2402,20 @@ static enum micros_ipc_error model_reply_receive(
     if (has_notification) {
         model_canonicalize_notification(
             &incoming,
-            model->endpoints[notification_source_slot].value,
+            notification_source_slot == MICROS_PROCESS_CAPACITY
+                ? MICROS_ENDPOINT_NONE
+                : model->endpoints[
+                    notification_source_slot
+                ].value,
             event_mask
         );
-        destination->pending_events[notification_source_slot] = 0;
-        destination->pending_notification_sources &=
-            ~(UINT64_C(1) << notification_source_slot);
+        if (notification_source_slot == MICROS_PROCESS_CAPACITY) {
+            destination->pending_kernel_events = 0;
+        } else {
+            destination->pending_events[notification_source_slot] = 0;
+            destination->pending_notification_sources &=
+                ~(UINT64_C(1) << notification_source_slot);
+        }
         model_stage_delivery(
             &model->threads[replier_slot],
             receive_buffer,
@@ -2535,6 +2566,83 @@ static enum micros_ipc_error model_notify(
     destination->pending_events[source_slot] |= event_mask;
     destination->pending_notification_sources |=
         UINT64_C(1) << source_slot;
+    return MICROS_IPC_OK;
+}
+
+static enum micros_ipc_error model_kernel_notify(
+    struct model_state *model,
+    micros_endpoint_t destination_endpoint,
+    uint64_t event_mask
+)
+{
+    struct model_endpoint *destination;
+    struct micros_thread_handle previous = null_thread_handle();
+    struct micros_ipc_message notification;
+    size_t destination_slot;
+    size_t receiver_slot;
+    enum micros_ipc_error error;
+
+    if (event_mask == 0) {
+        return MICROS_IPC_ERROR_ARGUMENT;
+    }
+    if (
+        !model_resolve_active_endpoint(
+            model,
+            destination_endpoint,
+            &destination_slot
+        )
+    ) {
+        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
+    }
+    destination = &model->endpoints[destination_slot];
+    model_canonicalize_notification(
+        &notification,
+        MICROS_ENDPOINT_NONE,
+        event_mask
+    );
+    if (
+        model_find_receiver(
+            model,
+            destination_slot,
+            MICROS_ENDPOINT_NONE,
+            &previous,
+            &receiver_slot
+        )
+        && (
+            model->threads[receiver_slot].runtime_flags
+            & MICROS_THREAD_RTS_IPC_REPLY
+        ) == 0
+    ) {
+        struct model_thread *receiver =
+            &model->threads[receiver_slot];
+        const struct model_transition transition = {
+            .thread_slot = receiver_slot,
+            .clear_flags = MICROS_THREAD_RTS_IPC_RECEIVE,
+        };
+        uintptr_t receive_buffer = receiver->ipc_receive_buffer;
+
+        error = model_apply_transitions(model, &transition, 1);
+        if (error != MICROS_IPC_OK) {
+            return error;
+        }
+        model_ipc_unlink(
+            model,
+            &destination->receiver_head,
+            &destination->receiver_tail,
+            previous,
+            receiver_slot
+        );
+        receiver->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
+        receiver->ipc_next = null_thread_handle();
+        receiver->ipc_receive_source = 0;
+        model_stage_delivery(
+            receiver,
+            receive_buffer,
+            &notification
+        );
+        return MICROS_IPC_OK;
+    }
+    destination->pending_kernel_events |= event_mask;
     return MICROS_IPC_OK;
 }
 
@@ -3132,6 +3240,12 @@ static enum micros_ipc_error model_execute_action(
             action->endpoint,
             action->value
         );
+    case MODEL_OPERATION_KERNEL_NOTIFY:
+        return model_kernel_notify(
+            model,
+            action->endpoint,
+            action->value
+        );
     case MODEL_OPERATION_DRAIN:
         return model_drain_thread(model, action->thread_slot);
     case MODEL_OPERATION_HOLD:
@@ -3212,6 +3326,13 @@ static enum micros_ipc_error production_execute_action(
             &registry,
             &objects,
             thread,
+            action->endpoint,
+            action->value
+        );
+    case MODEL_OPERATION_KERNEL_NOTIFY:
+        return micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
             action->endpoint,
             action->value
         );
@@ -3426,6 +3547,19 @@ static struct model_action notify_action(
     return action;
 }
 
+static struct model_action kernel_notify_action(
+    micros_endpoint_t destination,
+    uint64_t event_mask
+)
+{
+    struct model_action action =
+        base_action(MODEL_OPERATION_KERNEL_NOTIFY);
+
+    action.endpoint = destination;
+    action.value = event_mask;
+    return action;
+}
+
 static struct model_action thread_action(
     enum model_operation operation,
     size_t thread_slot
@@ -3498,6 +3632,27 @@ static bool run_model_prelude(
     );
     RUN(thread_action(MODEL_OPERATION_DRAIN, 2), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 0), MICROS_IPC_OK);
+    RUN(thread_action(MODEL_OPERATION_HOLD, 2), MICROS_IPC_OK);
+
+    RUN(
+        kernel_notify_action(
+            model->processes[1].primary_endpoint,
+            UINT64_C(0x01)
+        ),
+        MICROS_IPC_OK
+    );
+    RUN(
+        kernel_notify_action(
+            model->processes[1].primary_endpoint,
+            UINT64_C(0x04)
+        ),
+        MICROS_IPC_OK
+    );
+    RUN(
+        receive_action(2, MICROS_ENDPOINT_ANY, *step),
+        MICROS_IPC_OK
+    );
+    RUN(thread_action(MODEL_OPERATION_DRAIN, 2), MICROS_IPC_OK);
     RUN(thread_action(MODEL_OPERATION_HOLD, 2), MICROS_IPC_OK);
 
     RUN(
@@ -4218,7 +4373,7 @@ static struct model_action build_random_action(
     size_t thread_slot;
     size_t process_slot;
 
-    switch (random % 12) {
+    switch (random % 13) {
     case 0:
         thread_slot = find_held_full_thread(
             model,
@@ -4280,7 +4435,7 @@ static struct model_action build_random_action(
                     &token
                 )
             ) {
-                if (random % 12 == 3) {
+                if (random % 13 == 3) {
                     return reply_action(thread_slot, token, step);
                 }
                 return reply_receive_action(
@@ -4296,7 +4451,7 @@ static struct model_action build_random_action(
             (random >> 8) % MODEL_THREAD_COUNT
         );
         if (thread_slot != MICROS_THREAD_CAPACITY) {
-            return random % 12 == 3
+            return random % 13 == 3
                 ? reply_action(
                     thread_slot,
                     UINT64_C(0xf000000000000000)
@@ -4433,6 +4588,13 @@ static struct model_action build_random_action(
             }
         }
         break;
+    case 12:
+        process_slot =
+            (random >> 16) % MODEL_DENIED_PROCESS;
+        return kernel_notify_action(
+            model->processes[process_slot].primary_endpoint,
+            UINT64_C(1) << ((random >> 24) % 63)
+        );
     default:
         break;
     }

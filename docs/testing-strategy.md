@@ -289,7 +289,8 @@ endpoint/thread/root/frame cleanup.
 page after sender commit but before selected-thread return preflight. It
 requires the exact `invalid-bootstrap-ipc-buffer` panic and trap context.
 The ADR-0037 kernel-origin notification slice extends the native notification
-model and `test-qemu-ipc`. It must prove source-`NONE` immediate delivery,
+and persistent IPC models plus `test-qemu-ipc`. They prove source-`NONE`
+immediate delivery,
 pending-mask coalescing, `ANY`-only consumption, reply-wait exclusion,
 state-preserving failures, selected-thread completion return, and complete
 baseline restoration. That evidence does not claim PLIC routing,

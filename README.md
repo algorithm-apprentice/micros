@@ -135,7 +135,8 @@ and complete teardown back to the object baseline. The IPC gate uses trusted
 kernel-owned messages before the syscall ABI exists and proves immediate and
 blocked send/receive, tokenized call/reply, atomic `reply_receive`,
 notification coalescing and reply-wait exclusion, deadlock rejection, close
-cancellation, generation reuse, and scheduler/object baseline restoration.
+cancellation, generation reuse, kernel-origin source-`NONE` event injection,
+and scheduler/object baseline restoration.
 The IPC ecall core gate executes real U-mode `ecall` instructions through the
 production trap route and proves guard commit, rollback, immediate completion,
 stable negative results, upper-endpoint rejection, register preservation, and

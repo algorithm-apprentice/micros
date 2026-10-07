@@ -1852,6 +1852,8 @@ _Noreturn void micros_ipc_syscall_test_finish(void)
             uart_write_hex64(
                 endpoint->pending_notification_sources
             );
+            uart_write(" kernel-events=");
+            uart_write_hex64(endpoint->pending_kernel_events);
             uart_write("\n");
             uart_flush();
             failure_stage =

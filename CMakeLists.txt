@@ -692,7 +692,7 @@ if(MICROS_BUILD_IPC_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced deadlock=rejected"
+            "MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced kernel-events=injected deadlock=rejected"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

@@ -123,6 +123,7 @@ IPC_TEST_PASS = (
     "queues=blocking "
     "calls=tokenized "
     "notifications=coalesced "
+    "kernel-events=injected "
     "deadlock=rejected"
 )
 OBJECTS_READY_MARKER = "MICROS_OBJECTS_READY"

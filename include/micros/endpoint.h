@@ -60,6 +60,7 @@ struct micros_endpoint_record {
     struct micros_thread_handle receiver_head;
     struct micros_thread_handle receiver_tail;
     uint64_t pending_notification_sources;
+    uint64_t pending_kernel_events;
     uint64_t pending_events[MICROS_PROCESS_CAPACITY];
 };
 

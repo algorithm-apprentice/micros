@@ -420,7 +420,7 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "MICROS_IPC_TEST_PASS "
         "endpoints=generation-safe queues=blocking "
         "calls=tokenized notifications=coalesced "
-        "deadlock=rejected\n"
+        "kernel-events=injected deadlock=rejected\n"
     );
     uart_flush();
 #endif

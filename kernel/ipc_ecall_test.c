@@ -148,6 +148,7 @@ bool micros_ipc_ecall_core_test_finish_trap(
         !thread_ipc_state_is_clear(thread)
         || server->pending_events[processes[IPC_ECALL_CLIENT].slot]
             != UINT64_C(5)
+        || server->pending_kernel_events != 0
         || (
             server->pending_notification_sources
             & (UINT64_C(1) << processes[IPC_ECALL_CLIENT].slot)
