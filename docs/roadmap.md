@@ -74,7 +74,9 @@ model with three multithreaded model processes. It compares complete IPC and
 scheduler state after every mixed operation, denial, malformed input, close,
 and reuse. An isolated QEMU gate exercises the same production portable
 mechanism with three exact process generations and trusted kernel-owned
-messages, then restores the object, endpoint, and scheduler baseline.
+messages, then restores the object, endpoint, and scheduler baseline. Target
+endpoint lifecycle and IPC component paths now share one authoritative,
+failure-atomic, one-shot registry runtime.
 Kernel IRQ injection, the target current-thread adapter, user-buffer copying,
 and the syscall ABI remain dependency-ready follow-up work; they are not
 silently supplied by the acceptance component.

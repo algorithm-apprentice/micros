@@ -50,6 +50,8 @@ The current implementation provides:
   invariant tests;
 - native generation-safe sender/receiver queue topology, FIFO-link, and
   corruption tests, including queued-call and reply-wait state shapes;
+- one authoritative target endpoint/IPC registry with failure-atomic one-shot
+  profile initialization and shared endpoint/IPC component-test access;
 - native failure-atomic sender/receiver FIFO enqueue tests with canonical
   message ownership, token uniqueness, and ready-peer detection;
 - native generation-safe staged inbound-message state validation for runnable

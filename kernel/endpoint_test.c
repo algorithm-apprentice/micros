@@ -4,9 +4,8 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
+#include "kernel/ipc_runtime_internal.h"
 #include "micros/kernel_object_runtime.h"
-
-static struct micros_endpoint_registry registry;
 
 bool micros_endpoint_runtime_run_self_test(void);
 
@@ -35,7 +34,12 @@ bool micros_endpoint_runtime_run_self_test(void)
             .notify_targets = UINT32_C(1) << 2,
         },
     };
+    static const struct micros_privilege_profile invalid_profile = {
+        .id = 0,
+        .name = "INVALID",
+    };
     struct micros_kernel_objects *objects;
+    struct micros_endpoint_registry *registry;
     struct micros_process_handle processes[2];
     struct micros_process_handle replacement_process;
     struct micros_thread_handle threads[2];
@@ -61,11 +65,27 @@ bool micros_endpoint_runtime_run_self_test(void)
         baseline_processes != 0
         || baseline_threads != 0
         || baseline_harts != 1
-        || micros_endpoint_registry_initialize(
-            &registry,
+        || micros_ipc_runtime_registry() != NULL
+        || micros_ipc_runtime_authoritative_registry() != NULL
+        || micros_ipc_runtime_validate()
+            != MICROS_ENDPOINT_ERROR_NOT_INITIALIZED
+        || micros_ipc_runtime_initialize(&invalid_profile, 1)
+            != MICROS_ENDPOINT_ERROR_PROFILE
+        || micros_ipc_runtime_registry() != NULL
+        || micros_ipc_runtime_authoritative_registry() != NULL
+        || micros_ipc_runtime_initialize(
             profiles,
             sizeof(profiles) / sizeof(profiles[0])
         ) != MICROS_ENDPOINT_OK
+        || micros_ipc_runtime_initialize(
+            profiles,
+            sizeof(profiles) / sizeof(profiles[0])
+        ) != MICROS_ENDPOINT_ERROR_ALREADY_INITIALIZED
+        || (
+            registry =
+                micros_ipc_runtime_authoritative_registry()
+        ) == NULL
+        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
         || micros_process_create(objects, &processes[0])
             != MICROS_KERNEL_OBJECT_OK
         || micros_thread_create(
@@ -81,13 +101,13 @@ bool micros_endpoint_runtime_run_self_test(void)
             &threads[1]
         ) != MICROS_KERNEL_OBJECT_OK
         || micros_endpoint_reserve(
-            &registry,
+            registry,
             objects,
             processes[0],
             &endpoints[0]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_reserve(
-            &registry,
+            registry,
             objects,
             processes[1],
             &endpoints[1]
@@ -112,7 +132,7 @@ bool micros_endpoint_runtime_run_self_test(void)
     record = (const struct micros_endpoint_record *)(uintptr_t)1;
     if (
         micros_endpoint_resolve_active(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             &record
@@ -120,78 +140,78 @@ bool micros_endpoint_runtime_run_self_test(void)
         || record
             != (const struct micros_endpoint_record *)(uintptr_t)1
         || micros_endpoint_install_profile(
-            &registry,
+            registry,
             objects,
             processes[0],
             1
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_install_profile(
-            &registry,
+            registry,
             objects,
             processes[1],
             2
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_activate(
-            &registry,
+            registry,
             objects,
             endpoints[0]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_activate(
-            &registry,
+            registry,
             objects,
             endpoints[1]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             MICROS_PRIVILEGE_OPERATION_CALL,
             endpoints[1]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             MICROS_PRIVILEGE_OPERATION_SEND,
             endpoints[1]
         ) != MICROS_ENDPOINT_ERROR_UNAUTHORIZED
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
             endpoints[0]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
             endpoints[1]
         ) != MICROS_ENDPOINT_ERROR_UNAUTHORIZED
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[1],
             MICROS_PRIVILEGE_OPERATION_SEND,
             endpoints[0]
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[1],
             MICROS_PRIVILEGE_OPERATION_CALL,
             endpoints[0]
         ) != MICROS_ENDPOINT_ERROR_UNAUTHORIZED
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[1],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
             endpoints[0]
         ) != MICROS_ENDPOINT_ERROR_UNAUTHORIZED
         || micros_endpoint_authorize_target(
-            &registry,
+            registry,
             objects,
             endpoints[1],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
@@ -205,7 +225,7 @@ bool micros_endpoint_runtime_run_self_test(void)
 
     if (
         micros_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[0]
         ) != MICROS_ENDPOINT_OK
@@ -224,7 +244,7 @@ bool micros_endpoint_runtime_run_self_test(void)
             &replacement_thread
         ) != MICROS_KERNEL_OBJECT_OK
         || micros_endpoint_reserve(
-            &registry,
+            registry,
             objects,
             replacement_process,
             &replacement_endpoint
@@ -237,7 +257,7 @@ bool micros_endpoint_runtime_run_self_test(void)
     if (
         replacement_endpoint == endpoints[0]
         || micros_endpoint_resolve_internal(
-            &registry,
+            registry,
             objects,
             endpoints[0],
             &record
@@ -245,12 +265,12 @@ bool micros_endpoint_runtime_run_self_test(void)
         || record
             != (const struct micros_endpoint_record *)(uintptr_t)1
         || micros_endpoint_close(
-            &registry,
+            registry,
             objects,
             replacement_endpoint
         ) != MICROS_ENDPOINT_OK
         || micros_endpoint_close(
-            &registry,
+            registry,
             objects,
             endpoints[1]
         ) != MICROS_ENDPOINT_OK
@@ -266,7 +286,7 @@ bool micros_endpoint_runtime_run_self_test(void)
         || objects->live_thread_count != baseline_threads
         || objects->registered_hart_count != baseline_harts
         || micros_endpoint_registry_validate_objects(
-            &registry,
+            registry,
             objects
         ) != MICROS_ENDPOINT_OK
     ) {
