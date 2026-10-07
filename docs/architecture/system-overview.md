@@ -205,6 +205,13 @@ token so a future multithreaded process can have several concurrent calls
 without reply ambiguity. Pointers inside a message have no cross-process
 meaning.
 
+One RISC-V `ecall` namespace exposes IPC operations 1 through 6 and reserves
+grant create, revoke, copy-from, and copy-to as operations 7 through 10.
+Existing IPC register layouts and results remain unchanged. Grant create
+returns one nonnegative opaque token in `a0`; every failure is one stable
+negative result. Freestanding C wrappers and service startup remain a separate
+runtime layer over this fixed kernel ABI.
+
 ### Bulk data
 
 Direct memory grants are the initial data plane. A grant identifies a bounded
@@ -213,6 +220,10 @@ non-transitive: a grantee cannot forward the grant to another service. VFS
 therefore uses resident page-sized bounce buffers for application-to-filesystem
 and application-to-TTY transfers. The kernel performs checked copies; user
 services never map arbitrary memory from another process.
+
+The grantor alone creates or revokes its grants. The exact grantee invokes
+copy-from or copy-to with both the grantor endpoint and opaque token. No user
+grant-table registration or user-visible inspect operation exists.
 
 ### Process creation
 

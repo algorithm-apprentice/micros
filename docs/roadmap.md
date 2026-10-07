@@ -136,9 +136,16 @@ exact wired process-generation ownership. Transferable-frame mapping, VM fault
 delivery, and mutation remain later VM work. Native owner classification and
 an isolated QEMU gate prove failure-atomic handoff, handed-off IPC/grant access,
 revoked mutation, bootstrap-only generic context preparation, and a real
-handed-off user return. The freestanding user-service runtime design is the
-next dependency-ready outcome. PM's later tokenized preparation transition
-remains the only post-handoff context-creation replacement.
+handed-off user return.
+ADR-0041 defines the next small boundary: one unified RISC-V `ecall`
+namespace retaining IPC operations 1 through 6 and assigning grant create,
+revoke, copy-from, and copy-to to operations 7 through 10. It fixes register
+layouts, stable generic results, current-process authority, one bootstrap
+cleanup gate, and real handed-off `ecall` integration without adding runtime
+wrappers or startup. The freestanding user-service runtime follows only after
+this syscall implementation merges.
+PM's later tokenized preparation transition remains the only post-handoff
+context-creation replacement.
 
 ## v0.1 completion goal
 
@@ -225,6 +232,7 @@ model, IPC reply model, or global current-execution representation.
 - blocking send, receive, call, reply/receive, and notification;
 - deadlock-chain detection;
 - direct grants and safe-copy operations;
+- unified user grant syscalls;
 - wired post-handoff address resolution for initial services;
 - freestanding user-service runtime.
 
@@ -234,6 +242,8 @@ model, IPC reply model, or global current-execution representation.
 - every blocking transition has a tested wakeup path;
 - deadlock tests terminate deterministically;
 - grant direction, bounds, overflow, endpoint, and lifetime checks pass;
+- real U-mode grant create, revoke, and both copy directions preserve stable
+  results and non-result registers;
 - wired service roots retain activation, IPC-buffer, and checked-copy access
   after the irreversible ownership handoff;
 - no protocol relies on raw pointers crossing an address space.

@@ -336,6 +336,20 @@ exact marker is:
 MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
 ```
 
+ADR-0041 defines the next target evidence without claiming that its workflow
+exists yet. Native tests cover the unified operation/result values, exact
+grant register shapes, upper-bit and unused-register rejection, 64-bit scalar
+preservation, token/result disjointness, recoverable grant-error mapping, and
+fatal phase/invariant classification. One isolated bootstrap QEMU component
+then executes real U-mode `ecall` instructions through the production
+top-level dispatcher. It must preserve representative IPC behavior while
+proving grant create, revoke, both copy directions,
+page-local/cross-page/zero-length behavior, exact stable failures,
+non-result-register preservation, stale authority after reuse, and complete
+cleanup. The retained-state `test-qemu-address-space-handoff` image is also
+extended with real operations 7 through 10 after its `VM_WIRED` commit,
+proving the same syscall path in `HANDED_OFF` without claiming teardown.
+
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
