@@ -171,6 +171,21 @@ resolution, zero/multiple-thread projection rejection, candidate-return
 cycles, repeated intermediate corruption, and the post-reply graph used by
 `reply_receive`. Every deadlock or corruption result preserves the complete
 registry, object state, tokens, messages, and outputs.
+Endpoint-close cancellation tests combine closing-owned send, receive, call,
+notification, and staged-delivery state with foreign queued senders, specific
+receivers, reply waits, pending notifications, and already staged messages.
+They require one atomic transition to detach the closing process, wake exact
+foreign dependents with `DEAD_ENDPOINT`, preserve unrelated `ANY` receivers,
+cancel caller/callee tokens, and clear notification state in both directions;
+an owned staged `DEAD_ENDPOINT` result is discarded by a later cascading
+close, while successfully staged messages and notifications reject close
+before mutation until drained. Separate stale queue-generation,
+token-generation, notification-source, staged-source, held-thread, and late
+scheduler failures prove byte-exact preservation. A deterministic seeded
+512-case scenario sweep creates a fresh fixture for each selected cancellation
+class and checks staged-delivery preflight plus unrelated-state preservation.
+It is not a persistent cross-operation reference model and does not satisfy
+ADR-0030's required 8,192-transition model.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap

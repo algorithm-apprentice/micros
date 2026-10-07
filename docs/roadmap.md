@@ -58,9 +58,22 @@ before send, receive, call, or `reply_receive` blocking mutation. It follows
 resolves exact endpoint/process generations through the checked sole-live-
 thread projection, rejects candidate returns as deadlock, and treats repeated
 intermediate threads as corruption. `reply_receive` checks the graph after
-simulating reply completion. Full endpoint cancellation, kernel IRQ injection,
-the target current-thread adapter, and the syscall ABI remain dependency-ready
-follow-up work.
+simulating reply completion. Endpoint close now preflights every exact-
+generation queue, token, notification, and staged message reference before one
+non-failing cancellation commit. It unlinks held closing-process threads,
+wakes foreign senders, specific receivers, and reply waiters with
+`DEAD_ENDPOINT`, cancels caller/callee reply rights, clears pending
+notifications in both directions, and preserves unrelated `ANY` receivers.
+An owned staged `DEAD_ENDPOINT` result from an earlier close is discarded when
+its endpoint later closes, allowing cancellation to cascade. Successfully
+staged messages or notifications must instead be drained before close; their
+rejection is failure-atomic. The final commit finishes through the ADR-0029
+lifecycle close without exposing a partial transition. The current 512-case
+seeded cancellation sweep resets state for each scenario; it is not
+ADR-0030's persistent 8,192-transition cross-operation model. That model, the
+QEMU IPC acceptance gate, kernel IRQ injection, the target current-thread
+adapter, and the syscall ABI remain dependency-ready follow-up work. IPC
+acceptance is therefore not complete.
 
 ## v0.1 completion goal
 

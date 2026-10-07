@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "endpoint_internal.h"
+
 #define MICROS_ENDPOINT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534550)
 
 _Static_assert(
@@ -1182,6 +1184,42 @@ static bool staged_delivery_state_is_valid(
     );
 }
 
+static bool staged_error_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+)
+{
+    const struct micros_endpoint_record *owner =
+        &registry->endpoints[thread->owner.slot];
+
+    return (
+        thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread_handle_is_zero(thread->ipc_next)
+        && (
+            thread->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) == 0
+        && bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        && thread->ipc_send_destination == 0
+        && thread->ipc_receive_source == 0
+        && thread->ipc_receive_buffer == 0
+        && thread->ipc_delivery_pending
+        && bytes_are_zero(
+            &thread->ipc_inbound_message,
+            sizeof(thread->ipc_inbound_message)
+        )
+        && thread->ipc_staged_result
+            == MICROS_IPC_ERROR_DEAD_ENDPOINT
+        && thread->ipc_reply_token == 0
+        && thread->ipc_reply_callee == 0
+        && owner->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && process_handles_equal(owner->owner, thread->owner)
+    );
+}
+
 static bool thread_has_no_ipc_flags(
     const struct micros_thread *thread
 )
@@ -1565,6 +1603,10 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                                 objects,
                                 thread
                             )
+                            && !staged_error_state_is_valid(
+                                registry,
+                                thread
+                            )
                         )
                 )
             ) {
@@ -1867,6 +1909,22 @@ static bool endpoint_is_pending_notification_source(
     return false;
 }
 
+void micros_endpoint_close_commit_prevalidated(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle owner
+)
+{
+    struct micros_endpoint_record *record =
+        &registry->endpoints[owner.slot];
+    struct micros_process *process =
+        &objects->processes[owner.slot];
+
+    clear_endpoint_record(record);
+    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    process->privilege_profile = 0;
+}
+
 enum micros_endpoint_error micros_endpoint_close(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
@@ -1874,8 +1932,6 @@ enum micros_endpoint_error micros_endpoint_close(
 )
 {
     const struct micros_endpoint_record *resolved_record;
-    struct micros_endpoint_record *record;
-    struct micros_process *process;
     struct micros_process_handle owner;
     enum micros_endpoint_error error;
 
@@ -1916,11 +1972,11 @@ enum micros_endpoint_error micros_endpoint_close(
         return MICROS_ENDPOINT_ERROR_STATE;
     }
 
-    record = &registry->endpoints[owner.slot];
-    process = &objects->processes[owner.slot];
-    clear_endpoint_record(record);
-    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
-    process->privilege_profile = 0;
+    micros_endpoint_close_commit_prevalidated(
+        registry,
+        objects,
+        owner
+    );
     return MICROS_ENDPOINT_OK;
 }
 

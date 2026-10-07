@@ -87,6 +87,14 @@ The current implementation provides:
   precedence, `ANY` termination, exact generation and sole-thread projection,
   candidate and repeated-intermediate cycles, post-reply `reply_receive`
   simulation, and byte-exact failure preservation;
+- native atomic endpoint-close cancellation tests covering closing-owned
+  queues and staged state, foreign sender/specific-receiver/reply-wait wakes
+  with `DEAD_ENDPOINT`, caller/callee token cancellation, notifications in
+  both directions, unrelated `ANY` receiver preservation, stale and corrupt
+  exact-generation references, failure-atomic staged-delivery rejection, late
+  scheduler failure atomicity, cascading close of an owned staged
+  `DEAD_ENDPOINT` result, and a deterministic seeded 512-case scenario sweep
+  that creates a fresh fixture for each case;
 - an isolated endpoint/profile QEMU component gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
@@ -123,9 +131,21 @@ Portable deadlock preflight now follows the v0.1 `SEND`, `REPLY`, specific
 endpoint owner's checked sole live thread. It rejects a return to the
 candidate, rejects repeated intermediates as corruption, caps the walk at the
 thread-table capacity, and checks `reply_receive` after simulating reply
-completion. These operations consume scheduler-held non-current callers;
-endpoint cancellation, kernel IRQ injection, the target current-thread
-adapter, and the syscall ABI remain separate later slices.
+completion. Portable endpoint close now validates every exact-generation
+queue, token, notification, and staged reference before mutation. One bounded
+commit removes closing-owned wait state, wakes exact foreign dependents with a
+canonical no-message `DEAD_ENDPOINT` completion, cancels tokens whose caller
+or callee is closing, clears pending events from and to the endpoint slot,
+preserves unrelated `ANY` receivers, and commits the ADR-0029 lifecycle close.
+An owned staged `DEAD_ENDPOINT` completion from an earlier close is discarded
+when its endpoint later closes. An already committed successful message or
+notification rejects close before any mutation and must be drained first. The
+512-case seeded sweep is reset-per-case scenario coverage, not ADR-0030's
+persistent cross-operation model. The required 8,192-transition model and
+QEMU IPC acceptance gate remain follow-up work, so IPC acceptance is not
+complete. These operations consume scheduler-held non-current callers; kernel
+IRQ injection, the target current-thread adapter, and the syscall ABI remain
+separate later slices.
 
 ## Prerequisites
 

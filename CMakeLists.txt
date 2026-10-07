@@ -140,6 +140,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/endpoint.c
         kernel/ipc.c
         tests/host/ipc_call_test.c
+        tests/host/ipc_close_test.c
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
         tests/host/ipc_notify_test.c

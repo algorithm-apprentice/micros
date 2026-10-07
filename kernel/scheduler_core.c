@@ -364,21 +364,19 @@ static void queue_enqueue_tail_prevalidated(
     }
 }
 
-static bool ipc_wake_clear_flag_is_valid(uint32_t flag)
+static bool ipc_transition_clear_flags_are_valid(uint32_t flags)
 {
     return (
-        flag == MICROS_THREAD_RTS_INACTIVE
-        || flag == MICROS_THREAD_RTS_IPC_SEND
-        || flag == MICROS_THREAD_RTS_IPC_RECEIVE
-        || flag == MICROS_THREAD_RTS_IPC_REPLY
+        flags != 0
+        && (
+            flags
+            & ~(
+                MICROS_THREAD_RTS_INACTIVE
+                | MICROS_THREAD_RTS_IPC_MASK
+            )
+        ) == 0
     );
 }
-
-struct ipc_transition_request {
-    struct micros_thread_handle handle;
-    uint32_t clear_flag;
-    uint32_t set_flags;
-};
 
 static bool ipc_transition_set_flags_are_valid(uint32_t flags)
 {
@@ -389,9 +387,9 @@ static bool ipc_transition_set_flags_are_valid(uint32_t flags)
     );
 }
 
-static enum micros_kernel_object_error commit_ipc_transitions(
+enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
     struct micros_kernel_objects *objects,
-    const struct ipc_transition_request *requests,
+    const struct micros_scheduler_ipc_transition *requests,
     size_t request_count
 )
 {
@@ -399,10 +397,10 @@ static enum micros_kernel_object_error commit_ipc_transitions(
         struct micros_thread_handle handle;
         struct micros_thread *thread;
         struct micros_hart *hart;
-        uint32_t clear_flag;
+        uint32_t clear_flags;
         uint32_t set_flags;
         uint32_t resulting_flags;
-    } transitions[3];
+    } transitions[MICROS_THREAD_CAPACITY];
     enum micros_kernel_object_error error;
     size_t index;
     size_t other_index;
@@ -411,20 +409,20 @@ static enum micros_kernel_object_error commit_ipc_transitions(
         objects == NULL
         || requests == NULL
         || request_count < 1
-        || request_count > 3
+        || request_count > MICROS_THREAD_CAPACITY
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
     for (index = 0; index < request_count; ++index) {
         if (
-            !ipc_wake_clear_flag_is_valid(
-                requests[index].clear_flag
+            !ipc_transition_clear_flags_are_valid(
+                requests[index].clear_flags
             )
             || !ipc_transition_set_flags_are_valid(
                 requests[index].set_flags
             )
             || (
-                requests[index].clear_flag
+                requests[index].clear_flags
                 & requests[index].set_flags
             ) != 0
         ) {
@@ -447,8 +445,8 @@ static enum micros_kernel_object_error commit_ipc_transitions(
     }
     for (index = 0; index < request_count; ++index) {
         transitions[index].handle = requests[index].handle;
-        transitions[index].clear_flag =
-            requests[index].clear_flag;
+        transitions[index].clear_flags =
+            requests[index].clear_flags;
         transitions[index].set_flags =
             requests[index].set_flags;
         error = resolve_thread_mutable(
@@ -463,8 +461,8 @@ static enum micros_kernel_object_error commit_ipc_transitions(
             !transitions[index].thread->scheduler_assigned
             || (
                 transitions[index].thread->runtime_flags
-                & transitions[index].clear_flag
-            ) == 0
+                & transitions[index].clear_flags
+            ) != transitions[index].clear_flags
             || (
                 transitions[index].thread->runtime_flags
                 & transitions[index].set_flags
@@ -475,7 +473,7 @@ static enum micros_kernel_object_error commit_ipc_transitions(
         transitions[index].resulting_flags =
             (
                 transitions[index].thread->runtime_flags
-                & ~transitions[index].clear_flag
+                & ~transitions[index].clear_flags
             )
             | transitions[index].set_flags;
         transitions[index].hart = NULL;
@@ -524,13 +522,17 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake(
     uint32_t clear_flag
 )
 {
-    const struct ipc_transition_request request = {
+    const struct micros_scheduler_ipc_transition request = {
         .handle = thread,
-        .clear_flag = clear_flag,
+        .clear_flags = clear_flag,
         .set_flags = 0,
     };
 
-    return commit_ipc_transitions(objects, &request, 1);
+    return micros_scheduler_commit_ipc_transitions(
+        objects,
+        &request,
+        1
+    );
 }
 
 enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
@@ -541,20 +543,20 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(
     uint32_t second_clear_flag
 )
 {
-    const struct ipc_transition_request requests[2] = {
+    const struct micros_scheduler_ipc_transition requests[2] = {
         {
             .handle = first_thread_handle,
-            .clear_flag = first_clear_flag,
+            .clear_flags = first_clear_flag,
             .set_flags = 0,
         },
         {
             .handle = second_thread_handle,
-            .clear_flag = second_clear_flag,
+            .clear_flags = second_clear_flag,
             .set_flags = 0,
         },
     };
 
-    return commit_ipc_transitions(
+    return micros_scheduler_commit_ipc_transitions(
         objects,
         requests,
         sizeof(requests) / sizeof(requests[0])
@@ -567,20 +569,20 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_call_delivery(
     struct micros_thread_handle receiver
 )
 {
-    const struct ipc_transition_request requests[2] = {
+    const struct micros_scheduler_ipc_transition requests[2] = {
         {
             .handle = caller,
-            .clear_flag = MICROS_THREAD_RTS_INACTIVE,
+            .clear_flags = MICROS_THREAD_RTS_INACTIVE,
             .set_flags = MICROS_THREAD_RTS_IPC_REPLY,
         },
         {
             .handle = receiver,
-            .clear_flag = MICROS_THREAD_RTS_IPC_RECEIVE,
+            .clear_flags = MICROS_THREAD_RTS_IPC_RECEIVE,
             .set_flags = 0,
         },
     };
 
-    return commit_ipc_transitions(
+    return micros_scheduler_commit_ipc_transitions(
         objects,
         requests,
         sizeof(requests) / sizeof(requests[0])
@@ -594,20 +596,20 @@ micros_scheduler_commit_ipc_reply_receive_wait(
     struct micros_thread_handle replier
 )
 {
-    const struct ipc_transition_request requests[2] = {
+    const struct micros_scheduler_ipc_transition requests[2] = {
         {
             .handle = caller,
-            .clear_flag = MICROS_THREAD_RTS_IPC_REPLY,
+            .clear_flags = MICROS_THREAD_RTS_IPC_REPLY,
             .set_flags = 0,
         },
         {
             .handle = replier,
-            .clear_flag = MICROS_THREAD_RTS_INACTIVE,
+            .clear_flags = MICROS_THREAD_RTS_INACTIVE,
             .set_flags = MICROS_THREAD_RTS_IPC_RECEIVE,
         },
     };
 
-    return commit_ipc_transitions(
+    return micros_scheduler_commit_ipc_transitions(
         objects,
         requests,
         sizeof(requests) / sizeof(requests[0])
@@ -622,25 +624,25 @@ micros_scheduler_commit_ipc_reply_receive_delivery(
     struct micros_thread_handle sender
 )
 {
-    const struct ipc_transition_request requests[3] = {
+    const struct micros_scheduler_ipc_transition requests[3] = {
         {
             .handle = caller,
-            .clear_flag = MICROS_THREAD_RTS_IPC_REPLY,
+            .clear_flags = MICROS_THREAD_RTS_IPC_REPLY,
             .set_flags = 0,
         },
         {
             .handle = replier,
-            .clear_flag = MICROS_THREAD_RTS_INACTIVE,
+            .clear_flags = MICROS_THREAD_RTS_INACTIVE,
             .set_flags = 0,
         },
         {
             .handle = sender,
-            .clear_flag = MICROS_THREAD_RTS_IPC_SEND,
+            .clear_flags = MICROS_THREAD_RTS_IPC_SEND,
             .set_flags = 0,
         },
     };
 
-    return commit_ipc_transitions(
+    return micros_scheduler_commit_ipc_transitions(
         objects,
         requests,
         sizeof(requests) / sizeof(requests[0])

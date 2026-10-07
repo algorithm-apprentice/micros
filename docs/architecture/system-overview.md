@@ -260,6 +260,11 @@ interrupts disabled.
   are hart-local, never standalone global execution state.
 - IPC payloads never authorize memory access by themselves.
 - A reply token is one-shot and resolves to exactly one blocked caller thread.
+- Endpoint close atomically removes every exact-generation IPC reference,
+  wakes exact foreign dependents with a dead-endpoint result, and leaves
+  unrelated `ANY` receivers blocked. A later close may discard its own staged
+  dead-endpoint result, but a successfully staged message or notification must
+  be drained before close.
 - Every cross-address-space copy is bounded by an active grant.
 - A direct grant is never forwarded across a second service boundary.
 - Executable bytes are followed by a local instruction-fetch synchronization
