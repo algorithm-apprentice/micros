@@ -10,6 +10,10 @@
 #include "micros/timer.h"
 #include "micros/trap.h"
 
+#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+#include "kernel/address_space_handoff_test.h"
+#endif
+
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
 #endif
@@ -352,6 +356,18 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "MICROS_USER_ADDRESS_SPACE_TEST_PASS "
         "roots=isolated reuse=zeroed active=guarded "
         "ownership=validated sum=cleared\n"
+    );
+    uart_flush();
+#endif
+
+#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+    if (!micros_address_space_handoff_runtime_run_self_test()) {
+        MICROS_PANIC(hart_id, "address-space-handoff-test");
+    }
+    uart_write(
+        "MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS "
+        "phase=handed-off wired=validated ipc=resident "
+        "grants=atomic mutation=revoked\n"
     );
     uart_flush();
 #endif

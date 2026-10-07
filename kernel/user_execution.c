@@ -276,6 +276,7 @@ enum micros_user_execution_error micros_user_execution_prepare(
     const struct micros_user_context *initial_context
 )
 {
+    const struct micros_frame_ownership *ledger;
     struct micros_kernel_objects *objects;
     const struct micros_thread *thread;
     const struct micros_process *process;
@@ -298,6 +299,18 @@ enum micros_user_execution_error micros_user_execution_prepare(
         &process
     );
     if (error != MICROS_USER_EXECUTION_OK) {
+        goto done;
+    }
+    ledger = micros_frame_ownership_runtime_ledger();
+    if (ledger == NULL) {
+        error = MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
+        goto done;
+    }
+    if (
+        ledger->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_PHASE;
         goto done;
     }
     if (
@@ -672,6 +685,7 @@ void micros_user_execution_install_return_frame(
 }
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
+    || defined(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
     || defined(MICROS_BUILD_IPC_SYSCALL_TEST) \

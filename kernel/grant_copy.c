@@ -158,6 +158,8 @@ static enum micros_grant_error copy_grant(
     if (
         ledger->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        && ledger->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
     ) {
         error = MICROS_GRANT_ERROR_PHASE;
         goto done;

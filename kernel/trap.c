@@ -8,6 +8,9 @@
 #include "kernel/ipc_ecall_test.h"
 #endif
 #include "kernel/ipc_syscall.h"
+#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+#include "kernel/address_space_handoff_test.h"
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
 #endif
@@ -521,7 +524,29 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             return;
         }
 #endif
+#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+        if (!user_timer) {
+            enum micros_address_space_handoff_test_trap_result result =
+                micros_address_space_handoff_test_handle_trap(
+                    hart,
+                    frame
+                );
+
+            if (
+                result
+                    == MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_SUPERVISOR_RETURN
+            ) {
+                return;
+            }
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "address-space-handoff-test-mismatch",
+                frame
+            );
+        }
+#endif
 #if !defined(MICROS_BUILD_USER_EXECUTION_TEST) \
+    && !defined(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST) \
     && !defined(MICROS_BUILD_SCHEDULER_TEST) \
     && !defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     && !defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)

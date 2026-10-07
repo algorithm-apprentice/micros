@@ -78,7 +78,8 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
-`test-qemu-frame-ownership`, `test-qemu-user-address-space`, and
+`test-qemu-frame-ownership`, `test-qemu-user-address-space`,
+`test-qemu-address-space-handoff`, and
 `test-qemu-user-execution`, `test-qemu-scheduler`,
 `test-qemu-scheduler-invalid-outgoing`, and
 `test-qemu-scheduler-invalid-next`. From a clean checkout,
@@ -105,6 +106,7 @@ cmake --workflow --preset test-qemu-ipc-syscall-panic
 cmake --workflow --preset test-qemu-nested-trap
 cmake --workflow --preset test-qemu-frame-ownership
 cmake --workflow --preset test-qemu-user-address-space
+cmake --workflow --preset test-qemu-address-space-handoff
 cmake --workflow --preset test-qemu-user-execution
 cmake --workflow --preset test-qemu-scheduler
 cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
@@ -315,19 +317,25 @@ and chunk-pairing tests, grant-model copy transitions, and a dedicated
 directions, byte-exact failure atomicity, stale authority rejection, and
 complete cleanup. The marker explicitly identifies bootstrap phase; no
 post-handoff copy claim is valid before a separate mapping-authority design.
-ADR-0040 defines the required next evidence without claiming that its workflow
-exists yet. Its implementation adds one isolated wired-handoff QEMU component
-that first rejects a reachable leaf planned `VM_TRANSFERABLE` without
+ADR-0040 evidence includes native phase/owner classification and the isolated
+`test-qemu-address-space-handoff` component. It first rejects a reachable leaf
+planned `VM_TRANSFERABLE` without
 mutation, then commits every live service leaf to exact `VM_WIRED` ownership.
-After the irreversible transition it must prove root validation and activation,
+After the irreversible transition it proves root validation and activation,
 IPC-buffer snapshot/write, and page-local/cross-page checked copy, while
 bootstrap mapping mutation remains phase-rejected. Foreign wired ownership,
 transferable live leaves, malformed PTEs, absent mappings, and permission
-failures must preserve all affected bytes and prevalidated state. An absent
-target combined with unrelated structural corruption must report the
-structural failure first. Generic execution-context preparation must return
+failures preserve all affected bytes and prevalidated state. An absent
+target combined with unrelated structural corruption reports the
+structural failure first. Generic execution-context preparation returns
 `PHASE` without changing its thread, saved context, or kernel stack, while an
-already prepared thread still returns through the common scheduler path.
+already prepared thread still returns through the common scheduler path. The
+exact marker is:
+
+```text
+MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
+```
+
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
@@ -341,9 +349,10 @@ transition.
 same virtual page to distinct typed frames, switches ASID-zero roots with exact
 fences, checks SUM-gated hardware access, proves full-page zeroing on reuse,
 rejects active/stale/corrupt roots without mutation, atomically tears roots
-down, and verifies every process-root API is revoked after ownership handoff.
-It also translates arbitrary aligned user addresses and proves failure-atomic
-64-byte IPC snapshot/write across a page boundary, including range, alignment,
+down, then verifies mapping mutation is revoked after ownership handoff while
+read-only operations reject a rootless process with `STATE`. It also
+translates arbitrary aligned user addresses and proves failure-atomic 64-byte
+IPC snapshot/write across a page boundary, including range, alignment,
 mapping, and read/write permission rejection.
 `test-qemu-user-execution` enters a relocation-free payload in U-mode, proves
 user-stack access and kernel-page isolation, captures every integer register

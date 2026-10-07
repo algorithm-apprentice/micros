@@ -70,6 +70,9 @@ micros_user_address_space_translate(
 );
 
 enum micros_user_address_space_error
+micros_user_address_space_complete_wired_handoff(void);
+
+enum micros_user_address_space_error
 micros_user_address_space_activate(
     struct micros_process_handle process
 );

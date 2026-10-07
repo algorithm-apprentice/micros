@@ -125,18 +125,20 @@ ADR-0039's one-page-bounded checked copies are now implemented using exact
 grant participants, retained at-most-two-page physical plans, explicit
 direction and bounds, failure-atomic commit, native/model evidence, and a
 three-address-space QEMU grant gate. This implementation is
-bootstrap-phase-only; post-handoff service use requires a later reviewed
-mapping-authority replacement. The user syscall/runtime ABI remains outside
+initially bootstrap-phase-only; the separate ADR-0040 outcome supplies its
+post-handoff mapping authority. The user syscall/runtime ABI remains outside
 this outcome.
-ADR-0040 defines that replacement for the statically embedded service set:
+ADR-0040's replacement is now implemented for the statically embedded service
+set:
 every live bootstrap leaf must be staged `VM_WIRED` before ownership commit,
 and read-only root validation, lookup, translation, and activation then use
 exact wired process-generation ownership. Transferable-frame mapping, VM fault
-delivery, and mutation remain later VM work. Its implementation must merge
-before the freestanding user-service runtime exposes checked copy. Generic
-execution-context preparation remains bootstrap-only; all live threads are
-already prepared at handoff, and PM's later tokenized preparation transition
-is the only post-handoff replacement.
+delivery, and mutation remain later VM work. Native owner classification and
+an isolated QEMU gate prove failure-atomic handoff, handed-off IPC/grant access,
+revoked mutation, bootstrap-only generic context preparation, and a real
+handed-off user return. The freestanding user-service runtime design is the
+next dependency-ready outcome. PM's later tokenized preparation transition
+remains the only post-handoff context-creation replacement.
 
 ## v0.1 completion goal
 

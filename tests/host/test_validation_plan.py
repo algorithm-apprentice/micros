@@ -125,6 +125,44 @@ class ValidationPlanTests(unittest.TestCase):
         )
         self.assertIn(validation_plan.IPC_MODEL, commands)
 
+    def test_wired_handoff_paths_own_component_gate(self):
+        for path in (
+            "arch/riscv64/address_space_handoff_test.S",
+            "kernel/address_space_handoff_test.h",
+            "kernel/address_space_handoff_test.c",
+            "kernel/bootstrap_memory.c",
+            "kernel/frame_ownership.c",
+            "kernel/user_address_space.c",
+            "kernel/user_address_space_core.c",
+            "kernel/user_execution.c",
+            "kernel/ipc_buffer.c",
+            "kernel/grant_copy.c",
+            "kernel/address_space.c",
+            "kernel/sv39.c",
+            "kernel/scheduler.c",
+            "arch/riscv64/mmu.S",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                for workflow_name in (
+                    "test-qemu-address-space-handoff",
+                    "test-qemu-frame-ownership",
+                    "test-qemu-user-address-space",
+                    "test-qemu-user-execution",
+                    "test-qemu-grant",
+                    "test-qemu-ipc-syscall",
+                    "test-qemu-ipc-syscall-panic",
+                    "test-qemu-scheduler",
+                ):
+                    self.assertIn(
+                        validation_plan.workflow(workflow_name),
+                        commands,
+                    )
+                self.assertTrue(
+                    validation_plan.IPC_MODEL in commands
+                    or validation_plan.UNIT_FULL in commands
+                )
+
     def test_fast_full_escalation_runs_complete_qemu(self):
         commands = validation_plan.plan(
             ["kernel/unclassified_target_code.c"],
