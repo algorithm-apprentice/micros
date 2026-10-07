@@ -60,6 +60,9 @@ The current implementation provides:
   pivot, rollback, same-priority head restoration, and higher-priority wakeup;
 - native generation-safe staged inbound-message state validation for runnable
   receivers;
+- native canonical no-message completion tests covering zero message/buffer
+  shape, duplicate-staging rejection, queued ordinary-send completion, call
+  exclusion, and successful-completion close preflight;
 - native failure-atomic matching dequeue and delivery commit tests covering
   head/middle/tail selection, unmatched FIFO preservation, queued-call reply
   wait, ordinary wakeups, exact staged messages, and ready-queue effects;
@@ -117,10 +120,14 @@ flag positions, and dormant kernel-owned state are present; queue transitions
 now have complete cross-object topology validation. Queue mutation and
 held-thread FIFO enqueue are implemented. Matching dequeue now commits message
 staging, exact FIFO unlink, queued-call reply-wait retention, and scheduler
-wakeup atomically for incoming held senders and receivers. Portable ordinary
-send and receive now authorize exact active endpoints and profile policy,
-snapshot canonical messages, match before blocking, and preserve specific or
-`ANY` FIFO order. Portable call now allocates nonreused reply tokens from fixed
+wakeup atomically for incoming held senders and receivers. Consuming a queued
+ordinary sender now stages its canonical no-message `OK` completion; consuming
+a queued call clears only `IPC_SEND` and leaves the caller in reply wait
+without a completion. Portable ordinary send and receive now authorize exact
+active endpoints and profile policy, snapshot canonical messages, match before
+blocking, and preserve specific or `ANY` FIFO order. A failure-atomic helper
+also stages canonical no-message `OK` or `DEAD_ENDPOINT` completion for the
+target adapter. Portable call now allocates nonreused reply tokens from fixed
 kernel state, delivers the canonical token immediately or through the sender
 queue, and leaves the exact caller in reply-only wait with its reply buffer
 retained. Portable reply resolves that opaque token through the fixed thread
@@ -153,13 +160,14 @@ canonical no-message `DEAD_ENDPOINT` completion, cancels tokens whose caller
 or callee is closing, clears pending events from and to the endpoint slot,
 preserves unrelated `ANY` receivers, and commits the ADR-0029 lifecycle close.
 An owned staged `DEAD_ENDPOINT` completion from an earlier close is discarded
-when its endpoint later closes. An already committed successful message or
-notification rejects close before any mutation and must be drained first. The
-portable acceptance model now preserves one fixture for 8,192 mixed
-transitions, including all IPC operations, endpoint close/reuse, denial,
-malformed input, and deadlock. It compares complete run-time flags, endpoint
-queues, tokens, notifications, staged state, and scheduler queues/current after
-every transition and prints a replayable seed and trace evidence. The isolated
+when its endpoint later closes. An already committed successful message,
+notification, or no-message completion rejects close before any mutation and
+must be drained first. The portable acceptance model now preserves one fixture
+for 8,192 mixed transitions, including all IPC operations, endpoint
+close/reuse, denial, malformed input, and deadlock. It compares complete
+run-time flags, endpoint queues, tokens, notifications, staged state, and
+scheduler queues/current after every transition and prints a replayable seed
+and trace evidence. The isolated
 QEMU IPC image runs three production process generations through immediate and
 blocked delivery, token reply, `reply_receive`, notification, deadlock, close,
 reuse, and baseline restoration using trusted kernel-owned buffers. These
@@ -717,7 +725,8 @@ deferred, the component invokes the portable production IPC transitions with
 trusted kernel-owned messages and receive-buffer identities.
 
 The sequence proves immediate specific delivery, queued send plus `ANY`
-receive, exact call/reply token routing and one-shot rejection, atomic
+receive with canonical no-message sender completion drain, exact call/reply
+token routing and one-shot rejection, atomic
 `reply_receive` blocking followed by the next request, source-coalesced
 notifications that cannot satisfy a call reply wait, deterministic two-party
 deadlock rejection, close cancellation of a queued call and specific receiver,

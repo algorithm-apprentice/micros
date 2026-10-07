@@ -66,6 +66,13 @@ enum micros_ipc_error micros_ipc_endpoint_close(
     micros_endpoint_t endpoint
 );
 
+enum micros_ipc_error micros_ipc_stage_no_message_completion(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    enum micros_ipc_error result
+);
+
 enum micros_ipc_error micros_ipc_sender_enqueue(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
