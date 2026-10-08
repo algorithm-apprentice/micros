@@ -7,6 +7,21 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
     const struct micros_kernel_objects *objects
 );
 
+enum micros_kernel_object_error
+micros_thread_scheduler_admit_preflight(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_thread_handle thread,
+    uint8_t priority,
+    uint64_t quantum_counter_ticks
+);
+
+enum micros_kernel_object_error
+micros_scheduler_preflight_current_ipc(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart
+);
+
 void micros_scheduler_apply_return_plan(
     struct micros_kernel_objects *objects,
     const struct micros_scheduler_return_plan *plan

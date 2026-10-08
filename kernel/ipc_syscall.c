@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
+#include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
 #include "micros/ipc_abi.h"
@@ -313,6 +314,20 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
     );
     if (preflight_result != MICROS_IPC_ABI_OK) {
         return return_abi_error(frame, preflight_result);
+    }
+    if (
+        (
+            request.operation == MICROS_IPC_ABI_REPLY
+            || request.operation == MICROS_IPC_ABI_REPLY_RECEIVE
+        )
+        && micros_bootstrap_runtime_is_active_controller(
+            context->process
+        )
+    ) {
+        return return_abi_error(
+            frame,
+            MICROS_IPC_ABI_UNAUTHORIZED
+        );
     }
     if (
         micros_user_execution_store_context(

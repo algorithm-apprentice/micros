@@ -162,6 +162,33 @@
       }
     },
     {
+      "name": "riscv64-bootstrap-launcher-test",
+      "displayName": "RISC-V 64 static bootstrap launcher test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-bootstrap-launcher-test",
+      "cacheVariables": {
+        "MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-bootstrap-ready-timeout-test",
+      "displayName": "RISC-V 64 bootstrap readiness-timeout panic test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-bootstrap-ready-timeout-test",
+      "cacheVariables": {
+        "MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-bootstrap-manifest-panic-test",
+      "displayName": "RISC-V 64 malformed bootstrap manifest panic test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-bootstrap-manifest-panic-test",
+      "cacheVariables": {
+        "MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -370,6 +397,27 @@
       "configurePreset": "riscv64-user-runtime-test",
       "targets": [
         "test-qemu-user-runtime"
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-launcher",
+      "configurePreset": "riscv64-bootstrap-launcher-test",
+      "targets": [
+        "test-qemu-bootstrap-launcher"
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-ready-timeout",
+      "configurePreset": "riscv64-bootstrap-ready-timeout-test",
+      "targets": [
+        "test-qemu-bootstrap-ready-timeout"
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-manifest-panic",
+      "configurePreset": "riscv64-bootstrap-manifest-panic-test",
+      "targets": [
+        "test-qemu-bootstrap-manifest-panic"
       ]
     },
     {
@@ -707,6 +755,48 @@
         {
           "type": "build",
           "name": "test-qemu-user-runtime"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-launcher",
+      "displayName": "Build and run static bootstrap launcher acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-bootstrap-launcher-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-bootstrap-launcher"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-ready-timeout",
+      "displayName": "Build and run bootstrap readiness-timeout panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-bootstrap-ready-timeout-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-bootstrap-ready-timeout"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-manifest-panic",
+      "displayName": "Build and run malformed bootstrap manifest panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-bootstrap-manifest-panic-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-bootstrap-manifest-panic"
         }
       ]
     },

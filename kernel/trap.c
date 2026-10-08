@@ -4,12 +4,16 @@
 #include <stdint.h>
 
 #include "arch/riscv64/platform.h"
+#include "kernel/bootstrap_runtime.h"
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
 #include "kernel/ipc_ecall_test.h"
 #endif
 #include "kernel/syscall.h"
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
+#endif
+#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+#include "kernel/bootstrap_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
@@ -47,6 +51,43 @@ extern unsigned char __trap_emergency_stack_top[];
 extern unsigned char micros_trap_entry[];
 
 void micros_riscv_trap_install(struct micros_hart *hart);
+
+static void fail_active_bootstrap_service_trap(
+    struct micros_hart *hart
+)
+{
+    const struct micros_bootstrap_control_state *state =
+        micros_bootstrap_runtime_state();
+    struct micros_thread_handle current;
+    size_t index;
+
+    if (
+        state == NULL
+        || state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
+        || micros_hart_current_thread(
+            micros_kernel_object_runtime_registry(),
+            micros_kernel_object_runtime_boot_hart_handle(),
+            &current
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return;
+    }
+    for (index = 0; index < state->entry_count; ++index) {
+        if (
+            state->bindings[index].thread.slot == current.slot
+            && state->bindings[index].thread.generation
+                == current.generation
+        ) {
+            micros_bootstrap_runtime_fail(
+                MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
+                state->bindings[index].service_id,
+                state->bindings[index].endpoint,
+                0
+            );
+        }
+    }
+    (void)hart;
+}
 
 static uintptr_t read_sscratch(void)
 {
@@ -432,6 +473,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             micros_scheduler_user_trap_enter(hart, frame)
                 != MICROS_SCHEDULER_OK
         ) {
+            fail_active_bootstrap_service_trap(hart);
             MICROS_TRAP_PANIC(
                 hart->hardware_id,
                 "scheduler-user-entry",
@@ -453,11 +495,18 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             micros_user_execution_capture_trap(hart, frame)
                 != MICROS_USER_EXECUTION_OK
         ) {
+            fail_active_bootstrap_service_trap(hart);
             MICROS_TRAP_PANIC(
                 hart->hardware_id,
                 "user-execution-capture",
                 frame
             );
+        }
+        if (
+            !user_timer
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            fail_active_bootstrap_service_trap(hart);
         }
         if (user_timer) {
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
@@ -509,6 +558,14 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             }
 #endif
         }
+#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+        if (
+            !user_timer
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            micros_bootstrap_test_handle_trap(hart, frame);
+        }
+#endif
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST
         if (
             !user_timer
@@ -795,6 +852,29 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                     );
 
             if (scheduler_error != MICROS_SCHEDULER_OK) {
+                const struct micros_bootstrap_control_state *state =
+                    micros_bootstrap_runtime_state();
+
+                if (
+                    frame->a7
+                        == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+                    && state != NULL
+                    && (
+                        state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+                        || state->phase
+                            == MICROS_BOOTSTRAP_PHASE_SEALED
+                    )
+                ) {
+                    micros_bootstrap_runtime_fail(
+                        state->phase
+                                == MICROS_BOOTSTRAP_PHASE_SEALED
+                            ? MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION
+                            : MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                        0,
+                        MICROS_ENDPOINT_NONE,
+                        0
+                    );
+                }
                 MICROS_TRAP_PANIC(
                     hart->hardware_id,
                     "ipc-syscall-return",

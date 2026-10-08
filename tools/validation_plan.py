@@ -27,6 +27,9 @@ QEMU_WORKFLOWS = (
     "test-qemu-grant",
     "test-qemu-grant-syscall",
     "test-qemu-user-runtime",
+    "test-qemu-bootstrap-launcher",
+    "test-qemu-bootstrap-ready-timeout",
+    "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc",
     "test-qemu-ipc-ecall-core",
     "test-qemu-ipc-syscall",
@@ -45,6 +48,35 @@ PLANNER_INPUTS = (
     "tools/validation_plan.py",
     "tests/host/test_validation_plan.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
+)
+
+BOOTSTRAP_CROSS_GATE_INPUTS = (
+    "kernel/bootstrap_control.c",
+    "kernel/bootstrap_control_core.c",
+    "kernel/bootstrap_image.c",
+    "kernel/bootstrap_manifest.c",
+    "kernel/bootstrap_runtime.c",
+    "kernel/bootstrap_syscall.c",
+)
+
+BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
+    "test-qemu-object-model",
+    "test-qemu-endpoint",
+    "test-qemu-grant",
+    "test-qemu-grant-syscall",
+    "test-qemu-user-runtime",
+    "test-qemu-bootstrap-launcher",
+    "test-qemu-bootstrap-ready-timeout",
+    "test-qemu-bootstrap-manifest-panic",
+    "test-qemu-ipc",
+    "test-qemu-ipc-ecall-core",
+    "test-qemu-ipc-syscall",
+    "test-qemu-ipc-syscall-panic",
+    "test-qemu-frame-ownership",
+    "test-qemu-user-address-space",
+    "test-qemu-address-space-handoff",
+    "test-qemu-user-execution",
+    "test-qemu-scheduler",
 )
 
 SHARED_QEMU_PATHS = (
@@ -217,6 +249,63 @@ GATE_INPUTS = {
             "kernel/user_execution.c",
         )
     ),
+    "test-qemu-bootstrap-launcher": (
+        "arch/riscv64/sbi.c",
+        "arch/riscv64/mmu.S",
+        "arch/riscv64/trap.S",
+        "arch/riscv64/uart.c",
+        "arch/riscv64/user_entry.S",
+        "include/micros/runtime.h",
+        "kernel/address_space.c",
+        "kernel/bootstrap_memory.c",
+        "kernel/bootstrap_control.c",
+        "kernel/bootstrap_control_core.c",
+        "kernel/bootstrap_image.c",
+        "kernel/bootstrap_manifest.c",
+        "kernel/bootstrap_runtime.c",
+        "kernel/bootstrap_syscall.c",
+        "kernel/bootstrap_test.c",
+        "kernel/bootstrap_test.h",
+        "kernel/bootstrap_test_fixture.h",
+        "kernel/endpoint.c",
+        "kernel/fdt.c",
+        "kernel/frame_allocator.c",
+        "kernel/frame_ownership.c",
+        "kernel/grant.c",
+        "kernel/grant_runtime.c",
+        "kernel/ipc_abi.c",
+        "kernel/ipc.c",
+        "kernel/ipc_buffer.c",
+        "kernel/ipc_runtime.c",
+        "kernel/ipc_syscall.c",
+        "kernel/kernel_object_runtime.c",
+        "kernel/kernel_objects.c",
+        "kernel/main.c",
+        "kernel/scheduler.c",
+        "kernel/scheduler_core.c",
+        "kernel/syscall.c",
+        "kernel/sv39.c",
+        "kernel/timer.c",
+        "kernel/trap.c",
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_core.c",
+        "kernel/user_execution.c",
+        "lib/runtime/memory.c",
+        "lib/runtime/memory.h",
+        "lib/runtime/memory_symbols.c",
+        "lib/runtime/raw_syscall.h",
+        "lib/runtime/raw_syscall.S",
+        "lib/runtime/runtime.c",
+        "lib/runtime/start.S",
+        "lib/runtime/user.ld",
+        "tests/host/test_generate_bootstrap_fixture.py",
+        "tests/qemu/bootstrap_launcher.c",
+        "tests/qemu/bootstrap_probe.c",
+        "tests/qemu/bootstrap_probe.S",
+        "tests/qemu/bootstrap_protocol.h",
+        "tools/check_user_elf.py",
+        "tools/generate_bootstrap_fixture.py",
+    ),
     "test-qemu-ipc": (
         "kernel/ipc.c",
         "kernel/endpoint.c",
@@ -310,6 +399,21 @@ GATE_INPUTS = {
         "arch/riscv64/scheduler_test.S",
     ),
 }
+
+GATE_INPUTS["test-qemu-bootstrap-ready-timeout"] = GATE_INPUTS[
+    "test-qemu-bootstrap-launcher"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
+GATE_INPUTS["test-qemu-bootstrap-manifest-panic"] = GATE_INPUTS[
+    "test-qemu-bootstrap-launcher"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
+for bootstrap_workflow in BOOTSTRAP_CROSS_GATE_WORKFLOWS:
+    GATE_INPUTS[bootstrap_workflow] += BOOTSTRAP_CROSS_GATE_INPUTS
 
 SLOW_MODEL_INPUTS = {
     "test-ipc-model": (

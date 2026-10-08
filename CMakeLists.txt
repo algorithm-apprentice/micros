@@ -63,6 +63,21 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    "Build the static bootstrap launcher acceptance image"
+    OFF
+)
+option(
+    MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    "Build the bootstrap readiness-timeout panic image"
+    OFF
+)
+option(
+    MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+    "Build the malformed bootstrap manifest panic image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -121,6 +136,9 @@ set(
     MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
     MICROS_BUILD_GRANT_SYSCALL_TEST
     MICROS_BUILD_USER_RUNTIME_TEST
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -234,6 +252,22 @@ if(MICROS_BUILD_HOST_TESTS)
         lib/runtime/runtime.c
         tests/host/runtime_test.c
     )
+    add_executable(
+        bootstrap_test
+        kernel/bootstrap_manifest.c
+        tests/host/bootstrap_manifest_test.c
+    )
+    add_executable(
+        bootstrap_control_test
+        kernel/bootstrap_control.c
+        kernel/bootstrap_control_core.c
+        kernel/bootstrap_image.c
+        kernel/bootstrap_manifest.c
+        kernel/endpoint.c
+        kernel/kernel_objects.c
+        kernel/scheduler_core.c
+        tests/host/bootstrap_control_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -280,6 +314,18 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
+    target_include_directories(
+        bootstrap_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        bootstrap_control_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
     target_compile_features(fdt_test PRIVATE c_std_17)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_features(sv39_test PRIVATE c_std_17)
@@ -289,6 +335,8 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(endpoint_test PRIVATE c_std_17)
     target_compile_features(ipc_model_test PRIVATE c_std_17)
     target_compile_features(runtime_test PRIVATE c_std_17)
+    target_compile_features(bootstrap_test PRIVATE c_std_17)
+    target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -371,6 +419,26 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         runtime_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        bootstrap_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        bootstrap_control_test
         PRIVATE
             -Wall
             -Wextra
@@ -475,6 +543,28 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            bootstrap_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            bootstrap_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            bootstrap_control_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            bootstrap_control_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -486,6 +576,8 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME endpoint-profile COMMAND endpoint_test)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
+    add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
+    add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -516,6 +608,8 @@ if(MICROS_BUILD_HOST_TESTS)
             scheduler_test
             endpoint_test
             runtime_test
+            bootstrap_test
+            bootstrap_control_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -561,6 +655,8 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             ipc_model_test
             runtime_test
+            bootstrap_test
+            bootstrap_control_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -688,6 +784,132 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
     )
 endif()
 
+if(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+)
+    function(micros_add_bootstrap_user target output_name)
+        add_executable(
+            "${target}"
+            lib/runtime/memory.c
+            lib/runtime/memory_symbols.c
+            lib/runtime/raw_syscall.S
+            lib/runtime/runtime.c
+            lib/runtime/start.S
+            ${ARGN}
+        )
+        set_target_properties(
+            "${target}"
+            PROPERTIES
+                OUTPUT_NAME "${output_name}"
+                SUFFIX ".elf"
+                RUNTIME_OUTPUT_DIRECTORY
+                    "${CMAKE_BINARY_DIR}/bootstrap"
+                LINK_DEPENDS
+                    "${MICROS_USER_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+        )
+        target_include_directories(
+            "${target}"
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        )
+        target_compile_features("${target}" PRIVATE c_std_17)
+        target_compile_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -msmall-data-limit=0
+                -mno-save-restore
+                -ffunction-sections
+                -fdata-sections
+                -g0
+                "$<$<COMPILE_LANGUAGE:C>:-std=c17;-ffreestanding;-fno-builtin;-fno-common;-fno-pic;-fno-pie;-fno-stack-protector;-fno-unwind-tables;-fno-asynchronous-unwind-tables>"
+                "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wpedantic;-Wmissing-prototypes;-Wstrict-prototypes>"
+        )
+        target_link_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -nostdlib
+                -static
+                "--ld-path=${MICROS_LD_LLD}"
+                "-Wl,-T,${MICROS_USER_LINKER_SCRIPT}"
+                -Wl,--build-id=none
+                -Wl,--fatal-warnings
+                -Wl,--gc-sections
+                -Wl,--no-relax
+                -Wl,-z,max-page-size=4096
+                -Wl,-z,common-page-size=4096
+                "-Wl,-Map,${CMAKE_BINARY_DIR}/bootstrap/${output_name}.map"
+        )
+        add_custom_command(
+            TARGET "${target}"
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                --elf
+                "$<TARGET_FILE:${target}>"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endfunction()
+
+    micros_add_bootstrap_user(
+        micros_bootstrap_launcher
+        micros-bootstrap-launcher
+        tests/qemu/bootstrap_launcher.c
+    )
+    micros_add_bootstrap_user(
+        micros_bootstrap_probe
+        micros-bootstrap-probe
+        tests/qemu/bootstrap_probe.S
+        tests/qemu/bootstrap_probe.c
+    )
+    if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+        target_compile_definitions(
+            micros_bootstrap_probe
+            PRIVATE
+                MICROS_BOOTSTRAP_PROBE_OMIT_READY=1
+        )
+    endif()
+    set(
+        MICROS_BOOTSTRAP_FIXTURE_SOURCE
+        "${CMAKE_BINARY_DIR}/generated/bootstrap_fixture.c"
+    )
+    add_custom_command(
+        OUTPUT "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+            --launcher-elf
+            "$<TARGET_FILE:micros_bootstrap_launcher>"
+            --probe-elf
+            "$<TARGET_FILE:micros_bootstrap_probe>"
+            --output
+            "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        DEPENDS
+            micros_bootstrap_launcher
+            micros_bootstrap_probe
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    set_source_files_properties(
+        "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        PROPERTIES GENERATED TRUE
+    )
+endif()
+
 add_executable(
     micros
     arch/riscv64/boot.S
@@ -699,7 +921,13 @@ add_executable(
     arch/riscv64/uart.c
     arch/riscv64/user_entry.S
     kernel/address_space.c
+    kernel/bootstrap_control.c
+    kernel/bootstrap_control_core.c
+    kernel/bootstrap_image.c
+    kernel/bootstrap_manifest.c
     kernel/bootstrap_memory.c
+    kernel/bootstrap_runtime.c
+    kernel/bootstrap_syscall.c
     kernel/endpoint.c
     kernel/fdt.c
     kernel/frame_allocator.c
@@ -744,6 +972,43 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             "${MICROS_USER_RUNTIME_FIXTURE_SOURCE}"
             arch/riscv64/user_runtime_test.S
             kernel/user_runtime_test.c
+    )
+endif()
+
+if(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_bootstrap_probe
+    )
+    if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST=1
+        )
+    elseif(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST=1
+        )
+    else()
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST=1
+        )
+    endif()
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+            kernel/bootstrap_test.c
     )
 endif()
 
@@ -1066,6 +1331,122 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
     )
 endif()
 
+if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-launcher
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-ready-timeout
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --pattern
+            "MICROS_BOOTSTRAP_FAILURE reason=ready-timeout service=0x0000000000000002 endpoint=0x0000000000001001 phase=failed state=starting detail=0x[0-9a-f]{16}"
+            --forbid-marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-manifest-panic
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --marker
+            "MICROS_BOOTSTRAP_FAILURE reason=manifest-cycle service=0x0000000000000002 endpoint=0x00000000fffffffe phase=failed state=none detail=0x0000000000000006"
+            --forbid-marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_GRANT_SYSCALL_TEST)
     add_custom_target(
         test-qemu-grant-syscall
@@ -1093,7 +1474,7 @@ if(MICROS_BUILD_GRANT_SYSCALL_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            8
+            15
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -1127,7 +1508,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            8
+            12
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

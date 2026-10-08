@@ -503,43 +503,81 @@ enum micros_kernel_object_error micros_process_create(
     }
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        struct micros_process *process = &objects->processes[index];
-        uint32_t generation;
+        enum micros_kernel_object_error create_error;
 
         if (
-            process->slot_state
+            objects->processes[index].slot_state
             != MICROS_KERNEL_OBJECT_SLOT_FREE
         ) {
             continue;
         }
-        error = micros_process_next_generation(
+        create_error = micros_process_create_at(
+            objects,
             (uint16_t)index,
-            process->generation,
-            &generation
+            handle
         );
         if (
-            error
+            create_error
             == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
         ) {
             continue;
         }
-        if (error != MICROS_KERNEL_OBJECT_OK) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-        }
-
-        process->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
-        process->generation = generation;
-        process->live_thread_count = 0;
-        process->address_space_root = 0;
-        process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
-        process->privilege_profile = 0;
-        process->endpoint_lifecycle_consumed = false;
-        ++objects->live_process_count;
-        handle->slot = (uint16_t)index;
-        handle->generation = generation;
-        return MICROS_KERNEL_OBJECT_OK;
+        return create_error;
     }
     return MICROS_KERNEL_OBJECT_ERROR_EXHAUSTED;
+}
+
+enum micros_kernel_object_error micros_process_create_at(
+    struct micros_kernel_objects *objects,
+    uint16_t slot,
+    struct micros_process_handle *handle
+)
+{
+    struct micros_process *process;
+    uint32_t generation;
+    enum micros_kernel_object_error error;
+
+    if (
+        objects == NULL
+        || handle == NULL
+        || slot >= MICROS_PROCESS_CAPACITY
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    process = &objects->processes[slot];
+    if (
+        process->slot_state
+        == MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
+    }
+    if (process->slot_state != MICROS_KERNEL_OBJECT_SLOT_FREE) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    error = micros_process_next_generation(
+        slot,
+        process->generation,
+        &generation
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+
+    process->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
+    process->generation = generation;
+    process->live_thread_count = 0;
+    process->address_space_root = 0;
+    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    process->privilege_profile = 0;
+    process->endpoint_lifecycle_consumed = false;
+    ++objects->live_process_count;
+    handle->slot = slot;
+    handle->generation = generation;
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 enum micros_kernel_object_error micros_process_release(

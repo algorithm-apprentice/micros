@@ -35,6 +35,9 @@ enum micros_scheduler_error micros_scheduler_admit(
     uint64_t quantum_counter_ticks
 );
 
+enum micros_scheduler_error
+micros_scheduler_prepare_start_timer(void);
+
 enum micros_scheduler_error micros_scheduler_start(void);
 
 enum micros_scheduler_error micros_scheduler_user_trap_enter(

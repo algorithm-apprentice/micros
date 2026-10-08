@@ -68,6 +68,8 @@ static enum micros_ipc_error endpoint_error_to_ipc(
         return MICROS_IPC_ERROR_DEAD_ENDPOINT;
     case MICROS_ENDPOINT_ERROR_STATE:
         return MICROS_IPC_ERROR_STATE;
+    case MICROS_ENDPOINT_ERROR_CLOSING:
+        return MICROS_IPC_ERROR_ENDPOINT_CLOSING;
     case MICROS_ENDPOINT_ERROR_UNAUTHORIZED:
         return MICROS_IPC_ERROR_UNAUTHORIZED;
     case MICROS_ENDPOINT_ERROR_INVARIANT:
@@ -690,6 +692,7 @@ static enum micros_ipc_error preflight_reply(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle replier_handle,
     uint64_t reply_token,
+    micros_endpoint_t expected_caller_endpoint,
     const struct micros_ipc_message *message,
     uint32_t required_operation,
     struct reply_preflight *plan
@@ -753,6 +756,22 @@ static enum micros_ipc_error preflight_reply(
     );
     if (error != MICROS_IPC_OK) {
         return error;
+    }
+    if (expected_caller_endpoint != MICROS_ENDPOINT_NONE) {
+        const struct micros_endpoint_record *caller_endpoint =
+            &registry->endpoints[caller->owner.slot];
+
+        if (
+            caller_endpoint->state
+                != MICROS_ENDPOINT_STATE_ACTIVE
+            || caller_endpoint->value
+                != expected_caller_endpoint
+            || caller_endpoint->owner.slot != caller->owner.slot
+            || caller_endpoint->owner.generation
+                != caller->owner.generation
+        ) {
+            return MICROS_IPC_ERROR_REPLY_TOKEN;
+        }
     }
     if (reply_request_is_pending(objects, reply_token)) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
@@ -2522,6 +2541,25 @@ enum micros_ipc_error micros_ipc_reply(
     const struct micros_ipc_message *message
 )
 {
+    return micros_ipc_reply_expected_caller(
+        registry,
+        objects,
+        replier_handle,
+        reply_token,
+        MICROS_ENDPOINT_NONE,
+        message
+    );
+}
+
+enum micros_ipc_error micros_ipc_reply_expected_caller(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle replier_handle,
+    uint64_t reply_token,
+    micros_endpoint_t expected_caller,
+    const struct micros_ipc_message *message
+)
+{
     struct reply_preflight plan;
     enum micros_kernel_object_error scheduler_error;
     enum micros_ipc_error error;
@@ -2531,6 +2569,7 @@ enum micros_ipc_error micros_ipc_reply(
         objects,
         replier_handle,
         reply_token,
+        expected_caller,
         message,
         MICROS_PRIVILEGE_OPERATION_REPLY,
         &plan
@@ -2594,6 +2633,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
         objects,
         replier_handle,
         reply_token,
+        MICROS_ENDPOINT_NONE,
         reply_message,
         MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
         &reply_plan

@@ -1,4 +1,5 @@
 #include "micros/endpoint.h"
+#include "micros/bootstrap_control.h"
 #include "micros/scheduler_core.h"
 
 #include <stdbool.h>
@@ -105,6 +106,14 @@ static struct micros_user_context context_pattern(uint64_t base)
     }
     memcpy(&context, words, sizeof(context));
     return context;
+}
+
+static void write_u32_le(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 16);
+    bytes[3] = (uint8_t)(value >> 24);
 }
 
 static bool setup_lifecycle_fixture(void)
@@ -986,6 +995,157 @@ static bool test_endpoint_reuse_rejects_stale_generation(void)
     return true;
 }
 
+static bool test_source_only_seal_preserves_staged_source(void)
+{
+    micros_endpoint_t endpoints[2];
+    const struct micros_endpoint_record *record = NULL;
+    struct micros_thread *receiver;
+    size_t index;
+
+    EXPECT_TRUE(setup_lifecycle_fixture());
+    for (index = 0; index < 2; ++index) {
+        EXPECT_ERROR(
+            MICROS_ENDPOINT_OK,
+            micros_endpoint_reserve(
+                &registry,
+                &objects,
+                processes[index],
+                &endpoints[index]
+            )
+        );
+        EXPECT_ERROR(
+            MICROS_ENDPOINT_OK,
+            micros_endpoint_install_profile(
+                &registry,
+                &objects,
+                processes[index],
+                (uint8_t)(index + 1)
+            )
+        );
+        EXPECT_ERROR(
+            MICROS_ENDPOINT_OK,
+            micros_endpoint_activate(
+                &registry,
+                &objects,
+                endpoints[index]
+            )
+        );
+    }
+    receiver = &objects.threads[threads[1].slot];
+    receiver->ipc_receive_buffer = UINT64_C(0x61002000);
+    receiver->ipc_delivery_pending = true;
+    receiver->ipc_inbound_message.source = endpoints[0];
+    receiver->ipc_inbound_message.type =
+        MICROS_BOOTSTRAP_MESSAGE_READY_ACK;
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[0],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[4],
+        2
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[8],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[16],
+        endpoints[1]
+    );
+
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_seal_source_only(
+            &registry,
+            &objects,
+            endpoints[0]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    receiver->ipc_inbound_message.type = UINT32_C(60);
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_INVARIANT,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    receiver->ipc_inbound_message.type =
+        MICROS_BOOTSTRAP_MESSAGE_READY_ACK;
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_resolve_internal(
+            &registry,
+            &objects,
+            endpoints[0],
+            &record
+        )
+    );
+    EXPECT_TRUE(record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY);
+    record = (const struct micros_endpoint_record *)(uintptr_t)1;
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_CLOSING,
+        micros_endpoint_resolve_active(
+            &registry,
+            &objects,
+            endpoints[0],
+            &record
+        )
+    );
+    EXPECT_TRUE(
+        record == (const struct micros_endpoint_record *)(uintptr_t)1
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_CLOSING,
+        micros_endpoint_authorize_target(
+            &registry,
+            &objects,
+            endpoints[1],
+            MICROS_PRIVILEGE_OPERATION_SEND,
+            endpoints[0]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_STATE,
+        micros_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[0]
+        )
+    );
+
+    receiver->ipc_receive_buffer = 0;
+    receiver->ipc_delivery_pending = false;
+    memset(
+        &receiver->ipc_inbound_message,
+        0,
+        sizeof(receiver->ipc_inbound_message)
+    );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[0]
+        )
+    );
+    return true;
+}
+
 static bool test_relationship_validator_rejects_corruption(void)
 {
     micros_endpoint_t endpoint;
@@ -1105,6 +1265,10 @@ int main(void)
         {
             "endpoint reuse rejects stale generation",
             test_endpoint_reuse_rejects_stale_generation,
+        },
+        {
+            "source-only seal preserves staged source",
+            test_source_only_seal_preserves_staged_source,
         },
         {
             "resolution rejects unimplemented slots",

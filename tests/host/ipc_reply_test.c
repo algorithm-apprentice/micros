@@ -773,6 +773,8 @@ static bool test_reply_routes_exact_tokens_without_send_target(void)
     struct micros_thread *first_caller;
     struct micros_thread *second_caller;
     struct micros_thread *other_server;
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
     uint64_t first_token;
     uint64_t second_token;
     uint64_t saved_token;
@@ -808,14 +810,45 @@ static bool test_reply_routes_exact_tokens_without_send_target(void)
         second_token,
         &second_reply
     ));
-
+    registry_snapshot = registry;
+    objects_snapshot = objects;
     EXPECT_IPC_ERROR(
-        MICROS_IPC_OK,
-        micros_ipc_reply(
+        MICROS_IPC_ERROR_REPLY_TOKEN,
+        micros_ipc_reply_expected_caller(
             &registry,
             &objects,
             primary_threads[REPLY_PROCESS_OTHER_SERVER],
             second_token,
+            endpoints[REPLY_PROCESS_SERVER],
+            &second_reply
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(
+            &objects,
+            &objects_snapshot,
+            sizeof(objects)
+        ) == 0
+        && memcmp(
+            &second_reply,
+            &second_reply_snapshot,
+            sizeof(second_reply)
+        ) == 0
+    );
+
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_reply_expected_caller(
+            &registry,
+            &objects,
+            primary_threads[REPLY_PROCESS_OTHER_SERVER],
+            second_token,
+            endpoints[REPLY_PROCESS_CLIENT],
             &second_reply
         )
     );

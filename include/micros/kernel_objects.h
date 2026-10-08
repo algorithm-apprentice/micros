@@ -219,6 +219,12 @@ enum micros_kernel_object_error micros_process_create(
     struct micros_process_handle *handle
 );
 
+enum micros_kernel_object_error micros_process_create_at(
+    struct micros_kernel_objects *objects,
+    uint16_t slot,
+    struct micros_process_handle *handle
+);
+
 enum micros_kernel_object_error micros_process_release(
     struct micros_kernel_objects *objects,
     struct micros_process_handle handle

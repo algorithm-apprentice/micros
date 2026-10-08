@@ -1035,6 +1035,7 @@ def matches_expected_result(
     expected_outcome,
     markers,
     patterns,
+    forbidden_markers=(),
     require_fdt_events=False,
     require_fdt_reservations=False,
     require_panic_report=False,
@@ -1068,6 +1069,10 @@ def matches_expected_result(
         or FAILURE_MARKER in result.output
         or any(line.startswith("not ok ") for line in output_lines)
         or not _has_required_output(output_lines, markers, patterns)
+        or any(
+            forbidden in output_lines
+            for forbidden in forbidden_markers
+        )
     ):
         return False
     if (
@@ -1380,6 +1385,12 @@ def parse_arguments(argv):
         help="Full-line regular expression required in serial output",
     )
     parser.add_argument(
+        "--forbid-marker",
+        action="append",
+        default=[],
+        help="Exact serial line that must be absent; may be repeated",
+    )
+    parser.add_argument(
         "--expect",
         choices=("pass", "panic"),
         default="pass",
@@ -1585,6 +1596,7 @@ def main(argv=None):
             expected_outcome=expected_outcome,
             markers=arguments.marker,
             patterns=arguments.pattern,
+            forbidden_markers=arguments.forbid_marker,
             require_fdt_events=arguments.require_fdt_events,
             require_fdt_reservations=arguments.require_fdt_reservations,
             require_panic_report=arguments.require_panic_report,
