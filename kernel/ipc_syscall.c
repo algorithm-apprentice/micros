@@ -40,13 +40,13 @@ static _Noreturn void panic_ipc_syscall(
     );
 }
 
-static enum micros_ipc_syscall_return return_abi_error(
+static enum micros_syscall_return return_abi_error(
     struct micros_trap_frame *frame,
     enum micros_ipc_abi_result result
 )
 {
     frame->a0 = (uint64_t)(int64_t)result;
-    return MICROS_IPC_SYSCALL_RETURN_NORMAL;
+    return MICROS_SYSCALL_RETURN_NORMAL;
 }
 
 static bool capture_endpoint(uint64_t value, micros_endpoint_t *endpoint)
@@ -80,82 +80,83 @@ static enum micros_ipc_abi_result preflight_request(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
     struct micros_process_handle process,
+    const struct micros_syscall_arguments *arguments,
     struct ipc_syscall_request *request
 )
 {
     enum micros_ipc_buffer_error buffer_error;
 
-    if (request == NULL) {
+    if (arguments == NULL || request == NULL) {
         panic_ipc_syscall(hart, frame, "ipc-request-storage");
     }
-    request->operation = frame->a7;
-    request->token = frame->a0;
-    request->event_mask = frame->a1;
-    request->primary_buffer = (uintptr_t)frame->a1;
-    request->receive_buffer = (uintptr_t)frame->a3;
+    request->operation = arguments->a7;
+    request->token = arguments->a0;
+    request->event_mask = arguments->a1;
+    request->primary_buffer = (uintptr_t)arguments->a1;
+    request->receive_buffer = (uintptr_t)arguments->a3;
     switch (request->operation) {
     case MICROS_IPC_ABI_SEND:
         if (
-            frame->a2 != 0
-            || frame->a3 != 0
-            || !capture_endpoint(frame->a0, &request->endpoint)
+            arguments->a2 != 0
+            || arguments->a3 != 0
+            || !capture_endpoint(arguments->a0, &request->endpoint)
         ) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
         buffer_error = micros_ipc_buffer_snapshot(
             process,
-            frame->a1,
+            arguments->a1,
             MICROS_IPC_BUFFER_READ,
             &request->message
         );
         return map_buffer_error(hart, frame, buffer_error);
     case MICROS_IPC_ABI_RECEIVE:
         if (
-            frame->a2 != 0
-            || frame->a3 != 0
-            || !capture_endpoint(frame->a0, &request->source)
+            arguments->a2 != 0
+            || arguments->a3 != 0
+            || !capture_endpoint(arguments->a0, &request->source)
         ) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
         buffer_error = micros_ipc_buffer_validate(
             process,
-            frame->a1,
+            arguments->a1,
             MICROS_IPC_BUFFER_WRITE
         );
         return map_buffer_error(hart, frame, buffer_error);
     case MICROS_IPC_ABI_CALL:
         if (
-            frame->a2 != 0
-            || frame->a3 != 0
-            || !capture_endpoint(frame->a0, &request->endpoint)
+            arguments->a2 != 0
+            || arguments->a3 != 0
+            || !capture_endpoint(arguments->a0, &request->endpoint)
         ) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
         buffer_error = micros_ipc_buffer_snapshot(
             process,
-            frame->a1,
+            arguments->a1,
             MICROS_IPC_BUFFER_READ | MICROS_IPC_BUFFER_WRITE,
             &request->message
         );
         return map_buffer_error(hart, frame, buffer_error);
     case MICROS_IPC_ABI_REPLY:
-        if (frame->a2 != 0 || frame->a3 != 0) {
+        if (arguments->a2 != 0 || arguments->a3 != 0) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
         buffer_error = micros_ipc_buffer_snapshot(
             process,
-            frame->a1,
+            arguments->a1,
             MICROS_IPC_BUFFER_READ,
             &request->message
         );
         return map_buffer_error(hart, frame, buffer_error);
     case MICROS_IPC_ABI_REPLY_RECEIVE:
-        if (!capture_endpoint(frame->a2, &request->source)) {
+        if (!capture_endpoint(arguments->a2, &request->source)) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
         buffer_error = micros_ipc_buffer_snapshot(
             process,
-            frame->a1,
+            arguments->a1,
             MICROS_IPC_BUFFER_READ,
             &request->message
         );
@@ -164,16 +165,16 @@ static enum micros_ipc_abi_result preflight_request(
         }
         buffer_error = micros_ipc_buffer_validate(
             process,
-            frame->a3,
+            arguments->a3,
             MICROS_IPC_BUFFER_WRITE
         );
         return map_buffer_error(hart, frame, buffer_error);
     case MICROS_IPC_ABI_NOTIFY:
         if (
-            frame->a2 != 0
-            || frame->a3 != 0
-            || frame->a1 == 0
-            || !capture_endpoint(frame->a0, &request->endpoint)
+            arguments->a2 != 0
+            || arguments->a3 != 0
+            || arguments->a1 == 0
+            || !capture_endpoint(arguments->a0, &request->endpoint)
         ) {
             return MICROS_IPC_ABI_ARGUMENT;
         }
@@ -256,15 +257,14 @@ static bool operation_stages_immediate_completion(
     );
 }
 
-enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
+enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
     struct micros_hart *hart,
-    struct micros_trap_frame *frame
+    struct micros_trap_frame *frame,
+    const struct micros_syscall_context *context,
+    const struct micros_syscall_arguments *arguments
 )
 {
     struct micros_endpoint_registry *registry;
-    struct micros_kernel_objects *objects;
-    struct micros_hart_handle hart_handle;
-    struct micros_thread_handle current;
     const struct micros_thread *resolved;
     struct micros_scheduler_current_ipc_guard guard = {0};
     struct ipc_syscall_request request;
@@ -272,7 +272,13 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
     enum micros_ipc_error ipc_error;
     uint64_t abi_result;
 
-    if (hart == NULL || frame == NULL) {
+    if (
+        hart == NULL
+        || frame == NULL
+        || context == NULL
+        || arguments == NULL
+        || context->objects == NULL
+    ) {
         panic_ipc_syscall(hart, frame, "ipc-syscall-argument");
     }
     registry = micros_ipc_runtime_authoritative_registry();
@@ -286,30 +292,23 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
     if (micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK) {
         panic_ipc_syscall(hart, frame, "ipc-runtime-invariant");
     }
-    objects = micros_kernel_object_runtime_authoritative_registry();
-    hart_handle = micros_kernel_object_runtime_boot_hart_handle();
     if (
-        objects == NULL
-        || hart != &objects->harts[hart_handle.slot]
-        || micros_hart_current_thread(
-            objects,
-            hart_handle,
-            &current
-        ) != MICROS_KERNEL_OBJECT_OK
-        || micros_thread_resolve(objects, current, &resolved)
+        micros_thread_resolve(
+            context->objects,
+            context->current,
+            &resolved
+        )
             != MICROS_KERNEL_OBJECT_OK
-        || resolved->owner.slot >= MICROS_PROCESS_CAPACITY
+        || resolved->owner.slot != context->process.slot
+        || resolved->owner.generation != context->process.generation
     ) {
         panic_ipc_syscall(hart, frame, "ipc-current-invariant");
     }
-    if (frame->sepc > UINT64_MAX - 4) {
-        panic_ipc_syscall(hart, frame, "ipc-sepc-overflow");
-    }
-    frame->sepc += 4;
     preflight_result = preflight_request(
         hart,
         frame,
-        resolved->owner,
+        context->process,
+        arguments,
         &request
     );
     if (preflight_result != MICROS_IPC_ABI_OK) {
@@ -317,12 +316,12 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
     }
     if (
         micros_user_execution_store_context(
-            current,
+            context->current,
             (const struct micros_user_context *)frame
         ) != MICROS_USER_EXECUTION_OK
         || micros_scheduler_begin_current_ipc(
-            objects,
-            hart_handle,
+            context->objects,
+            context->hart,
             &guard
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
@@ -330,14 +329,14 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
     }
     ipc_error = execute_portable(
         registry,
-        objects,
-        current,
+        context->objects,
+        context->current,
         &request
     );
     if (ipc_error != MICROS_IPC_OK) {
         if (
             micros_scheduler_rollback_current_ipc(
-                objects,
+                context->objects,
                 &guard
             ) != MICROS_KERNEL_OBJECT_OK
             || !micros_ipc_abi_map_error(ipc_error, &abi_result)
@@ -349,13 +348,17 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
             );
         }
         frame->a0 = abi_result;
-        return MICROS_IPC_SYSCALL_RETURN_NORMAL;
+        return MICROS_SYSCALL_RETURN_NORMAL;
     }
     if (
         operation_stages_immediate_completion(request.operation)
     ) {
         if (
-            micros_thread_resolve(objects, current, &resolved)
+            micros_thread_resolve(
+                context->objects,
+                context->current,
+                &resolved
+            )
                 != MICROS_KERNEL_OBJECT_OK
         ) {
             panic_ipc_syscall(
@@ -369,8 +372,8 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
                 resolved->ipc_delivery_pending
                 || micros_ipc_stage_no_message_completion(
                     registry,
-                    objects,
-                    current,
+                    context->objects,
+                    context->current,
                     MICROS_IPC_OK
                 ) != MICROS_IPC_OK
             ) {
@@ -394,11 +397,11 @@ enum micros_ipc_syscall_return micros_ipc_handle_user_ecall(
     }
     if (
         micros_scheduler_commit_current_ipc(
-            objects,
+            context->objects,
             &guard
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
         panic_ipc_syscall(hart, frame, "ipc-guard-commit");
     }
-    return MICROS_IPC_SYSCALL_RETURN_CAPTURED;
+    return MICROS_SYSCALL_RETURN_CAPTURED;
 }

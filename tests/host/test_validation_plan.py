@@ -63,6 +63,71 @@ class ValidationPlanTests(unittest.TestCase):
                     ),
                     commands,
                 )
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-grant-syscall"
+                    ),
+                    commands,
+                )
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-address-space-handoff"
+                    ),
+                    commands,
+                )
+
+    def test_grant_syscall_paths_own_unified_gates(self):
+        for path in (
+            "kernel/syscall.c",
+            "kernel/ipc_syscall.c",
+            "kernel/grant_abi.c",
+            "kernel/grant_syscall_core.c",
+            "kernel/grant_syscall.c",
+            "kernel/grant.c",
+            "kernel/grant_copy.c",
+            "kernel/grant_copy_core.c",
+            "kernel/grant_runtime.c",
+            "tests/host/grant_syscall_core_test.c",
+            "kernel/grant_syscall_test.c",
+            "arch/riscv64/grant_syscall_test.S",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-grant-syscall"
+                    ),
+                    commands,
+                )
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-address-space-handoff"
+                    ),
+                    commands,
+                )
+        for path in (
+            "kernel/syscall.c",
+            "kernel/ipc_syscall.c",
+            "kernel/grant_abi.c",
+            "kernel/grant_syscall_core.c",
+            "kernel/grant_syscall.c",
+            "kernel/grant.c",
+            "kernel/grant_copy.c",
+            "kernel/grant_copy_core.c",
+            "kernel/grant_runtime.c",
+        ):
+            with self.subTest(shared_path=path):
+                commands = validation_plan.plan([path], "fast")
+                for workflow_name in (
+                    "test-qemu-ipc-ecall-core",
+                    "test-qemu-ipc-syscall",
+                    "test-qemu-ipc-syscall-panic",
+                ):
+                    self.assertIn(
+                        validation_plan.workflow(workflow_name),
+                        commands,
+                    )
+                self.assertIn(validation_plan.IPC_MODEL, commands)
 
     def test_grant_paths_own_endpoint_gate(self):
         for path in (
@@ -150,6 +215,7 @@ class ValidationPlanTests(unittest.TestCase):
                     "test-qemu-user-address-space",
                     "test-qemu-user-execution",
                     "test-qemu-grant",
+                    "test-qemu-grant-syscall",
                     "test-qemu-ipc-syscall",
                     "test-qemu-ipc-syscall-panic",
                     "test-qemu-scheduler",
@@ -312,6 +378,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-object-model": "kernel/object_model_test.c",
             "test-qemu-endpoint": "kernel/endpoint_test.c",
             "test-qemu-grant": "kernel/grant_test.c",
+            "test-qemu-grant-syscall": "kernel/grant_syscall_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
             "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
             "test-qemu-ipc-syscall": "kernel/ipc_syscall_test.c",

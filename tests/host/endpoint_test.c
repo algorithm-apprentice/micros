@@ -1069,6 +1069,7 @@ bool micros_ipc_reply_test_run(void);
 bool micros_ipc_state_test_run(void);
 bool micros_grant_test_run(void);
 bool micros_grant_copy_test_run(void);
+bool micros_grant_syscall_core_test_run(void);
 bool micros_user_address_space_core_test_run(void);
 
 int main(void)
@@ -1128,6 +1129,10 @@ int main(void)
         {
             "phase-aware user address-space authority",
             micros_user_address_space_core_test_run,
+        },
+        {
+            "unified grant syscall ABI",
+            micros_grant_syscall_core_test_run,
         },
         {
             "stable IPC syscall ABI",

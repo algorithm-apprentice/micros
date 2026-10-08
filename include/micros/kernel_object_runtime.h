@@ -56,6 +56,7 @@ micros_kernel_object_runtime_detach_address_space(
     || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
     || defined(MICROS_BUILD_IPC_SYSCALL_TEST) \
     || defined(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST) \
+    || defined(MICROS_BUILD_GRANT_SYSCALL_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
 struct micros_kernel_objects *

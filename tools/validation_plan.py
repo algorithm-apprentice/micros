@@ -25,6 +25,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-object-model",
     "test-qemu-endpoint",
     "test-qemu-grant",
+    "test-qemu-grant-syscall",
     "test-qemu-ipc",
     "test-qemu-ipc-ecall-core",
     "test-qemu-ipc-syscall",
@@ -86,6 +87,43 @@ WIRED_HANDOFF_INPUTS = (
     "arch/riscv64/mmu.S",
 )
 
+GRANT_SYSCALL_INPUTS = (
+    "arch/riscv64/grant_syscall_test.S",
+    "kernel/grant_syscall_test.h",
+    "kernel/grant_syscall_test.c",
+    "kernel/syscall.c",
+    "kernel/ipc_abi.c",
+    "kernel/grant_abi.c",
+    "kernel/grant_syscall_core.c",
+    "kernel/grant_syscall.c",
+    "kernel/ipc_syscall.c",
+    "kernel/grant.c",
+    "kernel/grant_copy.c",
+    "kernel/grant_copy_core.c",
+    "kernel/grant_runtime.c",
+    "kernel/ipc_runtime.c",
+    "kernel/endpoint.c",
+    "kernel/ipc.c",
+    "kernel/kernel_objects.c",
+    "kernel/scheduler.c",
+    "kernel/scheduler_core.c",
+    "kernel/user_address_space.c",
+    "kernel/user_execution.c",
+    "tests/host/grant_syscall_core_test.c",
+)
+
+UNIFIED_SYSCALL_PRODUCTION_INPUTS = (
+    "kernel/syscall.c",
+    "kernel/ipc_syscall.c",
+    "kernel/grant_abi.c",
+    "kernel/grant_syscall_core.c",
+    "kernel/grant_syscall.c",
+    "kernel/grant.c",
+    "kernel/grant_copy.c",
+    "kernel/grant_copy_core.c",
+    "kernel/grant_runtime.c",
+)
+
 GATE_INPUTS = {
     "test-qemu-smoke": (
         "kernel/fdt.c",
@@ -134,6 +172,9 @@ GATE_INPUTS = {
         "kernel/frame_ownership.c",
         "arch/riscv64/mmu.S",
     ) + WIRED_HANDOFF_INPUTS,
+    "test-qemu-grant-syscall": (
+        GRANT_SYSCALL_INPUTS + WIRED_HANDOFF_INPUTS
+    ),
     "test-qemu-ipc": (
         "kernel/ipc.c",
         "kernel/endpoint.c",
@@ -142,13 +183,11 @@ GATE_INPUTS = {
     ),
     "test-qemu-ipc-ecall-core": (
         "kernel/ipc_abi.c",
-        "kernel/ipc_syscall.c",
         "kernel/ipc_ecall_test.c",
         "arch/riscv64/ipc_ecall_test.S",
-    ),
+    ) + UNIFIED_SYSCALL_PRODUCTION_INPUTS,
     "test-qemu-ipc-syscall": (
         "kernel/ipc_abi.c",
-        "kernel/ipc_syscall.c",
         "kernel/ipc.c",
         "kernel/endpoint.c",
         "kernel/ipc_runtime.c",
@@ -164,10 +203,9 @@ GATE_INPUTS = {
         "kernel/ipc_syscall_test.c",
         "arch/riscv64/mmu.S",
         "arch/riscv64/ipc_syscall_test.S",
-    ) + WIRED_HANDOFF_INPUTS,
+    ) + UNIFIED_SYSCALL_PRODUCTION_INPUTS + WIRED_HANDOFF_INPUTS,
     "test-qemu-ipc-syscall-panic": (
         "kernel/ipc_abi.c",
-        "kernel/ipc_syscall.c",
         "kernel/ipc.c",
         "kernel/endpoint.c",
         "kernel/ipc_runtime.c",
@@ -183,7 +221,7 @@ GATE_INPUTS = {
         "kernel/ipc_syscall_panic_test.c",
         "arch/riscv64/mmu.S",
         "arch/riscv64/ipc_syscall_panic_test.S",
-    ) + WIRED_HANDOFF_INPUTS,
+    ) + UNIFIED_SYSCALL_PRODUCTION_INPUTS + WIRED_HANDOFF_INPUTS,
     "test-qemu-nested-trap": ("arch/riscv64/nested_trap_test.S",),
     "test-qemu-frame-ownership": (
         "kernel/frame_ownership_test.c",
@@ -192,9 +230,15 @@ GATE_INPUTS = {
     ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-user-address-space": (
         "kernel/grant.c",
+        "kernel/grant_abi.c",
         "kernel/grant_copy.c",
         "kernel/grant_copy_core.c",
         "kernel/grant_runtime.c",
+        "kernel/grant_syscall.c",
+        "kernel/grant_syscall_core.c",
+        "kernel/ipc_abi.c",
+        "kernel/ipc_syscall.c",
+        "kernel/syscall.c",
         "kernel/user_address_space.c",
         "kernel/address_space.c",
         "kernel/sv39.c",
@@ -203,7 +247,9 @@ GATE_INPUTS = {
         "arch/riscv64/mmu.S",
         "arch/riscv64/user_address_space_test.S",
     ) + WIRED_HANDOFF_INPUTS,
-    "test-qemu-address-space-handoff": WIRED_HANDOFF_INPUTS,
+    "test-qemu-address-space-handoff": (
+        WIRED_HANDOFF_INPUTS + GRANT_SYSCALL_INPUTS
+    ),
     "test-qemu-user-execution": (
         "kernel/user_execution_test.c",
         "arch/riscv64/user_execution_test.S",
@@ -229,9 +275,15 @@ SLOW_MODEL_INPUTS = {
         "CMakePresets.json",
         "kernel/endpoint.c",
         "kernel/grant.c",
+        "kernel/grant_abi.c",
         "kernel/grant_copy.c",
         "kernel/grant_copy_core.c",
         "kernel/grant_runtime.c",
+        "kernel/grant_syscall.c",
+        "kernel/grant_syscall_core.c",
+        "kernel/ipc_abi.c",
+        "kernel/ipc_syscall.c",
+        "kernel/syscall.c",
         "kernel/user_address_space.c",
         "kernel/address_space.c",
         "kernel/sv39.c",
@@ -244,6 +296,7 @@ SLOW_MODEL_INPUTS = {
         "tests/host/endpoint_model_test.c",
         "tests/host/grant_test.c",
         "tests/host/grant_copy_test.c",
+        "tests/host/grant_syscall_core_test.c",
         "tests/host/user_address_space_core_test.c",
         "tests/host/ipc_model_test.c",
         "tests/host/ipc_model_main.c",

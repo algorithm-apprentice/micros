@@ -68,7 +68,7 @@ static void copy_bytes(void *destination, const void *source, size_t size)
 bool micros_ipc_syscall_panic_test_before_return(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
-    enum micros_ipc_syscall_return ipc_return
+    enum micros_syscall_return syscall_return
 )
 {
     uint64_t released;
@@ -79,12 +79,12 @@ bool micros_ipc_syscall_panic_test_before_return(
     if (frame->a7 == MICROS_IPC_ABI_RECEIVE) {
         return (
             !buffer_invalidated
-            && ipc_return == MICROS_IPC_SYSCALL_RETURN_CAPTURED
+            && syscall_return == MICROS_SYSCALL_RETURN_CAPTURED
         );
     }
     if (
         frame->a7 != MICROS_IPC_ABI_SEND
-        || ipc_return != MICROS_IPC_SYSCALL_RETURN_CAPTURED
+        || syscall_return != MICROS_SYSCALL_RETURN_CAPTURED
         || buffer_invalidated
         || micros_user_address_space_release_page(
             processes[IPC_PANIC_CLIENT],

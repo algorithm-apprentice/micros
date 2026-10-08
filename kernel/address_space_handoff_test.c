@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
+#include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/grant_runtime_internal.h"
@@ -15,7 +16,9 @@
 #include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler.h"
+#include "micros/scheduler_core.h"
 #include "micros/sv39.h"
+#include "micros/syscall_abi.h"
 #include "micros/user_address_space.h"
 #include "micros/user_execution.h"
 
@@ -32,6 +35,42 @@ enum handoff_test_state {
     HANDOFF_TEST_SUPERVISOR,
 };
 
+enum handoff_syscall_command {
+    HANDOFF_SYSCALL_NONE = 0,
+    HANDOFF_SYSCALL_CREATE_READ,
+    HANDOFF_SYSCALL_CREATE_WRITE,
+    HANDOFF_SYSCALL_COPY_FROM_LOCAL,
+    HANDOFF_SYSCALL_COPY_FROM_CROSS,
+    HANDOFF_SYSCALL_COPY_TO_LOCAL,
+    HANDOFF_SYSCALL_COPY_TO_CROSS,
+    HANDOFF_SYSCALL_COPY_FROM_ZERO,
+    HANDOFF_SYSCALL_COPY_TO_ZERO,
+    HANDOFF_SYSCALL_WRONG_DIRECTION,
+    HANDOFF_SYSCALL_RANGE,
+    HANDOFF_SYSCALL_UNMAPPED,
+    HANDOFF_SYSCALL_PERMISSION,
+    HANDOFF_SYSCALL_REVOKE_READ,
+    HANDOFF_SYSCALL_REVOKE_WRITE,
+    HANDOFF_SYSCALL_STALE_READ,
+    HANDOFF_SYSCALL_STALE_WRITE,
+};
+
+enum handoff_syscall_control_action {
+    HANDOFF_SYSCALL_CONTROL_NONE = 0,
+    HANDOFF_SYSCALL_CONTROL_SWITCH,
+    HANDOFF_SYSCALL_CONTROL_FINISH,
+};
+
+struct handoff_syscall_script {
+    bool armed;
+    bool awaiting;
+    bool token_result;
+    bool preserve_state;
+    enum handoff_syscall_command command;
+    uint64_t expected_result;
+    struct micros_user_context captured;
+};
+
 static const uint64_t TEST_CODE_ADDRESS =
     MICROS_USER_VIRTUAL_BASE;
 static const uint64_t TEST_STACK_ADDRESS =
@@ -44,10 +83,13 @@ static const uint64_t TEST_READ_ONLY_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x4000);
 static const uint64_t TEST_UNMAPPED_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x6000);
+static const uint64_t TEST_SYSCALL_CONTROL_MAGIC =
+    UINT64_C(0x48414e444f464653);
 
 static struct micros_frame_ownership ownership_snapshot;
 static struct micros_frame_allocator allocator_snapshot;
 static struct micros_kernel_objects objects_snapshot;
+static struct micros_kernel_objects objects_observed;
 static struct micros_endpoint_registry endpoint_snapshot;
 static struct micros_grant_registry grant_snapshot;
 static unsigned char
@@ -68,11 +110,20 @@ static uint64_t user_physical[HANDOFF_PROCESS_COUNT][HANDOFF_PAGE_COUNT];
 static struct micros_process_handle processes[HANDOFF_PROCESS_COUNT];
 static struct micros_thread_handle threads[HANDOFF_PROCESS_COUNT];
 static micros_endpoint_t endpoints[HANDOFF_PROCESS_COUNT];
+static struct handoff_syscall_script
+    syscall_scripts[HANDOFF_PROCESS_COUNT];
+static micros_grant_t syscall_read_grant;
+static micros_grant_t syscall_write_grant;
+static enum handoff_syscall_control_action syscall_control_action;
+static size_t syscall_control_next;
 static volatile enum handoff_test_state test_state;
 static uint64_t failure_stage;
 
 extern const unsigned char micros_address_space_handoff_payload_start[];
 extern const unsigned char micros_address_space_handoff_payload_ecall[];
+extern const unsigned char
+    micros_address_space_handoff_payload_after_ecall[];
+extern const unsigned char micros_address_space_handoff_payload_spin[];
 extern const unsigned char micros_address_space_handoff_payload_end[];
 extern const unsigned char
     micros_address_space_handoff_test_supervisor_resume[];
@@ -479,6 +530,189 @@ static bool state_matches(
     );
 }
 
+static void normalize_syscall_objects(
+    struct micros_kernel_objects *objects
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        fill_bytes(
+            &objects->threads[index].user_context,
+            0,
+            sizeof(objects->threads[index].user_context)
+        );
+        objects->threads[index].remaining_counter_ticks = 0;
+    }
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        objects->harts[index].trap.entry_t0 = 0;
+        objects->harts[index].trap.entry_t1 = 0;
+        objects->harts[index].trap.entry_t2 = 0;
+        objects->harts[index].accounting_owner =
+            MICROS_SCHEDULER_ACCOUNTING_NONE;
+        objects->harts[index].accounting_started_at = 0;
+        objects->harts[index].accounted_thread =
+            (struct micros_thread_handle){0};
+        objects->harts[index].kernel_counter_ticks = 0;
+        objects->harts[index].idle_counter_ticks = 0;
+    }
+}
+
+static bool snapshot_syscall_state(
+    const struct micros_frame_ownership *ledger,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_grant_registry *grant_registry
+)
+{
+    size_t bitmap_words;
+
+    if (
+        ledger == NULL
+        || ledger->allocator == NULL
+        || objects == NULL
+        || endpoint_registry == NULL
+        || grant_registry == NULL
+        || ledger->managed_frame_count
+            > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+    ) {
+        return false;
+    }
+    bitmap_words = (size_t)(
+        (ledger->managed_frame_count + 63) / 64
+    );
+    fill_bytes(
+        &ownership_snapshot,
+        0,
+        sizeof(ownership_snapshot)
+    );
+    copy_bytes(
+        &ownership_snapshot,
+        ledger,
+        offsetof(struct micros_frame_ownership, owners)
+    );
+    copy_bytes(
+        ownership_snapshot.owners,
+        ledger->owners,
+        (size_t)ledger->managed_frame_count
+            * sizeof(ledger->owners[0])
+    );
+    copy_bytes(
+        ownership_snapshot.handoff_targets,
+        ledger->handoff_targets,
+        (size_t)ledger->managed_frame_count
+    );
+    fill_bytes(&allocator_snapshot, 0, sizeof(allocator_snapshot));
+    copy_bytes(
+        &allocator_snapshot,
+        ledger->allocator,
+        offsetof(struct micros_frame_allocator, allocated_bitmap)
+    );
+    copy_bytes(
+        allocator_snapshot.allocated_bitmap,
+        ledger->allocator->allocated_bitmap,
+        bitmap_words
+            * sizeof(ledger->allocator->allocated_bitmap[0])
+    );
+    copy_bytes(&objects_snapshot, objects, sizeof(objects_snapshot));
+    normalize_syscall_objects(&objects_snapshot);
+    copy_bytes(
+        &endpoint_snapshot,
+        endpoint_registry,
+        sizeof(endpoint_snapshot)
+    );
+    copy_bytes(
+        &grant_snapshot,
+        grant_registry,
+        sizeof(grant_snapshot)
+    );
+    if (!snapshot_page_tables(objects)) {
+        return false;
+    }
+    snapshot_user_bytes();
+    return true;
+}
+
+static bool syscall_state_matches(
+    const struct micros_frame_ownership *ledger,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_grant_registry *grant_registry
+)
+{
+    size_t bitmap_words;
+
+    if (
+        ledger == NULL
+        || ledger->allocator == NULL
+        || objects == NULL
+        || endpoint_registry == NULL
+        || grant_registry == NULL
+        || ledger->managed_frame_count
+            != ownership_snapshot.managed_frame_count
+        || ledger->managed_frame_count
+            > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+    ) {
+        return false;
+    }
+    bitmap_words = (size_t)(
+        (ledger->managed_frame_count + 63) / 64
+    );
+    copy_bytes(&objects_observed, objects, sizeof(objects_observed));
+    normalize_syscall_objects(&objects_observed);
+    return (
+        bytes_equal(
+            &ownership_snapshot,
+            ledger,
+            offsetof(struct micros_frame_ownership, owners)
+        )
+        && bytes_equal(
+            ownership_snapshot.owners,
+            ledger->owners,
+            (size_t)ledger->managed_frame_count
+                * sizeof(ledger->owners[0])
+        )
+        && bytes_equal(
+            ownership_snapshot.handoff_targets,
+            ledger->handoff_targets,
+            (size_t)ledger->managed_frame_count
+        )
+        && bytes_equal(
+            &allocator_snapshot,
+            ledger->allocator,
+            offsetof(
+                struct micros_frame_allocator,
+                allocated_bitmap
+            )
+        )
+        && bytes_equal(
+            allocator_snapshot.allocated_bitmap,
+            ledger->allocator->allocated_bitmap,
+            bitmap_words
+                * sizeof(
+                    ledger->allocator->allocated_bitmap[0]
+                )
+        )
+        && bytes_equal(
+            &objects_snapshot,
+            &objects_observed,
+            sizeof(objects_snapshot)
+        )
+        && bytes_equal(
+            &endpoint_snapshot,
+            endpoint_registry,
+            sizeof(endpoint_snapshot)
+        )
+        && bytes_equal(
+            &grant_snapshot,
+            grant_registry,
+            sizeof(grant_snapshot)
+        )
+        && page_tables_match(objects)
+        && user_bytes_match()
+    );
+}
+
 static bool frame_index_for_physical(
     const struct micros_frame_ownership *ledger,
     uint64_t physical_address,
@@ -572,10 +806,911 @@ static void prepare_context(
     size_t process_index
 )
 {
-    fill_bytes(context, 0, sizeof(*context));
-    context->sepc = TEST_CODE_ADDRESS;
+    uint64_t words[
+        sizeof(struct micros_user_context) / sizeof(uint64_t)
+    ];
+    size_t index;
+
+    for (index = 0; index < sizeof(words) / sizeof(words[0]); ++index) {
+        words[index] =
+            UINT64_C(0x1000)
+            + process_index * UINT64_C(0x1000)
+            + index;
+    }
+    copy_bytes(context, words, sizeof(*context));
+    context->sepc = TEST_CODE_ADDRESS
+        + (
+            (uintptr_t)micros_address_space_handoff_payload_spin
+            - (uintptr_t)micros_address_space_handoff_payload_start
+        );
     context->sp = TEST_STACK_ADDRESS + MICROS_SV39_PAGE_SIZE;
-    context->a0 = UINT64_C(0x1000) + process_index;
+    context->sstatus = 0;
+}
+
+static uint64_t handoff_read_satp(void)
+{
+    uint64_t satp;
+
+    __asm__ volatile("csrr %0, satp" : "=r"(satp));
+    return satp;
+}
+
+static uint64_t handoff_user_address_of(
+    const unsigned char *symbol
+)
+{
+    return TEST_CODE_ADDRESS
+        + (
+            (uintptr_t)symbol
+            - (uintptr_t)micros_address_space_handoff_payload_start
+        );
+}
+
+static uint64_t handoff_expected_satp(uint64_t root)
+{
+    return MICROS_RISCV_SATP_MODE_SV39 | (root >> 12);
+}
+
+static uint64_t handoff_abi_result(int64_t result)
+{
+    return (uint64_t)result;
+}
+
+static size_t handoff_current_actor(const struct micros_hart *hart)
+{
+    size_t process_index;
+
+    if (hart == NULL) {
+        return HANDOFF_PROCESS_COUNT;
+    }
+    for (
+        process_index = 0;
+        process_index < HANDOFF_PROCESS_COUNT;
+        ++process_index
+    ) {
+        if (
+            hart->current_thread.slot == threads[process_index].slot
+            && hart->current_thread.generation
+                == threads[process_index].generation
+        ) {
+            return process_index;
+        }
+    }
+    return HANDOFF_PROCESS_COUNT;
+}
+
+static bool handoff_scheduler_state_valid(
+    const struct micros_hart *hart,
+    size_t actor,
+    bool after_return
+)
+{
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_registry();
+    const struct micros_thread *thread;
+    const struct micros_process *process;
+
+    if (
+        objects == NULL
+        || hart == NULL
+        || actor >= HANDOFF_PROCESS_COUNT
+    ) {
+        return false;
+    }
+    thread = &objects->threads[threads[actor].slot];
+    process = &objects->processes[processes[actor].slot];
+    return (
+        thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+        && thread->generation == threads[actor].generation
+        && process->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+        && process->generation == processes[actor].generation
+        && hart->current_thread.slot == threads[actor].slot
+        && hart->current_thread.generation
+            == threads[actor].generation
+        && thread->runtime_flags == 0
+        && thread->scheduler_assigned
+        && thread->ready_linked
+        && hart->ready_head[thread->scheduler_priority].slot
+            == threads[actor].slot
+        && hart->ready_head[thread->scheduler_priority].generation
+            == threads[actor].generation
+        && hart->trap.primary_stack_bottom
+            == thread->kernel_stack_bottom
+        && hart->trap.primary_stack_top == thread->kernel_stack_top
+        && handoff_read_satp()
+            == handoff_expected_satp(process->address_space_root)
+        && (
+            !after_return
+            || (
+                hart->accounting_owner
+                    == MICROS_SCHEDULER_ACCOUNTING_THREAD
+                && hart->accounted_thread.slot
+                    == threads[actor].slot
+                && hart->accounted_thread.generation
+                    == threads[actor].generation
+            )
+        )
+    );
+}
+
+static bool handoff_syscall_mismatch(
+    uint64_t stage,
+    size_t actor,
+    enum handoff_syscall_command command,
+    const struct micros_trap_frame *frame
+)
+{
+    uart_write("MICROS_TEST_FAILURE handoff-syscall-stage=");
+    uart_write_hex64(stage);
+    uart_write(" actor=");
+    uart_write_hex64(actor);
+    uart_write(" command=");
+    uart_write_hex64((uint64_t)command);
+    if (frame != NULL) {
+        uart_write(" a0=");
+        uart_write_hex64(frame->a0);
+        uart_write(" a7=");
+        uart_write_hex64(frame->a7);
+        uart_write(" sepc=");
+        uart_write_hex64(frame->sepc);
+    }
+    uart_write("\n");
+    uart_flush();
+    return false;
+}
+
+static void arm_handoff_syscall_raw(
+    size_t actor,
+    struct micros_user_context *context,
+    enum handoff_syscall_command command,
+    uint64_t operation,
+    uint64_t a0,
+    uint64_t a1,
+    uint64_t a2,
+    uint64_t a3,
+    uint64_t a4,
+    uint64_t expected_result,
+    bool token_result,
+    bool preserve_state
+)
+{
+    struct handoff_syscall_script *script =
+        &syscall_scripts[actor];
+
+    script->armed = true;
+    script->awaiting = false;
+    script->token_result = token_result;
+    script->preserve_state = preserve_state;
+    script->command = command;
+    script->expected_result = expected_result;
+    context->a0 = a0;
+    context->a1 = a1;
+    context->a2 = a2;
+    context->a3 = a3;
+    context->a4 = a4;
+    context->a5 = 0;
+    context->a6 = 0;
+    context->a7 = operation;
+    context->sepc = handoff_user_address_of(
+        micros_address_space_handoff_payload_ecall
+    );
+}
+
+static bool arm_handoff_syscall(
+    size_t actor,
+    struct micros_user_context *context,
+    enum handoff_syscall_command command
+)
+{
+    switch (command) {
+    case HANDOFF_SYSCALL_CREATE_READ:
+    case HANDOFF_SYSCALL_CREATE_WRITE:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_CREATE,
+            endpoints[HANDOFF_GRANTEE],
+            TEST_DATA_SECOND_ADDRESS - 64,
+            256,
+            command == HANDOFF_SYSCALL_CREATE_READ
+                ? MICROS_GRANT_PERMISSION_READ
+                : MICROS_GRANT_PERMISSION_WRITE,
+            0,
+            0,
+            true,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_COPY_FROM_LOCAL:
+        write_pattern(
+            HANDOFF_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS,
+            32,
+            UINT8_C(0x31)
+        );
+        fill_bytes(
+            (void *)(uintptr_t)physical_for(
+                HANDOFF_GRANTEE,
+                TEST_DATA_ADDRESS + UINT64_C(0x0ff)
+            ),
+            UINT8_C(0xcc),
+            34
+        );
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            64,
+            TEST_DATA_ADDRESS + UINT64_C(0x100),
+            32,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_COPY_FROM_CROSS:
+        write_pattern(
+            HANDOFF_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS - 64,
+            128,
+            UINT8_C(0x41)
+        );
+        fill_bytes(
+            (void *)(uintptr_t)user_physical[HANDOFF_GRANTEE][2],
+            UINT8_C(0xcc),
+            MICROS_SV39_PAGE_SIZE
+        );
+        fill_bytes(
+            (void *)(uintptr_t)user_physical[HANDOFF_GRANTEE][3],
+            UINT8_C(0xcc),
+            MICROS_SV39_PAGE_SIZE
+        );
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            0,
+            TEST_DATA_SECOND_ADDRESS - 32,
+            128,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_COPY_TO_LOCAL:
+        write_pattern(
+            HANDOFF_GRANTEE,
+            TEST_DATA_ADDRESS + UINT64_C(0x180),
+            32,
+            UINT8_C(0x51)
+        );
+        fill_bytes(
+            (void *)(uintptr_t)physical_for(
+                HANDOFF_GRANTOR,
+                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x3f)
+            ),
+            UINT8_C(0xdd),
+            34
+        );
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_TO,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_write_grant,
+            128,
+            TEST_DATA_ADDRESS + UINT64_C(0x180),
+            32,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_COPY_TO_CROSS:
+        write_pattern(
+            HANDOFF_GRANTEE,
+            TEST_DATA_SECOND_ADDRESS - 48,
+            96,
+            UINT8_C(0x61)
+        );
+        fill_bytes(
+            (void *)(uintptr_t)user_physical[HANDOFF_GRANTOR][2],
+            UINT8_C(0xee),
+            MICROS_SV39_PAGE_SIZE
+        );
+        fill_bytes(
+            (void *)(uintptr_t)user_physical[HANDOFF_GRANTOR][3],
+            UINT8_C(0xee),
+            MICROS_SV39_PAGE_SIZE
+        );
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_TO,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_write_grant,
+            16,
+            TEST_DATA_SECOND_ADDRESS - 48,
+            96,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_COPY_FROM_ZERO:
+    case HANDOFF_SYSCALL_COPY_TO_ZERO:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            command == HANDOFF_SYSCALL_COPY_FROM_ZERO
+                ? MICROS_SYSCALL_ABI_GRANT_COPY_FROM
+                : MICROS_SYSCALL_ABI_GRANT_COPY_TO,
+            endpoints[HANDOFF_GRANTOR],
+            command == HANDOFF_SYSCALL_COPY_FROM_ZERO
+                ? syscall_read_grant
+                : syscall_write_grant,
+            0,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_WRONG_DIRECTION:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_write_grant,
+            0,
+            TEST_DATA_ADDRESS,
+            1,
+            handoff_abi_result(MICROS_SYSCALL_ABI_UNAUTHORIZED),
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_RANGE:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            257,
+            TEST_DATA_ADDRESS,
+            1,
+            handoff_abi_result(MICROS_SYSCALL_ABI_RANGE),
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_UNMAPPED:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            0,
+            TEST_UNMAPPED_ADDRESS,
+            1,
+            handoff_abi_result(
+                MICROS_SYSCALL_ABI_MEMORY_FAULT
+            ),
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_PERMISSION:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            0,
+            TEST_READ_ONLY_ADDRESS,
+            1,
+            handoff_abi_result(
+                MICROS_SYSCALL_ABI_MEMORY_FAULT
+            ),
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_REVOKE_READ:
+    case HANDOFF_SYSCALL_REVOKE_WRITE:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_REVOKE,
+            command == HANDOFF_SYSCALL_REVOKE_READ
+                ? syscall_read_grant
+                : syscall_write_grant,
+            0,
+            0,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            false
+        );
+        return true;
+    case HANDOFF_SYSCALL_STALE_READ:
+    case HANDOFF_SYSCALL_STALE_WRITE:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            command == HANDOFF_SYSCALL_STALE_READ
+                ? MICROS_SYSCALL_ABI_GRANT_COPY_FROM
+                : MICROS_SYSCALL_ABI_GRANT_COPY_TO,
+            endpoints[HANDOFF_GRANTOR],
+            command == HANDOFF_SYSCALL_STALE_READ
+                ? syscall_read_grant
+                : syscall_write_grant,
+            0,
+            TEST_DATA_ADDRESS,
+            1,
+            handoff_abi_result(
+                MICROS_SYSCALL_ABI_STALE_GRANT
+            ),
+            false,
+            true
+        );
+        return true;
+    case HANDOFF_SYSCALL_NONE:
+        return false;
+    }
+    return false;
+}
+
+static void arm_handoff_control(
+    struct micros_user_context *context
+)
+{
+    context->a0 = TEST_SYSCALL_CONTROL_MAGIC;
+    context->a7 = UINT64_MAX;
+    context->sepc = handoff_user_address_of(
+        micros_address_space_handoff_payload_ecall
+    );
+}
+
+static bool schedule_handoff_syscall(
+    size_t current,
+    size_t next,
+    enum handoff_syscall_command command,
+    struct micros_trap_frame *frame
+)
+{
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
+    struct micros_user_context *context;
+
+    if (
+        objects == NULL
+        || next >= HANDOFF_PROCESS_COUNT
+    ) {
+        return false;
+    }
+    context = current == next
+        ? (struct micros_user_context *)frame
+        : &objects->threads[threads[next].slot].user_context;
+    if (!arm_handoff_syscall(next, context, command)) {
+        return false;
+    }
+    if (current == next) {
+        return true;
+    }
+    syscall_control_action = HANDOFF_SYSCALL_CONTROL_SWITCH;
+    syscall_control_next = next;
+    arm_handoff_control((struct micros_user_context *)frame);
+    return true;
+}
+
+static bool finish_handoff_syscalls(
+    struct micros_trap_frame *frame
+)
+{
+    syscall_control_action = HANDOFF_SYSCALL_CONTROL_FINISH;
+    syscall_control_next = HANDOFF_PROCESS_COUNT;
+    arm_handoff_control((struct micros_user_context *)frame);
+    return true;
+}
+
+static bool transition_handoff_syscall(
+    size_t actor,
+    enum handoff_syscall_command command,
+    struct micros_trap_frame *frame
+)
+{
+    switch (command) {
+    case HANDOFF_SYSCALL_CREATE_READ:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_CREATE_WRITE,
+            frame
+        );
+    case HANDOFF_SYSCALL_CREATE_WRITE:
+        return schedule_handoff_syscall(
+            actor,
+            HANDOFF_GRANTEE,
+            HANDOFF_SYSCALL_COPY_FROM_LOCAL,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_FROM_LOCAL:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_COPY_FROM_CROSS,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_FROM_CROSS:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_COPY_TO_LOCAL,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_TO_LOCAL:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_COPY_TO_CROSS,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_TO_CROSS:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_COPY_FROM_ZERO,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_FROM_ZERO:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_COPY_TO_ZERO,
+            frame
+        );
+    case HANDOFF_SYSCALL_COPY_TO_ZERO:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_WRONG_DIRECTION,
+            frame
+        );
+    case HANDOFF_SYSCALL_WRONG_DIRECTION:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_RANGE,
+            frame
+        );
+    case HANDOFF_SYSCALL_RANGE:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_UNMAPPED,
+            frame
+        );
+    case HANDOFF_SYSCALL_UNMAPPED:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_PERMISSION,
+            frame
+        );
+    case HANDOFF_SYSCALL_PERMISSION:
+        return schedule_handoff_syscall(
+            actor,
+            HANDOFF_GRANTOR,
+            HANDOFF_SYSCALL_REVOKE_READ,
+            frame
+        );
+    case HANDOFF_SYSCALL_REVOKE_READ:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_REVOKE_WRITE,
+            frame
+        );
+    case HANDOFF_SYSCALL_REVOKE_WRITE:
+        return schedule_handoff_syscall(
+            actor,
+            HANDOFF_GRANTEE,
+            HANDOFF_SYSCALL_STALE_READ,
+            frame
+        );
+    case HANDOFF_SYSCALL_STALE_READ:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_STALE_WRITE,
+            frame
+        );
+    case HANDOFF_SYSCALL_STALE_WRITE:
+        return finish_handoff_syscalls(frame);
+    case HANDOFF_SYSCALL_NONE:
+        return false;
+    }
+    return false;
+}
+
+static bool validate_handoff_syscall_effect(
+    enum handoff_syscall_command command,
+    const struct micros_trap_frame *frame
+)
+{
+    switch (command) {
+    case HANDOFF_SYSCALL_CREATE_READ:
+        syscall_read_grant = (micros_grant_t)frame->a0;
+        return true;
+    case HANDOFF_SYSCALL_CREATE_WRITE:
+        syscall_write_grant = (micros_grant_t)frame->a0;
+        return syscall_write_grant != syscall_read_grant;
+    case HANDOFF_SYSCALL_COPY_FROM_LOCAL:
+        return (
+            pattern_matches(
+                HANDOFF_GRANTEE,
+                TEST_DATA_ADDRESS + UINT64_C(0x100),
+                32,
+                UINT8_C(0x31)
+            )
+            && *(const unsigned char *)(uintptr_t)physical_for(
+                HANDOFF_GRANTEE,
+                TEST_DATA_ADDRESS + UINT64_C(0x0ff)
+            ) == UINT8_C(0xcc)
+            && *(const unsigned char *)(uintptr_t)physical_for(
+                HANDOFF_GRANTEE,
+                TEST_DATA_ADDRESS + UINT64_C(0x120)
+            ) == UINT8_C(0xcc)
+        );
+    case HANDOFF_SYSCALL_COPY_FROM_CROSS:
+        return pattern_matches(
+            HANDOFF_GRANTEE,
+            TEST_DATA_SECOND_ADDRESS - 32,
+            128,
+            UINT8_C(0x41)
+        );
+    case HANDOFF_SYSCALL_COPY_TO_LOCAL:
+        return (
+            pattern_matches(
+                HANDOFF_GRANTOR,
+                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x40),
+                32,
+                UINT8_C(0x51)
+            )
+            && *(const unsigned char *)(uintptr_t)physical_for(
+                HANDOFF_GRANTOR,
+                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x3f)
+            ) == UINT8_C(0xdd)
+            && *(const unsigned char *)(uintptr_t)physical_for(
+                HANDOFF_GRANTOR,
+                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x60)
+            ) == UINT8_C(0xdd)
+        );
+    case HANDOFF_SYSCALL_COPY_TO_CROSS:
+        return pattern_matches(
+            HANDOFF_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS - 48,
+            96,
+            UINT8_C(0x61)
+        );
+    default:
+        return true;
+    }
+}
+
+bool micros_address_space_handoff_test_before_ecall(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    const struct micros_frame_ownership *ledger =
+        micros_frame_ownership_runtime_ledger();
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
+    struct micros_endpoint_registry *endpoint_registry =
+        micros_ipc_runtime_authoritative_registry();
+    struct micros_grant_registry *grant_registry =
+        micros_grant_runtime_authoritative_registry();
+    size_t actor = handoff_current_actor(hart);
+    struct handoff_syscall_script *script;
+
+    if (
+        test_state != HANDOFF_TEST_USER_RUNNING
+        || frame == NULL
+        || actor >= HANDOFF_PROCESS_COUNT
+        || !handoff_scheduler_state_valid(hart, actor, false)
+    ) {
+        return handoff_syscall_mismatch(
+            1,
+            actor,
+            HANDOFF_SYSCALL_NONE,
+            frame
+        );
+    }
+    script = &syscall_scripts[actor];
+    if (
+        !script->armed
+        || script->awaiting
+        || frame->sepc
+            != handoff_user_address_of(
+                micros_address_space_handoff_payload_ecall
+            )
+    ) {
+        return handoff_syscall_mismatch(
+            2,
+            actor,
+            script->command,
+            frame
+        );
+    }
+    if (
+        script->preserve_state
+        && !snapshot_syscall_state(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        return handoff_syscall_mismatch(
+            UINT64_C(0x20),
+            actor,
+            script->command,
+            frame
+        );
+    }
+    copy_bytes(
+        &script->captured,
+        (const struct micros_user_context *)frame,
+        sizeof(script->captured)
+    );
+    script->armed = false;
+    script->awaiting = true;
+    return true;
+}
+
+bool micros_address_space_handoff_test_after_dispatch(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    enum micros_syscall_return syscall_return
+)
+{
+    size_t actor = handoff_current_actor(hart);
+
+    return (
+        frame != NULL
+        && actor < HANDOFF_PROCESS_COUNT
+        && syscall_scripts[actor].awaiting
+        && syscall_return == MICROS_SYSCALL_RETURN_NORMAL
+    );
+}
+
+bool micros_address_space_handoff_test_after_return(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    const struct micros_frame_ownership *ledger =
+        micros_frame_ownership_runtime_ledger();
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
+    struct micros_endpoint_registry *endpoint_registry =
+        micros_ipc_runtime_authoritative_registry();
+    struct micros_grant_registry *grant_registry =
+        micros_grant_runtime_authoritative_registry();
+    size_t actor = handoff_current_actor(hart);
+    struct handoff_syscall_script *script;
+    struct micros_user_context expected;
+    enum handoff_syscall_command completed;
+
+    if (
+        frame == NULL
+        || actor >= HANDOFF_PROCESS_COUNT
+        || !handoff_scheduler_state_valid(hart, actor, true)
+    ) {
+        return handoff_syscall_mismatch(
+            3,
+            actor,
+            HANDOFF_SYSCALL_NONE,
+            frame
+        );
+    }
+    script = &syscall_scripts[actor];
+    if (!script->awaiting) {
+        return handoff_syscall_mismatch(
+            4,
+            actor,
+            script->command,
+            frame
+        );
+    }
+    copy_bytes(&expected, &script->captured, sizeof(expected));
+    if (script->token_result) {
+        if (
+            frame->a0 >= MICROS_GRANT_NONE
+            || (int64_t)frame->a0 < 0
+        ) {
+            return handoff_syscall_mismatch(
+                UINT64_C(0x41),
+                actor,
+                script->command,
+                frame
+            );
+        }
+        expected.a0 = frame->a0;
+    } else {
+        expected.a0 = script->expected_result;
+    }
+    expected.sepc = handoff_user_address_of(
+        micros_address_space_handoff_payload_after_ecall
+    );
+    if (!bytes_equal(frame, &expected, sizeof(expected))) {
+        return handoff_syscall_mismatch(
+            5,
+            actor,
+            script->command,
+            frame
+        );
+    }
+    if (
+        script->preserve_state
+        && !syscall_state_matches(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        return handoff_syscall_mismatch(
+            UINT64_C(0x50),
+            actor,
+            script->command,
+            frame
+        );
+    }
+    completed = script->command;
+    if (!validate_handoff_syscall_effect(completed, frame)) {
+        return handoff_syscall_mismatch(
+            UINT64_C(0x60),
+            actor,
+            completed,
+            frame
+        );
+    }
+    script->awaiting = false;
+    script->command = HANDOFF_SYSCALL_NONE;
+    if (!transition_handoff_syscall(actor, completed, frame)) {
+        return handoff_syscall_mismatch(
+            6,
+            actor,
+            completed,
+            frame
+        );
+    }
+    return true;
 }
 
 static bool stage_wired_pages(void)
@@ -637,6 +1772,10 @@ micros_address_space_handoff_test_handle_trap(
     struct micros_trap_frame *frame
 )
 {
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_test_registry();
+    size_t actor = handoff_current_actor(hart);
+    struct micros_user_context expected;
     const uint64_t control_mask =
         MICROS_RISCV_SSTATUS_SIE
         | MICROS_RISCV_SSTATUS_SPIE
@@ -653,18 +1792,71 @@ micros_address_space_handoff_test_handle_trap(
     }
     if (
         test_state != HANDOFF_TEST_USER_RUNNING
+        || objects == NULL
         || hart == NULL
         || frame == NULL
         || (frame->scause >> 63) != 0
         || (frame->scause & (UINT64_C(1) << 63) - 1) != 8
+        || actor >= HANDOFF_PROCESS_COUNT
         || frame->sepc
-            != TEST_CODE_ADDRESS
-                + (
-                    (uintptr_t)micros_address_space_handoff_payload_ecall
-                    - (uintptr_t)micros_address_space_handoff_payload_start
+            != handoff_user_address_of(
+                micros_address_space_handoff_payload_ecall
+            )
+        || frame->a0 != TEST_SYSCALL_CONTROL_MAGIC
+        || frame->a7 != UINT64_MAX
+        || syscall_control_action
+            == HANDOFF_SYSCALL_CONTROL_NONE
+    ) {
+        return MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_MISMATCH;
+    }
+    if (
+        syscall_control_action
+            == HANDOFF_SYSCALL_CONTROL_SWITCH
+    ) {
+        const struct micros_thread *next =
+            &objects->threads[threads[syscall_control_next].slot];
+
+        copy_bytes(&expected, &next->user_context, sizeof(expected));
+        if (
+            (
+                next->scheduler_assigned
+                ? micros_thread_runtime_flags_unset(
+                    objects,
+                    threads[syscall_control_next],
+                    MICROS_THREAD_RTS_INACTIVE
                 )
-        || frame->a0 != UINT64_C(0x4a5)
-        || frame->a7 != UINT64_C(0x40)
+                : micros_thread_scheduler_admit(
+                    objects,
+                    micros_kernel_object_runtime_boot_hart_handle(),
+                    threads[syscall_control_next],
+                    MICROS_SCHEDULER_PRIORITY_DEFAULT_USER,
+                    UINT64_MAX,
+                    true
+                )
+            ) != MICROS_KERNEL_OBJECT_OK
+            || micros_thread_scheduler_hold(
+                objects,
+                threads[actor]
+            ) != MICROS_KERNEL_OBJECT_OK
+            || micros_scheduler_select_user_return(hart, frame)
+                != MICROS_SCHEDULER_OK
+            || handoff_current_actor(hart)
+                != syscall_control_next
+            || !bytes_equal(frame, &expected, sizeof(expected))
+            || !handoff_scheduler_state_valid(
+                hart,
+                syscall_control_next,
+                true
+            )
+        ) {
+            return MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_MISMATCH;
+        }
+        syscall_control_action = HANDOFF_SYSCALL_CONTROL_NONE;
+        return MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_USER_RETURN;
+    }
+    if (
+        syscall_control_action
+            != HANDOFF_SYSCALL_CONTROL_FINISH
         || micros_scheduler_test_prepare_supervisor_return(
             hart,
             frame
@@ -677,6 +1869,7 @@ micros_address_space_handoff_test_handle_trap(
         (uintptr_t)micros_address_space_handoff_test_supervisor_resume;
     frame->sstatus &= ~control_mask;
     frame->sstatus |= MICROS_RISCV_SSTATUS_SPP;
+    syscall_control_action = HANDOFF_SYSCALL_CONTROL_NONE;
     test_state = HANDOFF_TEST_SUPERVISOR;
     return MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_SUPERVISOR_RETURN;
 }
@@ -707,6 +1900,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     struct micros_ipc_message observed_message;
     struct micros_frame_owner process_user_owner;
     struct micros_frame_owner saved_owner;
+    struct micros_grant_record grant_record;
     micros_grant_t read_grant;
     micros_grant_t write_grant;
     uint64_t *corrupt_pte;
@@ -1616,6 +2810,17 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     }
 
     failure_stage = 10;
+    if (
+        !arm_handoff_syscall(
+            HANDOFF_GRANTOR,
+            &objects->threads[
+                threads[HANDOFF_GRANTOR].slot
+            ].user_context,
+            HANDOFF_SYSCALL_CREATE_READ
+        )
+    ) {
+        goto done;
+    }
     test_state = HANDOFF_TEST_USER_RUNNING;
     micros_address_space_handoff_test_enter(
         threads[HANDOFF_GRANTOR].slot,
@@ -1634,6 +2839,26 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
         || micros_user_address_space_validate(
             processes[HANDOFF_GRANTEE]
         ) != MICROS_USER_ADDRESS_SPACE_OK
+        || syscall_scripts[HANDOFF_GRANTOR].armed
+        || syscall_scripts[HANDOFF_GRANTOR].awaiting
+        || syscall_scripts[HANDOFF_GRANTEE].armed
+        || syscall_scripts[HANDOFF_GRANTEE].awaiting
+        || micros_grant_inspect(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            &grant_record
+        ) != MICROS_GRANT_ERROR_STALE_GRANT
+        || micros_grant_inspect(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTOR],
+            syscall_write_grant,
+            &grant_record
+        ) != MICROS_GRANT_ERROR_STALE_GRANT
         || objects->processes[empty_process.slot].slot_state
             != MICROS_KERNEL_OBJECT_SLOT_LIVE
         || objects->processes[empty_process.slot].generation

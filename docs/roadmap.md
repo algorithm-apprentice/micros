@@ -137,13 +137,14 @@ delivery, and mutation remain later VM work. Native owner classification and
 an isolated QEMU gate prove failure-atomic handoff, handed-off IPC/grant access,
 revoked mutation, bootstrap-only generic context preparation, and a real
 handed-off user return.
-ADR-0041 defines the next small boundary: one unified RISC-V `ecall`
-namespace retaining IPC operations 1 through 6 and assigning grant create,
-revoke, copy-from, and copy-to to operations 7 through 10. It fixes register
-layouts, stable generic results, current-process authority, one bootstrap
-cleanup gate, and real handed-off `ecall` integration without adding runtime
-wrappers or startup. The freestanding user-service runtime follows only after
-this syscall implementation merges.
+ADR-0041's unified RISC-V `ecall` boundary is now implemented. IPC operations
+1 through 6 remain unchanged, while grant create, revoke, copy-from, and
+copy-to use operations 7 through 10 with fixed register layouts, stable
+generic results, and exact current-process authority. Native ABI tests, a
+three-process bootstrap cleanup gate, and retained-state handed-off
+integration prove real ecalls, stable failures, register preservation,
+generation reuse, and both copy directions. Runtime wrappers and startup
+remain the next separately reviewed user-service-runtime outcome.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
