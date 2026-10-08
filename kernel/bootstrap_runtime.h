@@ -47,6 +47,9 @@ micros_bootstrap_runtime_authoritative_state(void);
 
 enum micros_bootstrap_error micros_bootstrap_runtime_validate(void);
 
+enum micros_bootstrap_error
+micros_bootstrap_runtime_validate_vm_prepared(void);
+
 bool micros_bootstrap_runtime_is_active_controller(
     struct micros_process_handle process
 );

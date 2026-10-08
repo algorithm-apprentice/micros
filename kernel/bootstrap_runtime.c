@@ -9,6 +9,7 @@
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
 #include "kernel/scheduler_core_internal.h"
+#include "kernel/vm_handoff_runtime.h"
 #include "kernel/vm_snapshot.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_ownership_runtime.h"
@@ -1081,6 +1082,12 @@ static void rollback_preparation(size_t count)
     clear_bytes(prepared_bindings, sizeof(prepared_bindings));
     clear_bytes(preparation_order, sizeof(preparation_order));
     clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
+    if (
+        micros_vm_handoff_runtime_reset()
+            != MICROS_VM_HANDOFF_OK
+    ) {
+        panic_runtime("bootstrap-vm-handoff-rollback");
+    }
     if (preparation_baseline.valid) {
         const struct micros_frame_allocator *allocator =
             micros_bootstrap_frame_allocator();
@@ -1330,6 +1337,14 @@ static enum micros_bootstrap_error prepare_vm_snapshot(
             candidate.info,
             sizeof(*candidate.info)
         )
+        || micros_vm_handoff_runtime_prepare(
+            vm_binding,
+            &config->manifest->entries[
+                vm_binding->manifest_index
+            ],
+            vm_image,
+            &candidate
+        ) != MICROS_VM_HANDOFF_OK
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
@@ -1360,7 +1375,6 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
         &preparation_diagnostic,
         sizeof(preparation_diagnostic)
     );
-    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
     if (
         bootstrap_state.phase != MICROS_BOOTSTRAP_PHASE_UNINITIALIZED
         || config->expected_service_count
@@ -1369,6 +1383,14 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
             != config->manifest->header.entry_count
         || config->profile_count
             < config->manifest->header.entry_count
+    ) {
+        error = MICROS_BOOTSTRAP_ERROR_STATE;
+        goto done;
+    }
+    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
+    if (
+        micros_vm_handoff_runtime_reset()
+            != MICROS_VM_HANDOFF_OK
     ) {
         error = MICROS_BOOTSTRAP_ERROR_STATE;
         goto done;
@@ -1739,6 +1761,55 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
         ) {
             return MICROS_BOOTSTRAP_ERROR_INVARIANT;
         }
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_validate_vm_prepared(void)
+{
+    struct micros_vm_boot_summary observed_summary;
+    const struct micros_vm_handoff_state *handoff =
+        micros_vm_handoff_runtime_state();
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_authoritative_registry();
+    struct micros_endpoint_registry *registry =
+        micros_ipc_runtime_authoritative_registry();
+
+    if (
+        handoff == NULL
+        || handoff->phase != MICROS_VM_HANDOFF_PHASE_PREPARED
+        || prepared_vm_snapshot.info == NULL
+        || objects == NULL
+        || registry == NULL
+        || micros_vm_handoff_runtime_validate(
+            &bootstrap_state,
+            registry,
+            objects
+        ) != MICROS_VM_HANDOFF_OK
+        || micros_vm_boot_validate(
+            prepared_vm_snapshot.info,
+            &observed_summary
+        ) != MICROS_VM_BOOT_OK
+        || micros_vm_snapshot_validate_current(
+            &bootstrap_state.manifest,
+            bootstrap_state.bindings,
+            bootstrap_state.entry_count,
+            prepared_vm_snapshot.info
+        ) != MICROS_BOOTSTRAP_OK
+        || !bytes_equal(
+            &observed_summary,
+            &handoff->summary,
+            sizeof(observed_summary)
+        )
+        || !user_range_matches(
+            handoff->process,
+            handoff->boot_info_address,
+            prepared_vm_snapshot.info,
+            handoff->boot_info_size
+        )
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     return MICROS_BOOTSTRAP_OK;
 }

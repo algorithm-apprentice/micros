@@ -8,6 +8,8 @@
 #include "kernel/grant_syscall.h"
 #include "kernel/ipc_syscall.h"
 #include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/vm_handoff_core.h"
+#include "kernel/vm_handoff_syscall.h"
 #include "micros/bootstrap_control.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -49,6 +51,7 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
     struct micros_syscall_context context;
     struct micros_syscall_arguments arguments;
     struct micros_bootstrap_control_request bootstrap_request;
+    struct micros_vm_handoff_request vm_handoff_request;
     const struct micros_thread *thread;
     const struct micros_process *process;
 
@@ -65,6 +68,17 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
         && micros_bootstrap_control_decode(
             &arguments,
             &bootstrap_request
+        ) != MICROS_SYSCALL_ABI_OK
+    ) {
+        frame->a0 =
+            (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    if (
+        arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF
+        && micros_vm_handoff_decode(
+            &arguments,
+            &vm_handoff_request
         ) != MICROS_SYSCALL_ABI_OK
     ) {
         frame->a0 =
@@ -98,7 +112,11 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
         micros_bootstrap_runtime_state();
 
         if (
-        arguments.a7 == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+        (
+            arguments.a7
+                == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+            || arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF
+        )
         && state != NULL
         && state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
         ) {
@@ -142,11 +160,19 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
             &context,
             &arguments
         );
+    case MICROS_SYSCALL_ABI_VM_HANDOFF:
+        return micros_vm_handoff_handle_captured_user_ecall(
+            hart,
+            frame,
+            &context,
+            &arguments
+        );
     default:
         frame->a0 =
             (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
         return MICROS_SYSCALL_RETURN_NORMAL;
     }
     (void)bootstrap_request;
+    (void)vm_handoff_request;
     (void)process;
 }

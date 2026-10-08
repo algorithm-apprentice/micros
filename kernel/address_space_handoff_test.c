@@ -111,6 +111,7 @@ static uint64_t user_physical[HANDOFF_PROCESS_COUNT][HANDOFF_PAGE_COUNT];
 static struct micros_process_handle processes[HANDOFF_PROCESS_COUNT];
 static struct micros_thread_handle threads[HANDOFF_PROCESS_COUNT];
 static micros_endpoint_t endpoints[HANDOFF_PROCESS_COUNT];
+static const struct micros_vm_boot_info *handoff_snapshot_info;
 static struct handoff_syscall_script
     syscall_scripts[HANDOFF_PROCESS_COUNT];
 static micros_grant_t syscall_read_grant;
@@ -1750,7 +1751,7 @@ static bool stage_wired_pages(void)
             .endpoint = endpoints[index],
         };
     }
-    return (
+    if (
         micros_vm_snapshot_prepare(
             &manifest,
             bindings,
@@ -1773,7 +1774,53 @@ static bool stage_wired_pages(void)
             result.info,
             &result.summary
         ) == MICROS_VM_BOOT_OK
-    );
+    ) {
+        handoff_snapshot_info = result.info;
+        return true;
+    }
+    return false;
+}
+
+static bool validate_wired_snapshot(void)
+{
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_registry();
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_binding
+        bindings[HANDOFF_PROCESS_COUNT];
+    size_t index;
+
+    if (objects == NULL || handoff_snapshot_info == NULL) {
+        return false;
+    }
+    fill_bytes(&manifest, 0, sizeof(manifest));
+    fill_bytes(bindings, 0, sizeof(bindings));
+    manifest.header.entry_count = HANDOFF_PROCESS_COUNT;
+    for (index = 0; index < HANDOFF_PROCESS_COUNT; ++index) {
+        manifest.entries[index].service_id = (uint32_t)index + 1;
+        manifest.entries[index].process_slot = processes[index].slot;
+        manifest.entries[index].role_flags = (
+            index == HANDOFF_GRANTEE
+        )
+            ? MICROS_BOOTSTRAP_ROLE_VM
+            : 0;
+        bindings[index] = (struct micros_bootstrap_binding){
+            .manifest_index = (uint16_t)index,
+            .service_id = (uint32_t)index + 1,
+            .process = processes[index],
+            .thread = threads[index],
+            .root = objects->processes[
+                processes[index].slot
+            ].address_space_root,
+            .endpoint = endpoints[index],
+        };
+    }
+    return micros_vm_snapshot_validate_current(
+        &manifest,
+        bindings,
+        HANDOFF_PROCESS_COUNT,
+        handoff_snapshot_info
+    ) == MICROS_BOOTSTRAP_OK;
 }
 
 _Noreturn void micros_address_space_handoff_test_enter_production(
@@ -1922,6 +1969,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     struct micros_ipc_message message;
     struct micros_ipc_message observed_message;
     struct micros_frame_owner process_user_owner;
+    struct micros_frame_owner retained_owner;
     struct micros_frame_owner saved_owner;
     struct micros_grant_record grant_record;
     micros_grant_t read_grant;
@@ -1931,6 +1979,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     uint64_t frame_index;
     uint64_t orphan_physical;
     uint64_t physical_address;
+    uint64_t stale_snapshot_frame;
     uint32_t permissions;
     size_t contiguous;
     uintptr_t kernel_stack_bottom;
@@ -2249,7 +2298,26 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     }
     if (
         !stage_wired_pages()
-        || micros_user_execution_detach(threads[HANDOFF_GRANTEE])
+        || !validate_wired_snapshot()
+        || micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_RETAINED,
+            &retained_owner
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_ownership_runtime_allocate(
+            retained_owner,
+            &stale_snapshot_frame
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || validate_wired_snapshot()
+        || micros_frame_ownership_runtime_release(
+            retained_owner,
+            stale_snapshot_frame
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || !validate_wired_snapshot()
+    ) {
+        goto done;
+    }
+    if (
+        micros_user_execution_detach(threads[HANDOFF_GRANTEE])
             != MICROS_USER_EXECUTION_OK
         || !snapshot_state(
             ledger,

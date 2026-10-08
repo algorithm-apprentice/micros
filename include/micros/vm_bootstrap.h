@@ -188,6 +188,13 @@ enum micros_vm_boot_error micros_vm_boot_build(
     struct micros_vm_boot_summary *summary
 );
 
+enum micros_vm_boot_error micros_vm_boot_validate_authority(
+    const struct micros_vm_boot_info *info,
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle vm_process
+);
+
 _Static_assert(
     sizeof(struct micros_vm_boot_header) == MICROS_VM_BOOT_HEADER_SIZE,
     "VM boot header ABI changed"

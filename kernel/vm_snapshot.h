@@ -21,4 +21,11 @@ enum micros_bootstrap_error micros_vm_snapshot_prepare(
     struct micros_vm_snapshot_result *result
 );
 
+enum micros_bootstrap_error micros_vm_snapshot_validate_current(
+    const struct micros_bootstrap_manifest *manifest,
+    const struct micros_bootstrap_binding *bindings,
+    size_t binding_count,
+    const struct micros_vm_boot_info *expected
+);
+
 #endif

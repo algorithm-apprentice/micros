@@ -223,7 +223,8 @@ static enum micros_bootstrap_error validate_profile_relationships(
             controller_profile_id
         );
     uint32_t controller_target;
-    size_t index;
+        uint8_t vm_profile_id = 0;
+        size_t index;
 
     if (controller == NULL) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
@@ -238,20 +239,35 @@ static enum micros_bootstrap_error validate_profile_relationships(
         || controller->call_targets != 0
         || controller->send_targets != 0
         || controller->notify_targets != 0
-        || (
-            controller->kernel_operations
-            & MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
-        ) == 0
+        || controller->kernel_operations
+            != MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
     ) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
     }
-    for (index = 0; index < profile_count; ++index) {
+    for (index = 0; index < manifest->header.entry_count; ++index) {
         if (
-            profiles[index].id != controller_profile_id
-            && (
-                profiles[index].kernel_operations
-                & MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
+            (
+                manifest->entries[index].role_flags
+                & MICROS_BOOTSTRAP_ROLE_VM
             ) != 0
+        ) {
+            vm_profile_id = manifest->entries[index].profile_id;
+            break;
+        }
+    }
+    for (index = 0; index < profile_count; ++index) {
+        uint64_t expected_kernel_operations =
+            profiles[index].id == controller_profile_id
+            ? MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
+            : (
+                profiles[index].id == vm_profile_id
+                ? MICROS_KERNEL_OPERATION_VM_HANDOFF
+                : 0
+            );
+
+        if (
+            profiles[index].kernel_operations
+                != expected_kernel_operations
         ) {
             return MICROS_BOOTSTRAP_ERROR_PROFILE;
         }

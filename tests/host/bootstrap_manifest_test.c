@@ -46,6 +46,10 @@ static struct micros_privilege_profile profile(
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_CALL;
         result.call_targets = UINT32_C(1) << 1;
+        if (id == 2) {
+            result.kernel_operations =
+                MICROS_KERNEL_OPERATION_VM_HANDOFF;
+        }
     }
     return result;
 }
@@ -258,7 +262,42 @@ static bool test_manifest_validation(void)
         && memcmp(&plan, &sentinel, sizeof(plan)) == 0
     );
     profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
+    profiles[0].kernel_operations |=
+        MICROS_KERNEL_OPERATION_VM_HANDOFF;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            2,
+            images,
+            2,
+            profiles,
+            2,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     profiles[1].call_targets = 0;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            2,
+            images,
+            2,
+            profiles,
+            2,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[1] = profile(2, "VM");
+    profiles[1].kernel_operations = 0;
     plan = sentinel;
     EXPECT_TRUE(
         micros_bootstrap_manifest_validate(

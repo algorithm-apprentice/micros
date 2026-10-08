@@ -836,6 +836,56 @@ static bool copy_build_ranges(
     return true;
 }
 
+static enum micros_vm_boot_error authoritative_frame_state(
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle vm_process,
+    uint64_t frame_index,
+    uint8_t *state
+)
+{
+    struct micros_frame_owner owner =
+        ownership->owners[frame_index];
+    uint8_t target = ownership->handoff_targets[frame_index];
+    bool allocated = allocator_bit_is_set(allocator, frame_index);
+
+    switch (owner.kind) {
+    case MICROS_FRAME_OWNER_FREE:
+        if (allocated || target != MICROS_FRAME_HANDOFF_NONE) {
+            return MICROS_VM_BOOT_ERROR_STATE;
+        }
+        *state = MICROS_VM_FRAME_FREE;
+        return MICROS_VM_BOOT_OK;
+    case MICROS_FRAME_OWNER_KERNEL_RETAINED:
+    case MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE:
+    case MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE:
+        if (!allocated || target != MICROS_FRAME_HANDOFF_NONE) {
+            return MICROS_VM_BOOT_ERROR_STATE;
+        }
+        *state = MICROS_VM_FRAME_KERNEL;
+        return MICROS_VM_BOOT_OK;
+    case MICROS_FRAME_OWNER_PROCESS_USER:
+        if (
+            !allocated
+            || target != MICROS_FRAME_HANDOFF_VM_WIRED
+        ) {
+            return MICROS_VM_BOOT_ERROR_STATE;
+        }
+        *state = (
+            owner.slot == vm_process.slot
+            && owner.generation == vm_process.generation
+        )
+            ? MICROS_VM_FRAME_SELF_WIRED
+            : MICROS_VM_FRAME_SERVICE_WIRED;
+        return MICROS_VM_BOOT_OK;
+    case MICROS_FRAME_OWNER_KERNEL_TEMPORARY:
+    case MICROS_FRAME_OWNER_VM_WIRED:
+    case MICROS_FRAME_OWNER_VM_TRANSFERABLE:
+    default:
+        return MICROS_VM_BOOT_ERROR_STATE;
+    }
+}
+
 static enum micros_vm_boot_error derive_build_frame_states(
     struct micros_vm_boot_info *info,
     const struct micros_frame_allocator *allocator,
@@ -850,51 +900,33 @@ static enum micros_vm_boot_error derive_build_frame_states(
         frame_index < ownership->managed_frame_count;
         ++frame_index
     ) {
-        struct micros_frame_owner owner =
-            ownership->owners[frame_index];
-        uint8_t target = ownership->handoff_targets[frame_index];
-        bool allocated = allocator_bit_is_set(allocator, frame_index);
+        uint8_t state;
+        enum micros_vm_boot_error error =
+            authoritative_frame_state(
+                allocator,
+                ownership,
+                vm_process,
+                frame_index,
+                &state
+            );
 
-        switch (owner.kind) {
-        case MICROS_FRAME_OWNER_FREE:
-            if (allocated || target != MICROS_FRAME_HANDOFF_NONE) {
-                return MICROS_VM_BOOT_ERROR_STATE;
-            }
-            info->frame_states[frame_index] = MICROS_VM_FRAME_FREE;
+        if (error != MICROS_VM_BOOT_OK) {
+            return error;
+        }
+        info->frame_states[frame_index] = state;
+        switch (state) {
+        case MICROS_VM_FRAME_FREE:
             ++info->header.free_frame_count;
             break;
-        case MICROS_FRAME_OWNER_KERNEL_RETAINED:
-        case MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE:
-        case MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE:
-            if (!allocated || target != MICROS_FRAME_HANDOFF_NONE) {
-                return MICROS_VM_BOOT_ERROR_STATE;
-            }
-            info->frame_states[frame_index] = MICROS_VM_FRAME_KERNEL;
+        case MICROS_VM_FRAME_KERNEL:
             ++info->header.kernel_frame_count;
             break;
-        case MICROS_FRAME_OWNER_PROCESS_USER:
-            if (
-                !allocated
-                || target != MICROS_FRAME_HANDOFF_VM_WIRED
-            ) {
-                return MICROS_VM_BOOT_ERROR_STATE;
-            }
-            if (
-                owner.slot == vm_process.slot
-                && owner.generation == vm_process.generation
-            ) {
-                info->frame_states[frame_index] =
-                    MICROS_VM_FRAME_SELF_WIRED;
-                ++info->header.vm_self_wired_frame_count;
-            } else {
-                info->frame_states[frame_index] =
-                    MICROS_VM_FRAME_SERVICE_WIRED;
-                ++info->header.service_wired_frame_count;
-            }
+        case MICROS_VM_FRAME_SELF_WIRED:
+            ++info->header.vm_self_wired_frame_count;
             break;
-        case MICROS_FRAME_OWNER_KERNEL_TEMPORARY:
-        case MICROS_FRAME_OWNER_VM_WIRED:
-        case MICROS_FRAME_OWNER_VM_TRANSFERABLE:
+        case MICROS_VM_FRAME_SERVICE_WIRED:
+            ++info->header.service_wired_frame_count;
+            break;
         default:
             return MICROS_VM_BOOT_ERROR_STATE;
         }
@@ -1094,4 +1126,234 @@ enum micros_vm_boot_error micros_vm_boot_build(
     }
     copy_bytes(summary, &candidate, sizeof(candidate));
     return MICROS_VM_BOOT_OK;
+}
+
+static bool authority_ranges_match(
+    const struct micros_vm_boot_info *info,
+    const struct micros_frame_allocator *allocator
+)
+{
+    size_t index;
+
+    if (
+        allocator->memory_range_count
+            != info->header.memory_range_count
+        || allocator->reserved_range_count
+            != info->header.reserved_range_count
+        || allocator->managed_range_count
+            != info->header.managed_range_count
+        || allocator->managed_frame_count
+            != info->header.managed_frame_count
+        || allocator->free_frame_count
+            != info->header.free_frame_count
+    ) {
+        return false;
+    }
+    for (
+        index = 0;
+        index < allocator->memory_range_count;
+        ++index
+    ) {
+        if (
+            info->memory_ranges[index].base
+                != allocator->memory_ranges[index].base
+            || info->memory_ranges[index].size
+                != allocator->memory_ranges[index].size
+        ) {
+            return false;
+        }
+    }
+    for (
+        index = 0;
+        index < allocator->reserved_range_count;
+        ++index
+    ) {
+        if (
+            info->reserved_ranges[index].base
+                != allocator->reserved_ranges[index].base
+            || info->reserved_ranges[index].size
+                != allocator->reserved_ranges[index].size
+        ) {
+            return false;
+        }
+    }
+    for (
+        index = 0;
+        index < allocator->managed_range_count;
+        ++index
+    ) {
+        if (
+            info->managed_ranges[index].base
+                != allocator->managed_ranges[index].base
+            || info->managed_ranges[index].frame_count
+                != allocator->managed_ranges[index].frame_count
+            || info->managed_ranges[index].frame_index
+                != allocator->managed_ranges[index].bitmap_offset
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static enum micros_vm_boot_error
+validate_authoritative_inventory(
+    const struct micros_vm_boot_info *info,
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle vm_process
+)
+{
+    bool found_vm = false;
+    size_t space_index;
+
+    for (
+        space_index = 0;
+        space_index < info->header.address_space_count;
+        ++space_index
+    ) {
+        const struct micros_vm_address_space *space =
+            &info->address_spaces[space_index];
+        struct micros_process_handle process = {
+            .slot = space->process_slot,
+            .generation = space->process_generation,
+        };
+        uint64_t root_index;
+        size_t mapping_index;
+        size_t mapping_end =
+            space->mapping_index + space->mapping_count;
+        bool is_vm = (
+            space->service_id == info->header.service_id
+            && space->endpoint == info->header.self_endpoint
+            && process_handles_equal(process, vm_process)
+        );
+
+        if (
+            !physical_to_frame_index(
+                info,
+                space->root_physical_address,
+                &root_index
+            )
+            || !owner_matches_process(
+                ownership->owners[root_index],
+                MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+                process
+            )
+            || !allocator_bit_is_set(allocator, root_index)
+            || ownership->handoff_targets[root_index]
+                != MICROS_FRAME_HANDOFF_NONE
+        ) {
+            return MICROS_VM_BOOT_ERROR_IDENTITY;
+        }
+        if (is_vm) {
+            if (found_vm) {
+                return MICROS_VM_BOOT_ERROR_IDENTITY;
+            }
+            found_vm = true;
+        } else if (
+            space->service_id == info->header.service_id
+            || space->endpoint == info->header.self_endpoint
+            || process_handles_equal(process, vm_process)
+        ) {
+            return MICROS_VM_BOOT_ERROR_IDENTITY;
+        }
+        for (
+            mapping_index = space->mapping_index;
+            mapping_index < mapping_end;
+            ++mapping_index
+        ) {
+            const struct micros_vm_mapping *mapping =
+                &info->mappings[mapping_index];
+            uint64_t frame_index;
+            uint8_t expected_role = is_vm
+                ? MICROS_VM_MAPPING_SELF_WIRED
+                : MICROS_VM_MAPPING_SERVICE_WIRED;
+
+            if (
+                mapping->role != expected_role
+                || !physical_to_frame_index(
+                    info,
+                    mapping->physical_address,
+                    &frame_index
+                )
+                || !owner_matches_process(
+                    ownership->owners[frame_index],
+                    MICROS_FRAME_OWNER_PROCESS_USER,
+                    process
+                )
+                || !allocator_bit_is_set(allocator, frame_index)
+                || ownership->handoff_targets[frame_index]
+                    != MICROS_FRAME_HANDOFF_VM_WIRED
+            ) {
+                return MICROS_VM_BOOT_ERROR_MAPPING;
+            }
+        }
+    }
+    return found_vm
+        ? MICROS_VM_BOOT_OK
+        : MICROS_VM_BOOT_ERROR_IDENTITY;
+}
+
+enum micros_vm_boot_error micros_vm_boot_validate_authority(
+    const struct micros_vm_boot_info *info,
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle vm_process
+)
+{
+    struct micros_vm_boot_summary summary;
+    uint64_t frame_index;
+    enum micros_vm_boot_error error;
+
+    if (
+        info == NULL
+        || allocator == NULL
+        || ownership == NULL
+        || (uintptr_t)info % MICROS_VM_BOOT_INFO_ALIGNMENT != 0
+        || (uintptr_t)allocator
+            % _Alignof(struct micros_frame_allocator) != 0
+        || (uintptr_t)ownership
+            % _Alignof(struct micros_frame_ownership) != 0
+    ) {
+        return MICROS_VM_BOOT_ERROR_ARGUMENT;
+    }
+    if (
+        ownership->allocator != allocator
+        || ownership->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        || micros_frame_ownership_validate(ownership)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || micros_vm_boot_validate(info, &summary)
+            != MICROS_VM_BOOT_OK
+        || !authority_ranges_match(info, allocator)
+    ) {
+        return MICROS_VM_BOOT_ERROR_STATE;
+    }
+    for (
+        frame_index = 0;
+        frame_index < ownership->managed_frame_count;
+        ++frame_index
+    ) {
+        uint8_t state;
+
+        error = authoritative_frame_state(
+            allocator,
+            ownership,
+            vm_process,
+            frame_index,
+            &state
+        );
+        if (
+            error != MICROS_VM_BOOT_OK
+            || info->frame_states[frame_index] != state
+        ) {
+            return MICROS_VM_BOOT_ERROR_STATE;
+        }
+    }
+    return validate_authoritative_inventory(
+        info,
+        allocator,
+        ownership,
+        vm_process
+    );
 }

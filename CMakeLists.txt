@@ -273,7 +273,9 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         kernel/frame_ownership.c
         kernel/vm_bootstrap.c
+        kernel/vm_handoff_core.c
         tests/host/vm_bootstrap_test.c
+        tests/host/vm_handoff_test.c
     )
     target_include_directories(
         fdt_test
@@ -996,6 +998,9 @@ add_executable(
     kernel/user_address_space_core.c
     kernel/user_execution.c
     kernel/vm_bootstrap.c
+    kernel/vm_handoff_core.c
+    kernel/vm_handoff_runtime.c
+    kernel/vm_handoff_syscall.c
     kernel/vm_snapshot.c
 )
 

@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+bool micros_vm_handoff_test_run(void);
+
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
@@ -565,6 +567,12 @@ static bool test_builds_from_authoritative_state(void)
             == MICROS_VM_MAPPING_SERVICE_WIRED
         && micros_vm_boot_validate(&info, &summary)
             == MICROS_VM_BOOT_OK
+        && micros_vm_boot_validate_authority(
+            &info,
+            &build_allocator,
+            &build_ownership,
+            vm_process
+        ) == MICROS_VM_BOOT_OK
     );
     return true;
 }
@@ -574,10 +582,12 @@ static bool test_build_failure_clears_candidate(void)
     const struct micros_process_handle vm_process = {1, 1};
     const struct micros_process_handle service_process = {0, 1};
     struct micros_frame_owner service_user;
+    struct micros_frame_owner retained;
     struct micros_frame_owner temporary;
     struct micros_vm_boot_summary summary;
     struct micros_vm_boot_summary sentinel;
     uint64_t temporary_frame;
+    uint64_t retained_frame;
 
     memset(&sentinel, 0xa5, sizeof(sentinel));
     EXPECT_TRUE(initialize_build_fixture());
@@ -658,6 +668,38 @@ static bool test_build_failure_clears_candidate(void)
         && storage_is_zero(&info, sizeof(info))
         && memcmp(&summary, &sentinel, sizeof(summary)) == 0
     );
+
+    EXPECT_TRUE(
+        initialize_build_fixture()
+        && micros_vm_boot_build(
+            &info,
+            2,
+            3,
+            &build_allocator,
+            &build_ownership,
+            2,
+            UINT32_C(0x00001001),
+            vm_process,
+            &summary
+        ) == MICROS_VM_BOOT_OK
+        && micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_RETAINED,
+            &retained
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_frame_ownership_allocate(
+            &build_ownership,
+            retained,
+            &retained_frame
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_vm_boot_validate(&info, &summary)
+            == MICROS_VM_BOOT_OK
+        && micros_vm_boot_validate_authority(
+            &info,
+            &build_allocator,
+            &build_ownership,
+            vm_process
+        ) == MICROS_VM_BOOT_ERROR_STATE
+    );
     return true;
 }
 
@@ -671,6 +713,7 @@ int main(void)
         && test_misaligned_storage()
         && test_builds_from_authoritative_state()
         && test_build_failure_clears_candidate()
+        && micros_vm_handoff_test_run()
     )
         ? 0
         : 1;
