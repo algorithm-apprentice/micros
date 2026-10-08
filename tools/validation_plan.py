@@ -50,6 +50,35 @@ PLANNER_INPUTS = (
     "docs/adr/0032-fail-closed-change-aware-validation.md",
 )
 
+BOOTSTRAP_CROSS_GATE_INPUTS = (
+    "kernel/bootstrap_control.c",
+    "kernel/bootstrap_control_core.c",
+    "kernel/bootstrap_image.c",
+    "kernel/bootstrap_manifest.c",
+    "kernel/bootstrap_runtime.c",
+    "kernel/bootstrap_syscall.c",
+)
+
+BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
+    "test-qemu-object-model",
+    "test-qemu-endpoint",
+    "test-qemu-grant",
+    "test-qemu-grant-syscall",
+    "test-qemu-user-runtime",
+    "test-qemu-bootstrap-launcher",
+    "test-qemu-bootstrap-ready-timeout",
+    "test-qemu-bootstrap-manifest-panic",
+    "test-qemu-ipc",
+    "test-qemu-ipc-ecall-core",
+    "test-qemu-ipc-syscall",
+    "test-qemu-ipc-syscall-panic",
+    "test-qemu-frame-ownership",
+    "test-qemu-user-address-space",
+    "test-qemu-address-space-handoff",
+    "test-qemu-user-execution",
+    "test-qemu-scheduler",
+)
+
 SHARED_QEMU_PATHS = (
     "CMakeLists.txt",
     "CMakePresets.json",
@@ -383,6 +412,8 @@ GATE_INPUTS["test-qemu-bootstrap-manifest-panic"] = GATE_INPUTS[
     "arch/riscv64/panic.S",
     "kernel/panic.c",
 )
+for bootstrap_workflow in BOOTSTRAP_CROSS_GATE_WORKFLOWS:
+    GATE_INPUTS[bootstrap_workflow] += BOOTSTRAP_CROSS_GATE_INPUTS
 
 SLOW_MODEL_INPUTS = {
     "test-ipc-model": (

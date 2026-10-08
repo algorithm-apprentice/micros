@@ -105,6 +105,21 @@ class ValidationPlanTests(unittest.TestCase):
                     "test-qemu-bootstrap-manifest-panic",
                 )
 
+    def test_bootstrap_production_paths_select_cross_gate_union(self):
+        for path in (
+            "kernel/bootstrap_runtime.c",
+            "kernel/bootstrap_syscall.c",
+        ):
+            commands = validation_plan.plan([path], "fast")
+            with self.subTest(path=path):
+                for workflow_name in (
+                    validation_plan.BOOTSTRAP_CROSS_GATE_WORKFLOWS
+                ):
+                    self.assertIn(
+                        validation_plan.workflow(workflow_name),
+                        commands,
+                    )
+
     def test_grant_syscall_paths_own_unified_gates(self):
         for path in (
             "kernel/syscall.c",

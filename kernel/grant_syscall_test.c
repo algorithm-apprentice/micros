@@ -10,6 +10,7 @@
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
+#include "micros/bootstrap_control.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_copy.h"
 #include "micros/grant_runtime.h"
@@ -76,6 +77,7 @@ enum grant_syscall_command {
     GRANT_COMMAND_COPY_UPPER_TOKEN,
     GRANT_COMMAND_COPY_UNUSED,
     GRANT_COMMAND_UNKNOWN_OPERATION,
+    GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE,
     GRANT_COMMAND_COPY_WRONG_GRANTEE,
     GRANT_COMMAND_REVOKE_READ,
     GRANT_COMMAND_REVOKE_WRITE,
@@ -1540,6 +1542,25 @@ static bool arm_command(
             MICROS_SYSCALL_RETURN_NORMAL
         );
         return true;
+    case GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL,
+            MICROS_BOOTSTRAP_COMMAND_RELEASE,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            abi_result(MICROS_SYSCALL_ABI_UNAUTHORIZED),
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
     case GRANT_COMMAND_COPY_WRONG_GRANTEE:
         arm_raw(
             actor,
@@ -1904,6 +1925,13 @@ static bool transition_after_return(
             frame
         );
     case GRANT_COMMAND_UNKNOWN_OPERATION:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE,
+            frame
+        );
+    case GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE:
         return schedule_next(
             actor,
             GRANT_SYSCALL_WRONG,

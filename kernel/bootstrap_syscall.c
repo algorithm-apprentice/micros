@@ -31,6 +31,39 @@ static _Noreturn void panic_bootstrap_syscall(
     );
 }
 
+static _Noreturn void fail_active_bootstrap(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    enum micros_bootstrap_diagnostic_reason reason,
+    uint32_t service_id,
+    micros_endpoint_t endpoint
+)
+{
+    const struct micros_bootstrap_control_state *state =
+        micros_bootstrap_runtime_state();
+
+    if (
+        state != NULL
+        && (
+            state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING
+            || state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+            || state->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+        )
+    ) {
+        micros_bootstrap_runtime_fail(
+            reason,
+            service_id,
+            endpoint,
+            0
+        );
+    }
+    panic_bootstrap_syscall(
+        hart,
+        frame,
+        "bootstrap-invariant"
+    );
+}
+
 static enum micros_syscall_return return_result(
     struct micros_trap_frame *frame,
     enum micros_syscall_abi_result result
@@ -332,10 +365,12 @@ static enum micros_syscall_return handle_accept_ready(
             && error != MICROS_BOOTSTRAP_ERROR_RANGE
             && error != MICROS_BOOTSTRAP_ERROR_STATE
         ) {
-            panic_bootstrap_syscall(
+            fail_active_bootstrap(
                 hart,
                 frame,
-                "bootstrap-ready-invariant"
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                request->service_id,
+                request->endpoint
             );
         }
         return return_result(
@@ -354,13 +389,20 @@ static enum micros_syscall_return handle_accept_ready(
             &guard
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
-        panic_bootstrap_syscall(hart, frame, "bootstrap-ready-guard");
+        fail_active_bootstrap(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            request->service_id,
+            request->endpoint
+        );
     }
-    ipc_error = micros_ipc_reply(
+    ipc_error = micros_ipc_reply_expected_caller(
         registry,
         context->objects,
         context->current,
         request->reply_token,
+        request->endpoint,
         &plan.acknowledgment
     );
     if (ipc_error != MICROS_IPC_OK) {
@@ -370,10 +412,12 @@ static enum micros_syscall_return handle_accept_ready(
                 &guard
             ) != MICROS_KERNEL_OBJECT_OK
         ) {
-            panic_bootstrap_syscall(
+            fail_active_bootstrap(
                 hart,
                 frame,
-                "bootstrap-ready-rollback"
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                request->service_id,
+                request->endpoint
             );
         }
         return return_result(frame, map_ipc_error(ipc_error));
@@ -400,10 +444,12 @@ static enum micros_syscall_return handle_accept_ready(
         || micros_bootstrap_runtime_validate()
             != MICROS_BOOTSTRAP_OK
     ) {
-        panic_bootstrap_syscall(
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-ready-commit"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            request->service_id,
+            request->endpoint
         );
     }
     return MICROS_SYSCALL_RETURN_CAPTURED;
@@ -432,10 +478,12 @@ static enum micros_syscall_return handle_complete(
     );
     if (error != MICROS_BOOTSTRAP_OK) {
         if (error != MICROS_BOOTSTRAP_ERROR_STATE) {
-            panic_bootstrap_syscall(
+            fail_active_bootstrap(
                 hart,
                 frame,
-                "bootstrap-complete-invariant"
+                MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+                0,
+                MICROS_ENDPOINT_NONE
             );
         }
         return return_result(
@@ -461,10 +509,12 @@ static enum micros_syscall_return handle_complete(
             &guard
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
-        panic_bootstrap_syscall(
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-complete-guard"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+            0,
+            MICROS_ENDPOINT_NONE
         );
     }
     if (
@@ -473,10 +523,12 @@ static enum micros_syscall_return handle_complete(
             controller->thread
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
-        panic_bootstrap_syscall(
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-complete-remove"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+            0,
+            MICROS_ENDPOINT_NONE
         );
     }
     micros_endpoint_commit_source_only_prevalidated(
@@ -496,10 +548,12 @@ static enum micros_syscall_return handle_complete(
         || micros_bootstrap_runtime_validate()
             != MICROS_BOOTSTRAP_OK
     ) {
-        panic_bootstrap_syscall(
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-complete-commit"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+            0,
+            MICROS_ENDPOINT_NONE
         );
     }
     return MICROS_SYSCALL_RETURN_CAPTURED;
@@ -541,17 +595,20 @@ micros_bootstrap_handle_captured_user_ecall(
         return return_result(frame, decode_result);
     }
     state = micros_bootstrap_runtime_authoritative_state();
+    if (state == NULL) {
+        return return_result(
+            frame,
+            MICROS_SYSCALL_ABI_UNAUTHORIZED
+        );
+    }
     registry = micros_ipc_runtime_authoritative_registry();
-    grants = micros_grant_runtime_authoritative_registry();
-    if (
-        state == NULL
-        || registry == NULL
-        || grants == NULL
-    ) {
-        panic_bootstrap_syscall(
+    if (registry == NULL) {
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-runtime-invariant"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            0,
+            MICROS_ENDPOINT_NONE
         );
     }
     if (
@@ -570,10 +627,22 @@ micros_bootstrap_handle_captured_user_ecall(
     if (
         micros_bootstrap_runtime_validate() != MICROS_BOOTSTRAP_OK
     ) {
-        panic_bootstrap_syscall(
+        fail_active_bootstrap(
             hart,
             frame,
-            "bootstrap-control-invariant"
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            0,
+            MICROS_ENDPOINT_NONE
+        );
+    }
+    grants = micros_grant_runtime_authoritative_registry();
+    if (grants == NULL) {
+        fail_active_bootstrap(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            0,
+            MICROS_ENDPOINT_NONE
         );
     }
     switch (request.command) {
@@ -593,10 +662,12 @@ micros_bootstrap_handle_captured_user_ecall(
             && error != MICROS_BOOTSTRAP_ERROR_RANGE
             && error != MICROS_BOOTSTRAP_ERROR_STATE
         ) {
-            panic_bootstrap_syscall(
+            fail_active_bootstrap(
                 hart,
                 frame,
-                "bootstrap-release-invariant"
+                MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_TRANSITION,
+                request.service_id,
+                MICROS_ENDPOINT_NONE
             );
         }
         if (
@@ -604,10 +675,12 @@ micros_bootstrap_handle_captured_user_ecall(
             && micros_bootstrap_runtime_validate()
                 != MICROS_BOOTSTRAP_OK
         ) {
-            panic_bootstrap_syscall(
+            fail_active_bootstrap(
                 hart,
                 frame,
-                "bootstrap-release-commit"
+                MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_TRANSITION,
+                request.service_id,
+                MICROS_ENDPOINT_NONE
             );
         }
         return return_result(
@@ -647,9 +720,11 @@ micros_bootstrap_handle_captured_user_ecall(
             grants
         );
     }
-    panic_bootstrap_syscall(
+    fail_active_bootstrap(
         hart,
         frame,
-        "bootstrap-command-invariant"
+        MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+        0,
+        MICROS_ENDPOINT_NONE
     );
 }

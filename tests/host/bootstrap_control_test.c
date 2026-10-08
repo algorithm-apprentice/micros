@@ -503,6 +503,14 @@ static uint32_t read_u32_le(const unsigned char *bytes)
     );
 }
 
+static void write_u32_le(unsigned char *bytes, uint32_t value)
+{
+    bytes[0] = (unsigned char)value;
+    bytes[1] = (unsigned char)(value >> 8);
+    bytes[2] = (unsigned char)(value >> 16);
+    bytes[3] = (unsigned char)(value >> 24);
+}
+
 static bool test_control_transitions(void)
 {
     struct micros_bootstrap_control_state state;
@@ -695,6 +703,57 @@ static bool test_control_transitions(void)
             sizeof(ready_plan)
         ) == 0
     );
+    objects.threads[bindings[0].thread.slot].ipc_receive_buffer =
+        UINT64_C(0x61002000);
+    objects.threads[bindings[0].thread.slot].ipc_delivery_pending =
+        true;
+    objects.threads[bindings[0].thread.slot]
+        .ipc_inbound_message.source = bindings[1].endpoint;
+    objects.threads[bindings[0].thread.slot]
+        .ipc_inbound_message.type = UINT32_C(60);
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &complete_plan
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+    );
+    memset(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message,
+        0,
+        sizeof(
+            objects.threads[bindings[0].thread.slot]
+                .ipc_inbound_message
+        )
+    );
+    objects.threads[bindings[0].thread.slot]
+        .ipc_inbound_message.source = bindings[1].endpoint;
+    objects.threads[bindings[0].thread.slot]
+        .ipc_inbound_message.type =
+            MICROS_BOOTSTRAP_MESSAGE_READY_ACK;
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[0],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[4],
+        2
+    );
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[8],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[16],
+        bindings[0].endpoint
+    );
     EXPECT_TRUE(
         micros_bootstrap_control_prepare_complete(
             &state,
@@ -746,6 +805,30 @@ static bool test_control_transitions(void)
             bindings[1].endpoint,
             &endpoint
         ) == MICROS_ENDPOINT_ERROR_CLOSING
+    );
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[4],
+        1
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_control_validate(
+            &state,
+            &registry,
+            &objects
+        ) == MICROS_BOOTSTRAP_ERROR_INVARIANT
+    );
+    write_u32_le(
+        &objects.threads[bindings[0].thread.slot]
+            .ipc_inbound_message.payload[4],
+        2
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_control_validate(
+            &state,
+            &registry,
+            &objects
+        ) == MICROS_BOOTSTRAP_OK
     );
     return true;
 }

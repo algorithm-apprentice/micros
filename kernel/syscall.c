@@ -4,6 +4,7 @@
 
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_syscall.h"
+#include "kernel/bootstrap_runtime.h"
 #include "kernel/grant_syscall.h"
 #include "kernel/ipc_syscall.h"
 #include "kernel/kernel_object_runtime_internal.h"
@@ -93,6 +94,21 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
             &process
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
+        const struct micros_bootstrap_control_state *state =
+        micros_bootstrap_runtime_state();
+
+        if (
+        arguments.a7 == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+        && state != NULL
+        && state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+        ) {
+        micros_bootstrap_runtime_fail(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            0,
+            MICROS_ENDPOINT_NONE,
+            0
+        );
+        }
         panic_syscall(hart, frame, "syscall-current-invariant");
     }
     context.process = thread->owner;

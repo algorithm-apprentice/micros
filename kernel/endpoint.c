@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "endpoint_internal.h"
+#include "micros/bootstrap_control.h"
 
 #define MICROS_ENDPOINT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534550)
 
@@ -1138,6 +1139,46 @@ static bool notification_message_is_valid(
     return event_mask_is_nonzero;
 }
 
+static uint32_t read_u32_le(const uint8_t *bytes)
+{
+    return (
+        (uint32_t)bytes[0]
+        | (uint32_t)bytes[1] << 8
+        | (uint32_t)bytes[2] << 16
+        | (uint32_t)bytes[3] << 24
+    );
+}
+
+static bool source_only_message_is_valid(
+    const struct micros_ipc_message *message
+)
+{
+    size_t index;
+
+    if (
+        message->type != MICROS_BOOTSTRAP_MESSAGE_READY_ACK
+        || message->reply_token != 0
+        || read_u32_le(&message->payload[0])
+            != MICROS_BOOTSTRAP_MANIFEST_VERSION
+        || read_u32_le(&message->payload[4]) == 0
+        || read_u32_le(&message->payload[8])
+            != MICROS_BOOTSTRAP_MANIFEST_VERSION
+        || read_u32_le(&message->payload[12]) != 0
+        || read_u32_le(&message->payload[16])
+            == MICROS_ENDPOINT_NONE
+        || read_u32_le(&message->payload[16])
+            == MICROS_ENDPOINT_ANY
+    ) {
+        return false;
+    }
+    for (index = 20; index < sizeof(message->payload); ++index) {
+        if (message->payload[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool staged_delivery_state_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -1195,11 +1236,7 @@ static bool staged_delivery_state_is_valid(
                 thread->ipc_inbound_message.source,
                 &source
             ) == MICROS_ENDPOINT_OK
-            && (
-                source->state == MICROS_ENDPOINT_STATE_ACTIVE
-                || source->state
-                    == MICROS_ENDPOINT_STATE_SOURCE_ONLY
-            )
+            && source->state == MICROS_ENDPOINT_STATE_ACTIVE
         );
     }
     if (
@@ -1216,7 +1253,13 @@ static bool staged_delivery_state_is_valid(
     return (
         (
             source->state == MICROS_ENDPOINT_STATE_ACTIVE
-            || source->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            || (
+                source->state
+                    == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+                && source_only_message_is_valid(
+                    &thread->ipc_inbound_message
+                )
+            )
         )
         && (
             thread->ipc_inbound_message.type

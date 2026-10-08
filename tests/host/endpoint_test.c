@@ -1,4 +1,5 @@
 #include "micros/endpoint.h"
+#include "micros/bootstrap_control.h"
 #include "micros/scheduler_core.h"
 
 #include <stdbool.h>
@@ -105,6 +106,14 @@ static struct micros_user_context context_pattern(uint64_t base)
     }
     memcpy(&context, words, sizeof(context));
     return context;
+}
+
+static void write_u32_le(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 16);
+    bytes[3] = (uint8_t)(value >> 24);
 }
 
 static bool setup_lifecycle_fixture(void)
@@ -1026,8 +1035,24 @@ static bool test_source_only_seal_preserves_staged_source(void)
     receiver->ipc_receive_buffer = UINT64_C(0x61002000);
     receiver->ipc_delivery_pending = true;
     receiver->ipc_inbound_message.source = endpoints[0];
-    receiver->ipc_inbound_message.type = UINT32_C(60);
-    receiver->ipc_inbound_message.payload[0] = UINT8_C(6);
+    receiver->ipc_inbound_message.type =
+        MICROS_BOOTSTRAP_MESSAGE_READY_ACK;
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[0],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[4],
+        2
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[8],
+        MICROS_BOOTSTRAP_MANIFEST_VERSION
+    );
+    write_u32_le(
+        &receiver->ipc_inbound_message.payload[16],
+        endpoints[1]
+    );
 
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
@@ -1037,6 +1062,23 @@ static bool test_source_only_seal_preserves_staged_source(void)
             endpoints[0]
         )
     );
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_OK,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    receiver->ipc_inbound_message.type = UINT32_C(60);
+    EXPECT_ERROR(
+        MICROS_ENDPOINT_ERROR_INVARIANT,
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        )
+    );
+    receiver->ipc_inbound_message.type =
+        MICROS_BOOTSTRAP_MESSAGE_READY_ACK;
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
         micros_endpoint_registry_validate_objects(

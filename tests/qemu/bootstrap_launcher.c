@@ -64,6 +64,21 @@ static bool name_is_canonical(
     return terminated;
 }
 
+static bool names_equal(
+    const char left[MICROS_BOOTSTRAP_NAME_SIZE],
+    const char right[MICROS_BOOTSTRAP_NAME_SIZE]
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_BOOTSTRAP_NAME_SIZE; ++index) {
+        if (left[index] != right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static int64_t bootstrap_control(
     uint32_t command,
     uint32_t service_id,
@@ -142,7 +157,10 @@ static bool validate_manifest(
 {
     uint64_t active_ids = 0;
     uint64_t selected_ids = 0;
+    uint64_t total_pages = 0;
     uint32_t controller_id = 0;
+    uint32_t vm_count = 0;
+    uint32_t console_count = 0;
     size_t index;
 
     if (
@@ -154,8 +172,9 @@ static bool validate_manifest(
             != MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE
         || manifest->header.entry_capacity
             != MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        || manifest->header.entry_count == 0
         || manifest->header.entry_count
-            != MICROS_BOOTSTRAP_TEST_SERVICE_COUNT
+            > MICROS_BOOTSTRAP_SERVICE_CAPACITY
         || manifest->header.flags != 0
         || manifest->header.manifest_size
             != MICROS_BOOTSTRAP_MANIFEST_SIZE
@@ -178,6 +197,7 @@ static bool validate_manifest(
     for (index = 0; index < manifest->header.entry_count; ++index) {
         const struct micros_bootstrap_manifest_entry *entry =
             &manifest->entries[index];
+        uint32_t role_count = 0;
         size_t other;
 
         if (
@@ -199,11 +219,8 @@ static bool validate_manifest(
             )
             || (
                 entry->role_flags
-                & ~MICROS_BOOTSTRAP_ROLE_CONTROLLER
+                & ~MICROS_BOOTSTRAP_ROLE_DEFINED_MASK
             ) != 0
-            || entry->device_base != 0
-            || entry->device_length != 0
-            || entry->irq_source != 0
             || (
                 entry->prerequisites
                 & (
@@ -211,6 +228,47 @@ static bool validate_manifest(
                     << (entry->service_id - 1)
                 )
             ) != 0
+        ) {
+            return false;
+        }
+        role_count += (
+            entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER
+        ) != 0;
+        vm_count += (
+            entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM
+        ) != 0;
+        console_count += (
+            entry->role_flags
+            & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+        ) != 0;
+        role_count += (
+            entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM
+        ) != 0;
+        role_count += (
+            entry->role_flags
+            & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+        ) != 0;
+        if (role_count > 1) {
+            return false;
+        }
+        if (
+            (
+                entry->role_flags
+                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+            ) != 0
+        ) {
+            if (
+                entry->device_base != MICROS_BOOTSTRAP_UART_BASE
+                || entry->device_length
+                    != MICROS_BOOTSTRAP_UART_LENGTH
+                || entry->irq_source != MICROS_BOOTSTRAP_UART_IRQ
+            ) {
+                return false;
+            }
+        } else if (
+            entry->device_base != 0
+            || entry->device_length != 0
+            || entry->irq_source != 0
         ) {
             return false;
         }
@@ -243,15 +301,30 @@ static bool validate_manifest(
                     == entry->process_slot
                 || manifest->entries[other].image_id
                     == entry->image_id
+                || names_equal(
+                    manifest->entries[other].service_name,
+                    entry->service_name
+                )
+                || names_equal(
+                    manifest->entries[other].profile_name,
+                    entry->profile_name
+                )
             ) {
                 return false;
             }
         }
+        if (UINT64_MAX - total_pages < entry->user_page_limit) {
+            return false;
+        }
+        total_pages += entry->user_page_limit;
         active_ids |= UINT64_C(1) << (entry->service_id - 1);
     }
     if (
         controller_id
             != MICROS_BOOTSTRAP_TEST_LAUNCHER_SERVICE_ID
+        || vm_count > 1
+        || console_count > 1
+        || total_pages != manifest->header.total_user_page_limit
     ) {
         return false;
     }
@@ -326,9 +399,26 @@ static bool validate_configuration(
                 &micros_bootstrap_service_config.services[index];
 
         if (
-            service->service_id != index + 1
+            service->service_id == 0
+            || (
+                index != 0
+                && service->service_id
+                    <= micros_bootstrap_service_config.services[
+                        index - 1
+                    ].service_id
+            )
             || service->endpoint == MICROS_ENDPOINT_NONE
             || find_manifest_service(manifest, service->service_id) < 0
+            || (
+                service->service_id
+                    == MICROS_BOOTSTRAP_TEST_LAUNCHER_SERVICE_ID
+                && (
+                    service->endpoint
+                        != micros_bootstrap_service_config.self_endpoint
+                    || service->endpoint
+                        != micros_bootstrap_service_config.launcher_endpoint
+                )
+            )
         ) {
             return false;
         }

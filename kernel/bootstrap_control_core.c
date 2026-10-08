@@ -63,6 +63,12 @@ static bool thread_handles_equal(
     );
 }
 
+static bool staged_launcher_acknowledgments_are_valid(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t launcher
+);
+
 static struct micros_bootstrap_binding *find_binding_mutable(
     struct micros_bootstrap_control_state *state,
     uint32_t service_id
@@ -369,6 +375,24 @@ enum micros_bootstrap_error micros_bootstrap_control_validate(
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
+    if (state->phase == MICROS_BOOTSTRAP_PHASE_SEALED) {
+        const struct micros_bootstrap_binding *controller =
+            micros_bootstrap_control_find_binding(
+                state,
+                state->plan.controller_service_id
+            );
+
+        if (
+            controller == NULL
+            || !staged_launcher_acknowledgments_are_valid(
+                state,
+                objects,
+                controller->endpoint
+            )
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
+    }
     return MICROS_BOOTSTRAP_OK;
 }
 
@@ -593,6 +617,16 @@ static void write_u32_le(unsigned char *bytes, uint32_t value)
     bytes[3] = (unsigned char)(value >> 24);
 }
 
+static uint32_t read_u32_le(const unsigned char *bytes)
+{
+    return (
+        (uint32_t)bytes[0]
+        | (uint32_t)bytes[1] << 8
+        | (uint32_t)bytes[2] << 16
+        | (uint32_t)bytes[3] << 24
+    );
+}
+
 enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
     const struct micros_bootstrap_control_state *state,
     const struct micros_endpoint_registry *registry,
@@ -727,6 +761,96 @@ static bool launcher_has_grant_dependency(
     return false;
 }
 
+static bool staged_launcher_acknowledgments_are_valid(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t launcher
+)
+{
+    size_t thread_index;
+
+    for (
+        thread_index = 0;
+        thread_index < MICROS_THREAD_CAPACITY;
+        ++thread_index
+    ) {
+        const struct micros_thread *thread =
+            &objects->threads[thread_index];
+        const struct micros_ipc_message *message;
+        const struct micros_bootstrap_binding *binding;
+        const struct micros_bootstrap_runtime_entry *transition = NULL;
+        uint32_t service_id;
+        size_t payload_index;
+        size_t transition_index;
+
+        if (
+            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !thread->ipc_delivery_pending
+            || thread->ipc_staged_result != MICROS_IPC_OK
+            || thread->ipc_inbound_message.source != launcher
+        ) {
+            continue;
+        }
+        message = &thread->ipc_inbound_message;
+        if (
+            message->type != MICROS_BOOTSTRAP_MESSAGE_READY_ACK
+            || message->reply_token != 0
+            || read_u32_le(&message->payload[0])
+                != MICROS_BOOTSTRAP_MANIFEST_VERSION
+            || read_u32_le(&message->payload[8])
+                != MICROS_BOOTSTRAP_MANIFEST_VERSION
+            || read_u32_le(&message->payload[12]) != 0
+        ) {
+            return false;
+        }
+        for (
+            payload_index = 20;
+            payload_index < sizeof(message->payload);
+            ++payload_index
+        ) {
+            if (message->payload[payload_index] != 0) {
+                return false;
+            }
+        }
+        service_id = read_u32_le(&message->payload[4]);
+        binding = micros_bootstrap_control_find_binding(
+            state,
+            service_id
+        );
+        if (
+            binding == NULL
+            || thread->owner.slot != binding->process.slot
+            || thread->owner.generation
+                != binding->process.generation
+            || read_u32_le(&message->payload[16])
+                != binding->endpoint
+        ) {
+            return false;
+        }
+        for (
+            transition_index = 0;
+            transition_index < state->transitions.entry_count;
+            ++transition_index
+        ) {
+            if (
+                state->transitions.entries[transition_index].service_id
+                    == service_id
+            ) {
+                transition =
+                    &state->transitions.entries[transition_index];
+                break;
+            }
+        }
+        if (
+            transition == NULL
+            || transition->state != MICROS_BOOTSTRAP_SERVICE_READY
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
 enum micros_bootstrap_error
 micros_bootstrap_control_prepare_complete(
     const struct micros_bootstrap_control_state *state,
@@ -772,6 +896,11 @@ micros_bootstrap_control_prepare_complete(
         ) != MICROS_KERNEL_OBJECT_OK
         || controller_thread->runtime_flags != 0
         || !micros_thread_ipc_state_is_clear(controller_thread)
+        || !staged_launcher_acknowledgments_are_valid(
+            state,
+            objects,
+            controller->endpoint
+        )
         || launcher_has_grant_dependency(
             grants,
             controller->endpoint

@@ -1629,3 +1629,15 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
     }
     return MICROS_BOOTSTRAP_OK;
 }
+
+bool micros_bootstrap_runtime_is_active_controller(
+    struct micros_process_handle process
+)
+{
+    return (
+        bootstrap_state.phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+        && bootstrap_state.controller_process.slot == process.slot
+        && bootstrap_state.controller_process.generation
+            == process.generation
+    );
+}
