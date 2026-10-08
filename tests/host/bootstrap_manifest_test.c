@@ -47,8 +47,11 @@ static struct micros_privilege_profile profile(
             | MICROS_PRIVILEGE_OPERATION_CALL;
         result.call_targets = UINT32_C(1) << 1;
         if (id == 2) {
+            result.operations |= MICROS_PRIVILEGE_OPERATION_REPLY;
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_VM_HANDOFF;
+        } else {
+            result.call_targets |= UINT32_C(1) << 2;
         }
     }
     return result;

@@ -171,6 +171,15 @@
       }
     },
     {
+      "name": "riscv64-vm-handoff-test",
+      "displayName": "RISC-V 64 static VM handoff test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-handoff-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_HANDOFF_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-bootstrap-ready-timeout-test",
       "displayName": "RISC-V 64 bootstrap readiness-timeout panic test",
       "inherits": "riscv64-debug",
@@ -404,6 +413,13 @@
       "configurePreset": "riscv64-bootstrap-launcher-test",
       "targets": [
         "test-qemu-bootstrap-launcher"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-handoff",
+      "configurePreset": "riscv64-vm-handoff-test",
+      "targets": [
+        "test-qemu-vm-handoff"
       ]
     },
     {
@@ -769,6 +785,20 @@
         {
           "type": "build",
           "name": "test-qemu-bootstrap-launcher"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-handoff",
+      "displayName": "Build and run static VM handoff acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-handoff-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-handoff"
         }
       ]
     },

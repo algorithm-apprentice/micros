@@ -223,6 +223,7 @@ static enum micros_bootstrap_error validate_profile_relationships(
             controller_profile_id
         );
     uint32_t controller_target;
+        uint32_t vm_target = 0;
         uint8_t vm_profile_id = 0;
         size_t index;
 
@@ -252,6 +253,7 @@ static enum micros_bootstrap_error validate_profile_relationships(
             ) != 0
         ) {
             vm_profile_id = manifest->entries[index].profile_id;
+            vm_target = UINT32_C(1) << vm_profile_id;
             break;
         }
     }
@@ -276,6 +278,7 @@ static enum micros_bootstrap_error validate_profile_relationships(
         const struct micros_bootstrap_manifest_entry *entry =
             &manifest->entries[index];
         const struct micros_privilege_profile *profile;
+        uint32_t expected_call_targets;
 
         if (entry->profile_id == controller_profile_id) {
             if (
@@ -293,14 +296,29 @@ static enum micros_bootstrap_error validate_profile_relationships(
             profile_count,
             entry->profile_id
         );
+        expected_call_targets = controller_target;
+        if (
+            vm_profile_id != 0
+            && entry->profile_id != vm_profile_id
+        ) {
+            expected_call_targets |= vm_target;
+        }
         if (
             profile == NULL
             || profile->operations
                 != (
                     MICROS_PRIVILEGE_OPERATION_RECEIVE
                     | MICROS_PRIVILEGE_OPERATION_CALL
+                    | (
+                        (
+                            entry->role_flags
+                            & MICROS_BOOTSTRAP_ROLE_VM
+                        ) != 0
+                        ? MICROS_PRIVILEGE_OPERATION_REPLY
+                        : 0
+                    )
                 )
-            || profile->call_targets != controller_target
+            || profile->call_targets != expected_call_targets
             || profile->send_targets != 0
             || profile->notify_targets != 0
         ) {

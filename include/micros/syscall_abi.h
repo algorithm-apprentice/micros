@@ -21,6 +21,10 @@ enum micros_syscall_abi_operation {
     MICROS_SYSCALL_ABI_VM_HANDOFF = 12,
 };
 
+enum micros_vm_handoff_command {
+    MICROS_VM_HANDOFF_READY = 1,
+};
+
 enum micros_syscall_abi_result {
     MICROS_SYSCALL_ABI_OK = 0,
     MICROS_SYSCALL_ABI_ARGUMENT = -1,

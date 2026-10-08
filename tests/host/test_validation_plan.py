@@ -453,6 +453,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-grant-syscall": "kernel/grant_syscall_test.c",
             "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
+            "test-qemu-vm-handoff": "kernel/vm_handoff_test.c",
             "test-qemu-bootstrap-ready-timeout": "kernel/bootstrap_test.c",
             "test-qemu-bootstrap-manifest-panic": "kernel/bootstrap_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",

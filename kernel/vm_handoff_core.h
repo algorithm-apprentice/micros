@@ -8,10 +8,6 @@
 #include "micros/syscall_abi.h"
 #include "micros/vm_bootstrap.h"
 
-enum {
-    MICROS_VM_HANDOFF_READY = 1,
-};
-
 enum micros_vm_handoff_phase {
     MICROS_VM_HANDOFF_PHASE_UNINITIALIZED = 0,
     MICROS_VM_HANDOFF_PHASE_PREPARED,

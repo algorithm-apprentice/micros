@@ -164,12 +164,15 @@ and seals launcher authority through exact `SOURCE_ONLY` state. Native models
 and three isolated QEMU workflows prove success, timeout, cyclic-manifest
 failure, and stable diagnostics.
 
-The VM server and one-way ownership handoff are now the next dependency-ready
-outcome. ADR-0045 proposes one fixed VM boot-information/frame database,
-atomic all-static wired-plan staging, exact VM-only summary operation 12,
-irreversible handoff before generic VM readiness, and fatal VM self-fault
-behavior. Dynamic mappings and non-VM page-fault delivery remain outside that
-minimal Step 9 boundary.
+ADR-0045's VM server and one-way ownership handoff core are now implemented.
+The kernel constructs one fixed VM boot-information/frame database, stages
+every static user frame wired, validates exact VM-only operation 12, publishes
+ownership irreversibly before generic VM readiness, and retains wired IPC and
+grant-copy authority. A real launcher/VM/probe QEMU workflow proves independent
+kernel/VM database agreement, post-handoff return, launcher sealing, and a
+bidirectional checked-copy grant exchange. The two phase-accurate VM self-fault
+workflows remain before the Step 9 outcome is complete. Dynamic mappings and
+non-VM page-fault delivery remain outside that minimal boundary.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
