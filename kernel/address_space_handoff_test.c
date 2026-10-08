@@ -1715,42 +1715,8 @@ bool micros_address_space_handoff_test_after_return(
 
 static bool stage_wired_pages(void)
 {
-    size_t process_index;
-    size_t page_index;
-
-    for (
-        process_index = 0;
-        process_index < HANDOFF_PROCESS_COUNT;
-        ++process_index
-    ) {
-        struct micros_frame_owner owner;
-
-        if (
-            micros_frame_owner_make_process(
-                MICROS_FRAME_OWNER_PROCESS_USER,
-                processes[process_index],
-                &owner
-            ) != MICROS_FRAME_OWNERSHIP_OK
-        ) {
-            return false;
-        }
-        for (
-            page_index = 0;
-            page_index < HANDOFF_PAGE_COUNT;
-            ++page_index
-        ) {
-            if (
-                micros_frame_ownership_runtime_prepare_handoff(
-                    user_physical[process_index][page_index],
-                    owner,
-                    MICROS_FRAME_HANDOFF_VM_WIRED
-                ) != MICROS_FRAME_OWNERSHIP_OK
-            ) {
-                return false;
-            }
-        }
-    }
-    return true;
+    return micros_user_address_space_prepare_wired_handoff()
+        == MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 _Noreturn void micros_address_space_handoff_test_enter_production(
@@ -1906,6 +1872,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     uint64_t *corrupt_pte;
     uint64_t saved_pte;
     uint64_t frame_index;
+    uint64_t orphan_physical;
     uint64_t physical_address;
     uint32_t permissions;
     size_t contiguous;
@@ -2150,9 +2117,6 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     }
 
     failure_stage = 5;
-    if (!stage_wired_pages()) {
-        goto done;
-    }
     if (
         micros_user_execution_detach(threads[HANDOFF_GRANTEE])
             != MICROS_USER_EXECUTION_OK
@@ -2162,7 +2126,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
             endpoint_registry,
             grant_registry
         )
-        || micros_user_address_space_complete_wired_handoff()
+        || micros_user_address_space_prepare_wired_handoff()
             != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
         || !state_matches(
             ledger,
@@ -2185,7 +2149,74 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
             processes[HANDOFF_GRANTEE],
             &process_user_owner
         ) != MICROS_FRAME_OWNERSHIP_OK
-        || micros_frame_ownership_runtime_prepare_handoff(
+        || micros_frame_ownership_runtime_allocate(
+            process_user_owner,
+            &orphan_physical
+        ) != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        goto done;
+    }
+    if (
+        !snapshot_state(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        goto done;
+    }
+    if (
+        micros_user_address_space_prepare_wired_handoff()
+            != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
+    ) {
+        goto done;
+    }
+    if (
+        !state_matches(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        goto done;
+    }
+    if (
+        micros_frame_ownership_runtime_release(
+            process_user_owner,
+            orphan_physical
+        ) != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        goto done;
+    }
+    if (
+        !stage_wired_pages()
+        || micros_user_execution_detach(threads[HANDOFF_GRANTEE])
+            != MICROS_USER_EXECUTION_OK
+        || !snapshot_state(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+        || micros_user_address_space_complete_wired_handoff()
+            != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
+        || !state_matches(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+        || micros_user_execution_prepare(
+            threads[HANDOFF_GRANTEE],
+            &contexts[HANDOFF_GRANTEE]
+        ) != MICROS_USER_EXECUTION_OK
+    ) {
+        goto done;
+    }
+    if (
+        micros_frame_ownership_runtime_prepare_handoff(
             user_physical[HANDOFF_GRANTEE][2],
             process_user_owner,
             MICROS_FRAME_HANDOFF_VM_TRANSFERABLE

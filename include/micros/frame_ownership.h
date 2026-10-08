@@ -128,6 +128,13 @@ micros_frame_ownership_prepare_handoff(
     enum micros_frame_handoff_target target
 );
 
+enum micros_frame_ownership_error
+micros_frame_ownership_prepare_wired_process_user_set(
+    struct micros_frame_ownership *ownership,
+    const uint64_t *selected_bitmap,
+    size_t selected_word_count
+);
+
 enum micros_frame_ownership_error micros_frame_ownership_lookup(
     const struct micros_frame_ownership *ownership,
     uint64_t physical_address,

@@ -677,6 +677,107 @@ micros_frame_ownership_prepare_handoff(
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
+enum micros_frame_ownership_error
+micros_frame_ownership_prepare_wired_process_user_set(
+    struct micros_frame_ownership *ownership,
+    const uint64_t *selected_bitmap,
+    size_t selected_word_count
+)
+{
+    uint64_t selected_count = 0;
+    uint64_t process_user_count = 0;
+    uint64_t frame_index;
+    enum micros_frame_ownership_error error;
+
+    error = require_initialized(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
+    }
+    if (
+        selected_bitmap == NULL
+        || selected_word_count
+            != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = micros_frame_ownership_validate(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+
+    for (
+        frame_index = 0;
+        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
+        ++frame_index
+    ) {
+        size_t word_index = (size_t)(frame_index / 64);
+        uint64_t bit = UINT64_C(1) << (frame_index % 64);
+        bool selected =
+            (selected_bitmap[word_index] & bit) != 0;
+        struct micros_frame_owner owner;
+
+        if (frame_index >= ownership->managed_frame_count) {
+            if (selected) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+            }
+            continue;
+        }
+        owner = ownership->owners[frame_index];
+        if (owner.kind == MICROS_FRAME_OWNER_PROCESS_USER) {
+            if (
+                process_user_count
+                    == ownership->managed_frame_count
+            ) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+            }
+            ++process_user_count;
+            if (!selected) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+            }
+            if (
+                ownership->handoff_targets[frame_index]
+                    != MICROS_FRAME_HANDOFF_NONE
+            ) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
+            }
+            ++selected_count;
+            continue;
+        }
+        if (selected) {
+            return owner.kind == MICROS_FRAME_OWNER_FREE
+                ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
+                : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+    }
+    if (
+        process_user_count
+            != ownership->owner_counts[
+                MICROS_FRAME_OWNER_PROCESS_USER
+            ]
+        || selected_count != process_user_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+
+    for (
+        frame_index = 0;
+        frame_index < ownership->managed_frame_count;
+        ++frame_index
+    ) {
+        if (
+            ownership->owners[frame_index].kind
+                == MICROS_FRAME_OWNER_PROCESS_USER
+        ) {
+            ownership->handoff_targets[frame_index] =
+                MICROS_FRAME_HANDOFF_VM_WIRED;
+        }
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
 enum micros_frame_ownership_error micros_frame_ownership_lookup(
     const struct micros_frame_ownership *ownership,
     uint64_t physical_address,
