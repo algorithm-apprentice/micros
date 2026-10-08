@@ -73,6 +73,7 @@ user context, and restore the hart's idle trap stack.
 - [MINIX baseline parity audit](docs/research/minix-baseline-parity-audit.md)
 - [MINIX scheduler and context-switch study](docs/research/minix-scheduler-and-context-switch.md)
 - [MINIX endpoint and blocking IPC study](docs/research/minix-endpoint-and-ipc.md)
+- [MINIX RS and SEF bootstrap study](docs/research/minix-rs-sef-bootstrap.md)
 - [Roadmap](docs/roadmap.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [AI-native development workflow](docs/development/ai-native-workflow.md)

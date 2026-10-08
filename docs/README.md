@@ -39,6 +39,10 @@ This directory contains the design baseline for `micros`.
   traces process entry, libc initialization, IPC vectors, grant and safe-copy
   wrappers, and the service-startup boundary used by the freestanding runtime
   design.
+- [MINIX RS and SEF bootstrap study](research/minix-rs-sef-bootstrap.md)
+  traces static service descriptors, inhibited privilege setup, endpoint
+  visibility, initialization callbacks, readiness replies, boot ordering,
+  timeouts, and the deferred RS recovery breadth.
 
 ## Planning and verification
 

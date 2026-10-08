@@ -157,6 +157,16 @@ loader contract, startup, stack/data/BSS/rodata behavior, blocking IPC,
 register preservation, grant lifecycle and copies, accidental-return trapping,
 and complete cleanup. The static bootstrap launcher is now the next
 dependency-ready outcome.
+ADR-0043 now defines the accepted outcome without starting implementation.
+It specifies a pointer-free six-entry manifest, exact service and profile
+identities, generated embedded-image references, explicit prerequisite masks,
+lowest-ID topological order, complete held-service preparation, atomic
+profile/publication/release, one token-bound readiness transition, guest-owned
+counter deadlines, fatal post-publication failure, and irreversible launcher
+authority revocation. It also resolves the older static-init wording: launcher
+authority seals after the last static service, while ADR-0009 later creates
+init through PM/VFS/VM spawn. The ADR remains Proposed and the implementation
+todo remains pending until independent design review and merge.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
@@ -274,17 +284,40 @@ model, IPC reply model, or global current-execution representation.
 
 ### Deliverables
 
-- embedded service manifest;
-- bootstrap launcher;
-- service readiness protocol;
-- exact manifest privilege and device assignments;
+- pointer-free, versioned embedded service manifest with a six-entry bound;
+- generated immutable references to already checked service images;
+- deterministic explicit-prerequisite topology and cycle rejection;
+- kernel preparation of every static root, image, stack, context, reserved
+  endpoint, and held thread before launcher entry;
+- bootstrap launcher with manifest-bound release authority only;
+- atomic exact-profile installation, endpoint publication, and thread release;
+- one exact-generation readiness call and token-bound acknowledgment;
+- guest-owned readiness deadlines and stable fatal diagnostics;
+- exact manifest privilege, UART-page, and IRQ-source assignments;
+- irreversible launcher authority revocation after the last static service;
 - VM server;
 - one-way ownership handoff from bootstrap memory to VM.
 
 ### Exit criteria
 
-- launcher order is deterministic;
-- a missing readiness response fails with a useful diagnostic;
+- manifest validation rejects unknown versions, malformed entries, missing
+  profiles or images, invalid resource fields, missing prerequisites, and
+  cycles before manifest-directed service mutation;
+- launcher order is deterministic and independent from source array order;
+- unreleased endpoints remain hidden and held services remain off ready queues;
+- release installs only the exact named immutable profile and publishes one
+  endpoint generation atomically with exact scheduler admission;
+- malformed, foreign, early, duplicate, and stale readiness cannot release a
+  dependent;
+- a missing readiness response fails inside the guest with the exact service
+  identity and no host-timeout dependence;
+- failure before publication preserves or rolls back hidden state, while
+  failure after publication is fatal with no recovery fallback;
+- VM's generic ready transition follows the irreversible ownership handoff;
+- TTY release and readiness retain the ADR-0012 begin/commit gates;
+- final completion holds the launcher, clears the exact controller binding,
+  and makes bootstrap authority impossible to reintroduce while its retained
+  source-only endpoint rejects new destinations until later teardown;
 - every usable physical frame has exactly one owner;
 - user mapping changes after handoff require VM authority;
 - VM's complete fault-handling working set remains wired;
@@ -368,12 +401,12 @@ These require separate ADRs and are not part of the shell MVP:
 
 | Risk | Consequence | Mitigation |
 | --- | --- | --- |
-| Hidden bootstrap cycle | A service cannot start without one of its successors | Keep bootstrap interfaces explicit and one-way |
+| Hidden bootstrap cycle | A service cannot start without one of its successors | Validate explicit manifest prerequisites, reject cycles, and release in one deterministic topological order |
 | ABI churn | Every service changes at once | Accept endpoint, message, and grant ADRs before service code |
 | Assembly bugs | Corruption appears far from the cause | Dedicated QEMU context and trap tests with known register patterns |
 | Memory ownership ambiguity | Leaks or double allocation | Central ownership ledger and assertions before/after VM handoff |
 | Slow feedback | Kernel bugs become expensive to isolate | Keep pure logic host-testable and QEMU smoke tests short |
 | Unbounded source-level MINIX fidelity | MVP imports unrelated architecture, compatibility, or service breadth | Reproduce documented behavior and authority only, while keeping the DAG and non-goals |
 | Future concurrency requires redesign | Thread or SMP work replaces process and IPC foundations | Separate process/thread/hart objects and reply rights in v0.1 |
-| Silent service failure | Boot hangs without a diagnosis | Readiness timeouts and structured serial events |
+| Silent service failure | Boot hangs without a diagnosis | Use one guest-owned counter deadline, exact service identity, and a stable fatal bootstrap record |
 | Host-only assumptions | macOS build works but CI or target behavior differs | Separate host and target toolchains and test on Linux CI |

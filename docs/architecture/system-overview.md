@@ -80,7 +80,7 @@ service recovery.
 | Component | Mode | Initial responsibility |
 | --- | --- | --- |
 | Kernel | Supervisor | Traps, process/thread objects, page-table mechanism, IPC, grants, IRQ routing, bootstrap memory, initial scheduling |
-| Bootstrap launcher | User | Release statically embedded services in dependency order and verify readiness |
+| Bootstrap launcher | User | Release exact manifest-bound services one at a time, acknowledge readiness, then surrender bootstrap authority |
 | VM server | User | User-frame ownership, address-space policy, mappings, and page-fault decisions |
 | PM server | User | Process identity, parent/child relationships, spawn, exit, and wait |
 | TTY server | User | Serial terminal buffering and character-device protocol |
@@ -134,25 +134,36 @@ nested fault therefore selects that hart's emergency stack without a global
 hart ID. The OpenSBI timer's initialized, active, interval, deadline, and tick
 state are embedded in the hart object.
 
-### Phase 3: process and IPC substrate
+### Phase 3: process, IPC, and static image preparation
 
-The kernel creates statically described initial process slots and
-generation-bound private Sv39 roots for the bootstrap services. Each root
-shares the immutable supervisor-only kernel entries and owns a private user
-subtree at root index 1. Bootstrap anonymous user pages are fully zeroed,
-typed to the exact process generation, and may be mutated only while their
-root is inactive. One thread per process, saved contexts, and U-mode entry are
-represented explicitly: each thread owns a saved integer context and one
-slot-derived 16 KiB supervisor stack, and the boot hart switches its trap
-anchor from the idle stack to that thread stack before `sret` enters U-mode.
-User-origin traps capture the exact current thread before any test or future
-syscall handling. Independent run-time flags, 16 priority queues, a
-queue-reachable current thread, separate accounting, and repeated timer-driven
-switching are implemented. A no-runnable return restores the kernel root and
-idle stack, waits through the race-free interrupt window, and resumes a newly
-runnable thread after a real wake. Only the bootstrap launcher receives the
-temporary authority to release boot services and install their exact manifest
-privilege profiles.
+The kernel validates one pointer-free immutable bootstrap manifest and its
+generated catalog of already linked service images. It computes a
+lowest-service-ID topological order and rejects unknown versions, missing
+profiles or images, duplicate identities, invalid device fields, missing
+prerequisites, and cycles before any manifest-directed service mutation.
+
+For every active manifest entry, the kernel reserves the exact process slot,
+creates a generation-bound private Sv39 root, loads the checked RX, R, and
+RW/NX image, creates the external zeroed stack, prepares the sole initial
+thread context, reserves the endpoint, installs bootstrap scheduling policy,
+and leaves the thread held. Each root shares the immutable supervisor-only
+kernel entries and owns a private user subtree at root index 1. Bootstrap user
+pages are fully zeroed and typed to the exact process generation.
+
+Only the launcher receives its exact immutable profile, active endpoint, and
+runnable thread. Every other endpoint remains `RESERVED`, every other profile
+remains uninstalled, and every other thread retains `INACTIVE`. The launcher
+reads a read-only copy of the validated manifest and may select only
+kernel-prepared manifest entries.
+
+One thread per process, saved contexts, and U-mode entry remain explicit: each
+thread owns a saved integer context and one slot-derived 16 KiB supervisor
+stack. Independent run-time flags, 16 priority queues, a queue-reachable
+current thread, separate accounting, repeated timer-driven switching, and the
+race-free idle return remain the common execution mechanism.
+
+The proposed exact contract is
+[ADR-0043](../adr/0043-static-bootstrap-launcher.md).
 
 ### Phase 4: VM handoff
 
@@ -178,21 +189,44 @@ execution-context preparation: every live thread is already prepared at
 handoff, and only the later PM transaction may prepare a new executable
 context.
 
+The launcher releases VM first. VM's bootstrap ready call is accepted only
+after the separate `VM_READY` summary has been validated and the ownership
+phase has irreversibly changed to `HANDED_OFF`. Only then may the launcher
+acknowledge VM readiness and release PM. The launcher does not perform or
+infer the ownership commit.
+
 ### Phase 5: core user services
 
-The launcher starts PM, TTY, RAMFS, and VFS in dependency order. Every service
-must send an explicit ready message before its dependents are released. Before
-TTY can map or configure the UART, the launcher asks the kernel to quiesce the
-early console. TTY then commits UART/PLIC ownership and reports readiness.
-Bootstrap failure is fatal in the first MVP; automatic recovery is deferred.
+The launcher releases PM, TTY, RAMFS, and VFS one at a time in the explicit
+manifest order. Release atomically installs only the named profile, activates
+the reserved endpoint, records one readiness deadline, and makes the prepared
+thread runnable. Each service performs one versioned readiness `call`; the
+launcher validates its exact endpoint generation and the kernel atomically
+records the ready transition with the token-bound acknowledgment before any
+dependent is released.
+
+Before TTY release, the later console implementation inserts
+`console_handoff_begin`, the exact UART mapping while TTY remains held, and
+the required release gate. TTY's ordinary bootstrap readiness is accepted
+only after `console_handoff_commit`.
+
+Malformed, foreign, early, duplicate, missing, or expired readiness is fatal.
+There is no restart, alternate profile, skipped dependency, or recovery
+fallback. After the last static service is ready, the launcher seals bootstrap
+state, clears the exact controller binding, and holds its own thread. Its
+endpoint and immutable profile remain attached but confer no bootstrap
+authority in the sealed phase. Its wired process and root remain dormant until
+later PM/VM teardown exists.
 
 ### Phase 6: first user environment
 
-PM, VFS, and VM cooperate to load `init`. VFS creates one synthetic console
+After launcher authority is sealed, PM, VFS, and VM cooperate through the
+ordinary spawn transaction to load `init`. VFS creates one synthetic console
 object bound to the fixed TTY endpoint and installs it as init descriptors 0,
-1, and 2. Init starts the shell, and later spawn descriptor actions duplicate
-the parent's console descriptors. The shell can run a small built-in userland
-including at least `echo`, `cat`, `ls`, and `ps`.
+1, and 2. Init is not a static manifest entry and its activation does not
+restore launcher authority. Init starts the shell, and later spawn descriptor
+actions duplicate the parent's console descriptors. The shell can run a small
+built-in userland including at least `echo`, `cat`, `ls`, and `ps`.
 
 ## Runtime interactions
 
@@ -238,6 +272,43 @@ token only after success. The only compiler support is `memcpy` and `memset`.
 Launcher release, manifest privileges, readiness, service initialization, and
 recovery remain above this boundary in later DAG nodes. The runtime itself
 owns no lifecycle or protocol authority.
+
+### Static bootstrap launcher
+
+[ADR-0043](../adr/0043-static-bootstrap-launcher.md) proposes the Step 8
+contract.
+
+The immutable manifest has a six-entry capacity for the launcher, VM, PM, TTY,
+RAMFS, and VFS. Each active entry carries an exact service ID and name,
+process slot, generated embedded-image ID, profile ID and name, user-page and
+stack limits, explicit prerequisite mask, readiness timeout, and one narrowly
+defined bootstrap role. Only the TTY role may carry the fixed UART page and
+PLIC source required by ADR-0012.
+
+The manifest never contains a pointer or mutable privilege mask. The kernel
+resolves each image through an immutable checked image catalog and each
+profile through the sealed profile table. No privilege or prerequisite is
+inferred from service names, roles, source order, images, devices, or IRQs.
+Each static image exports one fixed writable bootstrap-configuration object;
+before context preparation, the kernel patches its exact service ID, own
+endpoint generation, launcher endpoint, manifest version, and the bounded
+static service-ID/endpoint table. The object is startup data, not authority;
+reserved endpoints remain unresolved until release. Prepared non-launcher
+threads remain inactive and scheduler-unassigned; their immutable intended
+policy is stored in bootstrap state and scheduler admission occurs only in the
+same commit that installs the profile and publishes the endpoint.
+
+RISC-V syscall operation 11 is reserved by the proposal for launcher-only
+bootstrap control. It releases the exact next service, atomically accepts one
+token-bound ready call, reports a fatal launcher-detected protocol failure, or
+irreversibly completes bootstrap. The generic freestanding runtime remains
+operations 1 through 10; launcher code owns a private wrapper.
+
+The readiness request and acknowledgment are fixed 64-byte IPC messages. The
+request's kernel-written source and reply token, not its payload, prove the
+exact service generation. The kernel owns one absolute `time`-counter
+deadline, so a missing response fails inside the guest without sleeps or
+reliance on the host harness timeout.
 
 ### Bulk data
 
@@ -371,8 +442,28 @@ interrupts disabled.
   object, and children receive them only through explicit descriptor actions.
 - A claimed user-driver IRQ is completed only after its owner acknowledges it.
 - Bootstrap-only privileges become unavailable after their transition point.
+- The immutable bootstrap manifest is versioned, pointer-free, bounded to six
+  entries, and completely validated before manifest-directed service
+  mutation.
+- Service IDs, process slots, thread handles, image IDs, profile IDs, and
+  endpoint generations remain distinct identities.
+- Every static service image, stack, and execution context exists before the
+  VM ownership handoff.
+- A non-launcher endpoint remains reserved and hidden until exact profile
+  installation, endpoint activation, starting state, deadline, and exact
+  scheduler admission commit together.
+- At most one static service is starting, and one exact endpoint generation
+  may complete one ready transition.
 - A service is not released until all development-DAG prerequisites have
   passed their readiness gate.
+- VM readiness implies the ownership handoff has committed; TTY readiness
+  implies console ownership has committed.
+- Bootstrap failure after publication is fatal and never rolls a service back
+  to a hidden endpoint.
+- Sealed bootstrap state has no controller binding, runnable launcher thread,
+  deadline, or operation that can restore authority; the retained launcher
+  endpoint is source-only for already staged acknowledgments and rejects every
+  new IPC destination.
 - The initial user image has one fixed `_start`, no relocation or
   dynamic-loader state, and no allocatable page with both write and execute
   permission.
