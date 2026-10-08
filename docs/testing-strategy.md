@@ -74,7 +74,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
-`test-qemu-grant`, `test-qemu-grant-syscall`,
+`test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
@@ -100,6 +100,7 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
+cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -363,31 +364,36 @@ ADR-0040 marker it emits:
 MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved
 ```
 
-ADR-0042 defines the next implementation evidence but does not add an
-implemented command yet. Its implementation must add:
+ADR-0042 evidence now includes native production-wrapper tests linked against
+a host raw-syscall capture stub for all operations 1 through 10. They prove
+exact register marshalling, full-width scalar preservation, direct stable
+results without `errno`, success-only grant-token publication, unchanged
+outputs on failure, and stack-local blocking-buffer semantics. The same native
+target tests the production-prefixed `memcpy` and `memset` bodies under ASan
+and UBSan.
 
-- native production-wrapper tests linked against a host raw-syscall capture
-  stub for all operations 1 through 10;
-- native `memcpy` and `memset` boundary/canary tests;
-- a repository-owned standalone user-ELF checker covering entry, load
-  segments, section closure, BSS, undefined symbols, relocations, dynamic
-  state, TLS, constructors, small data, and the exact raw stub;
-- one isolated workflow intended to be named `test-qemu-user-runtime`.
+`tools/check_user_elf.py` parses ELF64 headers, program headers, sections,
+symbols, and RISC-V instructions. Its malformed-fixture regressions reject
+wrong identity or flags, permission or range violations, orphan allocatable
+sections, BSS errors, dynamic/TLS/constructor/small-data/unwind state,
+relocations, undefined symbols, noncanonical startup, extra `gp`/`tp` writes,
+and any raw stub other than exact uncompressed `ecall; ret`.
 
-That QEMU image must load independent fixed-address user ELFs rather than copy
-payload bytes out of the kernel image. It must prove loader-zeroed BSS,
-initialized writable data, protected rodata, an external aligned stack,
-zero `gp`/`tp`, raw-stub and kernel register preservation, runtime use of
-production operations 1 through 10, deterministic accidental-return trapping,
-and complete bootstrap cleanup. Its proposed exact marker is:
+The isolated `test-qemu-user-runtime` workflow consumes only that checked ELF
+through a bounded generated fixture. Three isolated process generations run
+the same fixed virtual image with patched test-only role data and separate
+external stacks. User code proves initialized data, zero BSS, readable and
+protected rodata, zero `gp`/`tp`, stack-local canaries across blocking IPC,
+raw-stub and kernel register preservation, all production operations 1 through
+10, checked grant copies and stale-token rejection, and deterministic return
+through the labeled breakpoint. Loader and teardown checks prove complete
+page zero fill, final RX/R/RW-NX permissions, instruction synchronization,
+endpoint/grant/root/frame cleanup, and restoration of the pre-test baseline.
+Only the complete sequence emits:
 
 ```text
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
-
-The implementation must add the workflow to the authoritative QEMU inventory,
-validation ownership, documentation, and parser regressions in the same pull
-request. Until then, the implemented command list above remains unchanged.
 
 `test-qemu-nested-trap`
 injects a second fault

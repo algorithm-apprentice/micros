@@ -26,6 +26,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-endpoint",
     "test-qemu-grant",
     "test-qemu-grant-syscall",
+    "test-qemu-user-runtime",
     "test-qemu-ipc",
     "test-qemu-ipc-ecall-core",
     "test-qemu-ipc-syscall",
@@ -124,6 +125,30 @@ UNIFIED_SYSCALL_PRODUCTION_INPUTS = (
     "kernel/grant_runtime.c",
 )
 
+USER_RUNTIME_INPUTS = (
+    "include/micros/runtime.h",
+    "lib/runtime/memory.c",
+    "lib/runtime/memory.h",
+    "lib/runtime/memory_symbols.c",
+    "lib/runtime/raw_syscall.h",
+    "lib/runtime/raw_syscall.S",
+    "lib/runtime/runtime.c",
+    "lib/runtime/start.S",
+    "lib/runtime/user.ld",
+    "kernel/user_runtime_image.h",
+    "kernel/user_runtime_test.h",
+    "kernel/user_runtime_test.c",
+    "arch/riscv64/user_runtime_test.S",
+    "tests/host/runtime_test.c",
+    "tests/host/test_check_user_elf.py",
+    "tests/host/test_generate_user_runtime_fixture.py",
+    "tests/qemu/user_runtime_protocol.h",
+    "tests/qemu/user_runtime_probe.S",
+    "tests/qemu/user_runtime_service.c",
+    "tools/check_user_elf.py",
+    "tools/generate_user_runtime_fixture.py",
+)
+
 GATE_INPUTS = {
     "test-qemu-smoke": (
         "kernel/fdt.c",
@@ -174,6 +199,23 @@ GATE_INPUTS = {
     ) + WIRED_HANDOFF_INPUTS,
     "test-qemu-grant-syscall": (
         GRANT_SYSCALL_INPUTS + WIRED_HANDOFF_INPUTS
+    ),
+    "test-qemu-user-runtime": (
+        USER_RUNTIME_INPUTS
+        + UNIFIED_SYSCALL_PRODUCTION_INPUTS
+        + WIRED_HANDOFF_INPUTS
+        + (
+            "kernel/ipc_abi.c",
+            "kernel/ipc.c",
+            "kernel/ipc_runtime.c",
+            "kernel/ipc_buffer.c",
+            "kernel/endpoint.c",
+            "kernel/kernel_objects.c",
+            "kernel/scheduler.c",
+            "kernel/scheduler_core.c",
+            "kernel/user_address_space.c",
+            "kernel/user_execution.c",
+        )
     ),
     "test-qemu-ipc": (
         "kernel/ipc.c",

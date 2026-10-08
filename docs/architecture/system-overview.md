@@ -215,8 +215,7 @@ startup and wrapper policy.
 ### User-service runtime
 
 [ADR-0042](../adr/0042-freestanding-user-service-runtime.md)
-defines the review candidate for the first freestanding user-side layer. It
-does not become implementation authority until accepted.
+defines the implemented first freestanding user-side layer.
 
 An initial service is a fixed-address, non-PIE ELF64 RISC-V executable whose
 entry is `_start` at `0x40000000`. Page-separated load segments are RX, R, and
@@ -374,10 +373,10 @@ interrupts disabled.
 - Bootstrap-only privileges become unavailable after their transition point.
 - A service is not released until all development-DAG prerequisites have
   passed their readiness gate.
-- The proposed initial user image has one fixed `_start`, no relocation or
+- The initial user image has one fixed `_start`, no relocation or
   dynamic-loader state, and no allocatable page with both write and execute
   permission.
-- The proposed runtime does not retain syscall authority or results and does
+- The runtime does not retain syscall authority or results and does
   not initialize service readiness, process lifecycle, heap, TLS, arguments,
   or environment state.
 

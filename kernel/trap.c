@@ -20,6 +20,9 @@
 #ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
 #include "kernel/grant_syscall_test.h"
 #endif
+#ifdef MICROS_BUILD_USER_RUNTIME_TEST
+#include "kernel/user_runtime_test.h"
+#endif
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -506,6 +509,43 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             }
 #endif
         }
+#ifdef MICROS_BUILD_USER_RUNTIME_TEST
+        if (
+            !user_timer
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            enum micros_user_runtime_test_trap_result result =
+                micros_user_runtime_test_handle_trap(hart, frame);
+
+            if (
+                result
+                    == MICROS_USER_RUNTIME_TEST_TRAP_USER_RETURN
+            ) {
+                if (
+                    micros_scheduler_select_user_return(hart, frame)
+                        != MICROS_SCHEDULER_OK
+                ) {
+                    MICROS_TRAP_PANIC(
+                        hart->hardware_id,
+                        "user-runtime-test-return",
+                        frame
+                    );
+                }
+                return;
+            }
+            if (
+                result
+                    == MICROS_USER_RUNTIME_TEST_TRAP_SUPERVISOR_RETURN
+            ) {
+                return;
+            }
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "user-runtime-test-mismatch",
+                frame
+            );
+        }
+#endif
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
         if (
             !user_timer
@@ -654,6 +694,20 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             !user_timer
             && cause_code == MICROS_EXCEPTION_USER_ECALL
         ) {
+#ifdef MICROS_BUILD_USER_RUNTIME_TEST
+            if (
+                !micros_user_runtime_test_before_ecall(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "user-runtime-syscall-before",
+                    frame
+                );
+            }
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
             if (
                 !micros_ipc_syscall_test_before_ecall(
@@ -684,6 +738,21 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 #endif
             enum micros_syscall_return syscall_return =
                 micros_syscall_handle_user_ecall(hart, frame);
+#ifdef MICROS_BUILD_USER_RUNTIME_TEST
+            if (
+                !micros_user_runtime_test_after_dispatch(
+                    hart,
+                    frame,
+                    syscall_return
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "user-runtime-syscall-dispatch",
+                    frame
+                );
+            }
+#endif
 #ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
             if (
                 !micros_grant_syscall_test_after_dispatch(

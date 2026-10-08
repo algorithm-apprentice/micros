@@ -153,6 +153,15 @@
       }
     },
     {
+      "name": "riscv64-user-runtime-test",
+      "displayName": "RISC-V 64 freestanding user runtime test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-user-runtime-test",
+      "cacheVariables": {
+        "MICROS_BUILD_USER_RUNTIME_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -354,6 +363,13 @@
       "configurePreset": "riscv64-grant-syscall-test",
       "targets": [
         "test-qemu-grant-syscall"
+      ]
+    },
+    {
+      "name": "test-qemu-user-runtime",
+      "configurePreset": "riscv64-user-runtime-test",
+      "targets": [
+        "test-qemu-user-runtime"
       ]
     },
     {
@@ -677,6 +693,20 @@
         {
           "type": "build",
           "name": "test-qemu-grant-syscall"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-user-runtime",
+      "displayName": "Build and run freestanding user runtime acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-user-runtime-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-user-runtime"
         }
       ]
     },
