@@ -162,20 +162,26 @@ stack. Independent run-time flags, 16 priority queues, a queue-reachable
 current thread, separate accounting, repeated timer-driven switching, and the
 race-free idle return remain the common execution mechanism.
 
-The proposed exact contract is
+The implemented exact contract is
 [ADR-0043](../adr/0043-static-bootstrap-launcher.md).
 
 ### Phase 4: VM handoff
 
-The VM server starts with a kernel-provided memory map and reservation list.
-Its code, data, stack, frame database, IPC buffers, and grant buffers are wired
-before it completes a one-way handoff. The kernel stages exact
-`VM_WIRED`/`VM_TRANSFERABLE` targets separately from current owners, validates
-the complete plan while mutation is quiesced, then installs every class and
-the irreversible handed-off phase in one non-failing pass. After that point,
-VM decides user-memory policy while the kernel continues to validate and apply
-page-table operations. A page fault originating from VM is fatal in v0.1
-because VM cannot resolve its own fault.
+The VM server starts with one kernel-patched, fixed-capacity boot-information
+and frame-database object. It contains the canonical physical-memory,
+reservation, managed-range, address-space, mapping, per-frame-state, count,
+and digest snapshot with no pointer authority. Its code, data, stack,
+database, IPC buffers, and grant buffers are wired before it completes a
+one-way handoff.
+
+Every static `PROCESS_USER` frame is atomically staged `VM_WIRED` before the
+launcher runs. VM independently validates the complete snapshot, then invokes
+one exact VM-only summary operation. The kernel revalidates the scalar summary,
+all roots, the allocator, and typed ownership while mutation is quiesced, then
+installs every wired owner and the irreversible handed-off phase in one
+non-failing pass. After that point, VM owns ordinary frame-allocation policy
+while the kernel retains the allocator, typed-owner, and page-table mechanisms
+as privileged validation mirrors.
 
 Before the ownership commit, the address-space handoff path validates every
 live private root and requires every reachable bootstrap user leaf to be
@@ -194,6 +200,13 @@ after the separate `VM_READY` summary has been validated and the ownership
 phase has irreversibly changed to `HANDED_OFF`. Only then may the launcher
 acknowledge VM readiness and release PM. The launcher does not perform or
 infer the ownership commit.
+
+Step 9 exposes no post-handoff map, unmap, allocation, or page-fault protocol.
+All static mappings remain wired. A VM-originated fault is fatal; non-VM fault
+delivery remains disabled until a later reviewed mapping protocol defines
+suspension, exact mapping authority, mutation rollback, and retry. The
+proposed exact contract is
+[ADR-0045](../adr/0045-static-vm-bootstrap-and-handoff.md).
 
 ### Phase 5: core user services
 
@@ -269,14 +282,14 @@ the signed `a0` result. Stateless C wrappers expose operations 1 through 10,
 return stable results directly without `errno`, and publish a created grant
 token only after success. The only compiler support is `memcpy` and `memset`.
 
-Launcher release, manifest privileges, readiness, service initialization, and
-recovery remain above this boundary in later DAG nodes. The runtime itself
+Launcher release, manifest privileges, readiness, VM handoff, service
+initialization, and recovery remain above this boundary. The runtime itself
 owns no lifecycle or protocol authority.
 
 ### Static bootstrap launcher
 
-[ADR-0043](../adr/0043-static-bootstrap-launcher.md) proposes the Step 8
-contract.
+[ADR-0043](../adr/0043-static-bootstrap-launcher.md) defines the implemented
+Step 8 contract.
 
 The immutable manifest has a six-entry capacity for the launcher, VM, PM, TTY,
 RAMFS, and VFS. Each active entry carries an exact service ID and name,
@@ -298,7 +311,7 @@ threads remain inactive and scheduler-unassigned; their immutable intended
 policy is stored in bootstrap state and scheduler admission occurs only in the
 same commit that installs the profile and publishes the endpoint.
 
-RISC-V syscall operation 11 is reserved by the proposal for launcher-only
+RISC-V syscall operation 11 is implemented for launcher-only
 bootstrap control. It releases the exact next service, atomically accepts one
 token-bound ready call, reports a fatal launcher-detected protocol failure, or
 irreversibly completes bootstrap. The generic freestanding runtime remains

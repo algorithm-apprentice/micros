@@ -43,6 +43,9 @@ This directory contains the design baseline for `micros`.
   traces static service descriptors, inhibited privilege setup, endpoint
   visibility, initialization callbacks, readiness replies, boot ordering,
   timeouts, and the deferred RS recovery breadth.
+- [MINIX VM bootstrap and handoff study](research/minix-vm-bootstrap-and-handoff.md)
+  traces boot-memory import, VM's frame database, wired self-hosting,
+  privileged mapping authority, boot-service adoption, and fatal VM faults.
 
 ## Planning and verification
 

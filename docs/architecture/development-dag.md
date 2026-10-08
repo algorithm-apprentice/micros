@@ -146,6 +146,23 @@ ready call follows the ownership commit. TTY readiness is extended at Step 11
 so release follows `console_handoff_begin` and readiness follows
 `console_handoff_commit`.
 
+Step 9 is internally serialized:
+
+1. define and validate the fixed pointer-free VM boot-information/frame-state
+   object;
+2. atomically stage every static `PROCESS_USER` frame as `VM_WIRED`;
+3. patch and read back the exact VM object before launcher publication;
+4. start the real VM service and independently validate its frame database;
+5. accept one exact VM-only scalar summary operation;
+6. commit the irreversible ownership phase;
+7. return to VM through post-handoff wired authority;
+8. accept VM's ordinary launcher readiness only after that commit; and
+9. prove the launcher can seal while VM remains wired.
+
+Step 9 does not add dynamic mapping or non-VM page-fault delivery. Those
+interfaces require a later reviewed mapping authority before PM or executable
+loading may consume them.
+
 `init` is not a static manifest service. Step 14 creates it through the
 ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
 
