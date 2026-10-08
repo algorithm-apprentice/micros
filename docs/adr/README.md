@@ -59,3 +59,4 @@ to make the project appear more consistent than it was.
 | [0041](0041-unified-risc-v-grant-syscalls.md) | Unified RISC-V grant syscalls | Accepted |
 | [0042](0042-freestanding-user-service-runtime.md) | Freestanding user-service runtime | Accepted |
 | [0043](0043-static-bootstrap-launcher.md) | Static bootstrap launcher and embedded manifest | Accepted |
+| [0044](0044-bootstrap-failure-detail-encoding.md) | Bootstrap failure detail encoding | Accepted |
