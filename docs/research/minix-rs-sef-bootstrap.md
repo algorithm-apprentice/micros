@@ -400,6 +400,7 @@ runtime classifications remain in their earlier documents.
 | BL-20 | `init` is created later through the PM/VFS/VM spawn transaction rather than appearing in the static manifest | Required adaptation | ADR-0009 assigns init descriptors and executable preparation to the reviewed spawn path; ADR-0043 explicitly corrects ADR-0007's older revocation wording |
 | BL-21 | The kernel patches one bounded per-service configuration with exact self, launcher, and static peer endpoints | Required adaptation | ADR-0042 supplies no arguments or environment, while generation-safe endpoints cannot be inferred from fixed process slots; the data replaces MINIX `sys_whoami` plus the RS public-table grant without becoming authority |
 | BL-22 | Every manifest entry carries explicit image-page, stack-page, configuration, and readiness-timeout bounds validated before allocation | Compatible extension | Fixed bounds make failure deterministic and allocation-free without changing the valid fixed-service startup behavior |
+| BL-23 | A launcher `FAIL` report carries one bounded malformed-readiness field code for the stable kernel diagnostic | Compatible extension | MINIX startup handling has no equivalent versioned field-code ABI; the code preserves the BL-17 fatal policy while making the accepted `micros` failure record deterministic |
 
 No unclassified divergence remains for this outcome.
 
