@@ -450,28 +450,25 @@ static bool ipc_blocked_flags_are_valid(uint32_t flags)
     );
 }
 
-enum micros_kernel_object_error micros_scheduler_begin_current_ipc(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle hart_handle,
-    struct micros_scheduler_current_ipc_guard *guard
+enum micros_kernel_object_error
+micros_scheduler_preflight_current_ipc(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle
 )
 {
-    struct micros_hart *hart;
-    struct micros_thread *thread;
+    const struct micros_hart *hart;
+    const struct micros_thread *thread;
     struct micros_thread_handle current;
     enum micros_kernel_object_error error;
 
-    if (
-        objects == NULL
-        || !current_ipc_guard_is_zero(guard)
-    ) {
+    if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
     error = micros_scheduler_core_validate(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    error = micros_hart_resolve(objects, hart_handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -483,7 +480,7 @@ enum micros_kernel_object_error micros_scheduler_begin_current_ipc(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    error = resolve_thread_mutable(objects, current, &thread);
+    error = micros_thread_resolve(objects, current, &thread);
     if (
         error != MICROS_KERNEL_OBJECT_OK
         || !thread->scheduler_assigned
@@ -504,6 +501,42 @@ enum micros_kernel_object_error micros_scheduler_begin_current_ipc(
         || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error micros_scheduler_begin_current_ipc(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_scheduler_current_ipc_guard *guard
+)
+{
+    struct micros_hart *hart;
+    struct micros_thread *thread;
+    struct micros_thread_handle current;
+    enum micros_kernel_object_error error;
+
+    if (
+        objects == NULL
+        || !current_ipc_guard_is_zero(guard)
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = micros_scheduler_preflight_current_ipc(
+        objects,
+        hart_handle
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    current = hart->current_thread;
+    error = resolve_thread_mutable(objects, current, &thread);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
     error = queue_dequeue(objects, hart, current);
     if (error != MICROS_KERNEL_OBJECT_OK) {
@@ -1305,17 +1338,17 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
-enum micros_kernel_object_error micros_thread_scheduler_admit(
-    struct micros_kernel_objects *objects,
+enum micros_kernel_object_error
+micros_thread_scheduler_admit_preflight(
+    const struct micros_kernel_objects *objects,
     struct micros_hart_handle hart_handle,
     struct micros_thread_handle thread_handle,
     uint8_t priority,
-    uint64_t quantum_counter_ticks,
-    bool preemptible
+    uint64_t quantum_counter_ticks
 )
 {
-    struct micros_thread *thread;
-    struct micros_hart *hart;
+    const struct micros_thread *thread;
+    const struct micros_hart *hart;
     enum micros_kernel_object_error error;
 
     if (objects == NULL) {
@@ -1331,11 +1364,11 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_thread_mutable(objects, thread_handle, &thread);
+    error = micros_thread_resolve(objects, thread_handle, &thread);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    error = micros_hart_resolve(objects, hart_handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1362,6 +1395,40 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
     );
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
+    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error micros_thread_scheduler_admit(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_thread_handle thread_handle,
+    uint8_t priority,
+    uint64_t quantum_counter_ticks,
+    bool preemptible
+)
+{
+    struct micros_thread *thread;
+    struct micros_hart *hart;
+    enum micros_kernel_object_error error;
+
+    error = micros_thread_scheduler_admit_preflight(
+        objects,
+        hart_handle,
+        thread_handle,
+        priority,
+        quantum_counter_ticks
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = resolve_thread_mutable(objects, thread_handle, &thread);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    error = resolve_hart_mutable(objects, hart_handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
 
     thread->scheduler_assigned = true;

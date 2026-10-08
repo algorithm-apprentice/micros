@@ -306,6 +306,434 @@ static bool test_manifest_validation(void)
     return true;
 }
 
+struct validation_fixture {
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_expected_service expected[2];
+    struct micros_bootstrap_image_info images[2];
+    struct micros_privilege_profile profiles[2];
+};
+
+static void initialize_validation_fixture(
+    struct validation_fixture *fixture
+)
+{
+    initialize_manifest(&fixture->manifest);
+    memset(fixture->expected, 0, sizeof(fixture->expected));
+    fixture->expected[0] =
+        (struct micros_bootstrap_expected_service){
+            .service_id = 1,
+            .image_id = 101,
+            .process_slot = 0,
+            .profile_id = 1,
+            .role_flags = MICROS_BOOTSTRAP_ROLE_CONTROLLER,
+        };
+    set_name(
+        fixture->expected[0].service_name,
+        "bootstrap-launcher"
+    );
+    set_name(
+        fixture->expected[0].profile_name,
+        "BOOTSTRAP_LAUNCHER"
+    );
+    fixture->expected[1] =
+        (struct micros_bootstrap_expected_service){
+            .service_id = 2,
+            .image_id = 102,
+            .process_slot = 1,
+            .profile_id = 2,
+            .prerequisites = UINT64_C(1),
+            .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
+        };
+    set_name(fixture->expected[1].service_name, "vm");
+    set_name(fixture->expected[1].profile_name, "VM");
+    fixture->images[0] = (struct micros_bootstrap_image_info){
+        .version = MICROS_BOOTSTRAP_IMAGE_VERSION,
+        .image_id = 101,
+        .entry = MICROS_USER_VIRTUAL_BASE,
+        .config_address = MICROS_USER_VIRTUAL_BASE + 0x1000,
+        .config_size = sizeof(struct micros_bootstrap_service_config),
+        .page_count = 2,
+        .image_end = MICROS_USER_VIRTUAL_BASE + 0x2000,
+        .config_initially_zero = true,
+    };
+    fixture->images[1] = fixture->images[0];
+    fixture->images[1].image_id = 102;
+    fixture->profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
+    fixture->profiles[1] = profile(2, "VM");
+}
+
+static bool expect_validation_error(
+    const struct validation_fixture *fixture,
+    uint64_t available_pages,
+    enum micros_bootstrap_error expected_error
+)
+{
+    struct micros_bootstrap_manifest_plan plan;
+    struct micros_bootstrap_manifest_plan sentinel;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    return (
+        micros_bootstrap_manifest_validate(
+            &fixture->manifest,
+            fixture->expected,
+            2,
+            fixture->images,
+            2,
+            fixture->profiles,
+            2,
+            available_pages,
+            &plan
+        ) == expected_error
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+}
+
+static bool test_manifest_rejections(void)
+{
+    struct validation_fixture fixture;
+    struct micros_bootstrap_manifest_plan plan;
+    struct micros_bootstrap_diagnostic diagnostic;
+
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.header.version = 2;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_SHAPE
+        )
+    );
+    memset(&diagnostic, 0xa5, sizeof(diagnostic));
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate_detailed(
+            &fixture.manifest,
+            fixture.expected,
+            2,
+            fixture.images,
+            2,
+            fixture.profiles,
+            2,
+            32,
+            &plan,
+            &diagnostic
+        ) == MICROS_BOOTSTRAP_ERROR_SHAPE
+        && diagnostic.reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_HEADER
+        && diagnostic.service_id == 0
+        && diagnostic.endpoint == MICROS_ENDPOINT_NONE
+        && diagnostic.detail == 0
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.header.reserved2[3] = 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_SHAPE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[2].reserved2[0] = 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_SHAPE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[1].service_id = 2;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[1].image_id = 102;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[1].process_slot = 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    set_name(fixture.manifest.entries[1].service_name, "vm");
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    set_name(fixture.manifest.entries[1].profile_name, "VM");
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[0].role_flags |=
+        MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_ROLE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[0].device_base =
+        MICROS_BOOTSTRAP_UART_BASE;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_ROLE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[0].ready_timeout_counter_ticks = 0;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[0].prerequisites = UINT64_C(1) << 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.entries[0].prerequisites = UINT64_C(1) << 2;
+    fixture.expected[1].prerequisites = UINT64_C(1) << 2;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.manifest.header.total_user_page_limit = 6;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_RANGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.profiles[1].call_targets = 0;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_PROFILE
+        )
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate_detailed(
+            &fixture.manifest,
+            fixture.expected,
+            2,
+            fixture.images,
+            2,
+            fixture.profiles,
+            2,
+            32,
+            &plan,
+            &diagnostic
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && diagnostic.reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE
+        && diagnostic.service_id == 0
+        && diagnostic.detail == 0
+    );
+    initialize_validation_fixture(&fixture);
+    set_name(
+        fixture.profiles[1].name,
+        "BOOTSTRAP_LAUNCHER"
+    );
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_PROFILE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].config_address += 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].page_count = 1;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_RANGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.expected[1].image_id = 999;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            6,
+            MICROS_BOOTSTRAP_ERROR_RANGE
+        )
+    );
+    return true;
+}
+
+static bool test_three_service_topology(void)
+{
+    struct validation_fixture base;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_manifest_entry temporary;
+    struct micros_bootstrap_expected_service expected[3];
+    struct micros_bootstrap_image_info images[3];
+    struct micros_privilege_profile profiles[3];
+    struct micros_bootstrap_manifest_plan plan;
+    struct micros_bootstrap_diagnostic diagnostic;
+
+    initialize_validation_fixture(&base);
+    manifest = base.manifest;
+    manifest.header.entry_count = 3;
+    manifest.header.total_user_page_limit = 10;
+    manifest.entries[2] =
+        (struct micros_bootstrap_manifest_entry){
+            .service_id = 3,
+            .image_id = 103,
+            .process_slot = 2,
+            .stack_page_count = 1,
+            .profile_id = 3,
+            .prerequisites = UINT64_C(1),
+            .ready_timeout_counter_ticks = 100,
+            .user_page_limit = 3,
+        };
+    set_name(manifest.entries[2].service_name, "pm");
+    set_name(manifest.entries[2].profile_name, "PM");
+    expected[0] = base.expected[0];
+    expected[1] = base.expected[1];
+    expected[2] = (struct micros_bootstrap_expected_service){
+        .service_id = 3,
+        .image_id = 103,
+        .process_slot = 2,
+        .profile_id = 3,
+        .prerequisites = UINT64_C(1),
+    };
+    set_name(expected[2].service_name, "pm");
+    set_name(expected[2].profile_name, "PM");
+    images[0] = base.images[0];
+    images[1] = base.images[1];
+    images[2] = base.images[1];
+    images[2].image_id = 103;
+    profiles[0] = base.profiles[0];
+    profiles[1] = base.profiles[1];
+    profiles[2] = profile(3, "PM");
+
+    temporary = manifest.entries[2];
+    manifest.entries[2] = manifest.entries[0];
+    manifest.entries[0] = temporary;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            profiles,
+            3,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.ordered_service_ids[0] == 1
+        && plan.ordered_service_ids[1] == 2
+        && plan.ordered_service_ids[2] == 3
+    );
+
+    manifest.entries[0].prerequisites = UINT64_C(1) << 1;
+    expected[2].prerequisites = UINT64_C(1) << 1;
+    manifest.entries[2].prerequisites = UINT64_C(1) << 2;
+    expected[1].prerequisites = UINT64_C(1) << 2;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate_detailed(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            profiles,
+            3,
+            32,
+            &plan,
+            &diagnostic
+        ) == MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        && diagnostic.reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE
+        && diagnostic.service_id == 2
+        && diagnostic.endpoint == MICROS_ENDPOINT_NONE
+        && diagnostic.detail == UINT64_C(6)
+    );
+    manifest.entries[2].prerequisites = UINT64_C(1) << 3;
+    expected[1].prerequisites = UINT64_C(1) << 3;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate_detailed(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            profiles,
+            3,
+            32,
+            &plan,
+            &diagnostic
+        ) == MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        && diagnostic.reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE
+        && diagnostic.service_id == 2
+        && diagnostic.detail == UINT64_C(6)
+    );
+    return true;
+}
+
 static bool test_runtime_transitions(void)
 {
     struct micros_bootstrap_manifest manifest;
@@ -1025,6 +1453,8 @@ int main(void)
     return (
         test_manifest_contract()
         && test_manifest_validation()
+        && test_manifest_rejections()
+        && test_three_service_topology()
         && test_runtime_transitions()
         && test_replayable_runtime_model()
     )

@@ -1526,7 +1526,7 @@ static bool arm_command(
             actor,
             context,
             command,
-            UINT64_C(11),
+            UINT64_C(12),
             UINT64_C(0x1111),
             UINT64_C(0x2222),
             UINT64_C(0x3333),

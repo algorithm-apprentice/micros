@@ -9,6 +9,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/scheduler_context.h"
 #include "arch/riscv64/trap_context.h"
+#include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc_buffer_internal.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
@@ -25,6 +26,7 @@
 
 static bool scheduler_initialized;
 static bool scheduler_timer_enabled;
+static bool scheduler_start_timer_prepared;
 static uint64_t scheduler_preemption_interval;
 static struct micros_user_context selected_context;
 static uint64_t selected_root;
@@ -527,6 +529,37 @@ enum micros_scheduler_error micros_scheduler_admit(
     return map_object_error(error);
 }
 
+enum micros_scheduler_error
+micros_scheduler_prepare_start_timer(void)
+{
+    struct micros_hart *hart =
+        micros_kernel_object_runtime_boot_hart();
+    uintptr_t saved_status = riscv_irq_save();
+
+    if (
+        !scheduler_initialized
+        || hart == NULL
+        || !scheduler_timer_enabled
+        || scheduler_start_timer_prepared
+        || hart->current_thread.generation != 0
+    ) {
+        riscv_irq_restore(saved_status);
+        return MICROS_SCHEDULER_ERROR_STATE;
+    }
+    if (
+        !micros_timer_start(
+            hart,
+            scheduler_preemption_interval
+        )
+    ) {
+        riscv_irq_restore(saved_status);
+        return MICROS_SCHEDULER_ERROR_TIMER;
+    }
+    scheduler_start_timer_prepared = true;
+    riscv_irq_restore(saved_status);
+    return MICROS_SCHEDULER_OK;
+}
+
 enum micros_scheduler_error micros_scheduler_start(void)
 {
     struct micros_kernel_objects *objects = authoritative_objects();
@@ -588,15 +621,24 @@ enum micros_scheduler_error micros_scheduler_start(void)
         riscv_irq_restore(saved_status);
         return scheduler_error;
     }
-    if (
-        scheduler_timer_enabled
-        && !micros_timer_start(
-            hart,
-            scheduler_preemption_interval
-        )
-    ) {
-        riscv_irq_restore(saved_status);
-        return MICROS_SCHEDULER_ERROR_TIMER;
+    if (scheduler_timer_enabled) {
+        if (
+            scheduler_start_timer_prepared
+            && !micros_timer_prepare_return(hart)
+        ) {
+            riscv_irq_restore(saved_status);
+            return MICROS_SCHEDULER_ERROR_TIMER_REARM_FAILED;
+        }
+        if (
+            !scheduler_start_timer_prepared
+            && !micros_timer_start(
+                hart,
+                scheduler_preemption_interval
+            )
+        ) {
+            riscv_irq_restore(saved_status);
+            return MICROS_SCHEDULER_ERROR_TIMER;
+        }
     }
     scheduler_error = preflight_kernel_interval(hart, &accounting);
     if (scheduler_error != MICROS_SCHEDULER_OK) {
@@ -679,12 +721,18 @@ enum micros_scheduler_error micros_scheduler_handle_user_timer(
     struct micros_hart *hart
 )
 {
+    enum micros_scheduler_error error;
+
     if (!scheduler_initialized || hart == NULL) {
         return MICROS_SCHEDULER_ERROR_NOT_INITIALIZED;
     }
-    return handle_timer_result(
+    error = handle_timer_result(
         micros_timer_handle_interrupt(hart)
     );
+    if (error == MICROS_SCHEDULER_OK) {
+        micros_bootstrap_runtime_check_deadline(riscv_read_time());
+    }
+    return error;
 }
 
 static enum micros_scheduler_error select_user_return(
@@ -893,6 +941,12 @@ enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
         return MICROS_SCHEDULER_ERROR_INVARIANT;
     }
     timer_result = micros_timer_handle_interrupt(hart);
+    if (
+        timer_result == MICROS_TIMER_INTERRUPT_HANDLED
+        || timer_result == MICROS_TIMER_INTERRUPT_HANDLED_SPURIOUS
+    ) {
+        micros_bootstrap_runtime_check_deadline(riscv_read_time());
+    }
     if (timer_result == MICROS_TIMER_INTERRUPT_HANDLED) {
         hart->reschedule_pending = true;
 #ifdef MICROS_BUILD_SCHEDULER_TEST

@@ -239,6 +239,17 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/bootstrap_manifest.c
         tests/host/bootstrap_manifest_test.c
     )
+    add_executable(
+        bootstrap_control_test
+        kernel/bootstrap_control.c
+        kernel/bootstrap_control_core.c
+        kernel/bootstrap_image.c
+        kernel/bootstrap_manifest.c
+        kernel/endpoint.c
+        kernel/kernel_objects.c
+        kernel/scheduler_core.c
+        tests/host/bootstrap_control_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -287,6 +298,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         bootstrap_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        bootstrap_control_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -301,6 +318,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(ipc_model_test PRIVATE c_std_17)
     target_compile_features(runtime_test PRIVATE c_std_17)
     target_compile_features(bootstrap_test PRIVATE c_std_17)
+    target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -393,6 +411,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         bootstrap_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        bootstrap_control_test
         PRIVATE
             -Wall
             -Wextra
@@ -508,6 +536,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            bootstrap_control_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            bootstrap_control_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -520,6 +559,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
+    add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -551,6 +591,7 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             runtime_test
             bootstrap_test
+            bootstrap_control_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -597,6 +638,7 @@ if(MICROS_BUILD_HOST_TESTS)
             ipc_model_test
             runtime_test
             bootstrap_test
+            bootstrap_control_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -735,7 +777,13 @@ add_executable(
     arch/riscv64/uart.c
     arch/riscv64/user_entry.S
     kernel/address_space.c
+    kernel/bootstrap_control.c
+    kernel/bootstrap_control_core.c
+    kernel/bootstrap_image.c
+    kernel/bootstrap_manifest.c
     kernel/bootstrap_memory.c
+    kernel/bootstrap_runtime.c
+    kernel/bootstrap_syscall.c
     kernel/endpoint.c
     kernel/fdt.c
     kernel/frame_allocator.c
@@ -1129,7 +1177,7 @@ if(MICROS_BUILD_GRANT_SYSCALL_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            8
+            15
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -1163,7 +1211,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            8
+            12
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

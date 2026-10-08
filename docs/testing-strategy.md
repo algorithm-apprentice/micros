@@ -395,15 +395,24 @@ Only the complete sequence emits:
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
 
-ADR-0043 defines the next implementation evidence. Its implementation
-is intended to add native manifest validation and a replayable 4,096-operation
-launcher transition model. The native evidence must cover exact version-1
-layout, immutable image/profile resolution, page limits, explicit
-prerequisites, deterministic lowest-ID topology, cycles, held versus
-published endpoint state, exact bootstrap-configuration patching, exact
-profile installation, one starting service, token-bound readiness, deadlines,
-VM/console role gates, prepublication failure atomicity, and irreversible
-authority sealing.
+ADR-0043 native evidence now includes the `bootstrap-manifest` and
+`bootstrap-control` CTests in both native tiers. They cover exact version-1
+layout and offsets, immutable image/profile resolution, page limits,
+explicit prerequisites, deterministic lowest-ID topology, cycles, generated
+RX/R/RW image-catalog bounds, operation-11 decoding, held versus published
+endpoint state, exact profile and scheduler publication, one starting
+service, readiness acknowledgment construction, deadline boundaries,
+VM/console role gates, failure-atomic output/state preservation, source-only
+endpoint sealing, and a replayable 4,096-operation launcher transition model.
+The common RISC-V build also compiles the fixed preparation, reverse-order
+rollback, manifest-view, syscall, timeout, and final-seal paths before the
+isolated launcher images are added.
+
+ADR-0044 decoder coverage keeps operation-11 width and unused-register checks
+before current-thread resolution, then validates the `FAIL` reason and its
+`a4` detail after controller authority and runtime validation. Native cases
+cover all nine malformed-field codes and unrelated-reason detail rejection;
+detailed manifest validation separately covers authoritative cycle masks.
 
 The implementation is also intended to add three isolated workflows:
 

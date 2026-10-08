@@ -1915,8 +1915,72 @@ static bool endpoint_is_pending_notification_source(
     const struct micros_endpoint_record *source
 );
 
-enum micros_endpoint_error micros_endpoint_seal_source_only(
+enum micros_endpoint_error micros_endpoint_preflight_publish(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    uint8_t profile_id
+)
+{
+    const struct micros_endpoint_record *record;
+    const struct micros_privilege_profile *profile;
+    const struct micros_process *process;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_registry_validate_objects(registry, objects);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = endpoint_record_resolve_validated(
+        registry,
+        endpoint,
+        &record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = micros_privilege_profile_resolve(
+        registry,
+        profile_id,
+        &profile
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    process = &objects->processes[record->owner.slot];
+    if (
+        record->state != MICROS_ENDPOINT_STATE_RESERVED
+        || !endpoint_ipc_state_is_zero(record)
+        || process->privilege_profile != 0
+        || !process_threads_are_held(objects, record->owner, true)
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    (void)profile;
+    return MICROS_ENDPOINT_OK;
+}
+
+void micros_endpoint_commit_publish_prevalidated(
     struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    uint8_t profile_id
+)
+{
+    struct micros_process_handle owner;
+
+    (void)micros_endpoint_unpack(endpoint, &owner);
+    objects->processes[owner.slot].privilege_profile = profile_id;
+    registry->endpoints[owner.slot].state =
+        MICROS_ENDPOINT_STATE_ACTIVE;
+}
+
+enum micros_endpoint_error
+micros_endpoint_preflight_source_only(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     micros_endpoint_t endpoint
 )
@@ -1943,8 +2007,6 @@ enum micros_endpoint_error micros_endpoint_seal_source_only(
     if (
         record->state != MICROS_ENDPOINT_STATE_ACTIVE
         || !endpoint_ipc_state_is_zero(record)
-        || !process_threads_are_held(objects, record->owner, false)
-        || !process_threads_have_clear_ipc_state(objects, record->owner)
         || endpoint_is_pending_notification_source(registry, record)
     ) {
         return MICROS_ENDPOINT_ERROR_STATE;
@@ -1969,8 +2031,59 @@ enum micros_endpoint_error micros_endpoint_seal_source_only(
             return MICROS_ENDPOINT_ERROR_STATE;
         }
     }
-    registry->endpoints[record->owner.slot].state =
+    return MICROS_ENDPOINT_OK;
+}
+
+void micros_endpoint_commit_source_only_prevalidated(
+    struct micros_endpoint_registry *registry,
+    micros_endpoint_t endpoint
+)
+{
+    struct micros_process_handle owner;
+
+    (void)micros_endpoint_unpack(endpoint, &owner);
+    registry->endpoints[owner.slot].state =
         MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+}
+
+enum micros_endpoint_error micros_endpoint_seal_source_only(
+    struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+)
+{
+    const struct micros_endpoint_record *record;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = micros_endpoint_preflight_source_only(
+        registry,
+        objects,
+        endpoint
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = endpoint_record_resolve_validated(
+        registry,
+        endpoint,
+        &record
+    );
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (
+        !process_threads_are_held(objects, record->owner, false)
+        || !process_threads_have_clear_ipc_state(objects, record->owner)
+    ) {
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    micros_endpoint_commit_source_only_prevalidated(
+        registry,
+        endpoint
+    );
     return MICROS_ENDPOINT_OK;
 }
 

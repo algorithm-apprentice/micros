@@ -3,9 +3,11 @@
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
+#include "kernel/bootstrap_syscall.h"
 #include "kernel/grant_syscall.h"
 #include "kernel/ipc_syscall.h"
 #include "kernel/kernel_object_runtime_internal.h"
+#include "micros/bootstrap_control.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 
@@ -45,11 +47,28 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
 {
     struct micros_syscall_context context;
     struct micros_syscall_arguments arguments;
+    struct micros_bootstrap_control_request bootstrap_request;
     const struct micros_thread *thread;
     const struct micros_process *process;
 
     if (hart == NULL || frame == NULL) {
         panic_syscall(hart, frame, "syscall-argument");
+    }
+    if (frame->sepc > UINT64_MAX - 4) {
+        panic_syscall(hart, frame, "syscall-sepc-overflow");
+    }
+    arguments = capture_arguments(frame);
+    frame->sepc += 4;
+    if (
+        arguments.a7 == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+        && micros_bootstrap_control_decode(
+            &arguments,
+            &bootstrap_request
+        ) != MICROS_SYSCALL_ABI_OK
+    ) {
+        frame->a0 =
+            (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
     }
     context.objects =
         micros_kernel_object_runtime_authoritative_registry();
@@ -77,11 +96,6 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
         panic_syscall(hart, frame, "syscall-current-invariant");
     }
     context.process = thread->owner;
-    if (frame->sepc > UINT64_MAX - 4) {
-        panic_syscall(hart, frame, "syscall-sepc-overflow");
-    }
-    arguments = capture_arguments(frame);
-    frame->sepc += 4;
     switch (arguments.a7) {
     case MICROS_SYSCALL_ABI_SEND:
     case MICROS_SYSCALL_ABI_RECEIVE:
@@ -105,10 +119,18 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
             &context,
             &arguments
         );
+    case MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL:
+        return micros_bootstrap_handle_captured_user_ecall(
+            hart,
+            frame,
+            &context,
+            &arguments
+        );
     default:
         frame->a0 =
             (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
         return MICROS_SYSCALL_RETURN_NORMAL;
     }
+    (void)bootstrap_request;
     (void)process;
 }

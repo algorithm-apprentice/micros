@@ -130,8 +130,36 @@ enum micros_bootstrap_error {
     MICROS_BOOTSTRAP_ERROR_INVARIANT,
 };
 
+enum micros_bootstrap_diagnostic_reason {
+    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_HEADER = 1,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_PREPARE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_ORDER,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_TRANSITION,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_MALFORMED,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_FOREIGN,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_EARLY,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_DUPLICATE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_ROLE_GATE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_READY_TIMEOUT,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+};
+
+struct micros_bootstrap_diagnostic {
+    enum micros_bootstrap_diagnostic_reason reason;
+    uint32_t service_id;
+    micros_endpoint_t endpoint;
+    uint64_t detail;
+};
+
 enum micros_bootstrap_phase {
     MICROS_BOOTSTRAP_PHASE_UNINITIALIZED = 0,
+    MICROS_BOOTSTRAP_PHASE_PREPARING,
     MICROS_BOOTSTRAP_PHASE_RUNNING,
     MICROS_BOOTSTRAP_PHASE_SEALED,
     MICROS_BOOTSTRAP_PHASE_FAILED,
@@ -189,6 +217,19 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate(
     size_t profile_count,
     uint64_t available_user_pages,
     struct micros_bootstrap_manifest_plan *plan
+);
+
+enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
+    const struct micros_bootstrap_manifest *manifest,
+    const struct micros_bootstrap_expected_service *expected_services,
+    size_t expected_service_count,
+    const struct micros_bootstrap_image_info *images,
+    size_t image_count,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    uint64_t available_user_pages,
+    struct micros_bootstrap_manifest_plan *plan,
+    struct micros_bootstrap_diagnostic *diagnostic
 );
 
 enum micros_bootstrap_error micros_bootstrap_runtime_initialize(

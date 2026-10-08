@@ -525,6 +525,62 @@ static bool test_process_slots_reuse_with_new_generations(void)
     return true;
 }
 
+static bool test_process_exact_slot_creation_is_isolated(void)
+{
+    struct micros_process_handle exact = {UINT16_MAX, UINT32_MAX};
+    struct micros_process_handle lowest = {UINT16_MAX, UINT32_MAX};
+    struct micros_process_handle sentinel = exact;
+    struct micros_kernel_objects snapshot;
+
+    reset_objects();
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_initialize(&objects, 1, 1)
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create_at(&objects, 5, &exact)
+    );
+    EXPECT_TRUE(exact.slot == 5 && exact.generation == 1);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_process_create(&objects, &lowest)
+    );
+    EXPECT_TRUE(lowest.slot == 0 && lowest.generation == 1);
+    snapshot = objects;
+    sentinel = (struct micros_process_handle){
+        UINT16_MAX,
+        UINT32_MAX,
+    };
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_STATE,
+        micros_process_create_at(&objects, 5, &sentinel)
+    );
+    EXPECT_TRUE(
+        sentinel.slot == UINT16_MAX
+        && sentinel.generation == UINT32_MAX
+        && memcmp(&objects, &snapshot, sizeof(objects)) == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
+        micros_process_create_at(
+            &objects,
+            MICROS_PROCESS_CAPACITY,
+            &sentinel
+        )
+    );
+    EXPECT_TRUE(
+        sentinel.slot == UINT16_MAX
+        && sentinel.generation == UINT32_MAX
+        && memcmp(&objects, &snapshot, sizeof(objects)) == 0
+    );
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_OK,
+        micros_kernel_objects_validate(&objects)
+    );
+    return true;
+}
+
 static bool test_process_address_space_lifecycle_is_exact(void)
 {
     const uintptr_t root = UINT64_C(0x0000000081000000);
@@ -2240,6 +2296,10 @@ int main(void)
         {
             "process slots reuse with new generations",
             test_process_slots_reuse_with_new_generations,
+        },
+        {
+            "process exact-slot creation is isolated",
+            test_process_exact_slot_creation_is_isolated,
         },
         {
             "process address-space lifecycle is exact",

@@ -17,6 +17,7 @@ enum micros_syscall_abi_operation {
     MICROS_SYSCALL_ABI_GRANT_REVOKE = 8,
     MICROS_SYSCALL_ABI_GRANT_COPY_FROM = 9,
     MICROS_SYSCALL_ABI_GRANT_COPY_TO = 10,
+    MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL = 11,
 };
 
 enum micros_syscall_abi_result {
