@@ -23,7 +23,7 @@ flowchart TD
     F[Page tables and user mode]
     G[Process thread and hart objects plus kernel scheduler]
     H[IPC endpoints and privileges]
-    I[Direct grants grant syscalls wired handoff reads and user runtime]
+    I[Direct grants grant syscalls wired handoff reads then user runtime]
     J[Static bootstrap launcher]
     K[VM server and one-way handoff]
     L[PM spawn exit and wait]
@@ -96,7 +96,7 @@ failures attributable to one coherent change.
 | 4 | Traps, timer, bootstrap allocator, typed frame ownership | Expected exception recovery, timer ticks, allocator/owner invariants, and atomic handoff classification |
 | 5 | Page tables, process/thread/hart objects, user mode | U-mode isolation and repeated thread context switches |
 | 6 | Scheduler, endpoints, IPC | Blocking, wakeup, reply-token, stale endpoint, privilege, and deadlock tests |
-| 7 | Grants, grant syscalls, wired handoff reads, and user runtime | Real U-mode grant lifecycle and copies succeed before and after handoff for wired service pages; bounds, permissions, stale authority, and non-wired owners fail |
+| 7 | Grants, grant syscalls, wired handoff reads, then user runtime | First prove real U-mode grant lifecycle and copies before and after handoff for wired service pages; then prove one standalone freestanding ELF, startup path, raw `ecall`, and C wrappers for operations 1 through 10 |
 | 8 | Bootstrap launcher | Manifest order, exact privilege profiles, and readiness gates verified |
 | 9 | VM handoff | Frame ownership is disjoint and the VM working set remains wired |
 | 10 | PM | Spawn metadata, exit, wait, and failure rollback verified |
@@ -106,6 +106,21 @@ failures attributable to one coherent change.
 | 14 | Executable path, init, shell | Instruction synchronization passes and the shell runs the required commands |
 | 15 | DS, scheduler server, RS | Discovery and injected service recovery verified |
 | 16+ | Persistent storage and POSIX work | Added only behind explicit ADRs and conformance tests |
+
+Step 7 is internally serialized even though it is one graph node:
+
+1. endpoint and IPC mechanisms;
+2. direct-grant identity and lifetime;
+3. checked copies;
+4. wired post-handoff address-space reads;
+5. the unified operations 1 through 10;
+6. the freestanding user-service runtime.
+
+The runtime is not complete merely because the kernel ABI is callable from a
+test payload. It requires an independent user ELF, loader/BSS/stack contract,
+ABI-preserving raw stub, typed C wrappers, and target acceptance. The static
+launcher remains blocked until that complete runtime outcome is reviewed and
+implemented.
 
 ## Phase gates
 
@@ -122,6 +137,18 @@ Before the first user server, the kernel must demonstrate:
 - IPC permission enforcement;
 - finite deadlock-chain detection;
 - bounded direct grants.
+
+### Runtime gate
+
+Before the static launcher, the user runtime must demonstrate:
+
+- one standalone fixed-address ELF with exact RX, R, and RW/NX closure;
+- loader-owned BSS zeroing and an external aligned writable stack;
+- a C-ABI-preserving raw `ecall` boundary;
+- typed wrappers for every stable operation 1 through 10;
+- exact stable results without `errno`;
+- no relocation, hosted libc, heap, TLS, constructors, arguments, or service
+  readiness policy.
 
 ### Service gate
 

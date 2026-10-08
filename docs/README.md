@@ -35,6 +35,10 @@ This directory contains the design baseline for `micros`.
 - [MINIX user grant and safe-copy syscall study](research/minix-user-grant-syscall-boundary.md)
   traces direct IPC traps, user-managed grant publication, safe-copy kernel
   calls, and the required unified `micros` register ABI.
+- [MINIX user-service runtime study](research/minix-user-service-runtime.md)
+  traces process entry, libc initialization, IPC vectors, grant and safe-copy
+  wrappers, and the service-startup boundary used by the freestanding runtime
+  design.
 
 ## Planning and verification
 

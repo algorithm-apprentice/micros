@@ -209,8 +209,36 @@ One RISC-V `ecall` namespace exposes IPC operations 1 through 6 and reserves
 grant create, revoke, copy-from, and copy-to as operations 7 through 10.
 Existing IPC register layouts and results remain unchanged. Grant create
 returns one nonnegative opaque token in `a0`; every failure is one stable
-negative result. Freestanding C wrappers and service startup remain a separate
-runtime layer over this fixed kernel ABI.
+negative result. The kernel ABI remains independent from user-language
+startup and wrapper policy.
+
+### User-service runtime
+
+[ADR-0042](../adr/0042-freestanding-user-service-runtime.md)
+defines the review candidate for the first freestanding user-side layer. It
+does not become implementation authority until accepted.
+
+An initial service is a fixed-address, non-PIE ELF64 RISC-V executable whose
+entry is `_start` at `0x40000000`. Page-separated load segments are RX, R, and
+RW/NX. The external image owner copies file-backed bytes, zeroes every
+remaining segment byte, maps a separate zero-filled stack ending at
+`0x80000000`, performs instruction-fetch synchronization, and prepares the
+thread context. The runtime does not relocate itself or clear BSS.
+
+`_start` sets `gp` and `tp` to zero, preserves the supplied aligned stack, and
+calls `void micros_service_main(void)`. It provides no arguments,
+environment, constructors, TLS, heap, libc, or process-exit path. An
+accidental return executes a labeled user breakpoint and cannot fall through
+into arbitrary image bytes.
+
+One raw RV64 function consumes `a0` through `a7`, executes `ecall`, and returns
+the signed `a0` result. Stateless C wrappers expose operations 1 through 10,
+return stable results directly without `errno`, and publish a created grant
+token only after success. The only compiler support is `memcpy` and `memset`.
+
+Launcher release, manifest privileges, readiness, service initialization, and
+recovery remain above this boundary in later DAG nodes. The runtime itself
+owns no lifecycle or protocol authority.
 
 ### Bulk data
 
@@ -346,6 +374,12 @@ interrupts disabled.
 - Bootstrap-only privileges become unavailable after their transition point.
 - A service is not released until all development-DAG prerequisites have
   passed their readiness gate.
+- The proposed initial user image has one fixed `_start`, no relocation or
+  dynamic-loader state, and no allocatable page with both write and execute
+  permission.
+- The proposed runtime does not retain syscall authority or results and does
+  not initialize service readiness, process lifecycle, heap, TLS, arguments,
+  or environment state.
 
 ## Proposed source layout
 
