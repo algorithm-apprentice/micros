@@ -1,4 +1,5 @@
 #include "micros/bootstrap.h"
+#include "micros/vm_bootstrap.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -165,6 +166,10 @@ static bool test_manifest_validation(void)
     };
     images[1] = images[0];
     images[1].image_id = 102;
+    images[1].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    images[1].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    images[1].vm_boot_info_initially_zero = true;
     profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     profiles[1] = profile(2, "VM");
 
@@ -358,6 +363,10 @@ static void initialize_validation_fixture(
     };
     fixture->images[1] = fixture->images[0];
     fixture->images[1].image_id = 102;
+    fixture->images[1].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    fixture->images[1].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    fixture->images[1].vm_boot_info_initially_zero = true;
     fixture->profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     fixture->profiles[1] = profile(2, "VM");
 }
@@ -584,6 +593,36 @@ static bool test_manifest_rejections(void)
         )
     );
     initialize_validation_fixture(&fixture);
+    fixture.images[1].vm_boot_info_size = 0;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].vm_boot_info_initially_zero = false;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[0].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    fixture.images[0].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    fixture.images[0].vm_boot_info_initially_zero = true;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
     fixture.images[1].config_address += 1;
     EXPECT_TRUE(
         expect_validation_error(
@@ -615,6 +654,48 @@ static bool test_manifest_rejections(void)
         expect_validation_error(
             &fixture,
             6,
+            MICROS_BOOTSTRAP_ERROR_RANGE
+        )
+    );
+    return true;
+}
+
+static bool test_vm_mapping_capacity(void)
+{
+    struct validation_fixture fixture;
+    struct micros_bootstrap_manifest_plan plan;
+
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].page_count = 4091;
+    fixture.images[1].image_end =
+        MICROS_USER_VIRTUAL_BASE
+        + UINT64_C(4091) * MICROS_FRAME_SIZE;
+    fixture.manifest.entries[0].user_page_limit = 4092;
+    fixture.manifest.header.total_user_page_limit = 4096;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &fixture.manifest,
+            fixture.expected,
+            2,
+            fixture.images,
+            2,
+            fixture.profiles,
+            2,
+            4096,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+    );
+
+    fixture.images[1].page_count = 4092;
+    fixture.images[1].image_end =
+        MICROS_USER_VIRTUAL_BASE
+        + UINT64_C(4092) * MICROS_FRAME_SIZE;
+    fixture.manifest.entries[0].user_page_limit = 4093;
+    fixture.manifest.header.total_user_page_limit = 4097;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            4097,
             MICROS_BOOTSTRAP_ERROR_RANGE
         )
     );
@@ -664,6 +745,9 @@ static bool test_three_service_topology(void)
     images[1] = base.images[1];
     images[2] = base.images[1];
     images[2].image_id = 103;
+    images[2].vm_boot_info_address = 0;
+    images[2].vm_boot_info_size = 0;
+    images[2].vm_boot_info_initially_zero = false;
     profiles[0] = base.profiles[0];
     profiles[1] = base.profiles[1];
     profiles[2] = profile(3, "PM");
@@ -1454,6 +1538,7 @@ int main(void)
         test_manifest_contract()
         && test_manifest_validation()
         && test_manifest_rejections()
+        && test_vm_mapping_capacity()
         && test_three_service_topology()
         && test_runtime_transitions()
         && test_replayable_runtime_model()

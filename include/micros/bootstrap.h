@@ -101,7 +101,10 @@ struct micros_bootstrap_image_info {
     uint32_t config_size;
     uint32_t page_count;
     uint64_t image_end;
+    uint64_t vm_boot_info_address;
+    uint32_t vm_boot_info_size;
     bool config_initially_zero;
+    bool vm_boot_info_initially_zero;
 };
 
 struct micros_bootstrap_manifest_plan {

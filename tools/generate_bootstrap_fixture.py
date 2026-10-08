@@ -12,9 +12,11 @@ from tools import check_user_elf
 
 
 CONFIG_SYMBOL = "micros_bootstrap_service_config"
+VM_BOOT_INFO_SYMBOL = "micros_vm_boot_info"
 IMAGE_END_SYMBOL = "__micros_user_image_end"
 IMAGE_SEGMENT_COUNT = 3
 PAGE_SIZE = 4096
+VM_BOOT_INFO_SIZE = 364672
 
 
 def _format_bytes(data):
@@ -93,6 +95,59 @@ def _validated_descriptor(image, prefix):
             raise check_user_elf.ElfFormatError(
                 "bootstrap configuration initial bytes are nonzero"
             )
+    vm_boot_info = symbols.get(VM_BOOT_INFO_SYMBOL)
+    vm_boot_info_address = 0
+    vm_boot_info_size = 0
+    if vm_boot_info is not None:
+        if (
+            vm_boot_info.size != VM_BOOT_INFO_SIZE
+            or vm_boot_info.value % PAGE_SIZE != 0
+        ):
+            raise check_user_elf.ElfFormatError(
+                "VM boot information has wrong size or alignment"
+            )
+        vm_containing = [
+            program
+            for program in loads
+            if (
+                vm_boot_info.value >= program.virtual_address
+                and vm_boot_info.size
+                    <= program.virtual_address
+                    + program.memory_size
+                    - vm_boot_info.value
+            )
+        ]
+        if (
+            len(vm_containing) != 1
+            or vm_containing[0].flags
+                != (
+                    check_user_elf.PROGRAM_READ
+                    | check_user_elf.PROGRAM_WRITE
+                )
+        ):
+            raise check_user_elf.ElfFormatError(
+                "VM boot information is not wholly writable"
+            )
+        if (
+            config.value < vm_boot_info.value + vm_boot_info.size
+            and vm_boot_info.value < config.value + config.size
+        ):
+            raise check_user_elf.ElfFormatError(
+                "VM boot information overlaps bootstrap configuration"
+            )
+        vm_load = vm_containing[0]
+        vm_offset = vm_boot_info.value - vm_load.virtual_address
+        for index in range(vm_boot_info.size):
+            offset = vm_offset + index
+            if (
+                offset < vm_load.file_size
+                and image.data[vm_load.offset + offset] != 0
+            ):
+                raise check_user_elf.ElfFormatError(
+                    "VM boot information initial bytes are nonzero"
+                )
+        vm_boot_info_address = vm_boot_info.value
+        vm_boot_info_size = vm_boot_info.size
     page_count = sum(program.memory_size // PAGE_SIZE for program in loads)
     return {
         "prefix": prefix,
@@ -102,6 +157,8 @@ def _validated_descriptor(image, prefix):
         "config_address": config.value,
         "image_end": symbols[IMAGE_END_SYMBOL].value,
         "page_count": page_count,
+        "vm_boot_info_address": vm_boot_info_address,
+        "vm_boot_info_size": vm_boot_info_size,
     }
 
 
@@ -162,6 +219,10 @@ def _render_image(descriptor, image_id, indent="    "):
             f"{indent}    .page_count = {descriptor['page_count']},",
             f"{indent}    .image_end = "
             f"UINT64_C(0x{descriptor['image_end']:016x}),",
+            f"{indent}    .vm_boot_info_address = "
+            f"UINT64_C(0x{descriptor['vm_boot_info_address']:016x}),",
+            f"{indent}    .vm_boot_info_size = "
+            f"UINT32_C(0x{descriptor['vm_boot_info_size']:08x}),",
             f"{indent}}},",
         )
     )

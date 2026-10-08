@@ -9,6 +9,13 @@
 
 struct micros_trap_frame;
 
+typedef bool (*micros_user_mapping_visitor)(
+    void *context,
+    uint64_t virtual_address,
+    uint64_t physical_address,
+    uint32_t permissions
+);
+
 #define MICROS_USER_VIRTUAL_BASE UINT64_C(0x0000000040000000)
 #define MICROS_USER_VIRTUAL_END UINT64_C(0x0000000080000000)
 
@@ -67,6 +74,15 @@ micros_user_address_space_translate(
     uint64_t *physical_address,
     uint32_t *permissions,
     size_t *contiguous_bytes
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_inventory(
+    struct micros_process_handle process,
+    micros_user_mapping_visitor visitor,
+    void *context,
+    uint64_t *root_physical_address,
+    size_t *mapping_count
 );
 
 enum micros_user_address_space_error

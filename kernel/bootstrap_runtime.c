@@ -9,6 +9,7 @@
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
 #include "kernel/scheduler_core_internal.h"
+#include "kernel/vm_snapshot.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"
@@ -58,6 +59,7 @@ static uint16_t
     preparation_order[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
 static struct preparation_baseline preparation_baseline;
 static struct micros_bootstrap_diagnostic preparation_diagnostic;
+static struct micros_vm_snapshot_result prepared_vm_snapshot;
 static bool failure_record_emitted;
 
 static void set_preparation_diagnostic(
@@ -717,6 +719,54 @@ static bool read_user_range(
     return true;
 }
 
+static bool user_range_matches(
+    struct micros_process_handle process,
+    uint64_t address,
+    const void *expected,
+    size_t size
+)
+{
+    const unsigned char *bytes = expected;
+    size_t compared = 0;
+
+    while (compared < size) {
+        uint64_t physical;
+        uint32_t permissions;
+        size_t contiguous;
+        size_t chunk;
+
+        if (
+            micros_user_address_space_translate(
+                process,
+                address + compared,
+                &physical,
+                &permissions,
+                &contiguous
+            ) != MICROS_USER_ADDRESS_SPACE_OK
+            || (
+                permissions & MICROS_SV39_PERMISSION_READ
+            ) == 0
+            || contiguous == 0
+        ) {
+            return false;
+        }
+        chunk = size - compared < contiguous
+            ? size - compared
+            : contiguous;
+        if (
+            !bytes_equal(
+                (const void *)(uintptr_t)physical,
+                bytes + compared,
+                chunk
+            )
+        ) {
+            return false;
+        }
+        compared += chunk;
+    }
+    return true;
+}
+
 static bool build_service_table(
     const struct micros_bootstrap_manifest *manifest,
     const struct micros_bootstrap_binding *bindings,
@@ -1030,6 +1080,7 @@ static void rollback_preparation(size_t count)
     clear_bytes(preparation_records, sizeof(preparation_records));
     clear_bytes(prepared_bindings, sizeof(prepared_bindings));
     clear_bytes(preparation_order, sizeof(preparation_order));
+    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
     if (preparation_baseline.valid) {
         const struct micros_frame_allocator *allocator =
             micros_bootstrap_frame_allocator();
@@ -1236,6 +1287,56 @@ static enum micros_bootstrap_error prepare_services(
     return MICROS_BOOTSTRAP_OK;
 }
 
+static enum micros_bootstrap_error prepare_vm_snapshot(
+    const struct micros_bootstrap_runtime_config *config
+)
+{
+    struct micros_vm_snapshot_result candidate;
+    const struct micros_bootstrap_binding *vm_binding;
+    const struct micros_bootstrap_image *vm_image;
+    enum micros_bootstrap_error error;
+
+    if (validation_plan.vm_service_id == 0) {
+        return MICROS_BOOTSTRAP_OK;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    error = micros_vm_snapshot_prepare(
+        config->manifest,
+        prepared_bindings,
+        config->manifest->header.entry_count,
+        &candidate
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    vm_binding = &prepared_bindings[candidate.vm_binding_index];
+    vm_image = preparation_records[
+        candidate.vm_binding_index
+    ].image;
+    if (
+        vm_image == NULL
+        || vm_binding->service_id != validation_plan.vm_service_id
+        || vm_image->vm_boot_info_address == 0
+        || vm_image->vm_boot_info_size != MICROS_VM_BOOT_INFO_SIZE
+        || !write_user_range(
+            vm_binding->process,
+            vm_image->vm_boot_info_address,
+            candidate.info,
+            sizeof(*candidate.info)
+        )
+        || !user_range_matches(
+            vm_binding->process,
+            vm_image->vm_boot_info_address,
+            candidate.info,
+            sizeof(*candidate.info)
+        )
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    prepared_vm_snapshot = candidate;
+    return MICROS_BOOTSTRAP_OK;
+}
+
 enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
     const struct micros_bootstrap_runtime_config *config
 )
@@ -1259,6 +1360,7 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
         &preparation_diagnostic,
         sizeof(preparation_diagnostic)
     );
+    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
     if (
         bootstrap_state.phase != MICROS_BOOTSTRAP_PHASE_UNINITIALIZED
         || config->expected_service_count
@@ -1360,6 +1462,17 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
     }
     error = prepare_services(config);
     if (error != MICROS_BOOTSTRAP_OK) {
+        goto done;
+    }
+    error = prepare_vm_snapshot(config);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        set_preparation_diagnostic(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_PREPARE,
+            validation_plan.vm_service_id,
+            MICROS_ENDPOINT_NONE,
+            0
+        );
+        rollback_preparation(config->manifest->header.entry_count);
         goto done;
     }
     if (

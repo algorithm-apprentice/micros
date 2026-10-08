@@ -996,6 +996,7 @@ add_executable(
     kernel/user_address_space_core.c
     kernel/user_execution.c
     kernel/vm_bootstrap.c
+    kernel/vm_snapshot.c
 )
 
 if(MICROS_BUILD_USER_RUNTIME_TEST)

@@ -38,6 +38,14 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
         self.assertIn("micros_bootstrap_test_images", output)
         self.assertIn(".image_id = 101", output)
         self.assertIn(".image_id = 103", output)
+        self.assertIn(
+            ".vm_boot_info_address = UINT64_C(0x0000000000000000)",
+            output,
+        )
+        self.assertIn(
+            ".vm_boot_info_size = UINT32_C(0x00000000)",
+            output,
+        )
         self.assertIn("micros_bootstrap_test_manifest", output)
         self.assertLess(
             output.index("MICROS_BOOTSTRAP_TEST_LAST_SERVICE_ID"),

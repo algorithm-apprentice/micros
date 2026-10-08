@@ -670,6 +670,123 @@ static enum micros_user_address_space_error validate_locked(
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
+static enum micros_user_address_space_error
+visit_user_mappings_locked(
+    const struct micros_process *process,
+    micros_user_mapping_visitor visitor,
+    void *context,
+    size_t *mapping_count
+)
+{
+    const struct user_page_table *root =
+        table_at(process->address_space_root);
+    struct micros_sv39_decoded_pte root_entry;
+    size_t count = 0;
+    enum micros_user_address_space_error error;
+
+    error = decode_pte(
+        root->entries[USER_ROOT_INDEX],
+        &root_entry
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (root_entry.kind == MICROS_SV39_PTE_ABSENT) {
+        *mapping_count = 0;
+        return MICROS_USER_ADDRESS_SPACE_OK;
+    }
+    if (root_entry.kind != MICROS_SV39_PTE_TABLE) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+    }
+    {
+        const struct user_page_table *middle =
+            table_at(root_entry.physical_address);
+        size_t middle_index;
+
+        for (
+            middle_index = 0;
+            middle_index < MICROS_SV39_TABLE_ENTRY_COUNT;
+            ++middle_index
+        ) {
+            struct micros_sv39_decoded_pte middle_entry;
+
+            error = decode_pte(
+                middle->entries[middle_index],
+                &middle_entry
+            );
+            if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+                return error;
+            }
+            if (middle_entry.kind == MICROS_SV39_PTE_ABSENT) {
+                continue;
+            }
+            if (middle_entry.kind != MICROS_SV39_PTE_TABLE) {
+                return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+            }
+            {
+                const struct user_page_table *leaf =
+                    table_at(middle_entry.physical_address);
+                size_t leaf_index;
+
+                for (
+                    leaf_index = 0;
+                    leaf_index < MICROS_SV39_TABLE_ENTRY_COUNT;
+                    ++leaf_index
+                ) {
+                    struct micros_sv39_decoded_pte leaf_entry;
+                    uint64_t virtual_address;
+
+                    error = decode_pte(
+                        leaf->entries[leaf_index],
+                        &leaf_entry
+                    );
+                    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+                        return error;
+                    }
+                    if (
+                        leaf_entry.kind
+                            == MICROS_SV39_PTE_ABSENT
+                    ) {
+                        continue;
+                    }
+                    if (
+                        leaf_entry.kind != MICROS_SV39_PTE_LEAF
+                        || (
+                            leaf_entry.permissions
+                            & MICROS_SV39_PERMISSION_USER
+                        ) == 0
+                        || count == SIZE_MAX
+                    ) {
+                        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+                    }
+                    virtual_address =
+                        MICROS_USER_VIRTUAL_BASE
+                        + (
+                            (
+                                (uint64_t)middle_index
+                                * MICROS_SV39_TABLE_ENTRY_COUNT
+                            ) + leaf_index
+                        ) * MICROS_SV39_PAGE_SIZE;
+                    if (
+                        !visitor(
+                            context,
+                            virtual_address,
+                            leaf_entry.physical_address,
+                            leaf_entry.permissions
+                                & ~MICROS_SV39_PERMISSION_USER
+                        )
+                    ) {
+                        return MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
+                    }
+                    ++count;
+                }
+            }
+        }
+    }
+    *mapping_count = count;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
 static enum micros_user_address_space_error lookup_leaf_locked(
     const struct micros_process *process,
     uint64_t virtual_address,
@@ -1301,6 +1418,72 @@ micros_user_address_space_translate(
             leaf_entry.permissions & ~MICROS_SV39_PERMISSION_USER;
         *contiguous_bytes =
             (size_t)(MICROS_SV39_PAGE_SIZE - offset);
+    }
+
+done_with_scratch:
+    release_scratch();
+done:
+    (void)ledger;
+    (void)kernel_report;
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_inventory(
+    struct micros_process_handle process,
+    micros_user_mapping_visitor visitor,
+    void *context,
+    uint64_t *root_physical_address,
+    size_t *mapping_count
+)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    size_t observed_mapping_count;
+    enum micros_user_address_space_error error;
+    uintptr_t saved_status;
+
+    if (
+        visitor == NULL
+        || root_physical_address == NULL
+        || mapping_count == NULL
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = riscv_irq_save();
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process_with_root(objects, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (!acquire_scratch()) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+        goto done;
+    }
+    error = validate_locked(process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    error = visit_user_mappings_locked(
+        resolved,
+        visitor,
+        context,
+        &observed_mapping_count
+    );
+    if (error == MICROS_USER_ADDRESS_SPACE_OK) {
+        *root_physical_address = resolved->address_space_root;
+        *mapping_count = observed_mapping_count;
     }
 
 done_with_scratch:

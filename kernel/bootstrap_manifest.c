@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "micros/sv39.h"
+#include "micros/vm_bootstrap.h"
 
 static void copy_bytes(void *destination, const void *source, size_t size)
 {
@@ -429,6 +430,26 @@ static enum micros_bootstrap_error validate_image_bound(
     ) {
         return MICROS_BOOTSTRAP_ERROR_IMAGE;
     }
+    if (
+        (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) != 0
+    ) {
+        if (
+            image->vm_boot_info_address
+                % MICROS_VM_BOOT_INFO_ALIGNMENT
+                != 0
+            || image->vm_boot_info_size
+                != MICROS_VM_BOOT_INFO_SIZE
+            || !image->vm_boot_info_initially_zero
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_IMAGE;
+        }
+    } else if (
+        image->vm_boot_info_address != 0
+        || image->vm_boot_info_size != 0
+        || image->vm_boot_info_initially_zero
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_IMAGE;
+    }
     stack_bytes =
         (uint64_t)entry->stack_page_count * MICROS_SV39_PAGE_SIZE;
     if (
@@ -485,6 +506,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
     uint64_t active_ids = 0;
     uint64_t selected_ids = 0;
     uint64_t total_pages = 0;
+    uint64_t prepared_mapping_count = 0;
     uint32_t controller_count = 0;
     uint32_t vm_count = 0;
     uint32_t console_count = 0;
@@ -680,6 +702,31 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
                 0
             );
         }
+        {
+            uint64_t entry_mapping_count =
+                (uint64_t)image->page_count
+                + entry->stack_page_count;
+
+            if (
+                (entry->role_flags
+                    & MICROS_BOOTSTRAP_ROLE_CONTROLLER)
+                    != 0
+            ) {
+                ++entry_mapping_count;
+            }
+            if (
+                UINT64_MAX - prepared_mapping_count
+                    < entry_mapping_count
+            ) {
+                RETURN_DIAGNOSTIC(
+                    MICROS_BOOTSTRAP_ERROR_RANGE,
+                    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
+                    entry->service_id,
+                    0
+                );
+            }
+            prepared_mapping_count += entry_mapping_count;
+        }
         if (UINT64_MAX - total_pages < entry->user_page_limit) {
             RETURN_DIAGNOSTIC(
                 MICROS_BOOTSTRAP_ERROR_RANGE,
@@ -712,6 +759,11 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         controller_count != 1
         || vm_count > 1
         || console_count > 1
+        || (
+            vm_count != 0
+            && prepared_mapping_count
+                > MICROS_VM_MAX_STATIC_MAPPINGS
+        )
         || total_pages != manifest->header.total_user_page_limit
         || total_pages > available_user_pages
     ) {

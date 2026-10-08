@@ -33,6 +33,8 @@ struct micros_bootstrap_image {
     uint32_t config_size;
     uint32_t page_count;
     uint64_t image_end;
+    uint64_t vm_boot_info_address;
+    uint32_t vm_boot_info_size;
 };
 
 enum micros_bootstrap_error micros_bootstrap_image_catalog_validate(

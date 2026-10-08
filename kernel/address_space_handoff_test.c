@@ -9,6 +9,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc_runtime_internal.h"
+#include "kernel/vm_snapshot.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_copy.h"
 #include "micros/grant_runtime.h"
@@ -1715,8 +1716,64 @@ bool micros_address_space_handoff_test_after_return(
 
 static bool stage_wired_pages(void)
 {
-    return micros_user_address_space_prepare_wired_handoff()
-        == MICROS_USER_ADDRESS_SPACE_OK;
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_registry();
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_binding
+        bindings[HANDOFF_PROCESS_COUNT];
+    struct micros_vm_snapshot_result result;
+    size_t index;
+
+    if (objects == NULL) {
+        return false;
+    }
+    fill_bytes(&manifest, 0, sizeof(manifest));
+    fill_bytes(bindings, 0, sizeof(bindings));
+    fill_bytes(&result, 0, sizeof(result));
+    manifest.header.entry_count = HANDOFF_PROCESS_COUNT;
+    for (index = 0; index < HANDOFF_PROCESS_COUNT; ++index) {
+        manifest.entries[index].service_id = (uint32_t)index + 1;
+        manifest.entries[index].process_slot = processes[index].slot;
+        manifest.entries[index].role_flags = (
+            index == HANDOFF_GRANTEE
+        )
+            ? MICROS_BOOTSTRAP_ROLE_VM
+            : 0;
+        bindings[index] = (struct micros_bootstrap_binding){
+            .manifest_index = (uint16_t)index,
+            .service_id = (uint32_t)index + 1,
+            .process = processes[index],
+            .thread = threads[index],
+            .root = objects->processes[
+                processes[index].slot
+            ].address_space_root,
+            .endpoint = endpoints[index],
+        };
+    }
+    return (
+        micros_vm_snapshot_prepare(
+            &manifest,
+            bindings,
+            HANDOFF_PROCESS_COUNT,
+            &result
+        ) == MICROS_BOOTSTRAP_OK
+        && result.info != NULL
+        && result.vm_binding_index == HANDOFF_GRANTEE
+        && result.summary.address_space_count
+            == HANDOFF_PROCESS_COUNT
+        && result.summary.mapping_count
+            == HANDOFF_PROCESS_COUNT * HANDOFF_PAGE_COUNT
+        && result.summary.vm_self_wired_frame_count
+            == HANDOFF_PAGE_COUNT
+        && result.info->mappings[0].role
+            == MICROS_VM_MAPPING_SERVICE_WIRED
+        && result.info->mappings[HANDOFF_PAGE_COUNT].role
+            == MICROS_VM_MAPPING_SELF_WIRED
+        && micros_vm_boot_validate(
+            result.info,
+            &result.summary
+        ) == MICROS_VM_BOOT_OK
+    );
 }
 
 _Noreturn void micros_address_space_handoff_test_enter_production(
