@@ -673,6 +673,32 @@ Integration scenarios include:
 - malformed message type, endpoint, grant, and request identifier;
 - later, service restart and endpoint replacement.
 
+ADR-0045 defines the next VM-handoff evidence. Native tests are intended to
+cover the exact 364672-byte boot-information ABI, range/address-space/mapping/
+state/count validation, independent digest agreement, failure-atomic
+all-user-frame wired staging, operation-12 authority and precedence,
+irreversible commit, and a replayable minimum 4096-transition model.
+
+The later implementation adds:
+
+```text
+test-qemu-vm-handoff
+test-qemu-vm-self-fault
+test-qemu-vm-self-fault-sealed
+```
+
+The success image uses the production launcher, one real VM ELF, and one
+test-only probe. It must prove independent kernel/VM snapshot and static
+mapping agreement, one real VM-only handoff ecall, exact wired ownership for
+VM and every static service, post-handoff return, a real VM/probe IPC plus
+checked-copy grant exchange, generic readiness only after the ownership
+commit, and final launcher sealing. The self-fault image commits the same
+handoff, then requires exact VM-origin fault diagnostics and panic without a
+host timeout or success marker. The sealed variant first completes VM
+readiness and launcher sealing, then requires the non-bootstrap
+`vm-self-fault` classification and explicitly forbids a bootstrap failure
+record.
+
 Every blocking scenario has a host-side timeout. A timeout is a test failure
 with the latest structured serial events attached.
 

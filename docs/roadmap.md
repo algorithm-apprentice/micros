@@ -155,18 +155,21 @@ relocations, undefined symbols, startup mutations, and noncanonical raw-stub
 instructions. The isolated three-process QEMU image proves the checked ELF
 loader contract, startup, stack/data/BSS/rodata behavior, blocking IPC,
 register preservation, grant lifecycle and copies, accidental-return trapping,
-and complete cleanup. The static bootstrap launcher is now the next
-dependency-ready outcome.
-ADR-0043 now defines the accepted outcome without starting implementation.
-It specifies a pointer-free six-entry manifest, exact service and profile
-identities, generated embedded-image references, explicit prerequisite masks,
-lowest-ID topological order, complete held-service preparation, atomic
-profile/publication/release, one token-bound readiness transition, guest-owned
-counter deadlines, fatal post-publication failure, and irreversible launcher
-authority revocation. It also resolves the older static-init wording: launcher
-authority seals after the last static service, while ADR-0009 later creates
-init through PM/VFS/VM spawn. The ADR remains Proposed and the implementation
-todo remains pending until independent design review and merge.
+and complete cleanup.
+ADR-0043's static bootstrap launcher is now implemented. The kernel validates
+the pointer-free manifest and generated images, prepares every static service
+while held, publishes exact profiles/endpoints/scheduler state atomically,
+enforces token-bound readiness and guest-owned deadlines through operation 11,
+and seals launcher authority through exact `SOURCE_ONLY` state. Native models
+and three isolated QEMU workflows prove success, timeout, cyclic-manifest
+failure, and stable diagnostics.
+
+The VM server and one-way ownership handoff are now the next dependency-ready
+outcome. ADR-0045 proposes one fixed VM boot-information/frame database,
+atomic all-static wired-plan staging, exact VM-only summary operation 12,
+irreversible handoff before generic VM readiness, and fatal VM self-fault
+behavior. Dynamic mappings and non-VM page-fault delivery remain outside that
+minimal Step 9 boundary.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
@@ -321,7 +324,9 @@ model, IPC reply model, or global current-execution representation.
 - every usable physical frame has exactly one owner;
 - user mapping changes after handoff require VM authority;
 - VM's complete fault-handling working set remains wired;
-- VM failure is reported as a fatal bootstrap error.
+- VM failure while launcher bootstrap is running is a fatal bootstrap error;
+  after launcher sealing, VM self-fault uses its exact non-bootstrap fatal
+  diagnostic and never recurses into VM.
 
 ## Milestone 5: core user-space services
 
