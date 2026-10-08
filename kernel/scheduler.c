@@ -1010,7 +1010,8 @@ _Noreturn void micros_scheduler_idle_accounting_panic(
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
     || defined(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST) \
-    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST)
+    || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
+    || defined(MICROS_BUILD_GRANT_SYSCALL_TEST)
 _Noreturn void micros_scheduler_test_enter_without_timer(
     struct micros_thread_handle thread
 )
@@ -1081,7 +1082,8 @@ _Noreturn void micros_scheduler_test_enter_without_timer(
     || defined(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
-    || defined(MICROS_BUILD_IPC_SYSCALL_TEST)
+    || defined(MICROS_BUILD_IPC_SYSCALL_TEST) \
+    || defined(MICROS_BUILD_GRANT_SYSCALL_TEST)
 enum micros_scheduler_error
 micros_scheduler_test_prepare_supervisor_return(
     struct micros_hart *hart,

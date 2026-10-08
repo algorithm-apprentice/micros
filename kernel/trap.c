@@ -7,7 +7,7 @@
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
 #include "kernel/ipc_ecall_test.h"
 #endif
-#include "kernel/ipc_syscall.h"
+#include "kernel/syscall.h"
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
 #endif
@@ -16,6 +16,9 @@
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
 #include "kernel/ipc_syscall_panic_test.h"
+#endif
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+#include "kernel/grant_syscall_test.h"
 #endif
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
@@ -524,19 +527,116 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             return;
         }
 #endif
-#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
-        if (!user_timer) {
-            enum micros_address_space_handoff_test_trap_result result =
-                micros_address_space_handoff_test_handle_trap(
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+        if (
+            !user_timer
+            && cause_code == MICROS_EXCEPTION_USER_ECALL
+            && frame->a7 == UINT64_MAX
+        ) {
+            enum micros_grant_syscall_test_control_result result =
+                micros_grant_syscall_test_handle_control_trap(
                     hart,
                     frame
                 );
 
             if (
                 result
-                    == MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_SUPERVISOR_RETURN
+                    == MICROS_GRANT_SYSCALL_TEST_CONTROL_USER_RETURN
+                || result
+                    == MICROS_GRANT_SYSCALL_TEST_CONTROL_SUPERVISOR_RETURN
             ) {
                 return;
+            }
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "grant-syscall-test-control",
+                frame
+            );
+        }
+#endif
+#ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
+        if (!user_timer) {
+            if (cause_code == MICROS_EXCEPTION_USER_ECALL) {
+                if (frame->a7 == UINT64_MAX) {
+                    enum micros_address_space_handoff_test_trap_result
+                        result =
+                            micros_address_space_handoff_test_handle_trap(
+                                hart,
+                                frame
+                            );
+
+                    if (
+                        result
+                            == MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_USER_RETURN
+                        || result
+                            == MICROS_ADDRESS_SPACE_HANDOFF_TEST_TRAP_SUPERVISOR_RETURN
+                    ) {
+                        return;
+                    }
+                } else {
+                    enum micros_syscall_return syscall_return;
+
+                    if (
+                        !micros_address_space_handoff_test_before_ecall(
+                            hart,
+                            frame
+                        )
+                    ) {
+                        MICROS_TRAP_PANIC(
+                            hart->hardware_id,
+                            "address-space-handoff-syscall-before",
+                            frame
+                        );
+                    }
+                    syscall_return =
+                        micros_syscall_handle_user_ecall(hart, frame);
+                    if (
+                        !micros_address_space_handoff_test_after_dispatch(
+                            hart,
+                            frame,
+                            syscall_return
+                        )
+                    ) {
+                        MICROS_TRAP_PANIC(
+                            hart->hardware_id,
+                            "address-space-handoff-syscall-dispatch",
+                            frame
+                        );
+                    }
+                    if (
+                        (
+                            syscall_return
+                                == MICROS_SYSCALL_RETURN_CAPTURED
+                                ? micros_scheduler_select_captured_user_return(
+                                    hart,
+                                    frame
+                                )
+                                : micros_scheduler_select_user_return(
+                                    hart,
+                                    frame
+                                )
+                        ) != MICROS_SCHEDULER_OK
+                    ) {
+                        MICROS_TRAP_PANIC(
+                            hart->hardware_id,
+                            "address-space-handoff-syscall-return",
+                            frame
+                        );
+                    }
+                    if (
+                        !micros_address_space_handoff_test_after_return(
+                            hart,
+                            frame
+                        )
+                    ) {
+                        MICROS_TRAP_PANIC(
+                            hart->hardware_id,
+                            "address-space-handoff-syscall-after",
+                            frame
+                        );
+                    }
+                    return;
+                }
             }
             MICROS_TRAP_PANIC(
                 hart->hardware_id,
@@ -568,14 +668,43 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 );
             }
 #endif
-            enum micros_ipc_syscall_return ipc_return =
-                micros_ipc_handle_user_ecall(hart, frame);
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+            if (
+                !micros_grant_syscall_test_before_ecall(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "grant-syscall-test-before",
+                    frame
+                );
+            }
+#endif
+            enum micros_syscall_return syscall_return =
+                micros_syscall_handle_user_ecall(hart, frame);
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+            if (
+                !micros_grant_syscall_test_after_dispatch(
+                    hart,
+                    frame,
+                    syscall_return
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "grant-syscall-test-dispatch",
+                    frame
+                );
+            }
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
             if (
                 !micros_ipc_syscall_panic_test_before_return(
                     hart,
                     frame,
-                    ipc_return
+                    syscall_return
                 )
             ) {
                 MICROS_TRAP_PANIC(
@@ -586,7 +715,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             }
 #endif
             enum micros_scheduler_error scheduler_error =
-                ipc_return == MICROS_IPC_SYSCALL_RETURN_CAPTURED
+                syscall_return == MICROS_SYSCALL_RETURN_CAPTURED
                     ? micros_scheduler_select_captured_user_return(
                         hart,
                         frame
@@ -613,6 +742,20 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 MICROS_TRAP_PANIC(
                     hart->hardware_id,
                     "ipc-syscall-test-after",
+                    frame
+                );
+            }
+#endif
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+            if (
+                !micros_grant_syscall_test_after_return(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "grant-syscall-test-after",
                     frame
                 );
             }

@@ -48,6 +48,10 @@ _Noreturn void micros_ipc_syscall_runtime_run_self_test(void);
 _Noreturn void micros_ipc_syscall_panic_runtime_run_self_test(void);
 #endif
 
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+_Noreturn void micros_grant_syscall_runtime_run_self_test(void);
+#endif
+
 #ifdef MICROS_BUILD_FRAME_OWNERSHIP_TEST
 bool micros_frame_ownership_runtime_run_self_test(void);
 #endif
@@ -369,6 +373,11 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
         "phase=handed-off wired=validated ipc=resident "
         "grants=atomic mutation=revoked\n"
     );
+    uart_write(
+        "MICROS_GRANT_SYSCALL_HANDOFF_PASS "
+        "phase=handed-off operations=create,revoke,copy-from,copy-to "
+        "errors=stable registers=preserved\n"
+    );
     uart_flush();
 #endif
 
@@ -395,6 +404,11 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
     micros_ipc_syscall_panic_runtime_run_self_test();
     MICROS_PANIC(hart_id, "ipc-syscall-panic-test-returned");
+#endif
+
+#ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
+    micros_grant_syscall_runtime_run_self_test();
+    MICROS_PANIC(hart_id, "grant-syscall-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

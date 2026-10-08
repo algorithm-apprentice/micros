@@ -2,13 +2,14 @@
 .balign 4
 .globl micros_address_space_handoff_payload_start
 micros_address_space_handoff_payload_start:
-    li a0, 0x4a5
-    li a7, 0x40
 .globl micros_address_space_handoff_payload_ecall
 micros_address_space_handoff_payload_ecall:
     ecall
+.globl micros_address_space_handoff_payload_after_ecall
+micros_address_space_handoff_payload_after_ecall:
+.globl micros_address_space_handoff_payload_spin
+micros_address_space_handoff_payload_spin:
 1:
-    wfi
     j 1b
 .globl micros_address_space_handoff_payload_end
 micros_address_space_handoff_payload_end:

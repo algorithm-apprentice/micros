@@ -108,6 +108,7 @@ cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-grant
+cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -137,10 +138,17 @@ generation-safe direct-grant lifecycle, and complete teardown back to the
 object baseline. The grant gate uses three exact address spaces to prove
 page-local and cross-page checked copy in both directions, failure-atomic
 mapping/permission denial, stale authority rejection, and complete cleanup.
+The unified grant-syscall gate executes real U-mode operations 7 through 10
+through the production dispatcher. It proves read/write creation, revoke,
+page-local and cross-page copy in both directions, zero-length validation,
+stable shape/authority/range/mapping failures, endpoint-generation reuse,
+non-result-register preservation, representative IPC compatibility, and
+complete bootstrap cleanup.
 The address-space handoff gate validates every live bootstrap leaf's wired
 target before the irreversible transition, then proves exact `VM_WIRED`
 validation, activation, IPC-buffer access, checked grants, revoked mutation,
-bootstrap-only context preparation, and a real handed-off U-mode return.
+bootstrap-only context preparation, real handed-off grant ecalls, and an
+ordinary scheduler return.
 The IPC gate uses trusted
 kernel-owned messages before the syscall ABI exists and proves immediate and
 blocked send/receive, tokenized call/reply, atomic `reply_receive`,

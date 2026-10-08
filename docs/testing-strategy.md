@@ -74,7 +74,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
-`test-qemu-grant`,
+`test-qemu-grant`, `test-qemu-grant-syscall`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
@@ -99,6 +99,7 @@ cmake --workflow --preset test-qemu-mmu
 cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-grant
+cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -336,19 +337,31 @@ exact marker is:
 MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
 ```
 
-ADR-0041 defines the next target evidence without claiming that its workflow
-exists yet. Native tests cover the unified operation/result values, exact
+ADR-0041 evidence now includes native unified-ABI tests and the dedicated
+`test-qemu-grant-syscall` workflow. Native tests cover the unified
+operation/result values, exact
 grant register shapes, upper-bit and unused-register rejection, 64-bit scalar
 preservation, token/result disjointness, recoverable grant-error mapping, and
-fatal phase/invariant classification. One isolated bootstrap QEMU component
-then executes real U-mode `ecall` instructions through the production
-top-level dispatcher. It must preserve representative IPC behavior while
+fatal phase/invariant classification. The isolated bootstrap QEMU component
+executes real U-mode `ecall` instructions through the production top-level
+dispatcher. It preserves representative IPC behavior while
 proving grant create, revoke, both copy directions,
 page-local/cross-page/zero-length behavior, exact stable failures,
 non-result-register preservation, stale authority after reuse, and complete
-cleanup. The retained-state `test-qemu-address-space-handoff` image is also
-extended with real operations 7 through 10 after its `VM_WIRED` commit,
-proving the same syscall path in `HANDED_OFF` without claiming teardown.
+cleanup. It emits:
+
+```text
+MICROS_GRANT_SYSCALL_TEST_PASS namespace=unified phase=bootstrap lifecycle=checked directions=checked errors=stable registers=preserved cleanup=complete
+```
+
+The retained-state `test-qemu-address-space-handoff` image also executes real
+operations 7 through 10 after its `VM_WIRED` commit, proving the same syscall
+path in `HANDED_OFF` without claiming teardown. In addition to the unchanged
+ADR-0040 marker it emits:
+
+```text
+MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved
+```
 
 `test-qemu-nested-trap`
 injects a second fault

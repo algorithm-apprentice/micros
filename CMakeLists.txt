@@ -53,6 +53,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_GRANT_SYSCALL_TEST
+    "Build the unified grant syscall acceptance image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -109,6 +114,7 @@ set(
     MICROS_BUILD_IPC_ECALL_CORE_TEST
     MICROS_BUILD_IPC_SYSCALL_TEST
     MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
+    MICROS_BUILD_GRANT_SYSCALL_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -176,7 +182,9 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler_core.c
         kernel/endpoint.c
         kernel/grant.c
+        kernel/grant_abi.c
         kernel/grant_copy_core.c
+        kernel/grant_syscall_core.c
         kernel/user_address_space_core.c
         kernel/ipc_abi.c
         kernel/ipc.c
@@ -187,6 +195,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_delivery_test.c
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
+        tests/host/grant_syscall_core_test.c
         tests/host/user_address_space_core_test.c
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
@@ -548,14 +557,18 @@ add_executable(
     kernel/frame_allocator.c
     kernel/frame_ownership.c
     kernel/grant.c
+    kernel/grant_abi.c
     kernel/grant_copy.c
     kernel/grant_copy_core.c
+    kernel/grant_syscall_core.c
+    kernel/grant_syscall.c
     kernel/grant_runtime.c
     kernel/ipc_abi.c
     kernel/ipc.c
     kernel/ipc_buffer.c
     kernel/ipc_runtime.c
     kernel/ipc_syscall.c
+    kernel/syscall.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/scheduler_core.c
@@ -889,6 +902,54 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
     )
 endif()
 
+if(MICROS_BUILD_GRANT_SYSCALL_TEST)
+    add_custom_target(
+        test-qemu-grant-syscall
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_GRANT_SYSCALL_TEST_PASS namespace=unified phase=bootstrap lifecycle=checked directions=checked errors=stable registers=preserved cleanup=complete"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_GRANT_SYSCALL_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_GRANT_SYSCALL_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            arch/riscv64/grant_syscall_test.S
+            kernel/grant_syscall_test.c
+    )
+endif()
+
 if(MICROS_BUILD_NESTED_TRAP_TEST)
     add_custom_target(
         test-qemu-nested-trap
@@ -1013,6 +1074,8 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked"
+            --marker
+            "MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

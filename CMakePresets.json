@@ -144,6 +144,15 @@
       }
     },
     {
+      "name": "riscv64-grant-syscall-test",
+      "displayName": "RISC-V 64 unified grant syscall test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-grant-syscall-test",
+      "cacheVariables": {
+        "MICROS_BUILD_GRANT_SYSCALL_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -338,6 +347,13 @@
       "configurePreset": "riscv64-ipc-syscall-panic-test",
       "targets": [
         "test-qemu-ipc-syscall-panic"
+      ]
+    },
+    {
+      "name": "test-qemu-grant-syscall",
+      "configurePreset": "riscv64-grant-syscall-test",
+      "targets": [
+        "test-qemu-grant-syscall"
       ]
     },
     {
@@ -647,6 +663,20 @@
         {
           "type": "build",
           "name": "test-qemu-ipc-syscall-panic"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-grant-syscall",
+      "displayName": "Build and run unified grant syscall acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-grant-syscall-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-grant-syscall"
         }
       ]
     },

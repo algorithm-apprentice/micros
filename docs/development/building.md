@@ -719,11 +719,17 @@ permission and absent-mapping failure atomicity, transferable/foreign owner
 rejection, and structural-error precedence over an absent requested leaf.
 Create, allocate, release, destroy, and generic execution-context preparation
 remain phase-rejected. An already prepared thread then performs a real U-mode
-round trip through the ordinary scheduler return path. Only that complete
-sequence emits:
+round trip through the ordinary scheduler return path. After the `VM_WIRED`
+commit, the same prepared grantor and grantee execute real unified grant
+operations 7 through 10 through the production dispatcher. They create
+read/write grants, perform page-local, cross-page, and zero-length copies in
+both directions, observe stable direction/range/mapping/permission failures,
+revoke both tokens, and reject later stale use while preserving every
+non-result register. Only that complete sequence emits both records:
 
 ```text
 MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
+MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved
 ```
 
 ## User execution-context and U-mode test
@@ -783,6 +789,34 @@ MICROS_GRANT_TEST_PASS identity=generation-safe directions=checked bounds=valida
 The phase field identifies this gate's bootstrap cleanup contract. The
 separate `test-qemu-address-space-handoff` gate proves the same production
 copy path through exact `VM_WIRED` mappings after handoff.
+
+## Unified grant syscall acceptance
+
+Build and run the bootstrap-phase grant syscall component with:
+
+```bash
+cmake --workflow --preset test-qemu-grant-syscall
+```
+
+The image creates grantor, grantee, and wrong-process generations with real
+threads, endpoints, private roots, executable payloads, stacks, writable
+cross-page buffers, and read-only pages. Actual U-mode ecalls use the
+production top-level dispatcher. A representative IPC notification preserves
+operations 1 through 6 before grantor ecalls create read and write tokens.
+The grantee proves page-local, cross-page, and zero-length `copy_from` and
+`copy_to`; rejected calls cover wrong participants and direction, revoked
+tokens, stale endpoints, upper-bit and unused-register shapes, range,
+overflow, oversize, absent mappings, and permissions. Every return changes
+only `a0` and `sepc`, every rejected operation preserves authority, mapping,
+owner, and user-byte snapshots, and endpoint-generation reuse cannot restore
+old authority. Final teardown restores the grant, endpoint, object, root,
+frame, allocator, scheduler, and trap-stack baselines.
+
+Only that complete sequence emits:
+
+```text
+MICROS_GRANT_SYSCALL_TEST_PASS namespace=unified phase=bootstrap lifecycle=checked directions=checked errors=stable registers=preserved cleanup=complete
+```
 
 ## Blocking IPC acceptance test
 
