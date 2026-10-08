@@ -268,6 +268,11 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler_core.c
         tests/host/bootstrap_control_test.c
     )
+    add_executable(
+        vm_bootstrap_test
+        kernel/vm_bootstrap.c
+        tests/host/vm_bootstrap_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -322,6 +327,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         bootstrap_control_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        vm_bootstrap_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -337,6 +348,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(runtime_test PRIVATE c_std_17)
     target_compile_features(bootstrap_test PRIVATE c_std_17)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
+    target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -439,6 +451,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         bootstrap_control_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        vm_bootstrap_test
         PRIVATE
             -Wall
             -Wextra
@@ -565,6 +587,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            vm_bootstrap_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            vm_bootstrap_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -578,6 +611,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME user-runtime COMMAND runtime_test)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
+    add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -610,6 +644,7 @@ if(MICROS_BUILD_HOST_TESTS)
             runtime_test
             bootstrap_test
             bootstrap_control_test
+            vm_bootstrap_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -657,6 +692,7 @@ if(MICROS_BUILD_HOST_TESTS)
             runtime_test
             bootstrap_test
             bootstrap_control_test
+            vm_bootstrap_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -957,6 +993,7 @@ add_executable(
     kernel/user_address_space.c
     kernel/user_address_space_core.c
     kernel/user_execution.c
+    kernel/vm_bootstrap.c
 )
 
 if(MICROS_BUILD_USER_RUNTIME_TEST)
