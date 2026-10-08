@@ -162,6 +162,15 @@
       }
     },
     {
+      "name": "riscv64-bootstrap-launcher-test",
+      "displayName": "RISC-V 64 static bootstrap launcher test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-bootstrap-launcher-test",
+      "cacheVariables": {
+        "MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-nested-trap-test",
       "displayName": "RISC-V 64 per-hart nested trap test",
       "inherits": "riscv64-debug",
@@ -370,6 +379,13 @@
       "configurePreset": "riscv64-user-runtime-test",
       "targets": [
         "test-qemu-user-runtime"
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-launcher",
+      "configurePreset": "riscv64-bootstrap-launcher-test",
+      "targets": [
+        "test-qemu-bootstrap-launcher"
       ]
     },
     {
@@ -707,6 +723,20 @@
         {
           "type": "build",
           "name": "test-qemu-user-runtime"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-bootstrap-launcher",
+      "displayName": "Build and run static bootstrap launcher acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-bootstrap-launcher-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-bootstrap-launcher"
         }
       ]
     },

@@ -75,6 +75,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
+`test-qemu-bootstrap-launcher`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
@@ -101,6 +102,7 @@ cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
+cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -405,8 +407,7 @@ service, readiness acknowledgment construction, deadline boundaries,
 VM/console role gates, failure-atomic output/state preservation, source-only
 endpoint sealing, and a replayable 4,096-operation launcher transition model.
 The common RISC-V build also compiles the fixed preparation, reverse-order
-rollback, manifest-view, syscall, timeout, and final-seal paths before the
-isolated launcher images are added.
+rollback, manifest-view, syscall, timeout, and final-seal paths.
 
 ADR-0044 decoder coverage keeps operation-11 width and unused-register checks
 before current-thread resolution, then validates the `FAIL` reason and its
@@ -414,25 +415,39 @@ before current-thread resolution, then validates the `FAIL` reason and its
 cover all nine malformed-field codes and unrelated-reason detail rejection;
 detailed manifest validation separately covers authoritative cycle masks.
 
-The implementation is also intended to add three isolated workflows:
+The successful launcher workflow is now implemented:
 
 ```text
 test-qemu-bootstrap-launcher
+```
+
+It uses checked launcher and probe ELFs, a generated immutable image catalog
+and deliberately permuted manifest, the production preparation and
+operation-11 paths, and one post-seal probe trap. Only the exact pass marker
+below is accepted:
+
+```text
+MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked
+```
+
+The two fatal-path workflows remain to be added:
+
+```text
 test-qemu-bootstrap-ready-timeout
 test-qemu-bootstrap-manifest-panic
 ```
 
-These workflows do not exist at design time and are not part of the implemented
-command inventory above.
+They are not yet part of the implemented command inventory above.
 
-The success image will use one real launcher ELF and test-only probe ELFs
+The success image uses one real launcher ELF and test-only probe ELFs
 through the production object, address-space, runtime, IPC, scheduler, and
-syscall paths. It must prove that all images and contexts are prepared while
+syscall paths. It proves that all images and contexts are prepared while
 inactive and scheduler-unassigned, unreleased endpoints remain hidden, release
 follows explicit prerequisites, and exact profiles plus scheduler policies are
 installed atomically with endpoint publication. Readiness calls carry the
-exact source generation and reply token, deterministic malformed/duplicate/
-early/foreign precedence is enforced, and acknowledgments commit atomically.
+exact source generation and reply token, and acknowledgments commit atomically.
+The native transition/classification tests retain malformed, duplicate,
+early, and foreign precedence coverage.
 Final completion holds the launcher, clears the exact controller binding, and
 seals authority while the retained source-only endpoint rejects new
 destinations but still validates already staged acknowledgment source state.

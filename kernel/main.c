@@ -13,6 +13,9 @@
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
 #endif
+#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+#include "kernel/bootstrap_test.h"
+#endif
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -418,6 +421,11 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST
     micros_user_runtime_runtime_run_self_test();
     MICROS_PANIC(hart_id, "user-runtime-test-returned");
+#endif
+
+#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    micros_bootstrap_test_launch();
+    MICROS_PANIC(hart_id, "bootstrap-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

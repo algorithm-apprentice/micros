@@ -63,6 +63,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    "Build the static bootstrap launcher acceptance image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -121,6 +126,7 @@ set(
     MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
     MICROS_BUILD_GRANT_SYSCALL_TEST
     MICROS_BUILD_USER_RUNTIME_TEST
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -766,6 +772,121 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
     )
 endif()
 
+if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+    function(micros_add_bootstrap_user target output_name)
+        add_executable(
+            "${target}"
+            lib/runtime/memory.c
+            lib/runtime/memory_symbols.c
+            lib/runtime/raw_syscall.S
+            lib/runtime/runtime.c
+            lib/runtime/start.S
+            ${ARGN}
+        )
+        set_target_properties(
+            "${target}"
+            PROPERTIES
+                OUTPUT_NAME "${output_name}"
+                SUFFIX ".elf"
+                RUNTIME_OUTPUT_DIRECTORY
+                    "${CMAKE_BINARY_DIR}/bootstrap"
+                LINK_DEPENDS
+                    "${MICROS_USER_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+        )
+        target_include_directories(
+            "${target}"
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        )
+        target_compile_features("${target}" PRIVATE c_std_17)
+        target_compile_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -msmall-data-limit=0
+                -mno-save-restore
+                -ffunction-sections
+                -fdata-sections
+                -g0
+                "$<$<COMPILE_LANGUAGE:C>:-std=c17;-ffreestanding;-fno-builtin;-fno-common;-fno-pic;-fno-pie;-fno-stack-protector;-fno-unwind-tables;-fno-asynchronous-unwind-tables>"
+                "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wpedantic;-Wmissing-prototypes;-Wstrict-prototypes>"
+        )
+        target_link_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -nostdlib
+                -static
+                "--ld-path=${MICROS_LD_LLD}"
+                "-Wl,-T,${MICROS_USER_LINKER_SCRIPT}"
+                -Wl,--build-id=none
+                -Wl,--fatal-warnings
+                -Wl,--gc-sections
+                -Wl,--no-relax
+                -Wl,-z,max-page-size=4096
+                -Wl,-z,common-page-size=4096
+                "-Wl,-Map,${CMAKE_BINARY_DIR}/bootstrap/${output_name}.map"
+        )
+        add_custom_command(
+            TARGET "${target}"
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                --elf
+                "$<TARGET_FILE:${target}>"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endfunction()
+
+    micros_add_bootstrap_user(
+        micros_bootstrap_launcher
+        micros-bootstrap-launcher
+        tests/qemu/bootstrap_launcher.c
+    )
+    micros_add_bootstrap_user(
+        micros_bootstrap_probe
+        micros-bootstrap-probe
+        tests/qemu/bootstrap_probe.S
+        tests/qemu/bootstrap_probe.c
+    )
+    set(
+        MICROS_BOOTSTRAP_FIXTURE_SOURCE
+        "${CMAKE_BINARY_DIR}/generated/bootstrap_fixture.c"
+    )
+    add_custom_command(
+        OUTPUT "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+            --launcher-elf
+            "$<TARGET_FILE:micros_bootstrap_launcher>"
+            --probe-elf
+            "$<TARGET_FILE:micros_bootstrap_probe>"
+            --output
+            "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        DEPENDS
+            micros_bootstrap_launcher
+            micros_bootstrap_probe
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    set_source_files_properties(
+        "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+        PROPERTIES GENERATED TRUE
+    )
+endif()
+
 add_executable(
     micros
     arch/riscv64/boot.S
@@ -828,6 +949,25 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             "${MICROS_USER_RUNTIME_FIXTURE_SOURCE}"
             arch/riscv64/user_runtime_test.S
             kernel/user_runtime_test.c
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_bootstrap_probe
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
+            kernel/bootstrap_test.c
     )
 endif()
 
@@ -1144,6 +1284,40 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
             --require-trap-context
             --timeout
             8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-launcher
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
