@@ -13,7 +13,9 @@
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
 #endif
-#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+#if defined(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST) \
+    || defined(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST) \
+    || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
 #include "kernel/bootstrap_test.h"
 #endif
 
@@ -423,7 +425,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     MICROS_PANIC(hart_id, "user-runtime-test-returned");
 #endif
 
-#ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+#if defined(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST) \
+    || defined(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST) \
+    || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
     micros_bootstrap_test_launch();
     MICROS_PANIC(hart_id, "bootstrap-test-returned");
 #endif

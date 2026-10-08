@@ -76,6 +76,8 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
+`test-qemu-bootstrap-ready-timeout`,
+`test-qemu-bootstrap-manifest-panic`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
 `test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
 `test-qemu-nested-trap`, and
@@ -103,6 +105,8 @@ cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
+cmake --workflow --preset test-qemu-bootstrap-ready-timeout
+cmake --workflow --preset test-qemu-bootstrap-manifest-panic
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -430,14 +434,19 @@ below is accepted:
 MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked
 ```
 
-The two fatal-path workflows remain to be added:
+The two fatal-path workflows are also implemented:
 
 ```text
 test-qemu-bootstrap-ready-timeout
 test-qemu-bootstrap-manifest-panic
 ```
 
-They are not yet part of the implemented command inventory above.
+The timeout image runs a released probe that deliberately omits readiness and
+requires the guest counter deadline to emit `reason=ready-timeout`; host
+timeout is rejected. The malformed-manifest image supplies a dependency cycle
+and requires `reason=manifest-cycle` before endpoint, user-frame, or scheduler
+publication. Both require the complete bootstrap panic report and explicitly
+forbid the success marker.
 
 The success image uses one real launcher ELF and test-only probe ELFs
 through the production object, address-space, runtime, IPC, scheduler, and

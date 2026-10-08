@@ -15,6 +15,7 @@ volatile uint64_t micros_bootstrap_probe_data =
     UINT64_C(0x50524f4245444154);
 
 _Noreturn void micros_bootstrap_probe_report(int64_t result);
+_Noreturn void micros_bootstrap_probe_wait(void);
 
 static void clear_bytes(void *storage, size_t size)
 {
@@ -223,6 +224,14 @@ void micros_service_main(void)
     ) {
         __builtin_trap();
     }
+#ifdef MICROS_BOOTSTRAP_PROBE_OMIT_READY
+    if (
+        micros_bootstrap_service_config.service_id
+        == MICROS_BOOTSTRAP_TEST_FIRST_SERVICE_ID
+    ) {
+        micros_bootstrap_probe_wait();
+    }
+#endif
     clear_bytes(&message, sizeof(message));
     message.type = MICROS_BOOTSTRAP_MESSAGE_READY;
     write_u32_le(

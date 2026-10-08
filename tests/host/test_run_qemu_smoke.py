@@ -501,6 +501,25 @@ class ExpectedOutcomeTest(unittest.TestCase):
 
         self.assertTrue(accepted)
 
+    def test_rejects_forbidden_marker(self):
+        result = run_qemu_smoke.QemuResult(
+            output=PANIC_OUTPUT + "MICROS_BOOTSTRAP_TEST_PASS\n",
+            return_code=0,
+            timed_out=False,
+        )
+
+        accepted = run_qemu_smoke.matches_expected_result(
+            result=result,
+            observed_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            expected_outcome=run_qemu_smoke.SmokeOutcome.PANIC,
+            markers=("MICROS_PANIC reason=intentional-test",),
+            patterns=(),
+            forbidden_markers=("MICROS_BOOTSTRAP_TEST_PASS",),
+            require_panic_report=True,
+        )
+
+        self.assertFalse(accepted)
+
     def test_rejects_panic_that_times_out(self):
         result = run_qemu_smoke.QemuResult(
             output=PANIC_OUTPUT,

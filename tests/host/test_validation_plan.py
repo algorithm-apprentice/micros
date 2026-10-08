@@ -93,6 +93,18 @@ class ValidationPlanTests(unittest.TestCase):
                     "test-qemu-bootstrap-launcher",
                 )
 
+    def test_bootstrap_fatal_gates_own_panic_paths(self):
+        for path in ("arch/riscv64/panic.S", "kernel/panic.c"):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-bootstrap-ready-timeout",
+                )
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-bootstrap-manifest-panic",
+                )
+
     def test_grant_syscall_paths_own_unified_gates(self):
         for path in (
             "kernel/syscall.c",
@@ -426,6 +438,8 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-grant-syscall": "kernel/grant_syscall_test.c",
             "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
+            "test-qemu-bootstrap-ready-timeout": "kernel/bootstrap_test.c",
+            "test-qemu-bootstrap-manifest-panic": "kernel/bootstrap_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
             "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
             "test-qemu-ipc-syscall": "kernel/ipc_syscall_test.c",

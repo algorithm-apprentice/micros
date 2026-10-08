@@ -115,6 +115,24 @@ static const struct micros_bootstrap_runtime_config runtime_config = {
         MICROS_BOOTSTRAP_TEST_SCHEDULER_INTERVAL,
 };
 
+#ifdef MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+static struct micros_bootstrap_manifest cycle_manifest;
+static struct micros_bootstrap_expected_service
+        cycle_expected_services[MICROS_BOOTSTRAP_TEST_SERVICE_COUNT];
+static struct micros_bootstrap_runtime_config cycle_runtime_config;
+
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+        uint8_t *output = destination;
+        const uint8_t *input = source;
+        size_t index;
+
+        for (index = 0; index < size; ++index) {
+            output[index] = input[index];
+        }
+}
+#endif
+
 static _Noreturn void test_failure(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
@@ -268,7 +286,31 @@ static bool configuration_is_exact(
 
 _Noreturn void micros_bootstrap_test_launch(void)
 {
+#ifdef MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+    copy_bytes(
+        &cycle_manifest,
+        &micros_bootstrap_test_manifest,
+        sizeof(cycle_manifest)
+    );
+    copy_bytes(
+        cycle_expected_services,
+        expected_services,
+        sizeof(cycle_expected_services)
+    );
+    copy_bytes(
+        &cycle_runtime_config,
+        &runtime_config,
+        sizeof(cycle_runtime_config)
+    );
+    cycle_manifest.entries[2].prerequisites = UINT64_C(1) << 2;
+    cycle_expected_services[1].prerequisites = UINT64_C(1) << 2;
+    cycle_runtime_config.manifest = &cycle_manifest;
+    cycle_runtime_config.expected_services =
+        cycle_expected_services;
+    micros_bootstrap_runtime_launch(&cycle_runtime_config);
+#else
     micros_bootstrap_runtime_launch(&runtime_config);
+#endif
 }
 
 _Noreturn void micros_bootstrap_test_handle_trap(

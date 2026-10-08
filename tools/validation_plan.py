@@ -28,6 +28,8 @@ QEMU_WORKFLOWS = (
     "test-qemu-grant-syscall",
     "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher",
+    "test-qemu-bootstrap-ready-timeout",
+    "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc",
     "test-qemu-ipc-ecall-core",
     "test-qemu-ipc-syscall",
@@ -368,6 +370,19 @@ GATE_INPUTS = {
         "arch/riscv64/scheduler_test.S",
     ),
 }
+
+GATE_INPUTS["test-qemu-bootstrap-ready-timeout"] = GATE_INPUTS[
+    "test-qemu-bootstrap-launcher"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
+GATE_INPUTS["test-qemu-bootstrap-manifest-panic"] = GATE_INPUTS[
+    "test-qemu-bootstrap-launcher"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
 
 SLOW_MODEL_INPUTS = {
     "test-ipc-model": (

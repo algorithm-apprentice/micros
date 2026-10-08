@@ -68,6 +68,16 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    "Build the bootstrap readiness-timeout panic image"
+    OFF
+)
+option(
+    MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+    "Build the malformed bootstrap manifest panic image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -127,6 +137,8 @@ set(
     MICROS_BUILD_GRANT_SYSCALL_TEST
     MICROS_BUILD_USER_RUNTIME_TEST
     MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -772,7 +784,11 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
     )
 endif()
 
-if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+if(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+)
     function(micros_add_bootstrap_user target output_name)
         add_executable(
             "${target}"
@@ -857,6 +873,13 @@ if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
         tests/qemu/bootstrap_probe.S
         tests/qemu/bootstrap_probe.c
     )
+    if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+        target_compile_definitions(
+            micros_bootstrap_probe
+            PRIVATE
+                MICROS_BOOTSTRAP_PROBE_OMIT_READY=1
+        )
+    endif()
     set(
         MICROS_BOOTSTRAP_FIXTURE_SOURCE
         "${CMAKE_BINARY_DIR}/generated/bootstrap_fixture.c"
@@ -952,17 +975,35 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
     )
 endif()
 
-if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+if(
+    MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
+    OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
+    OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
+)
     add_dependencies(
         micros
         micros_bootstrap_launcher
         micros_bootstrap_probe
     )
-    target_compile_definitions(
-        micros
-        PRIVATE
-            MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST=1
-    )
+    if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST=1
+        )
+    elseif(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST=1
+        )
+    else()
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST=1
+        )
+    endif()
     target_sources(
         micros
         PRIVATE
@@ -1311,6 +1352,88 @@ if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
             "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
             --require-fdt-events
             --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-ready-timeout
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --pattern
+            "MICROS_BOOTSTRAP_FAILURE reason=ready-timeout service=0x0000000000000002 endpoint=0x0000000000001001 phase=failed state=starting detail=0x[0-9a-f]{16}"
+            --forbid-marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            20
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
+    add_custom_target(
+        test-qemu-bootstrap-manifest-panic
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --marker
+            "MICROS_BOOTSTRAP_FAILURE reason=manifest-cycle service=0x0000000000000002 endpoint=0x00000000fffffffe phase=failed state=none detail=0x0000000000000006"
+            --forbid-marker
+            "MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
