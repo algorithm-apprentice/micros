@@ -234,6 +234,11 @@ if(MICROS_BUILD_HOST_TESTS)
         lib/runtime/runtime.c
         tests/host/runtime_test.c
     )
+    add_executable(
+        bootstrap_test
+        kernel/bootstrap_manifest.c
+        tests/host/bootstrap_manifest_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -280,6 +285,12 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
+    target_include_directories(
+        bootstrap_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
     target_compile_features(fdt_test PRIVATE c_std_17)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_features(sv39_test PRIVATE c_std_17)
@@ -289,6 +300,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(endpoint_test PRIVATE c_std_17)
     target_compile_features(ipc_model_test PRIVATE c_std_17)
     target_compile_features(runtime_test PRIVATE c_std_17)
+    target_compile_features(bootstrap_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -371,6 +383,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         runtime_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        bootstrap_test
         PRIVATE
             -Wall
             -Wextra
@@ -475,6 +497,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            bootstrap_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            bootstrap_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -486,6 +519,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME endpoint-profile COMMAND endpoint_test)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
+    add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -516,6 +550,7 @@ if(MICROS_BUILD_HOST_TESTS)
             scheduler_test
             endpoint_test
             runtime_test
+            bootstrap_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -561,6 +596,7 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             ipc_model_test
             runtime_test
+            bootstrap_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )

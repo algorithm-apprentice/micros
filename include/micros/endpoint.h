@@ -39,6 +39,7 @@ enum micros_endpoint_state {
     MICROS_ENDPOINT_STATE_FREE = 0,
     MICROS_ENDPOINT_STATE_RESERVED,
     MICROS_ENDPOINT_STATE_ACTIVE,
+    MICROS_ENDPOINT_STATE_SOURCE_ONLY,
 };
 
 struct micros_privilege_profile {
@@ -83,6 +84,7 @@ enum micros_endpoint_error {
     MICROS_ENDPOINT_ERROR_ENDPOINT,
     MICROS_ENDPOINT_ERROR_STALE,
     MICROS_ENDPOINT_ERROR_STATE,
+    MICROS_ENDPOINT_ERROR_CLOSING,
     MICROS_ENDPOINT_ERROR_PROFILE,
     MICROS_ENDPOINT_ERROR_UNAUTHORIZED,
     MICROS_ENDPOINT_ERROR_INVARIANT,
@@ -130,6 +132,12 @@ enum micros_endpoint_error micros_endpoint_install_profile(
 enum micros_endpoint_error micros_endpoint_activate(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+);
+
+enum micros_endpoint_error micros_endpoint_seal_source_only(
+    struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     micros_endpoint_t endpoint
 );
 
