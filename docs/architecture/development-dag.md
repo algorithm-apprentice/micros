@@ -97,7 +97,7 @@ failures attributable to one coherent change.
 | 5 | Page tables, process/thread/hart objects, user mode | U-mode isolation and repeated thread context switches |
 | 6 | Scheduler, endpoints, IPC | Blocking, wakeup, reply-token, stale endpoint, privilege, and deadlock tests |
 | 7 | Grants, grant syscalls, wired handoff reads, then user runtime | First prove real U-mode grant lifecycle and copies before and after handoff for wired service pages; then prove one standalone freestanding ELF, startup path, raw `ecall`, and C wrappers for operations 1 through 10 |
-| 8 | Bootstrap launcher | Manifest order, exact privilege profiles, and readiness gates verified |
+| 8 | Bootstrap launcher | Immutable manifest validation, deterministic topology, held-image preparation, exact profile/publication release, token-bound readiness, internal timeout failure, and irreversible authority revocation verified |
 | 9 | VM handoff | Frame ownership is disjoint and the VM working set remains wired |
 | 10 | PM | Spawn metadata, exit, wait, and failure rollback verified |
 | 11 | TTY | Two-phase console handoff, deferred PLIC completion, input, and output verified |
@@ -121,6 +121,33 @@ test payload. It requires an independent user ELF, loader/BSS/stack contract,
 ABI-preserving raw stub, typed C wrappers, and target acceptance. The static
 launcher remains blocked until that complete runtime outcome is reviewed and
 implemented.
+
+Step 8 is also internally serialized:
+
+1. validate the pointer-free manifest, immutable profile identities, generated
+   image catalog, resource bounds, explicit prerequisites, and cycle-free
+   lowest-ID topological order;
+2. prepare every static process, root, image, stack, first thread, context,
+   reserved endpoint, and held scheduling policy before launcher entry;
+3. run only the launcher with its exact profile and active endpoint;
+4. atomically install one service's exact profile, publish its endpoint, arm
+   one guest-owned readiness deadline, and release its prepared thread;
+5. accept one exact-generation readiness call and acknowledge it through the
+   request's one-shot reply token;
+6. repeat only after the previous service is ready; and
+7. hold the launcher, clear the exact controller binding, and irreversibly
+   seal bootstrap authority; its retained endpoint and profile remain inert
+   until later teardown.
+
+The initial static service chain is launcher, VM, PM, TTY, RAMFS, and VFS.
+The Step 8 implementation uses test-only probe ELFs and does not implement
+those service protocols. VM readiness is extended at Step 9 so the generic
+ready call follows the ownership commit. TTY readiness is extended at Step 11
+so release follows `console_handoff_begin` and readiness follows
+`console_handoff_commit`.
+
+`init` is not a static manifest service. Step 14 creates it through the
+ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
 
 ## Phase gates
 
@@ -155,7 +182,8 @@ Before the static launcher, the user runtime must demonstrate:
 Before executable loading, VM, PM, TTY, RAMFS, and VFS must each:
 
 - start from the static launcher;
-- publish a ready state;
+- perform one exact-generation, versioned readiness call and receive its
+  token-bound acknowledgment;
 - reject malformed requests;
 - survive ordinary client termination without leaking owned state;
 - expose enough diagnostics to identify the current request and peer endpoint.

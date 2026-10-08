@@ -395,6 +395,63 @@ Only the complete sequence emits:
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
 
+ADR-0043 defines the next implementation evidence. Its implementation
+is intended to add native manifest validation and a replayable 4,096-operation
+launcher transition model. The native evidence must cover exact version-1
+layout, immutable image/profile resolution, page limits, explicit
+prerequisites, deterministic lowest-ID topology, cycles, held versus
+published endpoint state, exact bootstrap-configuration patching, exact
+profile installation, one starting service, token-bound readiness, deadlines,
+VM/console role gates, prepublication failure atomicity, and irreversible
+authority sealing.
+
+The implementation is also intended to add three isolated workflows:
+
+```text
+test-qemu-bootstrap-launcher
+test-qemu-bootstrap-ready-timeout
+test-qemu-bootstrap-manifest-panic
+```
+
+These workflows do not exist at design time and are not part of the implemented
+command inventory above.
+
+The success image will use one real launcher ELF and test-only probe ELFs
+through the production object, address-space, runtime, IPC, scheduler, and
+syscall paths. It must prove that all images and contexts are prepared while
+inactive and scheduler-unassigned, unreleased endpoints remain hidden, release
+follows explicit prerequisites, and exact profiles plus scheduler policies are
+installed atomically with endpoint publication. Readiness calls carry the
+exact source generation and reply token, deterministic malformed/duplicate/
+early/foreign precedence is enforced, and acknowledgments commit atomically.
+Final completion holds the launcher, clears the exact controller binding, and
+seals authority while the retained source-only endpoint rejects new
+destinations but still validates already staged acknowledgment source state.
+Only the complete sequence may emit:
+
+```text
+MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked
+```
+
+The missing-readiness image must fail from the guest's own `time`-counter
+deadline with:
+
+```text
+MICROS_BOOTSTRAP_FAILURE reason=ready-timeout
+```
+
+The malformed-manifest image must reject a two-entry cycle before any
+manifest-directed process, user-frame, endpoint, or scheduler mutation with:
+
+```text
+MICROS_BOOTSTRAP_FAILURE reason=manifest-cycle
+```
+
+Both expected-failure images then require
+`MICROS_PANIC reason=bootstrap-failure`, clean SBI system-failure shutdown, no
+success marker, and no host timeout. The launcher gate does not claim a VM
+ownership handoff, TTY console transition, or any real service protocol.
+
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
@@ -452,6 +509,8 @@ Initial native test subjects include:
 - FDT memory-node iteration, multiple `reg` tuples, reservations, and malformed
   bounds;
 - IPC transition and deadlock-detection models;
+- immutable bootstrap-manifest parsing, profile/image resolution, explicit
+  prerequisite topology, and launcher lifecycle transitions;
 - permission masks;
 - grant bounds, direction, lifetime, and overflow checks;
 - user-runtime wrapper register marshalling, stable result propagation, and
@@ -493,6 +552,12 @@ Examples of required properties:
 - the ownership handoff changes every planned class and the phase atomically;
 - a reply token wakes exactly one blocked caller thread and cannot be reused;
 - an IPC transition preserves exactly one blocked or runnable state;
+- a bootstrap service is hidden before release, has exactly one starting and
+  ready transition, and cannot release a dependent before every prerequisite
+  is ready;
+- a failed prepublication bootstrap transition preserves complete manifest,
+  profile, endpoint, scheduler, deadline, and launcher state;
+- sealed bootstrap authority cannot be reintroduced;
 - a grant cannot authorize bytes outside its declared range;
 - RAMFS link and open-reference counts never become negative;
 - failed spawn steps restore every resource acquired by earlier steps.
@@ -533,6 +598,9 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - invalid grant and unmapped-buffer rejection.
 - standalone user `_start`, external stack, BSS/data/rodata behavior, raw
   `ecall`, typed wrappers, and accidental-return trapping.
+- static launcher preparation, reserved endpoint visibility, exact-profile
+  release, versioned readiness acknowledgment, internal timeout failure, and
+  final authority sealing.
 
 Most component tests may run in one test kernel to avoid repeated QEMU startup.
 Tests expected to panic or corrupt their own address space use isolated images.
@@ -547,8 +615,14 @@ exist must add the corresponding QEMU integration scenario.
 
 Integration scenarios include:
 
-- launcher readiness and failure paths;
-- manifest and application privilege-profile installation;
+- launcher exact-generation readiness, timeout, and fatal malformed-message
+  paths;
+- manifest service-profile installation without inferred privileges;
+- VM `VM_READY` ownership commit before its generic launcher readiness;
+- TTY console-begin and exact mapping before release, then console commit
+  before its generic launcher readiness;
+- final launcher authority sealing before PM spawns init;
+- application privilege-profile installation through PM's separate authority;
 - VM ownership handoff;
 - fatal VM-originated fault handling;
 - PM exit/wait behavior;
