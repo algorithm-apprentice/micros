@@ -1083,7 +1083,8 @@ _Noreturn void micros_scheduler_test_enter_without_timer(
     || defined(MICROS_BUILD_SCHEDULER_TEST) \
     || defined(MICROS_BUILD_IPC_ECALL_CORE_TEST) \
     || defined(MICROS_BUILD_IPC_SYSCALL_TEST) \
-    || defined(MICROS_BUILD_GRANT_SYSCALL_TEST)
+    || defined(MICROS_BUILD_GRANT_SYSCALL_TEST) \
+    || defined(MICROS_BUILD_USER_RUNTIME_TEST)
 enum micros_scheduler_error
 micros_scheduler_test_prepare_supervisor_return(
     struct micros_hart *hart,

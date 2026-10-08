@@ -156,6 +156,34 @@ class ValidationPlanTests(unittest.TestCase):
         )
         self.assertIn(validation_plan.IPC_MODEL, commands)
 
+    def test_user_runtime_paths_own_native_static_and_qemu_gate(self):
+        for path in (
+            "include/micros/runtime.h",
+            "lib/runtime/runtime.c",
+            "lib/runtime/memory.c",
+            "lib/runtime/start.S",
+            "lib/runtime/raw_syscall.S",
+            "lib/runtime/user.ld",
+            "tests/host/runtime_test.c",
+            "tests/host/test_check_user_elf.py",
+            "tools/check_user_elf.py",
+            "tools/generate_user_runtime_fixture.py",
+            "tests/qemu/user_runtime_service.c",
+            "kernel/user_runtime_test.c",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertIn(
+                    validation_plan.workflow(
+                        "test-qemu-user-runtime"
+                    ),
+                    commands,
+                )
+                self.assertTrue(
+                    validation_plan.UNIT_FAST in commands
+                    or validation_plan.UNIT_FULL in commands
+                )
+
     def test_checked_copy_paths_own_grant_gate(self):
         for path in (
             "kernel/grant.c",
@@ -379,6 +407,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-endpoint": "kernel/endpoint_test.c",
             "test-qemu-grant": "kernel/grant_test.c",
             "test-qemu-grant-syscall": "kernel/grant_syscall_test.c",
+            "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",
             "test-qemu-ipc-ecall-core": "kernel/ipc_ecall_test.c",
             "test-qemu-ipc-syscall": "kernel/ipc_syscall_test.c",

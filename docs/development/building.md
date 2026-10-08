@@ -117,6 +117,9 @@ The current implementation provides:
 - an isolated production IPC ecall core gate using real U-mode instructions,
   transactional current-thread guard commit/rollback, completion return,
   stable errors, and baseline restoration;
+- a fixed-address standalone user-service ELF, minimal startup and compiler
+  support, typed wrappers for operations 1 through 10, a fail-closed ELF
+  checker, and an isolated three-process runtime acceptance gate;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
@@ -248,6 +251,14 @@ build/riscv64-debug/kernel/micros.elf
 build/riscv64-debug/kernel/micros.map
 ```
 
+The dedicated runtime acceptance workflow additionally produces:
+
+```text
+build/riscv64-user-runtime-test/user-runtime/micros-user-runtime-service.elf
+build/riscv64-user-runtime-test/user-runtime/micros-user-runtime-service.map
+build/riscv64-user-runtime-test/kernel/micros.elf
+```
+
 The ELF uses the `rv64imac_zicsr_zifencei` and `lp64` baseline, contains no
 host startup objects or libc, and preserves the OpenSBI boot arguments in `a0`
 and `a1` until `kernel_main`. Every target link runs
@@ -293,8 +304,10 @@ requires every untracked file to be staged first.
 The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
 and kernel-object implementations with warnings as errors, ASan, and UBSan.
-It then runs their native tests plus the Python QEMU-harness and ELF-layout
-tests.
+It also links the production user-runtime wrappers against a raw-syscall
+capture stub, exercises the production-prefixed `memcpy` and `memset` bodies,
+and runs malformed standalone-ELF and fixture-generator regressions. It then
+runs the Python QEMU-harness and kernel ELF-layout tests.
 
 The parser has fixed resource bounds:
 
@@ -816,6 +829,42 @@ Only that complete sequence emits:
 
 ```text
 MICROS_GRANT_SYSCALL_TEST_PASS namespace=unified phase=bootstrap lifecycle=checked directions=checked errors=stable registers=preserved cleanup=complete
+```
+
+## Freestanding user-service runtime acceptance
+
+Build and run the standalone runtime gate with:
+
+```bash
+cmake --workflow --preset test-qemu-user-runtime
+```
+
+The workflow first links a non-PIE ELF64 RISC-V service at `0x40000000`
+through `lib/runtime/user.ld`. `tools/check_user_elf.py` requires exactly
+three page-separated RX, R, and RW/NX load segments, loader-owned NOBITS BSS,
+the reviewed linker symbols, no dynamic/TLS/constructor/small-data/unwind or
+relocation state, no undefined symbol, exact startup `gp`/`tp` writes, an
+uncompressed `ecall; ret` raw stub, and the labeled accidental-return
+breakpoint.
+
+A bounded host generator embeds only checked segment bytes and descriptors in
+the kernel test image. The target dirties and zeroes every candidate image and
+stack page, copies exact file bytes, verifies zero fill and final permissions,
+patches one test-only role object in each inactive root, executes `fence.i`,
+and prepares three threads with the same fixed virtual layout and separate
+external stacks.
+
+The service code then proves startup, initialized data, BSS, read-only data,
+compiler memory support, stack-local canaries across blocking calls, the raw
+register-preserving send probe, all typed wrappers for operations 1 through
+10, call/reply tokens, atomic reply/receive, notification delivery, read/write
+grant copies, revoke, and stale-token rejection. One service returns normally;
+startup traps at `micros_runtime_service_returned`, and the kernel verifies the
+exact breakpoint before restoring every endpoint, grant, root, frame, object,
+scheduler, and trap-stack baseline. Only the complete sequence emits:
+
+```text
+MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
 
 ## Blocking IPC acceptance test

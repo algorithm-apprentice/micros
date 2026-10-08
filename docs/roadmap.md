@@ -143,16 +143,20 @@ copy-to use operations 7 through 10 with fixed register layouts, stable
 generic results, and exact current-process authority. Native ABI tests, a
 three-process bootstrap cleanup gate, and retained-state handed-off
 integration prove real ecalls, stable failures, register preservation,
-generation reuse, and both copy directions. Runtime wrappers and startup
-remain the next separately reviewed user-service-runtime outcome.
-ADR-0042 now supplies the accepted design: one fixed
-standalone ELF at the existing user window, loader-owned BSS and external
-stack initialization, a no-argument service entry, one raw RV64 `ecall`
-function, typed wrappers for operations 1 through 10, direct stable results
-without `errno`, and only `memcpy`/`memset` compiler support. It remains
-unimplemented and cannot unblock the static launcher until the ADR is
-accepted and the separate implementation outcome passes native, static, and
-QEMU runtime acceptance.
+generation reuse, and both copy directions.
+ADR-0042's freestanding user-service runtime is now implemented. It supplies
+one fixed standalone ELF at the existing user window, loader-owned BSS and
+external stack initialization, a no-argument service entry, one raw RV64
+`ecall` function, typed wrappers for operations 1 through 10, direct stable
+results without `errno`, and only `memcpy`/`memset` compiler support. Native
+raw-stub tests prove exact argument, result, output, and token preservation.
+The repository-owned ELF checker rejects forbidden segments, sections,
+relocations, undefined symbols, startup mutations, and noncanonical raw-stub
+instructions. The isolated three-process QEMU image proves the checked ELF
+loader contract, startup, stack/data/BSS/rodata behavior, blocking IPC,
+register preservation, grant lifecycle and copies, accidental-return trapping,
+and complete cleanup. The static bootstrap launcher is now the next
+dependency-ready outcome.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 

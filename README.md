@@ -109,6 +109,7 @@ cmake --workflow --preset test-qemu-object-model
 cmake --workflow --preset test-qemu-endpoint
 cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
+cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall
@@ -144,6 +145,13 @@ page-local and cross-page copy in both directions, zero-length validation,
 stable shape/authority/range/mapping failures, endpoint-generation reuse,
 non-result-register preservation, representative IPC compatibility, and
 complete bootstrap cleanup.
+The freestanding user-runtime gate loads one independently linked fixed-address
+service ELF into three isolated roots. It proves loader-owned zero fill,
+external stacks, startup `gp`/`tp` policy, protected read-only data, initialized
+and zero-initialized writable state, the raw `ecall` boundary, typed wrappers
+for operations 1 through 10, blocking stack-local IPC, register preservation,
+success-only grant-token publication, deterministic service-return trapping,
+and complete bootstrap cleanup.
 The address-space handoff gate validates every live bootstrap leaf's wired
 target before the irreversible transition, then proves exact `VM_WIRED`
 validation, activation, IPC-buffer access, checked grants, revoked mutation,
