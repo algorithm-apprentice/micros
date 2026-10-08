@@ -176,6 +176,18 @@ enum micros_vm_boot_error micros_vm_boot_finalize(
     struct micros_vm_boot_summary *summary
 );
 
+enum micros_vm_boot_error micros_vm_boot_build(
+    struct micros_vm_boot_info *info,
+    size_t address_space_count,
+    size_t mapping_count,
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    uint32_t vm_service_id,
+    uint32_t vm_endpoint,
+    struct micros_process_handle vm_process,
+    struct micros_vm_boot_summary *summary
+);
+
 _Static_assert(
     sizeof(struct micros_vm_boot_header) == MICROS_VM_BOOT_HEADER_SIZE,
     "VM boot header ABI changed"

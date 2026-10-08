@@ -270,6 +270,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_bootstrap_test
+        kernel/frame_allocator.c
+        kernel/frame_ownership.c
         kernel/vm_bootstrap.c
         tests/host/vm_bootstrap_test.c
     )

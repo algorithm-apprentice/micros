@@ -23,6 +23,11 @@
 
 _Alignas(MICROS_VM_BOOT_INFO_ALIGNMENT)
 static struct micros_vm_boot_info info;
+static struct micros_frame_allocator build_allocator;
+static struct micros_frame_ownership build_ownership;
+static uint64_t
+    build_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+static uint64_t build_frames[8];
 
 static void initialize_valid_info(void)
 {
@@ -146,6 +151,184 @@ static bool expect_error(enum micros_vm_boot_error expected)
         micros_vm_boot_validate(&info, &summary) == expected
         && memcmp(&summary, &sentinel, sizeof(summary)) == 0
     );
+}
+
+static bool storage_is_zero(const void *storage, size_t size)
+{
+    const uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool initialize_build_fixture(void)
+{
+    const struct micros_physical_range memory = {
+        .base = UINT64_C(0x80000000),
+        .size = UINT64_C(0x00009000),
+    };
+    const struct micros_physical_range reserved = {
+        .base = UINT64_C(0x80000000),
+        .size = UINT64_C(0x00001000),
+    };
+    const struct micros_process_handle vm_process = {1, 1};
+    const struct micros_process_handle service_process = {0, 1};
+    struct micros_frame_owner vm_table;
+    struct micros_frame_owner vm_user;
+    struct micros_frame_owner service_table;
+    struct micros_frame_owner service_user;
+    struct micros_frame_owner retained;
+    struct micros_frame_owner temporary;
+    size_t index;
+
+    memset(&info, 0, sizeof(info));
+    memset(&build_allocator, 0, sizeof(build_allocator));
+    memset(&build_ownership, 0, sizeof(build_ownership));
+    memset(build_bitmap, 0, sizeof(build_bitmap));
+    memset(build_frames, 0, sizeof(build_frames));
+    if (
+        micros_frame_allocator_initialize(
+            &build_allocator,
+            &memory,
+            1,
+            &reserved,
+            1
+        ) != MICROS_FRAME_ALLOCATOR_OK
+        || micros_frame_ownership_initialize(
+            &build_ownership,
+            &build_allocator
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_process(
+            MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+            vm_process,
+            &vm_table
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_process(
+            MICROS_FRAME_OWNER_PROCESS_USER,
+            vm_process,
+            &vm_user
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_process(
+            MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+            service_process,
+            &service_table
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_process(
+            MICROS_FRAME_OWNER_PROCESS_USER,
+            service_process,
+            &service_user
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_RETAINED,
+            &retained
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_TEMPORARY,
+            &temporary
+        ) != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        return false;
+    }
+    {
+        const struct micros_frame_owner owners[8] = {
+            vm_table,
+            vm_user,
+            vm_user,
+            service_table,
+            service_user,
+            temporary,
+            temporary,
+            retained,
+        };
+
+        for (index = 0; index < 8; ++index) {
+            if (
+                micros_frame_ownership_allocate(
+                    &build_ownership,
+                    owners[index],
+                    &build_frames[index]
+                ) != MICROS_FRAME_OWNERSHIP_OK
+            ) {
+                return false;
+            }
+        }
+    }
+    if (
+        micros_frame_ownership_release(
+            &build_ownership,
+            temporary,
+            build_frames[5]
+        ) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_ownership_release(
+            &build_ownership,
+            temporary,
+            build_frames[6]
+        ) != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        return false;
+    }
+    build_bitmap[0] =
+        (UINT64_C(1) << 1)
+        | (UINT64_C(1) << 2)
+        | (UINT64_C(1) << 4);
+    if (
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &build_ownership,
+            build_bitmap,
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        ) != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        return false;
+    }
+
+    info.address_spaces[0] = (struct micros_vm_address_space){
+        .service_id = 2,
+        .endpoint = UINT32_C(0x00001001),
+        .process_generation = 1,
+        .process_slot = 1,
+        .mapping_count = 2,
+        .mapping_index = 0,
+        .root_physical_address = build_frames[0],
+    };
+    info.address_spaces[1] = (struct micros_vm_address_space){
+        .service_id = 1,
+        .endpoint = UINT32_C(0x00001000),
+        .process_generation = 1,
+        .process_slot = 0,
+        .mapping_count = 1,
+        .mapping_index = 2,
+        .root_physical_address = build_frames[3],
+    };
+    info.mappings[0] = (struct micros_vm_mapping){
+        .process_generation = 1,
+        .process_slot = 1,
+        .permissions =
+            MICROS_VM_PERMISSION_READ | MICROS_VM_PERMISSION_EXECUTE,
+        .virtual_address = MICROS_USER_VIRTUAL_BASE,
+        .physical_address = build_frames[1],
+    };
+    info.mappings[1] = (struct micros_vm_mapping){
+        .process_generation = 1,
+        .process_slot = 1,
+        .permissions =
+            MICROS_VM_PERMISSION_READ | MICROS_VM_PERMISSION_WRITE,
+        .virtual_address = MICROS_USER_VIRTUAL_BASE + MICROS_FRAME_SIZE,
+        .physical_address = build_frames[2],
+    };
+    info.mappings[2] = (struct micros_vm_mapping){
+        .process_generation = 1,
+        .process_slot = 0,
+        .permissions =
+            MICROS_VM_PERMISSION_READ | MICROS_VM_PERMISSION_EXECUTE,
+        .virtual_address = MICROS_USER_VIRTUAL_BASE,
+        .physical_address = build_frames[4],
+    };
+    return true;
 }
 
 static bool test_abi_contract(void)
@@ -349,6 +532,135 @@ static bool test_misaligned_storage(void)
     return true;
 }
 
+static bool test_builds_from_authoritative_state(void)
+{
+    const struct micros_process_handle vm_process = {1, 1};
+    struct micros_vm_boot_summary summary;
+
+    EXPECT_TRUE(initialize_build_fixture());
+    EXPECT_TRUE(
+        micros_vm_boot_build(
+            &info,
+            2,
+            3,
+            &build_allocator,
+            &build_ownership,
+            2,
+            UINT32_C(0x00001001),
+            vm_process,
+            &summary
+        ) == MICROS_VM_BOOT_OK
+        && summary.managed_frame_count == 8
+        && summary.free_frame_count == 2
+        && summary.vm_self_wired_frame_count == 2
+        && summary.address_space_count == 2
+        && summary.mapping_count == 3
+        && info.header.kernel_frame_count == 3
+        && info.header.service_wired_frame_count == 1
+        && info.mappings[0].role
+            == MICROS_VM_MAPPING_SELF_WIRED
+        && info.mappings[1].role
+            == MICROS_VM_MAPPING_SELF_WIRED
+        && info.mappings[2].role
+            == MICROS_VM_MAPPING_SERVICE_WIRED
+        && micros_vm_boot_validate(&info, &summary)
+            == MICROS_VM_BOOT_OK
+    );
+    return true;
+}
+
+static bool test_build_failure_clears_candidate(void)
+{
+    const struct micros_process_handle vm_process = {1, 1};
+    const struct micros_process_handle service_process = {0, 1};
+    struct micros_frame_owner service_user;
+    struct micros_frame_owner temporary;
+    struct micros_vm_boot_summary summary;
+    struct micros_vm_boot_summary sentinel;
+    uint64_t temporary_frame;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    EXPECT_TRUE(initialize_build_fixture());
+    EXPECT_TRUE(
+        micros_frame_owner_make_process(
+            MICROS_FRAME_OWNER_PROCESS_USER,
+            service_process,
+            &service_user
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_frame_ownership_prepare_handoff(
+            &build_ownership,
+            build_frames[4],
+            service_user,
+            MICROS_FRAME_HANDOFF_NONE
+        ) == MICROS_FRAME_OWNERSHIP_OK
+    );
+    summary = sentinel;
+    EXPECT_TRUE(
+        micros_vm_boot_build(
+            &info,
+            2,
+            3,
+            &build_allocator,
+            &build_ownership,
+            2,
+            UINT32_C(0x00001001),
+            vm_process,
+            &summary
+        ) == MICROS_VM_BOOT_ERROR_STATE
+        && storage_is_zero(&info, sizeof(info))
+        && memcmp(&summary, &sentinel, sizeof(summary)) == 0
+    );
+
+    EXPECT_TRUE(initialize_build_fixture());
+    info.mappings[2].physical_address = build_frames[2];
+    summary = sentinel;
+    EXPECT_TRUE(
+        micros_vm_boot_build(
+            &info,
+            2,
+            3,
+            &build_allocator,
+            &build_ownership,
+            2,
+            UINT32_C(0x00001001),
+            vm_process,
+            &summary
+        ) == MICROS_VM_BOOT_ERROR_MAPPING
+        && storage_is_zero(&info, sizeof(info))
+        && memcmp(&summary, &sentinel, sizeof(summary)) == 0
+    );
+
+    EXPECT_TRUE(
+        initialize_build_fixture()
+        && micros_frame_owner_make_kernel(
+            MICROS_FRAME_OWNER_KERNEL_TEMPORARY,
+            &temporary
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_frame_ownership_allocate(
+            &build_ownership,
+            temporary,
+            &temporary_frame
+        ) == MICROS_FRAME_OWNERSHIP_OK
+    );
+    summary = sentinel;
+    EXPECT_TRUE(
+        micros_vm_boot_build(
+            &info,
+            2,
+            3,
+            &build_allocator,
+            &build_ownership,
+            2,
+            UINT32_C(0x00001001),
+            vm_process,
+            &summary
+        ) == MICROS_VM_BOOT_ERROR_STATE
+        && storage_is_zero(&info, sizeof(info))
+        && memcmp(&summary, &sentinel, sizeof(summary)) == 0
+    );
+    return true;
+}
+
 int main(void)
 {
     return (
@@ -357,6 +669,8 @@ int main(void)
         && test_finalize_is_failure_atomic()
         && test_rejections()
         && test_misaligned_storage()
+        && test_builds_from_authoritative_state()
+        && test_build_failure_clears_candidate()
     )
         ? 0
         : 1;
