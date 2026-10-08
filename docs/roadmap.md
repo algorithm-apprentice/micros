@@ -145,6 +145,14 @@ three-process bootstrap cleanup gate, and retained-state handed-off
 integration prove real ecalls, stable failures, register preservation,
 generation reuse, and both copy directions. Runtime wrappers and startup
 remain the next separately reviewed user-service-runtime outcome.
+ADR-0042 now supplies the accepted design: one fixed
+standalone ELF at the existing user window, loader-owned BSS and external
+stack initialization, a no-argument service entry, one raw RV64 `ecall`
+function, typed wrappers for operations 1 through 10, direct stable results
+without `errno`, and only `memcpy`/`memset` compiler support. It remains
+unimplemented and cannot unblock the static launcher until the ADR is
+accepted and the separate implementation outcome passes native, static, and
+QEMU runtime acceptance.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
@@ -235,7 +243,7 @@ model, IPC reply model, or global current-execution representation.
 - direct grants and safe-copy operations;
 - unified user grant syscalls;
 - wired post-handoff address resolution for initial services;
-- freestanding user-service runtime.
+- one fixed standalone service ELF and freestanding user-service runtime.
 
 ### Exit criteria
 
@@ -247,6 +255,15 @@ model, IPC reply model, or global current-execution representation.
   results and non-result registers;
 - wired service roots retain activation, IPC-buffer, and checked-copy access
   after the irreversible ownership handoff;
+- one independent user ELF has exact RX, R, and RW/NX load closure, no
+  relocation or hosted-libc dependency, loader-zeroed BSS, and an external
+  aligned stack;
+- startup establishes the reviewed `gp`/`tp` policy, enters the no-argument C
+  service function, and traps deterministically if that function returns;
+- host-stub tests cover typed wrappers for operations 1 through 10, and one
+  real QEMU image proves those production operations through the standalone
+  runtime while preserving registers, stack state, initialized data, BSS, and
+  read-only data;
 - no protocol relies on raw pointers crossing an address space.
 
 ## Milestone 4: bootstrap and memory service

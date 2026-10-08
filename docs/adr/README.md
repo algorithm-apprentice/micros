@@ -57,3 +57,4 @@ to make the project appear more consistent than it was.
 | [0039](0039-page-bounded-checked-grant-copy.md) | Page-bounded checked grant copy | Accepted |
 | [0040](0040-post-handoff-wired-address-space-resolution.md) | Post-handoff wired address-space resolution | Accepted |
 | [0041](0041-unified-risc-v-grant-syscalls.md) | Unified RISC-V grant syscalls | Accepted |
+| [0042](0042-freestanding-user-service-runtime.md) | Freestanding user-service runtime | Accepted |

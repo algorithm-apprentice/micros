@@ -363,6 +363,32 @@ ADR-0040 marker it emits:
 MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved
 ```
 
+ADR-0042 defines the next implementation evidence but does not add an
+implemented command yet. Its implementation must add:
+
+- native production-wrapper tests linked against a host raw-syscall capture
+  stub for all operations 1 through 10;
+- native `memcpy` and `memset` boundary/canary tests;
+- a repository-owned standalone user-ELF checker covering entry, load
+  segments, section closure, BSS, undefined symbols, relocations, dynamic
+  state, TLS, constructors, small data, and the exact raw stub;
+- one isolated workflow intended to be named `test-qemu-user-runtime`.
+
+That QEMU image must load independent fixed-address user ELFs rather than copy
+payload bytes out of the kernel image. It must prove loader-zeroed BSS,
+initialized writable data, protected rodata, an external aligned stack,
+zero `gp`/`tp`, raw-stub and kernel register preservation, runtime use of
+production operations 1 through 10, deterministic accidental-return trapping,
+and complete bootstrap cleanup. Its proposed exact marker is:
+
+```text
+MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
+```
+
+The implementation must add the workflow to the authoritative QEMU inventory,
+validation ownership, documentation, and parser regressions in the same pull
+request. Until then, the implemented command list above remains unchanged.
+
 `test-qemu-nested-trap`
 injects a second fault
 after the per-hart `sscratch` sentinel is armed and proves that the registered
@@ -422,9 +448,13 @@ Initial native test subjects include:
 - IPC transition and deadlock-detection models;
 - permission masks;
 - grant bounds, direction, lifetime, and overflow checks;
+- user-runtime wrapper register marshalling, stable result propagation, and
+  grant-token output preservation through a host raw-syscall stub;
+- freestanding `memcpy` and `memset` semantics without a hosted libc;
 - page-table index and flag calculations;
 - allocatable ELF section closure against linker permission ranges;
-- ELF header validation;
+- kernel and standalone user ELF header, program-header, relocation, symbol,
+  and section-permission validation;
 - RAMFS directories, inode lifetime, and path traversal;
 - protocol message validation.
 
@@ -495,6 +525,8 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - deadlock-chain rejection;
 - safe-copy across distinct address spaces;
 - invalid grant and unmapped-buffer rejection.
+- standalone user `_start`, external stack, BSS/data/rodata behavior, raw
+  `ecall`, typed wrappers, and accidental-return trapping.
 
 Most component tests may run in one test kernel to avoid repeated QEMU startup.
 Tests expected to panic or corrupt their own address space use isolated images.

@@ -111,7 +111,7 @@ provide hosted libc, `errno`, or a separate libsys kernel-call message layer.
 | Kernel-call trap and message | Safe copy uses a 64-byte message and distinct `KERVEC_INTR` entry | Required adaptation: one RISC-V `ecall` namespace and scalar registers replace the second trap/message ABI |
 | Result convention | Integer status; grant allocation may use `errno` | Compatible extension: stable negative project errors and a nonnegative returned token, with no hosted `errno` |
 | Inspect operation | User library already owns the mutable entry | Compatible least-authority extension: no user inspect syscall; the opaque token is sufficient |
-| Runtime wrappers | libc/libsys provide hosted wrappers and constructor-selected IPC vectors | Required adaptation: the selected freestanding toolchain requires direct wrappers without hosted constructors; their design remains the next task |
+| Runtime wrappers | libc/libsys provide hosted wrappers and constructor-selected IPC vectors | Classified by [the user-service runtime study](minix-user-service-runtime.md); this syscall-boundary study does not duplicate that later startup/runtime decision |
 | VM retry | Ordinary safe copy may suspend and retry through VM | Staged substitution: current resident-only checked copy returns an explicit fault |
 
 ## Required unified namespace
@@ -146,10 +146,11 @@ All unused argument registers are zero. Endpoints, grants, and permission masks
 must fit their public 32-bit representations. Address, offset, and length
 arguments use full RV64 values.
 
-## Deferred runtime work
+## Runtime design boundary
 
-The later freestanding runtime design consumes this fixed ABI and separately
-defines:
+The freestanding runtime design in
+[the user-service runtime study](minix-user-service-runtime.md) consumes this
+fixed ABI and separately defines:
 
 - C wrapper names and output-preservation behavior;
 - one raw RISC-V `ecall` stub;
