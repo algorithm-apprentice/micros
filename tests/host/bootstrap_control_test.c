@@ -751,6 +751,16 @@ static bool sealed_notification_matches(
     return true;
 }
 
+static bool test_binding_lookup_rejects_oversized_count(void)
+{
+    struct micros_bootstrap_control_state state;
+
+    memset(&state, 0, sizeof(state));
+    state.entry_count = MICROS_BOOTSTRAP_SERVICE_CAPACITY + 1;
+    state.controller_process.generation = 7;
+    return micros_bootstrap_control_find_binding(&state, 7) == NULL;
+}
+
 static bool test_control_transitions(void)
 {
     struct micros_bootstrap_control_state state;
@@ -1692,6 +1702,7 @@ int main(void)
     return (
         test_valid_commands()
         && test_malformed_commands()
+        && test_binding_lookup_rejects_oversized_count()
         && test_control_transitions()
         && test_pm_completion_rejections_are_atomic()
         && test_pm_completion_queues_sealed_event_once()

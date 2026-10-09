@@ -24,6 +24,12 @@ enum micros_pm_control_output_error {
     MICROS_PM_CONTROL_OUTPUT_ERROR_INVARIANT,
 };
 
+enum micros_pm_control_authority_result {
+    MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED = 0,
+    MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED,
+    MICROS_PM_CONTROL_AUTHORITY_INVARIANT,
+};
+
 struct micros_pm_control_output_chunk {
     uintptr_t physical_address;
     size_t size;
@@ -50,15 +56,35 @@ bool micros_pm_control_syscall_phase_is_ready(
     enum micros_frame_ownership_phase ownership_phase
 );
 
-bool micros_pm_control_syscall_authority_matches(
+enum micros_pm_control_authority_result
+micros_pm_control_syscall_caller_classify(
     const struct micros_pm_control_state *state,
+    const struct micros_syscall_context *context,
+    const struct micros_process *caller_process,
+    const struct micros_thread *caller_thread
+);
+
+enum micros_pm_control_authority_result
+micros_pm_control_syscall_authority_classify(
+    const struct micros_pm_control_state *state,
+    size_t bootstrap_entry_count,
     uint32_t planned_pm_service_id,
     const struct micros_bootstrap_binding *binding,
     const struct micros_bootstrap_manifest_entry *entry,
     const struct micros_syscall_context *context,
-    const struct micros_process *process,
+    const struct micros_process *caller_process,
+    const struct micros_thread *caller_thread,
     const struct micros_endpoint_record *endpoint,
     const struct micros_privilege_profile *profile
+);
+
+enum micros_pm_control_authority_result
+micros_pm_control_syscall_authority_resolve(
+    const struct micros_pm_control_state *state,
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_syscall_context *context
 );
 
 enum micros_pm_control_output_error

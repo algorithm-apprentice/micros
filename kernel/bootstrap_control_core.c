@@ -95,6 +95,12 @@ static struct micros_bootstrap_binding *find_binding_mutable(
 {
     size_t index;
 
+    if (
+        state == NULL
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return NULL;
+    }
     for (index = 0; index < state->entry_count; ++index) {
         if (state->bindings[index].service_id == service_id) {
             return &state->bindings[index];
@@ -109,17 +115,10 @@ micros_bootstrap_control_find_binding(
     uint32_t service_id
 )
 {
-    size_t index;
-
-    if (state == NULL) {
-        return NULL;
-    }
-    for (index = 0; index < state->entry_count; ++index) {
-        if (state->bindings[index].service_id == service_id) {
-            return &state->bindings[index];
-        }
-    }
-    return NULL;
+    return micros_bootstrap_control_find_binding_bounded(
+        state,
+        service_id
+    );
 }
 
 static bool binding_matches_manifest(

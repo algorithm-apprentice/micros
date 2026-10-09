@@ -51,6 +51,28 @@ struct micros_bootstrap_complete_plan {
     struct micros_ipc_kernel_notification_plan pm_notification;
 };
 
+static inline const struct micros_bootstrap_binding *
+micros_bootstrap_control_find_binding_bounded(
+    const struct micros_bootstrap_control_state *state,
+    uint32_t service_id
+)
+{
+    size_t index;
+
+    if (
+        state == NULL
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return NULL;
+    }
+    for (index = 0; index < state->entry_count; ++index) {
+        if (state->bindings[index].service_id == service_id) {
+            return &state->bindings[index];
+        }
+    }
+    return NULL;
+}
+
 enum micros_bootstrap_error micros_bootstrap_control_state_prepare(
     struct micros_bootstrap_control_state *state,
     const struct micros_bootstrap_manifest *manifest,

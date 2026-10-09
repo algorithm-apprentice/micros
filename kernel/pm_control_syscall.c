@@ -63,73 +63,6 @@ static _Noreturn void fail_pm_control(
     panic_pm_control(hart, frame, "pm-control-invariant");
 }
 
-static bool pm_is_authorized(
-    const struct micros_pm_control_state *state,
-    const struct micros_bootstrap_control_state *bootstrap,
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    const struct micros_syscall_context *context
-)
-{
-    const struct micros_bootstrap_binding *binding;
-    const struct micros_bootstrap_manifest_entry *entry;
-    const struct micros_privilege_profile *profile;
-    const struct micros_process *process;
-    const struct micros_endpoint_record *endpoint;
-
-    if (
-        state == NULL
-        || bootstrap == NULL
-        || registry == NULL
-        || objects == NULL
-        || context == NULL
-        || bootstrap->plan.pm_service_id == 0
-    ) {
-        return false;
-    }
-    binding = micros_bootstrap_control_find_binding(
-        bootstrap,
-        bootstrap->plan.pm_service_id
-    );
-    if (
-        binding == NULL
-        || binding->manifest_index >= bootstrap->entry_count
-    ) {
-        return false;
-    }
-    entry = &bootstrap->manifest.entries[binding->manifest_index];
-    if (
-        micros_process_resolve(
-            objects,
-            context->process,
-            &process
-        ) != MICROS_KERNEL_OBJECT_OK
-        || micros_endpoint_resolve_active(
-            registry,
-            objects,
-            binding->endpoint,
-            &endpoint
-        ) != MICROS_ENDPOINT_OK
-        || micros_privilege_profile_resolve(
-            registry,
-            entry->profile_id,
-            &profile
-        ) != MICROS_ENDPOINT_OK
-    ) {
-        return false;
-    }
-    return micros_pm_control_syscall_authority_matches(
-        state,
-        bootstrap->plan.pm_service_id,
-        binding,
-        entry,
-        context,
-        process,
-        endpoint,
-        profile
-    );
-}
-
 static enum micros_pm_control_output_error translate_output(
     void *context,
     uint64_t user_address,
@@ -199,6 +132,7 @@ micros_pm_control_handle_captured_user_ecall(
     struct micros_kernel_objects *objects;
     const struct micros_vm_handoff_state *handoff;
     const struct micros_frame_ownership *ownership;
+    enum micros_pm_control_authority_result authority;
     enum micros_pm_control_error control_error;
 
     if (
@@ -220,19 +154,24 @@ micros_pm_control_handle_captured_user_ecall(
     bootstrap = micros_bootstrap_runtime_authoritative_state();
     registry = micros_ipc_runtime_authoritative_registry();
     objects = context->objects;
-    if (
-        !pm_is_authorized(
-            state,
-            bootstrap,
-            registry,
-            objects,
-            context
-        )
-    ) {
+    authority = micros_pm_control_syscall_authority_resolve(
+        state,
+        bootstrap,
+        registry,
+        objects,
+        context
+    );
+    if (authority == MICROS_PM_CONTROL_AUTHORITY_INVARIANT) {
+        fail_pm_control(hart, frame, state);
+    }
+    if (authority == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED) {
         return return_result(
             frame,
             MICROS_SYSCALL_ABI_UNAUTHORIZED
         );
+    }
+    if (authority != MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED) {
+        fail_pm_control(hart, frame, state);
     }
     handoff = micros_vm_handoff_runtime_state();
     ownership = micros_frame_ownership_runtime_ledger();

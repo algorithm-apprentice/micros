@@ -215,6 +215,7 @@ static bool test_syscall_authority(void)
     struct micros_bootstrap_manifest_entry entry = {0};
     struct micros_syscall_context context = {0};
     struct micros_process process;
+    struct micros_thread thread;
     struct micros_endpoint_record endpoint = {0};
     struct micros_privilege_profile profile = {0};
 
@@ -231,6 +232,7 @@ static bool test_syscall_authority(void)
     context.current = state.thread;
     context.process = state.process;
     process = objects.processes[state.process.slot];
+    thread = objects.threads[state.thread.slot];
     process.primary_endpoint = state.endpoint;
     process.privilege_profile = MICROS_PRIVILEGE_PROFILE_PM;
     endpoint.state = MICROS_ENDPOINT_STATE_ACTIVE;
@@ -240,95 +242,277 @@ static bool test_syscall_authority(void)
     profile.kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL;
 
     EXPECT_TRUE(
-        micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_caller_classify(
             &state,
+            &context,
+            &process,
+            &thread
+        ) == MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED
+        &&
+        micros_pm_control_syscall_authority_classify(
+            &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED
     );
     context.process.generation += 1;
     EXPECT_TRUE(
-        !micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_INVARIANT
     );
     context.process = state.process;
-    context.current.generation += 1;
+    endpoint.sender_head = (struct micros_thread_handle){
+        .slot = 0,
+        .generation = 1,
+    };
+    profile.operations = UINT32_MAX;
     EXPECT_TRUE(
-        !micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED
     );
-    context.current = state.thread;
+    endpoint.sender_head = (struct micros_thread_handle){0};
+    profile.operations = 0;
+    binding.endpoint += UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS;
+    state.endpoint = binding.endpoint;
+    process.primary_endpoint = binding.endpoint;
+    endpoint.value = binding.endpoint;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_classify(
+            &state,
+            3,
+            state.service_id,
+            &binding,
+            &entry,
+            &context,
+            &process,
+            &thread,
+            &endpoint,
+            &profile
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
+    );
+    binding.endpoint -= UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS;
+    state.endpoint = binding.endpoint;
+    process.primary_endpoint = binding.endpoint;
+    endpoint.value = binding.endpoint;
     endpoint.owner.generation += 1;
     EXPECT_TRUE(
-        !micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
     );
     endpoint.owner = state.process;
     entry.role_flags = 0;
     EXPECT_TRUE(
-        !micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
     );
     entry.role_flags = MICROS_BOOTSTRAP_ROLE_PM;
     profile.kernel_operations |= UINT64_C(0x2);
     EXPECT_TRUE(
-        !micros_pm_control_syscall_authority_matches(
+        micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             state.service_id,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
-        && !micros_pm_control_syscall_authority_matches(
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
+        && micros_pm_control_syscall_authority_classify(
             &state,
+            3,
             0,
             &binding,
             &entry,
             &context,
             &process,
+            &thread,
             &endpoint,
             &profile
-        )
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
+        && micros_pm_control_syscall_authority_classify(
+            &state,
+            MICROS_BOOTSTRAP_SERVICE_CAPACITY + 1,
+            state.service_id,
+            &binding,
+            &entry,
+            &context,
+            &process,
+            &thread,
+            &endpoint,
+            &profile
+        ) == MICROS_PM_CONTROL_AUTHORITY_INVARIANT
+    );
+    return true;
+}
+
+static bool test_syscall_authority_resolution(void)
+{
+    struct micros_kernel_objects objects;
+    struct micros_pm_control_state state;
+    struct micros_bootstrap_control_state bootstrap = {0};
+    struct micros_endpoint_registry registry = {0};
+    struct micros_syscall_context context = {0};
+    struct micros_process_handle foreign_process;
+    struct micros_thread_handle foreign_thread;
+    struct micros_bootstrap_binding *binding;
+    struct micros_bootstrap_manifest_entry *entry;
+    struct micros_endpoint_record *endpoint;
+    struct micros_privilege_profile *profile;
+
+    EXPECT_TRUE(initialize_fixture(&objects, &state));
+    foreign_process = (struct micros_process_handle){
+        .slot = 1,
+        .generation = objects.processes[1].generation,
+    };
+    EXPECT_TRUE(
+        micros_thread_create(
+            &objects,
+            foreign_process,
+            &foreign_thread
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
+    objects.processes[state.process.slot].primary_endpoint =
+        state.endpoint;
+    objects.processes[state.process.slot].privilege_profile =
+        MICROS_PRIVILEGE_PROFILE_PM;
+    bootstrap.entry_count = 1;
+    bootstrap.plan.pm_service_id = state.service_id;
+    binding = &bootstrap.bindings[0];
+    binding->service_id = state.service_id;
+    binding->endpoint = state.endpoint;
+    binding->process = state.process;
+    binding->thread = state.thread;
+    entry = &bootstrap.manifest.entries[0];
+    entry->service_id = state.service_id;
+    entry->process_slot = state.process.slot;
+    entry->profile_id = MICROS_PRIVILEGE_PROFILE_PM;
+    entry->role_flags = MICROS_BOOTSTRAP_ROLE_PM;
+    endpoint = &registry.endpoints[state.process.slot];
+    endpoint->state = MICROS_ENDPOINT_STATE_ACTIVE;
+    endpoint->owner = state.process;
+    endpoint->value = state.endpoint;
+    profile = &registry.profiles[MICROS_PRIVILEGE_PROFILE_PM];
+    profile->id = MICROS_PRIVILEGE_PROFILE_PM;
+    profile->kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL;
+    registry.profile_count = MICROS_PRIVILEGE_PROFILE_CAPACITY + 1;
+    context.objects = &objects;
+    context.process = state.process;
+    context.current = state.thread;
+
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_AUTHORIZED
+    );
+    context.process = foreign_process;
+    context.current = foreign_thread;
+    bootstrap.entry_count = MICROS_BOOTSTRAP_SERVICE_CAPACITY + 1;
+    endpoint->state = MICROS_ENDPOINT_STATE_RESERVED;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
+    );
+    bootstrap.entry_count = 1;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
+    );
+    objects.threads[foreign_thread.slot].owner = state.process;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_INVARIANT
+    );
+    objects.threads[foreign_thread.slot].owner = foreign_process;
+    context.process = state.process;
+    context.current = state.thread;
+    bootstrap.entry_count = MICROS_BOOTSTRAP_SERVICE_CAPACITY + 1;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_INVARIANT
+    );
+    bootstrap.entry_count = 1;
+    EXPECT_TRUE(
+        micros_pm_control_syscall_authority_resolve(
+            &state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_PM_CONTROL_AUTHORITY_UNAUTHORIZED
     );
     return true;
 }
@@ -914,6 +1098,7 @@ bool micros_pm_control_test_run(void)
     return (
         test_contract_and_decode()
         && test_syscall_authority()
+        && test_syscall_authority_resolution()
         && test_syscall_phase_and_retained_output()
         && test_state_preparation()
         && test_reserve_abort_lifecycle()
