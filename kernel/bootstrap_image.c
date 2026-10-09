@@ -5,6 +5,7 @@
 
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
+#include "micros/vm_bootstrap.h"
 
 static bool pointer_is_aligned(const void *pointer, size_t alignment)
 {
@@ -21,18 +22,18 @@ static void clear_bytes(void *storage, size_t size)
     }
 }
 
-static bool config_bytes_are_zero(
+static bool range_bytes_are_zero(
     const struct micros_bootstrap_image_segment *segment,
-    uint64_t config_address,
-    uint32_t config_size
+    uint64_t address,
+    uint32_t size
 )
 {
-    uint64_t config_offset = config_address
+    uint64_t range_offset = address
         - segment->virtual_address;
     uint64_t index;
 
-    for (index = 0; index < config_size; ++index) {
-        uint64_t offset = config_offset + index;
+    for (index = 0; index < size; ++index) {
+        uint64_t offset = range_offset + index;
 
         if (
             offset < segment->file_size
@@ -42,6 +43,19 @@ static bool config_bytes_are_zero(
         }
     }
     return true;
+}
+
+static bool ranges_overlap(
+    uint64_t left_base,
+    uint64_t left_size,
+    uint64_t right_base,
+    uint64_t right_size
+)
+{
+    return (
+        left_base < right_base + right_size
+        && right_base < left_base + left_size
+    );
 }
 
 static enum micros_bootstrap_error validate_image(
@@ -62,6 +76,10 @@ static enum micros_bootstrap_error validate_image(
     uint64_t page_count = 0;
     bool entry_found = false;
     bool config_found = false;
+    bool vm_boot_info_found = false;
+    bool has_vm_boot_info =
+        image->vm_boot_info_address != 0
+        || image->vm_boot_info_size != 0;
     size_t index;
 
     if (
@@ -73,7 +91,31 @@ static enum micros_bootstrap_error validate_image(
         || image->config_address % 8 != 0
         || image->config_size
             != sizeof(struct micros_bootstrap_service_config)
+        || UINT64_MAX - image->config_address
+            < image->config_size
         || image->page_count == 0
+        || (
+            (image->vm_boot_info_address == 0)
+            != (image->vm_boot_info_size == 0)
+        )
+        || (
+            has_vm_boot_info
+            && (
+                image->vm_boot_info_address
+                    % MICROS_VM_BOOT_INFO_ALIGNMENT
+                    != 0
+                || image->vm_boot_info_size
+                    != MICROS_VM_BOOT_INFO_SIZE
+                || UINT64_MAX - image->vm_boot_info_address
+                    < image->vm_boot_info_size
+                || ranges_overlap(
+                    image->config_address,
+                    image->config_size,
+                    image->vm_boot_info_address,
+                    image->vm_boot_info_size
+                )
+            )
+        )
     ) {
         return MICROS_BOOTSTRAP_ERROR_IMAGE;
     }
@@ -126,7 +168,7 @@ static enum micros_bootstrap_error validate_image(
                     segment->flags
                     & MICROS_BOOTSTRAP_IMAGE_WRITE
                 ) == 0
-                || !config_bytes_are_zero(
+                || !range_bytes_are_zero(
                     segment,
                     image->config_address,
                     image->config_size
@@ -135,6 +177,30 @@ static enum micros_bootstrap_error validate_image(
                 return MICROS_BOOTSTRAP_ERROR_IMAGE;
             }
             config_found = true;
+        }
+        if (
+            has_vm_boot_info
+            && image->vm_boot_info_address
+                >= segment->virtual_address
+            && image->vm_boot_info_address < segment_end
+        ) {
+            if (
+                vm_boot_info_found
+                || image->vm_boot_info_size
+                    > segment_end - image->vm_boot_info_address
+                || (
+                    segment->flags
+                    & MICROS_BOOTSTRAP_IMAGE_WRITE
+                ) == 0
+                || !range_bytes_are_zero(
+                    segment,
+                    image->vm_boot_info_address,
+                    image->vm_boot_info_size
+                )
+            ) {
+                return MICROS_BOOTSTRAP_ERROR_IMAGE;
+            }
+            vm_boot_info_found = true;
         }
         if (
             UINT64_MAX - page_count
@@ -149,6 +215,7 @@ static enum micros_bootstrap_error validate_image(
     if (
         !entry_found
         || !config_found
+        || (has_vm_boot_info && !vm_boot_info_found)
         || image->image_end != next_address
         || image->page_count != page_count
     ) {
@@ -162,7 +229,10 @@ static enum micros_bootstrap_error validate_image(
         .config_size = image->config_size,
         .page_count = image->page_count,
         .image_end = image->image_end,
+        .vm_boot_info_address = image->vm_boot_info_address,
+        .vm_boot_info_size = image->vm_boot_info_size,
         .config_initially_zero = true,
+        .vm_boot_info_initially_zero = has_vm_boot_info,
     };
     return MICROS_BOOTSTRAP_OK;
 }

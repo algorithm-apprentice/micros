@@ -9,6 +9,8 @@
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
 #include "kernel/scheduler_core_internal.h"
+#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm_snapshot.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"
@@ -58,6 +60,7 @@ static uint16_t
     preparation_order[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
 static struct preparation_baseline preparation_baseline;
 static struct micros_bootstrap_diagnostic preparation_diagnostic;
+static struct micros_vm_snapshot_result prepared_vm_snapshot;
 static bool failure_record_emitted;
 
 static void set_preparation_diagnostic(
@@ -225,7 +228,7 @@ static const char *diagnostic_state_name(uint32_t service_id)
     return "none";
 }
 
-_Noreturn void micros_bootstrap_runtime_fail(
+void micros_bootstrap_runtime_record_failure(
     enum micros_bootstrap_diagnostic_reason reason,
     uint32_t service_id,
     micros_endpoint_t endpoint,
@@ -254,6 +257,21 @@ _Noreturn void micros_bootstrap_runtime_fail(
         uart_flush();
         failure_record_emitted = true;
     }
+}
+
+_Noreturn void micros_bootstrap_runtime_fail(
+    enum micros_bootstrap_diagnostic_reason reason,
+    uint32_t service_id,
+    micros_endpoint_t endpoint,
+    uint64_t detail
+)
+{
+    micros_bootstrap_runtime_record_failure(
+        reason,
+        service_id,
+        endpoint,
+        detail
+    );
     panic_runtime("bootstrap-failure");
 }
 
@@ -717,6 +735,54 @@ static bool read_user_range(
     return true;
 }
 
+static bool user_range_matches(
+    struct micros_process_handle process,
+    uint64_t address,
+    const void *expected,
+    size_t size
+)
+{
+    const unsigned char *bytes = expected;
+    size_t compared = 0;
+
+    while (compared < size) {
+        uint64_t physical;
+        uint32_t permissions;
+        size_t contiguous;
+        size_t chunk;
+
+        if (
+            micros_user_address_space_translate(
+                process,
+                address + compared,
+                &physical,
+                &permissions,
+                &contiguous
+            ) != MICROS_USER_ADDRESS_SPACE_OK
+            || (
+                permissions & MICROS_SV39_PERMISSION_READ
+            ) == 0
+            || contiguous == 0
+        ) {
+            return false;
+        }
+        chunk = size - compared < contiguous
+            ? size - compared
+            : contiguous;
+        if (
+            !bytes_equal(
+                (const void *)(uintptr_t)physical,
+                bytes + compared,
+                chunk
+            )
+        ) {
+            return false;
+        }
+        compared += chunk;
+    }
+    return true;
+}
+
 static bool build_service_table(
     const struct micros_bootstrap_manifest *manifest,
     const struct micros_bootstrap_binding *bindings,
@@ -1030,6 +1096,13 @@ static void rollback_preparation(size_t count)
     clear_bytes(preparation_records, sizeof(preparation_records));
     clear_bytes(prepared_bindings, sizeof(prepared_bindings));
     clear_bytes(preparation_order, sizeof(preparation_order));
+    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
+    if (
+        micros_vm_handoff_runtime_reset()
+            != MICROS_VM_HANDOFF_OK
+    ) {
+        panic_runtime("bootstrap-vm-handoff-rollback");
+    }
     if (preparation_baseline.valid) {
         const struct micros_frame_allocator *allocator =
             micros_bootstrap_frame_allocator();
@@ -1236,6 +1309,64 @@ static enum micros_bootstrap_error prepare_services(
     return MICROS_BOOTSTRAP_OK;
 }
 
+static enum micros_bootstrap_error prepare_vm_snapshot(
+    const struct micros_bootstrap_runtime_config *config
+)
+{
+    struct micros_vm_snapshot_result candidate;
+    const struct micros_bootstrap_binding *vm_binding;
+    const struct micros_bootstrap_image *vm_image;
+    enum micros_bootstrap_error error;
+
+    if (validation_plan.vm_service_id == 0) {
+        return MICROS_BOOTSTRAP_OK;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    error = micros_vm_snapshot_prepare(
+        config->manifest,
+        prepared_bindings,
+        config->manifest->header.entry_count,
+        &candidate
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    vm_binding = &prepared_bindings[candidate.vm_binding_index];
+    vm_image = preparation_records[
+        candidate.vm_binding_index
+    ].image;
+    if (
+        vm_image == NULL
+        || vm_binding->service_id != validation_plan.vm_service_id
+        || vm_image->vm_boot_info_address == 0
+        || vm_image->vm_boot_info_size != MICROS_VM_BOOT_INFO_SIZE
+        || !write_user_range(
+            vm_binding->process,
+            vm_image->vm_boot_info_address,
+            candidate.info,
+            sizeof(*candidate.info)
+        )
+        || !user_range_matches(
+            vm_binding->process,
+            vm_image->vm_boot_info_address,
+            candidate.info,
+            sizeof(*candidate.info)
+        )
+        || micros_vm_handoff_runtime_prepare(
+            vm_binding,
+            &config->manifest->entries[
+                vm_binding->manifest_index
+            ],
+            vm_image,
+            &candidate
+        ) != MICROS_VM_HANDOFF_OK
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    prepared_vm_snapshot = candidate;
+    return MICROS_BOOTSTRAP_OK;
+}
+
 enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
     const struct micros_bootstrap_runtime_config *config
 )
@@ -1267,6 +1398,14 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
             != config->manifest->header.entry_count
         || config->profile_count
             < config->manifest->header.entry_count
+    ) {
+        error = MICROS_BOOTSTRAP_ERROR_STATE;
+        goto done;
+    }
+    clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
+    if (
+        micros_vm_handoff_runtime_reset()
+            != MICROS_VM_HANDOFF_OK
     ) {
         error = MICROS_BOOTSTRAP_ERROR_STATE;
         goto done;
@@ -1360,6 +1499,17 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
     }
     error = prepare_services(config);
     if (error != MICROS_BOOTSTRAP_OK) {
+        goto done;
+    }
+    error = prepare_vm_snapshot(config);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        set_preparation_diagnostic(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_PREPARE,
+            validation_plan.vm_service_id,
+            MICROS_ENDPOINT_NONE,
+            0
+        );
+        rollback_preparation(config->manifest->header.entry_count);
         goto done;
     }
     if (
@@ -1626,6 +1776,55 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
         ) {
             return MICROS_BOOTSTRAP_ERROR_INVARIANT;
         }
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_validate_vm_prepared(void)
+{
+    struct micros_vm_boot_summary observed_summary;
+    const struct micros_vm_handoff_state *handoff =
+        micros_vm_handoff_runtime_state();
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_authoritative_registry();
+    struct micros_endpoint_registry *registry =
+        micros_ipc_runtime_authoritative_registry();
+
+    if (
+        handoff == NULL
+        || handoff->phase != MICROS_VM_HANDOFF_PHASE_PREPARED
+        || prepared_vm_snapshot.info == NULL
+        || objects == NULL
+        || registry == NULL
+        || micros_vm_handoff_runtime_validate(
+            &bootstrap_state,
+            registry,
+            objects
+        ) != MICROS_VM_HANDOFF_OK
+        || micros_vm_boot_validate(
+            prepared_vm_snapshot.info,
+            &observed_summary
+        ) != MICROS_VM_BOOT_OK
+        || micros_vm_snapshot_validate_current(
+            &bootstrap_state.manifest,
+            bootstrap_state.bindings,
+            bootstrap_state.entry_count,
+            prepared_vm_snapshot.info
+        ) != MICROS_BOOTSTRAP_OK
+        || !bytes_equal(
+            &observed_summary,
+            &handoff->summary,
+            sizeof(observed_summary)
+        )
+        || !user_range_matches(
+            handoff->process,
+            handoff->boot_info_address,
+            prepared_vm_snapshot.info,
+            handoff->boot_info_size
+        )
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     return MICROS_BOOTSTRAP_OK;
 }

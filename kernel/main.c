@@ -18,6 +18,12 @@
     || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
 #include "kernel/bootstrap_test.h"
 #endif
+#if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
+#include "kernel/vm_handoff_test.h"
+#endif
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -430,6 +436,14 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
     micros_bootstrap_test_launch();
     MICROS_PANIC(hart_id, "bootstrap-test-returned");
+#endif
+
+#if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
+    micros_vm_handoff_test_launch();
+    MICROS_PANIC(hart_id, "vm-handoff-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

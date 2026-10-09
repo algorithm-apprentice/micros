@@ -192,13 +192,24 @@ PANIC_CORE_PATTERNS = (
 )
 TRAP_CONTEXT_PATTERN = re.compile(
     r"^MICROS_TRAP_CONTEXT "
-    r"origin=[SU] "
+    r"origin=([SU]) "
     r"sstatus=0x[0-9a-f]{16} "
-    r"scause=0x[0-9a-f]{16} "
-    r"stval=0x[0-9a-f]{16} "
+    r"scause=0x([0-9a-f]{16}) "
+    r"stval=0x([0-9a-f]{16}) "
     r"sepc=0x([0-9a-f]{16}) "
     r"ra=0x[0-9a-f]{16} "
     r"sp=0x[0-9a-f]{16}$"
+)
+VM_SELF_FAULT_PATTERN = re.compile(
+    r"^MICROS_VM_SELF_FAULT "
+    r"service=0x([0-9a-f]{16}) "
+    r"process-slot=0x([0-9a-f]{16}) "
+    r"process-generation=0x([0-9a-f]{16}) "
+    r"endpoint=0x([0-9a-f]{16}) "
+    r"scause=0x([0-9a-f]{16}) "
+    r"stval=0x([0-9a-f]{16}) "
+    r"sepc=0x([0-9a-f]{16}) "
+    r"ownership=(bootstrap|handed-off)$"
 )
 
 
@@ -917,7 +928,13 @@ def _has_complete_nested_trap_test_report(output):
     )
 
 
-def _has_complete_trap_context(output, expected_sepc=None):
+def _has_complete_trap_context(
+    output,
+    expected_sepc=None,
+    expected_origin=None,
+    expected_scause=None,
+    expected_stval=None,
+):
     output_lines, terminated = _split_output_records(output)
     panic_indices = [
         index
@@ -949,8 +966,45 @@ def _has_complete_trap_context(output, expected_sepc=None):
     ):
         return False
     return (
-        expected_sepc is None
-        or int(match.group(1), 16) == expected_sepc
+        (expected_origin is None or match.group(1) == expected_origin)
+        and (
+            expected_scause is None
+            or int(match.group(2), 16) == expected_scause
+        )
+        and (
+            expected_stval is None
+            or int(match.group(3), 16) == expected_stval
+        )
+        and (
+            expected_sepc is None
+            or int(match.group(4), 16) == expected_sepc
+        )
+    )
+
+
+def _has_vm_self_fault(
+    output,
+    *,
+    expected_sepc,
+    expected_scause,
+    expected_stval,
+    expected_ownership,
+):
+    output_lines, terminated = _split_output_records(output)
+    indices = [
+        index
+        for index, line in enumerate(output_lines)
+        if line.startswith("MICROS_VM_SELF_FAULT")
+    ]
+    if len(indices) != 1 or not terminated[indices[0]]:
+        return False
+    match = VM_SELF_FAULT_PATTERN.fullmatch(output_lines[indices[0]])
+    return (
+        match is not None
+        and int(match.group(5), 16) == expected_scause
+        and int(match.group(6), 16) == expected_stval
+        and int(match.group(7), 16) == expected_sepc
+        and match.group(8) == expected_ownership
     )
 
 
@@ -1028,6 +1082,19 @@ def _has_required_output(output_lines, markers, patterns):
     )
 
 
+def _has_ordered_patterns(output_lines, patterns):
+    next_index = 0
+
+    for pattern in patterns:
+        for index in range(next_index, len(output_lines)):
+            if re.fullmatch(pattern, output_lines[index]):
+                next_index = index + 1
+                break
+        else:
+            return False
+    return True
+
+
 def matches_expected_result(
     *,
     result,
@@ -1036,6 +1103,8 @@ def matches_expected_result(
     markers,
     patterns,
     forbidden_markers=(),
+    forbidden_patterns=(),
+    ordered_patterns=(),
     require_fdt_events=False,
     require_fdt_reservations=False,
     require_panic_report=False,
@@ -1059,6 +1128,14 @@ def matches_expected_result(
     require_nested_trap_test_report=False,
     require_trap_context=False,
     expected_trap_context_sepc=None,
+    expected_trap_context_origin=None,
+    expected_trap_context_scause=None,
+    expected_trap_context_stval=None,
+    require_vm_self_fault=False,
+    expected_vm_self_fault_sepc=None,
+    expected_vm_self_fault_scause=None,
+    expected_vm_self_fault_stval=None,
+    expected_vm_self_fault_ownership=None,
 ):
     output_lines = result.output.splitlines()
 
@@ -1073,6 +1150,12 @@ def matches_expected_result(
             forbidden in output_lines
             for forbidden in forbidden_markers
         )
+        or any(
+            re.fullmatch(pattern, line)
+            for pattern in forbidden_patterns
+            for line in output_lines
+        )
+        or not _has_ordered_patterns(output_lines, ordered_patterns)
     ):
         return False
     if (
@@ -1203,10 +1286,30 @@ def matches_expected_result(
         and not _has_complete_trap_context(
             result.output,
             expected_sepc=expected_trap_context_sepc,
+            expected_origin=expected_trap_context_origin,
+            expected_scause=expected_trap_context_scause,
+            expected_stval=expected_trap_context_stval,
         )
     ):
         return False
     if not require_trap_context and has_trap_context:
+        return False
+    if (
+        require_vm_self_fault
+        and (
+            expected_vm_self_fault_sepc is None
+            or expected_vm_self_fault_scause is None
+            or expected_vm_self_fault_stval is None
+            or expected_vm_self_fault_ownership is None
+            or not _has_vm_self_fault(
+                result.output,
+                expected_sepc=expected_vm_self_fault_sepc,
+                expected_scause=expected_vm_self_fault_scause,
+                expected_stval=expected_vm_self_fault_stval,
+                expected_ownership=expected_vm_self_fault_ownership,
+            )
+        )
+    ):
         return False
     return True
 
@@ -1391,6 +1494,18 @@ def parse_arguments(argv):
         help="Exact serial line that must be absent; may be repeated",
     )
     parser.add_argument(
+        "--forbid-pattern",
+        action="append",
+        default=[],
+        help="Full-line regular expression that must be absent; may be repeated",
+    )
+    parser.add_argument(
+        "--ordered-pattern",
+        action="append",
+        default=[],
+        help="Full-line regex required in the given order; may be repeated",
+    )
+    parser.add_argument(
         "--expect",
         choices=("pass", "panic"),
         default="pass",
@@ -1510,6 +1625,50 @@ def parse_arguments(argv):
         "--trap-context-sepc-symbol",
         help="ELF symbol whose address must equal trap-context sepc",
     )
+    parser.add_argument(
+        "--trap-context-origin",
+        choices=("S", "U"),
+        help="Exact required trap-context origin",
+    )
+    parser.add_argument(
+        "--trap-context-scause",
+        type=lambda value: int(value, 0),
+        help="Exact required trap-context scause",
+    )
+    parser.add_argument(
+        "--trap-context-stval",
+        type=lambda value: int(value, 0),
+        help="Exact required trap-context stval",
+    )
+    parser.add_argument(
+        "--require-vm-self-fault",
+        action="store_true",
+        help="Require one exact VM self-fault record",
+    )
+    parser.add_argument(
+        "--vm-self-fault-elf",
+        type=Path,
+        help="ELF containing the expected VM fault-PC symbol",
+    )
+    parser.add_argument(
+        "--vm-self-fault-symbol",
+        help="Symbol whose address must equal VM self-fault sepc",
+    )
+    parser.add_argument(
+        "--vm-self-fault-scause",
+        type=lambda value: int(value, 0),
+        help="Exact required VM self-fault scause",
+    )
+    parser.add_argument(
+        "--vm-self-fault-stval",
+        type=lambda value: int(value, 0),
+        help="Exact required VM self-fault stval",
+    )
+    parser.add_argument(
+        "--vm-self-fault-ownership",
+        choices=("bootstrap", "handed-off"),
+        help="Exact required VM self-fault ownership phase",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     arguments = parser.parse_args(argv)
 
@@ -1533,7 +1692,11 @@ def parse_arguments(argv):
             "--expected-frame-allocator-managed-delta requires "
             "two --memory values and a frame allocator report"
         )
-    for pattern in arguments.pattern:
+    for pattern in (
+        arguments.pattern
+        + arguments.forbid_pattern
+        + arguments.ordered_pattern
+    ):
         try:
             re.compile(pattern)
         except re.error as error:
@@ -1548,12 +1711,51 @@ def parse_arguments(argv):
             "--trap-context-sepc-symbol requires "
             "--require-trap-context"
         )
+    if (
+        any(
+            value is not None
+            for value in (
+                arguments.trap_context_origin,
+                arguments.trap_context_scause,
+                arguments.trap_context_stval,
+            )
+        )
+        and not arguments.require_trap_context
+    ):
+        parser.error(
+            "trap-context field requirements need "
+            "--require-trap-context"
+        )
+    vm_fault_arguments = (
+        arguments.vm_self_fault_elf,
+        arguments.vm_self_fault_symbol,
+        arguments.vm_self_fault_scause,
+        arguments.vm_self_fault_stval,
+        arguments.vm_self_fault_ownership,
+    )
+    if arguments.require_vm_self_fault:
+        if any(value is None for value in vm_fault_arguments):
+            parser.error(
+                "--require-vm-self-fault needs ELF, symbol, "
+                "scause, stval, and ownership"
+            )
+        if not arguments.vm_self_fault_elf.is_file():
+            parser.error(
+                "VM self-fault ELF does not exist: "
+                f"{arguments.vm_self_fault_elf}"
+            )
+    elif any(value is not None for value in vm_fault_arguments):
+        parser.error(
+            "VM self-fault expectations need "
+            "--require-vm-self-fault"
+        )
     return arguments
 
 
 def main(argv=None):
     arguments = parse_arguments(argv)
     expected_trap_context_sepc = None
+    expected_vm_self_fault_sepc = None
     if arguments.trap_context_sepc_symbol:
         try:
             expected_trap_context_sepc = resolve_symbol_address(
@@ -1564,6 +1766,18 @@ def main(argv=None):
         except (FileNotFoundError, RuntimeError, ValueError) as error:
             print(str(error), file=sys.stderr)
             return 2
+    if arguments.require_vm_self_fault:
+        try:
+            expected_vm_self_fault_sepc = resolve_symbol_address(
+                arguments.nm,
+                arguments.vm_self_fault_elf,
+                arguments.vm_self_fault_symbol,
+            )
+        except (FileNotFoundError, RuntimeError, ValueError) as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        if expected_trap_context_sepc is None:
+            expected_trap_context_sepc = expected_vm_self_fault_sepc
 
     expected_outcome = SmokeOutcome(arguments.expect)
     successful_runs = []
@@ -1597,6 +1811,8 @@ def main(argv=None):
             markers=arguments.marker,
             patterns=arguments.pattern,
             forbidden_markers=arguments.forbid_marker,
+            forbidden_patterns=arguments.forbid_pattern,
+            ordered_patterns=arguments.ordered_pattern,
             require_fdt_events=arguments.require_fdt_events,
             require_fdt_reservations=arguments.require_fdt_reservations,
             require_panic_report=arguments.require_panic_report,
@@ -1644,6 +1860,20 @@ def main(argv=None):
             ),
             require_trap_context=arguments.require_trap_context,
             expected_trap_context_sepc=expected_trap_context_sepc,
+            expected_trap_context_origin=arguments.trap_context_origin,
+            expected_trap_context_scause=arguments.trap_context_scause,
+            expected_trap_context_stval=arguments.trap_context_stval,
+            require_vm_self_fault=arguments.require_vm_self_fault,
+            expected_vm_self_fault_sepc=expected_vm_self_fault_sepc,
+            expected_vm_self_fault_scause=(
+                arguments.vm_self_fault_scause
+            ),
+            expected_vm_self_fault_stval=(
+                arguments.vm_self_fault_stval
+            ),
+            expected_vm_self_fault_ownership=(
+                arguments.vm_self_fault_ownership
+            ),
         )
         if not accepted:
             return print_tap_result(

@@ -1,4 +1,5 @@
 #include "micros/bootstrap.h"
+#include "micros/vm_bootstrap.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -9,6 +10,13 @@
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
+            fprintf( \
+                stderr, \
+                "%s:%d: expected %s\n", \
+                __FILE__, \
+                __LINE__, \
+                #expression \
+            ); \
             return false; \
         } \
     } while (false)
@@ -45,6 +53,11 @@ static struct micros_privilege_profile profile(
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_CALL;
         result.call_targets = UINT32_C(1) << 1;
+        if (id == 2) {
+            result.operations |= MICROS_PRIVILEGE_OPERATION_REPLY;
+            result.kernel_operations =
+                MICROS_KERNEL_OPERATION_VM_HANDOFF;
+        }
     }
     return result;
 }
@@ -149,6 +162,7 @@ static bool test_manifest_validation(void)
         .process_slot = 1,
         .profile_id = 2,
         .prerequisites = UINT64_C(1),
+        .call_targets = UINT32_C(1) << 1,
         .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
     };
     set_name(expected[1].service_name, "vm");
@@ -165,6 +179,10 @@ static bool test_manifest_validation(void)
     };
     images[1] = images[0];
     images[1].image_id = 102;
+    images[1].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    images[1].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    images[1].vm_boot_info_initially_zero = true;
     profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     profiles[1] = profile(2, "VM");
 
@@ -253,7 +271,42 @@ static bool test_manifest_validation(void)
         && memcmp(&plan, &sentinel, sizeof(plan)) == 0
     );
     profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
+    profiles[0].kernel_operations |=
+        MICROS_KERNEL_OPERATION_VM_HANDOFF;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            2,
+            images,
+            2,
+            profiles,
+            2,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     profiles[1].call_targets = 0;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            2,
+            images,
+            2,
+            profiles,
+            2,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[1] = profile(2, "VM");
+    profiles[1].kernel_operations = 0;
     plan = sentinel;
     EXPECT_TRUE(
         micros_bootstrap_manifest_validate(
@@ -342,6 +395,7 @@ static void initialize_validation_fixture(
             .process_slot = 1,
             .profile_id = 2,
             .prerequisites = UINT64_C(1),
+            .call_targets = UINT32_C(1) << 1,
             .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
         };
     set_name(fixture->expected[1].service_name, "vm");
@@ -358,6 +412,10 @@ static void initialize_validation_fixture(
     };
     fixture->images[1] = fixture->images[0];
     fixture->images[1].image_id = 102;
+    fixture->images[1].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    fixture->images[1].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    fixture->images[1].vm_boot_info_initially_zero = true;
     fixture->profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     fixture->profiles[1] = profile(2, "VM");
 }
@@ -568,7 +626,7 @@ static bool test_manifest_rejections(void)
         ) == MICROS_BOOTSTRAP_ERROR_PROFILE
         && diagnostic.reason
             == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE
-        && diagnostic.service_id == 0
+        && diagnostic.service_id == 2
         && diagnostic.detail == 0
     );
     initialize_validation_fixture(&fixture);
@@ -581,6 +639,36 @@ static bool test_manifest_rejections(void)
             &fixture,
             32,
             MICROS_BOOTSTRAP_ERROR_PROFILE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].vm_boot_info_size = 0;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].vm_boot_info_initially_zero = false;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
+        )
+    );
+    initialize_validation_fixture(&fixture);
+    fixture.images[0].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    fixture.images[0].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    fixture.images[0].vm_boot_info_initially_zero = true;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            32,
+            MICROS_BOOTSTRAP_ERROR_IMAGE
         )
     );
     initialize_validation_fixture(&fixture);
@@ -615,6 +703,48 @@ static bool test_manifest_rejections(void)
         expect_validation_error(
             &fixture,
             6,
+            MICROS_BOOTSTRAP_ERROR_RANGE
+        )
+    );
+    return true;
+}
+
+static bool test_vm_mapping_capacity(void)
+{
+    struct validation_fixture fixture;
+    struct micros_bootstrap_manifest_plan plan;
+
+    initialize_validation_fixture(&fixture);
+    fixture.images[1].page_count = 4091;
+    fixture.images[1].image_end =
+        MICROS_USER_VIRTUAL_BASE
+        + UINT64_C(4091) * MICROS_FRAME_SIZE;
+    fixture.manifest.entries[0].user_page_limit = 4092;
+    fixture.manifest.header.total_user_page_limit = 4096;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &fixture.manifest,
+            fixture.expected,
+            2,
+            fixture.images,
+            2,
+            fixture.profiles,
+            2,
+            4096,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+    );
+
+    fixture.images[1].page_count = 4092;
+    fixture.images[1].image_end =
+        MICROS_USER_VIRTUAL_BASE
+        + UINT64_C(4092) * MICROS_FRAME_SIZE;
+    fixture.manifest.entries[0].user_page_limit = 4093;
+    fixture.manifest.header.total_user_page_limit = 4097;
+    EXPECT_TRUE(
+        expect_validation_error(
+            &fixture,
+            4097,
             MICROS_BOOTSTRAP_ERROR_RANGE
         )
     );
@@ -657,6 +787,7 @@ static bool test_three_service_topology(void)
         .process_slot = 2,
         .profile_id = 3,
         .prerequisites = UINT64_C(1),
+        .call_targets = UINT32_C(1) << 1,
     };
     set_name(expected[2].service_name, "pm");
     set_name(expected[2].profile_name, "PM");
@@ -664,6 +795,9 @@ static bool test_three_service_topology(void)
     images[1] = base.images[1];
     images[2] = base.images[1];
     images[2].image_id = 103;
+    images[2].vm_boot_info_address = 0;
+    images[2].vm_boot_info_size = 0;
+    images[2].vm_boot_info_initially_zero = false;
     profiles[0] = base.profiles[0];
     profiles[1] = base.profiles[1];
     profiles[2] = profile(3, "PM");
@@ -1450,14 +1584,33 @@ static bool test_replayable_runtime_model(void)
 
 int main(void)
 {
-    return (
-        test_manifest_contract()
-        && test_manifest_validation()
-        && test_manifest_rejections()
-        && test_three_service_topology()
-        && test_runtime_transitions()
-        && test_replayable_runtime_model()
-    )
-        ? 0
-        : 1;
+    if (!test_manifest_contract()) {
+        fprintf(stderr, "manifest contract failed\n");
+        return 1;
+    }
+    if (!test_manifest_validation()) {
+        fprintf(stderr, "manifest validation failed\n");
+        return 1;
+    }
+    if (!test_manifest_rejections()) {
+        fprintf(stderr, "manifest rejections failed\n");
+        return 1;
+    }
+    if (!test_vm_mapping_capacity()) {
+        fprintf(stderr, "VM mapping capacity failed\n");
+        return 1;
+    }
+    if (!test_three_service_topology()) {
+        fprintf(stderr, "three-service topology failed\n");
+        return 1;
+    }
+    if (!test_runtime_transitions()) {
+        fprintf(stderr, "runtime transitions failed\n");
+        return 1;
+    }
+    if (!test_replayable_runtime_model()) {
+        fprintf(stderr, "runtime model failed\n");
+        return 1;
+    }
+    return 0;
 }

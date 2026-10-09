@@ -28,6 +28,10 @@ QEMU_WORKFLOWS = (
     "test-qemu-grant-syscall",
     "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher",
+    "test-qemu-vm-handoff",
+    "test-qemu-vm-ready-early",
+    "test-qemu-vm-self-fault",
+    "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout",
     "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc",
@@ -57,6 +61,11 @@ BOOTSTRAP_CROSS_GATE_INPUTS = (
     "kernel/bootstrap_manifest.c",
     "kernel/bootstrap_runtime.c",
     "kernel/bootstrap_syscall.c",
+    "kernel/vm_bootstrap.c",
+    "kernel/vm_handoff_core.c",
+    "kernel/vm_handoff_runtime.c",
+    "kernel/vm_handoff_syscall.c",
+    "kernel/vm_snapshot.c",
 )
 
 BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
@@ -66,6 +75,10 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-grant-syscall",
     "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher",
+    "test-qemu-vm-handoff",
+    "test-qemu-vm-ready-early",
+    "test-qemu-vm-self-fault",
+    "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout",
     "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc",
@@ -412,6 +425,46 @@ GATE_INPUTS["test-qemu-bootstrap-manifest-panic"] = GATE_INPUTS[
     "arch/riscv64/panic.S",
     "kernel/panic.c",
 )
+GATE_INPUTS["test-qemu-vm-handoff"] = GATE_INPUTS[
+    "test-qemu-bootstrap-launcher"
+] + (
+    "include/micros/vm_bootstrap.h",
+    "kernel/vm_bootstrap.c",
+    "kernel/vm_handoff_core.c",
+    "kernel/vm_handoff_core.h",
+    "kernel/vm_handoff_runtime.c",
+    "kernel/vm_handoff_runtime.h",
+    "kernel/vm_handoff_syscall.c",
+    "kernel/vm_handoff_syscall.h",
+    "kernel/vm_handoff_test.c",
+    "kernel/vm_handoff_test.h",
+    "kernel/vm_handoff_test_fixture.h",
+    "kernel/vm_snapshot.c",
+    "kernel/vm_snapshot.h",
+    "tests/host/test_generate_vm_handoff_fixture.py",
+    "tests/host/vm_handoff_test.c",
+    "tests/qemu/vm_handoff_probe.S",
+    "tests/qemu/vm_handoff_probe.c",
+    "tests/qemu/vm_handoff_protocol.h",
+    "tests/qemu/vm_self_fault.S",
+    "tests/qemu/vm_server.c",
+    "tools/generate_vm_handoff_fixture.py",
+)
+GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
+    "test-qemu-vm-handoff"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
+GATE_INPUTS["test-qemu-vm-self-fault"] = GATE_INPUTS[
+    "test-qemu-vm-handoff"
+] + (
+    "arch/riscv64/panic.S",
+    "kernel/panic.c",
+)
+GATE_INPUTS["test-qemu-vm-self-fault-sealed"] = GATE_INPUTS[
+    "test-qemu-vm-self-fault"
+]
 for bootstrap_workflow in BOOTSTRAP_CROSS_GATE_WORKFLOWS:
     GATE_INPUTS[bootstrap_workflow] += BOOTSTRAP_CROSS_GATE_INPUTS
 

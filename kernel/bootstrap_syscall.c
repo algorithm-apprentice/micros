@@ -11,6 +11,7 @@
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/scheduler_core_internal.h"
+#include "kernel/vm_handoff_runtime.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_core.h"
 #include "micros/ipc_runtime.h"
@@ -170,6 +171,8 @@ static bool controller_is_authorized(
 
 static bool role_gate_ready(
     const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     uint32_t service_id,
     bool release
 )
@@ -194,7 +197,14 @@ static bool role_gate_ready(
         !release
         && (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) != 0
     ) {
-        return false;
+        return micros_vm_handoff_runtime_role_ready(
+            state,
+            registry,
+            objects,
+            service_id,
+            binding->process,
+            binding->endpoint
+        );
     }
     return true;
 }
@@ -342,6 +352,7 @@ static enum micros_syscall_return handle_accept_ready(
 {
     struct micros_bootstrap_ready_plan plan;
     struct micros_scheduler_current_ipc_guard guard = {0};
+    const struct micros_bootstrap_binding *binding;
     const struct micros_thread *thread;
     enum micros_bootstrap_error error;
     enum micros_ipc_error ipc_error;
@@ -355,9 +366,37 @@ static enum micros_syscall_return handle_accept_ready(
         request->service_id,
         request->endpoint,
         now,
-        role_gate_ready(state, request->service_id, false),
+        role_gate_ready(
+            state,
+            registry,
+            context->objects,
+            request->service_id,
+            false
+        ),
         &plan
     );
+    if (error == MICROS_BOOTSTRAP_ERROR_ROLE) {
+        binding = micros_bootstrap_control_find_binding(
+            state,
+            request->service_id
+        );
+        if (binding == NULL) {
+            fail_active_bootstrap(
+                hart,
+                frame,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                request->service_id,
+                request->endpoint
+            );
+        }
+        fail_active_bootstrap(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_READY_ROLE_GATE,
+            binding->service_id,
+            binding->endpoint
+        );
+    }
     if (error != MICROS_BOOTSTRAP_OK) {
         if (
             error != MICROS_BOOTSTRAP_ERROR_ARGUMENT
@@ -654,7 +693,13 @@ micros_bootstrap_handle_captured_user_ecall(
             context->hart,
             request.service_id,
             riscv_read_time(),
-            role_gate_ready(state, request.service_id, true)
+            role_gate_ready(
+                state,
+                registry,
+                context->objects,
+                request.service_id,
+                true
+            )
         );
         if (
             error != MICROS_BOOTSTRAP_OK

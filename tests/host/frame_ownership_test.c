@@ -1057,6 +1057,46 @@ static bool expect_handoff_completion_failure(
     return true;
 }
 
+static bool expect_wired_set_failure(
+    size_t word_count,
+    enum micros_frame_ownership_error expected_error
+)
+{
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    memcpy(
+        &allocator_snapshot,
+        &allocator,
+        sizeof(allocator_snapshot)
+    );
+    EXPECT_ERROR(
+        expected_error,
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &ownership,
+            release_bitmap,
+            word_count
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &allocator,
+            &allocator_snapshot,
+            sizeof(allocator)
+        ) == 0
+    );
+    return true;
+}
+
 static bool test_atomically_releases_process_owned_sets(void)
 {
     const struct micros_process_handle process_one = {1, 2};
@@ -1744,6 +1784,208 @@ static bool test_stages_and_atomically_commits_handoff(void)
     return true;
 }
 
+static bool test_atomically_stages_complete_wired_set(void)
+{
+    const struct micros_frame_owner process_user_one =
+        raw_process_owner(MICROS_FRAME_OWNER_PROCESS_USER, 1, 2);
+    const struct micros_frame_owner process_user_two =
+        raw_process_owner(MICROS_FRAME_OWNER_PROCESS_USER, 2, 3);
+    const struct micros_frame_owner process_table =
+        raw_process_owner(MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE, 1, 2);
+    const struct micros_frame_owner retained =
+        raw_kernel_owner(MICROS_FRAME_OWNER_KERNEL_RETAINED);
+    uint64_t frames[4];
+
+    EXPECT_TRUE(initialize_fixture(TEST_FRAME_COUNT));
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_allocate(
+            &ownership,
+            process_user_one,
+            &frames[0]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_allocate(
+            &ownership,
+            process_user_two,
+            &frames[1]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_allocate(
+            &ownership,
+            process_table,
+            &frames[2]
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_allocate(
+            &ownership,
+            retained,
+            &frames[3]
+        )
+    );
+
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT,
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &ownership,
+            NULL,
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+    );
+    clear_release_bitmap();
+    select_release_index(0);
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS,
+            MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER
+        )
+    );
+    select_release_index(1);
+    select_release_index(2);
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS,
+            MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER
+        )
+    );
+    clear_release_bitmap();
+    select_release_index(0);
+    select_release_index(1);
+    select_release_index(4);
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS,
+            MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
+        )
+    );
+    clear_release_bitmap();
+    select_release_index(0);
+    select_release_index(1);
+    select_release_index(TEST_FRAME_COUNT);
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS,
+            MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED
+        )
+    );
+    clear_release_bitmap();
+    select_release_index(0);
+    select_release_index(1);
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS - 1,
+            MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_prepare_handoff(
+            &ownership,
+            frames[0],
+            process_user_one,
+            MICROS_FRAME_HANDOFF_VM_TRANSFERABLE
+        )
+    );
+    EXPECT_TRUE(
+        expect_wired_set_failure(
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS,
+            MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_prepare_handoff(
+            &ownership,
+            frames[0],
+            process_user_one,
+            MICROS_FRAME_HANDOFF_NONE
+        )
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &ownership,
+            release_bitmap,
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        )
+    );
+    EXPECT_TRUE(
+        ownership.handoff_targets[0]
+            == MICROS_FRAME_HANDOFF_VM_WIRED
+        && ownership.handoff_targets[1]
+            == MICROS_FRAME_HANDOFF_VM_WIRED
+        && ownership.handoff_targets[2]
+            == MICROS_FRAME_HANDOFF_NONE
+        && ownership.handoff_targets[3]
+            == MICROS_FRAME_HANDOFF_NONE
+        && micros_frame_ownership_validate(&ownership)
+            == MICROS_FRAME_OWNERSHIP_OK
+    );
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION,
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &ownership,
+            release_bitmap,
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_complete_handoff(&ownership)
+    );
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_PHASE,
+        micros_frame_ownership_prepare_wired_process_user_set(
+            &ownership,
+            release_bitmap,
+            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+    );
+    return true;
+}
+
 static bool test_validator_rejects_independent_corruption(void)
 {
     const struct micros_frame_owner process_user = raw_process_owner(
@@ -2031,6 +2273,77 @@ static bool model_plan_is_valid(
         owner.kind == MICROS_FRAME_OWNER_KERNEL_RETAINED
         && target == MICROS_FRAME_HANDOFF_VM_TRANSFERABLE
     );
+}
+
+static enum micros_frame_ownership_error
+model_prepare_wired_set_error(
+    const struct micros_frame_owner *model_owners,
+    const uint8_t *model_targets,
+    enum micros_frame_ownership_phase model_phase,
+    size_t frame_count,
+    const uint64_t *selected_bitmap
+)
+{
+    size_t index;
+
+    if (model_phase == MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
+    }
+    for (
+        index = 0;
+        index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
+        ++index
+    ) {
+        bool selected = (
+            selected_bitmap[index / 64]
+            & (UINT64_C(1) << (index % 64))
+        ) != 0;
+
+        if (index >= frame_count) {
+            if (selected) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+            }
+            continue;
+        }
+        if (
+            model_owners[index].kind
+                == MICROS_FRAME_OWNER_PROCESS_USER
+        ) {
+            if (!selected) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+            }
+            if (
+                model_targets[index]
+                    != MICROS_FRAME_HANDOFF_NONE
+            ) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
+            }
+        } else if (selected) {
+            return model_owner_is_free(model_owners[index])
+                ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
+                : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+static void model_apply_wired_set(
+    const struct micros_frame_owner *model_owners,
+    uint8_t *model_targets,
+    size_t frame_count
+)
+{
+    size_t index;
+
+    for (index = 0; index < frame_count; ++index) {
+        if (
+            model_owners[index].kind
+                == MICROS_FRAME_OWNER_PROCESS_USER
+        ) {
+            model_targets[index] =
+                MICROS_FRAME_HANDOFF_VM_WIRED;
+        }
+    }
 }
 
 static bool model_handoff_is_ready(
@@ -2398,13 +2711,20 @@ static bool test_matches_seeded_reference_model(void)
         }
         operation = value % (
             model_phase == MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-                ? 6U
-                : 7U
+                ? 7U
+                : 8U
         );
         if (
             model_phase == MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
             && operation == 4
             && ((value >> 24) & 7U) != 0
+        ) {
+            operation = 5;
+        }
+        if (
+            model_phase == MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+            && operation == 6
+            && ((value >> 24) & 31U) != 0
         ) {
             operation = 5;
         }
@@ -2745,6 +3065,53 @@ static bool test_matches_seeded_reference_model(void)
                 );
                 return false;
             }
+        } else if (operation == 6) {
+            enum micros_frame_ownership_error expected_error;
+            size_t mutation_index =
+                (value >> 8) % (TEST_FRAME_COUNT + 1);
+
+            clear_release_bitmap();
+            for (index = 0; index < TEST_FRAME_COUNT; ++index) {
+                if (
+                    model_owners[index].kind
+                        == MICROS_FRAME_OWNER_PROCESS_USER
+                ) {
+                    select_release_index(index);
+                }
+            }
+            if (((value >> 20) & 1U) != 0) {
+                release_bitmap[mutation_index / 64]
+                    ^= UINT64_C(1) << (mutation_index % 64);
+            }
+            expected_error = model_prepare_wired_set_error(
+                model_owners,
+                model_targets,
+                model_phase,
+                TEST_FRAME_COUNT,
+                release_bitmap
+            );
+            if (
+                micros_frame_ownership_prepare_wired_process_user_set(
+                    &ownership,
+                    release_bitmap,
+                    MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+                ) != expected_error
+            ) {
+                fprintf(
+                    stderr,
+                    "seed=0x%08x step=%zu wired-set mismatch\n",
+                    seed,
+                    step
+                );
+                return false;
+            }
+            if (expected_error == MICROS_FRAME_OWNERSHIP_OK) {
+                model_apply_wired_set(
+                    model_owners,
+                    model_targets,
+                    TEST_FRAME_COUNT
+                );
+            }
         } else {
             enum micros_frame_ownership_error expected_error =
                 model_phase
@@ -2837,6 +3204,10 @@ int main(void)
         {
             "stages and atomically commits handoff",
             test_stages_and_atomically_commits_handoff,
+        },
+        {
+            "atomically stages complete wired set",
+            test_atomically_stages_complete_wired_set,
         },
         {
             "rejects independent corruption",

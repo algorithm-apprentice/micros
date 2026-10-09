@@ -23,6 +23,7 @@ enum {
 
 #define MICROS_BOOTSTRAP_MANIFEST_MAGIC UINT32_C(0x3153424d)
 #define MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL UINT64_C(0x1)
+#define MICROS_KERNEL_OPERATION_VM_HANDOFF UINT64_C(0x2)
 #define MICROS_BOOTSTRAP_ROLE_CONTROLLER UINT32_C(0x00000001)
 #define MICROS_BOOTSTRAP_ROLE_VM UINT32_C(0x00000002)
 #define MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER UINT32_C(0x00000004)
@@ -87,6 +88,7 @@ struct micros_bootstrap_expected_service {
     char service_name[MICROS_BOOTSTRAP_NAME_SIZE];
     char profile_name[MICROS_BOOTSTRAP_NAME_SIZE];
     uint64_t prerequisites;
+    uint32_t call_targets;
     uint32_t role_flags;
     uint32_t irq_source;
     uint64_t device_base;
@@ -101,7 +103,10 @@ struct micros_bootstrap_image_info {
     uint32_t config_size;
     uint32_t page_count;
     uint64_t image_end;
+    uint64_t vm_boot_info_address;
+    uint32_t vm_boot_info_size;
     bool config_initially_zero;
+    bool vm_boot_info_initially_zero;
 };
 
 struct micros_bootstrap_manifest_plan {

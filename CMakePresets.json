@@ -171,6 +171,42 @@
       }
     },
     {
+      "name": "riscv64-vm-handoff-test",
+      "displayName": "RISC-V 64 static VM handoff test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-handoff-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_HANDOFF_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-vm-ready-early-test",
+      "displayName": "RISC-V 64 early VM readiness role-gate test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-ready-early-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_READY_EARLY_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-vm-self-fault-test",
+      "displayName": "RISC-V 64 running VM self-fault test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-self-fault-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_SELF_FAULT_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-vm-self-fault-sealed-test",
+      "displayName": "RISC-V 64 sealed VM self-fault test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-self-fault-sealed-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-bootstrap-ready-timeout-test",
       "displayName": "RISC-V 64 bootstrap readiness-timeout panic test",
       "inherits": "riscv64-debug",
@@ -404,6 +440,34 @@
       "configurePreset": "riscv64-bootstrap-launcher-test",
       "targets": [
         "test-qemu-bootstrap-launcher"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-handoff",
+      "configurePreset": "riscv64-vm-handoff-test",
+      "targets": [
+        "test-qemu-vm-handoff"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-ready-early",
+      "configurePreset": "riscv64-vm-ready-early-test",
+      "targets": [
+        "test-qemu-vm-ready-early"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault",
+      "configurePreset": "riscv64-vm-self-fault-test",
+      "targets": [
+        "test-qemu-vm-self-fault"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault-sealed",
+      "configurePreset": "riscv64-vm-self-fault-sealed-test",
+      "targets": [
+        "test-qemu-vm-self-fault-sealed"
       ]
     },
     {
@@ -769,6 +833,62 @@
         {
           "type": "build",
           "name": "test-qemu-bootstrap-launcher"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-handoff",
+      "displayName": "Build and run static VM handoff acceptance",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-handoff-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-handoff"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-ready-early",
+      "displayName": "Build and run early VM readiness role-gate panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-ready-early-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-ready-early"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault",
+      "displayName": "Build and run running VM self-fault panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-self-fault-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-self-fault"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault-sealed",
+      "displayName": "Build and run sealed VM self-fault panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-self-fault-sealed-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-self-fault-sealed"
         }
       ]
     },

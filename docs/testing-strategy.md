@@ -76,6 +76,10 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
+`test-qemu-vm-handoff`,
+`test-qemu-vm-ready-early`,
+`test-qemu-vm-self-fault`,
+`test-qemu-vm-self-fault-sealed`,
 `test-qemu-bootstrap-ready-timeout`,
 `test-qemu-bootstrap-manifest-panic`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
@@ -105,6 +109,10 @@ cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
+cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-vm-ready-early
+cmake --workflow --preset test-qemu-vm-self-fault
+cmake --workflow --preset test-qemu-vm-self-fault-sealed
 cmake --workflow --preset test-qemu-bootstrap-ready-timeout
 cmake --workflow --preset test-qemu-bootstrap-manifest-panic
 cmake --workflow --preset test-qemu-ipc
@@ -673,31 +681,55 @@ Integration scenarios include:
 - malformed message type, endpoint, grant, and request identifier;
 - later, service restart and endpoint replacement.
 
-ADR-0045 defines the next VM-handoff evidence. Native tests are intended to
-cover the exact 364672-byte boot-information ABI, range/address-space/mapping/
-state/count validation, independent digest agreement, failure-atomic
-all-user-frame wired staging, operation-12 authority and precedence,
-irreversible commit, and a replayable minimum 4096-transition model.
+ADR-0045 VM-handoff evidence now includes native validation of the exact
+364672-byte boot-information ABI, canonical ranges, address spaces, mappings,
+frame states, independent counts and digest, failure-atomic all-user-frame
+wired staging, operation-12 shape and summary authority, irreversible commit,
+and the retained replayable 4096-transition ownership model.
 
-The later implementation adds:
+The successful workflow is implemented:
 
 ```text
 test-qemu-vm-handoff
+```
+
+It uses the production launcher, one real VM ELF, and one test-only probe. The
+kernel constructs and reads back the fixed VM database, while the VM
+independently validates every range, mapping, state, count, and digest before
+issuing the real VM-only operation-12 ecall. The gate then proves post-handoff
+return, VM readiness only after ownership publication, dependent probe
+release, launcher sealing, and a real bidirectional checked-copy grant exchange
+between the probe and VM. Only the exact marker is accepted:
+
+```text
+MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm
+```
+
+The expected-failure workflow:
+
+```text
+test-qemu-vm-ready-early
+```
+
+has the real VM validate its boot database but deliberately send ordinary
+readiness before operation 12. It requires the exact `ready-role-gate`
+bootstrap failure for the bound VM service and endpoint, forbids the handoff
+success marker, and rejects host timeout.
+
+Both fatal workflows are implemented:
+
+```text
 test-qemu-vm-self-fault
 test-qemu-vm-self-fault-sealed
 ```
 
-The success image uses the production launcher, one real VM ELF, and one
-test-only probe. It must prove independent kernel/VM snapshot and static
-mapping agreement, one real VM-only handoff ecall, exact wired ownership for
-VM and every static service, post-handoff return, a real VM/probe IPC plus
-checked-copy grant exchange, generic readiness only after the ownership
-commit, and final launcher sealing. The self-fault image commits the same
-handoff, then requires exact VM-origin fault diagnostics and panic without a
-host timeout or success marker. The sealed variant first completes VM
-readiness and launcher sealing, then requires the non-bootstrap
-`vm-self-fault` classification and explicitly forbids a bootstrap failure
-record.
+The running image commits the same handoff and faults before generic VM
+readiness. It requires the exact VM identity, fault registers,
+`ownership=handed-off`, the authoritative `RUNNING+STARTING` service-fault
+record, ordered trap-context panic, and no success marker. The sealed variant
+first completes VM readiness, the real grant exchange, and launcher sealing;
+it then requires `MICROS_PANIC reason=vm-self-fault`, exact trap context, no
+success marker, and no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure
 with the latest structured serial events attached.

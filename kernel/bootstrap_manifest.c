@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "micros/sv39.h"
+#include "micros/vm_bootstrap.h"
 
 static void copy_bytes(void *destination, const void *source, size_t size)
 {
@@ -222,7 +223,9 @@ static enum micros_bootstrap_error validate_profile_relationships(
             controller_profile_id
         );
     uint32_t controller_target;
-    size_t index;
+        uint32_t active_profile_targets = 0;
+        uint8_t vm_profile_id = 0;
+        size_t index;
 
     if (controller == NULL) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
@@ -237,20 +240,36 @@ static enum micros_bootstrap_error validate_profile_relationships(
         || controller->call_targets != 0
         || controller->send_targets != 0
         || controller->notify_targets != 0
-        || (
-            controller->kernel_operations
-            & MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
-        ) == 0
+        || controller->kernel_operations
+            != MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
     ) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
     }
-    for (index = 0; index < profile_count; ++index) {
+    for (index = 0; index < manifest->header.entry_count; ++index) {
+        active_profile_targets |=
+            UINT32_C(1) << manifest->entries[index].profile_id;
         if (
-            profiles[index].id != controller_profile_id
-            && (
-                profiles[index].kernel_operations
-                & MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
+            (
+                manifest->entries[index].role_flags
+                & MICROS_BOOTSTRAP_ROLE_VM
             ) != 0
+        ) {
+            vm_profile_id = manifest->entries[index].profile_id;
+        }
+    }
+    for (index = 0; index < profile_count; ++index) {
+        uint64_t expected_kernel_operations =
+            profiles[index].id == controller_profile_id
+            ? MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
+            : (
+                profiles[index].id == vm_profile_id
+                ? MICROS_KERNEL_OPERATION_VM_HANDOFF
+                : 0
+            );
+
+        if (
+            profiles[index].kernel_operations
+                != expected_kernel_operations
         ) {
             return MICROS_BOOTSTRAP_ERROR_PROFILE;
         }
@@ -282,8 +301,25 @@ static enum micros_bootstrap_error validate_profile_relationships(
                 != (
                     MICROS_PRIVILEGE_OPERATION_RECEIVE
                     | MICROS_PRIVILEGE_OPERATION_CALL
+                    | (
+                        (
+                            entry->role_flags
+                            & MICROS_BOOTSTRAP_ROLE_VM
+                        ) != 0
+                        ? MICROS_PRIVILEGE_OPERATION_REPLY
+                        : 0
+                    )
                 )
-            || profile->call_targets != controller_target
+            || (
+                profile->call_targets & controller_target
+            ) == 0
+            || (
+                profile->call_targets & ~active_profile_targets
+            ) != 0
+            || (
+                profile->call_targets
+                & (UINT32_C(1) << entry->profile_id)
+            ) != 0
             || profile->send_targets != 0
             || profile->notify_targets != 0
         ) {
@@ -429,6 +465,26 @@ static enum micros_bootstrap_error validate_image_bound(
     ) {
         return MICROS_BOOTSTRAP_ERROR_IMAGE;
     }
+    if (
+        (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) != 0
+    ) {
+        if (
+            image->vm_boot_info_address
+                % MICROS_VM_BOOT_INFO_ALIGNMENT
+                != 0
+            || image->vm_boot_info_size
+                != MICROS_VM_BOOT_INFO_SIZE
+            || !image->vm_boot_info_initially_zero
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_IMAGE;
+        }
+    } else if (
+        image->vm_boot_info_address != 0
+        || image->vm_boot_info_size != 0
+        || image->vm_boot_info_initially_zero
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_IMAGE;
+    }
     stack_bytes =
         (uint64_t)entry->stack_page_count * MICROS_SV39_PAGE_SIZE;
     if (
@@ -485,6 +541,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
     uint64_t active_ids = 0;
     uint64_t selected_ids = 0;
     uint64_t total_pages = 0;
+    uint64_t prepared_mapping_count = 0;
     uint32_t controller_count = 0;
     uint32_t vm_count = 0;
     uint32_t console_count = 0;
@@ -662,6 +719,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         if (
             profile == NULL
             || !fixed_names_equal(profile->name, entry->profile_name)
+            || profile->call_targets != expected->call_targets
         ) {
             RETURN_DIAGNOSTIC(
                 MICROS_BOOTSTRAP_ERROR_PROFILE,
@@ -679,6 +737,31 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
                 entry->service_id,
                 0
             );
+        }
+        {
+            uint64_t entry_mapping_count =
+                (uint64_t)image->page_count
+                + entry->stack_page_count;
+
+            if (
+                (entry->role_flags
+                    & MICROS_BOOTSTRAP_ROLE_CONTROLLER)
+                    != 0
+            ) {
+                ++entry_mapping_count;
+            }
+            if (
+                UINT64_MAX - prepared_mapping_count
+                    < entry_mapping_count
+            ) {
+                RETURN_DIAGNOSTIC(
+                    MICROS_BOOTSTRAP_ERROR_RANGE,
+                    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
+                    entry->service_id,
+                    0
+                );
+            }
+            prepared_mapping_count += entry_mapping_count;
         }
         if (UINT64_MAX - total_pages < entry->user_page_limit) {
             RETURN_DIAGNOSTIC(
@@ -712,6 +795,11 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         controller_count != 1
         || vm_count > 1
         || console_count > 1
+        || (
+            vm_count != 0
+            && prepared_mapping_count
+                > MICROS_VM_MAX_STATIC_MAPPINGS
+        )
         || total_pages != manifest->header.total_user_page_limit
         || total_pages > available_user_pages
     ) {

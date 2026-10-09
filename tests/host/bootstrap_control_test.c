@@ -9,6 +9,7 @@
 #include "kernel/endpoint_internal.h"
 #include "micros/scheduler_core.h"
 #include "micros/sv39.h"
+#include "micros/vm_bootstrap.h"
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -626,7 +627,7 @@ static bool test_control_transitions(void)
             109,
             false,
             &ready_plan
-        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
         && memcmp(
             &ready_plan,
             &ready_sentinel,
@@ -904,6 +905,61 @@ static bool test_image_catalog(void)
         && infos[0].config_initially_zero
         && infos[1].image_id == 102
     );
+
+    images[0].segments[2].memory_size =
+        91 * MICROS_SV39_PAGE_SIZE;
+    images[0].page_count = 93;
+    images[0].image_end =
+        MICROS_USER_VIRTUAL_BASE + 93 * MICROS_SV39_PAGE_SIZE;
+    images[0].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 3 * MICROS_SV39_PAGE_SIZE;
+    images[0].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    EXPECT_TRUE(
+        micros_bootstrap_image_catalog_validate(
+            images,
+            2,
+            infos,
+            2
+        ) == MICROS_BOOTSTRAP_OK
+        && infos[0].vm_boot_info_address
+            == images[0].vm_boot_info_address
+        && infos[0].vm_boot_info_size == MICROS_VM_BOOT_INFO_SIZE
+        && infos[0].vm_boot_info_initially_zero
+        && infos[1].vm_boot_info_address == 0
+        && infos[1].vm_boot_info_size == 0
+        && !infos[1].vm_boot_info_initially_zero
+    );
+    images[0].vm_boot_info_address += 1;
+    EXPECT_TRUE(
+        micros_bootstrap_image_catalog_validate(
+            images,
+            2,
+            infos,
+            2
+        ) == MICROS_BOOTSTRAP_ERROR_IMAGE
+    );
+    images[0].vm_boot_info_address -= 1;
+    images[0].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE - 1;
+    EXPECT_TRUE(
+        micros_bootstrap_image_catalog_validate(
+            images,
+            2,
+            infos,
+            2
+        ) == MICROS_BOOTSTRAP_ERROR_IMAGE
+    );
+    images[0].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    images[0].vm_boot_info_address = images[0].config_address;
+    EXPECT_TRUE(
+        micros_bootstrap_image_catalog_validate(
+            images,
+            2,
+            infos,
+            2
+        ) == MICROS_BOOTSTRAP_ERROR_IMAGE
+    );
+    images[0].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 3 * MICROS_SV39_PAGE_SIZE;
 
     memset(sentinel, 0xa5, sizeof(sentinel));
     memcpy(infos, sentinel, sizeof(infos));
