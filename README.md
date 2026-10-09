@@ -114,6 +114,7 @@ cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -159,6 +160,11 @@ and zero-initialized writable state, the raw `ecall` boundary, typed wrappers
 for operations 1 through 10, blocking stack-local IPC, register preservation,
 success-only grant-token publication, deterministic service-return trapping,
 and complete bootstrap cleanup.
+The PM service gate starts the real launcher, VM, PM, and a test-only probe.
+It proves VM handoff before PM readiness, stable malformed and unmanaged-caller
+protocol results without lifecycle-table mutation, one exact bootstrap-sealed
+kernel event, and a real PM-only reserve/abort transaction with no leaked
+process resources and consumed generation and transaction identities.
 The early-VM-readiness gate proves that a VM readiness call before operation
 12 emits the exact `ready-role-gate` bootstrap failure for the bound VM
 endpoint rather than a generic launcher transition failure.

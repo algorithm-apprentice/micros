@@ -110,6 +110,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
+`test-qemu-pm-service`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -143,6 +144,7 @@ cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -763,6 +765,29 @@ record, ordered trap-context panic, and no success marker. The sealed variant
 first completes VM readiness, the real grant exchange, and launcher sealing;
 it then requires `MICROS_PANIC reason=vm-self-fault`, exact trap context, no
 success marker, and no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
+
+The PM Step 10 workflow is implemented:
+
+```text
+test-qemu-pm-service
+```
+
+It starts the production launcher and VM, the real PM service, and one
+test-only probe. PM validates its exact service identity and portable
+lifecycle-table initialization before sending readiness. Before sealing, the
+probe receives stable bad-version, malformed, and unmanaged-caller results,
+and the test compares the complete PM table byte for byte to prove rejection
+did not mutate lifecycle state. Launcher completion then commits the exact
+kernel-origin bootstrap-sealed notification. PM consumes that event, performs
+one real operation-13 reservation and exact abort, and reports the opaque
+transaction to the kernel. The kernel requires the reserved slot to retain no
+root, thread, endpoint, profile, grant, scheduler state, or process-owned
+frame, while the consumed process generation and PM-control transaction remain
+advanced and stale. Only the exact marker is accepted:
+
+```text
+MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
+```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure
 with the latest structured serial events attached.

@@ -180,6 +180,15 @@
       }
     },
     {
+      "name": "riscv64-pm-service-test",
+      "displayName": "RISC-V 64 PM service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-pm-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_PM_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-vm-ready-early-test",
       "displayName": "RISC-V 64 early VM readiness role-gate test",
       "inherits": "riscv64-debug",
@@ -447,6 +456,13 @@
       "configurePreset": "riscv64-vm-handoff-test",
       "targets": [
         "test-qemu-vm-handoff"
+      ]
+    },
+    {
+      "name": "test-qemu-pm-service",
+      "configurePreset": "riscv64-pm-service-test",
+      "targets": [
+        "test-qemu-pm-service"
       ]
     },
     {
@@ -847,6 +863,20 @@
         {
           "type": "build",
           "name": "test-qemu-vm-handoff"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-pm-service",
+      "displayName": "Build and run the PM service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-pm-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-pm-service"
         }
       ]
     },
