@@ -69,6 +69,25 @@ static bool staged_launcher_acknowledgments_are_valid(
     micros_endpoint_t launcher
 );
 
+static const struct micros_bootstrap_runtime_entry *
+find_runtime_entry(
+    const struct micros_bootstrap_control_state *state,
+    uint32_t service_id
+)
+{
+    size_t index;
+
+    for (index = 0; index < state->transitions.entry_count; ++index) {
+        if (
+            state->transitions.entries[index].service_id
+                == service_id
+        ) {
+            return &state->transitions.entries[index];
+        }
+    }
+    return NULL;
+}
+
 static struct micros_bootstrap_binding *find_binding_mutable(
     struct micros_bootstrap_control_state *state,
     uint32_t service_id
@@ -76,6 +95,12 @@ static struct micros_bootstrap_binding *find_binding_mutable(
 {
     size_t index;
 
+    if (
+        state == NULL
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return NULL;
+    }
     for (index = 0; index < state->entry_count; ++index) {
         if (state->bindings[index].service_id == service_id) {
             return &state->bindings[index];
@@ -90,17 +115,10 @@ micros_bootstrap_control_find_binding(
     uint32_t service_id
 )
 {
-    size_t index;
-
-    if (state == NULL) {
-        return NULL;
-    }
-    for (index = 0; index < state->entry_count; ++index) {
-        if (state->bindings[index].service_id == service_id) {
-            return &state->bindings[index];
-        }
-    }
-    return NULL;
+    return micros_bootstrap_control_find_binding_bounded(
+        state,
+        service_id
+    );
 }
 
 static bool binding_matches_manifest(
@@ -851,6 +869,79 @@ static bool staged_launcher_acknowledgments_are_valid(
     return true;
 }
 
+static enum micros_bootstrap_error find_ready_pm_endpoint(
+    const struct micros_bootstrap_control_state *state,
+    micros_endpoint_t *endpoint
+)
+{
+    const struct micros_bootstrap_binding *binding;
+    const struct micros_bootstrap_manifest_entry *pm_entry = NULL;
+    const struct micros_bootstrap_runtime_entry *transition;
+    size_t index;
+
+    *endpoint = MICROS_ENDPOINT_NONE;
+    for (index = 0; index < state->entry_count; ++index) {
+        const struct micros_bootstrap_manifest_entry *entry =
+            &state->manifest.entries[index];
+
+        if ((entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) == 0) {
+            continue;
+        }
+        if (pm_entry != NULL) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
+        pm_entry = entry;
+    }
+    if (state->plan.pm_service_id == 0) {
+        return pm_entry == NULL
+            ? MICROS_BOOTSTRAP_OK
+            : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    binding = micros_bootstrap_control_find_binding(
+        state,
+        state->plan.pm_service_id
+    );
+    transition = find_runtime_entry(
+        state,
+        state->plan.pm_service_id
+    );
+    if (
+        pm_entry == NULL
+        || pm_entry->service_id != state->plan.pm_service_id
+        || pm_entry->role_flags != MICROS_BOOTSTRAP_ROLE_PM
+        || pm_entry->profile_id != MICROS_PRIVILEGE_PROFILE_PM
+        || binding == NULL
+        || &state->manifest.entries[binding->manifest_index]
+            != pm_entry
+        || transition == NULL
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (
+        transition->state != MICROS_BOOTSTRAP_SERVICE_READY
+        || transition->endpoint_state
+            != MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_STATE;
+    }
+    *endpoint = binding->endpoint;
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error map_notification_error(
+    enum micros_ipc_error error
+)
+{
+    switch (error) {
+    case MICROS_IPC_OK:
+        return MICROS_BOOTSTRAP_OK;
+    case MICROS_IPC_ERROR_STATE:
+        return MICROS_BOOTSTRAP_ERROR_STATE;
+    default:
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+}
+
 enum micros_bootstrap_error
 micros_bootstrap_control_prepare_complete(
     const struct micros_bootstrap_control_state *state,
@@ -863,6 +954,7 @@ micros_bootstrap_control_prepare_complete(
     struct micros_bootstrap_complete_plan candidate;
     const struct micros_bootstrap_binding *controller;
     const struct micros_thread *controller_thread;
+    micros_endpoint_t pm_endpoint;
     enum micros_bootstrap_error error;
 
     if (
@@ -910,6 +1002,10 @@ micros_bootstrap_control_prepare_complete(
             ? MICROS_BOOTSTRAP_ERROR_INVARIANT
             : MICROS_BOOTSTRAP_ERROR_STATE;
     }
+    error = find_ready_pm_endpoint(state, &pm_endpoint);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
     copy_bytes(
         &candidate.transitions,
         &state->transitions,
@@ -930,6 +1026,20 @@ micros_bootstrap_control_prepare_complete(
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
+    if (pm_endpoint != MICROS_ENDPOINT_NONE) {
+        error = map_notification_error(
+            micros_ipc_prepare_kernel_notification(
+                registry,
+                objects,
+                pm_endpoint,
+                MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED,
+                &candidate.pm_notification
+            )
+        );
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
+        }
+    }
     candidate.active = true;
     candidate.controller_binding_index =
         (uint16_t)(controller - &state->bindings[0]);
@@ -939,6 +1049,8 @@ micros_bootstrap_control_prepare_complete(
 
 void micros_bootstrap_control_commit_complete_prevalidated(
     struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
     struct micros_bootstrap_complete_plan *plan
 )
 {
@@ -953,5 +1065,12 @@ void micros_bootstrap_control_commit_complete_prevalidated(
     state->controller_thread =
         (struct micros_thread_handle){0, 0};
     state->controller_endpoint = 0;
+    if (plan->pm_notification.active) {
+        micros_ipc_commit_kernel_notification_prevalidated(
+            registry,
+            objects,
+            &plan->pm_notification
+        );
+    }
     clear_bytes(plan, sizeof(*plan));
 }

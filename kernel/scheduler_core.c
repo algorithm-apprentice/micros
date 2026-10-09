@@ -807,23 +807,109 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
+enum micros_kernel_object_error micros_scheduler_prepare_ipc_wake(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    uint32_t clear_flag,
+    struct micros_scheduler_ipc_wake_plan *plan
+)
+{
+    struct micros_scheduler_ipc_wake_plan candidate = {0};
+    const struct micros_thread *thread;
+    const struct micros_hart *hart;
+    enum micros_kernel_object_error error;
+
+    if (
+        objects == NULL
+        || plan == NULL
+        || !ipc_transition_clear_flags_are_valid(clear_flag)
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = micros_scheduler_core_validate(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = micros_thread_resolve(objects, thread_handle, &thread);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (
+        !thread->scheduler_assigned
+        || (thread->runtime_flags & clear_flag) != clear_flag
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    candidate.resulting_flags =
+        thread->runtime_flags & ~clear_flag;
+    if (candidate.resulting_flags == 0) {
+        if (thread_is_current(objects, thread_handle)) {
+            return MICROS_KERNEL_OBJECT_ERROR_STATE;
+        }
+        error = micros_hart_resolve(
+            objects,
+            thread->scheduler_hart,
+            &hart
+        );
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        error = preflight_tail_enqueue(
+            objects,
+            hart,
+            thread_handle,
+            thread->scheduler_priority
+        );
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+        candidate.hart = thread->scheduler_hart;
+    }
+    candidate.active = true;
+    candidate.thread = thread_handle;
+    *plan = candidate;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+void micros_scheduler_commit_ipc_wake_prevalidated(
+    struct micros_kernel_objects *objects,
+    struct micros_scheduler_ipc_wake_plan *plan
+)
+{
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+
+    thread->runtime_flags = plan->resulting_flags;
+    if (plan->resulting_flags == 0) {
+        queue_enqueue_tail_prevalidated(
+            objects,
+            &objects->harts[plan->hart.slot],
+            plan->thread
+        );
+    }
+    *plan = (struct micros_scheduler_ipc_wake_plan){0};
+}
+
 enum micros_kernel_object_error micros_scheduler_commit_ipc_wake(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle thread,
     uint32_t clear_flag
 )
 {
-    const struct micros_scheduler_ipc_transition request = {
-        .handle = thread,
-        .clear_flags = clear_flag,
-        .set_flags = 0,
-    };
+    struct micros_scheduler_ipc_wake_plan plan;
+    enum micros_kernel_object_error error;
 
-    return micros_scheduler_commit_ipc_transitions(
+    error = micros_scheduler_prepare_ipc_wake(
         objects,
-        &request,
-        1
+        thread,
+        clear_flag,
+        &plan
     );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    micros_scheduler_commit_ipc_wake_prevalidated(objects, &plan);
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 enum micros_kernel_object_error micros_scheduler_commit_ipc_wake_pair(

@@ -4,6 +4,7 @@
 #include "micros/bootstrap_control.h"
 #include "micros/grant.h"
 #include "micros/ipc.h"
+#include "micros/ipc_core.h"
 
 struct micros_bootstrap_binding {
     uint16_t manifest_index;
@@ -47,7 +48,30 @@ struct micros_bootstrap_complete_plan {
     uint16_t controller_binding_index;
     uint16_t reserved;
     struct micros_bootstrap_runtime transitions;
+    struct micros_ipc_kernel_notification_plan pm_notification;
 };
+
+static inline const struct micros_bootstrap_binding *
+micros_bootstrap_control_find_binding_bounded(
+    const struct micros_bootstrap_control_state *state,
+    uint32_t service_id
+)
+{
+    size_t index;
+
+    if (
+        state == NULL
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return NULL;
+    }
+    for (index = 0; index < state->entry_count; ++index) {
+        if (state->bindings[index].service_id == service_id) {
+            return &state->bindings[index];
+        }
+    }
+    return NULL;
+}
 
 enum micros_bootstrap_error micros_bootstrap_control_state_prepare(
     struct micros_bootstrap_control_state *state,
@@ -107,6 +131,8 @@ micros_bootstrap_control_prepare_complete(
 
 void micros_bootstrap_control_commit_complete_prevalidated(
     struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
     struct micros_bootstrap_complete_plan *plan
 );
 

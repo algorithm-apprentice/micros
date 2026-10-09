@@ -29,6 +29,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
+    "test-qemu-pm-service",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -57,6 +58,7 @@ PLANNER_INPUTS = (
 BOOTSTRAP_CROSS_GATE_INPUTS = (
     "kernel/bootstrap_control.c",
     "kernel/bootstrap_control_core.c",
+    "kernel/bootstrap_control_internal.h",
     "kernel/bootstrap_image.c",
     "kernel/bootstrap_manifest.c",
     "kernel/bootstrap_runtime.c",
@@ -76,6 +78,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
+    "test-qemu-pm-service",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -449,6 +452,34 @@ GATE_INPUTS["test-qemu-vm-handoff"] = GATE_INPUTS[
     "tests/qemu/vm_self_fault.S",
     "tests/qemu/vm_server.c",
     "tools/generate_vm_handoff_fixture.py",
+)
+GATE_INPUTS["test-qemu-pm-service"] = GATE_INPUTS[
+    "test-qemu-vm-handoff"
+] + (
+    "include/micros/pm.h",
+    "kernel/pm_control_core.c",
+    "kernel/pm_control_core.h",
+    "kernel/pm_control_runtime.c",
+    "kernel/pm_control_runtime.h",
+    "kernel/pm_control_syscall_core.c",
+    "kernel/pm_control_syscall_core.h",
+    "kernel/pm_control_syscall.c",
+    "kernel/pm_control_syscall.h",
+    "kernel/pm_service_test.c",
+    "kernel/pm_service_test.h",
+    "kernel/pm_service_test_fixture.h",
+    "servers/pm/pm_control.c",
+    "servers/pm/pm_control.h",
+    "servers/pm/pm_core.c",
+    "servers/pm/pm_core.h",
+    "servers/pm/pm_service.c",
+    "tests/host/pm_control_test.c",
+    "tests/host/pm_test.c",
+    "tests/host/test_generate_pm_service_fixture.py",
+    "tests/qemu/pm_service_probe.c",
+    "tests/qemu/pm_service_protocol.h",
+    "tests/qemu/pm_service_report.S",
+    "tools/generate_pm_service_fixture.py",
 )
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"

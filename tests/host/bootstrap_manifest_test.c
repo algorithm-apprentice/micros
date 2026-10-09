@@ -42,21 +42,38 @@ static struct micros_privilege_profile profile(
     memset(&result, 0, sizeof(result));
     result.id = id;
     set_name(result.name, name);
-    if (id == 1) {
+    if (id == MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER) {
         result.operations =
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_REPLY;
         result.kernel_operations =
             MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL;
+    } else if (id == MICROS_PRIVILEGE_PROFILE_APPLICATION) {
+        result.operations = MICROS_PRIVILEGE_OPERATION_CALL;
+        result.call_targets =
+            (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_PM
+            )
+            | (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS
+            );
     } else {
         result.operations =
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_CALL;
-        result.call_targets = UINT32_C(1) << 1;
-        if (id == 2) {
+        result.call_targets =
+            UINT32_C(1)
+            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+        if (id == MICROS_PRIVILEGE_PROFILE_VM) {
             result.operations |= MICROS_PRIVILEGE_OPERATION_REPLY;
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_VM_HANDOFF;
+        } else if (id == MICROS_PRIVILEGE_PROFILE_PM) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+            result.kernel_operations =
+                MICROS_KERNEL_OPERATION_PM_CONTROL;
         }
     }
     return result;
@@ -114,9 +131,21 @@ static bool test_manifest_contract(void)
         && MICROS_BOOTSTRAP_MANIFEST_MAGIC
             == UINT32_C(0x3153424d)
         && MICROS_BOOTSTRAP_SERVICE_CAPACITY == 6
+        && MICROS_BOOTSTRAP_ROLE_PM == UINT32_C(0x8)
+        && MICROS_BOOTSTRAP_ROLE_DEFINED_MASK == UINT32_C(0xf)
+        && MICROS_KERNEL_OPERATION_PM_CONTROL == UINT64_C(0x4)
+        && MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER == 1
+        && MICROS_PRIVILEGE_PROFILE_VM == 2
+        && MICROS_PRIVILEGE_PROFILE_PM == 3
+        && MICROS_PRIVILEGE_PROFILE_TTY == 4
+        && MICROS_PRIVILEGE_PROFILE_RAMFS == 5
+        && MICROS_PRIVILEGE_PROFILE_VFS == 6
+        && MICROS_PRIVILEGE_PROFILE_APPLICATION == 7
+        && MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED == UINT64_C(0x1)
         && sizeof(struct micros_bootstrap_manifest_header) == 64
         && sizeof(struct micros_bootstrap_manifest_entry) == 192
         && sizeof(struct micros_bootstrap_manifest) == 1216
+        && sizeof(struct micros_bootstrap_manifest_plan) == 60
         && sizeof(struct micros_bootstrap_service_config) == 128
         && offsetof(
             struct micros_bootstrap_manifest_entry,
@@ -126,6 +155,10 @@ static bool test_manifest_contract(void)
             struct micros_bootstrap_service_config,
             services
         ) == 24
+        && offsetof(
+            struct micros_bootstrap_manifest_plan,
+            pm_service_id
+        ) == 20
         && MICROS_BOOTSTRAP_MANIFEST_VIEW
             == UINT64_C(0x000000007fffe000)
     );
@@ -755,12 +788,26 @@ static bool test_three_service_topology(void)
 {
     struct validation_fixture base;
     struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_manifest valid_manifest;
     struct micros_bootstrap_manifest_entry temporary;
-    struct micros_bootstrap_expected_service expected[3];
-    struct micros_bootstrap_image_info images[3];
-    struct micros_privilege_profile profiles[3];
+    struct micros_bootstrap_expected_service expected[4] = {0};
+    struct micros_bootstrap_expected_service valid_expected[4] = {0};
+    struct micros_bootstrap_image_info images[4] = {0};
+    struct micros_privilege_profile profiles[8] = {0};
+    struct micros_privilege_profile valid_profiles[8] = {0};
     struct micros_bootstrap_manifest_plan plan;
+    struct micros_bootstrap_manifest_plan sentinel;
     struct micros_bootstrap_diagnostic diagnostic;
+    static const char *const profile_names[7] = {
+        "BOOTSTRAP_LAUNCHER",
+        "VM",
+        "PM",
+        "TTY",
+        "RAMFS",
+        "VFS",
+        "APPLICATION",
+    };
+    size_t index;
 
     initialize_validation_fixture(&base);
     manifest = base.manifest;
@@ -773,9 +820,10 @@ static bool test_three_service_topology(void)
             .process_slot = 2,
             .stack_page_count = 1,
             .profile_id = 3,
-            .prerequisites = UINT64_C(1),
+            .prerequisites = UINT64_C(1) << 1,
             .ready_timeout_counter_ticks = 100,
             .user_page_limit = 3,
+            .role_flags = MICROS_BOOTSTRAP_ROLE_PM,
         };
     set_name(manifest.entries[2].service_name, "pm");
     set_name(manifest.entries[2].profile_name, "PM");
@@ -786,8 +834,9 @@ static bool test_three_service_topology(void)
         .image_id = 103,
         .process_slot = 2,
         .profile_id = 3,
-        .prerequisites = UINT64_C(1),
+        .prerequisites = UINT64_C(1) << 1,
         .call_targets = UINT32_C(1) << 1,
+        .role_flags = MICROS_BOOTSTRAP_ROLE_PM,
     };
     set_name(expected[2].service_name, "pm");
     set_name(expected[2].profile_name, "PM");
@@ -800,11 +849,19 @@ static bool test_three_service_topology(void)
     images[2].vm_boot_info_initially_zero = false;
     profiles[0] = base.profiles[0];
     profiles[1] = base.profiles[1];
-    profiles[2] = profile(3, "PM");
+    for (index = 2; index < 7; ++index) {
+        profiles[index] = profile(
+            (uint8_t)(index + 1),
+            profile_names[index]
+        );
+    }
 
     temporary = manifest.entries[2];
     manifest.entries[2] = manifest.entries[0];
     manifest.entries[0] = temporary;
+    valid_manifest = manifest;
+    memcpy(valid_expected, expected, sizeof(expected));
+    memcpy(valid_profiles, profiles, sizeof(profiles));
     EXPECT_TRUE(
         micros_bootstrap_manifest_validate(
             &manifest,
@@ -813,17 +870,211 @@ static bool test_three_service_topology(void)
             images,
             3,
             profiles,
-            3,
+            7,
             32,
             &plan
         ) == MICROS_BOOTSTRAP_OK
+        && plan.pm_service_id == 3
         && plan.ordered_service_ids[0] == 1
         && plan.ordered_service_ids[1] == 2
         && plan.ordered_service_ids[2] == 3
     );
 
-    manifest.entries[0].prerequisites = UINT64_C(1) << 1;
-    expected[2].prerequisites = UINT64_C(1) << 1;
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            6,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[6].call_targets = UINT32_C(1) << 3;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    profiles[6].operations |= MICROS_PRIVILEGE_OPERATION_RECEIVE;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    set_name(profiles[3].name, "TTY_BAD");
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    profiles[2].operations &= ~MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    profiles[2].call_targets |=
+        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    profiles[2].kernel_operations = 0;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &valid_manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
+    manifest.entries[0].prerequisites = UINT64_C(1);
+    expected[2].prerequisites = UINT64_C(1);
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
+    manifest.entries[0].role_flags = 0;
+    expected[2].role_flags = 0;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest = valid_manifest;
+    manifest.entries[0].role_flags |= MICROS_BOOTSTRAP_ROLE_VM;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            valid_expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
+    manifest.entries[0].process_slot = 3;
+    expected[2].process_slot = 3;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
     manifest.entries[2].prerequisites = UINT64_C(1) << 2;
     expected[1].prerequisites = UINT64_C(1) << 2;
     EXPECT_TRUE(
@@ -833,8 +1084,8 @@ static bool test_three_service_topology(void)
             3,
             images,
             3,
-            profiles,
-            3,
+            valid_profiles,
+            7,
             32,
             &plan,
             &diagnostic
@@ -847,6 +1098,223 @@ static bool test_three_service_topology(void)
     );
     manifest.entries[2].prerequisites = UINT64_C(1) << 3;
     expected[1].prerequisites = UINT64_C(1) << 3;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate_detailed(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            valid_profiles,
+            7,
+            32,
+            &plan,
+            &diagnostic
+        ) == MICROS_BOOTSTRAP_ERROR_TOPOLOGY
+        && diagnostic.reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE
+        && diagnostic.service_id == 2
+        && diagnostic.detail == UINT64_C(6)
+    );
+
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
+    memcpy(profiles, valid_profiles, sizeof(profiles));
+    manifest.header.entry_count = 4;
+    manifest.header.total_user_page_limit = 13;
+    manifest.entries[3] =
+        (struct micros_bootstrap_manifest_entry){
+            .service_id = 4,
+            .image_id = 104,
+            .process_slot = 3,
+            .stack_page_count = 1,
+            .profile_id = 8,
+            .prerequisites = UINT64_C(1) << 2,
+            .ready_timeout_counter_ticks = 100,
+            .user_page_limit = 3,
+        };
+    set_name(manifest.entries[3].service_name, "probe");
+    set_name(manifest.entries[3].profile_name, "PROBE");
+    expected[3] = (struct micros_bootstrap_expected_service){
+        .service_id = 4,
+        .image_id = 104,
+        .process_slot = 3,
+        .profile_id = 8,
+        .prerequisites = UINT64_C(1) << 2,
+        .call_targets = UINT32_C(1) << 1,
+    };
+    set_name(expected[3].service_name, "probe");
+    set_name(expected[3].profile_name, "PROBE");
+    images[3] = images[2];
+    images[3].image_id = 104;
+    profiles[7] = profile(8, "PROBE");
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            8,
+            40,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.pm_service_id == 3
+        && plan.ordered_service_ids[3] == 4
+    );
+
+    {
+        struct micros_bootstrap_manifest probe_manifest = manifest;
+        struct micros_bootstrap_expected_service probe_expected[4];
+
+        memcpy(probe_expected, expected, sizeof(probe_expected));
+        probe_manifest.entries[3].role_flags =
+            MICROS_BOOTSTRAP_ROLE_PM;
+        probe_expected[3].role_flags = MICROS_BOOTSTRAP_ROLE_PM;
+        plan = sentinel;
+        EXPECT_TRUE(
+            micros_bootstrap_manifest_validate(
+                &probe_manifest,
+                probe_expected,
+                4,
+                images,
+                4,
+                profiles,
+                8,
+                40,
+                &plan
+            ) == MICROS_BOOTSTRAP_ERROR_ROLE
+            && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        );
+    }
+    {
+        struct micros_bootstrap_manifest probe_manifest = manifest;
+        struct micros_bootstrap_expected_service probe_expected[4];
+
+        memcpy(probe_expected, expected, sizeof(probe_expected));
+        probe_manifest.entries[3].profile_id =
+            MICROS_PRIVILEGE_PROFILE_APPLICATION;
+        set_name(
+            probe_manifest.entries[3].profile_name,
+            "APPLICATION"
+        );
+        probe_expected[3].profile_id =
+            MICROS_PRIVILEGE_PROFILE_APPLICATION;
+        probe_expected[3].call_targets =
+            (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_PM
+            ) | (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_VFS
+            );
+        set_name(probe_expected[3].profile_name, "APPLICATION");
+        plan = sentinel;
+        EXPECT_TRUE(
+            micros_bootstrap_manifest_validate(
+                &probe_manifest,
+                probe_expected,
+                4,
+                images,
+                4,
+                profiles,
+                8,
+                40,
+                &plan
+            ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+            && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        );
+    }
+    {
+        struct micros_bootstrap_expected_service probe_expected[4];
+
+        memcpy(probe_expected, expected, sizeof(probe_expected));
+        profiles[7].call_targets |= UINT32_C(1) << 9;
+        probe_expected[3].call_targets = profiles[7].call_targets;
+        plan = sentinel;
+        EXPECT_TRUE(
+            micros_bootstrap_manifest_validate(
+                &manifest,
+                probe_expected,
+                4,
+                images,
+                4,
+                profiles,
+                8,
+                40,
+                &plan
+            ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+            && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        );
+    }
+    profiles[7] = profile(8, "PROBE");
+    profiles[7].kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            8,
+            40,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+
+    manifest = valid_manifest;
+    memcpy(expected, valid_expected, sizeof(expected));
+    memset(profiles, 0, sizeof(profiles));
+    profiles[0] = valid_profiles[0];
+    profiles[1] = valid_profiles[1];
+    profiles[2] = (struct micros_privilege_profile){
+        .id = 3,
+        .operations =
+            MICROS_PRIVILEGE_OPERATION_RECEIVE
+            | MICROS_PRIVILEGE_OPERATION_CALL,
+        .call_targets =
+            (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            ) | (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_VM
+            ),
+    };
+    set_name(profiles[2].name, "VM_HANDOFF_PROBE");
+    manifest.entries[0].role_flags = 0;
+    set_name(
+        manifest.entries[0].service_name,
+        "vm-handoff-probe"
+    );
+    set_name(
+        manifest.entries[0].profile_name,
+        "VM_HANDOFF_PROBE"
+    );
+    expected[2].role_flags = 0;
+    expected[2].call_targets = profiles[2].call_targets;
+    set_name(expected[2].service_name, "vm-handoff-probe");
+    set_name(expected[2].profile_name, "VM_HANDOFF_PROBE");
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            3,
+            images,
+            3,
+            profiles,
+            3,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.pm_service_id == 0
+    );
+    manifest.entries[2].prerequisites = UINT64_C(1) << 2;
+    expected[1].prerequisites = UINT64_C(1) << 2;
     EXPECT_TRUE(
         micros_bootstrap_manifest_validate_detailed(
             &manifest,

@@ -726,6 +726,7 @@ static bool test_notify_coalesces_and_never_blocks(void)
             &objects
         ) == MICROS_ENDPOINT_OK
     );
+
     return true;
 }
 
@@ -802,6 +803,7 @@ static bool test_kernel_notify_coalesces_and_any_receives(void)
             &objects
         ) == MICROS_ENDPOINT_OK
     );
+
     return true;
 }
 
@@ -893,6 +895,179 @@ static bool test_kernel_notify_wakes_only_any_receiver(void)
             &registry,
             &objects
         ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
+static bool test_kernel_notify_prepare_commit_is_retained(void)
+{
+    struct micros_ipc_kernel_notification_plan plan;
+    struct micros_ipc_kernel_notification_plan sentinel;
+    struct micros_ipc_kernel_notification_plan zero_plan = {0};
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_endpoint_record *destination;
+    struct micros_thread *receiver;
+    const uint64_t event_mask = UINT64_C(0x0000000000000400);
+
+    EXPECT_TRUE(setup_notify_fixture());
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_ERROR_ARGUMENT,
+        micros_ipc_prepare_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            0,
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && state_is_unchanged(
+            &registry_snapshot,
+            &objects_snapshot
+        )
+    );
+
+    plan = sentinel;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_prepare_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask,
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        plan.active
+        && !plan.deliver_to_receiver
+        && state_is_unchanged(
+            &registry_snapshot,
+            &objects_snapshot
+        )
+    );
+    micros_ipc_commit_kernel_notification_prevalidated(
+        &registry,
+        &objects,
+        &plan
+    );
+    destination = &registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    EXPECT_TRUE(
+        memcmp(&plan, &zero_plan, sizeof(plan)) == 0
+        && destination->pending_kernel_events == event_mask
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60010800)
+        )
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    plan = sentinel;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_prepare_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask,
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        plan.active
+        && plan.deliver_to_receiver
+        && state_is_unchanged(
+            &registry_snapshot,
+            &objects_snapshot
+        )
+    );
+    micros_ipc_commit_kernel_notification_prevalidated(
+        &registry,
+        &objects,
+        &plan
+    );
+    destination = &registry.endpoints[
+        processes[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    receiver = &objects.threads[
+        primary_threads[NOTIFY_PROCESS_DESTINATION].slot
+    ];
+    EXPECT_TRUE(
+        memcmp(&plan, &zero_plan, sizeof(plan)) == 0
+        && destination->pending_kernel_events == 0
+        && thread_handle_is_zero(destination->receiver_head)
+        && thread_handle_is_zero(destination->receiver_tail)
+        && receiver->runtime_flags == 0
+        && receiver->ready_linked
+        && receiver->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && receiver->ipc_receive_source == 0
+        && receiver->ipc_delivery_pending
+        && notification_message_matches(
+            &receiver->ipc_inbound_message,
+            MICROS_ENDPOINT_NONE,
+            event_mask
+        )
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+
+    EXPECT_TRUE(setup_notify_fixture());
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x60011000)
+        )
+    );
+    EXPECT_TRUE(
+        make_single_receiver_current_blocked(
+            primary_threads[NOTIFY_PROCESS_DESTINATION]
+        )
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    plan = sentinel;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_ERROR_STATE,
+        micros_ipc_prepare_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            event_mask,
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && state_is_unchanged(
+            &registry_snapshot,
+            &objects_snapshot
+        )
     );
     return true;
 }
@@ -2474,6 +2649,10 @@ bool micros_ipc_notify_test_run(void)
         {
             "kernel notify wakes only any receiver",
             test_kernel_notify_wakes_only_any_receiver,
+        },
+        {
+            "kernel notify prepare commit is retained",
+            test_kernel_notify_prepare_commit_is_retained,
         },
         {
             "kernel notify rejections are atomic",

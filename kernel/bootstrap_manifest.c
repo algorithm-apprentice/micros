@@ -81,6 +81,30 @@ static bool fixed_names_equal(
     return true;
 }
 
+static bool fixed_name_matches_literal(
+    const char name[MICROS_BOOTSTRAP_NAME_SIZE],
+    const char *literal
+)
+{
+    size_t index = 0;
+
+    while (literal[index] != '\0') {
+        if (
+            index >= MICROS_BOOTSTRAP_NAME_SIZE
+            || name[index] != literal[index]
+        ) {
+            return false;
+        }
+        ++index;
+    }
+    for (; index < MICROS_BOOTSTRAP_NAME_SIZE; ++index) {
+        if (name[index] != '\0') {
+            return false;
+        }
+    }
+    return true;
+}
+
 static const struct micros_bootstrap_expected_service *find_expected(
     const struct micros_bootstrap_expected_service *expected,
     size_t count,
@@ -127,6 +151,133 @@ static const struct micros_privilege_profile *find_profile(
         }
     }
     return NULL;
+}
+
+static bool profile_matches(
+    const struct micros_privilege_profile *profile,
+    uint8_t id,
+    const char *name,
+    uint32_t operations,
+    uint32_t call_targets,
+    uint64_t kernel_operations
+)
+{
+    return profile != NULL
+        && profile->id == id
+        && fixed_name_matches_literal(profile->name, name)
+        && profile->operations == operations
+        && profile->call_targets == call_targets
+        && profile->send_targets == 0
+        && profile->notify_targets == 0
+        && profile->kernel_operations == kernel_operations;
+}
+
+static bool stable_pm_profiles_match(
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count
+)
+{
+    const uint32_t launcher_target =
+        UINT32_C(1)
+        << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+    const uint32_t bootstrap_service_operations =
+        MICROS_PRIVILEGE_OPERATION_RECEIVE
+        | MICROS_PRIVILEGE_OPERATION_CALL;
+
+    return profile_matches(
+        find_profile(
+            profiles,
+            profile_count,
+            MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+        ),
+        MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+        "BOOTSTRAP_LAUNCHER",
+        MICROS_PRIVILEGE_OPERATION_RECEIVE
+            | MICROS_PRIVILEGE_OPERATION_REPLY,
+        0,
+        MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
+    )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_VM
+            ),
+            MICROS_PRIVILEGE_PROFILE_VM,
+            "VM",
+            bootstrap_service_operations
+                | MICROS_PRIVILEGE_OPERATION_REPLY,
+            launcher_target,
+            MICROS_KERNEL_OPERATION_VM_HANDOFF
+        )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_PM
+            ),
+            MICROS_PRIVILEGE_PROFILE_PM,
+            "PM",
+            bootstrap_service_operations
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
+            launcher_target,
+            MICROS_KERNEL_OPERATION_PM_CONTROL
+        )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_TTY
+            ),
+            MICROS_PRIVILEGE_PROFILE_TTY,
+            "TTY",
+            bootstrap_service_operations,
+            launcher_target,
+            0
+        )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_RAMFS
+            ),
+            MICROS_PRIVILEGE_PROFILE_RAMFS,
+            "RAMFS",
+            bootstrap_service_operations,
+            launcher_target,
+            0
+        )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_VFS
+            ),
+            MICROS_PRIVILEGE_PROFILE_VFS,
+            "VFS",
+            bootstrap_service_operations,
+            launcher_target,
+            0
+        )
+        && profile_matches(
+            find_profile(
+                profiles,
+                profile_count,
+                MICROS_PRIVILEGE_PROFILE_APPLICATION
+            ),
+            MICROS_PRIVILEGE_PROFILE_APPLICATION,
+            "APPLICATION",
+            MICROS_PRIVILEGE_OPERATION_CALL,
+            (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_PM
+            ) | (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_VFS
+            ),
+            0
+        );
 }
 
 static enum micros_bootstrap_error validate_profile_table(
@@ -223,9 +374,10 @@ static enum micros_bootstrap_error validate_profile_relationships(
             controller_profile_id
         );
     uint32_t controller_target;
-        uint32_t active_profile_targets = 0;
-        uint8_t vm_profile_id = 0;
-        size_t index;
+    uint32_t installed_profile_targets = 0;
+    uint8_t vm_profile_id = 0;
+    uint8_t pm_profile_id = 0;
+    size_t index;
 
     if (controller == NULL) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
@@ -245,9 +397,22 @@ static enum micros_bootstrap_error validate_profile_relationships(
     ) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
     }
+    for (index = 0; index < profile_count; ++index) {
+        installed_profile_targets |=
+            UINT32_C(1) << profiles[index].id;
+    }
+    for (index = 0; index < profile_count; ++index) {
+        if (
+            (
+                profiles[index].call_targets
+                | profiles[index].send_targets
+                | profiles[index].notify_targets
+            ) & ~installed_profile_targets
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_PROFILE;
+        }
+    }
     for (index = 0; index < manifest->header.entry_count; ++index) {
-        active_profile_targets |=
-            UINT32_C(1) << manifest->entries[index].profile_id;
         if (
             (
                 manifest->entries[index].role_flags
@@ -256,6 +421,26 @@ static enum micros_bootstrap_error validate_profile_relationships(
         ) {
             vm_profile_id = manifest->entries[index].profile_id;
         }
+        if (
+            (
+                manifest->entries[index].role_flags
+                & MICROS_BOOTSTRAP_ROLE_PM
+            ) != 0
+        ) {
+            pm_profile_id = manifest->entries[index].profile_id;
+        }
+    }
+    if (
+        pm_profile_id != 0
+        && (
+            controller_profile_id
+                != MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            || vm_profile_id != MICROS_PRIVILEGE_PROFILE_VM
+            || pm_profile_id != MICROS_PRIVILEGE_PROFILE_PM
+            || !stable_pm_profiles_match(profiles, profile_count)
+        )
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_PROFILE;
     }
     for (index = 0; index < profile_count; ++index) {
         uint64_t expected_kernel_operations =
@@ -264,7 +449,11 @@ static enum micros_bootstrap_error validate_profile_relationships(
             : (
                 profiles[index].id == vm_profile_id
                 ? MICROS_KERNEL_OPERATION_VM_HANDOFF
-                : 0
+                : (
+                    profiles[index].id == pm_profile_id
+                    ? MICROS_KERNEL_OPERATION_PM_CONTROL
+                    : 0
+                )
             );
 
         if (
@@ -290,6 +479,28 @@ static enum micros_bootstrap_error validate_profile_relationships(
             }
             continue;
         }
+        if (
+            entry->profile_id
+                == MICROS_PRIVILEGE_PROFILE_APPLICATION
+            || (
+                (
+                    entry->role_flags
+                    & MICROS_BOOTSTRAP_ROLE_VM
+                ) != 0
+                && entry->profile_id
+                    != MICROS_PRIVILEGE_PROFILE_VM
+            )
+            || (
+                (
+                    entry->role_flags
+                    & MICROS_BOOTSTRAP_ROLE_PM
+                ) != 0
+                && entry->profile_id
+                    != MICROS_PRIVILEGE_PROFILE_PM
+            )
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_PROFILE;
+        }
         profile = find_profile(
             profiles,
             profile_count,
@@ -309,12 +520,23 @@ static enum micros_bootstrap_error validate_profile_relationships(
                         ? MICROS_PRIVILEGE_OPERATION_REPLY
                         : 0
                     )
+                    | (
+                        (
+                            entry->role_flags
+                            & MICROS_BOOTSTRAP_ROLE_PM
+                        ) != 0
+                        ? (
+                            MICROS_PRIVILEGE_OPERATION_REPLY
+                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+                        )
+                        : 0
+                    )
                 )
             || (
                 profile->call_targets & controller_target
             ) == 0
             || (
-                profile->call_targets & ~active_profile_targets
+                profile->call_targets & ~installed_profile_targets
             ) != 0
             || (
                 profile->call_targets
@@ -395,6 +617,7 @@ static enum micros_bootstrap_error validate_entry_shape(
     role_count += (
         entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
     ) != 0;
+    role_count += (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) != 0;
     if (role_count > 1) {
         return MICROS_BOOTSTRAP_ERROR_ROLE;
     }
@@ -545,7 +768,11 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
     uint32_t controller_count = 0;
     uint32_t vm_count = 0;
     uint32_t console_count = 0;
+    uint32_t pm_count = 0;
     uint8_t controller_profile_id = 0;
+    const struct micros_bootstrap_manifest_entry *pm_entry = NULL;
+    const struct micros_bootstrap_manifest_entry *pm_identity_entry =
+        NULL;
     size_t index;
     enum micros_bootstrap_error error;
 
@@ -780,6 +1007,16 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         console_count += (
             entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
         ) != 0;
+        pm_count += (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) != 0;
+        if (
+            entry->service_id == 3
+            && entry->process_slot == 2
+            && entry->profile_id == MICROS_PRIVILEGE_PROFILE_PM
+            && fixed_name_matches_literal(entry->service_name, "pm")
+            && fixed_name_matches_literal(entry->profile_name, "PM")
+        ) {
+            pm_identity_entry = entry;
+        }
         if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER) {
             candidate.controller_service_id = entry->service_id;
             controller_profile_id = entry->profile_id;
@@ -790,11 +1027,16 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER) {
             candidate.console_service_id = entry->service_id;
         }
+        if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) {
+            candidate.pm_service_id = entry->service_id;
+            pm_entry = entry;
+        }
     }
     if (
         controller_count != 1
         || vm_count > 1
         || console_count > 1
+        || pm_count > 1
         || (
             vm_count != 0
             && prepared_mapping_count
@@ -804,7 +1046,10 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         || total_pages > available_user_pages
     ) {
         enum micros_bootstrap_error aggregate_error =
-            controller_count != 1 || vm_count > 1 || console_count > 1
+            controller_count != 1
+                || vm_count > 1
+                || console_count > 1
+                || pm_count > 1
                 ? MICROS_BOOTSTRAP_ERROR_ROLE
                 : MICROS_BOOTSTRAP_ERROR_RANGE;
 
@@ -812,6 +1057,48 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
             aggregate_error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             0,
+            0
+        );
+    }
+    if (
+        (
+            pm_count == 0
+            && pm_identity_entry != NULL
+            && vm_count == 1
+            && pm_identity_entry->prerequisites
+                == (
+                    UINT64_C(1)
+                    << (candidate.vm_service_id - 1)
+                )
+        )
+        || (
+            pm_entry != NULL
+            && (
+                vm_count != 1
+                || pm_entry->service_id != 3
+                || pm_entry->process_slot != 2
+                || pm_entry->profile_id
+                    != MICROS_PRIVILEGE_PROFILE_PM
+                || !fixed_name_matches_literal(
+                    pm_entry->service_name,
+                    "pm"
+                )
+                || !fixed_name_matches_literal(
+                    pm_entry->profile_name,
+                    "PM"
+                )
+                || pm_entry->prerequisites
+                    != (
+                        UINT64_C(1)
+                        << (candidate.vm_service_id - 1)
+                    )
+            )
+        )
+    ) {
+        RETURN_DIAGNOSTIC(
+            MICROS_BOOTSTRAP_ERROR_ROLE,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+            pm_entry != NULL ? pm_entry->service_id : 3,
             0
         );
     }

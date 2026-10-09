@@ -83,6 +83,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_PM_SERVICE_TEST
+    "Build the real PM service integration image"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -160,6 +165,7 @@ set(
     MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
+    MICROS_BUILD_PM_SERVICE_TEST
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -288,6 +294,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/bootstrap_image.c
         kernel/bootstrap_manifest.c
         kernel/endpoint.c
+        kernel/ipc.c
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         tests/host/bootstrap_control_test.c
@@ -300,6 +307,16 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/vm_handoff_core.c
         tests/host/vm_bootstrap_test.c
         tests/host/vm_handoff_test.c
+    )
+    add_executable(
+        pm_test
+        kernel/kernel_objects.c
+        kernel/pm_control_core.c
+        kernel/pm_control_syscall_core.c
+        kernel/scheduler_core.c
+        servers/pm/pm_core.c
+        tests/host/pm_control_test.c
+        tests/host/pm_test.c
     )
     target_include_directories(
         fdt_test
@@ -361,6 +378,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         vm_bootstrap_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        pm_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -377,6 +400,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_test PRIVATE c_std_17)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
+    target_compile_features(pm_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -489,6 +513,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         vm_bootstrap_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        pm_test
         PRIVATE
             -Wall
             -Wextra
@@ -626,6 +660,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            pm_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            pm_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -640,6 +685,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
+    add_test(NAME pm-lifecycle COMMAND pm_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -673,6 +719,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
+            pm_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -721,6 +768,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
+            pm_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -853,6 +901,7 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
+    OR MICROS_BUILD_PM_SERVICE_TEST
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -937,6 +986,7 @@ if(
     )
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
+        OR MICROS_BUILD_PM_SERVICE_TEST
         OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -947,7 +997,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
-        if(MICROS_BUILD_VM_READY_EARLY_TEST)
+        if(MICROS_BUILD_PM_SERVICE_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_PM_SERVICE_TEST=1
+            )
+        elseif(MICROS_BUILD_VM_READY_EARLY_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -966,44 +1022,100 @@ if(
                     MICROS_VM_SELF_FAULT_SEALED=1
             )
         endif()
-        micros_add_bootstrap_user(
-            micros_vm_handoff_probe
-            micros-vm-handoff-probe
-            tests/qemu/vm_handoff_probe.S
-            tests/qemu/vm_handoff_probe.c
-        )
-        set(
-            MICROS_VM_HANDOFF_FIXTURE_SOURCE
-            "${CMAKE_BINARY_DIR}/generated/vm_handoff_fixture.c"
-        )
-        add_custom_command(
-            OUTPUT "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
-            COMMAND
-                "${MICROS_PYTHON}"
-                -B
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
-                --launcher-elf
-                "$<TARGET_FILE:micros_bootstrap_launcher>"
-                --vm-elf
-                "$<TARGET_FILE:micros_vm_server>"
-                --probe-elf
-                "$<TARGET_FILE:micros_vm_handoff_probe>"
-                --output
-                "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
-            DEPENDS
-                micros_bootstrap_launcher
-                micros_vm_server
+        if(MICROS_BUILD_PM_SERVICE_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                servers/pm/pm_core.c
+                servers/pm/pm_service.c
+                tests/qemu/pm_service_report.S
+            )
+            target_compile_definitions(
+                micros_pm_service
+                PRIVATE
+                    MICROS_PM_SERVICE_TEST=1
+            )
+            micros_add_bootstrap_user(
+                micros_pm_service_probe
+                micros-pm-service-probe
+                tests/qemu/pm_service_probe.c
+            )
+            set(
+                MICROS_PM_SERVICE_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/pm_service_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_pm_service_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf
+                    "$<TARGET_FILE:micros_pm_service>"
+                    --probe-elf
+                    "$<TARGET_FILE:micros_pm_service_probe>"
+                    --output
+                    "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_pm_service_probe
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_pm_service_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        else()
+            micros_add_bootstrap_user(
                 micros_vm_handoff_probe
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            VERBATIM
-        )
-        set_source_files_properties(
-            "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
-            PROPERTIES GENERATED TRUE
-        )
+                micros-vm-handoff-probe
+                tests/qemu/vm_handoff_probe.S
+                tests/qemu/vm_handoff_probe.c
+            )
+            set(
+                MICROS_VM_HANDOFF_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/vm_handoff_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --probe-elf
+                    "$<TARGET_FILE:micros_vm_handoff_probe>"
+                    --output
+                    "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_vm_handoff_probe
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        endif()
     else()
         micros_add_bootstrap_user(
             micros_bootstrap_probe
@@ -1090,6 +1202,10 @@ add_executable(
     kernel/scheduler.c
     kernel/main.c
     kernel/panic.c
+    kernel/pm_control_core.c
+    kernel/pm_control_runtime.c
+    kernel/pm_control_syscall.c
+    kernel/pm_control_syscall_core.c
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
@@ -1198,6 +1314,27 @@ if(
         PRIVATE
             "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
             kernel/vm_handoff_test.c
+    )
+endif()
+
+if(MICROS_BUILD_PM_SERVICE_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_pm_service_probe
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_PM_SERVICE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+            kernel/pm_service_test.c
     )
 endif()
 
@@ -1573,6 +1710,40 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            30
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_PM_SERVICE_TEST)
+    add_custom_target(
+        test-qemu-pm-service
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

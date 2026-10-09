@@ -33,6 +33,18 @@ struct micros_scheduler_ipc_transition {
     uint32_t set_flags;
 };
 
+enum micros_kernel_object_error micros_scheduler_prepare_ipc_wake(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread,
+    uint32_t clear_flag,
+    struct micros_scheduler_ipc_wake_plan *plan
+);
+
+void micros_scheduler_commit_ipc_wake_prevalidated(
+    struct micros_kernel_objects *objects,
+    struct micros_scheduler_ipc_wake_plan *plan
+);
+
 enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
     struct micros_kernel_objects *objects,
     const struct micros_scheduler_ipc_transition *requests,

@@ -124,6 +124,65 @@ class ValidationPlanTests(unittest.TestCase):
                         commands,
                     )
 
+    def test_pm_bootstrap_paths_select_pm_gate(self):
+        for path in (
+            "kernel/bootstrap_control_core.c",
+            "kernel/bootstrap_manifest.c",
+            "kernel/bootstrap_runtime.c",
+            "kernel/bootstrap_syscall.c",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-pm-service",
+                )
+
+    def test_pm_production_and_fixture_paths_own_pm_gate(self):
+        for path in (
+            "kernel/pm_control_core.c",
+            "kernel/pm_control_core.h",
+            "kernel/pm_control_runtime.c",
+            "kernel/pm_control_runtime.h",
+            "kernel/pm_control_syscall_core.c",
+            "kernel/pm_control_syscall_core.h",
+            "kernel/pm_control_syscall.c",
+            "kernel/pm_control_syscall.h",
+            "kernel/pm_service_test.c",
+            "kernel/pm_service_test.h",
+            "kernel/pm_service_test_fixture.h",
+            "servers/pm/pm_control.c",
+            "servers/pm/pm_control.h",
+            "servers/pm/pm_core.c",
+            "servers/pm/pm_core.h",
+            "servers/pm/pm_service.c",
+            "tests/host/pm_control_test.c",
+            "tests/host/pm_test.c",
+            "tests/host/test_generate_pm_service_fixture.py",
+            "tests/qemu/pm_service_probe.c",
+            "tests/qemu/pm_service_protocol.h",
+            "tests/qemu/pm_service_report.S",
+            "tools/generate_pm_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                commands = validation_plan.plan([path], "fast")
+                self.assertEqual(validation_plan.UNIT_FAST, commands[0])
+                self.assertIn(
+                    validation_plan.workflow("test-qemu-pm-service"),
+                    commands,
+                )
+
+    def test_pm_dispatch_and_vm_fixture_paths_select_pm_gate(self):
+        for path in (
+            "kernel/syscall.c",
+            "tests/qemu/vm_server.c",
+            "tools/generate_bootstrap_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-pm-service",
+                )
+
     def test_vm_fault_source_selects_all_vm_workflows(self):
         commands = validation_plan.plan(
             ["tests/qemu/vm_self_fault.S"],
@@ -474,6 +533,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
             "test-qemu-vm-handoff": "kernel/vm_handoff_test.c",
+            "test-qemu-pm-service": "kernel/pm_service_test.c",
             "test-qemu-vm-ready-early": "tests/qemu/vm_server.c",
             "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
             "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",

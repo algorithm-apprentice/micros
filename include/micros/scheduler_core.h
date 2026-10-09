@@ -40,6 +40,14 @@ struct micros_scheduler_current_ipc_guard {
     uintptr_t thread_stack_top;
 };
 
+struct micros_scheduler_ipc_wake_plan {
+    bool active;
+    uint8_t reserved[3];
+    uint32_t resulting_flags;
+    struct micros_thread_handle thread;
+    struct micros_hart_handle hart;
+};
+
 enum micros_kernel_object_error micros_scheduler_core_validate(
     const struct micros_kernel_objects *objects
 );

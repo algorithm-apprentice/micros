@@ -576,6 +576,8 @@ static enum micros_syscall_return handle_complete(
     );
     micros_bootstrap_control_commit_complete_prevalidated(
         state,
+        registry,
+        context->objects,
         &plan
     );
     if (
