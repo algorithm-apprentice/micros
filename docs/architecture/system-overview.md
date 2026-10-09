@@ -125,7 +125,9 @@ verifies agreement among the reachable table tree, allocator bitmap, and
 ledger, verifies exact supervisor-only RX, R, and RW/NX mappings, enables Sv39
 through an ordered translation fence, and starts timer interrupts. Managed RAM
 is identity-mapped RW/NX, while UART and PLIC device addresses remain fixed
-platform constants in v0.1; only UART is mapped during this phase.
+platform constants in v0.1. The kernel maps the UART page and only the three
+PLIC pages required for source-10 priority, hart-0 supervisor enable, and
+hart-0 supervisor claim/complete.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
@@ -201,11 +203,17 @@ phase has irreversibly changed to `HANDED_OFF`. Only then may the launcher
 acknowledge VM readiness and release PM. The launcher does not perform or
 infer the ownership commit.
 
-Step 9 exposes no post-handoff map, unmap, allocation, or page-fault protocol.
-All static mappings remain wired. A VM-originated fault is fatal; non-VM fault
-delivery remains disabled until a later reviewed mapping protocol defines
-suspension, exact mapping authority, mutation rollback, and retry. The
-proposed exact contract is
+Step 9 exposes no general post-handoff map, unmap, allocation, or page-fault
+protocol. Step 11 adds one nonrepeatable exception: exact VM authority may
+install the fixed UART device page into the held TTY root without allocating a
+frame or page table. The device leaf is outside managed RAM, is tracked
+separately from VM's handoff snapshot, and is rejected by managed-memory
+lookup, IPC-buffer, grant, and inventory paths. Every ordinary static mapping
+remains wired.
+
+A VM-originated fault is fatal; non-VM fault delivery remains disabled until a
+later reviewed mapping protocol defines suspension, exact mapping authority,
+mutation rollback, and retry. The exact handoff contract is
 [ADR-0045](../adr/0045-static-vm-bootstrap-and-handoff.md).
 
 ### Phase 5: core user services
@@ -218,10 +226,20 @@ launcher validates its exact endpoint generation and the kernel atomically
 records the ready transition with the token-bound acknowledgment before any
 dependent is released.
 
-Before TTY release, the later console implementation inserts
-`console_handoff_begin`, the exact UART mapping while TTY remains held, and
-the required release gate. TTY's ordinary bootstrap readiness is accepted
-only after `console_handoff_commit`.
+Before TTY release, the launcher invokes exact `console_handoff_begin`.
+The kernel disables ordinary early-console output and notifies VM. VM invokes
+one exact operation-12 command that writes the fixed UART PTE at
+`0x7fffe000`, then the kernel notifies the launcher that mapping committed.
+Only then may the launcher release TTY.
+
+TTY initializes the NS16550A while PLIC source 10 remains disabled, drains
+stale device state, and commits ownership through operation 14. The kernel
+then installs the exact source route and enables supervisor-external delivery.
+One manifest-bounded absolute deadline is armed at console begin and covers
+mapping, release, initialization, commit, and readiness without being extended
+at release. TTY's ordinary bootstrap readiness is accepted only after commit
+and clears that deadline. The exact contract is
+[ADR-0047](../adr/0047-tty-console-handoff-and-serial-protocol.md).
 
 Malformed, foreign, early, duplicate, missing, or expired readiness is fatal.
 There is no restart, alternate profile, skipped dependency, or recovery
@@ -355,6 +373,19 @@ therefore uses resident page-sized bounce buffers for application-to-filesystem
 and application-to-TTY transfers. The kernel performs checked copies; user
 services never map arbitrary memory from another process.
 
+TTY uses short `SUBMIT_READ`, `SUBMIT_WRITE`, `CANCEL`, and `COLLECT` calls
+rather than retaining VFS's only thread for a canonical read. Completion is a
+coalesced TTY-to-VFS notification. TTY retains only the exact VFS endpoint,
+last accepted request ID, grant, offset, length, and one bounded request slot
+per direction. Accepted IDs increase monotonically; a `BUSY` submission does
+not advance that sequence and may be retried unchanged. Applications never
+call TTY directly.
+
+Write acceptance precedes physical drain. If a collected write still occupies
+the resident transmit buffer, one armed writable event notifies VFS when that
+buffer becomes reusable. VFS may retry the unaccepted ID unchanged unless a
+higher ID has since been accepted, in which case the older ID is stale.
+
 The grantor alone creates or revokes its grants. The exact grantee invokes
 copy-from or copy-to with both the grantor endpoint and opaque token. No user
 grant-table registration or user-visible inspect operation exists.
@@ -411,12 +442,17 @@ separate consumers added only after thread and hart objects exist.
 
 Before TTY starts, the kernel owns a polled transmit-only early console. The
 launcher begins handoff by asking the kernel to stop ordinary console output
-before TTY receives its MMIO mapping. TTY initializes the UART, commits
-ownership through an authorized kernel operation, and only then reports ready.
-For each interrupt the kernel claims the PLIC source, notifies TTY, and leaves
-the source in service. TTY drains the UART and explicitly completes the
-interrupt. A fatal kernel panic may seize the UART in polled mode with
-interrupts disabled.
+before exact VM authority maps one user R/W, non-executable UART page into the
+held TTY root. TTY initializes the UART, commits ownership through authorized
+operation 14, and only then reports ready.
+
+The kernel maps no PLIC page into user space. For each supervisor-external
+interrupt it claims source 10, records the source in service, injects or
+coalesces one source-`NONE` event to exact TTY, and does not complete the
+source. TTY drains `IIR` to no-pending and invokes exact `IRQ_COMPLETE(10)`.
+The kernel validates ownership and in-service state before writing the PLIC
+completion register. A fatal kernel panic disables external delivery and may
+seize UART permanently in polled mode.
 
 ## Architectural invariants
 
@@ -481,6 +517,9 @@ interrupts disabled.
 - Every user leaf reachable at handoff has an exact `VM_WIRED` target for the
   same process generation; after handoff, read-only address resolution
   requires that exact wired owner.
+- The sole post-handoff device exception is the exact TTY UART leaf at
+  `0x7fffe000`; it names no managed frame and cannot back an IPC buffer, grant,
+  PM output, or managed mapping inventory entry.
 - A `VM_TRANSFERABLE` frame is not live user-mapping authority until a reviewed
   VM mapping transition binds it to an exact process generation.
 - Generic execution-context preparation is unavailable after handoff; existing
@@ -506,7 +545,15 @@ interrupts disabled.
 - Only VFS publishes file-descriptor and namespace state.
 - Init receives descriptors 0, 1, and 2 from one VFS-owned synthetic console
   object, and children receive them only through explicit descriptor actions.
-- A claimed user-driver IRQ is completed only after its owner acknowledges it.
+- Console begin, exact VM mapping, TTY release, console commit, and TTY
+  readiness occur in that order once.
+- One absolute manifest-bounded TTY deadline covers that complete sequence and
+  is not restarted at release.
+- PLIC source 10 has one exact TTY endpoint-generation owner, and a claim is
+  completed exactly once only after that owner drains UART state and
+  acknowledges it.
+- Direct application access to TTY, UART, PLIC, or IRQ completion is
+  impossible under the immutable profiles.
 - Bootstrap-only privileges become unavailable after their transition point.
 - The immutable bootstrap manifest is versioned, pointer-free, bounded to six
   entries, and completely validated before manifest-directed service
