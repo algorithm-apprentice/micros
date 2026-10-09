@@ -8,6 +8,8 @@
 
 #include "lib/runtime/memory.h"
 #include "lib/runtime/raw_syscall.h"
+#include "micros/bootstrap_control.h"
+#include "tests/qemu/bootstrap_launcher_control.h"
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -442,6 +444,27 @@ static bool test_grant_wrappers(void)
     return true;
 }
 
+static bool test_bootstrap_launcher_console_begin(void)
+{
+    reset_capture(MICROS_SYSCALL_ABI_OK);
+    EXPECT_TRUE(
+        micros_bootstrap_launcher_console_begin(
+            MICROS_TTY_SERVICE_ID
+        ) == MICROS_SYSCALL_ABI_OK
+        && arguments_match(
+            MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN,
+            MICROS_TTY_SERVICE_ID,
+            0,
+            0,
+            0,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+        )
+    );
+    return true;
+}
+
 static bool test_memory_support(void)
 {
     unsigned char source[320];
@@ -499,6 +522,7 @@ int main(void)
     if (
         !test_ipc_wrappers()
         || !test_grant_wrappers()
+        || !test_bootstrap_launcher_console_begin()
         || !test_memory_support()
     ) {
         return 1;

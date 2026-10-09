@@ -1461,10 +1461,12 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
     return MICROS_BOOTSTRAP_OK;
 }
 
-enum micros_bootstrap_error micros_bootstrap_runtime_release(
+static enum micros_bootstrap_error runtime_release(
     struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
-    uint64_t now
+    uint64_t now,
+    uint64_t retained_deadline,
+    bool retain_deadline
 )
 {
     struct micros_bootstrap_runtime candidate;
@@ -1513,9 +1515,15 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     if ((entry->prerequisites & ~ready_ids) != 0) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    if (
-        entry->ready_timeout_counter_ticks == 0
-        || UINT64_MAX - now < entry->ready_timeout_counter_ticks
+    if (entry->ready_timeout_counter_ticks == 0) {
+        return MICROS_BOOTSTRAP_ERROR_RANGE;
+    }
+    if (retain_deadline) {
+        if (retained_deadline == 0 || now >= retained_deadline) {
+            return MICROS_BOOTSTRAP_ERROR_STATE;
+        }
+    } else if (
+        UINT64_MAX - now < entry->ready_timeout_counter_ticks
     ) {
         return MICROS_BOOTSTRAP_ERROR_RANGE;
     }
@@ -1523,11 +1531,38 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     entry->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
     entry->scheduler_assigned = true;
     entry->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
-    entry->ready_deadline = now
-        + entry->ready_timeout_counter_ticks;
+    entry->ready_deadline = retain_deadline
+        ? retained_deadline
+        : now + entry->ready_timeout_counter_ticks;
     candidate.starting_service_id = service_id;
     copy_bytes(runtime, &candidate, sizeof(*runtime));
     return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_runtime_release(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now
+)
+{
+    return runtime_release(runtime, service_id, now, 0, false);
+}
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_release_retaining_deadline(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t deadline
+)
+{
+    return runtime_release(
+        runtime,
+        service_id,
+        now,
+        deadline,
+        true
+    );
 }
 
 enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(

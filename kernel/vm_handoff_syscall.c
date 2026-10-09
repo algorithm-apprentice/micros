@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/endpoint_internal.h"
@@ -257,6 +258,62 @@ static enum tty_map_phase_result tty_map_phase(
     return TTY_MAP_PHASE_READY;
 }
 
+static bool vm_console_event_state_is_clear(
+    const struct micros_vm_handoff_state *vm,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    const struct micros_endpoint_record *endpoint;
+    const struct micros_thread *thread;
+
+    return (
+        vm != NULL
+        && micros_endpoint_resolve_active(
+            registry,
+            objects,
+            vm->endpoint,
+            &endpoint
+        ) == MICROS_ENDPOINT_OK
+        && micros_thread_resolve(
+            objects,
+            vm->thread,
+            &thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && endpoint->pending_kernel_events == 0
+        && micros_thread_ipc_state_is_clear(thread)
+    );
+}
+
+static bool launcher_console_event_state_is_clear(
+    const struct micros_bootstrap_binding *launcher,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    const struct micros_endpoint_record *endpoint;
+    const struct micros_thread *thread;
+
+    return (
+        launcher != NULL
+        && micros_endpoint_resolve_active(
+            registry,
+            objects,
+            launcher->endpoint,
+            &endpoint
+        ) == MICROS_ENDPOINT_OK
+        && endpoint->pending_kernel_events == 0
+        && micros_thread_resolve(
+            objects,
+            launcher->thread,
+            &thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && !micros_ipc_thread_has_staged_kernel_notification(
+            thread
+        )
+    );
+}
+
 static _Noreturn void fail_console_map(
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
@@ -379,6 +436,7 @@ static enum micros_syscall_return handle_tty_mapping_command(
             context->objects
         ) != MICROS_TTY_HANDOFF_OK
         || !micros_plic_validate(MICROS_PLIC_DISABLED)
+        || !uart_console_handoff_is_quiesced()
         || micros_user_address_space_validate(tty->process)
             != MICROS_USER_ADDRESS_SPACE_OK
     ) {
@@ -400,6 +458,24 @@ static enum micros_syscall_return handle_tty_mapping_command(
             MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
             vm
         );
+    }
+    if (
+        !launcher_console_event_state_is_clear(
+            launcher,
+            registry,
+            context->objects
+        )
+    ) {
+        fail_console_map(hart, frame, tty, UINT64_C(0x301));
+    }
+    if (
+        !vm_console_event_state_is_clear(
+            vm,
+            registry,
+            context->objects
+        )
+    ) {
+        fail_console_map(hart, frame, tty, UINT64_C(0x300));
     }
     if (!micros_vm_tty_mapping_matches(request, tty->endpoint)) {
         fail_console_map(hart, frame, tty, UINT64_C(1));

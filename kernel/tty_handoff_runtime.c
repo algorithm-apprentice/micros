@@ -410,14 +410,66 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_begin(
     uint64_t interval
 )
 {
-    if (tty_handoff_state.service_id == 0) {
-        return MICROS_TTY_HANDOFF_ERROR_STATE;
-    }
-    return micros_tty_handoff_begin(
-        &tty_handoff_state.handoff,
+    struct micros_tty_handoff candidate;
+    enum micros_tty_handoff_error error;
+
+    error = micros_tty_handoff_runtime_prepare_begin(
         now,
-        interval
+        interval,
+        &candidate
     );
+    if (error != MICROS_TTY_HANDOFF_OK) {
+        return error;
+    }
+    copy_bytes(
+        &tty_handoff_state.handoff,
+        &candidate,
+        sizeof(tty_handoff_state.handoff)
+    );
+    return MICROS_TTY_HANDOFF_OK;
+}
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_begin(
+    uint64_t now,
+    uint64_t interval,
+    struct micros_tty_handoff *candidate
+)
+{
+    struct micros_tty_handoff local;
+    enum micros_tty_handoff_error error;
+
+    if (candidate == NULL || tty_handoff_state.service_id == 0) {
+        return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
+    }
+    copy_bytes(
+        &local,
+        &tty_handoff_state.handoff,
+        sizeof(local)
+    );
+    error = micros_tty_handoff_begin(&local, now, interval);
+    if (error != MICROS_TTY_HANDOFF_OK) {
+        return error;
+    }
+    copy_bytes(candidate, &local, sizeof(local));
+    return MICROS_TTY_HANDOFF_OK;
+}
+
+void micros_tty_handoff_runtime_commit_begin_deadline_prevalidated(
+    const struct micros_tty_handoff *candidate
+)
+{
+    tty_handoff_state.handoff.deadline = candidate->deadline;
+    tty_handoff_state.handoff.deadline_armed =
+        candidate->deadline_armed;
+}
+
+void micros_tty_handoff_runtime_commit_begin_phase_prevalidated(
+    const struct micros_tty_handoff *candidate
+)
+{
+    tty_handoff_state.handoff.console_phase =
+        candidate->console_phase;
 }
 
 enum micros_tty_handoff_error
@@ -428,7 +480,10 @@ micros_tty_handoff_runtime_prepare_mapped(
     struct micros_tty_handoff local;
     enum micros_tty_handoff_error error;
 
-    if (candidate == NULL || tty_handoff_state.service_id == 0) {
+    if (tty_handoff_state.service_id == 0) {
+        return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
+    }
+    if (candidate == NULL) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
     copy_bytes(
@@ -452,6 +507,110 @@ void micros_tty_handoff_runtime_commit_mapped_prevalidated(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
+    );
+}
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_release(
+    struct micros_tty_handoff *candidate
+)
+{
+    struct micros_tty_handoff local;
+    enum micros_tty_handoff_error error;
+
+    if (candidate == NULL || tty_handoff_state.service_id == 0) {
+        return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
+    }
+    copy_bytes(
+        &local,
+        &tty_handoff_state.handoff,
+        sizeof(local)
+    );
+    error = micros_tty_handoff_release(&local);
+    if (error != MICROS_TTY_HANDOFF_OK) {
+        return error;
+    }
+    copy_bytes(candidate, &local, sizeof(local));
+    return MICROS_TTY_HANDOFF_OK;
+}
+
+void micros_tty_handoff_runtime_commit_release_prevalidated(
+    const struct micros_tty_handoff *candidate
+)
+{
+    copy_bytes(
+        &tty_handoff_state.handoff,
+        candidate,
+        sizeof(tty_handoff_state.handoff)
+    );
+}
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_ready(
+    uint64_t now,
+    struct micros_tty_handoff *candidate
+)
+{
+    struct micros_tty_handoff local;
+    enum micros_tty_handoff_error error;
+
+    if (candidate == NULL || tty_handoff_state.service_id == 0) {
+        return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
+    }
+    copy_bytes(
+        &local,
+        &tty_handoff_state.handoff,
+        sizeof(local)
+    );
+    error = micros_tty_handoff_accept_ready(&local, now);
+    if (error != MICROS_TTY_HANDOFF_OK) {
+        return error;
+    }
+    copy_bytes(candidate, &local, sizeof(local));
+    return MICROS_TTY_HANDOFF_OK;
+}
+
+void micros_tty_handoff_runtime_commit_ready_prevalidated(
+    const struct micros_tty_handoff *candidate
+)
+{
+    copy_bytes(
+        &tty_handoff_state.handoff,
+        candidate,
+        sizeof(tty_handoff_state.handoff)
+    );
+}
+
+bool micros_tty_handoff_runtime_role_ready(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    return (
+        tty_bootstrap_state != NULL
+        && micros_tty_handoff_runtime_validate(
+            tty_bootstrap_state,
+            registry,
+            objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && tty_handoff_state.handoff.console_phase
+            == MICROS_TTY_CONSOLE_OWNED
+        && tty_handoff_state.handoff.route_phase
+            == MICROS_TTY_ROUTE_IDLE
+    );
+}
+
+bool micros_tty_handoff_runtime_deadline_expired(uint64_t now)
+{
+    return (
+        tty_handoff_state.service_id != 0
+        && micros_tty_handoff_validate(
+            &tty_handoff_state.handoff
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_deadline_expired(
+            &tty_handoff_state.handoff,
+            now
+        )
     );
 }
 

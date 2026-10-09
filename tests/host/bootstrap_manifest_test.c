@@ -1715,6 +1715,75 @@ static bool test_runtime_transitions(void)
     return true;
 }
 
+static bool test_retained_runtime_deadline(void)
+{
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_manifest_plan plan = {
+        .entry_count = 2,
+        .total_user_page_limit = 7,
+        .controller_service_id = 1,
+        .vm_service_id = 2,
+        .ordered_service_ids = {1, 2},
+        .ordered_manifest_indices = {1, 0},
+    };
+    struct micros_bootstrap_runtime runtime;
+    struct micros_bootstrap_runtime snapshot;
+
+    initialize_manifest(&manifest);
+    memset(&runtime, 0, sizeof(runtime));
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_initialize(
+            &manifest,
+            &plan,
+            &runtime
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    snapshot = runtime;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            120,
+            150
+        ) == MICROS_BOOTSTRAP_OK
+        && runtime.entries[0].ready_deadline == 150
+        && runtime.starting_service_id == 2
+    );
+
+    runtime = snapshot;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release(&runtime, 2, 120)
+            == MICROS_BOOTSTRAP_OK
+        && runtime.entries[0].ready_deadline == 220
+    );
+
+    runtime = snapshot;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            150,
+            150
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+        && micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            151,
+            150
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+        && micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            120,
+            0
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+    );
+    return true;
+}
+
 struct reference_runtime_entry {
     uint32_t service_id;
     uint64_t prerequisites;
@@ -2349,6 +2418,10 @@ int main(void)
     }
     if (!test_runtime_transitions()) {
         fprintf(stderr, "runtime transitions failed\n");
+        return 1;
+    }
+    if (!test_retained_runtime_deadline()) {
+        fprintf(stderr, "retained runtime deadline failed\n");
         return 1;
     }
     if (!test_replayable_runtime_model()) {

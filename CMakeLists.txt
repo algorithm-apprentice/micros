@@ -7,6 +7,11 @@ option(MICROS_BUILD_PANIC_TEST "Build the intentional panic image" OFF)
 option(MICROS_BUILD_TRAP_TEST "Build the trap recovery test image" OFF)
 option(MICROS_BUILD_TIMER_TEST "Build the timer interrupt test image" OFF)
 option(
+    MICROS_BUILD_UART_CONSOLE_TEST
+    "Build the UART console ownership handoff test image"
+    OFF
+)
+option(
     MICROS_BUILD_FRAME_ALLOCATOR_TEST
     "Build the bootstrap frame allocator test image"
     OFF
@@ -149,6 +154,7 @@ set(
     MICROS_BUILD_PANIC_TEST
     MICROS_BUILD_TRAP_TEST
     MICROS_BUILD_TIMER_TEST
+    MICROS_BUILD_UART_CONSOLE_TEST
     MICROS_BUILD_FRAME_ALLOCATOR_TEST
     MICROS_BUILD_TRAP_PANIC_TEST
     MICROS_BUILD_MMU_TEST
@@ -280,6 +286,7 @@ if(MICROS_BUILD_HOST_TESTS)
         runtime_test
         lib/runtime/memory.c
         lib/runtime/runtime.c
+        tests/qemu/bootstrap_launcher_control.c
         tests/host/runtime_test.c
     )
     add_executable(
@@ -323,6 +330,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/plic_core.c
         kernel/tty_handoff_core.c
         kernel/tty_handoff_runtime.c
+        kernel/uart_console_core.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
         tests/host/tty_handoff_test.c
@@ -1068,6 +1076,7 @@ if(
     micros_add_bootstrap_user(
         micros_bootstrap_launcher
         micros-bootstrap-launcher
+        tests/qemu/bootstrap_launcher_control.c
         tests/qemu/bootstrap_launcher.c
     )
     if(
@@ -1299,6 +1308,7 @@ add_executable(
     kernel/trap.c
     kernel/tty_handoff_core.c
     kernel/tty_handoff_runtime.c
+    kernel/uart_console_core.c
     kernel/user_address_space.c
     kernel/user_address_space_core.c
     kernel/user_execution.c
@@ -1308,6 +1318,19 @@ add_executable(
     kernel/vm_handoff_syscall.c
     kernel/vm_snapshot.c
 )
+
+if(MICROS_BUILD_UART_CONSOLE_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_UART_CONSOLE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/uart_console_test.c
+    )
+endif()
 
 if(MICROS_BUILD_USER_RUNTIME_TEST)
     add_dependencies(micros micros_user_runtime_service)
@@ -2728,6 +2751,42 @@ add_custom_target(
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     USES_TERMINAL
 )
+
+if(MICROS_BUILD_UART_CONSOLE_TEST)
+    add_custom_target(
+        test-qemu-uart-console
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_UART_CONSOLE_TEST begin=early"
+            --marker
+            "MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
 
 if(MICROS_BUILD_PANIC_TEST)
     add_custom_target(

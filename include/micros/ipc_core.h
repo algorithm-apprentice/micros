@@ -19,6 +19,10 @@ struct micros_ipc_kernel_notification_plan {
     struct micros_scheduler_ipc_wake_plan wake;
 };
 
+bool micros_ipc_thread_has_staged_kernel_notification(
+    const struct micros_thread *thread
+);
+
 /*
  * Portable operations consume a scheduler-held, non-current thread. Target
  * syscall integration owns the later current-thread transition and return

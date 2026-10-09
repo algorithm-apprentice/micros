@@ -197,6 +197,7 @@ static bool handle_vm_self_fault(
             frame
         );
     }
+    uart_panic_seize();
     uart_write("MICROS_VM_SELF_FAULT service=");
     uart_write_hex64(handoff->service_id);
     uart_write(" process-slot=");

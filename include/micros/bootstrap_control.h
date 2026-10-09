@@ -5,6 +5,7 @@
 
 #include "micros/bootstrap.h"
 #include "micros/syscall_abi.h"
+#include "micros/tty.h"
 
 #define MICROS_BOOTSTRAP_MESSAGE_READY UINT32_C(0x00000001)
 #define MICROS_BOOTSTRAP_MESSAGE_READY_ACK UINT32_C(0x00000002)
@@ -14,6 +15,7 @@ enum micros_bootstrap_command {
     MICROS_BOOTSTRAP_COMMAND_ACCEPT_READY,
     MICROS_BOOTSTRAP_COMMAND_FAIL,
     MICROS_BOOTSTRAP_COMMAND_COMPLETE,
+    MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN,
 };
 
 enum micros_bootstrap_failure_reason {
@@ -26,6 +28,7 @@ enum micros_bootstrap_failure_reason {
     MICROS_BOOTSTRAP_FAILURE_AUTHORITY,
     MICROS_BOOTSTRAP_FAILURE_COMPLETION,
     MICROS_BOOTSTRAP_FAILURE_READY_ROLE_GATE,
+    MICROS_BOOTSTRAP_FAILURE_CONSOLE_PROTOCOL,
 };
 
 struct micros_bootstrap_control_request {

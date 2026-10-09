@@ -337,6 +337,7 @@ enum micros_tty_handoff_error micros_tty_handoff_accept_ready(
     }
     if (
         state->console_phase != MICROS_TTY_CONSOLE_OWNED
+        || state->route_phase != MICROS_TTY_ROUTE_IDLE
         || !state->deadline_armed
         || now >= state->deadline
     ) {

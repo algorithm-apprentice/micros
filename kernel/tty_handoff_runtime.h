@@ -44,6 +44,21 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_begin(
 );
 
 enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_begin(
+    uint64_t now,
+    uint64_t interval,
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_begin_deadline_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_begin_phase_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+enum micros_tty_handoff_error
 micros_tty_handoff_runtime_prepare_mapped(
     struct micros_tty_handoff *candidate
 );
@@ -51,6 +66,32 @@ micros_tty_handoff_runtime_prepare_mapped(
 void micros_tty_handoff_runtime_commit_mapped_prevalidated(
     const struct micros_tty_handoff *candidate
 );
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_release(
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_release_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_ready(
+    uint64_t now,
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_ready_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+bool micros_tty_handoff_runtime_role_ready(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+);
+
+bool micros_tty_handoff_runtime_deadline_expired(uint64_t now);
 
 enum micros_tty_device_authority_status
 micros_tty_handoff_runtime_device_authority(

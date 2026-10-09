@@ -1,5 +1,6 @@
 #include "kernel/tty_handoff_core.h"
 #include "kernel/tty_handoff_runtime.h"
+#include "kernel/uart_console_core.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,6 +16,11 @@ static struct micros_thread runtime_thread;
 static struct micros_endpoint_record runtime_endpoint;
 static struct micros_process_handle runtime_process_handle;
 static struct micros_thread_handle runtime_thread_handle;
+
+static bool advance_to_phase(
+    enum micros_tty_console_phase phase,
+    struct micros_tty_handoff *state
+);
 
 const struct micros_bootstrap_binding *
 micros_bootstrap_control_find_binding(
@@ -154,18 +160,106 @@ static bool test_complete_handoff(void)
         ) == MICROS_TTY_HANDOFF_OK
         && state.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
         && state.claimed_source == MICROS_TTY_UART_IRQ_SOURCE
-        && micros_tty_handoff_accept_ready(&state, 149)
-            == MICROS_TTY_HANDOFF_OK
-        && !state.deadline_armed
-        && state.deadline == 0
         && micros_tty_handoff_complete(
             &state,
             MICROS_TTY_UART_IRQ_SOURCE
         ) == MICROS_TTY_HANDOFF_OK
         && state.route_phase == MICROS_TTY_ROUTE_IDLE
         && state.claimed_source == 0
+        && micros_tty_handoff_accept_ready(&state, 149)
+            == MICROS_TTY_HANDOFF_OK
+        && !state.deadline_armed
+        && state.deadline == 0
         && micros_tty_handoff_validate(&state)
             == MICROS_TTY_HANDOFF_OK
+    );
+    return true;
+}
+
+static bool test_deadline_covers_every_pre_ready_phase(void)
+{
+    const enum micros_tty_console_phase phases[] = {
+        MICROS_TTY_CONSOLE_MAP_REQUESTED,
+        MICROS_TTY_CONSOLE_MAPPED,
+        MICROS_TTY_CONSOLE_STARTING,
+        MICROS_TTY_CONSOLE_OWNED,
+    };
+    size_t index;
+
+    for (index = 0; index < sizeof(phases) / sizeof(phases[0]); ++index) {
+        struct micros_tty_handoff state;
+
+        EXPECT_TRUE(
+            advance_to_phase(phases[index], &state)
+            && state.deadline_armed
+            && state.deadline == 20
+            && !micros_tty_handoff_deadline_expired(&state, 19)
+            && micros_tty_handoff_deadline_expired(&state, 20)
+            && micros_tty_handoff_deadline_expired(&state, 21)
+        );
+    }
+    return true;
+}
+
+static bool test_ready_requires_idle_route(void)
+{
+    struct micros_tty_handoff state;
+    struct micros_tty_handoff snapshot;
+
+    EXPECT_TRUE(
+        advance_to_phase(MICROS_TTY_CONSOLE_OWNED, &state)
+        && micros_tty_handoff_claim(
+            &state,
+            MICROS_TTY_UART_IRQ_SOURCE
+        ) == MICROS_TTY_HANDOFF_OK
+    );
+    snapshot = state;
+    EXPECT_TRUE(
+        micros_tty_handoff_accept_ready(&state, 19)
+            == MICROS_TTY_HANDOFF_ERROR_STATE
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
+    );
+    return true;
+}
+
+static bool test_uart_console_ownership(void)
+{
+    struct micros_uart_console_state state;
+    struct micros_uart_console_state snapshot;
+
+    EXPECT_TRUE(
+        micros_uart_console_initialize(&state)
+            == MICROS_UART_CONSOLE_OK
+        && micros_uart_console_validate(&state)
+            == MICROS_UART_CONSOLE_OK
+        && micros_uart_console_preflight_begin(&state)
+            == MICROS_UART_CONSOLE_OK
+        && micros_uart_console_output_allowed(&state)
+    );
+    EXPECT_TRUE(
+        micros_uart_console_quiesce(&state)
+            == MICROS_UART_CONSOLE_OK
+        && state.owner == MICROS_UART_CONSOLE_OWNER_EARLY
+        && state.quiesced
+        && micros_uart_console_output_allowed(&state)
+        && micros_uart_console_commit_handoff(&state)
+            == MICROS_UART_CONSOLE_OK
+        && state.owner == MICROS_UART_CONSOLE_OWNER_TTY
+        && !micros_uart_console_output_allowed(&state)
+    );
+    snapshot = state;
+    EXPECT_TRUE(
+        micros_uart_console_preflight_begin(&state)
+            == MICROS_UART_CONSOLE_ERROR_STATE
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
+        && micros_uart_console_panic(&state)
+            == MICROS_UART_CONSOLE_OK
+        && state.owner == MICROS_UART_CONSOLE_OWNER_PANIC
+        && micros_uart_console_output_allowed(&state)
+        && micros_uart_console_panic(&state)
+            == MICROS_UART_CONSOLE_OK
+        && micros_uart_console_validate(&state)
+            == MICROS_UART_CONSOLE_OK
     );
     return true;
 }
@@ -401,6 +495,9 @@ static bool test_runtime_lifecycle_validation(void)
     struct micros_endpoint_registry registry = {0};
     struct micros_kernel_objects objects = {0};
     struct micros_tty_handoff mapped;
+    struct micros_tty_handoff begin;
+    struct micros_tty_handoff released;
+    struct micros_tty_handoff ready;
     struct micros_tty_device_authority authority;
     struct micros_tty_device_authority authority_sentinel;
     struct micros_tty_handoff_runtime_state *runtime;
@@ -482,9 +579,33 @@ static bool test_runtime_lifecycle_validation(void)
     );
     runtime_process.privilege_profile = 0;
 
+    runtime = micros_tty_handoff_runtime_authoritative_state();
     EXPECT_TRUE(
-        micros_tty_handoff_runtime_begin(100, 50)
-            == MICROS_TTY_HANDOFF_OK
+        runtime != NULL
+        && micros_tty_handoff_runtime_prepare_begin(
+            100,
+            50,
+            &begin
+        ) == MICROS_TTY_HANDOFF_OK
+        && runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_EARLY
+        && !runtime->handoff.deadline_armed
+    );
+    micros_tty_handoff_runtime_commit_begin_deadline_prevalidated(
+        &begin
+    );
+    EXPECT_TRUE(
+        runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_EARLY
+        && runtime->handoff.deadline_armed
+        && runtime->handoff.deadline == 150
+    );
+    micros_tty_handoff_runtime_commit_begin_phase_prevalidated(
+        &begin
+    );
+    EXPECT_TRUE(
+        runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_MAP_REQUESTED
         && micros_tty_handoff_runtime_validate(
             &bootstrap,
             &registry,
@@ -527,7 +648,15 @@ static bool test_runtime_lifecycle_validation(void)
     );
     runtime_endpoint.state = MICROS_ENDPOINT_STATE_RESERVED;
 
-    runtime = micros_tty_handoff_runtime_authoritative_state();
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_prepare_release(&released)
+            == MICROS_TTY_HANDOFF_OK
+        && runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_MAPPED
+        && released.console_phase
+            == MICROS_TTY_CONSOLE_STARTING
+        && released.deadline == 150
+    );
     transition->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
     transition->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
     transition->profile_installed = true;
@@ -543,29 +672,33 @@ static bool test_runtime_lifecycle_validation(void)
         binding->scheduler_preemptible;
     runtime_thread.quantum_counter_ticks =
         binding->scheduler_quantum_counter_ticks;
+    micros_tty_handoff_runtime_commit_release_prevalidated(&released);
     EXPECT_TRUE(
-        runtime != NULL
-        && micros_tty_handoff_release(&runtime->handoff)
-            == MICROS_TTY_HANDOFF_OK
-        && micros_tty_handoff_runtime_validate(
+        micros_tty_handoff_runtime_validate(
             &bootstrap,
             &registry,
             &objects
         ) == MICROS_TTY_HANDOFF_OK
         && micros_tty_handoff_commit(&runtime->handoff)
             == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_role_ready(
+            &registry,
+            &objects
+        )
         && micros_tty_handoff_runtime_validate(
             &bootstrap,
             &registry,
             &objects
         ) == MICROS_TTY_HANDOFF_OK
-        && micros_tty_handoff_accept_ready(
-            &runtime->handoff,
-            149
-        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_prepare_ready(149, &ready)
+            == MICROS_TTY_HANDOFF_OK
+        && ready.console_phase == MICROS_TTY_CONSOLE_OWNED
+        && !ready.deadline_armed
+        && ready.deadline == 0
     );
     transition->state = MICROS_BOOTSTRAP_SERVICE_READY;
     transition->ready_deadline = 0;
+    micros_tty_handoff_runtime_commit_ready_prevalidated(&ready);
     EXPECT_TRUE(
         micros_tty_handoff_runtime_validate(
             &bootstrap,
@@ -688,6 +821,9 @@ bool micros_tty_handoff_test_run(void)
 {
     return (
         test_complete_handoff()
+        && test_deadline_covers_every_pre_ready_phase()
+        && test_ready_requires_idle_route()
+        && test_uart_console_ownership()
         && test_failure_preservation()
         && test_device_leaf_classification()
         && test_runtime_lifecycle_validation()

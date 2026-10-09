@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/endpoint_internal.h"
@@ -32,6 +33,10 @@ static const struct micros_thread_handle vm_thread = {
     .slot = 1,
     .generation = 1,
 };
+static const struct micros_thread_handle launcher_thread = {
+    .slot = 3,
+    .generation = 1,
+};
 static const struct micros_process_handle foreign_process = {
     .slot = 2,
     .generation = 1,
@@ -53,7 +58,9 @@ static struct micros_endpoint_registry registry;
 static struct micros_process vm_process_record;
 static struct micros_process foreign_process_record;
 static struct micros_thread vm_thread_record;
+static struct micros_thread launcher_thread_record;
 static struct micros_thread foreign_thread_record;
+static struct micros_endpoint_record launcher_endpoint_record;
 static struct micros_endpoint_record vm_endpoint_record;
 static struct micros_bootstrap_control_state bootstrap;
 static struct micros_vm_handoff_state vm_state;
@@ -88,6 +95,19 @@ static bool thread_handles_equal(
         left.slot == right.slot
         && left.generation == right.generation
     );
+}
+
+static bool bytes_are_zero(const void *storage, size_t size)
+{
+    const unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static void reset_fixture(void)
@@ -128,6 +148,7 @@ static void reset_fixture(void)
         .bindings = {
             {
                 .service_id = TEST_LAUNCHER_SERVICE_ID,
+                .thread = launcher_thread,
                 .endpoint = launcher_endpoint,
             },
         },
@@ -173,6 +194,11 @@ static void reset_fixture(void)
         .generation = vm_thread.generation,
         .owner = vm_process,
     };
+    launcher_thread_record = (struct micros_thread){
+        .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
+        .generation = launcher_thread.generation,
+        .owner = vm_process,
+    };
     foreign_thread_record = (struct micros_thread){
         .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
         .generation = foreign_thread.generation,
@@ -182,6 +208,11 @@ static void reset_fixture(void)
         .state = MICROS_ENDPOINT_STATE_ACTIVE,
         .owner = vm_process,
         .value = vm_endpoint,
+    };
+    launcher_endpoint_record = (struct micros_endpoint_record){
+        .state = MICROS_ENDPOINT_STATE_ACTIVE,
+        .owner = vm_process,
+        .value = launcher_endpoint,
     };
     mapping_committed = false;
     notification_committed = false;
@@ -317,6 +348,45 @@ static bool test_notification_preflight_is_atomic(void)
     );
 }
 
+static bool test_uncleared_console_event_is_rejected(int event_state)
+{
+    struct micros_trap_frame frame = {0};
+
+    reset_fixture();
+    if (event_state == 1) {
+        vm_thread_record.ipc_delivery_pending = true;
+    } else if (event_state == 2) {
+        launcher_endpoint_record.pending_kernel_events =
+            MICROS_KERNEL_EVENT_CONSOLE_MAPPED;
+    } else if (event_state == 3) {
+        launcher_thread_record.ipc_delivery_pending = true;
+        launcher_thread_record.ipc_staged_result = MICROS_IPC_OK;
+        launcher_thread_record.ipc_inbound_message.source =
+            MICROS_ENDPOINT_NONE;
+        launcher_thread_record.ipc_inbound_message.type =
+            MICROS_IPC_TYPE_KERNEL_NOTIFICATION;
+    } else {
+        vm_endpoint_record.pending_kernel_events =
+            MICROS_KERNEL_EVENT_CONSOLE_MAP_REQUEST;
+    }
+    panic_armed = true;
+    if (setjmp(panic_target) == 0) {
+        (void)invoke_mapping(vm_process, vm_thread, &frame);
+        panic_armed = false;
+        return false;
+    }
+    panic_armed = false;
+    return (
+        failure_reason
+            == MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_MAP_GATE
+        && operation_stage == 0
+        && !mapping_committed
+        && !notification_committed
+        && tty_state.handoff.console_phase
+            == MICROS_TTY_CONSOLE_MAP_REQUESTED
+    );
+}
+
 int main(void)
 {
     return (
@@ -324,6 +394,10 @@ int main(void)
         && test_unauthorized_mapping_is_atomic()
         && test_wrong_phase_is_atomic()
         && test_notification_preflight_is_atomic()
+        && test_uncleared_console_event_is_rejected(0)
+        && test_uncleared_console_event_is_rejected(1)
+        && test_uncleared_console_event_is_rejected(2)
+        && test_uncleared_console_event_is_rejected(3)
     ) ? 0 : 1;
 }
 
@@ -507,11 +581,57 @@ enum micros_kernel_object_error micros_thread_resolve(
         *thread = &vm_thread_record;
         return MICROS_KERNEL_OBJECT_OK;
     }
+    if (thread_handles_equal(handle, launcher_thread)) {
+        *thread = &launcher_thread_record;
+        return MICROS_KERNEL_OBJECT_OK;
+    }
     if (thread_handles_equal(handle, foreign_thread)) {
         *thread = &foreign_thread_record;
         return MICROS_KERNEL_OBJECT_OK;
     }
     return MICROS_KERNEL_OBJECT_ERROR_STALE;
+}
+
+bool micros_thread_ipc_state_is_clear(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread != NULL
+        && thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && thread->ipc_next.slot == 0
+        && thread->ipc_next.generation == 0
+        && bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        && thread->ipc_send_destination == 0
+        && thread->ipc_receive_source == 0
+        && thread->ipc_receive_buffer == 0
+        && !thread->ipc_delivery_pending
+        && bytes_are_zero(
+            &thread->ipc_inbound_message,
+            sizeof(thread->ipc_inbound_message)
+        )
+        && thread->ipc_staged_result == MICROS_IPC_OK
+        && thread->ipc_reply_token == 0
+        && thread->ipc_reply_callee == 0
+    );
+}
+
+bool micros_ipc_thread_has_staged_kernel_notification(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread != NULL
+        && thread->ipc_delivery_pending
+        && thread->ipc_staged_result == MICROS_IPC_OK
+        && thread->ipc_inbound_message.source
+            == MICROS_ENDPOINT_NONE
+        && thread->ipc_inbound_message.type
+            == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+    );
 }
 
 enum micros_endpoint_error micros_endpoint_resolve_active(
@@ -525,11 +645,16 @@ enum micros_endpoint_error micros_endpoint_resolve_active(
         endpoint_registry != &registry
         || kernel_objects != &objects
         || record == NULL
-        || endpoint != vm_endpoint
     ) {
         return MICROS_ENDPOINT_ERROR_STALE;
     }
-    *record = &vm_endpoint_record;
+    if (endpoint == vm_endpoint) {
+        *record = &vm_endpoint_record;
+    } else if (endpoint == launcher_endpoint) {
+        *record = &launcher_endpoint_record;
+    } else {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
     return MICROS_ENDPOINT_OK;
 }
 
@@ -550,6 +675,11 @@ micros_privilege_profile_allows_kernel_operation(
 bool micros_plic_validate(enum micros_plic_phase expected_phase)
 {
     return expected_phase == MICROS_PLIC_DISABLED;
+}
+
+bool uart_console_handoff_is_quiesced(void)
+{
+    return true;
 }
 
 enum micros_user_address_space_error

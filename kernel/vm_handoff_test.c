@@ -137,6 +137,13 @@ static _Noreturn void test_failure(
 
 _Noreturn void micros_vm_handoff_test_launch(void)
 {
+#ifdef MICROS_BUILD_VM_SELF_FAULT_TEST
+    if (!uart_console_begin_preflight()) {
+        MICROS_PANIC(0, "vm-self-fault-console-preflight");
+    }
+    uart_console_begin_quiesce_prevalidated();
+    uart_console_handoff_commit_prevalidated();
+#endif
     micros_bootstrap_runtime_launch(&runtime_config);
 }
 

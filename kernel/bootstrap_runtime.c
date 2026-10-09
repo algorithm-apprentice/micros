@@ -166,6 +166,8 @@ static const char *diagnostic_reason_name(
         return "completion";
     case MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_MAP_GATE:
         return "console-map-gate";
+    case MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_PROTOCOL:
+        return "console-protocol";
     }
     return "authority";
 }
@@ -245,6 +247,7 @@ void micros_bootstrap_runtime_record_failure(
         bootstrap_state.phase = MICROS_BOOTSTRAP_PHASE_FAILED;
         bootstrap_state.transitions.phase =
             MICROS_BOOTSTRAP_PHASE_FAILED;
+        uart_panic_seize();
         uart_write("MICROS_BOOTSTRAP_FAILURE reason=");
         uart_write(diagnostic_reason_name(reason));
         uart_write(" service=");
@@ -283,12 +286,31 @@ void micros_bootstrap_runtime_check_deadline(uint64_t now)
 {
     uint32_t service_id;
     const struct micros_bootstrap_binding *binding;
+    const struct micros_tty_handoff_runtime_state *tty;
     size_t index;
 
+    if (bootstrap_state.phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
+        return;
+    }
+    tty = micros_tty_handoff_runtime_state();
     if (
-        bootstrap_state.phase != MICROS_BOOTSTRAP_PHASE_RUNNING
-        || bootstrap_state.transitions.starting_service_id == 0
+        tty != NULL
+        && micros_tty_handoff_runtime_deadline_expired(now)
     ) {
+        binding = micros_bootstrap_control_find_binding(
+            &bootstrap_state,
+            tty->service_id
+        );
+        micros_bootstrap_runtime_fail(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_READY_TIMEOUT,
+            tty->service_id,
+            binding == NULL
+                ? MICROS_ENDPOINT_NONE
+                : binding->endpoint,
+            (uint64_t)tty->handoff.console_phase
+        );
+    }
+    if (bootstrap_state.transitions.starting_service_id == 0) {
         return;
     }
     service_id = bootstrap_state.transitions.starting_service_id;
@@ -1857,6 +1879,8 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
         micros_kernel_object_runtime_authoritative_registry();
     struct micros_endpoint_registry *registry =
         micros_ipc_runtime_authoritative_registry();
+    const struct micros_tty_handoff_runtime_state *tty =
+        micros_tty_handoff_runtime_state();
     size_t index;
 
     if (
@@ -1880,6 +1904,20 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
                     registry,
                     objects
                 ) != MICROS_TTY_HANDOFF_OK
+        )
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (
+        bootstrap_state.plan.console_service_id != 0
+        && (
+            tty == NULL
+            || (
+                tty->handoff.console_phase
+                    == MICROS_TTY_CONSOLE_EARLY
+                    ? !uart_console_begin_preflight()
+                    : !uart_console_handoff_is_active()
+            )
         )
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;

@@ -19,6 +19,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-panic",
     "test-qemu-trap",
     "test-qemu-timer",
+    "test-qemu-uart-console",
     "test-qemu-frame-allocator",
     "test-qemu-trap-panic",
     "test-qemu-mmu",
@@ -93,6 +94,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-address-space-handoff",
     "test-qemu-user-execution",
     "test-qemu-scheduler",
+    "test-qemu-uart-console",
 )
 
 SHARED_QEMU_PATHS = (
@@ -206,6 +208,14 @@ GATE_INPUTS = {
     "test-qemu-panic": ("kernel/panic.c", "arch/riscv64/panic.S"),
     "test-qemu-trap": ("arch/riscv64/trap_test.S",),
     "test-qemu-timer": ("arch/riscv64/sbi.c",),
+    "test-qemu-uart-console": (
+        "arch/riscv64/platform.h",
+        "arch/riscv64/uart.c",
+        "kernel/uart_console_core.c",
+        "kernel/uart_console_core.h",
+        "kernel/uart_console_test.c",
+        "kernel/uart_console_test.h",
+    ),
     "test-qemu-frame-allocator": (
         "kernel/frame_allocator.c",
         "kernel/frame_allocator_test.c",
@@ -316,6 +326,8 @@ GATE_INPUTS = {
         "lib/runtime/user.ld",
         "tests/host/test_generate_bootstrap_fixture.py",
         "tests/qemu/bootstrap_launcher.c",
+        "tests/qemu/bootstrap_launcher_control.c",
+        "tests/qemu/bootstrap_launcher_control.h",
         "tests/qemu/bootstrap_probe.c",
         "tests/qemu/bootstrap_probe.S",
         "tests/qemu/bootstrap_protocol.h",

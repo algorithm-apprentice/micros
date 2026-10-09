@@ -54,6 +54,15 @@
       }
     },
     {
+      "name": "riscv64-uart-console-test",
+      "displayName": "RISC-V 64 UART console ownership test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-uart-console-test",
+      "cacheVariables": {
+        "MICROS_BUILD_UART_CONSOLE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-frame-allocator-test",
       "displayName": "RISC-V 64 frame allocator test",
       "inherits": "riscv64-debug",
@@ -358,6 +367,13 @@
       "configurePreset": "riscv64-timer-test",
       "targets": [
         "test-qemu-timer"
+      ]
+    },
+    {
+      "name": "test-qemu-uart-console",
+      "configurePreset": "riscv64-uart-console-test",
+      "targets": [
+        "test-qemu-uart-console"
       ]
     },
     {
@@ -667,6 +683,20 @@
         {
           "type": "build",
           "name": "test-qemu-timer"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-uart-console",
+      "displayName": "Build and run the UART console ownership test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-uart-console-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-uart-console"
         }
       ]
     },

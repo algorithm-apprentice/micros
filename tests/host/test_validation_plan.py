@@ -86,6 +86,8 @@ class ValidationPlanTests(unittest.TestCase):
             "kernel/user_address_space_core.c",
             "lib/runtime/memory.h",
             "lib/runtime/raw_syscall.h",
+            "tests/qemu/bootstrap_launcher_control.c",
+            "tests/qemu/bootstrap_launcher_control.h",
         ):
             with self.subTest(path=path):
                 self.assert_workflow_selected(
@@ -107,6 +109,21 @@ class ValidationPlanTests(unittest.TestCase):
                 self.assert_workflow_selected(
                     path,
                     "test-qemu-vm-ready-early",
+                )
+
+    def test_uart_console_paths_own_component_gate(self):
+        for path in (
+            "arch/riscv64/platform.h",
+            "arch/riscv64/uart.c",
+            "kernel/uart_console_core.c",
+            "kernel/uart_console_core.h",
+            "kernel/uart_console_test.c",
+            "kernel/uart_console_test.h",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-uart-console",
                 )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):

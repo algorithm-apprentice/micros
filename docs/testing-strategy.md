@@ -137,6 +137,7 @@ Budgets are review signals, not reasons to hide necessary coverage.
 The native validation tiers are `test-unit-fast`, `test-ipc-model`, and the
 complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
+`test-qemu-uart-console`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
@@ -166,6 +167,7 @@ cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
+cmake --workflow --preset test-qemu-uart-console
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
@@ -709,9 +711,28 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - static launcher preparation, reserved endpoint visibility, exact-profile
   release, versioned readiness acknowledgment, internal timeout failure, and
   final authority sealing.
+- UART transmitter drain, interrupt-disable quiescence, ordinary ownership
+  transfer away from the kernel, and terminal panic seizure.
 
 Most component tests may run in one test kernel to avoid repeated QEMU startup.
 Tests expected to panic or corrupt their own address space use isolated images.
+
+The isolated UART ownership workflow is:
+
+```text
+cmake --workflow --preset test-qemu-uart-console
+```
+
+It enables the NS16550A interrupt-enable register, executes the production
+console-begin quiesce and ownership transition, proves `IER = 0`, and then
+simulates TTY-side interrupt programming while ownership remains with TTY. It
+finally seizes the terminal through the production panic path. The panic check
+proves supervisor-external delivery is disabled and the fixed 8N1 divisor is
+restored before reporting success. It accepts only the exact marker:
+
+```text
+MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized
+```
 
 ## Integration tests
 
@@ -791,12 +812,15 @@ test-qemu-vm-self-fault-sealed
 ```
 
 The running image commits the same handoff and faults before generic VM
-readiness. It requires the exact VM identity, fault registers,
-`ownership=handed-off`, the authoritative `RUNNING+STARTING` service-fault
-record, ordered trap-context panic, and no success marker. The sealed variant
-first completes VM readiness, the real grant exchange, and launcher sealing;
-it then requires `MICROS_PANIC reason=vm-self-fault`, exact trap context, no
-success marker, and no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
+readiness. The fixture first quiesces the UART and transfers ordinary output
+ownership to TTY, so the exact VM self-fault record also proves that fatal
+diagnostics seize panic ownership before their first byte. The workflow
+requires the exact VM identity, fault registers, `ownership=handed-off`, the
+authoritative `RUNNING+STARTING` service-fault record, ordered trap-context
+panic, and no success marker. The sealed variant first completes VM readiness,
+the real grant exchange, and launcher sealing; it then requires
+`MICROS_PANIC reason=vm-self-fault`, exact trap context, no success marker, and
+no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
 
 The PM Step 10 workflow is implemented:
 

@@ -28,6 +28,9 @@
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
 #endif
+#ifdef MICROS_BUILD_UART_CONSOLE_TEST
+#include "kernel/uart_console_test.h"
+#endif
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -293,6 +296,10 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     );
     uart_write(" phase=bootstrap\n");
     uart_flush();
+
+#ifdef MICROS_BUILD_UART_CONSOLE_TEST
+    micros_uart_console_runtime_run_self_test(hart_id);
+#endif
 
 #ifdef MICROS_BUILD_PANIC_TEST
     MICROS_PANIC(hart_id, "intentional-test");

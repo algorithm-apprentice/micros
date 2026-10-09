@@ -163,6 +163,7 @@ enum micros_bootstrap_diagnostic_reason {
     MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
     MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
     MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_MAP_GATE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_PROTOCOL,
 };
 
 struct micros_bootstrap_diagnostic {
@@ -257,6 +258,14 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
     uint64_t now
+);
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_release_retaining_deadline(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t deadline
 );
 
 enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(
