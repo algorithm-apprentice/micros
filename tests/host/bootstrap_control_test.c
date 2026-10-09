@@ -627,7 +627,7 @@ static bool test_control_transitions(void)
             109,
             false,
             &ready_plan
-        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
         && memcmp(
             &ready_plan,
             &ready_sentinel,

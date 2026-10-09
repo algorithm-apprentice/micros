@@ -113,6 +113,7 @@ cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
 cmake --workflow --preset test-qemu-ipc
@@ -157,6 +158,9 @@ and zero-initialized writable state, the raw `ecall` boundary, typed wrappers
 for operations 1 through 10, blocking stack-local IPC, register preservation,
 success-only grant-token publication, deterministic service-return trapping,
 and complete bootstrap cleanup.
+The early-VM-readiness gate proves that a VM readiness call before operation
+12 emits the exact `ready-role-gate` bootstrap failure for the bound VM
+endpoint rather than a generic launcher transition failure.
 The address-space handoff gate validates every live bootstrap leaf's wired
 target before the irreversible transition, then proves exact `VM_WIRED`
 validation, activation, IPC-buffer access, checked grants, revoked mutation,

@@ -689,7 +689,7 @@ enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
         ) != 0
         && !role_gate_ready
     ) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
+        return MICROS_BOOTSTRAP_ERROR_ROLE;
     }
     if (endpoint != binding->endpoint) {
         return MICROS_BOOTSTRAP_ERROR_IDENTITY;

@@ -83,6 +83,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_VM_READY_EARLY_TEST
+    "Build the early VM readiness role-gate panic image"
+    OFF
+)
+option(
     MICROS_BUILD_VM_SELF_FAULT_TEST
     "Build the running-bootstrap VM self-fault image"
     OFF
@@ -155,6 +160,7 @@ set(
     MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
+    MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
@@ -847,6 +853,7 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
+    OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
 )
@@ -930,6 +937,7 @@ if(
     )
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
+        OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
     )
@@ -939,7 +947,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
-        if(MICROS_BUILD_VM_SELF_FAULT_TEST)
+        if(MICROS_BUILD_VM_READY_EARLY_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_VM_READY_EARLY=1
+            )
+        elseif(MICROS_BUILD_VM_SELF_FAULT_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -1144,6 +1158,7 @@ endif()
 
 if(
     MICROS_BUILD_VM_HANDOFF_TEST
+    OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
 )
@@ -1158,6 +1173,12 @@ if(
             micros
             PRIVATE
                 MICROS_BUILD_VM_HANDOFF_TEST=1
+        )
+    elseif(MICROS_BUILD_VM_READY_EARLY_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_VM_READY_EARLY_TEST=1
         )
     elseif(MICROS_BUILD_VM_SELF_FAULT_TEST)
         target_compile_definitions(
@@ -1554,6 +1575,47 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
             "MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm"
             --require-fdt-events
             --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            30
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_VM_READY_EARLY_TEST)
+    add_custom_target(
+        test-qemu-vm-ready-early
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --pattern
+            "MICROS_BOOTSTRAP_FAILURE reason=ready-role-gate service=0x0000000000000002 endpoint=0x0000000000001001 phase=failed state=starting detail=0x0000000000000000"
+            --forbid-marker
+            "MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready

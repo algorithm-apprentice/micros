@@ -223,7 +223,7 @@ static enum micros_bootstrap_error validate_profile_relationships(
             controller_profile_id
         );
     uint32_t controller_target;
-        uint32_t vm_target = 0;
+        uint32_t active_profile_targets = 0;
         uint8_t vm_profile_id = 0;
         size_t index;
 
@@ -246,6 +246,8 @@ static enum micros_bootstrap_error validate_profile_relationships(
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
     }
     for (index = 0; index < manifest->header.entry_count; ++index) {
+        active_profile_targets |=
+            UINT32_C(1) << manifest->entries[index].profile_id;
         if (
             (
                 manifest->entries[index].role_flags
@@ -253,8 +255,6 @@ static enum micros_bootstrap_error validate_profile_relationships(
             ) != 0
         ) {
             vm_profile_id = manifest->entries[index].profile_id;
-            vm_target = UINT32_C(1) << vm_profile_id;
-            break;
         }
     }
     for (index = 0; index < profile_count; ++index) {
@@ -278,7 +278,6 @@ static enum micros_bootstrap_error validate_profile_relationships(
         const struct micros_bootstrap_manifest_entry *entry =
             &manifest->entries[index];
         const struct micros_privilege_profile *profile;
-        uint32_t expected_call_targets;
 
         if (entry->profile_id == controller_profile_id) {
             if (
@@ -296,13 +295,6 @@ static enum micros_bootstrap_error validate_profile_relationships(
             profile_count,
             entry->profile_id
         );
-        expected_call_targets = controller_target;
-        if (
-            vm_profile_id != 0
-            && entry->profile_id != vm_profile_id
-        ) {
-            expected_call_targets |= vm_target;
-        }
         if (
             profile == NULL
             || profile->operations
@@ -318,7 +310,16 @@ static enum micros_bootstrap_error validate_profile_relationships(
                         : 0
                     )
                 )
-            || profile->call_targets != expected_call_targets
+            || (
+                profile->call_targets & controller_target
+            ) == 0
+            || (
+                profile->call_targets & ~active_profile_targets
+            ) != 0
+            || (
+                profile->call_targets
+                & (UINT32_C(1) << entry->profile_id)
+            ) != 0
             || profile->send_targets != 0
             || profile->notify_targets != 0
         ) {
@@ -718,6 +719,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         if (
             profile == NULL
             || !fixed_names_equal(profile->name, entry->profile_name)
+            || profile->call_targets != expected->call_targets
         ) {
             RETURN_DIAGNOSTIC(
                 MICROS_BOOTSTRAP_ERROR_PROFILE,

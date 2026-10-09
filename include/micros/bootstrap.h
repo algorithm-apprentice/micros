@@ -88,6 +88,7 @@ struct micros_bootstrap_expected_service {
     char service_name[MICROS_BOOTSTRAP_NAME_SIZE];
     char profile_name[MICROS_BOOTSTRAP_NAME_SIZE];
     uint64_t prerequisites;
+    uint32_t call_targets;
     uint32_t role_flags;
     uint32_t irq_source;
     uint64_t device_base;

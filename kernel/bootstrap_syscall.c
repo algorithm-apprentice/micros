@@ -352,6 +352,7 @@ static enum micros_syscall_return handle_accept_ready(
 {
     struct micros_bootstrap_ready_plan plan;
     struct micros_scheduler_current_ipc_guard guard = {0};
+    const struct micros_bootstrap_binding *binding;
     const struct micros_thread *thread;
     enum micros_bootstrap_error error;
     enum micros_ipc_error ipc_error;
@@ -374,6 +375,28 @@ static enum micros_syscall_return handle_accept_ready(
         ),
         &plan
     );
+    if (error == MICROS_BOOTSTRAP_ERROR_ROLE) {
+        binding = micros_bootstrap_control_find_binding(
+            state,
+            request->service_id
+        );
+        if (binding == NULL) {
+            fail_active_bootstrap(
+                hart,
+                frame,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                request->service_id,
+                request->endpoint
+            );
+        }
+        fail_active_bootstrap(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_READY_ROLE_GATE,
+            binding->service_id,
+            binding->endpoint
+        );
+    }
     if (error != MICROS_BOOTSTRAP_OK) {
         if (
             error != MICROS_BOOTSTRAP_ERROR_ARGUMENT

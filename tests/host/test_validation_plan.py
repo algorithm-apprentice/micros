@@ -104,6 +104,10 @@ class ValidationPlanTests(unittest.TestCase):
                     path,
                     "test-qemu-bootstrap-manifest-panic",
                 )
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-vm-ready-early",
+                )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):
         for path in (
@@ -127,6 +131,7 @@ class ValidationPlanTests(unittest.TestCase):
         )
         for workflow_name in (
             "test-qemu-vm-handoff",
+            "test-qemu-vm-ready-early",
             "test-qemu-vm-self-fault",
             "test-qemu-vm-self-fault-sealed",
         ):
@@ -469,6 +474,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
             "test-qemu-vm-handoff": "kernel/vm_handoff_test.c",
+            "test-qemu-vm-ready-early": "tests/qemu/vm_server.c",
             "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
             "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",
             "test-qemu-bootstrap-ready-timeout": "kernel/bootstrap_test.c",

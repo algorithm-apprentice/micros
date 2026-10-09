@@ -10,6 +10,13 @@
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
+            fprintf( \
+                stderr, \
+                "%s:%d: expected %s\n", \
+                __FILE__, \
+                __LINE__, \
+                #expression \
+            ); \
             return false; \
         } \
     } while (false)
@@ -50,8 +57,6 @@ static struct micros_privilege_profile profile(
             result.operations |= MICROS_PRIVILEGE_OPERATION_REPLY;
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_VM_HANDOFF;
-        } else {
-            result.call_targets |= UINT32_C(1) << 2;
         }
     }
     return result;
@@ -157,6 +162,7 @@ static bool test_manifest_validation(void)
         .process_slot = 1,
         .profile_id = 2,
         .prerequisites = UINT64_C(1),
+        .call_targets = UINT32_C(1) << 1,
         .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
     };
     set_name(expected[1].service_name, "vm");
@@ -389,6 +395,7 @@ static void initialize_validation_fixture(
             .process_slot = 1,
             .profile_id = 2,
             .prerequisites = UINT64_C(1),
+            .call_targets = UINT32_C(1) << 1,
             .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
         };
     set_name(fixture->expected[1].service_name, "vm");
@@ -619,7 +626,7 @@ static bool test_manifest_rejections(void)
         ) == MICROS_BOOTSTRAP_ERROR_PROFILE
         && diagnostic.reason
             == MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE
-        && diagnostic.service_id == 0
+        && diagnostic.service_id == 2
         && diagnostic.detail == 0
     );
     initialize_validation_fixture(&fixture);
@@ -780,6 +787,7 @@ static bool test_three_service_topology(void)
         .process_slot = 2,
         .profile_id = 3,
         .prerequisites = UINT64_C(1),
+        .call_targets = UINT32_C(1) << 1,
     };
     set_name(expected[2].service_name, "pm");
     set_name(expected[2].profile_name, "PM");
@@ -1576,15 +1584,33 @@ static bool test_replayable_runtime_model(void)
 
 int main(void)
 {
-    return (
-        test_manifest_contract()
-        && test_manifest_validation()
-        && test_manifest_rejections()
-        && test_vm_mapping_capacity()
-        && test_three_service_topology()
-        && test_runtime_transitions()
-        && test_replayable_runtime_model()
-    )
-        ? 0
-        : 1;
+    if (!test_manifest_contract()) {
+        fprintf(stderr, "manifest contract failed\n");
+        return 1;
+    }
+    if (!test_manifest_validation()) {
+        fprintf(stderr, "manifest validation failed\n");
+        return 1;
+    }
+    if (!test_manifest_rejections()) {
+        fprintf(stderr, "manifest rejections failed\n");
+        return 1;
+    }
+    if (!test_vm_mapping_capacity()) {
+        fprintf(stderr, "VM mapping capacity failed\n");
+        return 1;
+    }
+    if (!test_three_service_topology()) {
+        fprintf(stderr, "three-service topology failed\n");
+        return 1;
+    }
+    if (!test_runtime_transitions()) {
+        fprintf(stderr, "runtime transitions failed\n");
+        return 1;
+    }
+    if (!test_replayable_runtime_model()) {
+        fprintf(stderr, "runtime model failed\n");
+        return 1;
+    }
+    return 0;
 }

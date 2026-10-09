@@ -77,6 +77,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
+`test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
 `test-qemu-bootstrap-ready-timeout`,
@@ -109,6 +110,7 @@ cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
 cmake --workflow --preset test-qemu-bootstrap-ready-timeout
@@ -702,6 +704,17 @@ between the probe and VM. Only the exact marker is accepted:
 ```text
 MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm
 ```
+
+The expected-failure workflow:
+
+```text
+test-qemu-vm-ready-early
+```
+
+has the real VM validate its boot database but deliberately send ordinary
+readiness before operation 12. It requires the exact `ready-role-gate`
+bootstrap failure for the bound VM service and endpoint, forbids the handoff
+success marker, and rejects host timeout.
 
 Both fatal workflows are implemented:
 

@@ -37,6 +37,7 @@ static const struct micros_bootstrap_expected_service expected_services[] = {
         .service_name = "bootstrap-probe-a",
         .profile_name = "BOOTSTRAP_PROBE_A",
         .prerequisites = UINT64_C(1),
+        .call_targets = UINT32_C(1) << 1,
     },
     {
         .service_id = MICROS_BOOTSTRAP_TEST_LAST_SERVICE_ID,
@@ -46,6 +47,7 @@ static const struct micros_bootstrap_expected_service expected_services[] = {
         .service_name = "bootstrap-probe-b",
         .profile_name = "BOOTSTRAP_PROBE_B",
         .prerequisites = UINT64_C(1) << 1,
+        .call_targets = UINT32_C(1) << 1,
     },
 };
 

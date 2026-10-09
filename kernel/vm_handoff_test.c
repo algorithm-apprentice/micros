@@ -37,6 +37,7 @@ static const struct micros_bootstrap_expected_service
             .service_name = "vm",
             .profile_name = "VM",
             .prerequisites = UINT64_C(1),
+            .call_targets = UINT32_C(1) << 1,
             .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
         },
         {
@@ -47,6 +48,8 @@ static const struct micros_bootstrap_expected_service
             .service_name = "vm-handoff-probe",
             .profile_name = "VM_HANDOFF_PROBE",
             .prerequisites = UINT64_C(1) << 1,
+            .call_targets =
+                (UINT32_C(1) << 1) | (UINT32_C(1) << 2),
         },
     };
 

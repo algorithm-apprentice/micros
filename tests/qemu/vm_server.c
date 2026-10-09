@@ -750,6 +750,7 @@ static bool validate_configuration(void)
 static bool send_ready(void)
 {
     struct micros_ipc_message message;
+    size_t index;
 
     clear_bytes(&message, sizeof(message));
     message.type = MICROS_BOOTSTRAP_MESSAGE_READY;
@@ -770,18 +771,33 @@ static bool send_ready(void)
         &message.payload[16],
         micros_bootstrap_service_config.self_endpoint
     );
-    return (
+    if (
         micros_runtime_call(
             micros_bootstrap_service_config.launcher_endpoint,
             &message
-        ) == MICROS_SYSCALL_ABI_OK
-        && message.source
-            == micros_bootstrap_service_config.launcher_endpoint
-        && message.type == MICROS_BOOTSTRAP_MESSAGE_READY_ACK
-        && message.reply_token == 0
-        && read_u32_le(&message.payload[4])
-            == MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID
-    );
+        ) != MICROS_SYSCALL_ABI_OK
+        || message.source
+            != micros_bootstrap_service_config.launcher_endpoint
+        || message.type != MICROS_BOOTSTRAP_MESSAGE_READY_ACK
+        || message.reply_token != 0
+        || read_u32_le(&message.payload[0])
+            != MICROS_BOOTSTRAP_MANIFEST_VERSION
+        || read_u32_le(&message.payload[4])
+            != MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID
+        || read_u32_le(&message.payload[8])
+            != MICROS_BOOTSTRAP_MANIFEST_VERSION
+        || read_u32_le(&message.payload[12]) != 0
+        || read_u32_le(&message.payload[16])
+            != micros_bootstrap_service_config.self_endpoint
+    ) {
+        return false;
+    }
+    for (index = 20; index < sizeof(message.payload); ++index) {
+        if (message.payload[index] != 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static bool complete_handoff(void)
@@ -890,8 +906,16 @@ void micros_service_main(void)
         vm_data != UINT64_C(0x564d44415441564d)
         || !validate_configuration()
         || !validate_boot_info()
-        || !complete_handoff()
     ) {
+        __builtin_trap();
+    }
+#ifdef MICROS_VM_READY_EARLY
+    if (!send_ready()) {
+        __builtin_trap();
+    }
+    __builtin_trap();
+#endif
+    if (!complete_handoff()) {
         __builtin_trap();
     }
 #ifdef MICROS_VM_SELF_FAULT_RUNNING

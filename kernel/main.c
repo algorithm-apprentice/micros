@@ -19,6 +19,7 @@
 #include "kernel/bootstrap_test.h"
 #endif
 #if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
 #include "kernel/vm_handoff_test.h"
@@ -438,6 +439,7 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #endif
 
 #if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
     micros_vm_handoff_test_launch();

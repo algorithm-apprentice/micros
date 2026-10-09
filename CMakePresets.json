@@ -180,6 +180,15 @@
       }
     },
     {
+      "name": "riscv64-vm-ready-early-test",
+      "displayName": "RISC-V 64 early VM readiness role-gate test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-ready-early-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_READY_EARLY_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-vm-self-fault-test",
       "displayName": "RISC-V 64 running VM self-fault test",
       "inherits": "riscv64-debug",
@@ -438,6 +447,13 @@
       "configurePreset": "riscv64-vm-handoff-test",
       "targets": [
         "test-qemu-vm-handoff"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-ready-early",
+      "configurePreset": "riscv64-vm-ready-early-test",
+      "targets": [
+        "test-qemu-vm-ready-early"
       ]
     },
     {
@@ -831,6 +847,20 @@
         {
           "type": "build",
           "name": "test-qemu-vm-handoff"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-ready-early",
+      "displayName": "Build and run early VM readiness role-gate panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-ready-early-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-ready-early"
         }
       ]
     },
