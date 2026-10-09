@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "micros/bootstrap.h"
 #include "micros/endpoint.h"
 #include "micros/ipc.h"
 #include "micros/pm.h"
