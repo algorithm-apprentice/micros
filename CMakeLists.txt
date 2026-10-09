@@ -318,6 +318,11 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/pm_control_test.c
         tests/host/pm_test.c
     )
+    add_executable(
+        tty_test
+        servers/tty/tty_core.c
+        tests/host/tty_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -384,6 +389,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         pm_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -401,6 +412,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
+    target_compile_features(tty_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -523,6 +535,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         pm_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_test
         PRIVATE
             -Wall
             -Wextra
@@ -671,6 +693,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            tty_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -686,6 +719,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(NAME tty-core COMMAND tty_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -720,6 +754,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            tty_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -769,6 +804,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            tty_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
