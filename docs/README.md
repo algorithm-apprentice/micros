@@ -46,6 +46,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX VM bootstrap and handoff study](research/minix-vm-bootstrap-and-handoff.md)
   traces boot-memory import, VM's frame database, wired self-hosting,
   privileged mapping authority, boot-service adoption, and fatal VM faults.
+- [MINIX PM process-lifecycle study](research/minix-pm-process-lifecycle.md)
+  traces PM-owned process identity, creation coordination, exit teardown,
+  zombie retention, wait completion, reparenting, and rollback boundaries.
 
 ## Planning and verification
 

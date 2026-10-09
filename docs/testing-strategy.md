@@ -47,6 +47,39 @@ The full task and review loop is defined in
 | Stress and fuzz tests | Host and QEMU | Long sequences, malformed data, rare transitions | Scheduled or explicit |
 | Hardware tests | Physical target | Behavior not represented by QEMU | Post-MVP |
 
+### PM Step 10 evidence
+
+PM precedes the VM mapping and VFS executable paths in the development DAG.
+Its first implementation therefore splits evidence by authority boundary:
+
+- native unit and replayable model tests cover PM record generations,
+  monotonic PIDs, parent/child relationships, init reparenting, spawn stages,
+  reverse rollback including parent loss before activation, post-activation
+  orphan reparenting, exit, zombie retention, exact-child and any-child wait,
+  `NOHANG`, one-shot reply ownership, malformed transitions, and capacity
+  exhaustion;
+- native kernel-transition tests cover exact PM role and production tuple,
+  exact inert `APPLICATION` profile identity and policy, bootstrap-sealed
+  gating, retained output translation, hidden empty-process reservation,
+  stale abort rejection, byte-exact preservation for rejected operations,
+  zero live resources after successful abort, unchanged
+  endpoint/scheduler/ownership state, and exact one-step advancement or
+  terminal quarantine of the consumed process generation plus one-step
+  PM-control transaction advancement; and
+- one QEMU component test uses the real launcher, VM, PM, and a probe to prove
+  PM readiness after handoff, malformed and unmanaged-caller results, the
+  kernel-origin bootstrap-sealed event, a real PM-only reserve/abort sequence,
+  and deterministic success shutdown.
+
+The Step 10 target test must prove that the reserved process has no root,
+thread, endpoint, profile, grant, scheduler state, or process-owned frame. It
+must not create a fake runnable child or report a successful spawn.
+
+The later executable-path integration adds the first successful spawn, VFS and
+VM tokens, application-profile installation, instruction synchronization,
+activation, running exit teardown, and an end-to-end wait result. Those later
+tests extend rather than replace the Step 10 native lifecycle model.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:

@@ -75,6 +75,7 @@ user context, and restore the hart's idle trap stack.
 - [MINIX endpoint and blocking IPC study](docs/research/minix-endpoint-and-ipc.md)
 - [MINIX RS and SEF bootstrap study](docs/research/minix-rs-sef-bootstrap.md)
 - [MINIX VM bootstrap and handoff study](docs/research/minix-vm-bootstrap-and-handoff.md)
+- [MINIX PM process-lifecycle study](docs/research/minix-pm-process-lifecycle.md)
 - [Roadmap](docs/roadmap.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [AI-native development workflow](docs/development/ai-native-workflow.md)
