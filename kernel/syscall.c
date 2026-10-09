@@ -56,6 +56,7 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
     struct micros_syscall_arguments arguments;
     struct micros_bootstrap_control_request bootstrap_request;
     struct micros_vm_handoff_request vm_handoff_request;
+    struct micros_vm_tty_mapping_request vm_tty_mapping_request;
     struct micros_pm_control_request pm_control_request;
     struct micros_tty_control_request tty_control_request;
     const struct micros_thread *thread;
@@ -80,16 +81,30 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
             (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
         return MICROS_SYSCALL_RETURN_NORMAL;
     }
-    if (
-        arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF
-        && micros_vm_handoff_decode(
-            &arguments,
-            &vm_handoff_request
-        ) != MICROS_SYSCALL_ABI_OK
-    ) {
-        frame->a0 =
-            (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
-        return MICROS_SYSCALL_RETURN_NORMAL;
+    if (arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF) {
+        uint32_t command;
+
+        if (
+            micros_vm_handoff_decode_command(
+                &arguments,
+                &command
+            ) != MICROS_SYSCALL_ABI_OK
+            || (
+                command == MICROS_VM_HANDOFF_READY
+                    ? micros_vm_handoff_decode(
+                        &arguments,
+                        &vm_handoff_request
+                    ) != MICROS_SYSCALL_ABI_OK
+                    : micros_vm_handoff_decode_tty_mapping(
+                        &arguments,
+                        &vm_tty_mapping_request
+                    ) != MICROS_SYSCALL_ABI_OK
+            )
+        ) {
+            frame->a0 =
+                (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+            return MICROS_SYSCALL_RETURN_NORMAL;
+        }
     }
     if (
         arguments.a7 == MICROS_SYSCALL_ABI_PM_CONTROL

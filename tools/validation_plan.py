@@ -31,6 +31,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-tty",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -96,6 +97,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-tty",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -550,6 +552,21 @@ GATE_INPUTS["test-qemu-pm-service"] = GATE_INPUTS[
     "tests/qemu/pm_service_protocol.h",
     "tests/qemu/pm_service_report.S",
     "tools/generate_pm_service_fixture.py",
+)
+GATE_INPUTS["test-qemu-tty"] = GATE_INPUTS[
+    "test-qemu-pm-service"
+] + TTY_CONTROL_INPUTS + (
+    "include/micros/tty.h",
+    "kernel/tty_service_test.c",
+    "kernel/tty_service_test.h",
+    "kernel/tty_service_test_fixture.h",
+    "servers/tty/",
+    "tests/host/test_generate_tty_service_fixture.py",
+    "tests/qemu/tty_handoff_protocol.h",
+    "tests/qemu/tty_service_claim_wait.S",
+    "tests/qemu/tty_service_report.S",
+    "tests/qemu/tty_service_vfs.c",
+    "tools/generate_tty_service_fixture.py",
 )
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"

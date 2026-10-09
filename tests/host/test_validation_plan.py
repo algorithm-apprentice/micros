@@ -141,6 +141,29 @@ class ValidationPlanTests(unittest.TestCase):
                     "build-tty-service-image",
                 )
 
+    def test_tty_production_and_fixture_paths_own_qemu_gate(self):
+        for path in (
+            *validation_plan.TTY_CONTROL_INPUTS,
+            "include/micros/tty.h",
+            "kernel/tty_service_test.c",
+            "kernel/tty_service_test.h",
+            "kernel/tty_service_test_fixture.h",
+            "servers/tty/tty_service.c",
+            "servers/tty/tty_service_core.c",
+            "servers/tty/tty_uart.c",
+            "tests/host/test_generate_tty_service_fixture.py",
+            "tests/qemu/tty_handoff_protocol.h",
+            "tests/qemu/tty_service_claim_wait.S",
+            "tests/qemu/tty_service_report.S",
+            "tests/qemu/tty_service_vfs.c",
+            "tools/generate_tty_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-tty",
+                )
+
     def test_tty_trap_paths_own_scheduler_gate(self):
         for path in validation_plan.TTY_TRAP_INPUTS:
             with self.subTest(path=path):

@@ -28,6 +28,9 @@
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
 #endif
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
 #endif
@@ -798,6 +801,14 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             && cause_code != MICROS_EXCEPTION_USER_ECALL
         ) {
             micros_pm_service_test_handle_trap(hart, frame);
+        }
+#endif
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+        if (
+            !user_timer
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            micros_tty_service_test_handle_trap(hart, frame);
         }
 #endif
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST

@@ -889,8 +889,22 @@ cmake --workflow --preset build-tty-service-image
 The workflow cross-compiles the portable request/completion state machine,
 fixed NS16550A backend, operation-14 wrappers, and production service loop. The
 post-link checker enforces the repository's freestanding service-ELF contract.
-The dependency-closed launcher/VM/PM/TTY/VFS QEMU scenario is a separate later
-gate.
+
+## TTY service acceptance
+
+Build and run the dependency-closed launcher/VM/PM/TTY/VFS gate with:
+
+```bash
+cmake --workflow --preset test-qemu-tty
+```
+
+The host harness keeps ordinary QEMU workflows disconnected from stdin. For
+this gate only, it waits for the exact complete `MICROS_TTY_INPUT_READY` line
+and writes the configured serial bytes once. The guest proves the one-shot
+UART mapping, console commit before readiness, a retained source-10 claim,
+canonical erase and CR-to-LF processing, checked read/write grants,
+interrupt-driven output, physical UART drain, and matching claim/completion
+counts before clean SBI shutdown. The absolute host timeout is 60 seconds.
 
 ## PM service acceptance
 

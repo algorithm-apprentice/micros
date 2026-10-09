@@ -108,7 +108,7 @@ input-ready line. It uses no sleep, preserves the guest-owned readiness
 deadlines and host absolute timeout, and leaves every other QEMU workflow's
 stdin disconnected.
 
-The implementation must expose one stable `test-qemu-tty` workflow. The final
+The implementation exposes one stable `test-qemu-tty` workflow. The final
 marker is emitted by TTY after the probe's grant-backed write, and isolated
 test shutdown occurs only after the UART has physically drained and the
 kernel has validated matching source-10 claim/completion evidence.
@@ -145,6 +145,7 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
 `test-qemu-pm-service`,
+`test-qemu-tty`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -180,6 +181,7 @@ cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
+cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -860,6 +862,27 @@ advanced and stale. Only the exact marker is accepted:
 
 ```text
 MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
+```
+
+The TTY Step 11 workflow is implemented:
+
+```text
+test-qemu-tty
+```
+
+It links the production launcher, VM, PM, and TTY service with one exact VFS
+test peer. VM installs only the manifest-bound UART leaf before release, TTY
+commits ownership before readiness, and a deliberately pending transmit
+interrupt proves that readiness retains the claimed source until TTY's exact
+completion. The host sends `micros-ttyx<DEL>-input<CR>` only after the complete
+input-ready line. The VFS peer receives `micros-tty-input<LF>` through a
+write-direction grant and submits the final marker through a read-direction
+grant. The kernel requires matching nonzero source-10 claim/completion counts,
+one retained pre-ready claim, no live grants, a physically drained UART, and
+clean SBI shutdown. Only the exact marker is accepted:
+
+```text
+MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked
 ```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure

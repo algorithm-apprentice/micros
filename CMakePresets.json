@@ -198,6 +198,15 @@
       }
     },
     {
+      "name": "riscv64-tty-service-test",
+      "displayName": "RISC-V 64 TTY service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-tty-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_TTY_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
@@ -488,6 +497,13 @@
       "configurePreset": "riscv64-pm-service-test",
       "targets": [
         "test-qemu-pm-service"
+      ]
+    },
+    {
+      "name": "test-qemu-tty",
+      "configurePreset": "riscv64-tty-service-test",
+      "targets": [
+        "test-qemu-tty"
       ]
     },
     {
@@ -923,6 +939,20 @@
         {
           "type": "build",
           "name": "test-qemu-pm-service"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-tty",
+      "displayName": "Build and run the TTY service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-tty-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-tty"
         }
       ]
     },

@@ -14,6 +14,9 @@
 #include "kernel/plic.h"
 #include "kernel/scheduler_core_internal.h"
 #include "kernel/tty_handoff_runtime.h"
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
+#endif
 #include "kernel/user_address_space_internal.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
@@ -994,6 +997,11 @@ static enum micros_syscall_return handle_accept_ready(
         micros_tty_handoff_runtime_commit_ready_prevalidated(
             &tty_ready
         );
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+        micros_tty_service_test_record_ready(
+            tty_ready.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
+        );
+#endif
     }
     if (
         micros_thread_resolve(

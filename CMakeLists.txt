@@ -93,6 +93,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_TTY_SERVICE_TEST
+    "Build the real TTY service integration image"
+    OFF
+)
+option(
     MICROS_BUILD_TTY_SERVICE_IMAGE
     "Build the standalone real TTY service ELF"
     OFF
@@ -177,6 +182,7 @@ set(
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
     MICROS_BUILD_PM_SERVICE_TEST
+    MICROS_BUILD_TTY_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_IMAGE
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
@@ -1266,6 +1272,7 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
     OR MICROS_BUILD_PM_SERVICE_TEST
+    OR MICROS_BUILD_TTY_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_IMAGE
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
@@ -1344,7 +1351,10 @@ if(
         )
     endfunction()
 
-    if(MICROS_BUILD_TTY_SERVICE_IMAGE)
+    if(
+        MICROS_BUILD_TTY_SERVICE_IMAGE
+        OR MICROS_BUILD_TTY_SERVICE_TEST
+    )
         micros_add_bootstrap_user(
             micros_tty_service
             micros-tty-service
@@ -1354,6 +1364,19 @@ if(
             servers/tty/tty_service_core.c
             servers/tty/tty_uart.c
         )
+        if(MICROS_BUILD_TTY_SERVICE_TEST)
+            target_sources(
+                micros_tty_service
+                PRIVATE
+                    tests/qemu/tty_service_claim_wait.S
+            )
+            target_compile_definitions(
+                micros_tty_service
+                PRIVATE
+                    MICROS_BUILD_TTY_SERVICE_TEST=1
+                    MICROS_TTY_CONFIGURED_VFS_SERVICE_ID=5
+            )
+        endif()
     endif()
 
     micros_add_bootstrap_user(
@@ -1365,6 +1388,7 @@ if(
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
         OR MICROS_BUILD_PM_SERVICE_TEST
+        OR MICROS_BUILD_TTY_SERVICE_TEST
         OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -1375,7 +1399,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
-        if(MICROS_BUILD_PM_SERVICE_TEST)
+        if(MICROS_BUILD_TTY_SERVICE_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_TTY_HANDOFF_TEST=1
+            )
+        elseif(MICROS_BUILD_PM_SERVICE_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -1452,6 +1482,58 @@ if(
             )
             set_source_files_properties(
                 "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        elseif(MICROS_BUILD_TTY_SERVICE_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                servers/pm/pm_core.c
+                servers/pm/pm_service.c
+            )
+            micros_add_bootstrap_user(
+                micros_tty_service_vfs
+                micros-tty-service-vfs
+                tests/qemu/tty_service_report.S
+                tests/qemu/tty_service_vfs.c
+            )
+            set(
+                MICROS_TTY_SERVICE_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/tty_service_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf
+                    "$<TARGET_FILE:micros_pm_service>"
+                    --tty-elf
+                    "$<TARGET_FILE:micros_tty_service>"
+                    --vfs-elf
+                    "$<TARGET_FILE:micros_tty_service_vfs>"
+                    --output
+                    "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_tty_service
+                    micros_tty_service_vfs
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
                 PROPERTIES GENERATED TRUE
             )
         else()
@@ -1737,6 +1819,28 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
         PRIVATE
             "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
             kernel/pm_service_test.c
+    )
+endif()
+
+if(MICROS_BUILD_TTY_SERVICE_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_tty_service
+        micros_tty_service_vfs
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_TTY_SERVICE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+            kernel/tty_service_test.c
     )
 endif()
 
@@ -2155,6 +2259,44 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             --require-objects-ready
             --timeout
             45
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_TTY_SERVICE_TEST)
+    add_custom_target(
+        test-qemu-tty
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked"
+            --serial-input-trigger
+            "MICROS_TTY_INPUT_READY"
+            --serial-input-hex
+            "6d6963726f732d747479787f2d696e7075740d"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            60
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

@@ -10,6 +10,9 @@
 #include "kernel/plic.h"
 #include "kernel/tty_fault.h"
 #include "kernel/tty_handoff_runtime.h"
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
+#endif
 #include "kernel/user_address_space_internal.h"
 #include "micros/bootstrap.h"
 #include "micros/ipc_core.h"
@@ -113,6 +116,9 @@ enum micros_tty_interrupt_result micros_tty_interrupt_dispatch(
     micros_tty_handoff_runtime_commit_claim_prevalidated(
         &claimed_handoff
     );
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+    micros_tty_service_test_record_claim(hart, frame);
+#endif
     if (
         micros_ipc_prepare_kernel_notification(
             registry,

@@ -398,6 +398,133 @@ static bool handle_call(
     return notify_vfs(notification);
 }
 
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+struct tty_service_deferred_write {
+    const struct micros_tty_uart_bus *source;
+    bool active;
+    bool invalid;
+    uint8_t offset;
+    uint8_t value;
+};
+
+void micros_tty_service_test_enable_and_wait(
+    uintptr_t base,
+    uint8_t offset,
+    uint8_t value
+);
+
+static uint8_t read_deferred_uart(
+    void *context,
+    uint8_t offset
+)
+{
+    struct tty_service_deferred_write *write = context;
+
+    if (write == NULL || write->source == NULL) {
+        if (write != NULL) {
+            write->invalid = true;
+        }
+        return 0;
+    }
+    return write->source->read(
+        write->source->context,
+        offset
+    );
+}
+
+static void defer_uart_write(
+    void *context,
+    uint8_t offset,
+    uint8_t value
+)
+{
+    struct tty_service_deferred_write *write = context;
+
+    if (write == NULL || write->active) {
+        if (write != NULL) {
+            write->invalid = true;
+        }
+        return;
+    }
+    write->active = true;
+    write->offset = offset;
+    write->value = value;
+}
+
+static bool prepare_ready_interrupt_race(
+    const struct micros_tty_uart_bus *bus
+)
+{
+    struct tty_service_deferred_write write = {
+        .source = bus,
+    };
+    struct micros_tty_uart_bus deferred_bus = {
+        .read = read_deferred_uart,
+        .write = defer_uart_write,
+        .context = &write,
+    };
+    struct micros_tty_effects effects;
+    struct micros_tty_effects ignored;
+    uint64_t staged_count;
+
+    if (
+        micros_tty_receive_byte(
+            &tty_service.terminal,
+            (uint8_t)'x',
+            &effects
+        ) != MICROS_TTY_CORE_OK
+        || micros_tty_receive_byte(
+            &tty_service.terminal,
+            UINT8_C(0x7f),
+            &ignored
+        ) != MICROS_TTY_CORE_OK
+        || micros_tty_receive_byte(
+            &tty_service.terminal,
+            (uint8_t)'\r',
+            &ignored
+        ) != MICROS_TTY_CORE_OK
+        || micros_tty_read_stage(
+            &tty_service.terminal,
+            UINT64_C(1),
+            &staged_count
+        ) != MICROS_TTY_CORE_OK
+        || staged_count != 1
+        || tty_service.terminal.read_staging[0] != (uint8_t)'\n'
+        || micros_tty_read_commit(&tty_service.terminal)
+            != MICROS_TTY_CORE_OK
+    ) {
+        return false;
+    }
+    if (
+        micros_tty_uart_apply_effects(
+            &tty_uart,
+            &deferred_bus,
+            &tty_service.terminal,
+            &effects
+        ) != MICROS_TTY_UART_OK
+        || !write.active
+        || write.invalid
+        || micros_tty_service_validate(&tty_service)
+            != MICROS_TTY_SERVICE_OK
+    ) {
+        return false;
+    }
+    micros_tty_service_test_enable_and_wait(
+        (uintptr_t)bus->context,
+        write.offset,
+        write.value
+    );
+    return (
+        micros_tty_uart_validate(
+            &tty_uart,
+            &tty_service.terminal
+        ) == MICROS_TTY_UART_OK
+        && micros_tty_service_validate(&tty_service)
+            == MICROS_TTY_SERVICE_OK
+    );
+}
+#endif
+
 void micros_service_main(void)
 {
     micros_endpoint_t vfs_endpoint;
@@ -430,6 +557,9 @@ void micros_service_main(void)
         ) != MICROS_SYSCALL_ABI_OK
         || micros_tty_service_commit_ownership(&tty_service)
             != MICROS_TTY_SERVICE_OK
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+        || !prepare_ready_interrupt_race(&bus)
+#endif
         || !send_ready()
     ) {
         __builtin_trap();

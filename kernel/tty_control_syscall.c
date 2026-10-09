@@ -14,6 +14,9 @@
 #include "kernel/tty_control_syscall_core.h"
 #include "kernel/tty_fault.h"
 #include "kernel/tty_handoff_runtime.h"
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
+#endif
 #include "kernel/user_address_space_internal.h"
 #include "micros/ipc_runtime.h"
 #include "micros/panic.h"
@@ -251,6 +254,9 @@ static enum micros_syscall_return handle_complete(
     micros_tty_handoff_runtime_commit_complete_prevalidated(
         &handoff
     );
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+    micros_tty_service_test_record_completion();
+#endif
     if (
         micros_tty_handoff_runtime_validate(
             bootstrap,
