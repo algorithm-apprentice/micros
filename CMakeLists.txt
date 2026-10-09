@@ -328,11 +328,14 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         tty_test
         kernel/plic_core.c
+        kernel/tty_control_core.c
+        kernel/tty_control_syscall_core.c
         kernel/tty_handoff_core.c
         kernel/tty_handoff_runtime.c
         kernel/uart_console_core.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
+        tests/host/tty_control_test.c
         tests/host/tty_handoff_test.c
         tests/host/tty_test.c
     )
@@ -343,8 +346,56 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/vm_handoff_syscall.c
         tests/host/vm_handoff_syscall_test.c
     )
+    add_executable(
+        tty_interrupt_test
+        kernel/tty_handoff_core.c
+        kernel/tty_interrupt.c
+        tests/host/tty_interrupt_test.c
+    )
+    add_executable(
+        tty_control_syscall_test
+        kernel/tty_control_core.c
+        kernel/tty_control_syscall.c
+        kernel/tty_handoff_core.c
+        tests/host/tty_control_syscall_test.c
+    )
+    add_executable(
+        tty_fault_test
+        kernel/tty_fault.c
+        tests/host/tty_fault_test.c
+    )
+    add_executable(
+        trap_route_test
+        kernel/trap_route_core.c
+        tests/host/trap_route_test.c
+    )
     target_include_directories(
         vm_handoff_syscall_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_interrupt_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        trap_route_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_control_syscall_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/host/stubs"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_fault_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -354,8 +405,52 @@ if(MICROS_BUILD_HOST_TESTS)
         PRIVATE
             c_std_17
     )
+    target_compile_features(tty_interrupt_test PRIVATE c_std_17)
+    target_compile_features(trap_route_test PRIVATE c_std_17)
+    target_compile_features(tty_control_syscall_test PRIVATE c_std_17)
+    target_compile_features(tty_fault_test PRIVATE c_std_17)
     target_compile_options(
         vm_handoff_syscall_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_interrupt_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        trap_route_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_control_syscall_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_fault_test
         PRIVATE
             -Wall
             -Wextra
@@ -756,6 +851,50 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            tty_interrupt_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_interrupt_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            trap_route_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            trap_route_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_control_syscall_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_control_syscall_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_fault_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_fault_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -776,6 +915,13 @@ if(MICROS_BUILD_HOST_TESTS)
         NAME vm-handoff-syscall
         COMMAND vm_handoff_syscall_test
     )
+    add_test(NAME tty-interrupt COMMAND tty_interrupt_test)
+    add_test(NAME trap-route COMMAND trap_route_test)
+    add_test(
+        NAME tty-control-syscall
+        COMMAND tty_control_syscall_test
+    )
+    add_test(NAME tty-owner-fault COMMAND tty_fault_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -812,6 +958,10 @@ if(MICROS_BUILD_HOST_TESTS)
             pm_test
             tty_test
             vm_handoff_syscall_test
+            tty_interrupt_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -863,6 +1013,10 @@ if(MICROS_BUILD_HOST_TESTS)
             pm_test
             tty_test
             vm_handoff_syscall_test
+            tty_interrupt_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -1306,8 +1460,14 @@ add_executable(
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
+    kernel/trap_route_core.c
+    kernel/tty_control_core.c
+    kernel/tty_control_syscall.c
+    kernel/tty_control_syscall_core.c
+    kernel/tty_fault.c
     kernel/tty_handoff_core.c
     kernel/tty_handoff_runtime.c
+    kernel/tty_interrupt.c
     kernel/uart_console_core.c
     kernel/user_address_space.c
     kernel/user_address_space_core.c
@@ -2404,6 +2564,8 @@ if(MICROS_BUILD_SCHEDULER_TEST)
             "MICROS_IPC_RETURN completions=shared paths=start,user,captured,idle buffers=bounded"
             --marker
             "MICROS_SCHEDULER_TEST_PASS queues=minix-priority current=reachable accounting=separate switches=alternating idle=resumed registers=preserved"
+            --marker
+            "MICROS_TTY_TRAP_TEST_PASS user=cause9-scheduled supervisor=cause9-direct idle=cause9-selected"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready
@@ -2773,6 +2935,8 @@ if(MICROS_BUILD_UART_CONSOLE_TEST)
             "MICROS_UART_CONSOLE_TEST begin=early"
             --marker
             "MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized"
+            --marker
+            "MICROS_TTY_IRQ_TEST_PASS route=state-before-enable claim=source10 retained=in-service completion=explicit"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

@@ -7,6 +7,7 @@
 #include "arch/riscv64/platform.h"
 
 static struct micros_plic_controller plic_controller;
+static bool plic_initialized;
 
 static volatile uint32_t *plic_register(uintptr_t address)
 {
@@ -37,7 +38,8 @@ bool micros_plic_initialize(void)
         return false;
     }
     riscv_mmio_fence();
-    return micros_plic_validate(MICROS_PLIC_DISABLED);
+    plic_initialized = micros_plic_validate(MICROS_PLIC_DISABLED);
+    return plic_initialized;
 }
 
 bool micros_plic_prepare_tty(void)
@@ -65,6 +67,42 @@ bool micros_plic_enable_tty(void)
     return micros_plic_validate(MICROS_PLIC_ENABLED);
 }
 
+bool micros_plic_prepare_tty_enable(
+    struct micros_plic_tty_enable_plan *plan
+)
+{
+    return (
+        plic_initialized
+        && micros_plic_controller_prepare_tty_enable(
+            &plic_controller,
+            plan
+        ) == MICROS_PLIC_OK
+    );
+}
+
+void micros_plic_commit_tty_prepare_prevalidated(
+    const struct micros_plic_tty_enable_plan *plan
+)
+{
+    micros_plic_controller_commit_tty_prepare_prevalidated(
+        &plic_controller,
+        plan
+    );
+    riscv_mmio_fence();
+}
+
+void micros_plic_commit_tty_enable_prevalidated(
+    struct micros_plic_tty_enable_plan *plan
+)
+{
+    riscv_mmio_fence();
+    micros_plic_controller_commit_tty_enable_prevalidated(
+        &plic_controller,
+        plan
+    );
+    riscv_mmio_fence();
+}
+
 bool micros_plic_disable_tty(void)
 {
     if (
@@ -75,6 +113,11 @@ bool micros_plic_disable_tty(void)
     }
     riscv_mmio_fence();
     return micros_plic_validate(MICROS_PLIC_DISABLED);
+}
+
+bool micros_plic_panic_disable(void)
+{
+    return !plic_initialized || micros_plic_disable_tty();
 }
 
 bool micros_plic_claim(uint32_t *source)

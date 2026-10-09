@@ -1,5 +1,6 @@
 #include "kernel/tty_handoff_core.h"
 #include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty_control_syscall_core.h"
 #include "kernel/uart_console_core.h"
 
 #include <stdbool.h>
@@ -494,12 +495,24 @@ static bool test_runtime_lifecycle_validation(void)
         &bootstrap.transitions.entries[0];
     struct micros_endpoint_registry registry = {0};
     struct micros_kernel_objects objects = {0};
+    struct micros_syscall_context context = {
+        .objects = &objects,
+        .current = thread,
+        .process = process,
+    };
     struct micros_tty_handoff mapped;
     struct micros_tty_handoff begin;
     struct micros_tty_handoff released;
+    struct micros_tty_handoff committed;
+    struct micros_tty_handoff claimed;
+    struct micros_tty_handoff completed;
     struct micros_tty_handoff ready;
     struct micros_tty_device_authority authority;
     struct micros_tty_device_authority authority_sentinel;
+    struct micros_tty_handoff_runtime_state unexpected_state = {
+        .process = {4, 7},
+        .thread = {6, 9},
+    };
     struct micros_tty_handoff_runtime_state *runtime;
 
     *binding = (struct micros_bootstrap_binding){
@@ -534,11 +547,13 @@ static bool test_runtime_lifecycle_validation(void)
     runtime_process_handle = process;
     runtime_thread_handle = thread;
     runtime_process = (struct micros_process){
+        .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
         .generation = process.generation,
         .address_space_root = root,
         .primary_endpoint = endpoint,
     };
     runtime_thread = (struct micros_thread){
+        .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
         .generation = thread.generation,
         .owner = process,
         .context_attached = true,
@@ -549,6 +564,36 @@ static bool test_runtime_lifecycle_validation(void)
         .owner = process,
         .value = endpoint,
     };
+
+    bootstrap.plan.console_service_id = 0;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_resolve(
+            NULL,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_TTY_CONTROL_AUTHORITY_UNAUTHORIZED
+    );
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_resolve(
+            &unexpected_state,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
+    );
+    bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_resolve(
+            NULL,
+            &bootstrap,
+            &registry,
+            &objects,
+            &context
+        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
+    );
 
     EXPECT_TRUE(
         micros_tty_handoff_runtime_reset()
@@ -679,9 +724,57 @@ static bool test_runtime_lifecycle_validation(void)
             &registry,
             &objects
         ) == MICROS_TTY_HANDOFF_OK
-        && micros_tty_handoff_commit(&runtime->handoff)
+        && micros_tty_handoff_runtime_prepare_commit(&committed)
             == MICROS_TTY_HANDOFF_OK
-        && micros_tty_handoff_runtime_role_ready(
+        && runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_STARTING
+        && committed.console_phase == MICROS_TTY_CONSOLE_OWNED
+        && committed.route_phase == MICROS_TTY_ROUTE_IDLE
+    );
+    micros_tty_handoff_runtime_commit_console_prevalidated(
+        &committed
+    );
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_prepare_claim(
+            9,
+            &claimed
+        ) == MICROS_TTY_HANDOFF_ERROR_ARGUMENT
+        && runtime->handoff.route_phase == MICROS_TTY_ROUTE_IDLE
+        && micros_tty_handoff_runtime_prepare_claim(
+            MICROS_TTY_UART_IRQ_SOURCE,
+            &claimed
+        ) == MICROS_TTY_HANDOFF_OK
+        && runtime->handoff.route_phase == MICROS_TTY_ROUTE_IDLE
+        && claimed.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
+        && claimed.claimed_source == MICROS_TTY_UART_IRQ_SOURCE
+    );
+    micros_tty_handoff_runtime_commit_claim_prevalidated(&claimed);
+    EXPECT_TRUE(
+        runtime->handoff.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
+        && micros_tty_handoff_runtime_prepare_claim(
+            MICROS_TTY_UART_IRQ_SOURCE,
+            &claimed
+        ) == MICROS_TTY_HANDOFF_ERROR_STATE
+        && micros_tty_handoff_runtime_prepare_complete(
+            9,
+            &completed
+        ) == MICROS_TTY_HANDOFF_ERROR_ARGUMENT
+        && runtime->handoff.route_phase
+            == MICROS_TTY_ROUTE_IN_SERVICE
+        && micros_tty_handoff_runtime_prepare_complete(
+            MICROS_TTY_UART_IRQ_SOURCE,
+            &completed
+        ) == MICROS_TTY_HANDOFF_OK
+        && runtime->handoff.route_phase
+            == MICROS_TTY_ROUTE_IN_SERVICE
+        && completed.route_phase == MICROS_TTY_ROUTE_IDLE
+        && completed.claimed_source == 0
+    );
+    micros_tty_handoff_runtime_commit_complete_prevalidated(
+        &completed
+    );
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_role_ready(
             &registry,
             &objects
         )
@@ -720,6 +813,18 @@ static bool test_runtime_lifecycle_validation(void)
             &objects,
             &authority
         ) == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+    );
+    runtime_endpoint.state = MICROS_ENDPOINT_STATE_ACTIVE;
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_panic()
+            == MICROS_TTY_HANDOFF_OK
+        && runtime->handoff.console_phase
+            == MICROS_TTY_CONSOLE_PANIC
+        && runtime->handoff.route_phase == MICROS_TTY_ROUTE_PANIC
+        && runtime->handoff.claimed_source == 0
+        && !runtime->handoff.deadline_armed
+        && micros_tty_handoff_runtime_panic()
+            == MICROS_TTY_HANDOFF_OK
     );
     return true;
 }

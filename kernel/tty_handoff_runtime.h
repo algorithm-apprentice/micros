@@ -77,6 +77,35 @@ void micros_tty_handoff_runtime_commit_release_prevalidated(
 );
 
 enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_commit(
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_console_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_claim(
+    uint32_t source,
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_claim_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_prepare_complete(
+    uint32_t source,
+    struct micros_tty_handoff *candidate
+);
+
+void micros_tty_handoff_runtime_commit_complete_prevalidated(
+    const struct micros_tty_handoff *candidate
+);
+
+enum micros_tty_handoff_error
 micros_tty_handoff_runtime_prepare_ready(
     uint64_t now,
     struct micros_tty_handoff *candidate
@@ -92,6 +121,8 @@ bool micros_tty_handoff_runtime_role_ready(
 );
 
 bool micros_tty_handoff_runtime_deadline_expired(uint64_t now);
+
+enum micros_tty_handoff_error micros_tty_handoff_runtime_panic(void);
 
 enum micros_tty_device_authority_status
 micros_tty_handoff_runtime_device_authority(

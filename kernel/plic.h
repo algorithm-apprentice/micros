@@ -9,7 +9,17 @@
 bool micros_plic_initialize(void);
 bool micros_plic_prepare_tty(void);
 bool micros_plic_enable_tty(void);
+bool micros_plic_prepare_tty_enable(
+    struct micros_plic_tty_enable_plan *plan
+);
+void micros_plic_commit_tty_prepare_prevalidated(
+    const struct micros_plic_tty_enable_plan *plan
+);
+void micros_plic_commit_tty_enable_prevalidated(
+    struct micros_plic_tty_enable_plan *plan
+);
 bool micros_plic_disable_tty(void);
+bool micros_plic_panic_disable(void);
 bool micros_plic_claim(uint32_t *source);
 bool micros_plic_complete(uint32_t source);
 bool micros_plic_validate(enum micros_plic_phase expected_phase);

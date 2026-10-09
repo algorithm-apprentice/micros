@@ -32,6 +32,10 @@ struct micros_plic_controller {
     struct micros_plic_registers registers;
 };
 
+struct micros_plic_tty_enable_plan {
+    uint64_t validation_magic;
+};
+
 enum micros_plic_error micros_plic_controller_initialize(
     struct micros_plic_controller *controller,
     const struct micros_plic_registers *registers
@@ -41,6 +45,18 @@ enum micros_plic_error micros_plic_controller_validate(
 );
 enum micros_plic_error micros_plic_controller_prepare_tty(
     struct micros_plic_controller *controller
+);
+enum micros_plic_error micros_plic_controller_prepare_tty_enable(
+    const struct micros_plic_controller *controller,
+    struct micros_plic_tty_enable_plan *plan
+);
+void micros_plic_controller_commit_tty_prepare_prevalidated(
+    struct micros_plic_controller *controller,
+    const struct micros_plic_tty_enable_plan *plan
+);
+void micros_plic_controller_commit_tty_enable_prevalidated(
+    struct micros_plic_controller *controller,
+    struct micros_plic_tty_enable_plan *plan
 );
 enum micros_plic_error micros_plic_controller_enable_tty(
     struct micros_plic_controller *controller

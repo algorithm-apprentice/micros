@@ -93,9 +93,10 @@ its evidence is split at the real authority boundaries:
 - native kernel-transition tests cover the exact TTY tuple and profiles,
   console begin, one-shot operation-12 mapping, the non-managed device-leaf
   exception, managed-memory rejection, operation-14 authority, PLIC source-10
-  claim/in-service/complete state, `SEIE` independence, external-interrupt
-  return, begin-time deadline coverage, failure preservation, and DLAB-safe
-  panic seizure; and
+  claim/in-service/complete state, production syscall commit ordering and
+  failure preservation, cause-9 origin classification, `SEIE` independence,
+  begin-time deadline coverage, DLAB-safe panic seizure, and sealed owner-fault
+  diagnostics that retain the pre-seizure route/source snapshot; and
 - one QEMU component test uses the real launcher, VM, PM, and TTY plus an exact
   test VFS peer. It proves begin before mapping, mapping before release, commit
   before ready, one unextended guest deadline, marker-triggered host input,
@@ -597,7 +598,16 @@ wake; deferred message copy through a validated user buffer; stable success and
 dead-endpoint `a0` results; retained prevalidated physical chunks with no
 post-timer address-space revalidation; rejection of malformed residual
 non-pending state; timer-before-completion ordering; and exact completion
-clearing.
+clearing. It additionally raises real source-10 UART interrupts while U-mode
+and S-mode are active, proving that user-origin cause 9 captures and returns
+through ordinary scheduler selection while supervisor-origin cause 9 returns
+directly. A third source-10 interrupt from the idle enable window proves
+`IDLE`-to-`KERNEL` accounting and immediate idle-wake selection. The exact
+additional marker is:
+
+```text
+MICROS_TTY_TRAP_TEST_PASS user=cause9-scheduled supervisor=cause9-direct idle=cause9-selected
+```
 The two isolated invalid-context gates require a U-origin timer panic with
 exact diagnostics proving the outgoing or selected context failed before any
 return-plan mutation.
@@ -712,7 +722,8 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
   release, versioned readiness acknowledgment, internal timeout failure, and
   final authority sealing.
 - UART transmitter drain, interrupt-disable quiescence, ordinary ownership
-  transfer away from the kernel, and terminal panic seizure.
+  transfer away from the kernel, state-before-delivery PLIC enable, retained
+  source-10 claim ownership, explicit completion, and terminal panic seizure.
 
 Most component tests may run in one test kernel to avoid repeated QEMU startup.
 Tests expected to panic or corrupt their own address space use isolated images.
@@ -726,12 +737,18 @@ cmake --workflow --preset test-qemu-uart-console
 It enables the NS16550A interrupt-enable register, executes the production
 console-begin quiesce and ownership transition, proves `IER = 0`, and then
 simulates TTY-side interrupt programming while ownership remains with TTY. It
+publishes the owned/idle route before enabling PLIC source 10 and `sie.SEIE`,
+checks timer and global interrupt state are preserved, triggers a real UART
+THRE interrupt, retains the PLIC claim while the route is in service, and
+requires an explicit completion write before publishing the idle route. It
 finally seizes the terminal through the production panic path. The panic check
-proves supervisor-external delivery is disabled and the fixed 8N1 divisor is
-restored before reporting success. It accepts only the exact marker:
+proves supervisor-external delivery and PLIC source 10 are disabled, the
+runtime console and route are both `PANIC`, and the fixed 8N1 divisor is
+restored before reporting success. It accepts only the exact markers:
 
 ```text
 MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized
+MICROS_TTY_IRQ_TEST_PASS route=state-before-enable claim=source10 retained=in-service completion=explicit
 ```
 
 ## Integration tests

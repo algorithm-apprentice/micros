@@ -909,14 +909,14 @@ bool micros_scheduler_test_rejects_malformed_completion(
 }
 #endif
 
-enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
+enum micros_scheduler_error
+micros_scheduler_enter_supervisor_interrupt(
     struct micros_hart *hart
 )
 {
     struct micros_kernel_objects *objects = authoritative_objects();
     struct micros_hart_handle hart_handle =
         micros_kernel_object_runtime_boot_hart_handle();
-    enum micros_timer_interrupt_result timer_result;
     enum micros_kernel_object_error error;
 
     if (!scheduler_initialized || objects == NULL || hart == NULL) {
@@ -939,6 +939,21 @@ enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
             != MICROS_SCHEDULER_ACCOUNTING_KERNEL
     ) {
         return MICROS_SCHEDULER_ERROR_INVARIANT;
+    }
+    return MICROS_SCHEDULER_OK;
+}
+
+enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
+    struct micros_hart *hart
+)
+{
+    enum micros_timer_interrupt_result timer_result;
+    enum micros_scheduler_error scheduler_error;
+
+    scheduler_error =
+        micros_scheduler_enter_supervisor_interrupt(hart);
+    if (scheduler_error != MICROS_SCHEDULER_OK) {
+        return scheduler_error;
     }
     timer_result = micros_timer_handle_interrupt(hart);
     if (

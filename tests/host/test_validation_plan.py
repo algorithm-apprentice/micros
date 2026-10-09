@@ -119,11 +119,20 @@ class ValidationPlanTests(unittest.TestCase):
             "kernel/uart_console_core.h",
             "kernel/uart_console_test.c",
             "kernel/uart_console_test.h",
+            *validation_plan.TTY_CONTROL_INPUTS,
         ):
             with self.subTest(path=path):
                 self.assert_workflow_selected(
                     path,
                     "test-qemu-uart-console",
+                )
+
+    def test_tty_trap_paths_own_scheduler_gate(self):
+        for path in validation_plan.TTY_TRAP_INPUTS:
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-scheduler",
                 )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):

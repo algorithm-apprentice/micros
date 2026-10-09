@@ -7,6 +7,8 @@
 
 struct micros_trap_frame;
 
+void micros_panic_seize(void);
+
 _Noreturn void micros_panic_entry(
     uintptr_t hart_id,
     const char *reason,

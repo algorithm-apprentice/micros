@@ -7,6 +7,7 @@
 
 bool micros_tty_handoff_test_run(void);
 bool micros_plic_test_run(void);
+bool micros_tty_control_test_run(void);
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -568,6 +569,7 @@ int main(void)
     if (
         !micros_plic_test_run()
         || !micros_tty_handoff_test_run()
+        || !micros_tty_control_test_run()
         || !test_protocol_contract()
         || !test_result_contract()
         || !test_canonical_input_and_staged_read()

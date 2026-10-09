@@ -247,7 +247,7 @@ void micros_bootstrap_runtime_record_failure(
         bootstrap_state.phase = MICROS_BOOTSTRAP_PHASE_FAILED;
         bootstrap_state.transitions.phase =
             MICROS_BOOTSTRAP_PHASE_FAILED;
-        uart_panic_seize();
+        micros_panic_seize();
         uart_write("MICROS_BOOTSTRAP_FAILURE reason=");
         uart_write(diagnostic_reason_name(reason));
         uart_write(" service=");

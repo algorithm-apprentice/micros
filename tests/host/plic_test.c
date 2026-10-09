@@ -118,6 +118,59 @@ static bool test_route_transitions(void)
     return true;
 }
 
+static bool test_prevalidated_enable_order(void)
+{
+    struct plic_fixture fixture;
+    struct plic_fixture snapshot;
+    struct micros_plic_tty_enable_plan plan;
+    struct micros_plic_tty_enable_plan plan_sentinel;
+
+    EXPECT_TRUE(initialize_fixture(&fixture));
+    snapshot = fixture;
+    memset(&plan_sentinel, 0xa5, sizeof(plan_sentinel));
+    plan = plan_sentinel;
+    EXPECT_TRUE(
+        micros_plic_controller_prepare_tty_enable(
+            &fixture.controller,
+            &plan
+        ) == MICROS_PLIC_OK
+        && memcmp(&fixture, &snapshot, sizeof(fixture)) == 0
+        && memcmp(&plan, &plan_sentinel, sizeof(plan)) != 0
+    );
+    micros_plic_controller_commit_tty_prepare_prevalidated(
+        &fixture.controller,
+        &plan
+    );
+    EXPECT_TRUE(
+        fixture.priority == 1
+        && fixture.enable == 0
+        && fixture.threshold == 0
+        && fixture.controller.phase == MICROS_PLIC_PREPARED
+    );
+    micros_plic_controller_commit_tty_enable_prevalidated(
+        &fixture.controller,
+        &plan
+    );
+    EXPECT_TRUE(
+        fixture.priority == 1
+        && fixture.enable
+            == (UINT32_C(1) << MICROS_TTY_UART_IRQ_SOURCE)
+        && fixture.threshold == 0
+        && fixture.controller.phase == MICROS_PLIC_ENABLED
+    );
+    snapshot = fixture;
+    plan = plan_sentinel;
+    EXPECT_TRUE(
+        micros_plic_controller_prepare_tty_enable(
+            &fixture.controller,
+            &plan
+        ) == MICROS_PLIC_ERROR_STATE
+        && memcmp(&fixture, &snapshot, sizeof(fixture)) == 0
+        && memcmp(&plan, &plan_sentinel, sizeof(plan)) == 0
+    );
+    return true;
+}
+
 static bool test_failure_preservation(void)
 {
     struct plic_fixture fixture;
@@ -188,6 +241,7 @@ bool micros_plic_test_run(void)
 {
     return (
         test_route_transitions()
+        && test_prevalidated_enable_order()
         && test_failure_preservation()
         && test_register_validation()
     );

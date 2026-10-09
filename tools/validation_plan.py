@@ -199,6 +199,48 @@ USER_RUNTIME_INPUTS = (
     "tools/generate_user_runtime_fixture.py",
 )
 
+TTY_CONTROL_INPUTS = (
+    "kernel/panic.c",
+    "kernel/plic.c",
+    "kernel/plic.h",
+    "kernel/plic_core.c",
+    "kernel/plic_core.h",
+    "kernel/syscall.c",
+    "kernel/trap_route_core.c",
+    "kernel/trap_route_core.h",
+    "kernel/tty_control_core.c",
+    "kernel/tty_control_core.h",
+    "kernel/tty_control_syscall.c",
+    "kernel/tty_control_syscall.h",
+    "kernel/tty_control_syscall_core.c",
+    "kernel/tty_control_syscall_core.h",
+    "kernel/tty_fault.c",
+    "kernel/tty_fault.h",
+    "kernel/tty_handoff_core.c",
+    "kernel/tty_handoff_core.h",
+    "kernel/tty_handoff_runtime.c",
+    "kernel/tty_handoff_runtime.h",
+    "kernel/tty_interrupt.c",
+    "kernel/tty_interrupt.h",
+    "tests/host/plic_test.c",
+    "tests/host/stubs/arch/riscv64/interrupt.h",
+    "tests/host/tty_control_test.c",
+    "tests/host/tty_control_syscall_test.c",
+    "tests/host/tty_fault_test.c",
+    "tests/host/tty_handoff_test.c",
+    "tests/host/tty_interrupt_test.c",
+    "tests/host/tty_test.c",
+    "tests/host/trap_route_test.c",
+)
+
+TTY_TRAP_INPUTS = (
+    "kernel/trap_route_core.c",
+    "kernel/trap_route_core.h",
+    "kernel/tty_interrupt.c",
+    "kernel/tty_interrupt.h",
+    "tests/host/trap_route_test.c",
+)
+
 GATE_INPUTS = {
     "test-qemu-smoke": (
         "kernel/fdt.c",
@@ -215,7 +257,7 @@ GATE_INPUTS = {
         "kernel/uart_console_core.h",
         "kernel/uart_console_test.c",
         "kernel/uart_console_test.h",
-    ),
+    ) + TTY_CONTROL_INPUTS,
     "test-qemu-frame-allocator": (
         "kernel/frame_allocator.c",
         "kernel/frame_allocator_test.c",
@@ -417,7 +459,7 @@ GATE_INPUTS = {
         "kernel/scheduler_test.c",
         "kernel/kernel_objects.c",
         "arch/riscv64/scheduler_test.S",
-    ) + WIRED_HANDOFF_INPUTS,
+    ) + WIRED_HANDOFF_INPUTS + TTY_TRAP_INPUTS,
     "test-qemu-scheduler-invalid-outgoing": (
         "kernel/scheduler_invalid_test.c",
         "arch/riscv64/scheduler_test.S",

@@ -49,6 +49,11 @@ enum micros_scheduler_error micros_scheduler_handle_user_timer(
     struct micros_hart *hart
 );
 
+enum micros_scheduler_error
+micros_scheduler_enter_supervisor_interrupt(
+    struct micros_hart *hart
+);
+
 enum micros_scheduler_error micros_scheduler_handle_supervisor_timer(
     struct micros_hart *hart
 );
@@ -107,6 +112,11 @@ micros_scheduler_test_handle_user_trap(
 
 bool micros_scheduler_test_after_user_return(
     const struct micros_hart *hart,
+    const struct micros_trap_frame *frame
+);
+
+bool micros_scheduler_test_handle_external_interrupt(
+    struct micros_hart *hart,
     const struct micros_trap_frame *frame
 );
 

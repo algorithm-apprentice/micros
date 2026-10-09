@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #define MICROS_PLIC_CONTROLLER_MAGIC UINT64_C(0x504c49434354524c)
+#define MICROS_PLIC_TTY_ENABLE_PLAN_MAGIC \
+    UINT64_C(0x504c494354545950)
 
 static bool registers_are_valid(
     const struct micros_plic_registers *registers
@@ -129,6 +131,54 @@ enum micros_plic_error micros_plic_controller_prepare_tty(
     *controller->registers.threshold = 0;
     controller->phase = MICROS_PLIC_PREPARED;
     return MICROS_PLIC_OK;
+}
+
+enum micros_plic_error micros_plic_controller_prepare_tty_enable(
+    const struct micros_plic_controller *controller,
+    struct micros_plic_tty_enable_plan *plan
+)
+{
+    struct micros_plic_tty_enable_plan candidate;
+
+    if (plan == NULL) {
+        return MICROS_PLIC_ERROR_ARGUMENT;
+    }
+    if (
+        micros_plic_controller_validate(controller) != MICROS_PLIC_OK
+    ) {
+        return controller_shape_is_valid(controller)
+            ? MICROS_PLIC_ERROR_INVARIANT
+            : MICROS_PLIC_ERROR_ARGUMENT;
+    }
+    if (controller->phase != MICROS_PLIC_DISABLED) {
+        return MICROS_PLIC_ERROR_STATE;
+    }
+    candidate.validation_magic =
+        MICROS_PLIC_TTY_ENABLE_PLAN_MAGIC;
+    *plan = candidate;
+    return MICROS_PLIC_OK;
+}
+
+void micros_plic_controller_commit_tty_prepare_prevalidated(
+    struct micros_plic_controller *controller,
+    const struct micros_plic_tty_enable_plan *plan
+)
+{
+    (void)plan;
+    *controller->registers.priority = 1;
+    *controller->registers.threshold = 0;
+    controller->phase = MICROS_PLIC_PREPARED;
+}
+
+void micros_plic_controller_commit_tty_enable_prevalidated(
+    struct micros_plic_controller *controller,
+    struct micros_plic_tty_enable_plan *plan
+)
+{
+    *controller->registers.enable =
+        UINT32_C(1) << MICROS_TTY_UART_IRQ_SOURCE;
+    controller->phase = MICROS_PLIC_ENABLED;
+    plan->validation_magic = 0;
 }
 
 enum micros_plic_error micros_plic_controller_enable_tty(
