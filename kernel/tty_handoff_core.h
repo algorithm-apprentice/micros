@@ -2,8 +2,10 @@
 #define MICROS_KERNEL_TTY_HANDOFF_CORE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
+#include "micros/kernel_objects.h"
 #include "micros/tty.h"
 
 enum micros_tty_console_phase {
@@ -37,6 +39,18 @@ struct micros_tty_handoff {
     uint64_t deadline;
     uint32_t claimed_source;
     bool deadline_armed;
+};
+
+struct micros_tty_device_authority {
+    struct micros_process_handle process;
+    uint64_t root_physical_address;
+    enum micros_tty_console_phase console_phase;
+};
+
+enum micros_tty_device_leaf_class {
+    MICROS_TTY_DEVICE_LEAF_MANAGED = 1,
+    MICROS_TTY_DEVICE_LEAF_EXACT,
+    MICROS_TTY_DEVICE_LEAF_INVALID,
 };
 
 enum micros_tty_handoff_error micros_tty_handoff_initialize(
@@ -87,6 +101,29 @@ bool micros_tty_handoff_deadline_expired(
 
 enum micros_tty_handoff_error micros_tty_handoff_panic(
     struct micros_tty_handoff *state
+);
+
+bool micros_tty_device_leaf_required(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address
+);
+
+bool micros_tty_device_range_intersects(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uintptr_t base,
+    size_t length
+);
+
+enum micros_tty_handoff_error micros_tty_device_leaf_classify(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    uint64_t physical_address,
+    uint32_t permissions,
+    enum micros_tty_device_leaf_class *classification
 );
 
 #endif

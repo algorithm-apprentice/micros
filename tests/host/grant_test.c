@@ -326,6 +326,22 @@ static bool test_create_inspect_revoke_and_reuse(void)
     micros_grant_t second = MICROS_GRANT_NONE;
 
     EXPECT_TRUE(setup_fixture());
+    snapshot = grant_registry;
+    EXPECT_GRANT_ERROR(
+        MICROS_GRANT_ERROR_ARGUMENT,
+        micros_grant_create(
+            &grant_registry,
+            &endpoint_registry,
+            &objects,
+            processes[0],
+            endpoints[1],
+            MICROS_USER_VIRTUAL_BASE + UINT64_C(0x1000),
+            128,
+            MICROS_GRANT_PERMISSION_READ,
+            NULL
+        )
+    );
+    EXPECT_TRUE(registries_equal(&grant_registry, &snapshot));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_create(

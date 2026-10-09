@@ -48,6 +48,14 @@ static bool fits_u32(uint64_t value)
     return value <= UINT32_MAX;
 }
 
+static bool vm_handoff_command_is_known(uint32_t command)
+{
+    return (
+        command == MICROS_VM_HANDOFF_READY
+        || command == MICROS_VM_HANDOFF_MAP_TTY_UART
+    );
+}
+
 static bool pointer_is_aligned(const void *pointer, size_t alignment)
 {
     return (uintptr_t)pointer % alignment == 0;
@@ -116,6 +124,7 @@ enum micros_syscall_abi_result micros_vm_handoff_decode(
 {
     struct micros_vm_handoff_request candidate;
     uint32_t packed_counts;
+    uint32_t command;
 
     if (
         arguments == NULL
@@ -132,14 +141,14 @@ enum micros_syscall_abi_result micros_vm_handoff_decode(
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }
     if (
-        arguments->a7 != MICROS_SYSCALL_ABI_VM_HANDOFF
-        || !fits_u32(arguments->a0)
+        micros_vm_handoff_decode_command(arguments, &command)
+            != MICROS_SYSCALL_ABI_OK
         || !fits_u32(arguments->a1)
         || !fits_u32(arguments->a2)
         || !fits_u32(arguments->a3)
         || !fits_u32(arguments->a4)
         || !fits_u32(arguments->a5)
-        || arguments->a0 != MICROS_VM_HANDOFF_READY
+        || command != MICROS_VM_HANDOFF_READY
     ) {
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }
@@ -155,6 +164,108 @@ enum micros_syscall_abi_result micros_vm_handoff_decode(
     candidate.digest = arguments->a6;
     copy_bytes(request, &candidate, sizeof(candidate));
     return MICROS_SYSCALL_ABI_OK;
+}
+
+enum micros_syscall_abi_result micros_vm_handoff_decode_command(
+    const struct micros_syscall_arguments *arguments,
+    uint32_t *command
+)
+{
+    uint32_t candidate;
+
+    if (
+        arguments == NULL
+        || command == NULL
+        || !pointer_is_aligned(
+            arguments,
+            _Alignof(struct micros_syscall_arguments)
+        )
+        || !pointer_is_aligned(command, _Alignof(uint32_t))
+        || arguments->a7 != MICROS_SYSCALL_ABI_VM_HANDOFF
+        || !fits_u32(arguments->a0)
+        || !vm_handoff_command_is_known((uint32_t)arguments->a0)
+    ) {
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+    candidate = (uint32_t)arguments->a0;
+    copy_bytes(command, &candidate, sizeof(candidate));
+    return MICROS_SYSCALL_ABI_OK;
+}
+
+enum micros_syscall_abi_result
+micros_vm_handoff_decode_tty_mapping(
+    const struct micros_syscall_arguments *arguments,
+    struct micros_vm_tty_mapping_request *request
+)
+{
+    struct micros_vm_tty_mapping_request candidate;
+    uint32_t command;
+    uint32_t irq_source;
+    uint32_t mapped_length;
+
+    if (
+        arguments == NULL
+        || request == NULL
+        || !pointer_is_aligned(
+            arguments,
+            _Alignof(struct micros_syscall_arguments)
+        )
+        || !pointer_is_aligned(
+            request,
+            _Alignof(struct micros_vm_tty_mapping_request)
+        )
+        || micros_vm_handoff_decode_command(
+            arguments,
+            &command
+        ) != MICROS_SYSCALL_ABI_OK
+        || command != MICROS_VM_HANDOFF_MAP_TTY_UART
+        || !fits_u32(arguments->a1)
+        || !fits_u32(arguments->a2)
+        || !fits_u32(arguments->a3)
+    ) {
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+    irq_source = (uint32_t)(arguments->a6 >> 32);
+    mapped_length = (uint32_t)arguments->a6;
+    if (irq_source == 0 || mapped_length == 0) {
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.command = command;
+    candidate.version = (uint32_t)arguments->a1;
+    candidate.service_id = (uint32_t)arguments->a2;
+    candidate.endpoint = (uint32_t)arguments->a3;
+    candidate.virtual_base = arguments->a4;
+    candidate.physical_base = arguments->a5;
+    candidate.irq_source = irq_source;
+    candidate.mapped_length = mapped_length;
+    copy_bytes(request, &candidate, sizeof(candidate));
+    return MICROS_SYSCALL_ABI_OK;
+}
+
+bool micros_vm_tty_mapping_matches(
+    const struct micros_vm_tty_mapping_request *request,
+    micros_endpoint_t tty_endpoint
+)
+{
+    return (
+        request != NULL
+        && pointer_is_aligned(
+            request,
+            _Alignof(struct micros_vm_tty_mapping_request)
+        )
+        && tty_endpoint != MICROS_ENDPOINT_NONE
+        && tty_endpoint != MICROS_ENDPOINT_ANY
+        && request->command == MICROS_VM_HANDOFF_MAP_TTY_UART
+        && request->version == MICROS_TTY_MAPPING_VERSION
+        && request->service_id == MICROS_TTY_SERVICE_ID
+        && request->endpoint == tty_endpoint
+        && request->virtual_base == MICROS_TTY_UART_VIRTUAL_BASE
+        && request->physical_base == MICROS_TTY_UART_PHYSICAL_BASE
+        && request->irq_source == MICROS_TTY_UART_IRQ_SOURCE
+        && request->mapped_length == MICROS_TTY_UART_MAPPED_LENGTH
+    );
 }
 
 enum micros_vm_handoff_error micros_vm_handoff_state_prepare(

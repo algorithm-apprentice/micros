@@ -8,7 +8,10 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/grant_runtime_internal.h"
+#include "kernel/grant_syscall.h"
 #include "kernel/ipc_runtime_internal.h"
+#include "kernel/tty_handoff_runtime.h"
+#include "kernel/user_address_space_internal.h"
 #include "kernel/vm_snapshot.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_copy.h"
@@ -20,6 +23,7 @@
 #include "micros/scheduler_core.h"
 #include "micros/sv39.h"
 #include "micros/syscall_abi.h"
+#include "micros/tty.h"
 #include "micros/user_address_space.h"
 #include "micros/user_execution.h"
 
@@ -28,6 +32,12 @@ enum {
     HANDOFF_GRANTEE,
     HANDOFF_PROCESS_COUNT,
     HANDOFF_PAGE_COUNT = 5,
+    HANDOFF_RESERVED_PROCESS_COUNT = 2,
+    HANDOFF_GRANTOR_MAPPING_COUNT = HANDOFF_PAGE_COUNT,
+    HANDOFF_GRANTEE_MAPPING_COUNT = HANDOFF_PAGE_COUNT + 2,
+    HANDOFF_TOTAL_MAPPING_COUNT =
+        HANDOFF_GRANTOR_MAPPING_COUNT
+        + HANDOFF_GRANTEE_MAPPING_COUNT,
 };
 
 enum handoff_test_state {
@@ -84,6 +94,10 @@ static const uint64_t TEST_READ_ONLY_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x4000);
 static const uint64_t TEST_UNMAPPED_ADDRESS =
     MICROS_USER_VIRTUAL_BASE + UINT64_C(0x6000);
+static const uint64_t TEST_TTY_SPARE_ADDRESS =
+    MICROS_USER_VIRTUAL_BASE + UINT64_C(0x5000);
+static const uint64_t TEST_TTY_STACK_ADDRESS =
+    MICROS_TTY_UART_VIRTUAL_BASE + MICROS_SV39_PAGE_SIZE;
 static const uint64_t TEST_SYSCALL_CONTROL_MAGIC =
     UINT64_C(0x48414e444f464653);
 
@@ -108,6 +122,10 @@ static unsigned char user_bytes_observed[
     HANDOFF_PROCESS_COUNT
 ][HANDOFF_PAGE_COUNT][MICROS_SV39_PAGE_SIZE];
 static uint64_t user_physical[HANDOFF_PROCESS_COUNT][HANDOFF_PAGE_COUNT];
+static uint64_t tty_spare_physical;
+static uint64_t tty_stack_physical;
+static struct micros_process_handle
+    reserved_processes[HANDOFF_RESERVED_PROCESS_COUNT];
 static struct micros_process_handle processes[HANDOFF_PROCESS_COUNT];
 static struct micros_thread_handle threads[HANDOFF_PROCESS_COUNT];
 static micros_endpoint_t endpoints[HANDOFF_PROCESS_COUNT];
@@ -120,6 +138,11 @@ static enum handoff_syscall_control_action syscall_control_action;
 static size_t syscall_control_next;
 static volatile enum handoff_test_state test_state;
 static uint64_t failure_stage;
+
+struct managed_inventory_context {
+    size_t count;
+    bool saw_uart;
+};
 
 extern const unsigned char micros_address_space_handoff_payload_start[];
 extern const unsigned char micros_address_space_handoff_payload_ecall[];
@@ -168,6 +191,24 @@ static bool bytes_equal(
             return false;
         }
     }
+    return true;
+}
+
+static bool record_managed_mapping(
+    void *context,
+    uint64_t virtual_address,
+    uint64_t physical_address,
+    uint32_t permissions
+)
+{
+    struct managed_inventory_context *inventory = context;
+
+    (void)physical_address;
+    (void)permissions;
+    if (virtual_address == MICROS_TTY_UART_VIRTUAL_BASE) {
+        inventory->saw_uart = true;
+    }
+    ++inventory->count;
     return true;
 }
 
@@ -1763,12 +1804,14 @@ static bool stage_wired_pages(void)
         && result.summary.address_space_count
             == HANDOFF_PROCESS_COUNT
         && result.summary.mapping_count
-            == HANDOFF_PROCESS_COUNT * HANDOFF_PAGE_COUNT
+            == HANDOFF_TOTAL_MAPPING_COUNT
         && result.summary.vm_self_wired_frame_count
-            == HANDOFF_PAGE_COUNT
+            == HANDOFF_GRANTEE_MAPPING_COUNT
         && result.info->mappings[0].role
             == MICROS_VM_MAPPING_SERVICE_WIRED
-        && result.info->mappings[HANDOFF_PAGE_COUNT].role
+        && result.info->mappings[
+            HANDOFF_GRANTOR_MAPPING_COUNT
+        ].role
             == MICROS_VM_MAPPING_SELF_WIRED
         && micros_vm_boot_validate(
             result.info,
@@ -1946,10 +1989,18 @@ micros_address_space_handoff_test_handle_trap(
 
 bool micros_address_space_handoff_runtime_run_self_test(void)
 {
-    static const struct micros_privilege_profile profile = {
-        .id = 1,
-        .name = "HANDOFF_TEST",
-        .operations = MICROS_PRIVILEGE_OPERATION_RECEIVE,
+    static const struct micros_privilege_profile profiles[] = {
+        {
+            .id = 1,
+            .name = "HANDOFF_TEST",
+            .operations = MICROS_PRIVILEGE_OPERATION_RECEIVE,
+        },
+        {
+            .id = MICROS_PRIVILEGE_PROFILE_TTY,
+            .name = "TTY",
+            .operations = MICROS_PRIVILEGE_OPERATION_RECEIVE,
+            .kernel_operations = MICROS_KERNEL_OPERATION_TTY_CONTROL,
+        },
     };
     const uint32_t page_permissions[HANDOFF_PAGE_COUNT] = {
         MICROS_SV39_PERMISSION_READ | MICROS_SV39_PERMISSION_EXECUTE,
@@ -1962,9 +2013,16 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     struct micros_kernel_objects *objects;
     struct micros_endpoint_registry *endpoint_registry;
     struct micros_grant_registry *grant_registry;
+    struct micros_bootstrap_control_state tty_bootstrap;
+    struct micros_bootstrap_binding tty_binding;
+    struct micros_bootstrap_manifest_entry tty_entry;
     struct micros_process_handle empty_process;
     struct micros_user_context contexts[HANDOFF_PROCESS_COUNT];
     struct micros_user_context observed_context;
+    struct micros_syscall_arguments grant_arguments;
+    struct micros_syscall_context grant_context;
+    struct micros_trap_frame grant_frame;
+    struct micros_hart grant_hart;
     struct micros_thread thread_snapshot;
     struct micros_ipc_message message;
     struct micros_ipc_message observed_message;
@@ -1972,16 +2030,30 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     struct micros_frame_owner retained_owner;
     struct micros_frame_owner saved_owner;
     struct micros_grant_record grant_record;
+    struct micros_user_address_space_tty_uart_plan tty_map_plan;
+    struct micros_user_address_space_tty_uart_plan tty_map_sentinel;
+    struct micros_tty_handoff mapped_handoff;
+    struct micros_tty_handoff mapped_handoff_sentinel;
+    struct micros_tty_handoff_runtime_state *tty_runtime;
+    struct managed_inventory_context inventory;
     micros_grant_t read_grant;
     micros_grant_t write_grant;
+    micros_grant_t device_copy_grant;
+    uint64_t *tty_spare_pte;
+    uint64_t *tty_uart_pte;
     uint64_t *corrupt_pte;
+    uint64_t saved_spare_pte;
+    uint64_t saved_uart_pte;
     uint64_t saved_pte;
     uint64_t frame_index;
+    uint64_t inventory_root;
+    uint64_t tty_root;
     uint64_t orphan_physical;
     uint64_t physical_address;
     uint64_t stale_snapshot_frame;
     uint32_t permissions;
     size_t contiguous;
+    size_t inventory_count;
     uintptr_t kernel_stack_bottom;
     uintptr_t kernel_stack_top;
     uintptr_t saved_status;
@@ -1993,6 +2065,7 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
 
     saved_status = riscv_irq_save();
     fill_bytes(&message, 0, sizeof(message));
+    fill_bytes(&tty_bootstrap, 0, sizeof(tty_bootstrap));
     failure_stage = 1;
     objects = micros_kernel_object_runtime_test_registry();
     ledger = micros_frame_ownership_runtime_ledger();
@@ -2001,7 +2074,10 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
         || ledger == NULL
         || micros_ipc_runtime_registry() != NULL
         || micros_grant_runtime_registry() != NULL
-        || micros_ipc_runtime_initialize(&profile, 1)
+        || micros_ipc_runtime_initialize(
+            profiles,
+            sizeof(profiles) / sizeof(profiles[0])
+        )
             != MICROS_ENDPOINT_OK
         || micros_grant_runtime_initialize() != MICROS_GRANT_OK
         || (
@@ -2017,6 +2093,20 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
     }
 
     failure_stage = 2;
+    for (
+        process_index = 0;
+        process_index < HANDOFF_RESERVED_PROCESS_COUNT;
+        ++process_index
+    ) {
+        if (
+            micros_process_create(
+                objects,
+                &reserved_processes[process_index]
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            goto done;
+        }
+    }
     for (
         process_index = 0;
         process_index < HANDOFF_PROCESS_COUNT;
@@ -2082,6 +2172,88 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
         ) {
             goto done;
         }
+    }
+    if (
+        processes[HANDOFF_GRANTEE].slot != MICROS_TTY_PROCESS_SLOT
+        || micros_user_address_space_allocate_page(
+            processes[HANDOFF_GRANTEE],
+            TEST_TTY_SPARE_ADDRESS,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE,
+            &tty_spare_physical
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_allocate_page(
+            processes[HANDOFF_GRANTEE],
+            TEST_TTY_STACK_ADDRESS,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE,
+            &tty_stack_physical
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        goto done;
+    }
+    fill_bytes(
+        (void *)(uintptr_t)tty_spare_physical,
+        UINT8_C(0xc3),
+        MICROS_SV39_PAGE_SIZE
+    );
+    fill_bytes(
+        (void *)(uintptr_t)tty_stack_physical,
+        UINT8_C(0x3c),
+        MICROS_SV39_PAGE_SIZE
+    );
+    fill_bytes(&tty_binding, 0, sizeof(tty_binding));
+    fill_bytes(&tty_entry, 0, sizeof(tty_entry));
+    tty_binding.service_id = MICROS_TTY_SERVICE_ID;
+    tty_binding.process = processes[HANDOFF_GRANTEE];
+    tty_binding.thread = threads[HANDOFF_GRANTEE];
+    tty_binding.root = objects->processes[
+        processes[HANDOFF_GRANTEE].slot
+    ].address_space_root;
+    tty_binding.endpoint = endpoints[HANDOFF_GRANTEE];
+    tty_binding.scheduler_priority =
+        MICROS_SCHEDULER_PRIORITY_DEFAULT_USER;
+    tty_binding.scheduler_preemptible = true;
+    tty_binding.scheduler_quantum_counter_ticks = UINT64_MAX;
+    tty_entry.service_id = MICROS_TTY_SERVICE_ID;
+    tty_entry.image_id = 104;
+    tty_entry.process_slot = MICROS_TTY_PROCESS_SLOT;
+    tty_entry.profile_id = MICROS_PRIVILEGE_PROFILE_TTY;
+    tty_entry.role_flags = MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER;
+    tty_entry.irq_source = MICROS_TTY_UART_IRQ_SOURCE;
+    tty_entry.device_base = MICROS_TTY_UART_PHYSICAL_BASE;
+    tty_entry.device_length = MICROS_TTY_UART_MAPPED_LENGTH;
+    tty_bootstrap.entry_count = 1;
+    tty_bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
+    copy_bytes(
+        &tty_bootstrap.bindings[0],
+        &tty_binding,
+        sizeof(tty_binding)
+    );
+    copy_bytes(
+        &tty_bootstrap.manifest.entries[0],
+        &tty_entry,
+        sizeof(tty_entry)
+    );
+    tty_bootstrap.transitions.entry_count = 1;
+    tty_bootstrap.transitions.entries[0] =
+        (struct micros_bootstrap_runtime_entry){
+            .service_id = MICROS_TTY_SERVICE_ID,
+            .state = MICROS_BOOTSTRAP_SERVICE_PREPARED,
+            .endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_RESERVED,
+        };
+    if (
+        micros_tty_handoff_runtime_reset()
+            != MICROS_TTY_HANDOFF_OK
+        || micros_tty_handoff_runtime_prepare(
+            &tty_binding,
+            &tty_entry
+        ) != MICROS_TTY_HANDOFF_OK
+        || micros_tty_handoff_runtime_bind_bootstrap(
+            &tty_bootstrap
+        ) != MICROS_TTY_HANDOFF_OK
+    ) {
+        goto done;
     }
     if (
         micros_process_create(objects, &empty_process)
@@ -3027,6 +3199,523 @@ bool micros_address_space_handoff_runtime_run_self_test(void)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_grant_runtime_validate() != MICROS_GRANT_OK
         || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
+    ) {
+        goto done;
+    }
+
+    if (
+        (
+            objects->threads[
+                threads[HANDOFF_GRANTEE].slot
+            ].scheduler_assigned
+            && micros_thread_scheduler_remove(
+                objects,
+                threads[HANDOFF_GRANTEE]
+            ) != MICROS_KERNEL_OBJECT_OK
+        )
+        || objects->threads[
+            threads[HANDOFF_GRANTEE].slot
+        ].runtime_flags != MICROS_THREAD_RTS_INACTIVE
+    ) {
+        goto done;
+    }
+    objects->processes[
+        processes[HANDOFF_GRANTEE].slot
+    ].privilege_profile = 0;
+    endpoint_registry->endpoints[
+        processes[HANDOFF_GRANTEE].slot
+    ].state = MICROS_ENDPOINT_STATE_RESERVED;
+    if (
+        micros_tty_handoff_runtime_validate(
+            &tty_bootstrap,
+            endpoint_registry,
+            objects
+        ) != MICROS_TTY_HANDOFF_OK
+        || micros_tty_handoff_runtime_begin(100, 100)
+            != MICROS_TTY_HANDOFF_OK
+        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
+    ) {
+        goto done;
+    }
+
+    failure_stage = 11;
+    failure_stage = UINT64_C(0x1101);
+    tty_root = objects->processes[
+        processes[HANDOFF_GRANTEE].slot
+    ].address_space_root;
+    fill_bytes(
+        &tty_map_sentinel,
+        UINT8_C(0xa5),
+        sizeof(tty_map_sentinel)
+    );
+    tty_map_plan = tty_map_sentinel;
+    if (
+        micros_user_address_space_prepare_tty_uart_mapping(
+            processes[HANDOFF_GRANTOR],
+            objects->processes[
+                processes[HANDOFF_GRANTOR].slot
+            ].address_space_root,
+            &tty_map_plan
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED
+        || !bytes_equal(
+            &tty_map_plan,
+            &tty_map_sentinel,
+            sizeof(tty_map_plan)
+        )
+    ) {
+        goto done;
+    }
+    tty_spare_pte = leaf_pte_for(
+        objects,
+        processes[HANDOFF_GRANTEE],
+        TEST_TTY_SPARE_ADDRESS
+    );
+    tty_uart_pte = leaf_pte_for(
+        objects,
+        processes[HANDOFF_GRANTEE],
+        MICROS_TTY_UART_VIRTUAL_BASE
+    );
+    if (
+        tty_spare_pte == NULL
+        || tty_uart_pte == NULL
+        || *tty_spare_pte == 0
+        || *tty_uart_pte != 0
+    ) {
+        goto done;
+    }
+    saved_spare_pte = *tty_spare_pte;
+    failure_stage = UINT64_C(0x1102);
+    *tty_spare_pte = 0;
+    *tty_uart_pte = saved_spare_pte;
+    tty_map_plan = tty_map_sentinel;
+    if (
+        micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_prepare_tty_uart_mapping(
+            processes[HANDOFF_GRANTEE],
+            tty_root,
+            &tty_map_plan
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT
+        || !bytes_equal(
+            &tty_map_plan,
+            &tty_map_sentinel,
+            sizeof(tty_map_plan)
+        )
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = 0;
+    *tty_spare_pte = saved_spare_pte;
+    failure_stage = UINT64_C(0x1103);
+    if (
+        micros_user_address_space_activate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        goto done;
+    }
+    tty_map_plan = tty_map_sentinel;
+    if (
+        micros_user_address_space_prepare_tty_uart_mapping(
+            processes[HANDOFF_GRANTEE],
+            tty_root,
+            &tty_map_plan
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_STATE
+        || !bytes_equal(
+            &tty_map_plan,
+            &tty_map_sentinel,
+            sizeof(tty_map_plan)
+        )
+        || micros_user_address_space_activate_kernel()
+            != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_prepare_tty_uart_mapping(
+            processes[HANDOFF_GRANTEE],
+            tty_root,
+            &tty_map_plan
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_tty_handoff_runtime_prepare_mapped(
+            &mapped_handoff
+        ) != MICROS_TTY_HANDOFF_OK
+    ) {
+        goto done;
+    }
+    micros_user_address_space_commit_tty_uart_mapping(
+        &tty_map_plan
+    );
+    micros_tty_handoff_runtime_commit_mapped_prevalidated(
+        &mapped_handoff
+    );
+    fill_bytes(
+        &mapped_handoff_sentinel,
+        UINT8_C(0xa5),
+        sizeof(mapped_handoff_sentinel)
+    );
+    mapped_handoff = mapped_handoff_sentinel;
+    failure_stage = UINT64_C(0x1104);
+    if (
+        micros_tty_handoff_runtime_prepare_mapped(
+            &mapped_handoff
+        ) != MICROS_TTY_HANDOFF_ERROR_STATE
+        || !bytes_equal(
+            &mapped_handoff,
+            &mapped_handoff_sentinel,
+            sizeof(mapped_handoff)
+        )
+        || micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_validate_tty_uart_mapping(
+            processes[HANDOFF_GRANTEE],
+            tty_root
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        goto done;
+    }
+
+    physical_address = UINT64_C(0xfeedfacefeedface);
+    failure_stage = UINT64_C(0x1105);
+    permissions = UINT32_MAX;
+    if (
+        micros_user_address_space_lookup(
+            processes[HANDOFF_GRANTEE],
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            &physical_address,
+            &permissions
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        || physical_address != UINT64_C(0xfeedfacefeedface)
+        || permissions != UINT32_MAX
+    ) {
+        goto done;
+    }
+    physical_address = UINT64_C(0xfacefeedfacefeed);
+    failure_stage = UINT64_C(0x1106);
+    permissions = UINT32_MAX;
+    contiguous = SIZE_MAX;
+    if (
+        micros_user_address_space_translate(
+            processes[HANDOFF_GRANTEE],
+            MICROS_TTY_UART_VIRTUAL_BASE + 17,
+            &physical_address,
+            &permissions,
+            &contiguous
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        || physical_address != UINT64_C(0xfacefeedfacefeed)
+        || permissions != UINT32_MAX
+        || contiguous != SIZE_MAX
+    ) {
+        goto done;
+    }
+    inventory = (struct managed_inventory_context){0};
+    failure_stage = UINT64_C(0x1107);
+    inventory_root = 0;
+    inventory_count = 0;
+    if (
+        micros_user_address_space_inventory(
+            processes[HANDOFF_GRANTEE],
+            record_managed_mapping,
+            &inventory,
+            &inventory_root,
+            &inventory_count
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || inventory_root != tty_root
+        || inventory_count != HANDOFF_GRANTEE_MAPPING_COUNT
+        || inventory.count != inventory_count
+        || inventory.saw_uart
+    ) {
+        goto done;
+    }
+    fill_bytes(
+        &observed_message,
+        UINT8_C(0xa5),
+        sizeof(observed_message)
+    );
+    message = observed_message;
+    failure_stage = UINT64_C(0x1108);
+    if (
+        micros_ipc_buffer_snapshot(
+            processes[HANDOFF_GRANTEE],
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_IPC_BUFFER_READ,
+            &observed_message
+        ) != MICROS_IPC_BUFFER_ERROR_INVARIANT
+        || !bytes_equal(
+            &observed_message,
+            &message,
+            sizeof(observed_message)
+        )
+    ) {
+        goto done;
+    }
+
+    saved_uart_pte = *tty_uart_pte;
+    failure_stage = UINT64_C(0x1109);
+    if (
+        micros_sv39_make_leaf_pte(
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_EXECUTE
+                | MICROS_SV39_PERMISSION_USER,
+            &saved_pte
+        ) != MICROS_SV39_OK
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = saved_pte;
+    if (
+        micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+    ) {
+        goto done;
+    }
+    if (
+        micros_sv39_make_leaf_pte(
+            MICROS_TTY_UART_PHYSICAL_BASE
+                + MICROS_SV39_PAGE_SIZE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE
+                | MICROS_SV39_PERMISSION_USER,
+            &saved_pte
+        ) != MICROS_SV39_OK
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = saved_pte;
+    if (
+        micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = 0;
+    if (
+        micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = saved_uart_pte;
+    saved_spare_pte = *tty_spare_pte;
+    *tty_spare_pte = saved_uart_pte;
+    if (
+        micros_user_address_space_validate(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+    ) {
+        goto done;
+    }
+    *tty_spare_pte = saved_spare_pte;
+    physical_address = UINT64_C(0x1122334455667788);
+    if (
+        micros_user_address_space_release_page(
+            processes[HANDOFF_GRANTEE],
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            &physical_address
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+        || physical_address != UINT64_C(0x1122334455667788)
+        || micros_user_address_space_destroy(
+            processes[HANDOFF_GRANTEE]
+        ) != MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+        || *tty_uart_pte != saved_uart_pte
+        || micros_user_address_space_validate_tty_uart_mapping(
+            processes[HANDOFF_GRANTEE],
+            tty_root
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        goto done;
+    }
+
+    failure_stage = UINT64_C(0x1110);
+    tty_runtime =
+        micros_tty_handoff_runtime_authoritative_state();
+    if (
+        tty_runtime == NULL
+        || micros_endpoint_install_profile(
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTEE],
+            MICROS_PRIVILEGE_PROFILE_TTY
+        ) != MICROS_ENDPOINT_OK
+        || micros_endpoint_activate(
+            endpoint_registry,
+            objects,
+            endpoints[HANDOFF_GRANTEE]
+        ) != MICROS_ENDPOINT_OK
+        || micros_thread_scheduler_admit(
+            objects,
+            micros_kernel_object_runtime_boot_hart_handle(),
+            threads[HANDOFF_GRANTEE],
+            tty_binding.scheduler_priority,
+            tty_binding.scheduler_quantum_counter_ticks,
+            tty_binding.scheduler_preemptible
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_tty_handoff_release(&tty_runtime->handoff)
+            != MICROS_TTY_HANDOFF_OK
+    ) {
+        goto done;
+    }
+    tty_bootstrap.transitions.entries[0].state =
+        MICROS_BOOTSTRAP_SERVICE_STARTING;
+    tty_bootstrap.transitions.entries[0].endpoint_state =
+        MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
+    tty_bootstrap.transitions.entries[0].profile_installed = true;
+    tty_bootstrap.transitions.entries[0].scheduler_assigned = true;
+    tty_bootstrap.transitions.entries[0].ready_deadline =
+        tty_runtime->handoff.deadline;
+    if (
+        micros_tty_handoff_runtime_validate(
+            &tty_bootstrap,
+            endpoint_registry,
+            objects
+        ) != MICROS_TTY_HANDOFF_OK
+        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
+    ) {
+        goto done;
+    }
+
+    fill_bytes(&grant_hart, 0, sizeof(grant_hart));
+    grant_hart.hardware_id = 0;
+    fill_bytes(&grant_context, 0, sizeof(grant_context));
+    grant_context.objects = objects;
+    grant_context.process = processes[HANDOFF_GRANTEE];
+    grant_context.current = threads[HANDOFF_GRANTEE];
+    fill_bytes(&grant_frame, 0, sizeof(grant_frame));
+    grant_frame.a0 = UINT64_C(0x1122334455667788);
+    fill_bytes(&grant_arguments, 0, sizeof(grant_arguments));
+    grant_arguments.a0 = endpoints[HANDOFF_GRANTOR];
+    grant_arguments.a1 = MICROS_TTY_UART_VIRTUAL_BASE;
+    grant_arguments.a2 = MICROS_TTY_UART_MAPPED_LENGTH;
+    grant_arguments.a3 = MICROS_GRANT_PERMISSION_READ;
+    grant_arguments.a7 = MICROS_SYSCALL_ABI_GRANT_CREATE;
+    if (
+        !snapshot_state(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+        || micros_grant_handle_captured_user_ecall(
+            &grant_hart,
+            &grant_frame,
+            &grant_context,
+            &grant_arguments
+        ) != MICROS_SYSCALL_RETURN_NORMAL
+        || grant_frame.a0
+            != (uint64_t)(int64_t)
+                MICROS_SYSCALL_ABI_MEMORY_FAULT
+        || !state_matches(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        goto done;
+    }
+
+    failure_stage = UINT64_C(0x1111);
+    if (
+        micros_grant_create(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTOR],
+            endpoints[HANDOFF_GRANTEE],
+            TEST_DATA_SECOND_ADDRESS,
+            32,
+            MICROS_GRANT_PERMISSION_READ,
+            &device_copy_grant
+        ) != MICROS_GRANT_OK
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = 0;
+    if (
+        micros_grant_copy_from(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTEE],
+            endpoints[HANDOFF_GRANTOR],
+            device_copy_grant,
+            0,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            16
+        ) != MICROS_GRANT_ERROR_INVARIANT
+    ) {
+        goto done;
+    }
+    *tty_uart_pte = saved_uart_pte;
+    corrupt_pte = leaf_pte_for(
+        objects,
+        processes[HANDOFF_GRANTOR],
+        TEST_DATA_SECOND_ADDRESS
+    );
+    if (corrupt_pte == NULL) {
+        goto done;
+    }
+    saved_pte = *corrupt_pte;
+    *corrupt_pte = UINT64_C(1);
+    if (
+        micros_grant_copy_from(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTEE],
+            endpoints[HANDOFF_GRANTOR],
+            device_copy_grant,
+            0,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            16
+        ) != MICROS_GRANT_ERROR_INVARIANT
+    ) {
+        goto done;
+    }
+    *corrupt_pte = saved_pte;
+    if (
+        !snapshot_state(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+    ) {
+        goto done;
+    }
+    fill_bytes(&grant_frame, 0, sizeof(grant_frame));
+    grant_frame.a0 = UINT64_C(0x8877665544332211);
+    fill_bytes(&grant_arguments, 0, sizeof(grant_arguments));
+    grant_arguments.a0 = endpoints[HANDOFF_GRANTOR];
+    grant_arguments.a1 = device_copy_grant;
+    grant_arguments.a3 = MICROS_TTY_UART_VIRTUAL_BASE;
+    grant_arguments.a4 = 16;
+    grant_arguments.a7 = MICROS_SYSCALL_ABI_GRANT_COPY_FROM;
+    if (
+        micros_grant_handle_captured_user_ecall(
+            &grant_hart,
+            &grant_frame,
+            &grant_context,
+            &grant_arguments
+        ) != MICROS_SYSCALL_RETURN_NORMAL
+        || grant_frame.a0
+            != (uint64_t)(int64_t)
+                MICROS_SYSCALL_ABI_MEMORY_FAULT
+        || !state_matches(
+            ledger,
+            objects,
+            endpoint_registry,
+            grant_registry
+        )
+        || micros_grant_revoke(
+            grant_registry,
+            endpoint_registry,
+            objects,
+            processes[HANDOFF_GRANTOR],
+            device_copy_grant
+        ) != MICROS_GRANT_OK
     ) {
         goto done;
     }

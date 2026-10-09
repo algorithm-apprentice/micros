@@ -24,6 +24,7 @@ enum micros_syscall_abi_operation {
 
 enum micros_vm_handoff_command {
     MICROS_VM_HANDOFF_READY = 1,
+    MICROS_VM_HANDOFF_MAP_TTY_UART = 2,
 };
 
 enum micros_syscall_abi_result {

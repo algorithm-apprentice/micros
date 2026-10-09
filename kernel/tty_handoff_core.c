@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "micros/sv39.h"
+
 #define MICROS_TTY_HANDOFF_INITIALIZATION_MAGIC \
     UINT64_C(0x4d49435254545948)
 
@@ -23,6 +25,53 @@ static bool console_phase_is_preowned(
         phase == MICROS_TTY_CONSOLE_MAP_REQUESTED
         || phase == MICROS_TTY_CONSOLE_MAPPED
         || phase == MICROS_TTY_CONSOLE_STARTING
+    );
+}
+
+static bool console_phase_has_device_mapping(
+    enum micros_tty_console_phase phase
+)
+{
+    return (
+        phase == MICROS_TTY_CONSOLE_MAPPED
+        || phase == MICROS_TTY_CONSOLE_STARTING
+        || phase == MICROS_TTY_CONSOLE_OWNED
+    );
+}
+
+static bool process_is_valid(struct micros_process_handle process)
+{
+    return (
+        process.slot < MICROS_PROCESS_CAPACITY
+        && process.generation != 0
+        && process.generation <= MICROS_PROCESS_GENERATION_MAX
+    );
+}
+
+static bool processes_equal(
+    struct micros_process_handle left,
+    struct micros_process_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
+static bool device_authority_is_valid(
+    const struct micros_tty_device_authority *authority
+)
+{
+    return (
+        authority != NULL
+        && process_is_valid(authority->process)
+        && authority->root_physical_address != 0
+        && authority->root_physical_address
+            % MICROS_SV39_PAGE_SIZE == 0
+        && console_phase_has_device_mapping(
+            authority->console_phase
+        )
     );
 }
 
@@ -329,5 +378,101 @@ enum micros_tty_handoff_error micros_tty_handoff_panic(
     state->deadline = 0;
     state->claimed_source = 0;
     state->deadline_armed = false;
+    return MICROS_TTY_HANDOFF_OK;
+}
+
+bool micros_tty_device_leaf_required(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address
+)
+{
+    return (
+        device_authority_is_valid(authority)
+        && processes_equal(authority->process, process)
+        && authority->root_physical_address
+            == root_physical_address
+    );
+}
+
+bool micros_tty_device_range_intersects(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uintptr_t base,
+    size_t length
+)
+{
+    const uintptr_t uart_base =
+        (uintptr_t)MICROS_TTY_UART_VIRTUAL_BASE;
+    const uintptr_t uart_end =
+        uart_base + (uintptr_t)MICROS_TTY_UART_MAPPED_LENGTH;
+    uintptr_t end;
+
+    if (
+        !device_authority_is_valid(authority)
+        || !process_is_valid(process)
+        || !processes_equal(authority->process, process)
+        || length == 0
+        || UINTPTR_MAX - base < length
+    ) {
+        return false;
+    }
+    end = base + length;
+    return base < uart_end && end > uart_base;
+}
+
+enum micros_tty_handoff_error micros_tty_device_leaf_classify(
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    uint64_t physical_address,
+    uint32_t permissions,
+    enum micros_tty_device_leaf_class *classification
+)
+{
+    const uint32_t exact_permissions =
+        MICROS_SV39_PERMISSION_READ
+        | MICROS_SV39_PERMISSION_WRITE
+        | MICROS_SV39_PERMISSION_USER;
+    enum micros_tty_device_leaf_class candidate =
+        MICROS_TTY_DEVICE_LEAF_MANAGED;
+    bool exact_owner;
+
+    if (
+        authority == NULL
+        || classification == NULL
+        || !process_is_valid(process)
+        || root_physical_address == 0
+        || root_physical_address % MICROS_SV39_PAGE_SIZE != 0
+        || virtual_address % MICROS_SV39_PAGE_SIZE != 0
+        || physical_address % MICROS_SV39_PAGE_SIZE != 0
+    ) {
+        return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
+    }
+    if (!device_authority_is_valid(authority)) {
+        return MICROS_TTY_HANDOFF_ERROR_STATE;
+    }
+
+    exact_owner = (
+        processes_equal(authority->process, process)
+        && authority->root_physical_address
+            == root_physical_address
+    );
+    if (physical_address == MICROS_TTY_UART_PHYSICAL_BASE) {
+        candidate = (
+            exact_owner
+            && virtual_address == MICROS_TTY_UART_VIRTUAL_BASE
+            && permissions == exact_permissions
+        )
+            ? MICROS_TTY_DEVICE_LEAF_EXACT
+            : MICROS_TTY_DEVICE_LEAF_INVALID;
+    } else if (
+        exact_owner
+        && virtual_address == MICROS_TTY_UART_VIRTUAL_BASE
+    ) {
+        candidate = MICROS_TTY_DEVICE_LEAF_INVALID;
+    }
+    *classification = candidate;
     return MICROS_TTY_HANDOFF_OK;
 }

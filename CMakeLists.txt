@@ -322,10 +322,39 @@ if(MICROS_BUILD_HOST_TESTS)
         tty_test
         kernel/plic_core.c
         kernel/tty_handoff_core.c
+        kernel/tty_handoff_runtime.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
         tests/host/tty_handoff_test.c
         tests/host/tty_test.c
+    )
+    add_executable(
+        vm_handoff_syscall_test
+        kernel/tty_handoff_core.c
+        kernel/vm_handoff_core.c
+        kernel/vm_handoff_syscall.c
+        tests/host/vm_handoff_syscall_test.c
+    )
+    target_include_directories(
+        vm_handoff_syscall_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(
+        vm_handoff_syscall_test
+        PRIVATE
+            c_std_17
+    )
+    target_compile_options(
+        vm_handoff_syscall_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
     )
     target_include_directories(
         fdt_test
@@ -708,6 +737,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            vm_handoff_syscall_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            vm_handoff_syscall_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -724,6 +764,10 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
     add_test(NAME tty-core COMMAND tty_test)
+    add_test(
+        NAME vm-handoff-syscall
+        COMMAND vm_handoff_syscall_test
+    )
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -759,6 +803,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             tty_test
+            vm_handoff_syscall_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -809,6 +854,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             tty_test
+            vm_handoff_syscall_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -1251,6 +1297,8 @@ add_executable(
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
+    kernel/tty_handoff_core.c
+    kernel/tty_handoff_runtime.c
     kernel/user_address_space.c
     kernel/user_address_space_core.c
     kernel/user_execution.c

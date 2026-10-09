@@ -1,11 +1,103 @@
 #include "kernel/tty_handoff_core.h"
+#include "kernel/tty_handoff_runtime.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "micros/sv39.h"
+
 bool micros_tty_handoff_test_run(void);
+
+static struct micros_process runtime_process;
+static struct micros_thread runtime_thread;
+static struct micros_endpoint_record runtime_endpoint;
+static struct micros_process_handle runtime_process_handle;
+static struct micros_thread_handle runtime_thread_handle;
+
+const struct micros_bootstrap_binding *
+micros_bootstrap_control_find_binding(
+    const struct micros_bootstrap_control_state *state,
+    uint32_t service_id
+)
+{
+    return micros_bootstrap_control_find_binding_bounded(
+        state,
+        service_id
+    );
+}
+
+enum micros_kernel_object_error micros_process_resolve(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle handle,
+    const struct micros_process **process
+)
+{
+    if (
+        objects == NULL
+        || process == NULL
+        || handle.slot != runtime_process_handle.slot
+        || handle.generation != runtime_process_handle.generation
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STALE;
+    }
+    *process = &runtime_process;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_kernel_object_error micros_thread_resolve(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
+    const struct micros_thread **thread
+)
+{
+    if (
+        objects == NULL
+        || thread == NULL
+        || handle.slot != runtime_thread_handle.slot
+        || handle.generation != runtime_thread_handle.generation
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STALE;
+    }
+    *thread = &runtime_thread;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+enum micros_endpoint_error micros_endpoint_resolve_internal(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    const struct micros_endpoint_record **record
+)
+{
+    if (
+        registry == NULL
+        || objects == NULL
+        || record == NULL
+        || endpoint != runtime_endpoint.value
+    ) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    *record = &runtime_endpoint;
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error
+micros_privilege_profile_allows_kernel_operation(
+    const struct micros_endpoint_registry *registry,
+    uint8_t profile_id,
+    uint8_t operation
+)
+{
+    return (
+        registry != NULL
+        && profile_id == MICROS_PRIVILEGE_PROFILE_TTY
+        && operation == 3
+    )
+        ? MICROS_ENDPOINT_OK
+        : MICROS_ENDPOINT_ERROR_UNAUTHORIZED;
+}
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -104,6 +196,12 @@ static bool test_failure_preservation(void)
             == MICROS_TTY_HANDOFF_OK
         && micros_tty_handoff_mark_mapped(&state)
             == MICROS_TTY_HANDOFF_OK
+    );
+    snapshot = state;
+    EXPECT_TRUE(
+        micros_tty_handoff_mark_mapped(&state)
+            == MICROS_TTY_HANDOFF_ERROR_STATE
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
         && micros_tty_handoff_release(&state)
             == MICROS_TTY_HANDOFF_OK
         && micros_tty_handoff_commit(&state)
@@ -139,6 +237,356 @@ static bool test_failure_preservation(void)
         && micros_tty_handoff_complete(&state, 9)
             == MICROS_TTY_HANDOFF_ERROR_ARGUMENT
         && memcmp(&state, &snapshot, sizeof(state)) == 0
+    );
+    return true;
+}
+
+static bool test_device_leaf_classification(void)
+{
+    const struct micros_process_handle tty_process = {3, 7};
+    const struct micros_process_handle foreign_process = {2, 5};
+    const uint64_t tty_root = UINT64_C(0x80200000);
+    const uint32_t exact_permissions =
+        MICROS_SV39_PERMISSION_READ
+        | MICROS_SV39_PERMISSION_WRITE
+        | MICROS_SV39_PERMISSION_USER;
+    struct micros_tty_device_authority authority = {
+        .process = tty_process,
+        .root_physical_address = tty_root,
+        .console_phase = MICROS_TTY_CONSOLE_MAPPED,
+    };
+    enum micros_tty_device_leaf_class classification;
+
+    EXPECT_TRUE(
+        micros_tty_device_leaf_required(
+            &authority,
+            tty_process,
+            tty_root
+        )
+        && !micros_tty_device_leaf_required(
+            &authority,
+            foreign_process,
+            tty_root
+        )
+        && micros_tty_device_leaf_classify(
+            &authority,
+            tty_process,
+            tty_root,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_EXACT
+        && micros_tty_device_range_intersects(
+            &authority,
+            tty_process,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_MAPPED_LENGTH
+        )
+        && micros_tty_device_range_intersects(
+            &authority,
+            tty_process,
+            MICROS_TTY_UART_VIRTUAL_BASE - 1,
+            2
+        )
+        && !micros_tty_device_range_intersects(
+            &authority,
+            tty_process,
+            MICROS_TTY_UART_VIRTUAL_BASE
+                - MICROS_TTY_UART_MAPPED_LENGTH,
+            MICROS_TTY_UART_MAPPED_LENGTH
+        )
+        && !micros_tty_device_range_intersects(
+            &authority,
+            tty_process,
+            MICROS_TTY_UART_VIRTUAL_BASE
+                + MICROS_TTY_UART_MAPPED_LENGTH,
+            1
+        )
+        && !micros_tty_device_range_intersects(
+            &authority,
+            foreign_process,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_MAPPED_LENGTH
+        )
+    );
+    EXPECT_TRUE(
+        micros_tty_device_leaf_classify(
+            &authority,
+            tty_process,
+            tty_root,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            exact_permissions | MICROS_SV39_PERMISSION_EXECUTE,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_INVALID
+        && micros_tty_device_leaf_classify(
+            &authority,
+            tty_process,
+            tty_root,
+            MICROS_TTY_UART_VIRTUAL_BASE
+                + MICROS_TTY_UART_MAPPED_LENGTH,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_INVALID
+        && micros_tty_device_leaf_classify(
+            &authority,
+            foreign_process,
+            UINT64_C(0x80300000),
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_INVALID
+    );
+    EXPECT_TRUE(
+        micros_tty_device_leaf_classify(
+            &authority,
+            tty_process,
+            tty_root,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            UINT64_C(0x80400000),
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_INVALID
+        && micros_tty_device_leaf_classify(
+            &authority,
+            foreign_process,
+            UINT64_C(0x80300000),
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            UINT64_C(0x80400000),
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_OK
+        && classification == MICROS_TTY_DEVICE_LEAF_MANAGED
+    );
+    authority.console_phase = MICROS_TTY_CONSOLE_MAP_REQUESTED;
+    classification = MICROS_TTY_DEVICE_LEAF_INVALID;
+    EXPECT_TRUE(
+        micros_tty_device_leaf_classify(
+            &authority,
+            tty_process,
+            tty_root,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            exact_permissions,
+            &classification
+        ) == MICROS_TTY_HANDOFF_ERROR_STATE
+        && classification == MICROS_TTY_DEVICE_LEAF_INVALID
+    );
+    return true;
+}
+
+static bool test_runtime_lifecycle_validation(void)
+{
+    const struct micros_process_handle process = {3, 7};
+    const struct micros_thread_handle thread = {5, 9};
+    const micros_endpoint_t endpoint =
+        (process.generation << MICROS_ENDPOINT_SLOT_BITS)
+        | process.slot;
+    const uint64_t root = UINT64_C(0x80200000);
+    struct micros_bootstrap_control_state bootstrap = {0};
+    struct micros_bootstrap_binding *binding =
+        &bootstrap.bindings[0];
+    struct micros_bootstrap_manifest_entry *entry =
+        &bootstrap.manifest.entries[0];
+    struct micros_bootstrap_runtime_entry *transition =
+        &bootstrap.transitions.entries[0];
+    struct micros_endpoint_registry registry = {0};
+    struct micros_kernel_objects objects = {0};
+    struct micros_tty_handoff mapped;
+    struct micros_tty_device_authority authority;
+    struct micros_tty_device_authority authority_sentinel;
+    struct micros_tty_handoff_runtime_state *runtime;
+
+    *binding = (struct micros_bootstrap_binding){
+        .manifest_index = 0,
+        .service_id = MICROS_TTY_SERVICE_ID,
+        .process = process,
+        .thread = thread,
+        .root = root,
+        .endpoint = endpoint,
+        .scheduler_priority = 8,
+        .scheduler_preemptible = true,
+        .scheduler_quantum_counter_ticks = 100,
+    };
+    *entry = (struct micros_bootstrap_manifest_entry){
+        .service_id = MICROS_TTY_SERVICE_ID,
+        .image_id = 104,
+        .process_slot = MICROS_TTY_PROCESS_SLOT,
+        .profile_id = MICROS_PRIVILEGE_PROFILE_TTY,
+        .role_flags = MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER,
+        .device_base = MICROS_TTY_UART_PHYSICAL_BASE,
+        .device_length = MICROS_TTY_UART_MAPPED_LENGTH,
+        .irq_source = MICROS_TTY_UART_IRQ_SOURCE,
+    };
+    bootstrap.entry_count = 1;
+    bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
+    bootstrap.transitions.entry_count = 1;
+    *transition = (struct micros_bootstrap_runtime_entry){
+        .service_id = MICROS_TTY_SERVICE_ID,
+        .state = MICROS_BOOTSTRAP_SERVICE_PREPARED,
+        .endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_RESERVED,
+    };
+    runtime_process_handle = process;
+    runtime_thread_handle = thread;
+    runtime_process = (struct micros_process){
+        .generation = process.generation,
+        .address_space_root = root,
+        .primary_endpoint = endpoint,
+    };
+    runtime_thread = (struct micros_thread){
+        .generation = thread.generation,
+        .owner = process,
+        .context_attached = true,
+        .runtime_flags = MICROS_THREAD_RTS_INACTIVE,
+    };
+    runtime_endpoint = (struct micros_endpoint_record){
+        .state = MICROS_ENDPOINT_STATE_RESERVED,
+        .owner = process,
+        .value = endpoint,
+    };
+
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_reset()
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_prepare(binding, entry)
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_bind_bootstrap(&bootstrap)
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_device_authority(
+            &registry,
+            &objects,
+            &authority
+        ) == MICROS_TTY_DEVICE_AUTHORITY_NONE
+    );
+    runtime_process.privilege_profile =
+        MICROS_PRIVILEGE_PROFILE_TTY;
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_ERROR_INVARIANT
+    );
+    runtime_process.privilege_profile = 0;
+
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_begin(100, 50)
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_prepare_mapped(&mapped)
+            == MICROS_TTY_HANDOFF_OK
+    );
+    micros_tty_handoff_runtime_commit_mapped_prevalidated(&mapped);
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_device_authority(
+            &registry,
+            &objects,
+            &authority
+        ) == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+        && authority.process.slot == process.slot
+        && authority.process.generation == process.generation
+        && authority.root_physical_address == root
+        && authority.console_phase == MICROS_TTY_CONSOLE_MAPPED
+    );
+    memset(&authority_sentinel, 0xa5, sizeof(authority_sentinel));
+    authority = authority_sentinel;
+    runtime_endpoint.state = MICROS_ENDPOINT_STATE_ACTIVE;
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_device_authority(
+            &registry,
+            &objects,
+            &authority
+        ) == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+        && memcmp(
+            &authority,
+            &authority_sentinel,
+            sizeof(authority)
+        ) == 0
+    );
+    runtime_endpoint.state = MICROS_ENDPOINT_STATE_RESERVED;
+
+    runtime = micros_tty_handoff_runtime_authoritative_state();
+    transition->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
+    transition->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
+    transition->profile_installed = true;
+    transition->scheduler_assigned = true;
+    transition->ready_deadline = 150;
+    runtime_process.privilege_profile =
+        MICROS_PRIVILEGE_PROFILE_TTY;
+    runtime_endpoint.state = MICROS_ENDPOINT_STATE_ACTIVE;
+    runtime_thread.runtime_flags = 0;
+    runtime_thread.scheduler_assigned = true;
+    runtime_thread.scheduler_priority = binding->scheduler_priority;
+    runtime_thread.scheduler_preemptible =
+        binding->scheduler_preemptible;
+    runtime_thread.quantum_counter_ticks =
+        binding->scheduler_quantum_counter_ticks;
+    EXPECT_TRUE(
+        runtime != NULL
+        && micros_tty_handoff_release(&runtime->handoff)
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_commit(&runtime->handoff)
+            == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_tty_handoff_accept_ready(
+            &runtime->handoff,
+            149
+        ) == MICROS_TTY_HANDOFF_OK
+    );
+    transition->state = MICROS_BOOTSTRAP_SERVICE_READY;
+    transition->ready_deadline = 0;
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
+    );
+    transition->endpoint_state =
+        MICROS_BOOTSTRAP_ENDPOINT_SOURCE_ONLY;
+    runtime_endpoint.state = MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_ERROR_INVARIANT
+        && micros_tty_handoff_runtime_device_authority(
+            &registry,
+            &objects,
+            &authority
+        ) == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
     );
     return true;
 }
@@ -241,6 +689,8 @@ bool micros_tty_handoff_test_run(void)
     return (
         test_complete_handoff()
         && test_failure_preservation()
+        && test_device_leaf_classification()
+        && test_runtime_lifecycle_validation()
         && test_terminal_panic()
         && test_invariant_rejection()
     );

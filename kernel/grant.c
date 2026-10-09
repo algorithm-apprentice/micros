@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "grant_internal.h"
 #include "micros/user_address_space.h"
 
 #define MICROS_GRANT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534752)
@@ -447,8 +448,8 @@ static void retire_record(
     }
 }
 
-enum micros_grant_error micros_grant_create(
-    struct micros_grant_registry *registry,
+enum micros_grant_error micros_grant_prepare_create(
+    const struct micros_grant_registry *registry,
     const struct micros_endpoint_registry *endpoint_registry,
     const struct micros_kernel_objects *objects,
     struct micros_process_handle grantor,
@@ -456,12 +457,13 @@ enum micros_grant_error micros_grant_create(
     uintptr_t base,
     size_t length,
     uint32_t permissions,
-    micros_grant_t *grant
+    struct micros_grant_create_plan *plan
 )
 {
     const struct micros_process *grantor_process;
     const struct micros_endpoint_record *grantor_endpoint;
     const struct micros_endpoint_record *grantee_endpoint;
+    struct micros_grant_create_plan candidate_plan;
     micros_grant_t candidate;
     enum micros_grant_error error;
     size_t slot;
@@ -470,7 +472,7 @@ enum micros_grant_error micros_grant_create(
         registry == NULL
         || endpoint_registry == NULL
         || objects == NULL
-        || grant == NULL
+        || plan == NULL
         || grantee == MICROS_ENDPOINT_NONE
         || grantee == MICROS_ENDPOINT_ANY
         || !permissions_are_valid(permissions)
@@ -533,7 +535,11 @@ enum micros_grant_error micros_grant_create(
     ) {
         return MICROS_GRANT_ERROR_INVARIANT;
     }
-    registry->grants[slot] = (struct micros_grant_record){
+    clear_bytes(&candidate_plan, sizeof(candidate_plan));
+    candidate_plan.active = true;
+    candidate_plan.slot = slot;
+    candidate_plan.grant = candidate;
+    candidate_plan.record = (struct micros_grant_record){
         .state = MICROS_GRANT_SLOT_ACTIVE,
         .generation = registry->grants[slot].generation,
         .grantor = grantor,
@@ -543,8 +549,64 @@ enum micros_grant_error micros_grant_create(
         .length = length,
         .permissions = permissions,
     };
+    copy_bytes(plan, &candidate_plan, sizeof(*plan));
+    return MICROS_GRANT_OK;
+}
+
+void micros_grant_commit_create_prevalidated(
+    struct micros_grant_registry *registry,
+    struct micros_grant_create_plan *plan,
+    micros_grant_t *grant
+)
+{
+    copy_bytes(
+        &registry->grants[plan->slot],
+        &plan->record,
+        sizeof(plan->record)
+    );
     ++registry->active_count;
-    *grant = candidate;
+    *grant = plan->grant;
+    clear_bytes(plan, sizeof(*plan));
+}
+
+enum micros_grant_error micros_grant_create(
+    struct micros_grant_registry *registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle grantor,
+    micros_endpoint_t grantee,
+    uintptr_t base,
+    size_t length,
+    uint32_t permissions,
+    micros_grant_t *grant
+)
+{
+    struct micros_grant_create_plan plan;
+    enum micros_grant_error error;
+
+    if (grant == NULL) {
+        return MICROS_GRANT_ERROR_ARGUMENT;
+    }
+    error = micros_grant_prepare_create(
+        registry,
+        endpoint_registry,
+        objects,
+        grantor,
+        grantee,
+        base,
+        length,
+        permissions,
+        &plan
+    );
+
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    micros_grant_commit_create_prevalidated(
+        registry,
+        &plan,
+        grant
+    );
     return MICROS_GRANT_OK;
 }
 
