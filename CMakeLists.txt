@@ -301,6 +301,11 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/vm_bootstrap_test.c
         tests/host/vm_handoff_test.c
     )
+    add_executable(
+        pm_test
+        servers/pm/pm_core.c
+        tests/host/pm_test.c
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -361,6 +366,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         vm_bootstrap_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        pm_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -377,6 +388,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_test PRIVATE c_std_17)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
+    target_compile_features(pm_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -489,6 +501,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         vm_bootstrap_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        pm_test
         PRIVATE
             -Wall
             -Wextra
@@ -626,6 +648,17 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            pm_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            pm_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -640,6 +673,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
+    add_test(NAME pm-lifecycle COMMAND pm_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
 
     add_custom_target(
@@ -673,6 +707,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
+            pm_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -721,6 +756,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
+            pm_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
