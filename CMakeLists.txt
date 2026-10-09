@@ -320,7 +320,9 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
+        kernel/tty_handoff_core.c
         servers/tty/tty_core.c
+        tests/host/tty_handoff_test.c
         tests/host/tty_test.c
     )
     target_include_directories(

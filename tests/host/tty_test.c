@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+bool micros_tty_handoff_test_run(void);
+
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
@@ -563,7 +565,8 @@ static bool test_failure_preservation_and_invariants(void)
 int main(void)
 {
     if (
-        !test_protocol_contract()
+        !micros_tty_handoff_test_run()
+        || !test_protocol_contract()
         || !test_result_contract()
         || !test_canonical_input_and_staged_read()
         || !test_read_discard_preserves_input()
