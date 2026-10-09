@@ -8,6 +8,7 @@
 #include "kernel/endpoint_internal.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/pm_control_runtime.h"
 #include "kernel/scheduler_core_internal.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "kernel/vm_snapshot.h"
@@ -1098,6 +1099,12 @@ static void rollback_preparation(size_t count)
     clear_bytes(preparation_order, sizeof(preparation_order));
     clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
     if (
+        micros_pm_control_runtime_reset()
+            != MICROS_PM_CONTROL_OK
+    ) {
+        panic_runtime("bootstrap-pm-control-rollback");
+    }
+    if (
         micros_vm_handoff_runtime_reset()
             != MICROS_VM_HANDOFF_OK
     ) {
@@ -1367,6 +1374,32 @@ static enum micros_bootstrap_error prepare_vm_snapshot(
     return MICROS_BOOTSTRAP_OK;
 }
 
+static enum micros_bootstrap_error prepare_pm_control(
+    const struct micros_bootstrap_runtime_config *config
+)
+{
+    size_t index;
+
+    if (validation_plan.pm_service_id == 0) {
+        return MICROS_BOOTSTRAP_OK;
+    }
+    for (index = 0; index < config->manifest->header.entry_count; ++index) {
+        const struct micros_bootstrap_binding *binding =
+            &prepared_bindings[index];
+
+        if (binding->service_id != validation_plan.pm_service_id) {
+            continue;
+        }
+        return micros_pm_control_runtime_prepare(
+            binding,
+            &config->manifest->entries[binding->manifest_index]
+        ) == MICROS_PM_CONTROL_OK
+            ? MICROS_BOOTSTRAP_OK
+            : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+}
+
 enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
     const struct micros_bootstrap_runtime_config *config
 )
@@ -1403,6 +1436,13 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
         goto done;
     }
     clear_bytes(&prepared_vm_snapshot, sizeof(prepared_vm_snapshot));
+    if (
+        micros_pm_control_runtime_reset()
+            != MICROS_PM_CONTROL_OK
+    ) {
+        error = MICROS_BOOTSTRAP_ERROR_STATE;
+        goto done;
+    }
     if (
         micros_vm_handoff_runtime_reset()
             != MICROS_VM_HANDOFF_OK
@@ -1506,6 +1546,17 @@ enum micros_bootstrap_error micros_bootstrap_runtime_prepare(
         set_preparation_diagnostic(
             MICROS_BOOTSTRAP_DIAGNOSTIC_PREPARE,
             validation_plan.vm_service_id,
+            MICROS_ENDPOINT_NONE,
+            0
+        );
+        rollback_preparation(config->manifest->header.entry_count);
+        goto done;
+    }
+    error = prepare_pm_control(config);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        set_preparation_diagnostic(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_PREPARE,
+            validation_plan.pm_service_id,
             MICROS_ENDPOINT_NONE,
             0
         );

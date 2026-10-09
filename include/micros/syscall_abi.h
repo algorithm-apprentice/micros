@@ -19,6 +19,7 @@ enum micros_syscall_abi_operation {
     MICROS_SYSCALL_ABI_GRANT_COPY_TO = 10,
     MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL = 11,
     MICROS_SYSCALL_ABI_VM_HANDOFF = 12,
+    MICROS_SYSCALL_ABI_PM_CONTROL = 13,
 };
 
 enum micros_vm_handoff_command {

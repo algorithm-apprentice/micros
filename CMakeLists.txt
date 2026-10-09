@@ -303,7 +303,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         pm_test
+        kernel/kernel_objects.c
+        kernel/pm_control_core.c
+        kernel/pm_control_syscall_core.c
+        kernel/scheduler_core.c
         servers/pm/pm_core.c
+        tests/host/pm_control_test.c
         tests/host/pm_test.c
     )
     target_include_directories(
@@ -1126,6 +1131,10 @@ add_executable(
     kernel/scheduler.c
     kernel/main.c
     kernel/panic.c
+    kernel/pm_control_core.c
+    kernel/pm_control_runtime.c
+    kernel/pm_control_syscall.c
+    kernel/pm_control_syscall_core.c
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c

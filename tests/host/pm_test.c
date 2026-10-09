@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+bool micros_pm_control_test_run(void);
+
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
@@ -2302,7 +2304,8 @@ static bool test_replayable_transition_model(void)
 int main(void)
 {
     if (
-        !test_protocol_contract()
+        !micros_pm_control_test_run()
+        || !test_protocol_contract()
         || !test_runtime_gate_and_spawn()
         || !test_reverse_rollback_and_identity()
         || !test_rollback_acknowledgment_identity()

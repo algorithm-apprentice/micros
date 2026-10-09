@@ -35,6 +35,11 @@ enum micros_pm_exit_kind {
     MICROS_PM_EXIT_FAULT = 2,
 };
 
+enum micros_pm_control_command {
+    MICROS_PM_CONTROL_RESERVE = 1,
+    MICROS_PM_CONTROL_ABORT_RESERVED = 2,
+};
+
 struct micros_pm_process_handle {
     uint16_t slot;
     uint16_t reserved;
