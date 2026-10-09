@@ -99,7 +99,7 @@ failures attributable to one coherent change.
 | 7 | Grants, grant syscalls, wired handoff reads, then user runtime | First prove real U-mode grant lifecycle and copies before and after handoff for wired service pages; then prove one standalone freestanding ELF, startup path, raw `ecall`, and C wrappers for operations 1 through 10 |
 | 8 | Bootstrap launcher | Immutable manifest validation, deterministic topology, held-image preparation, exact profile/publication release, token-bound readiness, internal timeout failure, and irreversible authority revocation verified |
 | 9 | VM handoff | Frame ownership is disjoint and the VM working set remains wired |
-| 10 | PM | Spawn metadata, exit, wait, and failure rollback verified |
+| 10 | PM | PM identity, hidden process reservation, spawn metadata, exit, wait, and failure rollback verified |
 | 11 | TTY | Two-phase console handoff, deferred PLIC completion, input, and output verified |
 | 12 | RAMFS | Directory, file, and direct VFS-facing grant protocol tests pass |
 | 13 | VFS | Descriptor, console binding, pathname, mount, routing, and complete two-hop I/O verified |
@@ -162,6 +162,33 @@ Step 9 is internally serialized:
 Step 9 does not add dynamic mapping or non-VM page-fault delivery. Those
 interfaces require a later reviewed mapping authority before PM or executable
 loading may consume them.
+
+Step 10 is internally serialized:
+
+1. define the PM application table, semantic PID, parent/child, init-reaper,
+   exit, zombie, and wait contracts;
+2. add the exact PM bootstrap role and profile, the stable inert
+   `APPLICATION` profile identity, and PM readiness;
+3. inject one kernel-origin event when launcher authority is irreversibly
+   sealed;
+4. reserve and abort one hidden empty kernel process through exact PM-only
+   authority;
+5. prove the complete future spawn transaction and reverse rollback order in a
+   native transition model;
+6. prove versioned exit/wait decoding and malformed-client rejection; and
+7. run one real PM service after VM handoff without creating a dynamic child.
+
+The Step 10 reservation has no root, thread, endpoint, profile, mapping,
+grant, scheduler state, or process-owned frame. It preserves the process slot
+needed by a later transaction but cannot be published or run.
+
+Step 10 does not add a successful spawn path, dynamic mapping, executable
+loading, descriptor state, or running-process target teardown. Step 14 adds
+those integrations only after VM, PM, TTY, RAMFS, and VFS are all
+dependency-ready. At that point, VM creates and freezes mappings for the
+reserved process; PM's prepare transition creates the first thread and
+reserved endpoint, installs `APPLICATION`, attaches the executable context,
+and seals the mapping generation before final activation.
 
 `init` is not a static manifest service. Step 14 creates it through the
 ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.

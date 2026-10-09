@@ -231,6 +231,25 @@ endpoint and immutable profile remain attached but confer no bootstrap
 authority in the sealed phase. Its wired process and root remain dormant until
 later PM/VM teardown exists.
 
+PM initializes a separate bounded application-lifecycle table before reporting
+ready. Static manifest services remain an immutable bootstrap inventory rather
+than ordinary PM children: they have no application PID, wait parent, zombie
+state, or ordinary exit path before RS exists. The sealed profile table
+contains exact `APPLICATION` profile ID 7, but no process receives it before
+the later executable-preparation transition. When launcher completion seals
+bootstrap, the kernel injects one exact `BOOTSTRAP_SEALED` event into the
+manifest PM endpoint. That event enables PM's runtime process policy without
+transferring or reviving launcher authority.
+
+The initial PM outcome may reserve and abort one hidden empty kernel process
+after that event. The reservation has no address space, thread, endpoint,
+profile, scheduler state, grant, or process-owned frame. It proves PM's narrow
+ordinary-runtime authority and rollback boundary without claiming that a
+dynamic child can already run.
+
+The exact initial PM contract is
+[ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md).
+
 ### Phase 6: first user environment
 
 After launcher authority is sealed, PM, VFS, and VM cooperate through the
@@ -240,6 +259,10 @@ object bound to the fixed TTY endpoint and installs it as init descriptors 0,
 restore launcher authority. Init starts the shell, and later spawn descriptor
 actions duplicate the parent's console descriptors. The shell can run a small
 built-in userland including at least `echo`, `cat`, `ls`, and `ps`.
+
+The first successful internal PM transaction creates init as PID 1 with no
+parent and designates it as the application reaper. Static services remain
+outside that application parent tree.
 
 ## Runtime interactions
 
@@ -338,21 +361,36 @@ grant-table registration or user-visible inspect operation exists.
 
 ### Process creation
 
-PM coordinates process creation. It reserves a process, its first thread, and
-an endpoint, then asks the kernel to install the immutable application
-privilege profile. VFS resolves and buffers the executable and exposes its
-resident contents to VM through a read-only direct grant. VM maps destination
-child frames into a VM-only scratch window, copies and validates each ELF
-segment, removes the scratch mappings, maps the frames into the child, freezes
-the result, and returns a kernel-issued load-complete token to PM. VM cannot
-publish or run the child. PM is the sole caller of the kernel preparation
-transition: it presents the token, initializes the first-thread context, and
-causes the required local `fence.i`. The kernel records and seals the validated
-mapping generation while the thread is held; VM mapping changes are rejected.
-After PM and VFS commit their prepared state, PM invokes final activation,
-which revalidates that generation before making the endpoint visible and the
-thread runnable. This directed transaction avoids the PM/VFS/VM cycles found
-in MINIX.
+PM coordinates process creation. It first reserves one PM record and
+never-reused PID, then one hidden kernel process object. The reserved kernel
+process has no root, thread, endpoint, profile, or runnable state. VFS then
+resolves and buffers the executable and exposes its resident contents to VM
+through a read-only direct grant. VM creates the reserved process's address
+space, maps destination child frames into a VM-only scratch window, copies and
+validates each ELF segment, removes the scratch mappings, maps the frames into
+the child, freezes the result, and returns a kernel-issued load-complete token
+to PM. VM cannot publish or run the child.
+
+PM is the sole caller of the kernel preparation transition. It presents the
+reservation, load-complete token, and initial context. In one hidden
+transition, the kernel creates the first thread and reserved endpoint,
+installs only the immutable `APPLICATION` profile, performs the required local
+`fence.i`, initializes the context, and seals the validated mapping generation.
+VM mapping changes are then rejected. After PM and VFS commit their prepared
+state, PM invokes final activation, which revalidates that generation before
+making the endpoint visible and the thread runnable. Every earlier failure
+releases opaque resources in reverse order. This directed transaction avoids
+the PM/VFS/VM cycles found in MINIX.
+
+PM separately owns exit and wait semantics. Accepted exit first makes the
+thread permanently non-runnable and binds one exit transaction. After VFS
+cleanup, a PM-only detach transition atomically closes endpoint, IPC, grants,
+profile, scheduler/context, and thread state and leaves one exact
+VM-release-pending process. VM presents the same transaction to release
+mappings, root, and frames before PM releases the empty process. Only
+afterward does the PM record become a zombie. A matching exact-child or
+any-child wait consumes that status once; parent exit reparents children to
+init.
 
 ### File I/O
 
@@ -405,6 +443,9 @@ interrupts disabled.
   before the new thread can run.
 - A VM load-complete token is bound to one child mapping generation, and only
   PM may consume it to prepare and activate that spawn transaction.
+- A PM spawn reservation names one hidden kernel process generation with no
+  root, thread, endpoint, profile, grant, scheduler state, or process-owned
+  frame.
 - A prepared address space is kernel-sealed; activation revalidates its mapping
   generation, and changes require aborting and repeating load preparation.
 - The allocator bitmap answers availability, while the typed frame ledger is
@@ -448,6 +489,18 @@ interrupts disabled.
 - Only VM may request user mapping changes after the handoff.
 - VM's fault-handling working set is wired, and a VM-originated fault is fatal.
 - Only PM publishes process lifecycle state.
+- PM PIDs, PM record handles, kernel process handles, thread handles,
+  endpoints, service IDs, and spawn tokens are distinct identities.
+- PID zero is invalid, init is the sole application reaper, and a consumed PID
+  is not reused in v0.1.
+- A spawned application is invisible until final endpoint activation, and
+  every earlier failure rolls back the exact acquired resources in reverse
+  order.
+- An exited application releases all kernel, VM, VFS, IPC, and grant resources
+  before becoming a PM-only zombie; its PM record remains until one successful
+  matching wait.
+- PM runtime process creation remains disabled until the exact kernel-origin
+  bootstrap-sealed event.
 - A spawned process receives exactly one immutable application privilege
   profile before its endpoint becomes visible or its first thread runs.
 - Only VFS publishes file-descriptor and namespace state.

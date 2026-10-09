@@ -178,6 +178,17 @@ delivery remain outside that minimal boundary.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
+ADR-0046 defines the dependency-ready PM boundary. PM owns a bounded
+application table, monotonic semantic PIDs, parent/child and init-reaper
+relationships, spawn metadata, exit, zombie, and wait state. Launcher sealing
+delivers one exact kernel-origin event that enables runtime PM policy. The
+first PM kernel operation may reserve and abort only an empty hidden process
+with no root, thread, endpoint, profile, grant, mapping, scheduler state, or
+process-owned frame. The complete spawn and exit transactions are modeled with
+explicit reverse rollback, but dynamic mappings, executable loading, running
+child publication, and running-process target teardown remain later
+integrations.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
@@ -337,8 +348,8 @@ model, IPC reply model, or global current-execution representation.
 
 ### Deliverables
 
-- PM with spawn metadata, exit, and wait;
-- application privilege installation during spawn;
+- PM with application identity, hidden process reservation, spawn metadata,
+  exit, zombie, wait, and rollback;
 - interrupt-driven TTY with early-console and PLIC handoff;
 - RAMFS;
 - VFS with descriptors, a synthetic console object, pathname routing, and a
@@ -346,6 +357,17 @@ model, IPC reply model, or global current-execution representation.
 
 ### Exit criteria
 
+- PM starts through the static launcher after VM handoff and receives one
+  exact bootstrap-sealed runtime event;
+- semantic PIDs, parent/child relationships, init reparenting, zombie
+  retention, exact-child and any-child wait, and one-shot wait replies pass a
+  deterministic native model;
+- PM's initial kernel authority can reserve and abort only one empty hidden
+  process, releases every live reservation resource without changing
+  endpoint/scheduler/ownership state, and leaves exactly one consumed process
+  generation and transaction stale;
+- no Milestone 5 PM outcome claims a successful spawn or allocates post-handoff
+  user memory before the reviewed VM mapping protocol;
 - service protocols reject malformed types and payload lengths;
 - client termination releases server-owned state;
 - terminal data and file data use grants;
@@ -359,7 +381,11 @@ model, IPC reply model, or global current-execution representation.
 ### Deliverables
 
 - ELF loading;
+- post-handoff VM allocation, mapping, freeze, and release for one reserved
+  child;
 - PM/VFS/VM spawn transaction with rollback;
+- PM-only thread, endpoint, application-profile, context, and activation
+  transitions;
 - RISC-V instruction-fetch synchronization before a child runs;
 - init;
 - interactive shell;

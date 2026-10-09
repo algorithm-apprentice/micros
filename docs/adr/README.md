@@ -61,3 +61,4 @@ to make the project appear more consistent than it was.
 | [0043](0043-static-bootstrap-launcher.md) | Static bootstrap launcher and embedded manifest | Accepted |
 | [0044](0044-bootstrap-failure-detail-encoding.md) | Bootstrap failure detail encoding | Accepted |
 | [0045](0045-static-vm-bootstrap-and-handoff.md) | Static VM bootstrap and one-way handoff | Accepted |
+| [0046](0046-pm-process-lifecycle-and-spawn-metadata.md) | PM process lifecycle and spawn metadata | Accepted |
