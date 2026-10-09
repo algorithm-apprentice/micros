@@ -878,6 +878,20 @@ scheduler, and trap-stack baseline. Only the complete sequence emits:
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
 
+## TTY service image validation
+
+Build and validate the standalone real TTY service ELF with:
+
+```bash
+cmake --workflow --preset build-tty-service-image
+```
+
+The workflow cross-compiles the portable request/completion state machine,
+fixed NS16550A backend, operation-14 wrappers, and production service loop. The
+post-link checker enforces the repository's freestanding service-ELF contract.
+The dependency-closed launcher/VM/PM/TTY/VFS QEMU scenario is a separate later
+gate.
+
 ## PM service acceptance
 
 Build and run the launcher/VM/PM/probe integration gate with:

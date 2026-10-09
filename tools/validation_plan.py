@@ -50,6 +50,22 @@ QEMU_WORKFLOWS = (
     "test-qemu-scheduler-invalid-next",
 )
 
+IMAGE_WORKFLOWS = (
+    "build-tty-service-image",
+)
+
+IMAGE_INPUTS = {
+    "build-tty-service-image": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "servers/tty/",
+        "tools/check_user_elf.py",
+    ),
+}
+
 PLANNER_INPUTS = (
     "tools/validation_plan.py",
     "tests/host/test_validation_plan.py",
@@ -674,6 +690,14 @@ def affected_slow_models(paths):
     ]
 
 
+def affected_image_workflows(paths):
+    return [
+        name
+        for name, inputs in IMAGE_INPUTS.items()
+        if any(path_matches(path, inputs) for path in paths)
+    ]
+
+
 def requires_full_tier(paths):
     if any(path_matches(path, SHARED_QEMU_PATHS) for path in paths):
         return True
@@ -686,6 +710,7 @@ def requires_full_tier(paths):
                 for name in QEMU_WORKFLOWS
             )
             or bool(affected_slow_models([path]))
+            or bool(affected_image_workflows([path]))
             or path_matches(path, PLANNER_INPUTS)
         )
         if not known:
@@ -706,6 +731,7 @@ def plan(paths, tier, base="origin/main"):
     if tier == "full":
         commands = [UNIT_FULL]
         commands.extend(workflow(name) for name in QEMU_WORKFLOWS)
+        commands.extend(workflow(name) for name in IMAGE_WORKFLOWS)
         commands.append(DOCS)
         commands.extend(diff_commands(base))
         return commands
@@ -724,15 +750,20 @@ def plan(paths, tier, base="origin/main"):
         return plan(paths, "full", base)
 
     workflows = affected_workflows(code_paths)
+    image_workflows = affected_image_workflows(code_paths)
     if tier == "fast":
         for name in affected_slow_models(code_paths):
             append_unique(commands, workflow(name))
         for name in workflows:
             append_unique(commands, workflow(name))
+        for name in image_workflows:
+            append_unique(commands, workflow(name))
     else:
         commands[0] = UNIT_FULL
         append_unique(commands, SMOKE)
         for name in workflows:
+            append_unique(commands, workflow(name))
+        for name in image_workflows:
             append_unique(commands, workflow(name))
     commands.extend(diff_commands(base))
     return commands
@@ -827,6 +858,20 @@ def documented_slow_workflows(root):
     }
 
 
+def documented_image_workflows(root):
+    with open(
+        os.path.join(root, "docs/development/building.md"),
+        encoding="utf-8",
+    ) as source:
+        content = source.read()
+    return set(
+        re.findall(
+            r"cmake --workflow --preset (build-[a-z0-9-]+-image)",
+            content,
+        )
+    )
+
+
 def custom_target_block(cmake, target):
     marker = f"add_custom_target(\n        {target}\n"
     start = cmake.find(marker)
@@ -860,6 +905,17 @@ def validate_inventory(root):
         raise ValueError("slow-model CTest map is out of sync")
     if set(GATE_INPUTS) != qemu_inventory:
         raise ValueError("QEMU ownership map is out of sync")
+    image_inventory = {
+        name
+        for name in workflows
+        if name.startswith("build-") and name.endswith("-image")
+    }
+    if image_inventory != set(IMAGE_WORKFLOWS):
+        raise ValueError("image workflow inventory is out of sync")
+    if image_inventory != documented_image_workflows(root):
+        raise ValueError("documented image matrix is out of sync")
+    if set(IMAGE_INPUTS) != image_inventory:
+        raise ValueError("image ownership map is out of sync")
 
     with open(
         os.path.join(root, "CMakeLists.txt"),

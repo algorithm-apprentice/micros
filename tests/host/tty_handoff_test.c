@@ -202,10 +202,9 @@ static bool test_deadline_covers_every_pre_ready_phase(void)
     return true;
 }
 
-static bool test_ready_requires_idle_route(void)
+static bool test_ready_preserves_retained_route(void)
 {
     struct micros_tty_handoff state;
-    struct micros_tty_handoff snapshot;
 
     EXPECT_TRUE(
         advance_to_phase(MICROS_TTY_CONSOLE_OWNED, &state)
@@ -214,11 +213,19 @@ static bool test_ready_requires_idle_route(void)
             MICROS_TTY_UART_IRQ_SOURCE
         ) == MICROS_TTY_HANDOFF_OK
     );
-    snapshot = state;
     EXPECT_TRUE(
         micros_tty_handoff_accept_ready(&state, 19)
-            == MICROS_TTY_HANDOFF_ERROR_STATE
-        && memcmp(&state, &snapshot, sizeof(state)) == 0
+            == MICROS_TTY_HANDOFF_OK
+        && state.console_phase == MICROS_TTY_CONSOLE_OWNED
+        && state.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
+        && state.claimed_source == MICROS_TTY_UART_IRQ_SOURCE
+        && !state.deadline_armed
+        && state.deadline == 0
+        && micros_tty_handoff_complete(
+            &state,
+            MICROS_TTY_UART_IRQ_SOURCE
+        ) == MICROS_TTY_HANDOFF_OK
+        && state.route_phase == MICROS_TTY_ROUTE_IDLE
     );
     return true;
 }
@@ -761,6 +768,29 @@ static bool test_runtime_lifecycle_validation(void)
         ) == MICROS_TTY_HANDOFF_ERROR_ARGUMENT
         && runtime->handoff.route_phase
             == MICROS_TTY_ROUTE_IN_SERVICE
+        && micros_tty_handoff_runtime_role_ready(
+            &registry,
+            &objects
+        )
+        && micros_tty_handoff_runtime_prepare_ready(149, &ready)
+            == MICROS_TTY_HANDOFF_OK
+        && ready.console_phase == MICROS_TTY_CONSOLE_OWNED
+        && ready.route_phase == MICROS_TTY_ROUTE_IN_SERVICE
+        && ready.claimed_source == MICROS_TTY_UART_IRQ_SOURCE
+        && !ready.deadline_armed
+        && ready.deadline == 0
+        && runtime->handoff.route_phase
+            == MICROS_TTY_ROUTE_IN_SERVICE
+    );
+    transition->state = MICROS_BOOTSTRAP_SERVICE_READY;
+    transition->ready_deadline = 0;
+    micros_tty_handoff_runtime_commit_ready_prevalidated(&ready);
+    EXPECT_TRUE(
+        micros_tty_handoff_runtime_validate(
+            &bootstrap,
+            &registry,
+            &objects
+        ) == MICROS_TTY_HANDOFF_OK
         && micros_tty_handoff_runtime_prepare_complete(
             MICROS_TTY_UART_IRQ_SOURCE,
             &completed
@@ -773,25 +803,6 @@ static bool test_runtime_lifecycle_validation(void)
     micros_tty_handoff_runtime_commit_complete_prevalidated(
         &completed
     );
-    EXPECT_TRUE(
-        micros_tty_handoff_runtime_role_ready(
-            &registry,
-            &objects
-        )
-        && micros_tty_handoff_runtime_validate(
-            &bootstrap,
-            &registry,
-            &objects
-        ) == MICROS_TTY_HANDOFF_OK
-        && micros_tty_handoff_runtime_prepare_ready(149, &ready)
-            == MICROS_TTY_HANDOFF_OK
-        && ready.console_phase == MICROS_TTY_CONSOLE_OWNED
-        && !ready.deadline_armed
-        && ready.deadline == 0
-    );
-    transition->state = MICROS_BOOTSTRAP_SERVICE_READY;
-    transition->ready_deadline = 0;
-    micros_tty_handoff_runtime_commit_ready_prevalidated(&ready);
     EXPECT_TRUE(
         micros_tty_handoff_runtime_validate(
             &bootstrap,
@@ -927,7 +938,7 @@ bool micros_tty_handoff_test_run(void)
     return (
         test_complete_handoff()
         && test_deadline_covers_every_pre_ready_phase()
-        && test_ready_requires_idle_route()
+        && test_ready_preserves_retained_route()
         && test_uart_console_ownership()
         && test_failure_preservation()
         && test_device_leaf_classification()

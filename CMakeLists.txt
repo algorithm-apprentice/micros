@@ -93,6 +93,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_TTY_SERVICE_IMAGE
+    "Build the standalone real TTY service ELF"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -172,6 +177,7 @@ set(
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
     MICROS_BUILD_PM_SERVICE_TEST
+    MICROS_BUILD_TTY_SERVICE_IMAGE
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -338,6 +344,23 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/tty_control_test.c
         tests/host/tty_handoff_test.c
         tests/host/tty_test.c
+    )
+    add_executable(
+        tty_service_test
+        servers/tty/tty_core.c
+        servers/tty/tty_service_core.c
+        tests/host/tty_service_test.c
+    )
+    add_executable(
+        tty_uart_test
+        servers/tty/tty_core.c
+        servers/tty/tty_uart.c
+        tests/host/tty_uart_test.c
+    )
+    add_executable(
+        tty_service_control_test
+        servers/tty/tty_control.c
+        tests/host/tty_service_control_test.c
     )
     add_executable(
         vm_handoff_syscall_test
@@ -535,6 +558,24 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
+    target_include_directories(
+        tty_service_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_uart_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_service_control_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
     target_compile_features(fdt_test PRIVATE c_std_17)
     target_compile_features(frame_allocator_test PRIVATE c_std_17)
     target_compile_features(sv39_test PRIVATE c_std_17)
@@ -549,6 +590,9 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
     target_compile_features(tty_test PRIVATE c_std_17)
+    target_compile_features(tty_service_test PRIVATE c_std_17)
+    target_compile_features(tty_uart_test PRIVATE c_std_17)
+    target_compile_features(tty_service_control_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -681,6 +725,36 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         tty_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_service_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_uart_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_service_control_test
         PRIVATE
             -Wall
             -Wextra
@@ -841,6 +915,39 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            tty_service_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_service_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_uart_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_uart_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_service_control_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_service_control_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             vm_handoff_syscall_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -911,6 +1018,9 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
     add_test(NAME tty-core COMMAND tty_test)
+    add_test(NAME tty-service-core COMMAND tty_service_test)
+    add_test(NAME tty-uart COMMAND tty_uart_test)
+    add_test(NAME tty-service-control COMMAND tty_service_control_test)
     add_test(
         NAME vm-handoff-syscall
         COMMAND vm_handoff_syscall_test
@@ -957,6 +1067,9 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             tty_test
+            tty_service_test
+            tty_uart_test
+            tty_service_control_test
             vm_handoff_syscall_test
             tty_interrupt_test
             trap_route_test
@@ -1012,6 +1125,9 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             tty_test
+            tty_service_test
+            tty_uart_test
+            tty_service_control_test
             vm_handoff_syscall_test
             tty_interrupt_test
             trap_route_test
@@ -1150,6 +1266,7 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
     OR MICROS_BUILD_PM_SERVICE_TEST
+    OR MICROS_BUILD_TTY_SERVICE_IMAGE
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -1226,6 +1343,18 @@ if(
             VERBATIM
         )
     endfunction()
+
+    if(MICROS_BUILD_TTY_SERVICE_IMAGE)
+        micros_add_bootstrap_user(
+            micros_tty_service
+            micros-tty-service
+            servers/tty/tty_control.c
+            servers/tty/tty_core.c
+            servers/tty/tty_service.c
+            servers/tty/tty_service_core.c
+            servers/tty/tty_uart.c
+        )
+    endif()
 
     micros_add_bootstrap_user(
         micros_bootstrap_launcher

@@ -198,6 +198,15 @@
       }
     },
     {
+      "name": "riscv64-tty-service-image",
+      "displayName": "RISC-V 64 standalone TTY service image",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-tty-service-image",
+      "cacheVariables": {
+        "MICROS_BUILD_TTY_SERVICE_IMAGE": "ON"
+      }
+    },
+    {
       "name": "riscv64-vm-ready-early-test",
       "displayName": "RISC-V 64 early VM readiness role-gate test",
       "inherits": "riscv64-debug",
@@ -479,6 +488,13 @@
       "configurePreset": "riscv64-pm-service-test",
       "targets": [
         "test-qemu-pm-service"
+      ]
+    },
+    {
+      "name": "build-tty-service-image",
+      "configurePreset": "riscv64-tty-service-image",
+      "targets": [
+        "micros_tty_service"
       ]
     },
     {
@@ -907,6 +923,20 @@
         {
           "type": "build",
           "name": "test-qemu-pm-service"
+        }
+      ]
+    },
+    {
+      "name": "build-tty-service-image",
+      "displayName": "Build and validate the standalone TTY service image",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-tty-service-image"
+        },
+        {
+          "type": "build",
+          "name": "build-tty-service-image"
         }
       ]
     },

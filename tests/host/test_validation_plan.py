@@ -127,6 +127,20 @@ class ValidationPlanTests(unittest.TestCase):
                     "test-qemu-uart-console",
                 )
 
+    def test_tty_service_paths_own_image_gate(self):
+        for path in (
+            "servers/tty/tty_service.c",
+            "servers/tty/tty_service_core.c",
+            "servers/tty/tty_uart.c",
+            "servers/tty/tty_control.c",
+            "tools/check_user_elf.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "build-tty-service-image",
+                )
+
     def test_tty_trap_paths_own_scheduler_gate(self):
         for path in validation_plan.TTY_TRAP_INPUTS:
             with self.subTest(path=path):
@@ -414,6 +428,8 @@ class ValidationPlanTests(unittest.TestCase):
         self.assertEqual(validation_plan.UNIT_FULL, commands[0])
         for name in validation_plan.QEMU_WORKFLOWS:
             self.assertIn(validation_plan.workflow(name), commands)
+        for name in validation_plan.IMAGE_WORKFLOWS:
+            self.assertIn(validation_plan.workflow(name), commands)
 
     def test_pr_endpoint_uses_complete_native_and_ipc(self):
         commands = validation_plan.plan(["kernel/endpoint.c"], "pr")
@@ -658,7 +674,9 @@ class ValidationPlanTests(unittest.TestCase):
         commands = validation_plan.plan([], "full")
         self.assertEqual(validation_plan.UNIT_FULL, commands[0])
         self.assertEqual(
-            len(validation_plan.QEMU_WORKFLOWS) + 5,
+            len(validation_plan.QEMU_WORKFLOWS)
+            + len(validation_plan.IMAGE_WORKFLOWS)
+            + 5,
             len(commands),
         )
 

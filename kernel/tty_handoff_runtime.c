@@ -702,8 +702,12 @@ bool micros_tty_handoff_runtime_role_ready(
         ) == MICROS_TTY_HANDOFF_OK
         && tty_handoff_state.handoff.console_phase
             == MICROS_TTY_CONSOLE_OWNED
-        && tty_handoff_state.handoff.route_phase
-            == MICROS_TTY_ROUTE_IDLE
+        && (
+            tty_handoff_state.handoff.route_phase
+                == MICROS_TTY_ROUTE_IDLE
+            || tty_handoff_state.handoff.route_phase
+                == MICROS_TTY_ROUTE_IN_SERVICE
+        )
     );
 }
 
