@@ -51,6 +51,13 @@ enum micros_vm_handoff_error {
     MICROS_VM_HANDOFF_ERROR_INVARIANT,
 };
 
+enum micros_vm_self_fault_action {
+    MICROS_VM_SELF_FAULT_INVALID = 0,
+    MICROS_VM_SELF_FAULT_RUNNING_STARTING,
+    MICROS_VM_SELF_FAULT_RUNNING_READY,
+    MICROS_VM_SELF_FAULT_SEALED,
+};
+
 enum micros_syscall_abi_result micros_vm_handoff_decode(
     const struct micros_syscall_arguments *arguments,
     struct micros_vm_handoff_request *request
@@ -81,6 +88,11 @@ bool micros_vm_handoff_summary_matches(
 
 void micros_vm_handoff_commit_prevalidated(
     struct micros_vm_handoff_state *state
+);
+
+enum micros_vm_self_fault_action micros_vm_self_fault_classify(
+    enum micros_bootstrap_phase bootstrap_phase,
+    enum micros_bootstrap_service_state service_state
 );
 
 #endif

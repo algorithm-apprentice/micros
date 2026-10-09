@@ -83,6 +83,16 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_VM_SELF_FAULT_TEST
+    "Build the running-bootstrap VM self-fault image"
+    OFF
+)
+option(
+    MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
+    "Build the sealed-bootstrap VM self-fault image"
+    OFF
+)
+option(
     MICROS_BUILD_NESTED_TRAP_TEST
     "Build the per-hart nested trap test image"
     OFF
@@ -145,6 +155,8 @@ set(
     MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
+    MICROS_BUILD_VM_SELF_FAULT_TEST
+    MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
     MICROS_BUILD_NESTED_TRAP_TEST
     MICROS_BUILD_FRAME_OWNERSHIP_TEST
     MICROS_BUILD_USER_ADDRESS_SPACE_TEST
@@ -835,6 +847,8 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
+    OR MICROS_BUILD_VM_SELF_FAULT_TEST
+    OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
 )
     function(micros_add_bootstrap_user target output_name)
         add_executable(
@@ -914,12 +928,30 @@ if(
         micros-bootstrap-launcher
         tests/qemu/bootstrap_launcher.c
     )
-    if(MICROS_BUILD_VM_HANDOFF_TEST)
+    if(
+        MICROS_BUILD_VM_HANDOFF_TEST
+        OR MICROS_BUILD_VM_SELF_FAULT_TEST
+        OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
+    )
         micros_add_bootstrap_user(
             micros_vm_server
             micros-vm-server
+            tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
+        if(MICROS_BUILD_VM_SELF_FAULT_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_VM_SELF_FAULT_RUNNING=1
+            )
+        elseif(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_VM_SELF_FAULT_SEALED=1
+            )
+        endif()
         micros_add_bootstrap_user(
             micros_vm_handoff_probe
             micros-vm-handoff-probe
@@ -1110,18 +1142,36 @@ if(
     )
 endif()
 
-if(MICROS_BUILD_VM_HANDOFF_TEST)
+if(
+    MICROS_BUILD_VM_HANDOFF_TEST
+    OR MICROS_BUILD_VM_SELF_FAULT_TEST
+    OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
+)
     add_dependencies(
         micros
         micros_bootstrap_launcher
         micros_vm_server
         micros_vm_handoff_probe
     )
-    target_compile_definitions(
-        micros
-        PRIVATE
-            MICROS_BUILD_VM_HANDOFF_TEST=1
-    )
+    if(MICROS_BUILD_VM_HANDOFF_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_VM_HANDOFF_TEST=1
+        )
+    elseif(MICROS_BUILD_VM_SELF_FAULT_TEST)
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_VM_SELF_FAULT_TEST=1
+        )
+    else()
+        target_compile_definitions(
+            micros
+            PRIVATE
+                MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST=1
+        )
+    endif()
     target_sources(
         micros
         PRIVATE
@@ -1509,6 +1559,136 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
             --require-mmu-ready
             --require-frame-ownership-ready
             --require-objects-ready
+            --timeout
+            30
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_VM_SELF_FAULT_TEST)
+    add_custom_target(
+        test-qemu-vm-self-fault
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --nm
+            "${CMAKE_NM}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=bootstrap-failure"
+            --ordered-pattern
+            "MICROS_VM_SELF_FAULT service=0x0000000000000002 process-slot=0x0000000000000001 process-generation=0x0000000000000001 endpoint=0x0000000000001001 scause=0x000000000000000f stval=0x0000000070000000 sepc=0x[0-9a-f]{16} ownership=handed-off"
+            --ordered-pattern
+            "MICROS_BOOTSTRAP_FAILURE reason=service-fault service=0x0000000000000002 endpoint=0x0000000000001001 phase=failed state=starting detail=0x0000000000000000"
+            --ordered-pattern
+            "MICROS_PANIC reason=bootstrap-failure"
+            --forbid-marker
+            "MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --require-trap-context
+            --trap-context-origin
+            U
+            --trap-context-scause
+            0xf
+            --trap-context-stval
+            0x70000000
+            --require-vm-self-fault
+            --vm-self-fault-elf
+            "$<TARGET_FILE:micros_vm_server>"
+            --vm-self-fault-symbol
+            micros_vm_self_fault_instruction
+            --vm-self-fault-scause
+            0xf
+            --vm-self-fault-stval
+            0x70000000
+            --vm-self-fault-ownership
+            handed-off
+            --timeout
+            30
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
+    add_custom_target(
+        test-qemu-vm-self-fault-sealed
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --nm
+            "${CMAKE_NM}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_PANIC reason=vm-self-fault"
+            --ordered-pattern
+            "MICROS_VM_SELF_FAULT service=0x0000000000000002 process-slot=0x0000000000000001 process-generation=0x0000000000000001 endpoint=0x0000000000001001 scause=0x000000000000000f stval=0x0000000070000000 sepc=0x[0-9a-f]{16} ownership=handed-off"
+            --ordered-pattern
+            "MICROS_PANIC reason=vm-self-fault"
+            --forbid-pattern
+            "MICROS_BOOTSTRAP_FAILURE .+"
+            --forbid-marker
+            "MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm"
+            --expect
+            panic
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-panic-report
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --require-trap-context
+            --trap-context-origin
+            U
+            --trap-context-scause
+            0xf
+            --trap-context-stval
+            0x70000000
+            --require-vm-self-fault
+            --vm-self-fault-elf
+            "$<TARGET_FILE:micros_vm_server>"
+            --vm-self-fault-symbol
+            micros_vm_self_fault_instruction
+            --vm-self-fault-scause
+            0xf
+            --vm-self-fault-stval
+            0x70000000
+            --vm-self-fault-ownership
+            handed-off
             --timeout
             30
         DEPENDS micros

@@ -18,7 +18,9 @@
     || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
 #include "kernel/bootstrap_test.h"
 #endif
-#ifdef MICROS_BUILD_VM_HANDOFF_TEST
+#if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
 #include "kernel/vm_handoff_test.h"
 #endif
 
@@ -435,7 +437,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     MICROS_PANIC(hart_id, "bootstrap-test-returned");
 #endif
 
-#ifdef MICROS_BUILD_VM_HANDOFF_TEST
+#if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
     micros_vm_handoff_test_launch();
     MICROS_PANIC(hart_id, "vm-handoff-test-returned");
 #endif

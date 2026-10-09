@@ -170,9 +170,11 @@ every static user frame wired, validates exact VM-only operation 12, publishes
 ownership irreversibly before generic VM readiness, and retains wired IPC and
 grant-copy authority. A real launcher/VM/probe QEMU workflow proves independent
 kernel/VM database agreement, post-handoff return, launcher sealing, and a
-bidirectional checked-copy grant exchange. The two phase-accurate VM self-fault
-workflows remain before the Step 9 outcome is complete. Dynamic mappings and
-non-VM page-fault delivery remain outside that minimal boundary.
+bidirectional checked-copy grant exchange. Running- and sealed-phase VM
+self-fault workflows prove exact identity/register diagnostics, bootstrap
+service-fault ordering, and the post-seal no-bootstrap-failure path. This
+completes the static Step 9 boundary. Dynamic mappings and non-VM page-fault
+delivery remain outside that minimal boundary.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 

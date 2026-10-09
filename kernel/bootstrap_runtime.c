@@ -228,7 +228,7 @@ static const char *diagnostic_state_name(uint32_t service_id)
     return "none";
 }
 
-_Noreturn void micros_bootstrap_runtime_fail(
+void micros_bootstrap_runtime_record_failure(
     enum micros_bootstrap_diagnostic_reason reason,
     uint32_t service_id,
     micros_endpoint_t endpoint,
@@ -257,6 +257,21 @@ _Noreturn void micros_bootstrap_runtime_fail(
         uart_flush();
         failure_record_emitted = true;
     }
+}
+
+_Noreturn void micros_bootstrap_runtime_fail(
+    enum micros_bootstrap_diagnostic_reason reason,
+    uint32_t service_id,
+    micros_endpoint_t endpoint,
+    uint64_t detail
+)
+{
+    micros_bootstrap_runtime_record_failure(
+        reason,
+        service_id,
+        endpoint,
+        detail
+    );
     panic_runtime("bootstrap-failure");
 }
 

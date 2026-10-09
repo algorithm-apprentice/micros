@@ -77,6 +77,8 @@ complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
+`test-qemu-vm-self-fault`,
+`test-qemu-vm-self-fault-sealed`,
 `test-qemu-bootstrap-ready-timeout`,
 `test-qemu-bootstrap-manifest-panic`,
 `test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
@@ -107,6 +109,8 @@ cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-vm-self-fault
+cmake --workflow --preset test-qemu-vm-self-fault-sealed
 cmake --workflow --preset test-qemu-bootstrap-ready-timeout
 cmake --workflow --preset test-qemu-bootstrap-manifest-panic
 cmake --workflow --preset test-qemu-ipc
@@ -699,18 +703,20 @@ between the probe and VM. Only the exact marker is accepted:
 MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm
 ```
 
-The remaining fault workflows are:
+Both fatal workflows are implemented:
 
 ```text
 test-qemu-vm-self-fault
 test-qemu-vm-self-fault-sealed
 ```
 
-The self-fault image commits the same handoff, then requires exact VM-origin
-fault diagnostics and panic without a host timeout or success marker. The
-sealed variant first completes VM readiness and launcher sealing, then requires
-the non-bootstrap `vm-self-fault` classification and explicitly forbids a
-bootstrap failure record.
+The running image commits the same handoff and faults before generic VM
+readiness. It requires the exact VM identity, fault registers,
+`ownership=handed-off`, the authoritative `RUNNING+STARTING` service-fault
+record, ordered trap-context panic, and no success marker. The sealed variant
+first completes VM readiness, the real grant exchange, and launcher sealing;
+it then requires `MICROS_PANIC reason=vm-self-fault`, exact trap context, no
+success marker, and no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure
 with the latest structured serial events attached.

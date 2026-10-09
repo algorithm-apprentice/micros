@@ -180,6 +180,24 @@
       }
     },
     {
+      "name": "riscv64-vm-self-fault-test",
+      "displayName": "RISC-V 64 running VM self-fault test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-self-fault-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_SELF_FAULT_TEST": "ON"
+      }
+    },
+    {
+      "name": "riscv64-vm-self-fault-sealed-test",
+      "displayName": "RISC-V 64 sealed VM self-fault test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-self-fault-sealed-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-bootstrap-ready-timeout-test",
       "displayName": "RISC-V 64 bootstrap readiness-timeout panic test",
       "inherits": "riscv64-debug",
@@ -420,6 +438,20 @@
       "configurePreset": "riscv64-vm-handoff-test",
       "targets": [
         "test-qemu-vm-handoff"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault",
+      "configurePreset": "riscv64-vm-self-fault-test",
+      "targets": [
+        "test-qemu-vm-self-fault"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault-sealed",
+      "configurePreset": "riscv64-vm-self-fault-sealed-test",
+      "targets": [
+        "test-qemu-vm-self-fault-sealed"
       ]
     },
     {
@@ -799,6 +831,34 @@
         {
           "type": "build",
           "name": "test-qemu-vm-handoff"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault",
+      "displayName": "Build and run running VM self-fault panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-self-fault-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-self-fault"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-self-fault-sealed",
+      "displayName": "Build and run sealed VM self-fault panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-self-fault-sealed-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-self-fault-sealed"
         }
       ]
     },

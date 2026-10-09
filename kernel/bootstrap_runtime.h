@@ -61,6 +61,13 @@ _Noreturn void micros_bootstrap_runtime_fail(
     uint64_t detail
 );
 
+void micros_bootstrap_runtime_record_failure(
+    enum micros_bootstrap_diagnostic_reason reason,
+    uint32_t service_id,
+    micros_endpoint_t endpoint,
+    uint64_t detail
+);
+
 void micros_bootstrap_runtime_check_deadline(uint64_t now);
 
 #endif

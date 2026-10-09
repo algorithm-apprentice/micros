@@ -120,6 +120,21 @@ class ValidationPlanTests(unittest.TestCase):
                         commands,
                     )
 
+    def test_vm_fault_source_selects_all_vm_workflows(self):
+        commands = validation_plan.plan(
+            ["tests/qemu/vm_self_fault.S"],
+            "fast",
+        )
+        for workflow_name in (
+            "test-qemu-vm-handoff",
+            "test-qemu-vm-self-fault",
+            "test-qemu-vm-self-fault-sealed",
+        ):
+            self.assertIn(
+                validation_plan.workflow(workflow_name),
+                commands,
+            )
+
     def test_grant_syscall_paths_own_unified_gates(self):
         for path in (
             "kernel/syscall.c",
@@ -454,6 +469,8 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-user-runtime": "kernel/user_runtime_test.c",
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
             "test-qemu-vm-handoff": "kernel/vm_handoff_test.c",
+            "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
+            "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",
             "test-qemu-bootstrap-ready-timeout": "kernel/bootstrap_test.c",
             "test-qemu-bootstrap-manifest-panic": "kernel/bootstrap_test.c",
             "test-qemu-ipc": "kernel/ipc_test.c",

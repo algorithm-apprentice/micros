@@ -229,11 +229,39 @@ static bool test_rejects_invalid_state_without_mutation(void)
     return true;
 }
 
+static bool test_classifies_vm_self_fault_phase(void)
+{
+    EXPECT_TRUE(
+        micros_vm_self_fault_classify(
+            MICROS_BOOTSTRAP_PHASE_RUNNING,
+            MICROS_BOOTSTRAP_SERVICE_STARTING
+        ) == MICROS_VM_SELF_FAULT_RUNNING_STARTING
+        && micros_vm_self_fault_classify(
+            MICROS_BOOTSTRAP_PHASE_RUNNING,
+            MICROS_BOOTSTRAP_SERVICE_READY
+        ) == MICROS_VM_SELF_FAULT_RUNNING_READY
+        && micros_vm_self_fault_classify(
+            MICROS_BOOTSTRAP_PHASE_SEALED,
+            MICROS_BOOTSTRAP_SERVICE_READY
+        ) == MICROS_VM_SELF_FAULT_SEALED
+        && micros_vm_self_fault_classify(
+            MICROS_BOOTSTRAP_PHASE_RUNNING,
+            MICROS_BOOTSTRAP_SERVICE_PREPARED
+        ) == MICROS_VM_SELF_FAULT_INVALID
+        && micros_vm_self_fault_classify(
+            MICROS_BOOTSTRAP_PHASE_FAILED,
+            MICROS_BOOTSTRAP_SERVICE_READY
+        ) == MICROS_VM_SELF_FAULT_INVALID
+    );
+    return true;
+}
+
 bool micros_vm_handoff_test_run(void)
 {
     return (
         test_decodes_exact_shape()
         && test_prepares_matches_and_commits()
         && test_rejects_invalid_state_without_mutation()
+        && test_classifies_vm_self_fault_phase()
     );
 }

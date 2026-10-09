@@ -113,6 +113,8 @@ cmake --workflow --preset test-qemu-grant
 cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-vm-handoff
+cmake --workflow --preset test-qemu-vm-self-fault
+cmake --workflow --preset test-qemu-vm-self-fault-sealed
 cmake --workflow --preset test-qemu-ipc
 cmake --workflow --preset test-qemu-ipc-ecall-core
 cmake --workflow --preset test-qemu-ipc-syscall

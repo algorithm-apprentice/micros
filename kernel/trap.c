@@ -5,6 +5,7 @@
 
 #include "arch/riscv64/platform.h"
 #include "kernel/bootstrap_runtime.h"
+#include "kernel/vm_handoff_runtime.h"
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
 #include "kernel/ipc_ecall_test.h"
 #endif
@@ -15,7 +16,9 @@
 #ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
 #include "kernel/bootstrap_test.h"
 #endif
-#ifdef MICROS_BUILD_VM_HANDOFF_TEST
+#if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
+    || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
 #include "kernel/vm_handoff_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
@@ -31,6 +34,8 @@
 #include "kernel/user_runtime_test.h"
 #endif
 #include "micros/kernel_address_space.h"
+#include "micros/frame_ownership_runtime.h"
+#include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/scheduler.h"
@@ -44,6 +49,9 @@
 enum {
     MICROS_EXCEPTION_ILLEGAL_INSTRUCTION = 2,
     MICROS_EXCEPTION_USER_ECALL = 8,
+    MICROS_EXCEPTION_INSTRUCTION_PAGE_FAULT = 12,
+    MICROS_EXCEPTION_LOAD_PAGE_FAULT = 13,
+    MICROS_EXCEPTION_STORE_PAGE_FAULT = 15,
     MICROS_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
@@ -90,6 +98,149 @@ static void fail_active_bootstrap_service_trap(
         }
     }
     (void)hart;
+}
+
+static bool handle_vm_self_fault(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    uint64_t cause_code
+)
+{
+    const struct micros_vm_handoff_state *handoff =
+        micros_vm_handoff_runtime_state();
+    const struct micros_bootstrap_control_state *bootstrap =
+        micros_bootstrap_runtime_state();
+    const struct micros_frame_ownership *ownership =
+        micros_frame_ownership_runtime_ledger();
+    const struct micros_endpoint_registry *registry =
+        micros_ipc_runtime_registry();
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_registry();
+    struct micros_thread_handle current;
+    const char *ownership_name;
+    enum micros_bootstrap_service_state service_state = 0;
+    enum micros_vm_self_fault_action action;
+    size_t index;
+
+    if (
+        handoff == NULL
+        || objects == NULL
+        || (frame->scause & MICROS_SCAUSE_INTERRUPT) != 0
+        || (
+            cause_code != MICROS_EXCEPTION_INSTRUCTION_PAGE_FAULT
+            && cause_code != MICROS_EXCEPTION_LOAD_PAGE_FAULT
+            && cause_code != MICROS_EXCEPTION_STORE_PAGE_FAULT
+        )
+        || micros_hart_current_thread(
+            objects,
+            micros_kernel_object_runtime_boot_hart_handle(),
+            &current
+        ) != MICROS_KERNEL_OBJECT_OK
+        || current.slot != handoff->thread.slot
+        || current.generation != handoff->thread.generation
+    ) {
+        return false;
+    }
+    if (
+        bootstrap == NULL
+        || ownership == NULL
+        || registry == NULL
+        || micros_vm_handoff_runtime_validate(
+            bootstrap,
+            registry,
+            objects
+        ) != MICROS_VM_HANDOFF_OK
+    ) {
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "vm-self-fault-invariant",
+            frame
+        );
+    }
+    for (index = 0; index < bootstrap->transitions.entry_count; ++index) {
+        if (
+            bootstrap->transitions.entries[index].service_id
+                == handoff->service_id
+        ) {
+            service_state =
+                bootstrap->transitions.entries[index].state;
+            break;
+        }
+    }
+    action = micros_vm_self_fault_classify(
+        bootstrap->phase,
+        service_state
+    );
+    if (action == MICROS_VM_SELF_FAULT_INVALID) {
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "vm-self-fault-state",
+            frame
+        );
+    }
+    if (
+        ownership->phase == MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+    ) {
+        ownership_name = "bootstrap";
+    } else if (
+        ownership->phase
+            == MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    ) {
+        ownership_name = "handed-off";
+    } else {
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "vm-self-fault-ownership",
+            frame
+        );
+    }
+    uart_write("MICROS_VM_SELF_FAULT service=");
+    uart_write_hex64(handoff->service_id);
+    uart_write(" process-slot=");
+    uart_write_hex64(handoff->process.slot);
+    uart_write(" process-generation=");
+    uart_write_hex64(handoff->process.generation);
+    uart_write(" endpoint=");
+    uart_write_hex64(handoff->endpoint);
+    uart_write(" scause=");
+    uart_write_hex64(frame->scause);
+    uart_write(" stval=");
+    uart_write_hex64(frame->stval);
+    uart_write(" sepc=");
+    uart_write_hex64(frame->sepc);
+    uart_write(" ownership=");
+    uart_write(ownership_name);
+    uart_write("\n");
+    uart_flush();
+
+    if (
+        action == MICROS_VM_SELF_FAULT_RUNNING_STARTING
+        || action == MICROS_VM_SELF_FAULT_RUNNING_READY
+    ) {
+        micros_bootstrap_runtime_record_failure(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
+            handoff->service_id,
+            handoff->endpoint,
+            0
+        );
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "bootstrap-failure",
+            frame
+        );
+    }
+    if (action == MICROS_VM_SELF_FAULT_SEALED) {
+        MICROS_TRAP_PANIC(
+            hart->hardware_id,
+            "vm-self-fault",
+            frame
+        );
+    }
+    MICROS_TRAP_PANIC(
+        hart->hardware_id,
+        "vm-self-fault-phase",
+        frame
+    );
 }
 
 static uintptr_t read_sscratch(void)
@@ -509,6 +660,7 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             !user_timer
             && cause_code != MICROS_EXCEPTION_USER_ECALL
         ) {
+            (void)handle_vm_self_fault(hart, frame, cause_code);
             fail_active_bootstrap_service_trap(hart);
         }
         if (user_timer) {

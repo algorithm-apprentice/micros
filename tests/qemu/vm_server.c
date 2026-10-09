@@ -19,6 +19,8 @@ struct micros_vm_boot_info micros_vm_boot_info = {0};
 static volatile uint64_t vm_data = UINT64_C(0x564d44415441564d);
 static uint8_t grant_buffer[MICROS_VM_HANDOFF_TEST_DATA_SIZE];
 
+void micros_vm_trigger_self_fault(void);
+
 #define VM_FNV_OFFSET UINT64_C(14695981039346656037)
 #define VM_FNV_PRIME UINT64_C(1099511628211)
 
@@ -889,11 +891,21 @@ void micros_service_main(void)
         || !validate_configuration()
         || !validate_boot_info()
         || !complete_handoff()
-        || !send_ready()
-        || !serve_probe()
     ) {
         __builtin_trap();
     }
+#ifdef MICROS_VM_SELF_FAULT_RUNNING
+    micros_vm_trigger_self_fault();
+#endif
+    if (!send_ready()) {
+        __builtin_trap();
+    }
+    if (!serve_probe()) {
+        __builtin_trap();
+    }
+#ifdef MICROS_VM_SELF_FAULT_SEALED
+    micros_vm_trigger_self_fault();
+#endif
     for (;;) {
         struct micros_ipc_message message;
 

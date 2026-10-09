@@ -309,3 +309,22 @@ void micros_vm_handoff_commit_prevalidated(
 {
     state->phase = MICROS_VM_HANDOFF_PHASE_HANDED_OFF;
 }
+
+enum micros_vm_self_fault_action micros_vm_self_fault_classify(
+    enum micros_bootstrap_phase bootstrap_phase,
+    enum micros_bootstrap_service_state service_state
+)
+{
+    if (bootstrap_phase == MICROS_BOOTSTRAP_PHASE_RUNNING) {
+        if (service_state == MICROS_BOOTSTRAP_SERVICE_STARTING) {
+            return MICROS_VM_SELF_FAULT_RUNNING_STARTING;
+        }
+        if (service_state == MICROS_BOOTSTRAP_SERVICE_READY) {
+            return MICROS_VM_SELF_FAULT_RUNNING_READY;
+        }
+        return MICROS_VM_SELF_FAULT_INVALID;
+    }
+    return bootstrap_phase == MICROS_BOOTSTRAP_PHASE_SEALED
+        ? MICROS_VM_SELF_FAULT_SEALED
+        : MICROS_VM_SELF_FAULT_INVALID;
+}
