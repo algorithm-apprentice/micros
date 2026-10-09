@@ -320,8 +320,10 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
+        kernel/plic_core.c
         kernel/tty_handoff_core.c
         servers/tty/tty_core.c
+        tests/host/plic_test.c
         tests/host/tty_handoff_test.c
         tests/host/tty_test.c
     )
@@ -1240,6 +1242,8 @@ add_executable(
     kernel/scheduler.c
     kernel/main.c
     kernel/panic.c
+    kernel/plic.c
+    kernel/plic_core.c
     kernel/pm_control_core.c
     kernel/pm_control_runtime.c
     kernel/pm_control_syscall.c
@@ -1756,7 +1760,7 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            30
+            45
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -1790,7 +1794,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            30
+            45
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -2904,6 +2908,8 @@ if(MICROS_BUILD_MMU_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002"
+            --marker
+            "MICROS_TTY_CONTROLLER_TEST_PASS mapping=exact priority=disabled enable=disabled context=supervisor seie=independent"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

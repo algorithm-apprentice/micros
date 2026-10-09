@@ -7,6 +7,7 @@
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
+#include "kernel/plic.h"
 #include "micros/timer.h"
 #include "micros/trap.h"
 
@@ -252,6 +253,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     ) {
         MICROS_PANIC(hart_id, "mmu-init");
     }
+    if (!micros_plic_initialize()) {
+        MICROS_PANIC(hart_id, "plic-init");
+    }
     address_space = micros_kernel_address_space_report();
     if (address_space == NULL) {
         MICROS_PANIC(hart_id, "mmu-state");
@@ -347,13 +351,21 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #endif
 
 #ifdef MICROS_BUILD_MMU_TEST
-    if (!micros_kernel_address_space_run_self_test()) {
+    if (
+        !micros_kernel_address_space_run_self_test()
+        || !micros_plic_runtime_run_self_test()
+    ) {
         MICROS_PANIC(hart_id, "mmu-test-failed");
     }
     uart_write(
         "MICROS_MMU_TEST_PASS "
         "store-fault=text execute-fault=writable "
         "traps=0x0000000000000002\n"
+    );
+    uart_write(
+        "MICROS_TTY_CONTROLLER_TEST_PASS "
+        "mapping=exact priority=disabled enable=disabled "
+        "context=supervisor seie=independent\n"
     );
     uart_flush();
 #endif

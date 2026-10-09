@@ -7,6 +7,7 @@
 #include "arch/riscv64/trap_context.h"
 
 #define MICROS_RISCV_SIE_STIE (UINT64_C(1) << 5)
+#define MICROS_RISCV_SIE_SEIE (UINT64_C(1) << 9)
 
 static inline uintptr_t riscv_irq_save(void)
 {
@@ -57,6 +58,33 @@ static inline bool riscv_timer_interrupt_is_enabled(void)
 
     __asm__ volatile("csrr %0, sie" : "=r"(enabled));
     return (enabled & MICROS_RISCV_SIE_STIE) != 0;
+}
+
+static inline void riscv_external_interrupt_enable(void)
+{
+    uintptr_t mask = MICROS_RISCV_SIE_SEIE;
+
+    __asm__ volatile("csrs sie, %0" : : "r"(mask) : "memory");
+}
+
+static inline void riscv_external_interrupt_disable(void)
+{
+    uintptr_t mask = MICROS_RISCV_SIE_SEIE;
+
+    __asm__ volatile("csrc sie, %0" : : "r"(mask) : "memory");
+}
+
+static inline bool riscv_external_interrupt_is_enabled(void)
+{
+    uintptr_t enabled;
+
+    __asm__ volatile("csrr %0, sie" : "=r"(enabled));
+    return (enabled & MICROS_RISCV_SIE_SEIE) != 0;
+}
+
+static inline void riscv_mmio_fence(void)
+{
+    __asm__ volatile("fence iorw, iorw" : : : "memory");
 }
 
 static inline void riscv_wait_for_interrupt_with_irq_window(void)
