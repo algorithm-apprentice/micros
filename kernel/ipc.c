@@ -5,6 +5,27 @@
 #include "endpoint_internal.h"
 #include "scheduler_core_internal.h"
 
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    unsigned char *output = destination;
+    const unsigned char *input = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        output[index] = input[index];
+    }
+}
+
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
 static bool thread_handle_is_zero(
     struct micros_thread_handle handle
 )
@@ -932,13 +953,13 @@ static bool find_matching_sender(
     return false;
 }
 
-static bool find_matching_receiver(
+static bool find_matching_receiver_const(
     const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
+    const struct micros_kernel_objects *objects,
     micros_endpoint_t source,
     struct micros_thread_handle *previous,
     struct micros_thread_handle *matched,
-    struct micros_thread **receiver
+    const struct micros_thread **receiver
 )
 {
     struct micros_thread_handle current = endpoint->receiver_head;
@@ -946,7 +967,7 @@ static bool find_matching_receiver(
     size_t steps;
 
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        struct micros_thread *candidate;
+        const struct micros_thread *candidate;
 
         if (thread_handle_is_zero(current)) {
             return false;
@@ -965,6 +986,33 @@ static bool find_matching_receiver(
         current = candidate->ipc_next;
     }
     return false;
+}
+
+static bool find_matching_receiver(
+    const struct micros_endpoint_record *endpoint,
+    struct micros_kernel_objects *objects,
+    micros_endpoint_t source,
+    struct micros_thread_handle *previous,
+    struct micros_thread_handle *matched,
+    struct micros_thread **receiver
+)
+{
+    const struct micros_thread *resolved;
+
+    if (
+        !find_matching_receiver_const(
+            endpoint,
+            objects,
+            source,
+            previous,
+            matched,
+            &resolved
+        )
+    ) {
+        return false;
+    }
+    *receiver = &objects->threads[matched->slot];
+    return true;
 }
 
 static void unlink_thread(
@@ -1796,12 +1844,41 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
     uint64_t event_mask
 )
 {
+    struct micros_ipc_kernel_notification_plan plan;
+    enum micros_ipc_error error;
+
+    error = micros_ipc_prepare_kernel_notification(
+        registry,
+        objects,
+        destination_endpoint,
+        event_mask,
+        &plan
+    );
+    if (error != MICROS_IPC_OK) {
+        return error;
+    }
+    micros_ipc_commit_kernel_notification_prevalidated(
+        registry,
+        objects,
+        &plan
+    );
+    return MICROS_IPC_OK;
+}
+
+enum micros_ipc_error micros_ipc_prepare_kernel_notification(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t destination_endpoint,
+    uint64_t event_mask,
+    struct micros_ipc_kernel_notification_plan *plan
+)
+{
+    struct micros_ipc_kernel_notification_plan candidate;
     const struct micros_endpoint_record *resolved_destination;
-    struct micros_endpoint_record *destination;
+    const struct micros_endpoint_record *destination;
     struct micros_thread_handle previous = {0, 0};
     struct micros_thread_handle receiver_handle = {0, 0};
-    struct micros_thread *receiver = NULL;
-    struct micros_ipc_message notification;
+    const struct micros_thread *receiver = NULL;
     enum micros_endpoint_error endpoint_error;
     enum micros_kernel_object_error scheduler_error;
     bool has_receiver;
@@ -1809,12 +1886,14 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
     if (
         registry == NULL
         || objects == NULL
+        || plan == NULL
         || destination_endpoint == MICROS_ENDPOINT_NONE
         || destination_endpoint == MICROS_ENDPOINT_ANY
         || event_mask == 0
     ) {
         return MICROS_IPC_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
@@ -1831,12 +1910,15 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
     }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
+    candidate.destination_slot =
+        resolved_destination->owner.slot;
+    candidate.event_mask = event_mask;
     canonicalize_notification(
-        &notification,
+        &candidate.notification,
         MICROS_ENDPOINT_NONE,
         event_mask
     );
-    has_receiver = find_matching_receiver(
+    has_receiver = find_matching_receiver_const(
         destination,
         objects,
         MICROS_ENDPOINT_NONE,
@@ -1859,18 +1941,46 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
         ) {
             return MICROS_IPC_ERROR_STATE;
         }
-        scheduler_error = micros_scheduler_commit_ipc_wake(
+        scheduler_error = micros_scheduler_prepare_ipc_wake(
             objects,
             receiver_handle,
-            MICROS_THREAD_RTS_IPC_RECEIVE
+            MICROS_THREAD_RTS_IPC_RECEIVE,
+            &candidate.wake
         );
         if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
             return scheduler_error_to_ipc(scheduler_error);
         }
+        candidate.deliver_to_receiver = true;
+        candidate.previous_receiver = previous;
+        candidate.receiver = receiver_handle;
+        candidate.receive_buffer = receiver->ipc_receive_buffer;
+    }
+    candidate.active = true;
+    copy_bytes(plan, &candidate, sizeof(*plan));
+    return MICROS_IPC_OK;
+}
+
+void micros_ipc_commit_kernel_notification_prevalidated(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_ipc_kernel_notification_plan *plan
+)
+{
+    struct micros_endpoint_record *destination =
+        &registry->endpoints[plan->destination_slot];
+
+    if (plan->deliver_to_receiver) {
+        struct micros_thread *receiver =
+            &objects->threads[plan->receiver.slot];
+
+        micros_scheduler_commit_ipc_wake_prevalidated(
+            objects,
+            &plan->wake
+        );
         unlink_thread(
             objects,
-            previous,
-            receiver_handle,
+            plan->previous_receiver,
+            plan->receiver,
             &destination->receiver_head,
             &destination->receiver_tail
         );
@@ -1880,13 +1990,13 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
         receiver->ipc_receive_source = 0;
         stage_delivery(
             receiver,
-            receiver->ipc_receive_buffer,
-            &notification
+            plan->receive_buffer,
+            &plan->notification
         );
-        return MICROS_IPC_OK;
+    } else {
+        destination->pending_kernel_events |= plan->event_mask;
     }
-    destination->pending_kernel_events |= event_mask;
-    return MICROS_IPC_OK;
+    clear_bytes(plan, sizeof(*plan));
 }
 
 enum micros_ipc_error micros_ipc_receive(

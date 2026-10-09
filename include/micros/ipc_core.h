@@ -4,6 +4,20 @@
 #include <stdint.h>
 
 #include "micros/endpoint.h"
+#include "micros/scheduler_core.h"
+
+struct micros_ipc_kernel_notification_plan {
+    bool active;
+    bool deliver_to_receiver;
+    uint16_t destination_slot;
+    uint32_t reserved;
+    uint64_t event_mask;
+    struct micros_thread_handle previous_receiver;
+    struct micros_thread_handle receiver;
+    uintptr_t receive_buffer;
+    struct micros_ipc_message notification;
+    struct micros_scheduler_ipc_wake_plan wake;
+};
 
 /*
  * Portable operations consume a scheduler-held, non-current thread. Target
@@ -68,6 +82,20 @@ enum micros_ipc_error micros_ipc_inject_kernel_notification(
     struct micros_kernel_objects *objects,
     micros_endpoint_t destination,
     uint64_t event_mask
+);
+
+enum micros_ipc_error micros_ipc_prepare_kernel_notification(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t destination,
+    uint64_t event_mask,
+    struct micros_ipc_kernel_notification_plan *plan
+);
+
+void micros_ipc_commit_kernel_notification_prevalidated(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_ipc_kernel_notification_plan *plan
 );
 
 enum micros_ipc_error micros_ipc_receive(

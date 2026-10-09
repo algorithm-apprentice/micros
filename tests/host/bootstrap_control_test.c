@@ -7,6 +7,7 @@
 #include "kernel/bootstrap_control_internal.h"
 #include "kernel/bootstrap_image.h"
 #include "kernel/endpoint_internal.h"
+#include "micros/ipc_core.h"
 #include "micros/scheduler_core.h"
 #include "micros/sv39.h"
 #include "micros/vm_bootstrap.h"
@@ -270,15 +271,24 @@ static struct micros_privilege_profile profile(
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_CALL;
         result.call_targets = UINT32_C(1) << 1;
+        if (id == MICROS_PRIVILEGE_PROFILE_PM) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+            result.kernel_operations =
+                MICROS_KERNEL_OPERATION_PM_CONTROL;
+        }
     }
     return result;
 }
 
 static void initialize_manifest(
-    struct micros_bootstrap_manifest *manifest
+    struct micros_bootstrap_manifest *manifest,
+    bool include_pm
 )
 {
     struct micros_bootstrap_manifest_entry *launcher;
+    struct micros_bootstrap_manifest_entry *pm;
     struct micros_bootstrap_manifest_entry *vm;
 
     memset(manifest, 0, sizeof(*manifest));
@@ -290,8 +300,9 @@ static void initialize_manifest(
         MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE;
     manifest->header.entry_capacity =
         MICROS_BOOTSTRAP_SERVICE_CAPACITY;
-    manifest->header.entry_count = 2;
-    manifest->header.total_user_page_limit = 7;
+    manifest->header.entry_count = include_pm ? 3 : 2;
+    manifest->header.total_user_page_limit =
+        include_pm ? 10 : 7;
     manifest->header.manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE;
 
     vm = &manifest->entries[0];
@@ -317,6 +328,22 @@ static void initialize_manifest(
     set_name(launcher->profile_name, "BOOTSTRAP_LAUNCHER");
     launcher->user_page_limit = 4;
     launcher->role_flags = MICROS_BOOTSTRAP_ROLE_CONTROLLER;
+
+    if (!include_pm) {
+        return;
+    }
+    pm = &manifest->entries[2];
+    pm->service_id = 3;
+    pm->image_id = 103;
+    pm->process_slot = 2;
+    pm->stack_page_count = 1;
+    pm->profile_id = MICROS_PRIVILEGE_PROFILE_PM;
+    set_name(pm->service_name, "pm");
+    set_name(pm->profile_name, "PM");
+    pm->prerequisites = UINT64_C(1) << 1;
+    pm->ready_timeout_counter_ticks = 100;
+    pm->user_page_limit = 3;
+    pm->role_flags = MICROS_BOOTSTRAP_ROLE_PM;
 }
 
 static struct micros_user_context context_pattern(uint64_t base)
@@ -344,29 +371,34 @@ static bool setup_control_fixture(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
     struct micros_hart_handle *hart,
-    struct micros_bootstrap_binding bindings[2]
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY],
+    bool include_pm
 )
 {
-    static const struct micros_bootstrap_manifest_plan plan = {
-        .entry_count = 2,
-        .total_user_page_limit = 7,
+    struct micros_bootstrap_manifest_plan plan = {
+        .entry_count = include_pm ? 3 : 2,
+        .total_user_page_limit = include_pm ? 10 : 7,
         .controller_service_id = 1,
         .vm_service_id = 2,
-        .ordered_service_ids = {1, 2},
-        .ordered_manifest_indices = {1, 0},
+        .pm_service_id = include_pm ? 3 : 0,
+        .ordered_service_ids = {1, 2, 3},
+        .ordered_manifest_indices = {1, 0, 2},
     };
-    struct micros_privilege_profile profiles[2];
-    struct micros_process_handle processes[2];
-    struct micros_thread_handle threads[2];
-    micros_endpoint_t endpoints[2];
+    struct micros_privilege_profile profiles[3];
+    struct micros_process_handle processes[3];
+    struct micros_thread_handle threads[3];
+    micros_endpoint_t endpoints[3];
+    size_t service_count = include_pm ? 3 : 2;
     size_t index;
 
     memset(state, 0, sizeof(*state));
     memset(registry, 0, sizeof(*registry));
     memset(objects, 0, sizeof(*objects));
-    initialize_manifest(manifest);
+    initialize_manifest(manifest, include_pm);
     profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
     profiles[1] = profile(2, "VM");
+    profiles[2] = profile(MICROS_PRIVILEGE_PROFILE_PM, "PM");
     if (
         micros_kernel_objects_initialize(objects, 1, 1)
             != MICROS_KERNEL_OBJECT_OK
@@ -383,12 +415,12 @@ static bool setup_control_fixture(
         || micros_endpoint_registry_initialize(
             registry,
             profiles,
-            2
+            service_count
         ) != MICROS_ENDPOINT_OK
     ) {
         return false;
     }
-    for (index = 0; index < 2; ++index) {
+    for (index = 0; index < service_count; ++index) {
         struct micros_user_context context =
             context_pattern(UINT64_C(0x1000) + index * 0x100);
         uintptr_t root = UINT64_C(0x10000000)
@@ -450,13 +482,27 @@ static bool setup_control_fixture(
         .scheduler_preemptible = true,
         .scheduler_quantum_counter_ticks = 100,
     };
+    if (include_pm) {
+        bindings[2] = (struct micros_bootstrap_binding){
+            .manifest_index = 2,
+            .service_id = 3,
+            .process = processes[2],
+            .thread = threads[2],
+            .root = UINT64_C(0x10002000),
+            .endpoint = endpoints[2],
+            .prepared_page_count = 3,
+            .scheduler_priority = 6,
+            .scheduler_preemptible = true,
+            .scheduler_quantum_counter_ticks = 100,
+        };
+    }
     return (
         micros_bootstrap_control_state_prepare(
             state,
             manifest,
             &plan,
             bindings,
-            2
+            service_count
         ) == MICROS_BOOTSTRAP_OK
         && micros_bootstrap_control_validate(
             state,
@@ -494,6 +540,161 @@ static bool setup_control_fixture(
     );
 }
 
+static bool release_and_accept_ready(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    const struct micros_bootstrap_binding *binding,
+    uint64_t release_counter,
+    uint64_t ready_counter
+)
+{
+    struct micros_bootstrap_ready_plan plan;
+
+    if (
+        micros_bootstrap_control_release(
+            state,
+            registry,
+            objects,
+            hart,
+            binding->service_id,
+            release_counter,
+            true
+        ) != MICROS_BOOTSTRAP_OK
+        || micros_bootstrap_control_prepare_ready(
+            state,
+            registry,
+            objects,
+            binding->service_id,
+            binding->endpoint,
+            ready_counter,
+            true,
+            &plan
+        ) != MICROS_BOOTSTRAP_OK
+    ) {
+        return false;
+    }
+    micros_bootstrap_control_commit_ready_prevalidated(state, &plan);
+    return true;
+}
+
+static bool setup_ready_pm_fixture(
+    struct micros_bootstrap_control_state *state,
+    struct micros_bootstrap_manifest *manifest,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle *hart,
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY]
+)
+{
+    return (
+        setup_control_fixture(
+            state,
+            manifest,
+            registry,
+            objects,
+            hart,
+            bindings,
+            true
+        )
+        && release_and_accept_ready(
+            state,
+            registry,
+            objects,
+            *hart,
+            &bindings[0],
+            10,
+            109
+        )
+        && release_and_accept_ready(
+            state,
+            registry,
+            objects,
+            *hart,
+            &bindings[2],
+            110,
+            209
+        )
+        && micros_bootstrap_control_validate(
+            state,
+            registry,
+            objects
+        ) == MICROS_BOOTSTRAP_OK
+    );
+}
+
+static bool commit_complete_for_test(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    const struct micros_bootstrap_binding *controller,
+    struct micros_bootstrap_complete_plan *plan
+)
+{
+    if (
+        micros_thread_scheduler_hold(
+            objects,
+            controller->thread
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_scheduler_remove(
+            objects,
+            controller->thread
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return false;
+    }
+    micros_endpoint_commit_source_only_prevalidated(
+        registry,
+        controller->endpoint
+    );
+    micros_bootstrap_control_commit_complete_prevalidated(
+        state,
+        registry,
+        objects,
+        plan
+    );
+    return true;
+}
+
+static bool commit_current_complete_for_test(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    const struct micros_bootstrap_binding *controller,
+    struct micros_bootstrap_complete_plan *plan
+)
+{
+    struct micros_scheduler_current_ipc_guard guard = {0};
+
+    if (
+        micros_scheduler_begin_current_ipc(
+            objects,
+            hart,
+            &guard
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_scheduler_remove(
+            objects,
+            controller->thread
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return false;
+    }
+    micros_endpoint_commit_source_only_prevalidated(
+        registry,
+        controller->endpoint
+    );
+    micros_bootstrap_control_commit_complete_prevalidated(
+        state,
+        registry,
+        objects,
+        plan
+    );
+    return true;
+}
+
 static uint32_t read_u32_le(const unsigned char *bytes)
 {
     return (
@@ -512,6 +713,44 @@ static void write_u32_le(unsigned char *bytes, uint32_t value)
     bytes[3] = (unsigned char)(value >> 24);
 }
 
+static uint64_t read_u64_le(const unsigned char *bytes)
+{
+    uint64_t value = 0;
+    size_t index;
+
+    for (index = 0; index < sizeof(value); ++index) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
+}
+
+static bool sealed_notification_matches(
+    const struct micros_ipc_message *message
+)
+{
+    size_t index;
+
+    if (
+        message->source != MICROS_ENDPOINT_NONE
+        || message->type != MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+        || message->reply_token != 0
+        || read_u64_le(message->payload)
+            != MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED
+    ) {
+        return false;
+    }
+    for (
+        index = sizeof(uint64_t);
+        index < sizeof(message->payload);
+        ++index
+    ) {
+        if (message->payload[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool test_control_transitions(void)
 {
     struct micros_bootstrap_control_state state;
@@ -522,7 +761,8 @@ static bool test_control_transitions(void)
     struct micros_kernel_objects objects;
     struct micros_kernel_objects objects_snapshot;
     struct micros_hart_handle hart;
-    struct micros_bootstrap_binding bindings[2];
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
     struct micros_bootstrap_ready_plan ready_plan;
     struct micros_bootstrap_ready_plan ready_sentinel;
     struct micros_bootstrap_complete_plan complete_plan;
@@ -535,7 +775,8 @@ static bool test_control_transitions(void)
             &registry,
             &objects,
             &hart,
-            bindings
+            bindings,
+            false
         )
     );
     state_snapshot = state;
@@ -764,24 +1005,16 @@ static bool test_control_transitions(void)
             &complete_plan
         ) == MICROS_BOOTSTRAP_OK
         && complete_plan.active
+        && !complete_plan.pm_notification.active
     );
     EXPECT_TRUE(
-        micros_thread_scheduler_hold(
+        commit_complete_for_test(
+            &state,
+            &registry,
             &objects,
-            bindings[1].thread
-        ) == MICROS_KERNEL_OBJECT_OK
-        && micros_thread_scheduler_remove(
-            &objects,
-            bindings[1].thread
-        ) == MICROS_KERNEL_OBJECT_OK
-    );
-    micros_endpoint_commit_source_only_prevalidated(
-        &registry,
-        bindings[1].endpoint
-    );
-    micros_bootstrap_control_commit_complete_prevalidated(
-        &state,
-        &complete_plan
+            &bindings[1],
+            &complete_plan
+        )
     );
     EXPECT_TRUE(
         micros_bootstrap_control_validate(
@@ -826,6 +1059,459 @@ static bool test_control_transitions(void)
     );
     EXPECT_TRUE(
         micros_bootstrap_control_validate(
+            &state,
+            &registry,
+            &objects
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    return true;
+}
+
+static bool test_pm_completion_rejections_are_atomic(void)
+{
+    struct micros_bootstrap_control_state state;
+    struct micros_bootstrap_control_state state_snapshot;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_endpoint_registry registry;
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_hart_handle hart;
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    struct micros_bootstrap_complete_plan plan;
+    struct micros_bootstrap_complete_plan sentinel;
+    struct micros_bootstrap_ready_plan ready_plan;
+
+    EXPECT_TRUE(
+        setup_control_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings,
+            true
+        )
+        && release_and_accept_ready(
+            &state,
+            &registry,
+            &objects,
+            hart,
+            &bindings[0],
+            10,
+            109
+        )
+        && micros_bootstrap_control_release(
+            &state,
+            &registry,
+            &objects,
+            hart,
+            bindings[2].service_id,
+            110,
+            true
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_ready(
+            &state,
+            &registry,
+            &objects,
+            bindings[2].service_id,
+            bindings[2].endpoint,
+            209,
+            true,
+            &ready_plan
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    micros_bootstrap_control_commit_ready_prevalidated(
+        &state,
+        &ready_plan
+    );
+
+    registry.endpoints[bindings[2].process.slot].state =
+        MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_INVARIANT
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    registry.endpoints[bindings[2].process.slot].state =
+        MICROS_ENDPOINT_STATE_ACTIVE;
+
+    objects.threads[bindings[2].thread.slot].scheduler_assigned =
+        false;
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_INVARIANT
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    return true;
+}
+
+static bool test_pm_completion_queues_sealed_event_once(void)
+{
+    struct micros_bootstrap_control_state state;
+    struct micros_bootstrap_control_state state_snapshot;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_endpoint_registry registry;
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_hart_handle hart;
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    struct micros_bootstrap_complete_plan plan;
+    struct micros_bootstrap_complete_plan sentinel;
+    const struct micros_endpoint_record *pm_endpoint;
+
+    EXPECT_TRUE(
+        setup_ready_pm_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings
+        )
+    );
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.active
+        && plan.pm_notification.active
+        && !plan.pm_notification.deliver_to_receiver
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+        && commit_complete_for_test(
+            &state,
+            &registry,
+            &objects,
+            &bindings[1],
+            &plan
+        )
+        && state.phase == MICROS_BOOTSTRAP_PHASE_SEALED
+        && micros_endpoint_resolve_active(
+            &registry,
+            &objects,
+            bindings[2].endpoint,
+            &pm_endpoint
+        ) == MICROS_ENDPOINT_OK
+        && pm_endpoint->pending_kernel_events
+            == MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED
+        && micros_bootstrap_control_validate(
+            &state,
+            &registry,
+            &objects
+        ) == MICROS_BOOTSTRAP_OK
+    );
+
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    return true;
+}
+
+static bool test_pm_completion_wakes_only_any_receiver(void)
+{
+    struct micros_bootstrap_control_state state;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_endpoint_registry registry;
+    struct micros_kernel_objects objects;
+    struct micros_hart_handle hart;
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    struct micros_bootstrap_complete_plan plan;
+    struct micros_scheduler_return_plan return_plan;
+    const struct micros_endpoint_record *pm_endpoint;
+    const struct micros_thread *pm_thread;
+
+    EXPECT_TRUE(
+        setup_ready_pm_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings
+        )
+        && micros_thread_scheduler_hold(
+            &objects,
+            bindings[2].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            bindings[2].thread,
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x61004000)
+        ) == MICROS_IPC_OK
+    );
+    EXPECT_TRUE(
+        micros_thread_scheduler_hold(
+            &objects,
+            bindings[0].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_scheduler_accounting_initialize(
+            &objects,
+            hart,
+            100
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
+    EXPECT_TRUE(
+        micros_hart_plan_user_return(
+            &objects,
+            hart,
+            &return_plan
+        ) == MICROS_KERNEL_OBJECT_OK
+        && return_plan.selected.slot
+            == bindings[1].thread.slot
+        && return_plan.selected.generation
+            == bindings[1].thread.generation
+    );
+    EXPECT_TRUE(
+        micros_hart_commit_user_return(
+            &objects,
+            &return_plan
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_scheduler_account_enter_thread(
+            &objects,
+            hart,
+            bindings[1].thread,
+            101
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_scheduler_account_user_trap(
+            &objects,
+            hart,
+            102
+        ) == MICROS_KERNEL_OBJECT_OK
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.pm_notification.active
+        && plan.pm_notification.deliver_to_receiver
+    );
+    EXPECT_TRUE(
+        commit_current_complete_for_test(
+            &state,
+            &registry,
+            &objects,
+            hart,
+            &bindings[1],
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        micros_endpoint_resolve_active(
+            &registry,
+            &objects,
+            bindings[2].endpoint,
+            &pm_endpoint
+        ) == MICROS_ENDPOINT_OK
+        && micros_thread_resolve(
+            &objects,
+            bindings[2].thread,
+            &pm_thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && pm_endpoint->pending_kernel_events == 0
+        && pm_endpoint->receiver_head.generation == 0
+        && pm_endpoint->receiver_tail.generation == 0
+        && pm_thread->runtime_flags == 0
+        && pm_thread->ready_linked
+        && pm_thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && pm_thread->ipc_receive_source == 0
+        && pm_thread->ipc_receive_buffer == UINT64_C(0x61004000)
+        && pm_thread->ipc_delivery_pending
+        && sealed_notification_matches(
+            &pm_thread->ipc_inbound_message
+        )
+        && micros_bootstrap_control_validate(
+            &state,
+            &registry,
+            &objects
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    return true;
+}
+
+static bool test_pm_completion_preserves_specific_receiver(void)
+{
+    struct micros_bootstrap_control_state state;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_endpoint_registry registry;
+    struct micros_kernel_objects objects;
+    struct micros_hart_handle hart;
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    struct micros_bootstrap_complete_plan plan;
+    const struct micros_endpoint_record *pm_endpoint;
+    const struct micros_thread *pm_thread;
+
+    EXPECT_TRUE(
+        setup_ready_pm_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings
+        )
+        && micros_thread_scheduler_hold(
+            &objects,
+            bindings[2].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_receiver_enqueue(
+            &registry,
+            &objects,
+            bindings[2].thread,
+            bindings[0].endpoint,
+            UINT64_C(0x61005000)
+        ) == MICROS_IPC_OK
+    );
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.pm_notification.active
+        && !plan.pm_notification.deliver_to_receiver
+    );
+    EXPECT_TRUE(
+        commit_complete_for_test(
+            &state,
+            &registry,
+            &objects,
+            &bindings[1],
+            &plan
+        )
+    );
+    EXPECT_TRUE(
+        micros_endpoint_resolve_active(
+            &registry,
+            &objects,
+            bindings[2].endpoint,
+            &pm_endpoint
+        ) == MICROS_ENDPOINT_OK
+        && micros_thread_resolve(
+            &objects,
+            bindings[2].thread,
+            &pm_thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && pm_endpoint->pending_kernel_events
+            == MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED
+        && pm_endpoint->receiver_head.slot
+            == bindings[2].thread.slot
+        && pm_endpoint->receiver_head.generation
+            == bindings[2].thread.generation
+        && pm_endpoint->receiver_tail.slot
+            == bindings[2].thread.slot
+        && pm_endpoint->receiver_tail.generation
+            == bindings[2].thread.generation
+        && pm_thread->runtime_flags
+            == MICROS_THREAD_RTS_IPC_RECEIVE
+        && !pm_thread->ready_linked
+        && pm_thread->ipc_queue_kind
+            == MICROS_IPC_QUEUE_RECEIVER
+        && pm_thread->ipc_receive_source
+            == bindings[0].endpoint
+        && !pm_thread->ipc_delivery_pending
+        && micros_bootstrap_control_validate(
             &state,
             &registry,
             &objects
@@ -1007,6 +1693,10 @@ int main(void)
         test_valid_commands()
         && test_malformed_commands()
         && test_control_transitions()
+        && test_pm_completion_rejections_are_atomic()
+        && test_pm_completion_queues_sealed_event_once()
+        && test_pm_completion_wakes_only_any_receiver()
+        && test_pm_completion_preserves_specific_receiver()
         && test_image_catalog()
     )
         ? 0

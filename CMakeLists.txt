@@ -288,6 +288,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/bootstrap_image.c
         kernel/bootstrap_manifest.c
         kernel/endpoint.c
+        kernel/ipc.c
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         tests/host/bootstrap_control_test.c
