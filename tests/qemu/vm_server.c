@@ -8,6 +8,17 @@
 #include "micros/bootstrap_control.h"
 #include "micros/vm_bootstrap.h"
 #include "tests/qemu/vm_handoff_protocol.h"
+#ifdef MICROS_PM_SERVICE_TEST
+#include "tests/qemu/pm_service_protocol.h"
+#define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
+    MICROS_PM_TEST_LAUNCHER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID \
+    MICROS_PM_TEST_VM_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_PROBE_SERVICE_ID \
+    MICROS_PM_TEST_PROBE_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
+    MICROS_PM_TEST_SERVICE_COUNT
+#endif
 
 volatile struct micros_bootstrap_service_config
     micros_bootstrap_service_config;
@@ -17,7 +28,9 @@ __attribute__((section(".data.vm_boot_info"), used))
 struct micros_vm_boot_info micros_vm_boot_info = {0};
 
 static volatile uint64_t vm_data = UINT64_C(0x564d44415441564d);
+#ifndef MICROS_PM_SERVICE_TEST
 static uint8_t grant_buffer[MICROS_VM_HANDOFF_TEST_DATA_SIZE];
+#endif
 
 void micros_vm_trigger_self_fault(void);
 
@@ -65,6 +78,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
+#ifndef MICROS_PM_SERVICE_TEST
 static uint64_t read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
@@ -75,6 +89,7 @@ static uint64_t read_u64_le(const uint8_t *bytes)
     }
     return value;
 }
+#endif
 
 static bool add_u64(uint64_t left, uint64_t right, uint64_t *result)
 {
@@ -820,6 +835,7 @@ static bool complete_handoff(void)
     ) == MICROS_SYSCALL_ABI_OK;
 }
 
+#ifndef MICROS_PM_SERVICE_TEST
 static bool serve_probe(void)
 {
     struct micros_ipc_message request;
@@ -899,6 +915,7 @@ static bool serve_probe(void)
     return micros_runtime_reply(request.reply_token, &reply)
         == MICROS_SYSCALL_ABI_OK;
 }
+#endif
 
 void micros_service_main(void)
 {
@@ -924,9 +941,11 @@ void micros_service_main(void)
     if (!send_ready()) {
         __builtin_trap();
     }
+#ifndef MICROS_PM_SERVICE_TEST
     if (!serve_probe()) {
         __builtin_trap();
     }
+#endif
 #ifdef MICROS_VM_SELF_FAULT_SEALED
     micros_vm_trigger_self_fault();
 #endif
