@@ -80,6 +80,38 @@ VM tokens, application-profile installation, instruction synchronization,
 activation, running exit teardown, and an end-to-end wait result. Those later
 tests extend rather than replace the Step 10 native lifecycle model.
 
+### TTY Step 11 evidence
+
+TTY combines portable state machines with hardware and privilege behavior, so
+its evidence is split at the real authority boundaries:
+
+- native TTY tests cover byte-exact protocol parsing, strict request IDs,
+  grant direction and bounds, one pending read and write, cancellation,
+  completion notification and collection, 256-entry canonical input, CR/LF,
+  erase, overflow, echo, LF-to-CRLF output, physical drain, and replayable
+  mixed transitions;
+- native kernel-transition tests cover the exact TTY tuple and profiles,
+  console begin, one-shot operation-12 mapping, the non-managed device-leaf
+  exception, managed-memory rejection, operation-14 authority, PLIC source-10
+  claim/in-service/complete state, `SEIE` independence, external-interrupt
+  return, begin-time deadline coverage, failure preservation, and DLAB-safe
+  panic seizure; and
+- one QEMU component test uses the real launcher, VM, PM, and TTY plus an exact
+  test VFS peer. It proves begin before mapping, mapping before release, commit
+  before ready, one unextended guest deadline, marker-triggered host input,
+  canonical grant-backed read, empty-to-nonempty transmit start, grant-backed
+  interrupt-driven output, and deferred PLIC completion.
+
+The QEMU harness sends the configured bytes only after observing an exact TTY
+input-ready line. It uses no sleep, preserves the guest-owned readiness
+deadlines and host absolute timeout, and leaves every other QEMU workflow's
+stdin disconnected.
+
+The implementation must expose one stable `test-qemu-tty` workflow. The final
+marker is emitted by TTY after the probe's grant-backed write, and isolated
+test shutdown occurs only after the UART has physically drained and the
+kernel has validated matching source-10 claim/completion evidence.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:

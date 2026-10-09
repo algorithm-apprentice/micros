@@ -190,6 +190,31 @@ reserved process; PM's prepare transition creates the first thread and
 reserved endpoint, installs `APPLICATION`, attaches the executable context,
 and seals the mapping generation before final activation.
 
+Step 11 is internally serialized:
+
+1. fix the local MINIX TTY, grant, buffering, MMIO, notification, and explicit
+   IRQ-acknowledgment baseline;
+2. prepare one exact launcher/VM/TTY console binding and keep UART source 10
+   disabled;
+3. begin handoff, arm one manifest-bounded deadline, disable ordinary kernel
+   output, and notify VM while TTY remains held;
+4. let exact VM authority install only the fixed UART leaf at `0x7fffe000`
+   without allocation or page-table growth;
+5. notify the launcher from the kernel after that PTE commits, then release
+   TTY;
+6. initialize the NS16550A, drain stale state, commit ownership, install the
+   PLIC route, and only then accept TTY readiness;
+7. claim source 10, notify exact TTY, retain it in service, and complete it
+   only after TTY drains the device;
+8. prove bounded canonical input, interrupt-driven output, exact grants,
+   cancellation, completion and writable notifications, lost-wakeup
+   prevention, and malformed-request rejection in native models; and
+9. run one real QEMU TTY scenario with deterministic host input and no sleeps.
+
+Step 11's post-handoff mapping is a one-shot device exception. It does not add
+ordinary frames, map/unmap selection, page-table growth, page faults, scratch
+aliases, or the Step 14 executable-mapping transaction.
+
 `init` is not a static manifest service. Step 14 creates it through the
 ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
 

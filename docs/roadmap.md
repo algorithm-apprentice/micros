@@ -368,9 +368,18 @@ model, IPC reply model, or global current-execution representation.
   generation and transaction stale;
 - no Milestone 5 PM outcome claims a successful spawn or allocates post-handoff
   user memory before the reviewed VM mapping protocol;
+- TTY release follows console begin and one exact VM-installed UART device
+  leaf, while TTY readiness follows ownership commit;
+- one guest-owned manifest deadline covers the complete console begin through
+  readiness sequence without a pre-release timeout gap;
+- PLIC source 10 remains in service from kernel claim through exact TTY
+  acknowledgment after UART draining;
+- deterministic QEMU input and output prove canonical CR/LF and erase
+  processing, empty-to-nonempty transmit start, interrupt-driven
+  receive/transmit, and no routine kernel UART output after begin;
 - service protocols reject malformed types and payload lengths;
 - client termination releases server-owned state;
-- terminal data and file data use grants;
+- terminal data and file data use exact-direction grants;
 - non-transitive data paths use bounded resident bounce buffers;
 - init receives working descriptors 0, 1, and 2 without RAMFS device nodes;
 - RAMFS operations pass native model tests and QEMU integration tests;
