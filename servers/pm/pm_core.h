@@ -86,6 +86,9 @@ struct micros_pm_request {
     uint64_t reply_token;
     uint64_t child_pid;
     int32_t exit_code;
+    uint32_t grant;
+    uint32_t request_size;
+    uint32_t reserved1;
 };
 
 struct micros_pm_spawn_resources {

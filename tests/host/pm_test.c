@@ -139,6 +139,23 @@ static struct micros_ipc_message wait_request(
     return message;
 }
 
+static struct micros_ipc_message spawn_request(
+    uint32_t grant,
+    uint32_t request_size
+)
+{
+    struct micros_ipc_message message;
+
+    memset(&message, 0, sizeof(message));
+    message.source = UINT32_C(0x00001001);
+    message.type = MICROS_PM_MESSAGE_SPAWN;
+    message.reply_token = 11;
+    write_u32_le(&message.payload[0], MICROS_PM_PROTOCOL_VERSION);
+    write_u32_le(&message.payload[8], grant);
+    write_u32_le(&message.payload[12], request_size);
+    return message;
+}
+
 static struct micros_ipc_message sealed_event(void)
 {
     struct micros_ipc_message message;
@@ -160,6 +177,7 @@ static bool test_protocol_contract(void)
     struct micros_pm_request sentinel;
     struct micros_ipc_message result;
     struct micros_ipc_message result_sentinel;
+    size_t index;
 
     EXPECT_TRUE(
         MICROS_PM_PROCESS_CAPACITY == 64
@@ -185,6 +203,29 @@ static bool test_protocol_contract(void)
         && request.child_pid == UINT64_C(45)
         && request.exit_code == 0
     );
+    message = spawn_request(UINT32_C(0x1234), 256);
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_OK
+        && request.type == MICROS_PM_MESSAGE_SPAWN
+        && request.flags == 0
+        && request.grant == UINT32_C(0x1234)
+        && request.request_size == 256
+        && request.child_pid == 0
+        && request.exit_code == 0
+    );
+    message = spawn_request(UINT32_MAX, 256);
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_OK
+        && request.grant == UINT32_MAX
+    );
+    message = spawn_request(1, 4096);
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_OK
+        && request.request_size == 4096
+    );
 
     memset(&sentinel, 0xa5, sizeof(sentinel));
     request = sentinel;
@@ -209,6 +250,51 @@ static bool test_protocol_contract(void)
             == MICROS_PM_PROTOCOL_MALFORMED
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
+    message = spawn_request(1, 255);
+    request = sentinel;
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_MALFORMED
+        && memcmp(&request, &sentinel, sizeof(request)) == 0
+    );
+    message = spawn_request(1, 4097);
+    request = sentinel;
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_MALFORMED
+        && memcmp(&request, &sentinel, sizeof(request)) == 0
+    );
+    message = spawn_request(1, 256);
+    write_u32_le(&message.payload[4], 1);
+    request = sentinel;
+    EXPECT_TRUE(
+        micros_pm_decode_request(&message, &request)
+            == MICROS_PM_PROTOCOL_MALFORMED
+        && memcmp(&request, &sentinel, sizeof(request)) == 0
+    );
+    for (index = 0; index < 32; ++index) {
+        message = spawn_request(1, 256);
+        write_u32_le(
+            &message.payload[4],
+            UINT32_C(1) << index
+        );
+        request = sentinel;
+        EXPECT_TRUE(
+            micros_pm_decode_request(&message, &request)
+                == MICROS_PM_PROTOCOL_MALFORMED
+            && memcmp(&request, &sentinel, sizeof(request)) == 0
+        );
+    }
+    for (index = 16; index < sizeof(message.payload); ++index) {
+        message = spawn_request(1, 256);
+        message.payload[index] = 1;
+        request = sentinel;
+        EXPECT_TRUE(
+            micros_pm_decode_request(&message, &request)
+                == MICROS_PM_PROTOCOL_MALFORMED
+            && memcmp(&request, &sentinel, sizeof(request)) == 0
+        );
+    }
     message = wait_request(0, 0);
     message.reply_token = 0;
     request = sentinel;
@@ -272,6 +358,64 @@ static bool test_protocol_contract(void)
             == MICROS_PM_MESSAGE_RESULT
         && (int32_t)read_u32_le(&result.payload[8])
             == MICROS_PM_RESULT_BAD_TYPE
+    );
+    result = result_sentinel;
+    EXPECT_TRUE(
+        micros_pm_build_result(
+            MICROS_PM_MESSAGE_SPAWN,
+            MICROS_PM_RESULT_OK,
+            UINT64_C(0x0102030405060708),
+            MICROS_PM_EXIT_NONE,
+            0,
+            &result
+        ) == MICROS_PM_MODEL_OK
+        && read_u32_le(&result.payload[4])
+            == MICROS_PM_MESSAGE_SPAWN
+        && (int32_t)read_u32_le(&result.payload[8])
+            == MICROS_PM_RESULT_OK
+        && read_u64_le(&result.payload[16])
+            == UINT64_C(0x0102030405060708)
+        && read_u32_le(&result.payload[24])
+            == MICROS_PM_EXIT_NONE
+        && read_u32_le(&result.payload[28]) == 0
+    );
+    result = result_sentinel;
+    EXPECT_TRUE(
+        micros_pm_build_result(
+            MICROS_PM_MESSAGE_SPAWN,
+            MICROS_PM_RESULT_OK,
+            0,
+            MICROS_PM_EXIT_NONE,
+            0,
+            &result
+        ) == MICROS_PM_MODEL_ERROR_ARGUMENT
+        && memcmp(&result, &result_sentinel, sizeof(result)) == 0
+    );
+    result = result_sentinel;
+    EXPECT_TRUE(
+        micros_pm_build_result(
+            MICROS_PM_MESSAGE_SPAWN,
+            MICROS_PM_RESULT_DESCRIPTOR,
+            0,
+            MICROS_PM_EXIT_NONE,
+            0,
+            &result
+        ) == MICROS_PM_MODEL_OK
+        && (int32_t)read_u32_le(&result.payload[8])
+            == MICROS_PM_RESULT_DESCRIPTOR
+        && bytes_are_zero(&result.payload[12], 36)
+    );
+    result = result_sentinel;
+    EXPECT_TRUE(
+        micros_pm_build_result(
+            MICROS_PM_MESSAGE_SPAWN,
+            MICROS_PM_RESULT_DESCRIPTOR,
+            1,
+            MICROS_PM_EXIT_NONE,
+            0,
+            &result
+        ) == MICROS_PM_MODEL_ERROR_ARGUMENT
+        && memcmp(&result, &result_sentinel, sizeof(result)) == 0
     );
     return true;
 }

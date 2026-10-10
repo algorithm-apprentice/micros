@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "micros/spawn.h"
+
 #define MICROS_PM_INITIALIZATION_MAGIC UINT64_C(0x4d4943524f53504d)
 
 static void zero_bytes(void *value, size_t size)
@@ -129,7 +131,7 @@ static bool endpoint_is_published_elsewhere(
 static bool result_is_defined(enum micros_pm_result result)
 {
     return (
-        result >= MICROS_PM_RESULT_NO_CHILD
+        result >= MICROS_PM_RESULT_DESCRIPTOR
         && result <= MICROS_PM_RESULT_OK
     );
 }
@@ -675,6 +677,7 @@ enum micros_pm_protocol_status micros_pm_decode_request(
     if (
         message->type != MICROS_PM_MESSAGE_EXIT
         && message->type != MICROS_PM_MESSAGE_WAIT
+        && message->type != MICROS_PM_MESSAGE_SPAWN
     ) {
         return MICROS_PM_PROTOCOL_BAD_TYPE;
     }
@@ -691,11 +694,24 @@ enum micros_pm_protocol_status micros_pm_decode_request(
         ) {
             return MICROS_PM_PROTOCOL_MALFORMED;
         }
-    } else if (
-        (flags & ~MICROS_PM_WAIT_NOHANG) != 0
-        || !bytes_are_zero(&message->payload[16], 32)
-    ) {
-        return MICROS_PM_PROTOCOL_MALFORMED;
+    } else if (message->type == MICROS_PM_MESSAGE_WAIT) {
+        if (
+            (flags & ~MICROS_PM_WAIT_NOHANG) != 0
+            || !bytes_are_zero(&message->payload[16], 32)
+        ) {
+            return MICROS_PM_PROTOCOL_MALFORMED;
+        }
+    } else {
+        uint32_t request_size = read_u32_le(&message->payload[12]);
+
+        if (
+            flags != 0
+            || request_size < MICROS_SPAWN_REQUEST_SIZE_MIN
+            || request_size > MICROS_SPAWN_REQUEST_SIZE_MAX
+            || !bytes_are_zero(&message->payload[16], 32)
+        ) {
+            return MICROS_PM_PROTOCOL_MALFORMED;
+        }
     }
     if (message->reply_token == 0) {
         return MICROS_PM_PROTOCOL_INVARIANT;
@@ -710,8 +726,11 @@ enum micros_pm_protocol_status micros_pm_decode_request(
         decoded.exit_code = (int32_t)read_u32_le(
             &message->payload[8]
         );
-    } else {
+    } else if (message->type == MICROS_PM_MESSAGE_WAIT) {
         decoded.child_pid = read_u64_le(&message->payload[8]);
+    } else {
+        decoded.grant = read_u32_le(&message->payload[8]);
+        decoded.request_size = read_u32_le(&message->payload[12]);
     }
     *request = decoded;
     return MICROS_PM_PROTOCOL_OK;
@@ -737,20 +756,28 @@ enum micros_pm_model_error micros_pm_build_result(
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
     if (result == MICROS_PM_RESULT_OK) {
-        if (
-            request_type != MICROS_PM_MESSAGE_WAIT
-            || (
-                child_pid == 0
-                && (
-                    exit_kind != MICROS_PM_EXIT_NONE
-                    || exit_code != 0
+        if (request_type == MICROS_PM_MESSAGE_WAIT) {
+            if (
+                (
+                    child_pid == 0
+                    && (
+                        exit_kind != MICROS_PM_EXIT_NONE
+                        || exit_code != 0
+                    )
                 )
-            )
-            || (
-                child_pid != 0
-                && exit_kind != MICROS_PM_EXIT_NORMAL
-                && exit_kind != MICROS_PM_EXIT_FAULT
-            )
+                || (
+                    child_pid != 0
+                    && exit_kind != MICROS_PM_EXIT_NORMAL
+                    && exit_kind != MICROS_PM_EXIT_FAULT
+                )
+            ) {
+                return MICROS_PM_MODEL_ERROR_ARGUMENT;
+            }
+        } else if (
+            request_type != MICROS_PM_MESSAGE_SPAWN
+            || child_pid == 0
+            || exit_kind != MICROS_PM_EXIT_NONE
+            || exit_code != 0
         ) {
             return MICROS_PM_MODEL_ERROR_ARGUMENT;
         }

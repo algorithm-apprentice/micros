@@ -316,6 +316,8 @@ requires every untracked file to be staged first.
 The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
 and kernel-object implementations with warnings as errors, ASan, and UBSan.
+The fast graph also runs the bytewise spawn-request, application-stack, and
+runtime ELF planning tests through the `spawn-abi` CTest case.
 It also links the production user-runtime wrappers against a raw-syscall
 capture stub, exercises the production-prefixed `memcpy` and `memset` bodies,
 and runs malformed standalone-ELF and fixture-generator regressions. It then
