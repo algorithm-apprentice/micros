@@ -12,6 +12,7 @@ UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
 UNIT_FULL = ("cmake", "--workflow", "--preset", "test-unit")
 IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
 TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
+RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -635,11 +636,22 @@ SLOW_MODEL_INPUTS = {
         "servers/tty/tty_uart.h",
         "tests/host/tty_model_test.c",
     ),
+    "test-ramfs-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/grant.h",
+        "include/micros/ipc.h",
+        "include/micros/ramfs.h",
+        "servers/ramfs/",
+        "tests/host/ramfs_model_test.c",
+        "tools/generate_ramfs_seed.py",
+    ),
 }
 
 SLOW_MODEL_CTESTS = {
     "test-ipc-model": ("ipc-model", "ipc_model_test"),
     "test-tty-model": ("tty-model", "tty_model_test"),
+    "test-ramfs-model": ("ramfs-model", "ramfs_model_test"),
 }
 
 

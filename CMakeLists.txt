@@ -372,6 +372,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_dependencies(ramfs_seed_test ramfs_seed_image)
     add_executable(
+        ramfs_test
+        servers/ramfs/ramfs_core.c
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_test.c
+    )
+    add_dependencies(ramfs_test ramfs_seed_image)
+    add_executable(
+        ramfs_model_test
+        servers/ramfs/ramfs_core.c
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_model_test.c
+    )
+    add_dependencies(ramfs_model_test ramfs_seed_image)
+    add_executable(
         tty_test
         kernel/plic_core.c
         kernel/tty_control_core.c
@@ -606,6 +620,18 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        ramfs_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        ramfs_model_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         tty_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -649,6 +675,8 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
     target_compile_features(ramfs_seed_test PRIVATE c_std_17)
+    target_compile_features(ramfs_test PRIVATE c_std_17)
+    target_compile_features(ramfs_model_test PRIVATE c_std_17)
     target_compile_features(tty_test PRIVATE c_std_17)
     target_compile_features(tty_service_test PRIVATE c_std_17)
     target_compile_features(tty_uart_test PRIVATE c_std_17)
@@ -786,6 +814,26 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         ramfs_seed_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_model_test
         PRIVATE
             -Wall
             -Wextra
@@ -996,6 +1044,28 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            ramfs_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            ramfs_model_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_model_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             tty_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1124,6 +1194,11 @@ if(MICROS_BUILD_HOST_TESTS)
         NAME ramfs-seed
         COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
     )
+    add_test(
+        NAME ramfs-core
+        COMMAND ramfs_test "${MICROS_RAMFS_SEED_IMAGE}"
+    )
+    add_test(NAME ramfs-model COMMAND ramfs_model_test)
     add_test(NAME tty-core COMMAND tty_test)
     add_test(NAME tty-service-core COMMAND tty_service_test)
     add_test(NAME tty-uart COMMAND tty_uart_test)
@@ -1142,6 +1217,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME tty-owner-fault COMMAND tty_fault_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
     set_tests_properties(tty-model PROPERTIES LABELS slow)
+    set_tests_properties(ramfs-model PROPERTIES LABELS slow)
 
     add_custom_target(
         test-unit-fast
@@ -1176,6 +1252,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             ramfs_seed_test
+            ramfs_test
             tty_test
             tty_service_test
             tty_uart_test
@@ -1218,6 +1295,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
 
     add_custom_target(
+        test-ramfs-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            ramfs-model
+        DEPENDS ramfs_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
         test-unit
         COMMAND
             "${CMAKE_CTEST_COMMAND}"
@@ -1249,6 +1340,8 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             ramfs_seed_test
+            ramfs_test
+            ramfs_model_test
             tty_test
             tty_service_test
             tty_uart_test

@@ -170,8 +170,8 @@ Performance budgets are:
 Budgets are review signals, not reasons to hide necessary coverage.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
-`test-tty-model`, and the complete `test-unit` gate. The implemented QEMU
-targets are `test-qemu-smoke`,
+`test-tty-model`, `test-ramfs-model`, and the complete `test-unit` gate. The
+implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
@@ -200,6 +200,7 @@ the implemented configure, build, and execution gates are:
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
+cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
@@ -343,8 +344,11 @@ the recent complete operation trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-ipc-model` contains the replayable endpoint lifecycle, notification,
-close-cancellation, and persistent 8,192-transition IPC models. `test-unit`
-combines both tiers and remains the complete native gate.
+close-cancellation, and persistent 8,192-transition IPC models.
+`test-ramfs-model` compares the complete portable RAMFS state with an
+independent reference across 8,192 replayable mixed filesystem transitions.
+`test-unit` combines the fast tests and every persistent model and remains the
+complete native gate.
 
 `tools/validation_plan.py` maps committed, staged, unstaged, and untracked
 paths to `fast`, `pr`, or `full` execution plans. Documentation-only changes

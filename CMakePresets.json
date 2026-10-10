@@ -363,6 +363,13 @@
       ]
     },
     {
+      "name": "test-ramfs-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-ramfs-model"
+      ]
+    },
+    {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
     },
@@ -666,6 +673,20 @@
         {
           "type": "build",
           "name": "test-tty-model"
+        }
+      ]
+    },
+    {
+      "name": "test-ramfs-model",
+      "displayName": "Build and run persistent RAMFS model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-ramfs-model"
         }
       ]
     },

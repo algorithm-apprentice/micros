@@ -52,6 +52,14 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_fast_ramfs_runs_persistent_model(self):
+        commands = validation_plan.plan(
+            ["servers/ramfs/ramfs_core.c"],
+            "fast",
+        )
+        self.assertEqual(validation_plan.UNIT_FAST, commands[0])
+        self.assertIn(validation_plan.RAMFS_MODEL, commands)
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",
