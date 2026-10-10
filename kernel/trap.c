@@ -31,6 +31,9 @@
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tty_service_test.h"
 #endif
+#ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
+#include "kernel/ramfs_service_test.h"
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
 #endif
@@ -706,6 +709,33 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 frame
             );
         }
+#ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
+        if (
+            !user_timer
+            && !user_external
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            enum micros_ramfs_service_test_trap_result result =
+                micros_ramfs_service_test_handle_trap(hart, frame);
+
+            if (
+                result
+                    == MICROS_RAMFS_SERVICE_TEST_TRAP_USER_RETURN
+            ) {
+                if (
+                    micros_scheduler_select_user_return(hart, frame)
+                        != MICROS_SCHEDULER_OK
+                ) {
+                    MICROS_TRAP_PANIC(
+                        hart->hardware_id,
+                        "ramfs-service-test-return",
+                        frame
+                    );
+                }
+                return;
+            }
+        }
+#endif
         if (
             !user_timer
             && !user_external

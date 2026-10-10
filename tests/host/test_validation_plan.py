@@ -59,6 +59,10 @@ class ValidationPlanTests(unittest.TestCase):
         )
         self.assertEqual(validation_plan.UNIT_FAST, commands[0])
         self.assertIn(validation_plan.RAMFS_MODEL, commands)
+        self.assertIn(
+            validation_plan.workflow("test-qemu-ramfs"),
+            commands,
+        )
 
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
@@ -208,6 +212,49 @@ class ValidationPlanTests(unittest.TestCase):
                     path,
                     "test-qemu-scheduler",
                 )
+
+    def test_ramfs_production_and_fixture_paths_own_qemu_gate(self):
+        for path in (
+            "include/micros/ramfs.h",
+            "kernel/ramfs_service_test.c",
+            "kernel/ramfs_service_test.h",
+            "kernel/ramfs_service_test_fixture.h",
+            "servers/ramfs/ramfs_core.c",
+            "servers/ramfs/ramfs_seed.c",
+            "servers/ramfs/ramfs_service.c",
+            "tests/host/test_generate_ramfs_service_fixture.py",
+            "tests/qemu/ramfs_service_protocol.h",
+            "tests/qemu/ramfs_service_report.S",
+            "tests/qemu/ramfs_service_vfs.c",
+            "tools/generate_ramfs_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-ramfs",
+                )
+
+    def test_ramfs_startup_paths_select_retained_service_gates(self):
+        for path in (
+            "servers/ramfs/ramfs_service.c",
+            "tools/embed_ramfs_seed.py",
+            "tools/generate_ramfs_seed.py",
+            "tools/generate_ramfs_service_fixture.py",
+        ):
+            commands = validation_plan.plan([path], "fast")
+            with self.subTest(path=path):
+                for workflow_name in (
+                    "test-qemu-user-runtime",
+                    "test-qemu-bootstrap-launcher",
+                    "test-qemu-vm-handoff",
+                    "test-qemu-pm-service",
+                    "test-qemu-tty",
+                    "test-qemu-ramfs",
+                ):
+                    self.assertIn(
+                        validation_plan.workflow(workflow_name),
+                        commands,
+                    )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):
         for path in (

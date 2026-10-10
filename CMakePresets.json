@@ -207,6 +207,15 @@
       }
     },
     {
+      "name": "riscv64-ramfs-service-test",
+      "displayName": "RISC-V 64 RAMFS service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ramfs-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_RAMFS_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
@@ -527,6 +536,13 @@
       "configurePreset": "riscv64-tty-service-test",
       "targets": [
         "test-qemu-tty"
+      ]
+    },
+    {
+      "name": "test-qemu-ramfs",
+      "configurePreset": "riscv64-ramfs-service-test",
+      "targets": [
+        "test-qemu-ramfs"
       ]
     },
     {
@@ -1011,6 +1027,20 @@
         {
           "type": "build",
           "name": "test-qemu-tty"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-ramfs",
+      "displayName": "Build and run the RAMFS service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ramfs-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-ramfs"
         }
       ]
     },

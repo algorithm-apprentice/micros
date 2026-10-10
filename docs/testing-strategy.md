@@ -142,10 +142,10 @@ implementation must split evidence as follows:
   stale results, balanced non-root references, no live grants, VFS readiness,
   launcher sealing, TTY-routed output, and clean shutdown.
 
-The slow native workflow is implemented as `test-ramfs-model`.
-`test-qemu-ramfs` remains the required target workflow for the six-service
-scenario; no documentation or pull request may claim that command is
-implemented or has passed until the target exists.
+The slow native workflow is `test-ramfs-model`. The six-service component
+workflow is `test-qemu-ramfs`; it uses no host input or sleep and accepts only
+the exact RAMFS pass marker after VFS readiness, launcher sealing, physical
+UART drain, and zero live grants.
 
 ## Planned test commands
 
@@ -183,6 +183,7 @@ implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-vm-handoff`,
 `test-qemu-pm-service`,
 `test-qemu-tty`,
+`test-qemu-ramfs`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -223,6 +224,7 @@ cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-tty
+cmake --workflow --preset test-qemu-ramfs
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -927,6 +929,33 @@ clean SBI shutdown. Only the exact marker is accepted:
 
 ```text
 MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked
+```
+
+The RAMFS Step 12 component workflow is implemented:
+
+```text
+test-qemu-ramfs
+```
+
+It links the production launcher, VM, PM, TTY, and RAMFS services with one
+exact VFS test peer. VFS mounts once, reads the seeded `/etc/motd`, observes
+short EOF, creates `/tmp/note`, verifies sparse zeroes and written bytes,
+enumerates one directory record at a time, and checks malformed-version,
+wrong-direction-grant, stale-node, and excessive-putnode results. VFS revokes
+every temporary grant and releases every non-root reference before readiness.
+An exact resumable pre-readiness report proves that RAMFS test diagnostics
+preempt generic active-service fault classification for the current VFS
+thread; stage failures use the same path and retain their specific panic
+reason.
+After launcher sealing, it submits the sole marker through the real TTY path,
+waits for TTY completion and writability, revokes the marker grant, and reports
+through the isolated breakpoint hook. The kernel requires all six services
+ready, the VFS thread current, valid VM and TTY handoffs, and zero live grants,
+then waits for physical UART drain before clean shutdown. Only the exact marker
+is accepted:
+
+```text
+MICROS_RAMFS_TEST_PASS seed=validated mount=single lookup=bounded files=writable directories=cursor grants=checked refs=balanced
 ```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure

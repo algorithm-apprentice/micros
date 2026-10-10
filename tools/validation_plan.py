@@ -34,6 +34,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
     "test-qemu-tty",
+    "test-qemu-ramfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -112,6 +113,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
     "test-qemu-tty",
+    "test-qemu-ramfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -271,6 +273,21 @@ TTY_TRAP_INPUTS = (
     "kernel/tty_interrupt.c",
     "kernel/tty_interrupt.h",
     "tests/host/trap_route_test.c",
+)
+
+RAMFS_STARTUP_CROSS_GATE_INPUTS = (
+    "servers/ramfs/ramfs_service.c",
+    "tools/embed_ramfs_seed.py",
+    "tools/generate_ramfs_seed.py",
+    "tools/generate_ramfs_service_fixture.py",
+)
+
+RAMFS_RETAINED_GATE_WORKFLOWS = (
+    "test-qemu-user-runtime",
+    "test-qemu-bootstrap-launcher",
+    "test-qemu-vm-handoff",
+    "test-qemu-pm-service",
+    "test-qemu-tty",
 )
 
 GATE_INPUTS = {
@@ -581,6 +598,26 @@ GATE_INPUTS["test-qemu-tty"] = GATE_INPUTS[
     "tests/qemu/tty_service_report.S",
     "tests/qemu/tty_service_vfs.c",
     "tools/generate_tty_service_fixture.py",
+)
+for ramfs_retained_workflow in RAMFS_RETAINED_GATE_WORKFLOWS:
+    GATE_INPUTS[ramfs_retained_workflow] += (
+        RAMFS_STARTUP_CROSS_GATE_INPUTS
+    )
+GATE_INPUTS["test-qemu-ramfs"] = GATE_INPUTS[
+    "test-qemu-tty"
+] + (
+    "include/micros/ramfs.h",
+    "kernel/ramfs_service_test.c",
+    "kernel/ramfs_service_test.h",
+    "kernel/ramfs_service_test_fixture.h",
+    "servers/ramfs/",
+    "tests/host/test_generate_ramfs_service_fixture.py",
+    "tests/qemu/ramfs_service_protocol.h",
+    "tests/qemu/ramfs_service_report.S",
+    "tests/qemu/ramfs_service_vfs.c",
+    "tools/embed_ramfs_seed.py",
+    "tools/generate_ramfs_seed.py",
+    "tools/generate_ramfs_service_fixture.py",
 )
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"

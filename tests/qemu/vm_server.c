@@ -9,7 +9,18 @@
 #include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
 #include "tests/qemu/vm_handoff_protocol.h"
-#ifdef MICROS_TTY_HANDOFF_TEST
+#if defined(MICROS_RAMFS_SERVICE_TEST)
+#include "tests/qemu/ramfs_service_protocol.h"
+#define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
+    MICROS_RAMFS_TEST_LAUNCHER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID \
+    MICROS_RAMFS_TEST_VM_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_PROBE_SERVICE_ID \
+    MICROS_RAMFS_TEST_TTY_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
+    MICROS_RAMFS_TEST_SERVICE_COUNT
+#define MICROS_VM_TTY_HANDOFF_TEST
+#elif defined(MICROS_TTY_HANDOFF_TEST)
 #include "tests/qemu/tty_handoff_protocol.h"
 #define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
     MICROS_TTY_HANDOFF_TEST_LAUNCHER_SERVICE_ID
@@ -19,6 +30,7 @@
     MICROS_TTY_SERVICE_ID
 #define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
     MICROS_TTY_HANDOFF_TEST_SERVICE_COUNT
+#define MICROS_VM_TTY_HANDOFF_TEST
 #elif defined(MICROS_PM_SERVICE_TEST)
 #include "tests/qemu/pm_service_protocol.h"
 #define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
@@ -40,14 +52,14 @@ struct micros_vm_boot_info micros_vm_boot_info = {0};
 
 static volatile uint64_t vm_data = UINT64_C(0x564d44415441564d);
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
 static uint8_t grant_buffer[MICROS_VM_HANDOFF_TEST_DATA_SIZE];
 #endif
 
 void micros_vm_trigger_self_fault(void);
 static int find_service(uint32_t service_id);
 
-#ifdef MICROS_TTY_HANDOFF_TEST
+#ifdef MICROS_VM_TTY_HANDOFF_TEST
 struct vm_tty_mapping_descriptor {
     bool mapped;
     micros_endpoint_t endpoint;
@@ -104,7 +116,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-#ifdef MICROS_TTY_HANDOFF_TEST
+#ifdef MICROS_VM_TTY_HANDOFF_TEST
 static bool notification_is_canonical(
     const struct micros_ipc_message *message,
     uint64_t event_mask
@@ -178,7 +190,7 @@ static bool map_tty_uart(void)
 #endif
 
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
 static uint64_t read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
@@ -936,7 +948,7 @@ static bool complete_handoff(void)
 }
 
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
 static bool serve_probe(void)
 {
     struct micros_ipc_message request;
@@ -1042,7 +1054,7 @@ void micros_service_main(void)
     if (!send_ready()) {
         __builtin_trap();
     }
-#ifdef MICROS_TTY_HANDOFF_TEST
+#ifdef MICROS_VM_TTY_HANDOFF_TEST
     if (!map_tty_uart()) {
         __builtin_trap();
     }
@@ -1064,7 +1076,7 @@ void micros_service_main(void)
         ) {
             __builtin_trap();
         }
-#ifdef MICROS_TTY_HANDOFF_TEST
+#ifdef MICROS_VM_TTY_HANDOFF_TEST
         __builtin_trap();
 #endif
     }

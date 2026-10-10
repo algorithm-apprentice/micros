@@ -606,6 +606,15 @@ static enum micros_bootstrap_error validate_profile_relationships(
                         )
                         : 0
                     )
+                    | (
+                        entry->profile_id
+                            == MICROS_PRIVILEGE_PROFILE_RAMFS
+                        ? (
+                            MICROS_PRIVILEGE_OPERATION_REPLY
+                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+                        )
+                        : 0
+                    )
                 )
             || (
                 profile->call_targets & controller_target
