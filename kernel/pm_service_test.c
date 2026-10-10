@@ -145,7 +145,9 @@ static const struct micros_privilege_profile profiles[] = {
         .name = "VFS",
         .operations =
             MICROS_PRIVILEGE_OPERATION_RECEIVE
-            | MICROS_PRIVILEGE_OPERATION_CALL,
+            | MICROS_PRIVILEGE_OPERATION_CALL
+            | MICROS_PRIVILEGE_OPERATION_REPLY
+            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
         .call_targets =
             (
                 UINT32_C(1)

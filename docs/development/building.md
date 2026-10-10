@@ -905,6 +905,20 @@ read-only service data, cross-compiles the portable RAMFS core and production
 post-link budget check also requires the complete `PT_LOAD` footprint plus one
 external stack page to fit within the 192-page RAMFS process limit.
 
+## VFS service image validation
+
+Build and validate the standalone real VFS service ELF with:
+
+```bash
+cmake --workflow --preset build-vfs-service-image
+```
+
+The workflow cross-compiles the portable VFS core, exact application and
+backend wire adapters, and production receive/reply loop. The post-link
+checker enforces the freestanding service-ELF contract and requires the
+complete `PT_LOAD` footprint plus one external stack page to fit within the
+64-page VFS process limit.
+
 ## RAMFS service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/RAMFS/VFS gate with:

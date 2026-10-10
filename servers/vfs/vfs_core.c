@@ -18,7 +18,7 @@ static void zero_bytes(void *storage, size_t size)
     }
 }
 
-static bool bytes_are_zero(const void *storage, size_t size)
+static bool vfs_bytes_are_zero(const void *storage, size_t size)
 {
     const uint8_t *bytes = storage;
     size_t index;
@@ -31,7 +31,7 @@ static bool bytes_are_zero(const void *storage, size_t size)
     return true;
 }
 
-static uint32_t read_u32_le(const uint8_t *bytes)
+static uint32_t vfs_read_u32_le(const uint8_t *bytes)
 {
     return (
         (uint32_t)bytes[0]
@@ -41,7 +41,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-static uint64_t read_u64_le(const uint8_t *bytes)
+static uint64_t vfs_read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
     size_t index;
@@ -52,7 +52,7 @@ static uint64_t read_u64_le(const uint8_t *bytes)
     return value;
 }
 
-static void write_u32_le(uint8_t *bytes, uint32_t value)
+static void vfs_write_u32_le(uint8_t *bytes, uint32_t value)
 {
     bytes[0] = (uint8_t)value;
     bytes[1] = (uint8_t)(value >> 8);
@@ -60,7 +60,7 @@ static void write_u32_le(uint8_t *bytes, uint32_t value)
     bytes[3] = (uint8_t)(value >> 24);
 }
 
-static bool endpoint_is_canonical(micros_endpoint_t endpoint)
+static bool vfs_endpoint_is_canonical(micros_endpoint_t endpoint)
 {
     uint32_t slot_mask =
         (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) - 1;
@@ -130,21 +130,21 @@ static bool free_process_is_canonical(
     const struct micros_vfs_process_record *process
 )
 {
-    return bytes_are_zero(process, sizeof(*process));
+    return vfs_bytes_are_zero(process, sizeof(*process));
 }
 
 static bool free_open_file_is_canonical(
     const struct micros_vfs_open_file *open_file
 )
 {
-    return bytes_are_zero(open_file, sizeof(*open_file));
+    return vfs_bytes_are_zero(open_file, sizeof(*open_file));
 }
 
 static bool free_vnode_is_canonical(
     const struct micros_vfs_vnode *vnode
 )
 {
-    return bytes_are_zero(vnode, sizeof(*vnode));
+    return vfs_bytes_are_zero(vnode, sizeof(*vnode));
 }
 
 static bool pending_debt_is_canonical(
@@ -155,7 +155,7 @@ static bool pending_debt_is_canonical(
         .state = pending->state,
     };
 
-    return bytes_are_zero(
+    return vfs_bytes_are_zero(
         (const uint8_t *)pending + sizeof(pending->state),
         sizeof(*pending) - sizeof(pending->state)
     ) && expected.state == pending->state;
@@ -270,7 +270,7 @@ static enum micros_vfs_core_error validate_processes(
         }
         if (
             process->state != MICROS_VFS_PROCESS_ACTIVE
-            || !endpoint_is_canonical(process->endpoint)
+            || !vfs_endpoint_is_canonical(process->endpoint)
             || process->endpoint == state->self_endpoint
             || process->endpoint == state->ramfs_endpoint
             || process->endpoint == state->tty_endpoint
@@ -490,7 +490,7 @@ static enum micros_vfs_core_error validate_vnodes(
         if (
             vnode->state != MICROS_VFS_VNODE_ACTIVE
             || vnode->mount_root != (vnode_slot == 0)
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 vnode->reserved0,
                 sizeof(vnode->reserved0)
             )
@@ -552,7 +552,7 @@ static enum micros_vfs_core_error validate_pending(
     }
     if (pending->state == MICROS_VFS_PENDING_NONE) {
         if (
-            !bytes_are_zero(pending, sizeof(*pending))
+            !vfs_bytes_are_zero(pending, sizeof(*pending))
             || state->backend_page_owner != MICROS_VFS_PAGE_FREE
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
@@ -611,7 +611,7 @@ static enum micros_vfs_core_error validate_pending(
         || pending->descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
         || pending->open_file >= MICROS_VFS_OPEN_FILE_CAPACITY
         || pending->reserved != 0
-        || !endpoint_is_canonical(pending->endpoint)
+        || !vfs_endpoint_is_canonical(pending->endpoint)
         || pending->reply_token == 0
         || pending->count == 0
         || pending->count > MICROS_VFS_TRANSFER_MAX
@@ -2283,9 +2283,9 @@ static enum micros_vfs_core_error translate_directory_records(
             &state->backend_page[backend_offset];
         uint8_t *destination =
             &state->client_page[application_offset];
-        uint64_t node = read_u64_le(&source[0]);
-        uint32_t mode = read_u32_le(&source[8]);
-        uint32_t name_length = read_u32_le(&source[12]);
+        uint64_t node = vfs_read_u64_le(&source[0]);
+        uint32_t mode = vfs_read_u32_le(&source[8]);
+        uint32_t name_length = vfs_read_u32_le(&source[12]);
         size_t index;
 
         if (
@@ -2293,11 +2293,11 @@ static enum micros_vfs_core_error translate_directory_records(
             || !mode_is_canonical(mode)
             || name_length == 0
             || name_length > MICROS_VFS_NAME_MAX
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 &source[16 + name_length],
                 MICROS_VFS_NAME_MAX - name_length
             )
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 &source[76],
                 MICROS_RAMFS_DIRECTORY_RECORD_SIZE - 76
             )
@@ -2316,12 +2316,12 @@ static enum micros_vfs_core_error translate_directory_records(
             destination,
             MICROS_VFS_DIRECTORY_RECORD_SIZE
         );
-        write_u32_le(
+        vfs_write_u32_le(
             &destination[0],
             MICROS_VFS_DIRECTORY_RECORD_SIZE
         );
-        write_u32_le(&destination[4], mode);
-        write_u32_le(&destination[8], name_length);
+        vfs_write_u32_le(&destination[4], mode);
+        vfs_write_u32_le(&destination[8], name_length);
         for (index = 0; index < name_length; ++index) {
             destination[16 + index] = source[16 + index];
         }
@@ -3566,9 +3566,9 @@ enum micros_vfs_core_error micros_vfs_state_initialize(
 {
     if (
         state == NULL
-        || !endpoint_is_canonical(self_endpoint)
-        || !endpoint_is_canonical(ramfs_endpoint)
-        || !endpoint_is_canonical(tty_endpoint)
+        || !vfs_endpoint_is_canonical(self_endpoint)
+        || !vfs_endpoint_is_canonical(ramfs_endpoint)
+        || !vfs_endpoint_is_canonical(tty_endpoint)
         || self_endpoint == ramfs_endpoint
         || self_endpoint == tty_endpoint
         || ramfs_endpoint == tty_endpoint
@@ -3599,9 +3599,9 @@ enum micros_vfs_core_error micros_vfs_state_validate(
             state->phase != MICROS_VFS_PHASE_READY_UNMOUNTED
             && state->phase != MICROS_VFS_PHASE_MOUNTED
         )
-        || !endpoint_is_canonical(state->self_endpoint)
-        || !endpoint_is_canonical(state->ramfs_endpoint)
-        || !endpoint_is_canonical(state->tty_endpoint)
+        || !vfs_endpoint_is_canonical(state->self_endpoint)
+        || !vfs_endpoint_is_canonical(state->ramfs_endpoint)
+        || !vfs_endpoint_is_canonical(state->tty_endpoint)
         || state->self_endpoint == state->ramfs_endpoint
         || state->self_endpoint == state->tty_endpoint
         || state->ramfs_endpoint == state->tty_endpoint
@@ -3611,19 +3611,19 @@ enum micros_vfs_core_error micros_vfs_state_validate(
     }
     if (state->phase == MICROS_VFS_PHASE_READY_UNMOUNTED) {
         if (
-            !bytes_are_zero(
+            !vfs_bytes_are_zero(
                 state->processes,
                 sizeof(state->processes)
             )
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 state->open_files,
                 sizeof(state->open_files)
             )
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 state->vnodes,
                 sizeof(state->vnodes)
             )
-            || !bytes_are_zero(
+            || !vfs_bytes_are_zero(
                 &state->pending,
                 sizeof(state->pending)
             )
@@ -3710,7 +3710,7 @@ enum micros_vfs_core_error micros_vfs_attach_console(
     if (
         state == NULL
         || result == NULL
-        || !endpoint_is_canonical(endpoint)
+        || !vfs_endpoint_is_canonical(endpoint)
         || endpoint == state->self_endpoint
         || endpoint == state->ramfs_endpoint
         || endpoint == state->tty_endpoint
@@ -3796,8 +3796,8 @@ enum micros_vfs_core_error micros_vfs_share_descriptor(
     if (
         state == NULL
         || result == NULL
-        || !endpoint_is_canonical(source_endpoint)
-        || !endpoint_is_canonical(destination_endpoint)
+        || !vfs_endpoint_is_canonical(source_endpoint)
+        || !vfs_endpoint_is_canonical(destination_endpoint)
         || source_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
         || destination_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
         || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
@@ -3867,7 +3867,7 @@ enum micros_vfs_core_error micros_vfs_detach(
         || io == NULL
         || io->ramfs_call == NULL
         || result == NULL
-        || !endpoint_is_canonical(endpoint)
+        || !vfs_endpoint_is_canonical(endpoint)
         || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
         || state->phase != MICROS_VFS_PHASE_MOUNTED
     ) {
@@ -3994,7 +3994,7 @@ enum micros_vfs_core_error micros_vfs_handle_request(
         return MICROS_VFS_CORE_OK;
     }
     if (
-        !endpoint_is_canonical(request->source)
+        !vfs_endpoint_is_canonical(request->source)
         || !find_process(
             state,
             request->source,
@@ -4077,6 +4077,25 @@ enum micros_vfs_core_error micros_vfs_handle_request(
     return error;
 }
 
+static uint64_t expected_tty_event(
+    enum micros_vfs_pending_state state
+)
+{
+    switch (state) {
+    case MICROS_VFS_PENDING_TTY_READ_WAIT_COMPLETION:
+    case MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION:
+    case MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT:
+        return MICROS_TTY_EVENT_COMPLETION;
+    case MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE:
+    case MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT:
+    case MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE:
+        return MICROS_TTY_EVENT_WRITABLE;
+    case MICROS_VFS_PENDING_NONE:
+        return 0;
+    }
+    return 0;
+}
+
 enum micros_vfs_core_error micros_vfs_handle_tty_notification(
     struct micros_vfs_state *state,
     uint64_t events,
@@ -4101,16 +4120,10 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
     ) {
         return MICROS_VFS_CORE_ERROR_ARGUMENT;
     }
-    zero_bytes(action, sizeof(*action));
-    if (
-        events
-            == (
-                MICROS_TTY_EVENT_COMPLETION
-                | MICROS_TTY_EVENT_WRITABLE
-            )
-    ) {
+    if (events != expected_tty_event(state->pending.state)) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
+    zero_bytes(action, sizeof(*action));
     if ((events & MICROS_TTY_EVENT_COMPLETION) != 0) {
         if (
             state->pending.state
@@ -4197,7 +4210,7 @@ enum micros_vfs_core_error micros_vfs_begin_test_drain(
         || io == NULL
         || action == NULL
         || reply_token == 0
-        || !endpoint_is_canonical(endpoint)
+        || !vfs_endpoint_is_canonical(endpoint)
         || micros_vfs_state_validate(state)
             != MICROS_VFS_CORE_OK
         || !find_process(state, endpoint, &process_slot)

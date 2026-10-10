@@ -58,6 +58,7 @@ QEMU_WORKFLOWS = (
 IMAGE_WORKFLOWS = (
     "build-ramfs-service-image",
     "build-tty-service-image",
+    "build-vfs-service-image",
 )
 
 IMAGE_INPUTS = {
@@ -80,6 +81,15 @@ IMAGE_INPUTS = {
         "tools/check_user_elf.py",
         "tools/embed_ramfs_seed.py",
         "tools/generate_ramfs_seed.py",
+    ),
+    "build-vfs-service-image": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "servers/vfs/",
+        "tools/check_user_elf.py",
     ),
 }
 
@@ -703,6 +713,9 @@ SLOW_MODEL_INPUTS = {
     "test-vfs-model": (
         "CMakeLists.txt",
         "CMakePresets.json",
+        "include/micros/ramfs.h",
+        "include/micros/tty.h",
+        "include/micros/vfs.h",
         "servers/vfs/",
         "tests/host/vfs_model_test.c",
         "tests/host/vfs_test.c",

@@ -88,6 +88,9 @@ static struct micros_privilege_profile profile(
                 MICROS_PRIVILEGE_OPERATION_REPLY
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
         } else if (id == MICROS_PRIVILEGE_PROFILE_VFS) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
             result.call_targets |=
                 (
                     UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
@@ -347,6 +350,13 @@ static bool test_tty_service_contract(void)
             == (
                 UINT32_C(1)
                 << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            )
+        && profiles[5].operations
+            == (
+                MICROS_PRIVILEGE_OPERATION_RECEIVE
+                | MICROS_PRIVILEGE_OPERATION_CALL
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
             )
         && profiles[5].call_targets
             == (

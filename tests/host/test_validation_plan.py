@@ -191,6 +191,22 @@ class ValidationPlanTests(unittest.TestCase):
                     "build-ramfs-service-image",
                 )
 
+    def test_vfs_service_paths_own_image_gate(self):
+        for path in (
+            "include/micros/vfs.h",
+            "servers/vfs/vfs_core.c",
+            "servers/vfs/vfs_core.h",
+            "servers/vfs/vfs_service.c",
+            "servers/vfs/vfs_service_core.c",
+            "servers/vfs/vfs_service_core.h",
+            "tools/check_user_elf.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "build-vfs-service-image",
+                )
+
     def test_tty_production_and_fixture_paths_own_qemu_gate(self):
         for path in (
             *validation_plan.TTY_CONTROL_INPUTS,
@@ -683,6 +699,18 @@ class ValidationPlanTests(unittest.TestCase):
                 validation_plan.IPC_MODEL in commands
                 or commands[0] == validation_plan.UNIT_FULL
             )
+
+    def test_vfs_protocol_headers_own_vfs_model(self):
+        for path in (
+            "include/micros/vfs.h",
+            "include/micros/tty.h",
+            "include/micros/ramfs.h",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(
+                    "test-vfs-model",
+                    validation_plan.affected_slow_models([path]),
+                )
 
     def test_each_gate_has_target_specific_input(self):
         representatives = {

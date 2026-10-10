@@ -212,7 +212,8 @@ Budgets are review signals, not reasons to hide necessary coverage.
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 `test-tty-model`, `test-ramfs-model`, `test-vfs-model`, and the complete
 `test-unit` gate. The standalone image workflows are
-`build-tty-service-image` and `build-ramfs-service-image`. The implemented
+`build-tty-service-image`, `build-ramfs-service-image`, and
+`build-vfs-service-image`. The implemented
 QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
@@ -248,6 +249,7 @@ cmake --workflow --preset test-vfs-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset build-tty-service-image
 cmake --workflow --preset build-ramfs-service-image
+cmake --workflow --preset build-vfs-service-image
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap

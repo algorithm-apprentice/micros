@@ -1538,8 +1538,18 @@ static bool console_async_and_cleanup_are_exact(void)
         && state.next_tty_request_id == 3
     );
     events = vfs_test_fixture_drain_output(&fixture);
+    snapshot = state;
     EXPECT_TRUE(
         events == MICROS_TTY_EVENT_WRITABLE
+        && micros_vfs_handle_tty_notification(
+            &state,
+            events | MICROS_TTY_EVENT_COMPLETION,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_ERROR_INVARIANT
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
+        && fixture.backend_grant_count == 1
+        && state.next_tty_request_id == 3
         && micros_vfs_handle_tty_notification(
             &state,
             events,
