@@ -83,9 +83,17 @@ static struct micros_privilege_profile profile(
                 UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS;
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_TTY_CONTROL;
+        } else if (id == MICROS_PRIVILEGE_PROFILE_RAMFS) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
         } else if (id == MICROS_PRIVILEGE_PROFILE_VFS) {
             result.call_targets |=
-                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY;
+                (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+                ) | (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS
+                );
         }
     }
     return result;
@@ -180,8 +188,8 @@ static bool test_manifest_contract(void)
 static bool test_tty_service_contract(void)
 {
     struct micros_bootstrap_manifest manifest;
-    struct micros_bootstrap_expected_service expected[4] = {0};
-    struct micros_bootstrap_image_info images[4] = {0};
+    struct micros_bootstrap_expected_service expected[6] = {0};
+    struct micros_bootstrap_image_info images[6] = {0};
     struct micros_privilege_profile profiles[7] = {0};
     struct micros_bootstrap_manifest_plan plan;
     struct micros_bootstrap_manifest_plan sentinel;
@@ -317,6 +325,18 @@ static bool test_tty_service_contract(void)
             )
         && profiles[3].kernel_operations
             == MICROS_KERNEL_OPERATION_TTY_CONTROL
+        && profiles[4].operations
+            == (
+                MICROS_PRIVILEGE_OPERATION_RECEIVE
+                | MICROS_PRIVILEGE_OPERATION_CALL
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+            )
+        && profiles[4].call_targets
+            == (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            )
         && profiles[5].call_targets
             == (
                 (
@@ -324,6 +344,8 @@ static bool test_tty_service_contract(void)
                     << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
                 ) | (
                     UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+                ) | (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS
                 )
             )
         && micros_bootstrap_manifest_validate(
@@ -340,6 +362,44 @@ static bool test_tty_service_contract(void)
         && plan.console_service_id == 4
         && plan.ordered_service_ids[3] == 4
     );
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    profiles[4].operations &=
+        ~MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[4] = profile(5, "RAMFS");
+    plan = sentinel;
+    profiles[5].call_targets &=
+        ~(UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS);
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[5] = profile(6, "VFS");
 
     memset(&sentinel, 0xa5, sizeof(sentinel));
     plan = sentinel;
@@ -431,6 +491,88 @@ static bool test_tty_service_contract(void)
             &plan
         ) == MICROS_BOOTSTRAP_ERROR_ROLE
         && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest.entries[3].prerequisites = UINT64_C(1) << 2;
+    expected[3].prerequisites = UINT64_C(1) << 2;
+
+    manifest.header.entry_count = 6;
+    manifest.header.total_user_page_limit = 19;
+    manifest.entries[4] =
+        (struct micros_bootstrap_manifest_entry){
+            .service_id = 5,
+            .image_id = 105,
+            .process_slot = 4,
+            .stack_page_count = 1,
+            .profile_id = MICROS_PRIVILEGE_PROFILE_RAMFS,
+            .prerequisites = UINT64_C(1) << 3,
+            .ready_timeout_counter_ticks = 100,
+            .user_page_limit = 3,
+        };
+    set_name(manifest.entries[4].service_name, "ramfs");
+    set_name(manifest.entries[4].profile_name, "RAMFS");
+    expected[4] = (struct micros_bootstrap_expected_service){
+        .service_id = 5,
+        .image_id = 105,
+        .process_slot = 4,
+        .profile_id = MICROS_PRIVILEGE_PROFILE_RAMFS,
+        .prerequisites = UINT64_C(1) << 3,
+        .call_targets =
+            UINT32_C(1)
+            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+    };
+    set_name(expected[4].service_name, "ramfs");
+    set_name(expected[4].profile_name, "RAMFS");
+    images[4] = images[3];
+    images[4].image_id = 105;
+
+    manifest.entries[5] =
+        (struct micros_bootstrap_manifest_entry){
+            .service_id = 6,
+            .image_id = 106,
+            .process_slot = 5,
+            .stack_page_count = 1,
+            .profile_id = MICROS_PRIVILEGE_PROFILE_VFS,
+            .prerequisites = UINT64_C(1) << 4,
+            .ready_timeout_counter_ticks = 100,
+            .user_page_limit = 3,
+        };
+    set_name(manifest.entries[5].service_name, "vfs");
+    set_name(manifest.entries[5].profile_name, "VFS");
+    expected[5] = (struct micros_bootstrap_expected_service){
+        .service_id = 6,
+        .image_id = 106,
+        .process_slot = 5,
+        .profile_id = MICROS_PRIVILEGE_PROFILE_VFS,
+        .prerequisites = UINT64_C(1) << 4,
+        .call_targets =
+            (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            ) | (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+            ) | (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS
+            ),
+    };
+    set_name(expected[5].service_name, "vfs");
+    set_name(expected[5].profile_name, "VFS");
+    images[5] = images[3];
+    images[5].image_id = 106;
+
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            6,
+            images,
+            6,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.ordered_service_ids[4] == 5
+        && plan.ordered_service_ids[5] == 6
     );
     return true;
 }

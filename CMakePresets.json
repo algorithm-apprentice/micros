@@ -207,12 +207,30 @@
       }
     },
     {
+      "name": "riscv64-ramfs-service-test",
+      "displayName": "RISC-V 64 RAMFS service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ramfs-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_RAMFS_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
       "binaryDir": "${sourceDir}/build/riscv64-tty-service-image",
       "cacheVariables": {
         "MICROS_BUILD_TTY_SERVICE_IMAGE": "ON"
+      }
+    },
+    {
+      "name": "riscv64-ramfs-service-image",
+      "displayName": "RISC-V 64 standalone RAMFS service image",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ramfs-service-image",
+      "cacheVariables": {
+        "MICROS_BUILD_RAMFS_SERVICE_IMAGE": "ON"
       }
     },
     {
@@ -360,6 +378,13 @@
       "configurePreset": "host-debug",
       "targets": [
         "test-tty-model"
+      ]
+    },
+    {
+      "name": "test-ramfs-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-ramfs-model"
       ]
     },
     {
@@ -514,10 +539,24 @@
       ]
     },
     {
+      "name": "test-qemu-ramfs",
+      "configurePreset": "riscv64-ramfs-service-test",
+      "targets": [
+        "test-qemu-ramfs"
+      ]
+    },
+    {
       "name": "build-tty-service-image",
       "configurePreset": "riscv64-tty-service-image",
       "targets": [
         "micros_tty_service"
+      ]
+    },
+    {
+      "name": "build-ramfs-service-image",
+      "configurePreset": "riscv64-ramfs-service-image",
+      "targets": [
+        "micros_ramfs_service"
       ]
     },
     {
@@ -666,6 +705,20 @@
         {
           "type": "build",
           "name": "test-tty-model"
+        }
+      ]
+    },
+    {
+      "name": "test-ramfs-model",
+      "displayName": "Build and run persistent RAMFS model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-ramfs-model"
         }
       ]
     },
@@ -978,6 +1031,20 @@
       ]
     },
     {
+      "name": "test-qemu-ramfs",
+      "displayName": "Build and run the RAMFS service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ramfs-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-ramfs"
+        }
+      ]
+    },
+    {
       "name": "build-tty-service-image",
       "displayName": "Build and validate the standalone TTY service image",
       "steps": [
@@ -988,6 +1055,20 @@
         {
           "type": "build",
           "name": "build-tty-service-image"
+        }
+      ]
+    },
+    {
+      "name": "build-ramfs-service-image",
+      "displayName": "Build and validate the standalone RAMFS service image",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ramfs-service-image"
+        },
+        {
+          "type": "build",
+          "name": "build-ramfs-service-image"
         }
       ]
     },

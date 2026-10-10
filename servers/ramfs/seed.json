@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "/",
+      "type": "directory",
+      "mode": "0755"
+    },
+    {
+      "path": "/etc",
+      "type": "directory",
+      "mode": "0755"
+    },
+    {
+      "path": "/etc/motd",
+      "type": "file",
+      "mode": "0644",
+      "source": "servers/ramfs/seed/etc/motd"
+    }
+  ]
+}

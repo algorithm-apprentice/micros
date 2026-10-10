@@ -252,7 +252,9 @@ static bool stable_service_profiles_match(
             ),
             MICROS_PRIVILEGE_PROFILE_RAMFS,
             "RAMFS",
-            bootstrap_service_operations,
+            bootstrap_service_operations
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
             launcher_target,
             0,
             0
@@ -270,6 +272,9 @@ static bool stable_service_profiles_match(
                 | (
                     UINT32_C(1)
                     << MICROS_PRIVILEGE_PROFILE_TTY
+                ) | (
+                    UINT32_C(1)
+                    << MICROS_PRIVILEGE_PROFILE_RAMFS
                 ),
             0,
             0
@@ -595,6 +600,15 @@ static enum micros_bootstrap_error validate_profile_relationships(
                             entry->role_flags
                             & MICROS_BOOTSTRAP_ROLE_PM
                         ) != 0
+                        ? (
+                            MICROS_PRIVILEGE_OPERATION_REPLY
+                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+                        )
+                        : 0
+                    )
+                    | (
+                        entry->profile_id
+                            == MICROS_PRIVILEGE_PROFILE_RAMFS
                         ? (
                             MICROS_PRIVILEGE_OPERATION_REPLY
                             | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE

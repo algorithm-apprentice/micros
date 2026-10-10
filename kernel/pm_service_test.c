@@ -133,7 +133,9 @@ static const struct micros_privilege_profile profiles[] = {
         .name = "RAMFS",
         .operations =
             MICROS_PRIVILEGE_OPERATION_RECEIVE
-            | MICROS_PRIVILEGE_OPERATION_CALL,
+            | MICROS_PRIVILEGE_OPERATION_CALL
+            | MICROS_PRIVILEGE_OPERATION_REPLY
+            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
         .call_targets =
             UINT32_C(1)
             << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
@@ -150,6 +152,8 @@ static const struct micros_privilege_profile profiles[] = {
                 << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
             ) | (
                 UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+            ) | (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS
             ),
     },
     {

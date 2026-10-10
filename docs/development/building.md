@@ -891,6 +891,44 @@ The workflow cross-compiles the portable request/completion state machine,
 fixed NS16550A backend, operation-14 wrappers, and production service loop. The
 post-link checker enforces the repository's freestanding service-ELF contract.
 
+## RAMFS service image validation
+
+Build and validate the standalone real RAMFS service ELF with:
+
+```bash
+cmake --workflow --preset build-ramfs-service-image
+```
+
+The workflow generates and validates the canonical seed image, embeds it as
+read-only service data, cross-compiles the portable RAMFS core and production
+`reply_receive` loop, and checks the freestanding service-ELF contract. The
+post-link budget check also requires the complete `PT_LOAD` footprint plus one
+external stack page to fit within the 192-page RAMFS process limit.
+
+## RAMFS service acceptance
+
+Build and run the dependency-closed launcher/VM/PM/TTY/RAMFS/VFS gate with:
+
+```bash
+cmake --workflow --preset test-qemu-ramfs
+```
+
+The workflow embeds the production seed and links six checked freestanding
+service ELFs. The exact VFS peer validates seeded lookup and EOF, runtime
+directory and sparse-file behavior, one-record directory cursors, stable
+malformed/stale/grant/reference results, and balanced non-root references.
+Before the filesystem scenario it crosses a resumable report breakpoint while
+still `STARTING`, proving that exact RAMFS test reports are decoded before the
+generic active-service fault path.
+Only after revoking every filesystem grant does VFS acknowledge readiness.
+It then writes the exact pass marker through the real TTY, waits for TTY
+completion and writability, revokes the marker grant, and invokes the isolated
+report hook. The kernel verifies the sealed six-service state and zero live
+grants, waits for physical UART drain, and shuts down cleanly. The scenario
+uses no host input or sleep; the absolute host timeout is 180 seconds, leaving
+margin above the measured debug/TCG completion time while retaining a finite
+deadlock bound.
+
 ## TTY service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/VFS gate with:

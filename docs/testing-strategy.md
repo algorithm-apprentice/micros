@@ -142,10 +142,10 @@ implementation must split evidence as follows:
   stale results, balanced non-root references, no live grants, VFS readiness,
   launcher sealing, TTY-routed output, and clean shutdown.
 
-The implementation must add `test-ramfs-model` as a slow native workflow and
-`test-qemu-ramfs` as the target workflow. Until those targets exist, no
-documentation or pull request may claim that either command is implemented or
-has passed.
+The slow native workflow is `test-ramfs-model`. The six-service component
+workflow is `test-qemu-ramfs`; it uses no host input or sleep and accepts only
+the exact RAMFS pass marker after VFS readiness, launcher sealing, physical
+UART drain, and zero live grants.
 
 ## Planned test commands
 
@@ -170,8 +170,10 @@ Performance budgets are:
 Budgets are review signals, not reasons to hide necessary coverage.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
-`test-tty-model`, and the complete `test-unit` gate. The implemented QEMU
-targets are `test-qemu-smoke`,
+`test-tty-model`, `test-ramfs-model`, and the complete `test-unit` gate. The
+standalone image workflows are `build-tty-service-image` and
+`build-ramfs-service-image`. The
+implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
@@ -181,6 +183,7 @@ targets are `test-qemu-smoke`,
 `test-qemu-vm-handoff`,
 `test-qemu-pm-service`,
 `test-qemu-tty`,
+`test-qemu-ramfs`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -200,7 +203,10 @@ the implemented configure, build, and execution gates are:
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
+cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-unit
+cmake --workflow --preset build-tty-service-image
+cmake --workflow --preset build-ramfs-service-image
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
@@ -218,6 +224,7 @@ cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-tty
+cmake --workflow --preset test-qemu-ramfs
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -343,8 +350,11 @@ the recent complete operation trace on failure.
 The Python host tests include ELF allocatable-section closure, legacy-global
 rejection, and machine-readable QEMU record regressions.
 `test-ipc-model` contains the replayable endpoint lifecycle, notification,
-close-cancellation, and persistent 8,192-transition IPC models. `test-unit`
-combines both tiers and remains the complete native gate.
+close-cancellation, and persistent 8,192-transition IPC models.
+`test-ramfs-model` compares the complete portable RAMFS state with an
+independent reference across 8,192 replayable mixed filesystem transitions.
+`test-unit` combines the fast tests and every persistent model and remains the
+complete native gate.
 
 `tools/validation_plan.py` maps committed, staged, unstaged, and untracked
 paths to `fast`, `pr`, or `full` execution plans. Documentation-only changes
@@ -355,6 +365,15 @@ header, or QEMU-harness changes run the full tier. Explicit paths are unioned
 with Git discovery; rename discovery classifies both paths. Execution rejects
 remaining untracked files. Every plan ends with separate index, worktree, and
 branch-range diff checks.
+RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
+changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
+generated seed source and catalog, seed embedding/generation, and the
+six-service fixture generator retain the user-runtime, launcher, VM, PM, TTY,
+and RAMFS service gates. RAMFS service sources, generated seed data, and seed
+embedding/generation inputs also select `build-ramfs-service-image`. Inventory
+regressions require every documented QEMU workflow to have exact preset,
+ownership-map, and representative-input parity.
+
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and
@@ -919,6 +938,33 @@ clean SBI shutdown. Only the exact marker is accepted:
 
 ```text
 MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked
+```
+
+The RAMFS Step 12 component workflow is implemented:
+
+```text
+test-qemu-ramfs
+```
+
+It links the production launcher, VM, PM, TTY, and RAMFS services with one
+exact VFS test peer. VFS mounts once, reads the seeded `/etc/motd`, observes
+short EOF, creates `/tmp/note`, verifies sparse zeroes and written bytes,
+enumerates one directory record at a time, and checks malformed-version,
+wrong-direction-grant, stale-node, and excessive-putnode results. VFS revokes
+every temporary grant and releases every non-root reference before readiness.
+An exact resumable pre-readiness report proves that RAMFS test diagnostics
+preempt generic active-service fault classification for the current VFS
+thread; stage failures use the same path and retain their specific panic
+reason.
+After launcher sealing, it submits the sole marker through the real TTY path,
+waits for TTY completion and writability, revokes the marker grant, and reports
+through the isolated breakpoint hook. The kernel requires all six services
+ready, the VFS thread current, valid VM and TTY handoffs, and zero live grants,
+then waits for physical UART drain before clean shutdown. Only the exact marker
+is accepted:
+
+```text
+MICROS_RAMFS_TEST_PASS seed=validated mount=single lookup=bounded files=writable directories=cursor grants=checked refs=balanced
 ```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure

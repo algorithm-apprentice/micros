@@ -12,6 +12,7 @@ UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
 UNIT_FULL = ("cmake", "--workflow", "--preset", "test-unit")
 IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
 TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
+RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -33,6 +34,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
     "test-qemu-tty",
+    "test-qemu-ramfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -53,6 +55,7 @@ QEMU_WORKFLOWS = (
 )
 
 IMAGE_WORKFLOWS = (
+    "build-ramfs-service-image",
     "build-tty-service-image",
 )
 
@@ -65,6 +68,17 @@ IMAGE_INPUTS = {
         "lib/runtime/",
         "servers/tty/",
         "tools/check_user_elf.py",
+    ),
+    "build-ramfs-service-image": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "servers/ramfs/",
+        "tools/check_user_elf.py",
+        "tools/embed_ramfs_seed.py",
+        "tools/generate_ramfs_seed.py",
     ),
 }
 
@@ -99,6 +113,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
     "test-qemu-tty",
+    "test-qemu-ramfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -258,6 +273,24 @@ TTY_TRAP_INPUTS = (
     "kernel/tty_interrupt.c",
     "kernel/tty_interrupt.h",
     "tests/host/trap_route_test.c",
+)
+
+RAMFS_STARTUP_CROSS_GATE_INPUTS = (
+    "servers/ramfs/ramfs_embedded_seed.h",
+    "servers/ramfs/ramfs_service.c",
+    "servers/ramfs/seed.json",
+    "servers/ramfs/seed/",
+    "tools/embed_ramfs_seed.py",
+    "tools/generate_ramfs_seed.py",
+    "tools/generate_ramfs_service_fixture.py",
+)
+
+RAMFS_RETAINED_GATE_WORKFLOWS = (
+    "test-qemu-user-runtime",
+    "test-qemu-bootstrap-launcher",
+    "test-qemu-vm-handoff",
+    "test-qemu-pm-service",
+    "test-qemu-tty",
 )
 
 GATE_INPUTS = {
@@ -569,6 +602,27 @@ GATE_INPUTS["test-qemu-tty"] = GATE_INPUTS[
     "tests/qemu/tty_service_vfs.c",
     "tools/generate_tty_service_fixture.py",
 )
+for ramfs_retained_workflow in RAMFS_RETAINED_GATE_WORKFLOWS:
+    GATE_INPUTS[ramfs_retained_workflow] += (
+        RAMFS_STARTUP_CROSS_GATE_INPUTS
+    )
+GATE_INPUTS["test-qemu-ramfs"] = GATE_INPUTS[
+    "test-qemu-tty"
+] + (
+    "include/micros/ramfs.h",
+    "kernel/ramfs_service_test.c",
+    "kernel/ramfs_service_test.h",
+    "kernel/ramfs_service_test_fixture.h",
+    "servers/ramfs/",
+    "tests/host/ramfs_model_test.c",
+    "tests/host/test_generate_ramfs_service_fixture.py",
+    "tests/qemu/ramfs_service_protocol.h",
+    "tests/qemu/ramfs_service_report.S",
+    "tests/qemu/ramfs_service_vfs.c",
+    "tools/embed_ramfs_seed.py",
+    "tools/generate_ramfs_seed.py",
+    "tools/generate_ramfs_service_fixture.py",
+)
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"
 ] + (
@@ -635,11 +689,22 @@ SLOW_MODEL_INPUTS = {
         "servers/tty/tty_uart.h",
         "tests/host/tty_model_test.c",
     ),
+    "test-ramfs-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/grant.h",
+        "include/micros/ipc.h",
+        "include/micros/ramfs.h",
+        "servers/ramfs/",
+        "tests/host/ramfs_model_test.c",
+        "tools/generate_ramfs_seed.py",
+    ),
 }
 
 SLOW_MODEL_CTESTS = {
     "test-ipc-model": ("ipc-model", "ipc_model_test"),
     "test-tty-model": ("tty-model", "tty_model_test"),
+    "test-ramfs-model": ("ramfs-model", "ramfs_model_test"),
 }
 
 

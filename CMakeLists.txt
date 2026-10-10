@@ -103,6 +103,16 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_RAMFS_SERVICE_IMAGE
+    "Build the standalone real RAMFS service ELF"
+    OFF
+)
+option(
+    MICROS_BUILD_RAMFS_SERVICE_TEST
+    "Build the real RAMFS service integration image"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -184,6 +194,8 @@ set(
     MICROS_BUILD_PM_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_IMAGE
+    MICROS_BUILD_RAMFS_SERVICE_IMAGE
+    MICROS_BUILD_RAMFS_SERVICE_TEST
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -207,6 +219,34 @@ if(MICROS_TARGET_TEST_COUNT GREATER 1)
 endif()
 
 find_program(MICROS_PYTHON NAMES python3 REQUIRED)
+
+set(
+    MICROS_RAMFS_SEED_IMAGE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
+)
+add_custom_command(
+    OUTPUT "${MICROS_RAMFS_SEED_IMAGE}"
+    COMMAND
+        "${MICROS_PYTHON}"
+        -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+        --manifest
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+        --repository-root
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        --output
+        "${MICROS_RAMFS_SEED_IMAGE}"
+    DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed/etc/motd"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+)
+add_custom_target(
+    ramfs_seed_image
+    DEPENDS "${MICROS_RAMFS_SEED_IMAGE}"
+)
 
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
@@ -337,6 +377,26 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/pm_control_test.c
         tests/host/pm_test.c
     )
+    add_executable(
+        ramfs_seed_test
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_seed_test.c
+    )
+    add_dependencies(ramfs_seed_test ramfs_seed_image)
+    add_executable(
+        ramfs_test
+        servers/ramfs/ramfs_core.c
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_test.c
+    )
+    add_dependencies(ramfs_test ramfs_seed_image)
+    add_executable(
+        ramfs_model_test
+        servers/ramfs/ramfs_core.c
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_model_test.c
+    )
+    add_dependencies(ramfs_model_test ramfs_seed_image)
     add_executable(
         tty_test
         kernel/plic_core.c
@@ -566,6 +626,24 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        ramfs_seed_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        ramfs_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        ramfs_model_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         tty_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -608,6 +686,9 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
+    target_compile_features(ramfs_seed_test PRIVATE c_std_17)
+    target_compile_features(ramfs_test PRIVATE c_std_17)
+    target_compile_features(ramfs_model_test PRIVATE c_std_17)
     target_compile_features(tty_test PRIVATE c_std_17)
     target_compile_features(tty_service_test PRIVATE c_std_17)
     target_compile_features(tty_uart_test PRIVATE c_std_17)
@@ -735,6 +816,36 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         pm_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_seed_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_model_test
         PRIVATE
             -Wall
             -Wextra
@@ -934,6 +1045,39 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            ramfs_seed_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_seed_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            ramfs_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            ramfs_model_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_model_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             tty_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1058,6 +1202,15 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(
+        NAME ramfs-seed
+        COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
+    )
+    add_test(
+        NAME ramfs-core
+        COMMAND ramfs_test "${MICROS_RAMFS_SEED_IMAGE}"
+    )
+    add_test(NAME ramfs-model COMMAND ramfs_model_test)
     add_test(NAME tty-core COMMAND tty_test)
     add_test(NAME tty-service-core COMMAND tty_service_test)
     add_test(NAME tty-uart COMMAND tty_uart_test)
@@ -1076,6 +1229,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME tty-owner-fault COMMAND tty_fault_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
     set_tests_properties(tty-model PROPERTIES LABELS slow)
+    set_tests_properties(ramfs-model PROPERTIES LABELS slow)
 
     add_custom_target(
         test-unit-fast
@@ -1109,6 +1263,8 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            ramfs_seed_test
+            ramfs_test
             tty_test
             tty_service_test
             tty_uart_test
@@ -1151,6 +1307,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
 
     add_custom_target(
+        test-ramfs-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            ramfs-model
+        DEPENDS ramfs_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
         test-unit
         COMMAND
             "${CMAKE_CTEST_COMMAND}"
@@ -1181,6 +1351,9 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            ramfs_seed_test
+            ramfs_test
+            ramfs_model_test
             tty_test
             tty_service_test
             tty_uart_test
@@ -1326,6 +1499,8 @@ if(
     OR MICROS_BUILD_PM_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_IMAGE
+    OR MICROS_BUILD_RAMFS_SERVICE_IMAGE
+    OR MICROS_BUILD_RAMFS_SERVICE_TEST
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -1406,6 +1581,7 @@ if(
     if(
         MICROS_BUILD_TTY_SERVICE_IMAGE
         OR MICROS_BUILD_TTY_SERVICE_TEST
+        OR MICROS_BUILD_RAMFS_SERVICE_TEST
     )
         micros_add_bootstrap_user(
             micros_tty_service
@@ -1431,6 +1607,61 @@ if(
         endif()
     endif()
 
+    if(
+        MICROS_BUILD_RAMFS_SERVICE_IMAGE
+        OR MICROS_BUILD_RAMFS_SERVICE_TEST
+    )
+        set(
+            MICROS_RAMFS_EMBEDDED_SEED_SOURCE
+            "${CMAKE_BINARY_DIR}/generated/ramfs_embedded_seed.c"
+        )
+        add_custom_command(
+            OUTPUT "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
+                --input
+                "${MICROS_RAMFS_SEED_IMAGE}"
+                --output
+                "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            DEPENDS
+                "${MICROS_RAMFS_SEED_IMAGE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/ramfs_embedded_seed.h"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+        set_source_files_properties(
+            "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            PROPERTIES GENERATED TRUE
+        )
+        micros_add_bootstrap_user(
+            micros_ramfs_service
+            micros-ramfs-service
+            "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            servers/ramfs/ramfs_core.c
+            servers/ramfs/ramfs_seed.c
+            servers/ramfs/ramfs_service.c
+        )
+        add_custom_command(
+            TARGET micros_ramfs_service
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                --elf
+                "$<TARGET_FILE:micros_ramfs_service>"
+                --resident-page-limit
+                192
+                --stack-page-count
+                1
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endif()
+
     micros_add_bootstrap_user(
         micros_bootstrap_launcher
         micros-bootstrap-launcher
@@ -1441,6 +1672,7 @@ if(
         MICROS_BUILD_VM_HANDOFF_TEST
         OR MICROS_BUILD_PM_SERVICE_TEST
         OR MICROS_BUILD_TTY_SERVICE_TEST
+        OR MICROS_BUILD_RAMFS_SERVICE_TEST
         OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -1451,7 +1683,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
-        if(MICROS_BUILD_TTY_SERVICE_TEST)
+        if(MICROS_BUILD_RAMFS_SERVICE_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_RAMFS_SERVICE_TEST=1
+            )
+        elseif(MICROS_BUILD_TTY_SERVICE_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -1586,6 +1824,61 @@ if(
             )
             set_source_files_properties(
                 "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        elseif(MICROS_BUILD_RAMFS_SERVICE_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                servers/pm/pm_core.c
+                servers/pm/pm_service.c
+            )
+            micros_add_bootstrap_user(
+                micros_ramfs_service_vfs
+                micros-ramfs-service-vfs
+                tests/qemu/ramfs_service_report.S
+                tests/qemu/ramfs_service_vfs.c
+            )
+            set(
+                MICROS_RAMFS_SERVICE_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/ramfs_service_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_service_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf
+                    "$<TARGET_FILE:micros_pm_service>"
+                    --tty-elf
+                    "$<TARGET_FILE:micros_tty_service>"
+                    --ramfs-elf
+                    "$<TARGET_FILE:micros_ramfs_service>"
+                    --vfs-elf
+                    "$<TARGET_FILE:micros_ramfs_service_vfs>"
+                    --output
+                    "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_tty_service
+                    micros_ramfs_service
+                    micros_ramfs_service_vfs
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_service_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
                 PROPERTIES GENERATED TRUE
             )
         else()
@@ -1893,6 +2186,29 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
         PRIVATE
             "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
             kernel/tty_service_test.c
+    )
+endif()
+
+if(MICROS_BUILD_RAMFS_SERVICE_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_tty_service
+        micros_ramfs_service
+        micros_ramfs_service_vfs
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_RAMFS_SERVICE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
+            kernel/ramfs_service_test.c
     )
 endif()
 
@@ -2349,6 +2665,40 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
             --require-objects-ready
             --timeout
             90
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_RAMFS_SERVICE_TEST)
+    add_custom_target(
+        test-qemu-ramfs
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_RAMFS_TEST_PASS seed=validated mount=single lookup=bounded files=writable directories=cursor grants=checked refs=balanced"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            180
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

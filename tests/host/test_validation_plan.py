@@ -52,6 +52,18 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_fast_ramfs_runs_persistent_model(self):
+        commands = validation_plan.plan(
+            ["servers/ramfs/ramfs_core.c"],
+            "fast",
+        )
+        self.assertEqual(validation_plan.UNIT_FAST, commands[0])
+        self.assertIn(validation_plan.RAMFS_MODEL, commands)
+        self.assertIn(
+            validation_plan.workflow("test-qemu-ramfs"),
+            commands,
+        )
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",
@@ -153,6 +165,24 @@ class ValidationPlanTests(unittest.TestCase):
                     "build-tty-service-image",
                 )
 
+    def test_ramfs_service_paths_own_image_gate(self):
+        for path in (
+            "servers/ramfs/ramfs_core.c",
+            "servers/ramfs/ramfs_seed.c",
+            "servers/ramfs/ramfs_service.c",
+            "servers/ramfs/ramfs_embedded_seed.h",
+            "servers/ramfs/seed.json",
+            "servers/ramfs/seed/etc/motd",
+            "tools/check_user_elf.py",
+            "tools/embed_ramfs_seed.py",
+            "tools/generate_ramfs_seed.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "build-ramfs-service-image",
+                )
+
     def test_tty_production_and_fixture_paths_own_qemu_gate(self):
         for path in (
             *validation_plan.TTY_CONTROL_INPUTS,
@@ -183,6 +213,58 @@ class ValidationPlanTests(unittest.TestCase):
                     path,
                     "test-qemu-scheduler",
                 )
+
+    def test_ramfs_production_and_fixture_paths_own_qemu_gate(self):
+        for path in (
+            "include/micros/ramfs.h",
+            "kernel/ramfs_service_test.c",
+            "kernel/ramfs_service_test.h",
+            "kernel/ramfs_service_test_fixture.h",
+            "servers/ramfs/ramfs_core.c",
+            "servers/ramfs/ramfs_seed.c",
+            "servers/ramfs/ramfs_service.c",
+            "tests/host/test_generate_ramfs_service_fixture.py",
+            "tests/qemu/ramfs_service_protocol.h",
+            "tests/qemu/ramfs_service_report.S",
+            "tests/qemu/ramfs_service_vfs.c",
+            "tools/generate_ramfs_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-ramfs",
+                )
+
+    def test_ramfs_model_entry_point_owns_qemu_gate(self):
+        self.assert_workflow_selected(
+            "tests/host/ramfs_model_test.c",
+            "test-qemu-ramfs",
+        )
+
+    def test_ramfs_startup_paths_select_retained_service_gates(self):
+        for path in (
+            "servers/ramfs/ramfs_embedded_seed.h",
+            "servers/ramfs/ramfs_service.c",
+            "servers/ramfs/seed.json",
+            "servers/ramfs/seed/etc/motd",
+            "tools/embed_ramfs_seed.py",
+            "tools/generate_ramfs_seed.py",
+            "tools/generate_ramfs_service_fixture.py",
+        ):
+            commands = validation_plan.plan([path], "fast")
+            with self.subTest(path=path):
+                for workflow_name in (
+                    "test-qemu-user-runtime",
+                    "test-qemu-bootstrap-launcher",
+                    "test-qemu-vm-handoff",
+                    "test-qemu-pm-service",
+                    "test-qemu-tty",
+                    "test-qemu-ramfs",
+                ):
+                    self.assertIn(
+                        validation_plan.workflow(workflow_name),
+                        commands,
+                    )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):
         for path in (
@@ -598,8 +680,9 @@ class ValidationPlanTests(unittest.TestCase):
         representatives = {
             "test-qemu-smoke": "kernel/fdt.c",
             "test-qemu-panic": "kernel/panic.c",
-            "test-qemu-trap": "arch/riscv64/trap.S",
-            "test-qemu-timer": "kernel/timer.c",
+            "test-qemu-trap": "arch/riscv64/trap_test.S",
+            "test-qemu-timer": "arch/riscv64/sbi.c",
+            "test-qemu-uart-console": "kernel/uart_console_test.c",
             "test-qemu-frame-allocator": "kernel/frame_allocator.c",
             "test-qemu-trap-panic": "arch/riscv64/trap_test.S",
             "test-qemu-mmu": "kernel/mmu_test.c",
@@ -611,6 +694,8 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-bootstrap-launcher": "kernel/bootstrap_test.c",
             "test-qemu-vm-handoff": "kernel/vm_handoff_test.c",
             "test-qemu-pm-service": "kernel/pm_service_test.c",
+            "test-qemu-tty": "kernel/tty_service_test.c",
+            "test-qemu-ramfs": "kernel/ramfs_service_test.c",
             "test-qemu-vm-ready-early": "tests/qemu/vm_server.c",
             "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
             "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",
@@ -624,6 +709,9 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-nested-trap": "arch/riscv64/nested_trap_test.S",
             "test-qemu-frame-ownership": "kernel/frame_ownership_test.c",
             "test-qemu-user-address-space": "kernel/user_address_space_test.c",
+            "test-qemu-address-space-handoff": (
+                "kernel/address_space_handoff_test.c"
+            ),
             "test-qemu-user-execution": "kernel/user_execution_test.c",
             "test-qemu-scheduler": "kernel/scheduler_test.c",
             "test-qemu-scheduler-invalid-outgoing": (
@@ -633,8 +721,18 @@ class ValidationPlanTests(unittest.TestCase):
                 "arch/riscv64/scheduler_test.S"
             ),
         }
+        self.assertEqual(
+            set(validation_plan.QEMU_WORKFLOWS),
+            set(representatives),
+        )
         for expected, path in representatives.items():
             with self.subTest(workflow=expected, path=path):
+                self.assertTrue(
+                    validation_plan.path_matches(
+                        path,
+                        validation_plan.GATE_INPUTS[expected],
+                    )
+                )
                 self.assert_workflow_selected(path, expected)
 
     def test_diff_checks_cover_index_worktree_and_branch(self):
