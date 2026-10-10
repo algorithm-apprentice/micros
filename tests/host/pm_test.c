@@ -34,7 +34,7 @@ static bool complete_exit(
     struct micros_pm_process_handle child,
     uint64_t transaction,
     int32_t exit_code,
-    struct micros_pm_wait_outcome *outcome
+    struct micros_pm_wait_outcomes *outcomes
 );
 
 static void write_u32_le(uint8_t *bytes, uint32_t value)
@@ -94,6 +94,19 @@ static bool pm_handle_is_none(struct micros_pm_process_handle handle)
         && handle.reserved == 0
         && handle.generation == 0
     );
+}
+
+static bool bytes_are_zero(const void *storage, size_t size)
+{
+    const unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static struct micros_ipc_message exit_request(int32_t exit_code)
@@ -1004,7 +1017,7 @@ static bool test_orphaned_lifecycle_is_invalid(void)
     struct micros_pm_table table;
     struct micros_pm_process_handle init;
     struct micros_pm_process_handle child;
-    struct micros_pm_wait_outcome outcome;
+    struct micros_pm_wait_outcomes outcomes;
     uint64_t pid;
 
     EXPECT_TRUE(
@@ -1016,8 +1029,8 @@ static bool test_orphaned_lifecycle_is_invalid(void)
             &child,
             &pid
         )
-        && complete_exit(&table, child, 901, 9, &outcome)
-        && outcome.action == MICROS_PM_WAIT_ACTION_NONE
+        && complete_exit(&table, child, 901, 9, &outcomes)
+        && outcomes.count == 0
     );
     memset(
         &table.records[child.slot].parent,
@@ -1059,7 +1072,7 @@ static bool complete_exit(
     struct micros_pm_process_handle child,
     uint64_t transaction,
     int32_t exit_code,
-    struct micros_pm_wait_outcome *outcome
+    struct micros_pm_wait_outcomes *outcomes
 )
 {
     struct micros_pm_exit_effects effects;
@@ -1075,7 +1088,6 @@ static bool complete_exit(
         ) == MICROS_PM_MODEL_OK
         && !effects.aborted_spawn
         && effects.reparented_count == 0
-        && effects.reaper_wait.action == MICROS_PM_WAIT_ACTION_NONE
         && micros_pm_exit_detach(table, child, transaction)
             == MICROS_PM_MODEL_OK
         && micros_pm_exit_release_vm(table, child, transaction)
@@ -1084,7 +1096,7 @@ static bool complete_exit(
             table,
             child,
             transaction,
-            outcome
+            outcomes
         ) == MICROS_PM_MODEL_OK
     );
 }
@@ -1096,6 +1108,8 @@ static bool test_exit_wait_and_reply_restore(void)
     struct micros_pm_process_handle child;
     const struct micros_pm_process_record *record;
     struct micros_pm_wait_outcome outcome;
+    struct micros_pm_wait_outcomes outcomes;
+    struct micros_pm_wait_outcomes outcomes_sentinel;
     uint64_t pid;
 
     EXPECT_TRUE(
@@ -1134,6 +1148,8 @@ static bool test_exit_wait_and_reply_restore(void)
         && table.records[init.slot].wait.reply_token == 41
     );
 
+    memset(&outcomes_sentinel, 0xa5, sizeof(outcomes_sentinel));
+    outcomes = outcomes_sentinel;
     EXPECT_TRUE(
         micros_pm_exit_begin(
             &table,
@@ -1164,22 +1180,35 @@ static bool test_exit_wait_and_reply_restore(void)
             &table,
             child,
             501,
-            &outcome
+            &outcomes
         ) == MICROS_PM_MODEL_ERROR_STATE
+        && memcmp(
+            &outcomes,
+            &outcomes_sentinel,
+            sizeof(outcomes)
+        ) == 0
         && micros_pm_exit_release_vm(&table, child, 501)
             == MICROS_PM_MODEL_OK
         && micros_pm_exit_release_process(
             &table,
             child,
             501,
-            &outcome
+            &outcomes
         ) == MICROS_PM_MODEL_OK
-        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
-        && outcome.result == MICROS_PM_RESULT_OK
-        && outcome.reply_token == 41
-        && outcome.child_pid == 2
-        && outcome.exit_kind == MICROS_PM_EXIT_NORMAL
-        && outcome.exit_code == -17
+        && outcomes.count == 1
+        && outcomes.reserved == 0
+        && outcomes.entries[0].action
+            == MICROS_PM_WAIT_ACTION_REPLY
+        && outcomes.entries[0].result == MICROS_PM_RESULT_OK
+        && outcomes.entries[0].reply_token == 41
+        && outcomes.entries[0].child_pid == 2
+        && outcomes.entries[0].exit_kind == MICROS_PM_EXIT_NORMAL
+        && outcomes.entries[0].exit_code == -17
+        && pm_handles_equal(outcomes.entries[0].parent, init)
+        && bytes_are_zero(
+            &outcomes.entries[1],
+            sizeof(outcomes.entries[1])
+        )
         && micros_pm_process_resolve(&table, child, &record)
             == MICROS_PM_MODEL_OK
         && record->state == MICROS_PM_PROCESS_ZOMBIE
@@ -1218,6 +1247,7 @@ static bool test_wait_selection(void)
     struct micros_pm_process_handle second;
     struct micros_pm_process_handle third;
     struct micros_pm_wait_outcome outcome;
+    struct micros_pm_wait_outcomes outcomes;
     uint64_t first_pid;
     uint64_t second_pid;
     uint64_t third_pid;
@@ -1268,10 +1298,12 @@ static bool test_wait_selection(void)
         && outcome.result == MICROS_PM_RESULT_NO_CHILD
     );
     EXPECT_TRUE(
-        complete_exit(&table, second, 601, 22, &outcome)
-        && outcome.action == MICROS_PM_WAIT_ACTION_NONE
-        && complete_exit(&table, first, 602, 11, &outcome)
-        && outcome.action == MICROS_PM_WAIT_ACTION_NONE
+        complete_exit(&table, second, 601, 22, &outcomes)
+        && outcomes.count == 0
+        && bytes_are_zero(&outcomes, sizeof(outcomes))
+        && complete_exit(&table, first, 602, 11, &outcomes)
+        && outcomes.count == 0
+        && bytes_are_zero(&outcomes, sizeof(outcomes))
         && first_pid < second_pid
         && second_pid < third_pid
         && micros_pm_wait_begin(
@@ -1326,6 +1358,7 @@ static bool test_parent_exit_reparents_and_aborts(void)
     struct micros_pm_exit_effects effects;
     struct micros_pm_exit_effects effects_sentinel;
     struct micros_pm_wait_outcome outcome;
+    struct micros_pm_wait_outcomes outcomes;
     uint32_t released;
     uint64_t parent_pid;
     uint64_t zombie_pid;
@@ -1364,8 +1397,9 @@ static bool test_parent_exit_reparents_and_aborts(void)
             &outcome
         ) == MICROS_PM_MODEL_OK
         && outcome.action == MICROS_PM_WAIT_ACTION_BLOCKED
-        && complete_exit(&table, zombie, 701, 33, &outcome)
-        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
+        && complete_exit(&table, zombie, 701, 33, &outcomes)
+        && outcomes.count == 1
+        && outcomes.entries[0].child_pid == zombie_pid
         && micros_pm_begin_spawn(
             &table,
             parent,
@@ -1424,17 +1458,16 @@ static bool test_parent_exit_reparents_and_aborts(void)
         ) == MICROS_PM_MODEL_OK
         && !effects.aborted_spawn
         && effects.reparented_count == 2
-        && effects.reaper_wait.action == MICROS_PM_WAIT_ACTION_REPLY
-        && effects.reaper_wait.reply_token == 71
-        && effects.reaper_wait.child_pid == zombie_pid
         && !table.records[parent.slot].wait.active
+        && table.records[init.slot].wait.active
+        && !table.records[init.slot].wait.result_ready
         && micros_pm_process_resolve(&table, hidden, &record)
             == MICROS_PM_MODEL_ERROR_STALE
         && micros_pm_process_resolve(&table, zombie, &record)
             == MICROS_PM_MODEL_OK
         && record->parent.slot == init.slot
         && record->parent.generation == init.generation
-        && record->reap_pending
+        && !record->reap_pending
         && micros_pm_process_resolve(&table, running, &record)
             == MICROS_PM_MODEL_OK
         && record->parent.slot == init.slot
@@ -1452,11 +1485,194 @@ static bool test_parent_exit_reparents_and_aborts(void)
             0,
             &effects
         ) == MICROS_PM_MODEL_ERROR_INVARIANT
+        && micros_pm_exit_detach(&table, parent, 704)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_exit_release_vm(&table, parent, 704)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_exit_release_process(
+            &table,
+            parent,
+            704,
+            &outcomes
+        ) == MICROS_PM_MODEL_OK
+        && outcomes.count == 1
+        && outcomes.reserved == 0
+        && outcomes.entries[0].action
+            == MICROS_PM_WAIT_ACTION_REPLY
+        && outcomes.entries[0].reply_token == 71
+        && outcomes.entries[0].child_pid == parent_pid
+        && outcomes.entries[0].exit_kind
+            == MICROS_PM_EXIT_NORMAL
+        && outcomes.entries[0].exit_code == 44
+        && pm_handles_equal(outcomes.entries[0].parent, init)
+        && pm_handles_equal(outcomes.entries[0].child, parent)
+        && bytes_are_zero(
+            &outcomes.entries[1],
+            sizeof(outcomes.entries[1])
+        )
+        && micros_pm_process_resolve(&table, zombie, &record)
+            == MICROS_PM_MODEL_OK
+        && !record->reap_pending
+        && micros_pm_wait_reply_complete(&table, init, 71, true)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_process_resolve(&table, parent, &record)
+            == MICROS_PM_MODEL_ERROR_STALE
+        && micros_pm_wait_begin(
+            &table,
+            init,
+            0,
+            0,
+            73,
+            &outcome
+        ) == MICROS_PM_MODEL_OK
+        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
+        && outcome.child_pid == zombie_pid
+        && micros_pm_wait_reply_complete(&table, init, 73, true)
+            == MICROS_PM_MODEL_OK
         && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
     );
-    (void)parent_pid;
     (void)running_pid;
     (void)hidden_pid;
+    return true;
+}
+
+static bool test_nested_parent_exit_stages_independent_waits(void)
+{
+    struct micros_pm_table table;
+    struct micros_pm_process_handle init;
+    struct micros_pm_process_handle grandparent;
+    struct micros_pm_process_handle parent;
+    struct micros_pm_process_handle child;
+    const struct micros_pm_process_record *record;
+    struct micros_pm_exit_effects effects;
+    struct micros_pm_wait_outcome outcome;
+    struct micros_pm_wait_outcomes outcomes;
+    uint64_t grandparent_pid;
+    uint64_t parent_pid;
+    uint64_t child_pid;
+
+    EXPECT_TRUE(
+        initialize_running_init(&table, &init)
+        && spawn_running_child(
+            &table,
+            init,
+            UINT32_C(0x00002001),
+            &grandparent,
+            &grandparent_pid
+        )
+        && spawn_running_child(
+            &table,
+            grandparent,
+            UINT32_C(0x00003001),
+            &parent,
+            &parent_pid
+        )
+        && spawn_running_child(
+            &table,
+            parent,
+            UINT32_C(0x00004001),
+            &child,
+            &child_pid
+        )
+        && complete_exit(&table, child, 801, 33, &outcomes)
+        && outcomes.count == 0
+        && micros_pm_wait_begin(
+            &table,
+            init,
+            0,
+            0,
+            81,
+            &outcome
+        ) == MICROS_PM_MODEL_OK
+        && outcome.action == MICROS_PM_WAIT_ACTION_BLOCKED
+        && micros_pm_wait_begin(
+            &table,
+            grandparent,
+            parent_pid,
+            0,
+            82,
+            &outcome
+        ) == MICROS_PM_MODEL_OK
+        && outcome.action == MICROS_PM_WAIT_ACTION_BLOCKED
+        && micros_pm_exit_begin(
+            &table,
+            parent,
+            802,
+            MICROS_PM_EXIT_NORMAL,
+            44,
+            &effects
+        ) == MICROS_PM_MODEL_OK
+        && !effects.aborted_spawn
+        && effects.reparented_count == 1
+        && table.records[init.slot].wait.active
+        && !table.records[init.slot].wait.result_ready
+        && table.records[grandparent.slot].wait.active
+        && !table.records[grandparent.slot].wait.result_ready
+        && micros_pm_process_resolve(&table, child, &record)
+            == MICROS_PM_MODEL_OK
+        && pm_handles_equal(record->parent, init)
+        && !record->reap_pending
+        && micros_pm_exit_detach(&table, parent, 802)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_exit_release_vm(&table, parent, 802)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_exit_release_process(
+            &table,
+            parent,
+            802,
+            &outcomes
+        ) == MICROS_PM_MODEL_OK
+        && outcomes.count == 2
+        && outcomes.reserved == 0
+        && outcomes.entries[0].action
+            == MICROS_PM_WAIT_ACTION_REPLY
+        && outcomes.entries[0].reply_token == 81
+        && outcomes.entries[0].child_pid == child_pid
+        && outcomes.entries[0].exit_code == 33
+        && pm_handles_equal(outcomes.entries[0].parent, init)
+        && pm_handles_equal(outcomes.entries[0].child, child)
+        && outcomes.entries[1].action
+            == MICROS_PM_WAIT_ACTION_REPLY
+        && outcomes.entries[1].reply_token == 82
+        && outcomes.entries[1].child_pid == parent_pid
+        && outcomes.entries[1].exit_code == 44
+        && pm_handles_equal(
+            outcomes.entries[1].parent,
+            grandparent
+        )
+        && pm_handles_equal(outcomes.entries[1].child, parent)
+        && micros_pm_wait_reply_complete(&table, init, 81, false)
+            == MICROS_PM_MODEL_OK
+        && table.records[init.slot].wait.active
+        && !table.records[init.slot].wait.result_ready
+        && table.records[grandparent.slot].wait.result_ready
+        && micros_pm_process_resolve(&table, child, &record)
+            == MICROS_PM_MODEL_OK
+        && !record->reap_pending
+        && micros_pm_process_resolve(&table, parent, &record)
+            == MICROS_PM_MODEL_OK
+        && record->reap_pending
+        && micros_pm_wait_reply_complete(
+            &table,
+            grandparent,
+            82,
+            true
+        ) == MICROS_PM_MODEL_OK
+        && micros_pm_process_resolve(&table, parent, &record)
+            == MICROS_PM_MODEL_ERROR_STALE
+        && micros_pm_wait_resume(&table, init, &outcome)
+            == MICROS_PM_MODEL_OK
+        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
+        && outcome.reply_token == 81
+        && outcome.child_pid == child_pid
+        && pm_handles_equal(outcome.parent, init)
+        && micros_pm_wait_reply_complete(&table, init, 81, true)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_process_resolve(&table, child, &record)
+            == MICROS_PM_MODEL_ERROR_STALE
+        && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
+    );
+    (void)grandparent_pid;
     return true;
 }
 
@@ -2005,8 +2221,6 @@ static bool test_replayable_transition_model(void)
                     ) == MICROS_PM_MODEL_OK
                     && !effects.aborted_spawn
                     && effects.reparented_count == 0
-                    && effects.reaper_wait.action
-                        == MICROS_PM_WAIT_ACTION_NONE
                 );
                 record->state = MICROS_PM_PROCESS_EXITING;
                 record->exit_stage = MICROS_PM_EXIT_STAGE_STOPPED;
@@ -2022,7 +2236,7 @@ static bool test_replayable_transition_model(void)
             if (slot != PM_MODEL_NO_SLOT) {
                 struct pm_model_record *record
                     = &reference.records[slot];
-                struct micros_pm_wait_outcome outcome;
+                struct micros_pm_wait_outcomes outcomes;
 
                 operation_trace[step] |= (uint32_t)slot << 16;
                 if (
@@ -2060,7 +2274,7 @@ static bool test_replayable_transition_model(void)
                             &table,
                             record->handle,
                             record->transaction,
-                            &outcome
+                            &outcomes
                         ) == MICROS_PM_MODEL_OK
                     );
                     record->state = MICROS_PM_PROCESS_ZOMBIE;
@@ -2080,18 +2294,20 @@ static bool test_replayable_transition_model(void)
                             zombie_slot
                         );
                         PM_MODEL_EXPECT(
-                            outcome.action
+                            outcomes.count == 1
+                            && outcomes.entries[0].action
                                 == MICROS_PM_WAIT_ACTION_REPLY
-                            && outcome.reply_token
+                            && outcomes.entries[0].reply_token
                                 == reference.wait.reply_token
-                            && outcome.child_pid
+                            && outcomes.entries[0].child_pid
                                 == reference.records[zombie_slot].pid
+                            && pm_handles_equal(
+                                outcomes.entries[0].parent,
+                                init
+                            )
                         );
                     } else {
-                        PM_MODEL_EXPECT(
-                            outcome.action
-                                == MICROS_PM_WAIT_ACTION_NONE
-                        );
+                        PM_MODEL_EXPECT(outcomes.count == 0);
                     }
                 }
             }
@@ -2316,6 +2532,7 @@ int main(void)
         || !test_exit_wait_and_reply_restore()
         || !test_wait_selection()
         || !test_parent_exit_reparents_and_aborts()
+        || !test_nested_parent_exit_stages_independent_waits()
         || !test_replayable_transition_model()
     ) {
         return 1;
