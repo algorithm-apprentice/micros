@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-static uint16_t read_u16_le(const uint8_t *bytes)
+static uint16_t spawn_request_read_u16_le(const uint8_t *bytes)
 {
     return (uint16_t)(
         (uint16_t)bytes[0]
@@ -10,7 +10,7 @@ static uint16_t read_u16_le(const uint8_t *bytes)
     );
 }
 
-static uint32_t read_u32_le(const uint8_t *bytes)
+static uint32_t spawn_request_read_u32_le(const uint8_t *bytes)
 {
     return (
         (uint32_t)bytes[0]
@@ -20,7 +20,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-static bool bytes_are_zero(const uint8_t *bytes, size_t size)
+static bool spawn_request_bytes_are_zero(const uint8_t *bytes, size_t size)
 {
     size_t index;
 
@@ -32,7 +32,7 @@ static bool bytes_are_zero(const uint8_t *bytes, size_t size)
     return true;
 }
 
-static bool string_bytes_are_canonical(
+static bool spawn_request_string_bytes_are_canonical(
     const uint8_t *bytes,
     uint16_t size,
     bool require_nonempty,
@@ -68,7 +68,7 @@ static bool string_bytes_are_canonical(
     return !require_environment_separator || found_separator;
 }
 
-static bool decode_string_reference(
+static bool spawn_request_decode_string_reference(
     const uint8_t *bytes,
     size_t total_size,
     size_t reference_offset,
@@ -79,16 +79,16 @@ static bool decode_string_reference(
     size_t *next_offset
 )
 {
-    uint16_t offset = read_u16_le(&bytes[reference_offset]);
-    uint16_t size = read_u16_le(&bytes[reference_offset + 2]);
+    uint16_t offset = spawn_request_read_u16_le(&bytes[reference_offset]);
+    uint16_t size = spawn_request_read_u16_le(&bytes[reference_offset + 2]);
 
     if (
-        !bytes_are_zero(&bytes[reference_offset + 4], 4)
+        !spawn_request_bytes_are_zero(&bytes[reference_offset + 4], 4)
         || offset != expected_offset
         || size == 0
         || expected_offset > total_size
         || size > total_size - expected_offset
-        || !string_bytes_are_canonical(
+        || !spawn_request_string_bytes_are_canonical(
             &bytes[expected_offset],
             size,
             require_nonempty,
@@ -120,13 +120,13 @@ enum micros_spawn_request_error micros_spawn_request_decode(
     if (
         byte_count < MICROS_SPAWN_REQUEST_SIZE_MIN
         || byte_count > MICROS_SPAWN_REQUEST_SIZE_MAX
-        || read_u32_le(&bytes[0]) != MICROS_SPAWN_REQUEST_VERSION
-        || read_u32_le(&bytes[4])
+        || spawn_request_read_u32_le(&bytes[0]) != MICROS_SPAWN_REQUEST_VERSION
+        || spawn_request_read_u32_le(&bytes[4])
             != MICROS_SPAWN_REQUEST_HEADER_SIZE
-        || read_u32_le(&bytes[8]) != byte_count
-        || read_u32_le(&bytes[12]) != 0
-        || !bytes_are_zero(&bytes[30], 2)
-        || !bytes_are_zero(
+        || spawn_request_read_u32_le(&bytes[8]) != byte_count
+        || spawn_request_read_u32_le(&bytes[12]) != 0
+        || !spawn_request_bytes_are_zero(&bytes[30], 2)
+        || !spawn_request_bytes_are_zero(
             &bytes[MICROS_SPAWN_HEADER_RESERVED_OFFSET],
             MICROS_SPAWN_REQUEST_HEADER_SIZE
                 - MICROS_SPAWN_HEADER_RESERVED_OFFSET
@@ -136,13 +136,13 @@ enum micros_spawn_request_error micros_spawn_request_decode(
     }
 
     decoded.total_size = (uint32_t)byte_count;
-    decoded.argument_count = read_u16_le(
+    decoded.argument_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_ARGUMENT_COUNT_OFFSET]
     );
-    decoded.environment_count = read_u16_le(
+    decoded.environment_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_ENVIRONMENT_COUNT_OFFSET]
     );
-    decoded.descriptor_action_count = read_u16_le(
+    decoded.descriptor_action_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_DESCRIPTOR_ACTION_COUNT_OFFSET]
     );
     if (
@@ -152,7 +152,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
             > MICROS_SPAWN_ENVIRONMENT_CAPACITY
         || decoded.descriptor_action_count
             > MICROS_SPAWN_DESCRIPTOR_ACTION_CAPACITY
-        || !decode_string_reference(
+        || !spawn_request_decode_string_reference(
             bytes,
             byte_count,
             MICROS_SPAWN_PATH_REFERENCE_OFFSET,
@@ -167,7 +167,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
     }
 
     for (index = 0; index < decoded.argument_count; ++index) {
-        if (!decode_string_reference(
+        if (!spawn_request_decode_string_reference(
             bytes,
             byte_count,
             MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET
@@ -186,7 +186,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
         index < MICROS_SPAWN_ARGUMENT_CAPACITY;
         ++index
     ) {
-        if (!bytes_are_zero(
+        if (!spawn_request_bytes_are_zero(
             &bytes[MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET
                 + index * MICROS_SPAWN_STRING_REFERENCE_SIZE],
             MICROS_SPAWN_STRING_REFERENCE_SIZE
@@ -196,7 +196,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
     }
 
     for (index = 0; index < decoded.environment_count; ++index) {
-        if (!decode_string_reference(
+        if (!spawn_request_decode_string_reference(
             bytes,
             byte_count,
             MICROS_SPAWN_ENVIRONMENT_REFERENCES_OFFSET
@@ -215,7 +215,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
         index < MICROS_SPAWN_ENVIRONMENT_CAPACITY;
         ++index
     ) {
-        if (!bytes_are_zero(
+        if (!spawn_request_bytes_are_zero(
             &bytes[MICROS_SPAWN_ENVIRONMENT_REFERENCES_OFFSET
                 + index * MICROS_SPAWN_STRING_REFERENCE_SIZE],
             MICROS_SPAWN_STRING_REFERENCE_SIZE
@@ -233,9 +233,9 @@ enum micros_spawn_request_error micros_spawn_request_decode(
         size_t offset = MICROS_SPAWN_DESCRIPTOR_ACTIONS_OFFSET
             + index * MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE;
 
-        action->source = read_u16_le(&bytes[offset]);
-        action->destination = read_u16_le(&bytes[offset + 2]);
-        action->operation = read_u32_le(&bytes[offset + 4]);
+        action->source = spawn_request_read_u16_le(&bytes[offset]);
+        action->destination = spawn_request_read_u16_le(&bytes[offset + 2]);
+        action->operation = spawn_request_read_u32_le(&bytes[offset + 4]);
         if (
             action->source >= MICROS_SPAWN_DESCRIPTOR_CAPACITY
             || action->destination >= MICROS_SPAWN_DESCRIPTOR_CAPACITY
@@ -251,7 +251,7 @@ enum micros_spawn_request_error micros_spawn_request_decode(
         index < MICROS_SPAWN_DESCRIPTOR_ACTION_CAPACITY;
         ++index
     ) {
-        if (!bytes_are_zero(
+        if (!spawn_request_bytes_are_zero(
             &bytes[MICROS_SPAWN_DESCRIPTOR_ACTIONS_OFFSET
                 + index * MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE],
             MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE

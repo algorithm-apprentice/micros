@@ -120,6 +120,11 @@ The current implementation provides:
 - a fixed-address standalone user-service ELF, minimal startup and compiler
   support, typed wrappers for operations 1 through 10, a fail-closed ELF
   checker, and an isolated three-process runtime acceptance gate;
+- a production portable VM state owner with immutable boot-database
+  validation and bootstrap-identity binding, in-place post-handoff frame
+  states, exact slot-indexed dynamic mapping records, deterministic load
+  reservations, enforced scratch map/fill/commit ordering, and mirrored
+  freeze, rollback, commit, and exit-release transitions;
 - a fixed-capacity PM lifecycle model with semantic PIDs, generation-safe
   parent/child records, staged spawn rollback, exit, zombie, wait, and
   reparenting transitions;
@@ -317,7 +322,12 @@ The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
 and kernel-object implementations with warnings as errors, ASan, and UBSan.
 The fast graph also runs the bytewise spawn-request, application-stack, and
-runtime ELF planning tests through the `spawn-abi` CTest case.
+runtime ELF planning tests through the `spawn-abi` CTest case. The `vm-core`
+case covers boot import, the exact 64-by-512-byte record array, lowest-frame
+selection, bootstrap-identity mismatches, in-place input staging,
+scratch-page filling and commit-before-fill rejection, freeze, rollback before
+and after freeze, active-record reuse exclusion, exit release, and record/frame
+ownership agreement.
 It also links the production user-runtime wrappers against a raw-syscall
 capture stub, exercises the production-prefixed `memcpy` and `memset` bodies,
 and runs malformed standalone-ELF and fixture-generator regressions. It then
