@@ -943,6 +943,29 @@ uses no host input or sleep; the absolute host timeout is 180 seconds, leaving
 margin above the measured debug/TCG completion time while retaining a finite
 deadlock bound.
 
+## VFS service acceptance
+
+Build and run the dependency-closed
+launcher/VM/PM/TTY/RAMFS/VFS/application gate with:
+
+```bash
+cmake --workflow --preset test-qemu-vfs
+```
+
+The workflow links the six production services plus one isolated application
+probe. VFS mounts RAMFS, installs only the probe's trusted root, cwd, and
+descriptors 0 through 2, then reports readiness. The probe exercises seeded
+read and EOF, relative `mkdir`, relative create/write, absolute and relative
+reopen, cwd replacement, translated 80-byte directory records, and console
+I/O through both grant hops. The host sends
+`micros-vfsx<DEL>-input<CR>` only after the exact input-ready line and uses no
+sleep. After the exact pass marker, the private drain call waits for TTY
+resident output to empty without granting direct TTY authority. The kernel then
+waits for physical UART completion and accepts the report only from the probe
+thread after all seven services are ready, launcher authority is sealed, VM and
+TTY handoff state is valid, and the grant registry is empty. The absolute host
+timeout is 180 seconds.
+
 ## TTY service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/VFS gate with:

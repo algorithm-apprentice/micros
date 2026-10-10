@@ -71,6 +71,10 @@ class ValidationPlanTests(unittest.TestCase):
         )
         self.assertEqual(validation_plan.UNIT_FAST, commands[0])
         self.assertIn(validation_plan.VFS_MODEL, commands)
+        self.assertIn(
+            validation_plan.workflow("test-qemu-vfs"),
+            commands,
+        )
 
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
@@ -265,6 +269,31 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-ramfs",
         )
 
+    def test_vfs_production_and_fixture_paths_own_qemu_gate(self):
+        for path in (
+            "include/micros/vfs.h",
+            "kernel/vfs_service_test.c",
+            "kernel/vfs_service_test.h",
+            "kernel/vfs_service_test_fixture.h",
+            "servers/vfs/vfs_core.c",
+            "servers/vfs/vfs_service.c",
+            "servers/vfs/vfs_service_core.c",
+            "tests/host/test_generate_vfs_service_fixture.py",
+            "tests/host/vfs_model_test.c",
+            "tests/host/vfs_service_test.c",
+            "tests/host/vfs_test.c",
+            "tests/host/vfs_test_fixture.c",
+            "tests/qemu/vfs_service_probe.c",
+            "tests/qemu/vfs_service_protocol.h",
+            "tests/qemu/vfs_service_report.S",
+            "tools/generate_vfs_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-vfs",
+                )
+
     def test_ramfs_startup_paths_select_retained_service_gates(self):
         for path in (
             "servers/ramfs/ramfs_embedded_seed.h",
@@ -284,6 +313,7 @@ class ValidationPlanTests(unittest.TestCase):
                     "test-qemu-pm-service",
                     "test-qemu-tty",
                     "test-qemu-ramfs",
+                    "test-qemu-vfs",
                 ):
                     self.assertIn(
                         validation_plan.workflow(workflow_name),
@@ -732,6 +762,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-pm-service": "kernel/pm_service_test.c",
             "test-qemu-tty": "kernel/tty_service_test.c",
             "test-qemu-ramfs": "kernel/ramfs_service_test.c",
+            "test-qemu-vfs": "kernel/vfs_service_test.c",
             "test-qemu-vm-ready-early": "tests/qemu/vm_server.c",
             "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
             "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",

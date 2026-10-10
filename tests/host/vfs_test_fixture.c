@@ -886,6 +886,12 @@ static enum micros_vfs_backend_status fixture_ramfs_call(
         result = MICROS_RAMFS_RESULT_OK;
         break;
     case MICROS_VFS_RAMFS_LOOKUP:
+        if (
+            request->length < 2
+            || request->length > MICROS_RAMFS_PATH_MAX
+        ) {
+            return MICROS_VFS_BACKEND_INVARIANT;
+        }
         result = fixture_lookup(fixture, request, response);
         break;
     case MICROS_VFS_RAMFS_CREATE:

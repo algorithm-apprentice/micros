@@ -36,6 +36,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-pm-service",
     "test-qemu-tty",
     "test-qemu-ramfs",
+    "test-qemu-vfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -125,6 +126,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-pm-service",
     "test-qemu-tty",
     "test-qemu-ramfs",
+    "test-qemu-vfs",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -633,6 +635,25 @@ GATE_INPUTS["test-qemu-ramfs"] = GATE_INPUTS[
     "tools/embed_ramfs_seed.py",
     "tools/generate_ramfs_seed.py",
     "tools/generate_ramfs_service_fixture.py",
+)
+GATE_INPUTS["test-qemu-vfs"] = GATE_INPUTS[
+    "test-qemu-ramfs"
+] + (
+    "include/micros/vfs.h",
+    "kernel/vfs_service_test.c",
+    "kernel/vfs_service_test.h",
+    "kernel/vfs_service_test_fixture.h",
+    "servers/vfs/",
+    "tests/host/test_generate_vfs_service_fixture.py",
+    "tests/host/vfs_model_test.c",
+    "tests/host/vfs_service_test.c",
+    "tests/host/vfs_test.c",
+    "tests/host/vfs_test_fixture.c",
+    "tests/host/vfs_test_fixture.h",
+    "tests/qemu/vfs_service_probe.c",
+    "tests/qemu/vfs_service_protocol.h",
+    "tests/qemu/vfs_service_report.S",
+    "tools/generate_vfs_service_fixture.py",
 )
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"

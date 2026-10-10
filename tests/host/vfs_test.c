@@ -902,7 +902,7 @@ static bool create_write_mkdir_and_chdir_are_exact(void)
     EXPECT_TRUE(initialize_full_fixture());
     selected = path_request(
         MICROS_VFS_MESSAGE_MKDIR,
-        "/tmp",
+        "tmp",
         0,
         UINT32_C(0755)
     );

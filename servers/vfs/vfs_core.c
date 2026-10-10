@@ -573,6 +573,7 @@ static enum micros_vfs_core_error validate_pending(
         }
         return MICROS_VFS_CORE_OK;
     }
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
     if (
         pending->state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
@@ -596,6 +597,7 @@ static enum micros_vfs_core_error validate_pending(
         }
         return MICROS_VFS_CORE_OK;
     }
+#endif
     if (
         pending->state
             != MICROS_VFS_PENDING_TTY_READ_WAIT_COMPLETION
@@ -1425,8 +1427,9 @@ static bool extract_final_component(
     }
     name[*name_length] = 0;
     if (start == 0) {
-        state->client_page[0] = 0;
-        *parent_length = 1;
+        state->client_page[0] = '.';
+        state->client_page[1] = 0;
+        *parent_length = 2;
     } else {
         state->client_page[start] = 0;
         *parent_length = start + 1;
@@ -3390,6 +3393,7 @@ static enum micros_vfs_core_error retry_tty_write(
     return MICROS_VFS_CORE_OK;
 }
 
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
 static void prepare_test_drain_action(
     uint64_t reply_token,
     enum micros_vfs_result result,
@@ -3451,6 +3455,7 @@ static enum micros_vfs_core_error submit_test_drain(
     );
     return MICROS_VFS_CORE_OK;
 }
+#endif
 
 static enum micros_vfs_core_error cleanup_pending_operation(
     struct micros_vfs_state *state,
@@ -3550,7 +3555,9 @@ static enum micros_vfs_core_error cleanup_pending_operation(
         return MICROS_VFS_CORE_OK;
     case MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT:
     case MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT:
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
     case MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE:
+#endif
     case MICROS_VFS_PENDING_NONE:
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
@@ -3882,8 +3889,10 @@ enum micros_vfs_core_error micros_vfs_detach(
             == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
         || state->pending.state
             == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
         || state->pending.state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
+#endif
     ) {
         *result = MICROS_VFS_TRUSTED_BUSY;
         return MICROS_VFS_CORE_OK;
@@ -4088,7 +4097,9 @@ static uint64_t expected_tty_event(
         return MICROS_TTY_EVENT_COMPLETION;
     case MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE:
     case MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT:
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
     case MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE:
+#endif
         return MICROS_TTY_EVENT_WRITABLE;
     case MICROS_VFS_PENDING_NONE:
         return 0;
@@ -4162,6 +4173,7 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
             ) {
                 return MICROS_VFS_CORE_ERROR_INVARIANT;
             }
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
         } else if (
             state->pending.state
                 == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
@@ -4182,6 +4194,7 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
             ) {
                 return MICROS_VFS_CORE_ERROR_INVARIANT;
             }
+#endif
         } else {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
@@ -4195,6 +4208,7 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
     return MICROS_VFS_CORE_OK;
 }
 
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
 enum micros_vfs_core_error micros_vfs_begin_test_drain(
     struct micros_vfs_state *state,
     micros_endpoint_t endpoint,
@@ -4250,3 +4264,4 @@ enum micros_vfs_core_error micros_vfs_begin_test_drain(
     }
     return MICROS_VFS_CORE_OK;
 }
+#endif

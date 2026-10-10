@@ -34,6 +34,9 @@
 #ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
 #include "kernel/ramfs_service_test.h"
 #endif
+#ifdef MICROS_BUILD_VFS_SERVICE_TEST
+#include "kernel/vfs_service_test.h"
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
 #endif
@@ -734,6 +737,15 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 }
                 return;
             }
+        }
+#endif
+#ifdef MICROS_BUILD_VFS_SERVICE_TEST
+        if (
+            !user_timer
+            && !user_external
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            (void)micros_vfs_service_test_handle_trap(hart, frame);
         }
 #endif
         if (

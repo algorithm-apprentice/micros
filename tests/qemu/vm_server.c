@@ -9,7 +9,18 @@
 #include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
 #include "tests/qemu/vm_handoff_protocol.h"
-#if defined(MICROS_RAMFS_SERVICE_TEST)
+#if defined(MICROS_VFS_SERVICE_TEST)
+#include "tests/qemu/vfs_service_protocol.h"
+#define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
+    MICROS_VFS_TEST_LAUNCHER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID \
+    MICROS_VFS_TEST_VM_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_PROBE_SERVICE_ID \
+    MICROS_VFS_TEST_TTY_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
+    MICROS_VFS_TEST_SERVICE_COUNT
+#define MICROS_VM_TTY_HANDOFF_TEST
+#elif defined(MICROS_RAMFS_SERVICE_TEST)
 #include "tests/qemu/ramfs_service_protocol.h"
 #define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
     MICROS_RAMFS_TEST_LAUNCHER_SERVICE_ID

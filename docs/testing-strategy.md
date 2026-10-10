@@ -225,6 +225,7 @@ QEMU targets are `test-qemu-smoke`,
 `test-qemu-pm-service`,
 `test-qemu-tty`,
 `test-qemu-ramfs`,
+`test-qemu-vfs`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -268,6 +269,7 @@ cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-ramfs
+cmake --workflow --preset test-qemu-vfs
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -425,9 +427,9 @@ changes select `test-qemu-vfs`; operation-15 changes retain the native grant,
 grant-syscall, handed-off grant, user-runtime, and VFS gates; bootstrap
 capacity or VM static-address-space changes retain every affected launcher,
 VM, PM, TTY, RAMFS, and VFS fixture; and VFS linker/table changes select
-`build-vfs-service-image`. The new QEMU workflow must have the same preset,
-ownership-map, and representative-input parity before it can enter the
-authoritative inventory.
+`build-vfs-service-image`. The VFS QEMU workflow has the same preset,
+ownership-map, and representative-input parity as every other authoritative
+gate.
 
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
@@ -1027,6 +1029,34 @@ is accepted:
 
 ```text
 MICROS_RAMFS_TEST_PASS seed=validated mount=single lookup=bounded files=writable directories=cursor grants=checked refs=balanced
+```
+
+The VFS Step 13 component workflow is implemented:
+
+```text
+test-qemu-vfs
+```
+
+It links the six production services with one profile-8 application probe.
+Production VFS still accepts exactly six configured services; only the
+compile-time fixture path accepts service 7, mounts RAMFS, and attaches that
+endpoint with root, cwd, and console descriptors. The probe reads seeded
+`/etc/motd` through EOF, creates `tmp` relative to root, writes `tmp/note`,
+reopens it by absolute and cwd-relative paths, returns cwd to root, and
+enumerates complete translated 80-byte root records without exposing a RAMFS
+handle. Every transient descriptor is closed and every application and backend
+grant is revoked.
+
+The probe writes the exact input-ready line through VFS and TTY before the host
+sends `micros-vfsx<DEL>-input<CR>`. Descriptor 0 receives
+`micros-vfs-input<LF>`. After writing the pass marker, the probe invokes the
+private no-authority drain call; VFS waits until TTY resident output is empty.
+The kernel then requires the exact probe thread, all seven ready states, sealed
+launcher authority, valid VM and TTY handoffs, zero live grants, and physical
+UART drain before clean SBI shutdown. Only the exact marker is accepted:
+
+```text
+MICROS_VFS_TEST_PASS mount=single descriptors=owned paths=absolute,relative files=two-hop directories=translated console=two-hop grants=balanced
 ```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure

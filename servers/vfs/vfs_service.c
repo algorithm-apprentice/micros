@@ -360,6 +360,10 @@ static enum micros_vfs_backend_status tty_call(
 void micros_service_main(void)
 {
     struct vfs_service_runtime runtime;
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+    enum micros_vfs_trusted_result attach_result;
+    micros_endpoint_t application_endpoint;
+#endif
     const struct micros_vfs_io io = {
         .client_validate = client_validate,
         .client_copy = client_copy,
@@ -370,13 +374,26 @@ void micros_service_main(void)
         .context = &runtime,
     };
     struct micros_ipc_message message;
+    bool configuration_is_valid;
+
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+    configuration_is_valid =
+        micros_vfs_service_validate_test_configuration(
+            &micros_bootstrap_service_config,
+            &runtime.endpoints,
+            &application_endpoint
+        );
+#else
+    configuration_is_valid =
+        micros_vfs_service_validate_configuration(
+            &micros_bootstrap_service_config,
+            &runtime.endpoints
+        );
+#endif
 
     if (
         vfs_service_data[0] != MICROS_VFS_SERVICE_DATA_MAGIC
-        || !micros_vfs_service_validate_configuration(
-            &micros_bootstrap_service_config,
-            &runtime.endpoints
-        )
+        || !configuration_is_valid
         || micros_vfs_state_initialize(
             &vfs_state,
             runtime.endpoints.self,
@@ -385,6 +402,15 @@ void micros_service_main(void)
         ) != MICROS_VFS_CORE_OK
         || micros_vfs_mount(&vfs_state, &io)
             != MICROS_VFS_CORE_OK
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+        || micros_vfs_attach_console(
+            &vfs_state,
+            application_endpoint,
+            0,
+            &attach_result
+        ) != MICROS_VFS_CORE_OK
+        || attach_result != MICROS_VFS_TRUSTED_OK
+#endif
         || micros_vfs_state_validate(&vfs_state)
             != MICROS_VFS_CORE_OK
         || !send_ready(&runtime.endpoints)

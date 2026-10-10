@@ -111,6 +111,17 @@ static struct micros_bootstrap_service_config production_config(void)
     return config;
 }
 
+static struct micros_bootstrap_service_config test_config(void)
+{
+    struct micros_bootstrap_service_config config =
+        production_config();
+
+    config.service_count = MICROS_BOOTSTRAP_SERVICE_CAPACITY;
+    config.services[6].service_id = 7;
+    config.services[6].endpoint = application_endpoint;
+    return config;
+}
+
 static bool initialize_service_fixture(void)
 {
     enum micros_vfs_trusted_result result;
@@ -709,6 +720,75 @@ static bool production_configuration_is_exact(void)
     return true;
 }
 
+static bool test_configuration_is_exact(void)
+{
+    struct micros_bootstrap_service_config config = test_config();
+    struct micros_vfs_service_endpoints endpoints;
+    micros_endpoint_t selected_application;
+
+    EXPECT_TRUE(
+        micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+        && endpoints.launcher == UINT32_C(0x00001000)
+        && endpoints.tty == UINT32_C(0x00001003)
+        && endpoints.ramfs == UINT32_C(0x00001004)
+        && endpoints.self == UINT32_C(0x00001005)
+        && selected_application == application_endpoint
+        && !micros_vfs_service_validate_configuration(
+            &config,
+            &endpoints
+        )
+    );
+    config = production_config();
+    EXPECT_TRUE(
+        !micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+    );
+    config = test_config();
+    config.service_count = MICROS_BOOTSTRAP_SERVICE_CAPACITY + 1;
+    EXPECT_TRUE(
+        !micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+    );
+    config = test_config();
+    config.services[6].service_id = MICROS_VFS_SERVICE_ID;
+    EXPECT_TRUE(
+        !micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+    );
+    config = test_config();
+    config.services[6].endpoint = config.services[5].endpoint;
+    EXPECT_TRUE(
+        !micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+    );
+    config = test_config();
+    config.self_endpoint = application_endpoint;
+    EXPECT_TRUE(
+        !micros_vfs_service_validate_test_configuration(
+            &config,
+            &endpoints,
+            &selected_application
+        )
+    );
+    return true;
+}
+
 static bool service_dispatches_calls_and_notifications(void)
 {
     struct micros_ipc_message message =
@@ -801,6 +881,60 @@ static bool service_dispatches_calls_and_notifications(void)
     return true;
 }
 
+static bool service_dispatches_test_drain_only_for_application(void)
+{
+    struct micros_ipc_message message =
+        request_message(MICROS_VFS_TEST_MESSAGE_DRAIN);
+    struct micros_vfs_service_reply_action action;
+
+    EXPECT_TRUE(initialize_service_fixture());
+    EXPECT_TRUE(
+        micros_vfs_service_decode_request(
+            &message,
+            &(struct micros_vfs_request){0}
+        ) == MICROS_VFS_PROTOCOL_BAD_TYPE
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && action.reply_token == UINT64_C(0x55)
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_TEST_MESSAGE_DRAIN
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_RESULT_OK
+    );
+
+    EXPECT_TRUE(initialize_service_fixture());
+    message = request_message(MICROS_VFS_TEST_MESSAGE_DRAIN);
+    message.source = UINT32_C(0x00001002);
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_ERROR_INVARIANT
+    );
+
+    EXPECT_TRUE(initialize_service_fixture());
+    message = request_message(MICROS_VFS_TEST_MESSAGE_DRAIN);
+    message.payload[4] = 1;
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_ERROR_INVARIANT
+    );
+    return true;
+}
+
 int main(void)
 {
     return (
@@ -808,6 +942,8 @@ int main(void)
         && application_protocol_is_exact()
         && backend_protocol_is_exact()
         && production_configuration_is_exact()
+        && test_configuration_is_exact()
         && service_dispatches_calls_and_notifications()
+        && service_dispatches_test_drain_only_for_application()
     ) ? 0 : 1;
 }

@@ -400,8 +400,9 @@ static bool tty_request_is_exact(
     return false;
 }
 
-bool micros_vfs_service_validate_configuration(
+static bool validate_configuration_shape(
     const volatile struct micros_bootstrap_service_config *config,
+    size_t service_count,
     struct micros_vfs_service_endpoints *endpoints
 )
 {
@@ -416,7 +417,7 @@ bool micros_vfs_service_validate_configuration(
         || config->manifest_version
             != MICROS_BOOTSTRAP_MANIFEST_VERSION
         || config->service_id != MICROS_VFS_SERVICE_ID
-        || config->service_count != MICROS_VFS_SERVICE_ID
+        || config->service_count != service_count
         || config->self_endpoint
             != config->services[MICROS_VFS_SERVICE_ID - 1].endpoint
         || config->launcher_endpoint != config->services[0].endpoint
@@ -424,7 +425,7 @@ bool micros_vfs_service_validate_configuration(
     ) {
         return false;
     }
-    for (index = 0; index < MICROS_VFS_SERVICE_ID; ++index) {
+    for (index = 0; index < service_count; ++index) {
         const volatile struct micros_bootstrap_service_endpoint *service =
             &config->services[index];
 
@@ -444,7 +445,7 @@ bool micros_vfs_service_validate_configuration(
         }
     }
     for (
-        index = MICROS_VFS_SERVICE_ID;
+        index = service_count;
         index < MICROS_BOOTSTRAP_SERVICE_CAPACITY;
         ++index
     ) {
@@ -479,6 +480,41 @@ bool micros_vfs_service_validate_configuration(
     *endpoints = selected;
     return true;
 }
+
+bool micros_vfs_service_validate_configuration(
+    const volatile struct micros_bootstrap_service_config *config,
+    struct micros_vfs_service_endpoints *endpoints
+)
+{
+    return validate_configuration_shape(
+        config,
+        MICROS_VFS_SERVICE_ID,
+        endpoints
+    );
+}
+
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+bool micros_vfs_service_validate_test_configuration(
+    const volatile struct micros_bootstrap_service_config *config,
+    struct micros_vfs_service_endpoints *endpoints,
+    micros_endpoint_t *application_endpoint
+)
+{
+    if (
+        application_endpoint == NULL
+        || !validate_configuration_shape(
+            config,
+            MICROS_BOOTSTRAP_SERVICE_CAPACITY,
+            endpoints
+        )
+    ) {
+        return false;
+    }
+    *application_endpoint =
+        config->services[MICROS_BOOTSTRAP_SERVICE_CAPACITY - 1].endpoint;
+    return true;
+}
+#endif
 
 enum micros_vfs_protocol_status micros_vfs_service_decode_request(
     const struct micros_ipc_message *message,
@@ -625,7 +661,13 @@ enum micros_vfs_service_error micros_vfs_service_build_result(
                         != MICROS_VFS_MESSAGE_GETDENTS
                     && !result_fields_are_zero(result)
                 )
-                || !application_type_is_known(result->request_type)
+                || (
+                    !application_type_is_known(result->request_type)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+                    && result->request_type
+                        != MICROS_VFS_TEST_MESSAGE_DRAIN
+#endif
+                )
             )
         )
     ) {
@@ -983,6 +1025,28 @@ enum micros_vfs_service_error micros_vfs_service_handle_message(
         if (message->reply_token == 0) {
             return MICROS_VFS_SERVICE_ERROR_INVARIANT;
         }
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+        if (message->type == MICROS_VFS_TEST_MESSAGE_DRAIN) {
+            if (
+                read_u32_le(&message->payload[0])
+                    != MICROS_VFS_PROTOCOL_VERSION
+                || !bytes_are_zero(&message->payload[4], 44)
+                || micros_vfs_begin_test_drain(
+                    state,
+                    message->source,
+                    message->reply_token,
+                    io,
+                    &result
+                ) != MICROS_VFS_CORE_OK
+            ) {
+                return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+            }
+            if (!result.active) {
+                return MICROS_VFS_SERVICE_OK;
+            }
+            return publish_result(&result, action);
+        }
+#endif
         status = micros_vfs_service_decode_request(
             message,
             &request

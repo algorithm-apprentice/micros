@@ -216,6 +216,15 @@
       }
     },
     {
+      "name": "riscv64-vfs-service-test",
+      "displayName": "RISC-V 64 VFS service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vfs-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VFS_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
@@ -559,6 +568,13 @@
       "configurePreset": "riscv64-ramfs-service-test",
       "targets": [
         "test-qemu-ramfs"
+      ]
+    },
+    {
+      "name": "test-qemu-vfs",
+      "configurePreset": "riscv64-vfs-service-test",
+      "targets": [
+        "test-qemu-vfs"
       ]
     },
     {
@@ -1078,6 +1094,20 @@
         {
           "type": "build",
           "name": "test-qemu-ramfs"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vfs",
+      "displayName": "Build and run the VFS service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vfs-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vfs"
         }
       ]
     },

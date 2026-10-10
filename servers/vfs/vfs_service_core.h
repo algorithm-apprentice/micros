@@ -40,6 +40,14 @@ bool micros_vfs_service_validate_configuration(
     struct micros_vfs_service_endpoints *endpoints
 );
 
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+bool micros_vfs_service_validate_test_configuration(
+    const volatile struct micros_bootstrap_service_config *config,
+    struct micros_vfs_service_endpoints *endpoints,
+    micros_endpoint_t *application_endpoint
+);
+#endif
+
 enum micros_vfs_protocol_status micros_vfs_service_decode_request(
     const struct micros_ipc_message *message,
     struct micros_vfs_request *request
