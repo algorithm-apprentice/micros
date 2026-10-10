@@ -215,6 +215,31 @@ Step 11's post-handoff mapping is a one-shot device exception. It does not add
 ordinary frames, map/unmap selection, page-table growth, page faults, scratch
 aliases, or the Step 14 executable-mapping transaction.
 
+Step 12 is internally serialized:
+
+1. fix the local MINIX VFS, libfsdriver, MFS mount, lookup, create, mkdir,
+   read/write, getdents, and putnode baseline;
+2. define one reproducible pointer-free seed image and fixed BSS node, block,
+   path, name, file, transfer, and directory-record bounds;
+3. add generation-safe node identity, exact link/reference ownership, root
+   confinement, sparse-file semantics, and failure-atomic mutation in native
+   tests;
+4. define and model exact VFS-only mount, lookup, create, mkdir, read, write,
+   getdents, and putnode calls with directional one-page grants;
+5. run one replayable mixed RAMFS model that compares complete production and
+   independent reference state after every operation;
+6. add the exact RAMFS/VFS profile relationships, real RAMFS seed
+   initialization, readiness, and single-threaded service loop;
+7. run one six-service QEMU scenario with the real launcher, VM, PM, TTY, and
+   RAMFS plus an exact test VFS peer; and
+8. prove seed validation, one mount, path lookup, writable sparse data,
+   complete-record cursors, balanced references, checked grants, and clean
+   launcher sealing.
+
+Step 12 does not add production VFS descriptors, application I/O, unlink,
+rename, truncate, block storage, executable loading, init, or shell behavior.
+Those remain at their later DAG nodes.
+
 `init` is not a static manifest service. Step 14 creates it through the
 ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
 

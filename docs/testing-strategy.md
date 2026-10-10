@@ -113,6 +113,40 @@ marker is emitted by TTY after the probe's grant-backed write, and isolated
 test shutdown occurs only after the UART has physically drained and the
 kernel has validated matching source-10 claim/completion evidence.
 
+### RAMFS Step 12 evidence
+
+RAMFS is a portable state owner behind real IPC and grant boundaries, so its
+implementation must split evidence as follows:
+
+- native seed tests cover the versioned JSON declaration, deterministic
+  parent-before-child generation, pointer-free header and entry ABI, digest,
+  reserved bytes, parent/name/mode rules, exact payload coverage, aggregate
+  rounded block demand, retained seed-plus-arena cost, and every malformed or
+  capacity rejection;
+- host post-link and manifest tests cover the complete 192-page RAMFS service
+  limit and aggregate 4,096-static-mapping limit;
+- native RAMFS tests cover generation-safe nodes, root and parent invariants,
+  link/reference ownership, mount gating, absolute and relative traversal,
+  repeated separators, `.`, `..`, trailing separators, create, mkdir, short
+  EOF reads, sparse zeroes, cross-block writes, all-or-error grant failures,
+  complete directory records, cursor continuation, putnode batching, stale
+  handles, nondirectory empty/`.`/`..` traversal, and every stable result;
+- one slow replayable model performs at least 8,192 mixed mount, lookup,
+  create, mkdir, read, write, getdents, putnode, malformed, stale, capacity,
+  and injected grant-failure transitions while comparing complete production
+  state with an independent reference after each operation; and
+- one QEMU component scenario uses the real launcher, VM, PM, TTY, and RAMFS
+  plus an exact test VFS peer. It proves seed validation, one mount,
+  `/etc/motd` lookup and EOF, runtime directory/file creation, sparse
+  grant-backed I/O, one-record cursor continuation, stable malformed and
+  stale results, balanced non-root references, no live grants, VFS readiness,
+  launcher sealing, TTY-routed output, and clean shutdown.
+
+The implementation must add `test-ramfs-model` as a slow native workflow and
+`test-qemu-ramfs` as the target workflow. Until those targets exist, no
+documentation or pull request may claim that either command is implemented or
+has passed.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:
