@@ -365,6 +365,15 @@ header, or QEMU-harness changes run the full tier. Explicit paths are unioned
 with Git discovery; rename discovery classifies both paths. Execution rejects
 remaining untracked files. Every plan ends with separate index, worktree, and
 branch-range diff checks.
+RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
+changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
+generated seed source and catalog, seed embedding/generation, and the
+six-service fixture generator retain the user-runtime, launcher, VM, PM, TTY,
+and RAMFS service gates. RAMFS service sources, generated seed data, and seed
+embedding/generation inputs also select `build-ramfs-service-image`. Inventory
+regressions require every documented QEMU workflow to have exact preset,
+ownership-map, and representative-input parity.
+
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
 emitted range events, a nonempty firmware reservation result, allocator and

@@ -276,7 +276,10 @@ TTY_TRAP_INPUTS = (
 )
 
 RAMFS_STARTUP_CROSS_GATE_INPUTS = (
+    "servers/ramfs/ramfs_embedded_seed.h",
     "servers/ramfs/ramfs_service.c",
+    "servers/ramfs/seed.json",
+    "servers/ramfs/seed/",
     "tools/embed_ramfs_seed.py",
     "tools/generate_ramfs_seed.py",
     "tools/generate_ramfs_service_fixture.py",
@@ -611,6 +614,7 @@ GATE_INPUTS["test-qemu-ramfs"] = GATE_INPUTS[
     "kernel/ramfs_service_test.h",
     "kernel/ramfs_service_test_fixture.h",
     "servers/ramfs/",
+    "tests/host/ramfs_model_test.c",
     "tests/host/test_generate_ramfs_service_fixture.py",
     "tests/qemu/ramfs_service_protocol.h",
     "tests/qemu/ramfs_service_report.S",
