@@ -891,6 +891,20 @@ The workflow cross-compiles the portable request/completion state machine,
 fixed NS16550A backend, operation-14 wrappers, and production service loop. The
 post-link checker enforces the repository's freestanding service-ELF contract.
 
+## RAMFS service image validation
+
+Build and validate the standalone real RAMFS service ELF with:
+
+```bash
+cmake --workflow --preset build-ramfs-service-image
+```
+
+The workflow generates and validates the canonical seed image, embeds it as
+read-only service data, cross-compiles the portable RAMFS core and production
+`reply_receive` loop, and checks the freestanding service-ELF contract. The
+post-link budget check also requires the complete `PT_LOAD` footprint plus one
+external stack page to fit within the 192-page RAMFS process limit.
+
 ## TTY service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/VFS gate with:

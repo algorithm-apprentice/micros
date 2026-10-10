@@ -142,10 +142,10 @@ implementation must split evidence as follows:
   stale results, balanced non-root references, no live grants, VFS readiness,
   launcher sealing, TTY-routed output, and clean shutdown.
 
-The implementation must add `test-ramfs-model` as a slow native workflow and
-`test-qemu-ramfs` as the target workflow. Until those targets exist, no
-documentation or pull request may claim that either command is implemented or
-has passed.
+The slow native workflow is implemented as `test-ramfs-model`.
+`test-qemu-ramfs` remains the required target workflow for the six-service
+scenario; no documentation or pull request may claim that command is
+implemented or has passed until the target exists.
 
 ## Planned test commands
 
@@ -171,6 +171,8 @@ Budgets are review signals, not reasons to hide necessary coverage.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 `test-tty-model`, `test-ramfs-model`, and the complete `test-unit` gate. The
+standalone image workflows are `build-tty-service-image` and
+`build-ramfs-service-image`. The
 implemented QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
@@ -202,6 +204,8 @@ cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-unit
+cmake --workflow --preset build-tty-service-image
+cmake --workflow --preset build-ramfs-service-image
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap

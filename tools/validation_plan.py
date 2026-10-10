@@ -54,6 +54,7 @@ QEMU_WORKFLOWS = (
 )
 
 IMAGE_WORKFLOWS = (
+    "build-ramfs-service-image",
     "build-tty-service-image",
 )
 
@@ -66,6 +67,17 @@ IMAGE_INPUTS = {
         "lib/runtime/",
         "servers/tty/",
         "tools/check_user_elf.py",
+    ),
+    "build-ramfs-service-image": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "servers/ramfs/",
+        "tools/check_user_elf.py",
+        "tools/embed_ramfs_seed.py",
+        "tools/generate_ramfs_seed.py",
     ),
 }
 

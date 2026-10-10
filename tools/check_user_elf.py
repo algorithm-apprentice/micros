@@ -924,6 +924,33 @@ def validate_elf(image: ElfImage):
     return errors
 
 
+def resident_page_count(image: ElfImage, stack_page_count: int):
+    if stack_page_count < 0:
+        raise ValueError("stack page count must not be negative")
+    load_pages = sum(
+        (program.memory_size + PAGE_SIZE - 1) // PAGE_SIZE
+        for program in image.programs
+        if program.program_type == PROGRAM_LOAD
+    )
+    return load_pages + stack_page_count
+
+
+def validate_resident_page_limit(
+    image: ElfImage,
+    stack_page_count: int,
+    resident_page_limit: int,
+):
+    if resident_page_limit <= 0:
+        raise ValueError("resident page limit must be positive")
+    count = resident_page_count(image, stack_page_count)
+    if count > resident_page_limit:
+        return [
+            f"resident page count {count} exceeds limit "
+            f"{resident_page_limit}"
+        ]
+    return []
+
+
 def load_validated_elf(path: Path):
     image = load_elf(path)
     errors = validate_elf(image)
@@ -937,13 +964,30 @@ def main(argv=None):
         description="Validate a standalone micros user-service ELF."
     )
     parser.add_argument("--elf", required=True, type=Path)
+    parser.add_argument("--resident-page-limit", type=int)
+    parser.add_argument("--stack-page-count", type=int, default=0)
     arguments = parser.parse_args(argv)
+    if (
+        arguments.resident_page_limit is None
+        and arguments.stack_page_count != 0
+    ):
+        parser.error(
+            "--stack-page-count requires --resident-page-limit"
+        )
     if not arguments.elf.is_file():
         parser.error(f"ELF image does not exist: {arguments.elf}")
     try:
         image = load_elf(arguments.elf)
         errors = validate_elf(image)
-    except (OSError, ElfFormatError, struct.error) as error:
+        if arguments.resident_page_limit is not None:
+            errors.extend(
+                validate_resident_page_limit(
+                    image,
+                    arguments.stack_page_count,
+                    arguments.resident_page_limit,
+                )
+            )
+    except (OSError, ElfFormatError, ValueError, struct.error) as error:
         print(f"user ELF validation failed: {error}", file=sys.stderr)
         return 1
     if errors:

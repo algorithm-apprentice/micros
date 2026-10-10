@@ -326,6 +326,34 @@ class UserElfCheckerTest(unittest.TestCase):
         self.assertEqual([], check_user_elf.validate_elf(parsed))
         self.assertEqual(check_user_elf.USER_BASE, parsed.header.entry)
 
+    def test_enforces_complete_resident_page_budget(self):
+        image, _ = build_elf()
+        parsed = check_user_elf.parse_elf(bytes(image))
+
+        self.assertEqual(
+            4,
+            check_user_elf.resident_page_count(
+                parsed,
+                stack_page_count=1,
+            ),
+        )
+        self.assertEqual(
+            [],
+            check_user_elf.validate_resident_page_limit(
+                parsed,
+                stack_page_count=1,
+                resident_page_limit=4,
+            ),
+        )
+        self.assertEqual(
+            ["resident page count 4 exceeds limit 3"],
+            check_user_elf.validate_resident_page_limit(
+                parsed,
+                stack_page_count=1,
+                resident_page_limit=3,
+            ),
+        )
+
     def test_rejects_header_identity_flags_and_entry(self):
         cases = (
             (16, "<H", 3, "ET_EXEC"),

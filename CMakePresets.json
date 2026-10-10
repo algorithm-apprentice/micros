@@ -216,6 +216,15 @@
       }
     },
     {
+      "name": "riscv64-ramfs-service-image",
+      "displayName": "RISC-V 64 standalone RAMFS service image",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-ramfs-service-image",
+      "cacheVariables": {
+        "MICROS_BUILD_RAMFS_SERVICE_IMAGE": "ON"
+      }
+    },
+    {
       "name": "riscv64-vm-ready-early-test",
       "displayName": "RISC-V 64 early VM readiness role-gate test",
       "inherits": "riscv64-debug",
@@ -525,6 +534,13 @@
       "configurePreset": "riscv64-tty-service-image",
       "targets": [
         "micros_tty_service"
+      ]
+    },
+    {
+      "name": "build-ramfs-service-image",
+      "configurePreset": "riscv64-ramfs-service-image",
+      "targets": [
+        "micros_ramfs_service"
       ]
     },
     {
@@ -1009,6 +1025,20 @@
         {
           "type": "build",
           "name": "build-tty-service-image"
+        }
+      ]
+    },
+    {
+      "name": "build-ramfs-service-image",
+      "displayName": "Build and validate the standalone RAMFS service image",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-ramfs-service-image"
+        },
+        {
+          "type": "build",
+          "name": "build-ramfs-service-image"
         }
       ]
     },

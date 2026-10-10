@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static uint16_t read_u16_le(const uint8_t *bytes)
+static uint16_t seed_read_u16_le(const uint8_t *bytes)
 {
     return (uint16_t)(
         (uint16_t)bytes[0]
@@ -12,7 +12,7 @@ static uint16_t read_u16_le(const uint8_t *bytes)
     );
 }
 
-static uint32_t read_u32_le(const uint8_t *bytes)
+static uint32_t seed_read_u32_le(const uint8_t *bytes)
 {
     return (
         (uint32_t)bytes[0]
@@ -22,7 +22,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-static uint64_t read_u64_le(const uint8_t *bytes)
+static uint64_t seed_read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
     size_t index;
@@ -33,7 +33,7 @@ static uint64_t read_u64_le(const uint8_t *bytes)
     return value;
 }
 
-static bool bytes_are_zero(const uint8_t *bytes, size_t size)
+static bool seed_bytes_are_zero(const uint8_t *bytes, size_t size)
 {
     size_t index;
 
@@ -66,7 +66,7 @@ static const uint8_t *entry_at(
     ];
 }
 
-static bool mode_is_canonical(uint32_t mode)
+static bool seed_mode_is_canonical(uint32_t mode)
 {
     uint32_t type = mode & MICROS_RAMFS_MODE_TYPE_MASK;
 
@@ -86,17 +86,17 @@ static bool mode_is_canonical(uint32_t mode)
 static bool entry_is_directory(const uint8_t *entry)
 {
     return (
-        read_u32_le(&entry[4]) & MICROS_RAMFS_MODE_TYPE_MASK
+        seed_read_u32_le(&entry[4]) & MICROS_RAMFS_MODE_TYPE_MASK
     ) == MICROS_RAMFS_MODE_DIRECTORY;
 }
 
-static bool names_equal(
+static bool seed_names_equal(
     const uint8_t *left,
     const uint8_t *right
 )
 {
-    uint16_t left_length = read_u16_le(&left[2]);
-    uint16_t right_length = read_u16_le(&right[2]);
+    uint16_t left_length = seed_read_u16_le(&left[2]);
+    uint16_t right_length = seed_read_u16_le(&right[2]);
     size_t index;
 
     if (left_length != right_length) {
@@ -152,22 +152,22 @@ static enum micros_ramfs_seed_error validate_header(
     ) {
         return MICROS_RAMFS_SEED_ERROR_SIZE;
     }
-    if (read_u32_le(&image[0]) != MICROS_RAMFS_SEED_MAGIC) {
+    if (seed_read_u32_le(&image[0]) != MICROS_RAMFS_SEED_MAGIC) {
         return MICROS_RAMFS_SEED_ERROR_MAGIC;
     }
-    if (read_u16_le(&image[4]) != MICROS_RAMFS_SEED_VERSION) {
+    if (seed_read_u16_le(&image[4]) != MICROS_RAMFS_SEED_VERSION) {
         return MICROS_RAMFS_SEED_ERROR_VERSION;
     }
     if (
-        read_u16_le(&image[6]) != MICROS_RAMFS_SEED_HEADER_SIZE
-        || read_u16_le(&image[8]) != MICROS_RAMFS_SEED_ENTRY_SIZE
-        || read_u16_le(&image[10])
+        seed_read_u16_le(&image[6]) != MICROS_RAMFS_SEED_HEADER_SIZE
+        || seed_read_u16_le(&image[8]) != MICROS_RAMFS_SEED_ENTRY_SIZE
+        || seed_read_u16_le(&image[10])
             != MICROS_RAMFS_SEED_ENTRY_CAPACITY
     ) {
         return MICROS_RAMFS_SEED_ERROR_LAYOUT;
     }
 
-    *entry_count = read_u16_le(&image[12]);
+    *entry_count = seed_read_u16_le(&image[12]);
     if (
         *entry_count == 0
         || *entry_count > MICROS_RAMFS_SEED_ENTRY_CAPACITY
@@ -175,14 +175,14 @@ static enum micros_ramfs_seed_error validate_header(
         return MICROS_RAMFS_SEED_ERROR_CAPACITY;
     }
     if (
-        read_u16_le(&image[14]) != 0
-        || !bytes_are_zero(&image[32], 32)
+        seed_read_u16_le(&image[14]) != 0
+        || !seed_bytes_are_zero(&image[32], 32)
     ) {
         return MICROS_RAMFS_SEED_ERROR_RESERVED;
     }
 
-    *data_size = read_u32_le(&image[16]);
-    *declared_image_size = read_u32_le(&image[20]);
+    *data_size = seed_read_u32_le(&image[16]);
+    *declared_image_size = seed_read_u32_le(&image[20]);
     if (*data_size > MICROS_RAMFS_FILE_SIZE_MAX) {
         return MICROS_RAMFS_SEED_ERROR_CAPACITY;
     }
@@ -194,7 +194,7 @@ static enum micros_ramfs_seed_error validate_header(
         return MICROS_RAMFS_SEED_ERROR_SIZE;
     }
     if (
-        read_u64_le(&image[MICROS_RAMFS_SEED_DIGEST_OFFSET])
+        seed_read_u64_le(&image[MICROS_RAMFS_SEED_DIGEST_OFFSET])
         != micros_ramfs_seed_digest(image, image_size)
     ) {
         return MICROS_RAMFS_SEED_ERROR_DIGEST;
@@ -207,11 +207,14 @@ static enum micros_ramfs_seed_error validate_name(
     bool root
 )
 {
-    uint16_t length = read_u16_le(&entry[2]);
+    uint16_t length = seed_read_u16_le(&entry[2]);
     size_t index;
 
     if (root) {
-        if (length != 0 || !bytes_are_zero(&entry[16], 64)) {
+        if (
+            length != 0
+            || !seed_bytes_are_zero(&entry[16], 64)
+        ) {
             return MICROS_RAMFS_SEED_ERROR_NAME;
         }
         return MICROS_RAMFS_SEED_OK;
@@ -234,7 +237,12 @@ static enum micros_ramfs_seed_error validate_name(
     ) {
         return MICROS_RAMFS_SEED_ERROR_NAME;
     }
-    if (!bytes_are_zero(&entry[16 + length], 64 - length)) {
+    if (
+        !seed_bytes_are_zero(
+            &entry[16 + length],
+            64 - length
+        )
+    ) {
         return MICROS_RAMFS_SEED_ERROR_NAME;
     }
     return MICROS_RAMFS_SEED_OK;
@@ -246,15 +254,15 @@ static bool has_duplicate_name(
 )
 {
     const uint8_t *current = entry_at(image, current_index);
-    uint16_t parent = read_u16_le(&current[0]);
+    uint16_t parent = seed_read_u16_le(&current[0]);
     size_t index;
 
     for (index = 1; index < current_index; ++index) {
         const uint8_t *candidate = entry_at(image, index);
 
         if (
-            read_u16_le(&candidate[0]) == parent
-            && names_equal(current, candidate)
+            seed_read_u16_le(&candidate[0]) == parent
+            && seed_names_equal(current, candidate)
         ) {
             return true;
         }
@@ -275,18 +283,18 @@ static enum micros_ramfs_seed_error validate_active_entries(
 
     for (index = 0; index < entry_count; ++index) {
         const uint8_t *entry = entry_at(image, index);
-        uint16_t parent = read_u16_le(&entry[0]);
-        uint32_t mode = read_u32_le(&entry[4]);
-        uint32_t entry_data_offset = read_u32_le(&entry[8]);
-        uint32_t entry_data_size = read_u32_le(&entry[12]);
+        uint16_t parent = seed_read_u16_le(&entry[0]);
+        uint32_t mode = seed_read_u32_le(&entry[4]);
+        uint32_t entry_data_offset = seed_read_u32_le(&entry[8]);
+        uint32_t entry_data_size = seed_read_u32_le(&entry[12]);
         uint32_t type = mode & MICROS_RAMFS_MODE_TYPE_MASK;
         uint32_t blocks;
         enum micros_ramfs_seed_error error;
 
-        if (!bytes_are_zero(&entry[80], 48)) {
+        if (!seed_bytes_are_zero(&entry[80], 48)) {
             return MICROS_RAMFS_SEED_ERROR_RESERVED;
         }
-        if (!mode_is_canonical(mode)) {
+        if (!seed_mode_is_canonical(mode)) {
             return MICROS_RAMFS_SEED_ERROR_MODE;
         }
         error = validate_name(entry, index == 0);
@@ -382,7 +390,12 @@ enum micros_ramfs_seed_error micros_ramfs_seed_validate(
         (MICROS_RAMFS_SEED_ENTRY_CAPACITY - (size_t)entry_count)
         * MICROS_RAMFS_SEED_ENTRY_SIZE
     );
-    if (!bytes_are_zero(&image[inactive_offset], inactive_size)) {
+    if (
+        !seed_bytes_are_zero(
+            &image[inactive_offset],
+            inactive_size
+        )
+    ) {
         return MICROS_RAMFS_SEED_ERROR_RESERVED;
     }
 

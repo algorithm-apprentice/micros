@@ -103,6 +103,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_RAMFS_SERVICE_IMAGE
+    "Build the standalone real RAMFS service ELF"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -184,6 +189,7 @@ set(
     MICROS_BUILD_PM_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_IMAGE
+    MICROS_BUILD_RAMFS_SERVICE_IMAGE
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -208,36 +214,36 @@ endif()
 
 find_program(MICROS_PYTHON NAMES python3 REQUIRED)
 
+set(
+    MICROS_RAMFS_SEED_IMAGE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
+)
+add_custom_command(
+    OUTPUT "${MICROS_RAMFS_SEED_IMAGE}"
+    COMMAND
+        "${MICROS_PYTHON}"
+        -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+        --manifest
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+        --repository-root
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        --output
+        "${MICROS_RAMFS_SEED_IMAGE}"
+    DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed/etc/motd"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+)
+add_custom_target(
+    ramfs_seed_image
+    DEPENDS "${MICROS_RAMFS_SEED_IMAGE}"
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
-
-    set(
-        MICROS_RAMFS_SEED_IMAGE
-        "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
-    )
-    add_custom_command(
-        OUTPUT "${MICROS_RAMFS_SEED_IMAGE}"
-        COMMAND
-            "${MICROS_PYTHON}"
-            -B
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
-            --manifest
-            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
-            --repository-root
-            "${CMAKE_CURRENT_SOURCE_DIR}"
-            --output
-            "${MICROS_RAMFS_SEED_IMAGE}"
-        DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
-            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed/etc/motd"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        VERBATIM
-    )
-    add_custom_target(
-        ramfs_seed_image
-        DEPENDS "${MICROS_RAMFS_SEED_IMAGE}"
-    )
 
     add_executable(
         fdt_test
@@ -1487,6 +1493,7 @@ if(
     OR MICROS_BUILD_PM_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_IMAGE
+    OR MICROS_BUILD_RAMFS_SERVICE_IMAGE
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -1590,6 +1597,58 @@ if(
                     MICROS_TTY_CONFIGURED_VFS_SERVICE_ID=5
             )
         endif()
+    endif()
+
+    if(MICROS_BUILD_RAMFS_SERVICE_IMAGE)
+        set(
+            MICROS_RAMFS_EMBEDDED_SEED_SOURCE
+            "${CMAKE_BINARY_DIR}/generated/ramfs_embedded_seed.c"
+        )
+        add_custom_command(
+            OUTPUT "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
+                --input
+                "${MICROS_RAMFS_SEED_IMAGE}"
+                --output
+                "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            DEPENDS
+                "${MICROS_RAMFS_SEED_IMAGE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/ramfs_embedded_seed.h"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+        set_source_files_properties(
+            "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            PROPERTIES GENERATED TRUE
+        )
+        micros_add_bootstrap_user(
+            micros_ramfs_service
+            micros-ramfs-service
+            "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
+            servers/ramfs/ramfs_core.c
+            servers/ramfs/ramfs_seed.c
+            servers/ramfs/ramfs_service.c
+        )
+        add_custom_command(
+            TARGET micros_ramfs_service
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                --elf
+                "$<TARGET_FILE:micros_ramfs_service>"
+                --resident-page-limit
+                192
+                --stack-page-count
+                1
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
     endif()
 
     micros_add_bootstrap_user(

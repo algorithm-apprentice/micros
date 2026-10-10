@@ -161,6 +161,23 @@ class ValidationPlanTests(unittest.TestCase):
                     "build-tty-service-image",
                 )
 
+    def test_ramfs_service_paths_own_image_gate(self):
+        for path in (
+            "servers/ramfs/ramfs_core.c",
+            "servers/ramfs/ramfs_seed.c",
+            "servers/ramfs/ramfs_service.c",
+            "servers/ramfs/ramfs_embedded_seed.h",
+            "servers/ramfs/seed.json",
+            "tools/check_user_elf.py",
+            "tools/embed_ramfs_seed.py",
+            "tools/generate_ramfs_seed.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "build-ramfs-service-image",
+                )
+
     def test_tty_production_and_fixture_paths_own_qemu_gate(self):
         for path in (
             *validation_plan.TTY_CONTROL_INPUTS,
