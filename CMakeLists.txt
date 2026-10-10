@@ -211,6 +211,34 @@ find_program(MICROS_PYTHON NAMES python3 REQUIRED)
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
+    set(
+        MICROS_RAMFS_SEED_IMAGE
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
+    )
+    add_custom_command(
+        OUTPUT "${MICROS_RAMFS_SEED_IMAGE}"
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+            --manifest
+            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+            --repository-root
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            --output
+            "${MICROS_RAMFS_SEED_IMAGE}"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
+            "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed/etc/motd"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_custom_target(
+        ramfs_seed_image
+        DEPENDS "${MICROS_RAMFS_SEED_IMAGE}"
+    )
+
     add_executable(
         fdt_test
         kernel/fdt.c
@@ -337,6 +365,12 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/pm_control_test.c
         tests/host/pm_test.c
     )
+    add_executable(
+        ramfs_seed_test
+        servers/ramfs/ramfs_seed.c
+        tests/host/ramfs_seed_test.c
+    )
+    add_dependencies(ramfs_seed_test ramfs_seed_image)
     add_executable(
         tty_test
         kernel/plic_core.c
@@ -566,6 +600,12 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        ramfs_seed_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         tty_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -608,6 +648,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
+    target_compile_features(ramfs_seed_test PRIVATE c_std_17)
     target_compile_features(tty_test PRIVATE c_std_17)
     target_compile_features(tty_service_test PRIVATE c_std_17)
     target_compile_features(tty_uart_test PRIVATE c_std_17)
@@ -735,6 +776,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         pm_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        ramfs_seed_test
         PRIVATE
             -Wall
             -Wextra
@@ -934,6 +985,17 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            ramfs_seed_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            ramfs_seed_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             tty_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1058,6 +1120,10 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(
+        NAME ramfs-seed
+        COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
+    )
     add_test(NAME tty-core COMMAND tty_test)
     add_test(NAME tty-service-core COMMAND tty_service_test)
     add_test(NAME tty-uart COMMAND tty_uart_test)
@@ -1109,6 +1175,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            ramfs_seed_test
             tty_test
             tty_service_test
             tty_uart_test
@@ -1181,6 +1248,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            ramfs_seed_test
             tty_test
             tty_service_test
             tty_uart_test
