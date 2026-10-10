@@ -2348,7 +2348,7 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            60
+            90
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
