@@ -187,6 +187,77 @@ and `test-qemu-vfs`. The QEMU harness must send its configured input only after
 the exact VFS input-ready line, use no sleep, and accept only the exact final
 VFS pass marker.
 
+### ELF spawn Step 14 evidence
+
+The ELF spawn path crosses every production authority owner, so evidence must
+remain split at the actual boundaries:
+
+- byte-level native protocol tests cover the canonical at-most-one-page path,
+  argv, envp, and duplicate-only descriptor request; PM, VFS, and VM payload
+  fields; every reserved byte and overflow; stable public result precedence;
+  exact application-stack pointer rebasing and auxv values; and the
+  2,048-byte initial-frame/2,048-byte runtime-stack boundary. Only malformed
+  caller-to-PM grants produce public `GRANT`; trusted internal grant-capacity
+  exhaustion produces `NO_SPACE`, and every other trusted grant failure is
+  fatal;
+- native ELF tests cover the fixed static RISC-V ELF64 header and three
+  load-segment shape, complete file-range validation, exact RX/R/RW
+  permissions, no W+X, deterministic zero fill, entry, alignment,
+  contiguity, stack separation, 15-image-page limit, and every truncated or
+  overflowed input;
+- native VM and kernel-transition tests cover lowest-frame selection, the
+  sole VM-root scratch alias and its active- and inactive-root
+  complete-validation exception, transferable-to-exact-process-generation
+  `VM_WIRED` ownership, exact four-frame private Sv39 construction,
+  byte-identical shared supervisor root entries outside VPN2 index 1, freeze,
+  mapping generation, instruction synchronization, held execution
+  preparation, fixed lower-priority application scheduling, reservation
+  consumption, final activation, rollback before and after freeze, exit
+  detach, frame release, caller authority, stale tokens, and byte-exact
+  failure preservation;
+- native PM and VFS tests cover PID consumption, parentless init, executable
+  lookup and buffering, VFS-to-VM direct grants, root/cwd inheritance,
+  descriptor preparation, hidden commit, every reverse rollback row, normal
+  exit, reaper-exit rejection, child reparenting, same-parent combined
+  lowest-PID selection after zombie publication, distinct init/original-parent
+  two-waiter staging and independent reply restoration, zombie retention,
+  one-shot wait, and complete reference cleanup. The nested regression uses
+  `init -> C -> A -> B`, with `B` already zombie and both init and `C`
+  blocked: publishing `A` must stage `B` for init and `A` for `C`.
+  Executable lookup tests require `regular-file/child -> ACCESS` and a
+  component longer than `MICROS_VFS_NAME_MAX -> TOO_BIG`, with consumed PID,
+  complete rollback, and precedence over executable, grant, and descriptor
+  work;
+- one replayable native model compares complete production and independent
+  reference state across mixed valid and invalid load, spawn, rollback, exit,
+  and wait transitions and prints its seed and operation trace on failure;
+- host checks cover full-link and seeded-runtime application ELF parity, the
+  16-page application limit, 128-KiB executable limit, PM 32-page limit, VM
+  160-page limit, VFS 80-page limit, and retained aggregate static-mapping
+  limit; and
+- one isolated QEMU MMU/context-switch component uses distinct VM and peer
+  Sv39 roots. A labeled compile-time hook after the real first `SCRATCH_MAP`
+  makes the peer runnable and shortens VM's quantum to one counter tick. The
+  ordinary timer/scheduler path must preempt VM, activate the peer root,
+  validate VM's inactive root with the scratch leaf present, block the peer,
+  and reactivate VM through the normal ASID-zero full-fence path. VM rereads a
+  scratch sentinel, performs the real `SCRATCH_COMMIT`, and an exact expected
+  load-page-fault at the scratch VA proves the PTE and stale translation are
+  gone; and
+- one QEMU integration scenario uses the six real production static services
+  plus a dynamically spawned test-only PID 1 and child. It forces one
+  descriptor failure after VM freeze, then proves valid argv/env/auxv,
+  inherited descriptors 0/1/2, VFS I/O, normal return through PM exit, exact
+  wait status, zero live image/request grants, no scratch or transferable
+  frame, and final child-resource equality with the post-PID-1 baseline.
+
+The implementation must expose `test-elf-spawn-model`,
+`build-application-images`, and `test-qemu-elf-spawn`. The QEMU harness uses
+no sleep. The target runs both QEMU scenarios and accepts integration success
+only after physical UART drain and the complete resource-baseline report.
+The test PID 1 is not production init, and this gate does not claim shell
+behavior.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:
