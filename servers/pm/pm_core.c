@@ -471,6 +471,11 @@ static void clear_wait_outcome(struct micros_pm_wait_outcome *outcome)
     outcome->result = MICROS_PM_RESULT_OK;
 }
 
+static void clear_wait_outcomes(struct micros_pm_wait_outcomes *outcomes)
+{
+    zero_bytes(outcomes, sizeof(*outcomes));
+}
+
 static bool wait_matches_pid(
     const struct micros_pm_wait_state *wait,
     uint64_t pid
@@ -548,6 +553,7 @@ static bool has_matching_child(
 }
 
 static void populate_wait_outcome(
+    struct micros_pm_process_handle parent_handle,
     const struct micros_pm_process_record *parent,
     const struct micros_pm_process_record *child,
     struct micros_pm_process_handle child_handle,
@@ -560,6 +566,7 @@ static void populate_wait_outcome(
     outcome->child_pid = child->pid;
     outcome->exit_kind = child->exit_kind;
     outcome->exit_code = child->exit_code;
+    outcome->parent = parent_handle;
     outcome->child = child_handle;
 }
 
@@ -593,7 +600,13 @@ static bool stage_wait_result(
     child->reap_pending = true;
     parent->wait.result_ready = true;
     parent->wait.pending_child = child_handle;
-    populate_wait_outcome(parent, child, child_handle, outcome);
+    populate_wait_outcome(
+        parent_handle,
+        parent,
+        child,
+        child_handle,
+        outcome
+    );
     return true;
 }
 
@@ -1740,7 +1753,6 @@ enum micros_pm_model_error micros_pm_exit_begin(
     }
 
     zero_bytes(&committed, sizeof(committed));
-    clear_wait_outcome(&committed.reaper_wait);
     record = &table->records[process.slot];
     if (record->wait.result_ready) {
         table->records[
@@ -1772,11 +1784,6 @@ enum micros_pm_model_error micros_pm_exit_begin(
     record->exit_kind = exit_kind;
     record->exit_code = exit_code;
     record->exit_transaction = transaction;
-    (void)stage_wait_result(
-        table,
-        reaper,
-        &committed.reaper_wait
-    );
     *effects = committed;
     return MICROS_PM_MODEL_OK;
 }
@@ -1860,16 +1867,16 @@ enum micros_pm_model_error micros_pm_exit_release_process(
     struct micros_pm_table *table,
     struct micros_pm_process_handle process,
     uint64_t transaction,
-    struct micros_pm_wait_outcome *outcome
+    struct micros_pm_wait_outcomes *outcomes
 )
 {
-    struct micros_pm_wait_outcome committed;
+    struct micros_pm_wait_outcomes committed;
     struct micros_pm_process_record *record;
     const struct micros_pm_process_record *resolved;
     struct micros_pm_process_handle parent;
     enum micros_pm_model_error error;
 
-    if (table == NULL || outcome == NULL || transaction == 0) {
+    if (table == NULL || outcomes == NULL || transaction == 0) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
     error = micros_pm_table_validate(table);
@@ -1891,14 +1898,32 @@ enum micros_pm_model_error micros_pm_exit_release_process(
         return MICROS_PM_MODEL_ERROR_STALE;
     }
 
-    clear_wait_outcome(&committed);
+    clear_wait_outcomes(&committed);
     record = &table->records[process.slot];
     parent = record->parent;
     record->state = MICROS_PM_PROCESS_ZOMBIE;
     record->exit_stage = MICROS_PM_EXIT_STAGE_NONE;
     record->exit_transaction = 0;
-    (void)stage_wait_result(table, parent, &committed);
-    *outcome = committed;
+    if (
+        stage_wait_result(
+            table,
+            table->reaper,
+            &committed.entries[committed.count]
+        )
+    ) {
+        ++committed.count;
+    }
+    if (
+        !handles_equal(parent, table->reaper)
+        && stage_wait_result(
+            table,
+            parent,
+            &committed.entries[committed.count]
+        )
+    ) {
+        ++committed.count;
+    }
+    *outcomes = committed;
     return MICROS_PM_MODEL_OK;
 }
 
@@ -1940,6 +1965,7 @@ enum micros_pm_model_error micros_pm_wait_begin(
     }
 
     clear_wait_outcome(&committed);
+    committed.parent = parent;
     committed.reply_token = reply_token;
     if (resolved->wait.active) {
         committed.action = MICROS_PM_WAIT_ACTION_REPLY;
@@ -1967,6 +1993,7 @@ enum micros_pm_model_error micros_pm_wait_begin(
         parent_record->wait.pending_child = child_handle;
         child_record->reap_pending = true;
         populate_wait_outcome(
+            parent,
             parent_record,
             child_record,
             child_handle,
@@ -2019,6 +2046,7 @@ enum micros_pm_model_error micros_pm_wait_resume(
     }
 
     clear_wait_outcome(&committed);
+    committed.parent = parent;
     parent_record = &table->records[parent.slot];
     committed.action = MICROS_PM_WAIT_ACTION_BLOCKED;
     committed.reply_token = parent_record->wait.reply_token;

@@ -135,7 +135,19 @@ struct micros_pm_wait_outcome {
     uint64_t child_pid;
     enum micros_pm_exit_kind exit_kind;
     int32_t exit_code;
+    struct micros_pm_process_handle parent;
     struct micros_pm_process_handle child;
+};
+
+enum {
+    MICROS_PM_WAIT_OUTCOME_CAPACITY = 2,
+};
+
+struct micros_pm_wait_outcomes {
+    uint32_t count;
+    uint32_t reserved;
+    struct micros_pm_wait_outcome
+        entries[MICROS_PM_WAIT_OUTCOME_CAPACITY];
 };
 
 struct micros_pm_exit_effects {
@@ -145,7 +157,6 @@ struct micros_pm_exit_effects {
     struct micros_pm_process_handle aborted_child;
     uint32_t reparented_count;
     uint32_t reserved1;
-    struct micros_pm_wait_outcome reaper_wait;
 };
 
 struct micros_pm_process_record {
@@ -312,7 +323,7 @@ enum micros_pm_model_error micros_pm_exit_release_process(
     struct micros_pm_table *table,
     struct micros_pm_process_handle process,
     uint64_t transaction,
-    struct micros_pm_wait_outcome *outcome
+    struct micros_pm_wait_outcomes *outcomes
 );
 
 enum micros_pm_model_error micros_pm_wait_begin(
