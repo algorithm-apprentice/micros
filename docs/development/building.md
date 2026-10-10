@@ -287,10 +287,11 @@ Run the fast native development loop with:
 cmake --workflow --preset test-unit-fast
 ```
 
-Run the persistent IPC and endpoint models separately with:
+Run the persistent IPC/endpoint and TTY models separately with:
 
 ```bash
 cmake --workflow --preset test-ipc-model
+cmake --workflow --preset test-tty-model
 ```
 
 The complete native milestone gate remains:

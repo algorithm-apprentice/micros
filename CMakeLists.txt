@@ -364,6 +364,13 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/tty_uart_test.c
     )
     add_executable(
+        tty_model_test
+        servers/tty/tty_core.c
+        servers/tty/tty_service_core.c
+        servers/tty/tty_uart.c
+        tests/host/tty_model_test.c
+    )
+    add_executable(
         tty_service_control_test
         servers/tty/tty_control.c
         tests/host/tty_service_control_test.c
@@ -577,6 +584,12 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        tty_model_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         tty_service_control_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -598,6 +611,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(tty_test PRIVATE c_std_17)
     target_compile_features(tty_service_test PRIVATE c_std_17)
     target_compile_features(tty_uart_test PRIVATE c_std_17)
+    target_compile_features(tty_model_test PRIVATE c_std_17)
     target_compile_features(tty_service_control_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
@@ -751,6 +765,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         tty_uart_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_model_test
         PRIVATE
             -Wall
             -Wextra
@@ -943,6 +967,17 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            tty_model_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_model_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             tty_service_control_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1026,6 +1061,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME tty-core COMMAND tty_test)
     add_test(NAME tty-service-core COMMAND tty_service_test)
     add_test(NAME tty-uart COMMAND tty_uart_test)
+    add_test(NAME tty-model COMMAND tty_model_test)
     add_test(NAME tty-service-control COMMAND tty_service_control_test)
     add_test(
         NAME vm-handoff-syscall
@@ -1039,6 +1075,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_test(NAME tty-owner-fault COMMAND tty_fault_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
+    set_tests_properties(tty-model PROPERTIES LABELS slow)
 
     add_custom_target(
         test-unit-fast
@@ -1100,6 +1137,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
 
     add_custom_target(
+        test-tty-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            tty-model
+        DEPENDS tty_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
         test-unit
         COMMAND
             "${CMAKE_CTEST_COMMAND}"
@@ -1133,6 +1184,7 @@ if(MICROS_BUILD_HOST_TESTS)
             tty_test
             tty_service_test
             tty_uart_test
+            tty_model_test
             tty_service_control_test
             vm_handoff_syscall_test
             tty_interrupt_test

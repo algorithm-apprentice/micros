@@ -700,16 +700,16 @@ enum micros_tty_core_error micros_tty_output_take(
     }
 
     zero_bytes(&committed_effects, sizeof(committed_effects));
-    if (state->echo_count != 0) {
+    if (state->write_pending_lf) {
+        selected = '\n';
+        state->write_pending_lf = false;
+    } else if (state->echo_count != 0) {
         selected = state->echo[state->echo_head];
         state->echo[state->echo_head] = 0;
         state->echo_head = (uint16_t)(
             (state->echo_head + 1) % MICROS_TTY_ECHO_CAPACITY
         );
         --state->echo_count;
-    } else if (state->write_pending_lf) {
-        selected = '\n';
-        state->write_pending_lf = false;
     } else {
         selected = state->write[state->write_cursor];
         ++state->write_cursor;

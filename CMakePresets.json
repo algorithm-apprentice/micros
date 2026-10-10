@@ -356,6 +356,13 @@
       ]
     },
     {
+      "name": "test-tty-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-tty-model"
+      ]
+    },
+    {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
     },
@@ -645,6 +652,20 @@
         {
           "type": "build",
           "name": "test-ipc-model"
+        }
+      ]
+    },
+    {
+      "name": "test-tty-model",
+      "displayName": "Build and run persistent TTY model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-tty-model"
         }
       ]
     },

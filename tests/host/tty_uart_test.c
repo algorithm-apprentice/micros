@@ -479,6 +479,88 @@ static bool test_transmit_fill_stops_at_fifo_capacity(void)
     return true;
 }
 
+static bool test_pending_lf_precedes_echo_at_fifo_boundary(void)
+{
+    uint8_t bytes[MICROS_TTY_UART_FIFO_CAPACITY];
+    struct micros_tty_state terminal;
+    struct micros_tty_uart_state uart;
+    struct bus_fixture fixture = {0};
+    struct micros_tty_uart_bus bus = fixture_bus(&fixture);
+    struct micros_tty_uart_drain_effects drain_effects;
+    struct micros_tty_effects effects;
+    size_t index;
+
+    for (index = 0; index + 1 < sizeof(bytes); ++index) {
+        bytes[index] = (uint8_t)('a' + index);
+    }
+    bytes[sizeof(bytes) - 1] = '\n';
+    EXPECT_TRUE(initialize_uart(&terminal, &uart, &fixture));
+    fixture.write_count = 0;
+    EXPECT_TRUE(
+        micros_tty_write_accept(
+            &terminal,
+            bytes,
+            sizeof(bytes),
+            &effects
+        ) == MICROS_TTY_CORE_OK
+        && micros_tty_uart_apply_effects(
+            &uart,
+            &bus,
+            &terminal,
+            &effects
+        ) == MICROS_TTY_UART_OK
+    );
+    fixture.write_count = 0;
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){2, 0x02};
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){5, 0x20};
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){2, 0x01};
+    EXPECT_TRUE(
+        micros_tty_uart_drain(
+            &uart,
+            &bus,
+            &terminal,
+            &drain_effects
+        ) == MICROS_TTY_UART_OK
+        && fixture.write_count == MICROS_TTY_UART_FIFO_CAPACITY
+        && fixture.writes[MICROS_TTY_UART_FIFO_CAPACITY - 1].value
+            == '\r'
+        && terminal.write_pending_lf
+        && terminal.write_resident
+    );
+    EXPECT_TRUE(
+        micros_tty_receive_byte(&terminal, 'x', &effects)
+            == MICROS_TTY_CORE_OK
+        && !effects.enable_transmit
+    );
+    fixture.write_count = 0;
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){2, 0x02};
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){5, 0x20};
+    fixture.reads[fixture.read_count++] =
+        (struct bus_read){2, 0x01};
+    EXPECT_TRUE(
+        micros_tty_uart_drain(
+            &uart,
+            &bus,
+            &terminal,
+            &drain_effects
+        ) == MICROS_TTY_UART_OK
+        && fixture.write_count == 3
+        && fixture.writes[0].offset == 0
+        && fixture.writes[0].value == '\n'
+        && fixture.writes[1].offset == 0
+        && fixture.writes[1].value == 'x'
+        && fixture.writes[2].offset == 1
+        && fixture.writes[2].value == 0x05
+        && !micros_tty_output_pending(&terminal)
+    );
+    return true;
+}
+
 static bool test_corrupt_uart_state_has_no_mmio_effect(void)
 {
     static const uint8_t byte = 'q';
@@ -522,6 +604,7 @@ int main(void)
         && test_modem_status_is_acknowledged()
         && test_write_drain_reports_writable()
         && test_transmit_fill_stops_at_fifo_capacity()
+        && test_pending_lf_precedes_echo_at_fifo_boundary()
         && test_corrupt_uart_state_has_no_mmio_effect()
     ) ? 0 : 1;
 }

@@ -135,8 +135,9 @@ Performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The native validation tiers are `test-unit-fast`, `test-ipc-model`, and the
-complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
+The native validation tiers are `test-unit-fast`, `test-ipc-model`,
+`test-tty-model`, and the complete `test-unit` gate. The implemented QEMU
+targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
@@ -164,6 +165,7 @@ the implemented configure, build, and execution gates are:
 ```bash
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
+cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic

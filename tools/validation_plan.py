@@ -11,6 +11,7 @@ import subprocess
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
 UNIT_FULL = ("cmake", "--workflow", "--preset", "test-unit")
 IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
+TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -620,10 +621,25 @@ SLOW_MODEL_INPUTS = {
         "tests/host/ipc_notify_test.c",
         "tests/host/ipc_close_test.c",
     ) + WIRED_HANDOFF_INPUTS,
+    "test-tty-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/grant.h",
+        "include/micros/ipc.h",
+        "include/micros/tty.h",
+        "servers/tty/tty_core.c",
+        "servers/tty/tty_core.h",
+        "servers/tty/tty_service_core.c",
+        "servers/tty/tty_service_core.h",
+        "servers/tty/tty_uart.c",
+        "servers/tty/tty_uart.h",
+        "tests/host/tty_model_test.c",
+    ),
 }
 
 SLOW_MODEL_CTESTS = {
     "test-ipc-model": ("ipc-model", "ipc_model_test"),
+    "test-tty-model": ("tty-model", "tty_model_test"),
 }
 
 
