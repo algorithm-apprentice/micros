@@ -64,6 +64,14 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_fast_vfs_runs_persistent_model(self):
+        commands = validation_plan.plan(
+            ["servers/vfs/vfs_core.c"],
+            "fast",
+        )
+        self.assertEqual(validation_plan.UNIT_FAST, commands[0])
+        self.assertIn(validation_plan.VFS_MODEL, commands)
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",

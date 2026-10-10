@@ -388,6 +388,13 @@
       ]
     },
     {
+      "name": "test-vfs-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-vfs-model"
+      ]
+    },
+    {
       "name": "riscv64-debug",
       "configurePreset": "riscv64-debug"
     },
@@ -719,6 +726,20 @@
         {
           "type": "build",
           "name": "test-ramfs-model"
+        }
+      ]
+    },
+    {
+      "name": "test-vfs-model",
+      "displayName": "Build and run persistent VFS model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-vfs-model"
         }
       ]
     },
