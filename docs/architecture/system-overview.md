@@ -428,33 +428,61 @@ grant-table registration or user-visible inspect operation exists.
 PM coordinates process creation. It first reserves one PM record and
 never-reused PID, then one hidden kernel process object. The reserved kernel
 process has no root, thread, endpoint, profile, or runnable state. VFS then
-resolves and buffers the executable and exposes its resident contents to VM
-through a read-only direct grant. VM creates the reserved process's address
-space, maps destination child frames into a VM-only scratch window, copies and
-validates each ELF segment, removes the scratch mappings, maps the frames into
-the child, freezes the result, and returns a kernel-issued load-complete token
-to PM. VM cannot publish or run the child.
+copies the canonical request, resolves and buffers the executable, and exposes
+its resident executable and request snapshots to VM through separate read-only
+direct grants. VM validates the bounded static ELF, creates the initial
+argv/env/auxv stack, maps one selected destination frame at a time into a
+VM-only scratch window, initializes it, removes the scratch alias, and asks
+the kernel to atomically build and freeze the exact private child mappings.
+The returned load token binds the mapping generation, entry point, and stack
+pointer. VM cannot publish or run the child.
 
 PM is the sole caller of the kernel preparation transition. It presents the
-reservation, load-complete token, and initial context. In one hidden
-transition, the kernel creates the first thread and reserved endpoint,
-installs only the immutable `APPLICATION` profile, performs the required local
-`fence.i`, initializes the context, and seals the validated mapping generation.
-VM mapping changes are then rejected. After PM and VFS commit their prepared
-state, PM invokes final activation, which revalidates that generation before
-making the endpoint visible and the thread runnable. Every earlier failure
-releases opaque resources in reverse order. This directed transaction avoids
-the PM/VFS/VM cycles found in MINIX.
+reservation and load-complete token. In one hidden transition, the kernel
+creates the first thread and reserved endpoint, installs only the immutable
+`APPLICATION` profile, performs the required local `fence.i`, initializes the
+token-bound context, and seals the validated mapping generation. VM mapping
+changes are then rejected. After PM and VFS commit their hidden state, PM
+invokes final activation, which revalidates that generation before making the
+endpoint visible and the thread runnable. VM commits the activated mapping
+into its persistent process table and VFS releases its image transaction
+before PM reports success. Activation consumes the singleton hidden-process
+reservation, so the running child does not block a later sequential spawn.
+Every earlier failure releases opaque resources in reverse order. This
+directed transaction avoids the PM/VFS/VM cycles found in MINIX.
 
 PM separately owns exit and wait semantics. Accepted exit first makes the
-thread permanently non-runnable and binds one exit transaction. After VFS
-cleanup, a PM-only detach transition atomically closes endpoint, IPC, grants,
-profile, scheduler/context, and thread state and leaves one exact
-VM-release-pending process. VM presents the same transaction to release
-mappings, root, and frames before PM releases the empty process. Only
-afterward does the PM record become a zombie. A matching exact-child or
-any-child wait consumes that status once; parent exit reparents children to
-init.
+thread permanently non-runnable and binds one exit transaction. PM then moves
+the record to `EXITING`, clears its wait state, and reparents every live,
+exiting, or zombie child to init before VFS cleanup. A PM-only detach
+transition atomically closes endpoint, IPC, grants, profile,
+scheduler/context, and thread state and leaves one exact VM-release-pending
+process. VM presents the same transaction to release mappings, root, and
+frames before PM releases the empty process. Only afterward does the PM
+record become a zombie. PM then independently reevaluates init's complete
+adopted-child set and the exiting process's exact original parent's child set,
+deduplicating the scan when both parents are init. Each matching any-child
+wait selects the lowest PID in its own set, so one exit completion may stage
+results for two distinct parents. Each selected status is consumed once.
+
+Dynamic applications use a separate startup ABI from static services. Their
+single initial stack page contains `argc`, `argv`, `envp`, and a bounded auxv
+carrying kernel- and service-derived PM endpoint, VFS endpoint, PID, and page
+size values. The aligned initial frame may occupy at most the upper 2,048
+bytes, preserving at least 2,048 bytes below initial `sp` for the
+downward-growing runtime stack. A normal `micros_application_main` return
+becomes a PM `EXIT` call. Applications receive no bootstrap
+service-configuration mapping and retain authority only to PM and VFS.
+
+The v0.1 application thread is fixed to hart 0, priority 9, a
+1,000,000-counter-tick quantum, and preemptible scheduling. Static services
+remain at priority 8, so activation cannot preempt PM before the mandatory
+post-activation commits, while any ready service can preempt application
+work.
+
+The complete bounded transaction, wire formats, ELF subset, stack ABI,
+rollback, and normal-exit ordering are fixed by
+[ADR-0050](../adr/0050-post-handoff-elf-spawn.md).
 
 ### File I/O
 
@@ -535,7 +563,9 @@ seize UART permanently in polled mode.
   occupies `[0x40000000, 0x80000000)`, while every other root entry exactly
   matches the immutable kernel root.
 - Process-root mutation and destruction are rejected while that root is
-  active; ASID-zero activation performs complete local invalidation.
+  active except for the exact token-bound VM scratch leaf; that transition
+  runs with SIE clear and performs a local per-page invalidation. ASID-zero
+  activation otherwise performs complete local invalidation.
 - During `BOOTSTRAP`, every user leaf resolves one distinct exact
   `PROCESS_USER` owner, and every process-owned table or user frame is
   reachable in the matching role.
@@ -563,8 +593,14 @@ seize UART permanently in polled mode.
 - The sole post-handoff device exception is the exact TTY UART leaf at
   `0x7fffe000`; it names no managed frame and cannot back an IPC buffer, grant,
   PM output, or managed mapping inventory entry.
-- A `VM_TRANSFERABLE` frame is not live user-mapping authority until a reviewed
-  VM mapping transition binds it to an exact process generation.
+- The sole live user `VM_TRANSFERABLE` exception is one exact VM-root scratch
+  leaf at `0x7fffe000`, bound to one load token while VM fills the frame.
+  Complete root validation recognizes it in VM's attached root whether that
+  root is active or temporarily inactive, while ordinary user lookup, IPC,
+  grants, PM output, and managed inventory reject it. The immutable
+  supervisor direct map remains present but grants no user authority. No
+  child mapping contains a transferable frame; frozen and active child leaves
+  use exact process-generation `VM_WIRED` ownership.
 - Generic execution-context preparation is unavailable after handoff; existing
   prepared threads may return, while new preparation requires the PM-only
   load-complete-token transition.

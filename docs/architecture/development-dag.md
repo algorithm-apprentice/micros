@@ -103,9 +103,10 @@ failures attributable to one coherent change.
 | 11 | TTY | Two-phase console handoff, deferred PLIC completion, input, and output verified |
 | 12 | RAMFS | Directory, file, and direct VFS-facing grant protocol tests pass |
 | 13 | VFS | Descriptor, console binding, pathname, mount, routing, and complete two-hop I/O verified |
-| 14 | Executable path, init, shell | Instruction synchronization passes and the shell runs the required commands |
-| 15 | DS, scheduler server, RS | Discovery and injected service recovery verified |
-| 16+ | Persistent storage and POSIX work | Added only behind explicit ADRs and conformance tests |
+| 14 | ELF spawn path | A bounded dynamic application loads, activates, exits, waits, rolls back failed spawn, and returns to the post-init resource baseline |
+| 15 | Init and shell | Instruction synchronization remains valid and the shell runs the required commands |
+| 16 | DS, scheduler server, RS | Discovery and injected service recovery verified |
+| 17+ | Persistent storage and POSIX work | Added only behind explicit ADRs and conformance tests |
 
 Step 7 is internally serialized even though it is one graph node:
 
@@ -273,8 +274,35 @@ unlink, rename, named devices, pipes, sockets, block devices, signals, init, or
 the shell. Step 14 adds those dependency-ready integrations around the
 reviewed VFS state owner.
 
-`init` is not a static manifest service. Step 14 creates it through the
-ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
+Step 14 is internally serialized:
+
+1. fix the local MINIX exec, ELF loading, stack construction, kernel
+   activation, VFS cleanup, and VM release baseline;
+2. define one pointer-free bounded path, argv, envp, and descriptor-action
+   request plus a fixed static RISC-V ELF64 subset;
+3. promote VM into a production core and add one exact scratch-fill, freeze,
+   rollback, and release transaction after handoff;
+4. extend PM-only kernel control with token-bound execution preparation,
+   activation, exit-begin, execution detach, and empty-process release;
+5. add VFS executable buffering, VM-targeted direct grants, hidden descriptor
+   preparation, hidden commit, and exit cleanup;
+6. add one separate argv/env application startup path and normal-return exit;
+7. prove every preactivation rollback stage and both affected-parent
+   exit/wait sets in native state models and kernel component tests;
+8. run one isolated QEMU component that preempts VM between scratch map and
+   commit, activates another Sv39 root, reactivates VM, and proves the removed
+   scratch translation cannot remain usable; and
+9. run one QEMU fixture whose dynamic PID 1 forces a post-freeze spawn
+   rollback, spawns one child, verifies argv/env and inherited descriptors,
+   waits for its exit status, and returns all child resources to baseline.
+
+The Step 14 PID-1 program is an isolated integration fixture, not production
+init. It proves the production spawn, loader, application-runtime, exit, and
+wait mechanisms without combining them with shell policy or commands.
+
+`init` is not a static manifest service. Step 15 creates production init
+through the reviewed ADR-0009 PM/VFS/VM spawn transaction after launcher
+authority is sealed, then adds the shell and required commands.
 
 ## Phase gates
 

@@ -459,22 +459,41 @@ model, IPC reply model, or global current-execution representation.
 
 ## Milestone 6: shell MVP
 
+Milestone 6 is internally gated. The ELF spawn path is implemented and
+reviewed first with an isolated dynamic PID-1 fixture and child application.
+Production init, shell policy, and commands begin only after that fixture
+proves failed-spawn rollback, successful activation, normal exit, wait, and
+complete child-resource release.
+
 ### Deliverables
 
-- ELF loading;
-- post-handoff VM allocation, mapping, freeze, and release for one reserved
-  child;
-- PM/VFS/VM spawn transaction with rollback;
-- PM-only thread, endpoint, application-profile, context, and activation
-  transitions;
-- RISC-V instruction-fetch synchronization before a child runs;
-- init;
-- interactive shell;
-- `echo`, `cat`, `ls`, and `ps`;
-- automated serial end-to-end scenario.
+- ELF-spawn gate:
+  - bounded static RISC-V ELF loading;
+  - post-handoff VM allocation, scratch initialization, mapping, freeze,
+    rollback, and release for one reserved child;
+  - target-proven VM scratch preemption, inactive-root validation,
+    reactivation, and stale-translation removal;
+  - PM/VFS/VM spawn transaction with explicit descriptor duplication and
+    complete preactivation rollback;
+  - PM-only thread, endpoint, application-profile, context, and activation
+    transitions;
+  - separate argv/env application startup and normal-return exit;
+  - RISC-V instruction-fetch synchronization before a child runs; and
+  - deterministic dynamic-parent/child QEMU resource-baseline proof;
+- shell gate:
+  - production init;
+  - interactive shell;
+  - `echo`, `cat`, `ls`, and `ps`; and
+  - automated serial end-to-end scenario.
 
 ### Exit criteria
 
+- the ELF-spawn gate proves one post-freeze failed spawn leaves no resource,
+  one valid child receives exact argv/env and descriptors, and child
+  exit/wait returns to the post-init baseline;
+- a QEMU component preempts VM with the scratch leaf present, activates a
+  distinct Sv39 root, reactivates VM through the ordinary scheduler path, and
+  proves `SCRATCH_COMMIT` removes both the PTE and usable translation;
 - the complete system boots from a clean build;
 - the required command scenario succeeds without manual timing assumptions;
 - process exit and wait leave no process, frame, descriptor, or inode leak;
