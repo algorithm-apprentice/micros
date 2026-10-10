@@ -905,7 +905,9 @@ and writes the configured serial bytes once. The guest proves the one-shot
 UART mapping, console commit before readiness, a retained source-10 claim,
 canonical erase and CR-to-LF processing, checked read/write grants,
 interrupt-driven output, physical UART drain, and matching claim/completion
-counts before clean SBI shutdown. The absolute host timeout is 60 seconds.
+counts before clean SBI shutdown. The absolute host timeout is 90 seconds,
+leaving margin above the measured debug/TCG completion time while retaining a
+finite deadlock bound.
 
 ## PM service acceptance
 
