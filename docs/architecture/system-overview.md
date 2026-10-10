@@ -241,6 +241,18 @@ at release. TTY's ordinary bootstrap readiness is accepted only after commit
 and clears that deadline. The exact contract is
 [ADR-0047](../adr/0047-tty-console-handoff-and-serial-protocol.md).
 
+RAMFS validates one reproducible build-generated seed into a fixed writable
+node table and sparse data-block arena before reporting ready. After exact VFS
+is released, one `MOUNT` returns the referenced root and enables versioned
+lookup, create, mkdir, read, write, getdents, and putnode calls. Whole-path
+lookup remains confined to that root; generation-safe node handles and
+separate link/reference counts reject stale or excessive ownership changes.
+One-page exact-direction grants carry every path, name, file transfer, and
+directory listing. The retained seed, writable arena, metadata, code, and
+stack remain within one fail-closed 192-page RAMFS service budget. The exact
+contract is
+[ADR-0048](../adr/0048-ramfs-service-and-vfs-filesystem-protocol.md).
+
 Malformed, foreign, early, duplicate, missing, or expired readiness is fatal.
 There is no restart, alternate profile, skipped dependency, or recovery
 fallback. After the last static service is ready, the launcher seals bootstrap
@@ -432,6 +444,16 @@ object routes descriptors 0, 1, and 2 to TTY without adding RAMFS device nodes
 or dynamic driver discovery. RAMFS does not communicate with block drivers in
 the shell MVP.
 
+RAMFS owns one volatile rooted namespace, generation-safe node identities,
+regular-file data, namespace links, and backend references. Its initial state
+comes from a validated pointer-free seed blob but becomes writable in a fixed
+BSS arena before readiness. Open and close are represented by referenced
+lookup/create results and counted putnode release. Reads are short at EOF,
+sparse holes read as zero, writes commit one complete page-bounded request,
+and directory enumeration returns complete fixed backend records plus a
+continuation cursor. VFS later translates those records and owns every
+application-visible file position and descriptor.
+
 ### Interrupts
 
 The boot hart timer uses OpenSBI TIME absolute deadlines. The kernel owns
@@ -543,6 +565,17 @@ seize UART permanently in polled mode.
 - A spawned process receives exactly one immutable application privilege
   profile before its endpoint becomes visible or its first thread runs.
 - Only VFS publishes file-descriptor and namespace state.
+- Exact VFS is the sole RAMFS client, and RAMFS accepts exactly one mount.
+- A RAMFS node handle resolves only when its slot and nonzero generation
+  match one live node.
+- Every non-root RAMFS node has one live directory parent and one unique
+  sibling name; directory link counts equal two plus live child directories.
+- RAMFS reference counts never underflow, the root retains its mount pin, and
+  directory records do not acquire references.
+- Every RAMFS data block has at most one file owner; sparse holes read as zero,
+  and a write publishes all requested bytes and metadata or none.
+- RAMFS retains no VFS grant after a reply, and every grant direction matches
+  the exact path, name, read, write, or getdents data flow.
 - Init receives descriptors 0, 1, and 2 from one VFS-owned synthetic console
   object, and children receive them only through explicit descriptor actions.
 - Console begin, exact VM mapping, TTY release, console commit, and TTY

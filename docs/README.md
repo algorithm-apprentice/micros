@@ -49,6 +49,10 @@ This directory contains the design baseline for `micros`.
 - [MINIX PM process-lifecycle study](research/minix-pm-process-lifecycle.md)
   traces PM-owned process identity, creation coordination, exit teardown,
   zombie retention, wait completion, reparenting, and rollback boundaries.
+- [MINIX VFS/MFS filesystem protocol study](research/minix-vfs-mfs-filesystem-protocol.md)
+  traces VFS-only filesystem authority, mount and lookup, node references,
+  file and directory mutation, directional grants, sparse I/O, and directory
+  cursors.
 
 ## Planning and verification
 

@@ -202,6 +202,17 @@ claim/completion evidence, physical UART drain, and clean shutdown. This
 completes the Step 11 boundary; production VFS descriptors, RAMFS, init, and
 shell integration remain later steps.
 
+ADR-0048 defines the dependency-ready RAMFS boundary. One exact VFS peer
+mounts a validated build-generated seed into a fixed writable node and sparse
+data-block arena, then uses versioned lookup, create, mkdir, read, write,
+getdents, and putnode calls. Generation-safe node handles, separate link and
+reference counts, root-confined whole-path traversal, exact-direction
+one-page grants, all-or-error writes, and complete-record directory cursors
+preserve the selected MINIX behavior without adding a block layer. The design
+requires native seed/state tests, a replayable 8,192-transition model, and one
+six-service QEMU scenario. Implementation remains blocked until the design is
+merged.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
@@ -395,7 +406,16 @@ model, IPC reply model, or global current-execution representation.
 - terminal data and file data use exact-direction grants;
 - non-transitive data paths use bounded resident bounce buffers;
 - init receives working descriptors 0, 1, and 2 without RAMFS device nodes;
-- RAMFS operations pass native model tests and QEMU integration tests;
+- RAMFS validates a reproducible seed before readiness and accepts one exact
+  VFS mount;
+- RAMFS generation, parent/name, link/reference, block ownership, sparse-file,
+  capacity, and failure-atomic invariants pass deterministic native tests;
+- a replayable RAMFS model covers at least 8,192 mixed mount, namespace, I/O,
+  directory-cursor, release, malformed, stale, capacity, and grant-failure
+  transitions;
+- one QEMU integration proves the real RAMFS service's seed lookup, writable
+  sparse file, complete-record directory cursor, exact grants, balanced
+  references, VFS readiness, launcher sealing, and TTY-routed pass marker;
 - VFS resolves absolute and relative paths and enforces descriptor ownership.
 
 ## Milestone 6: shell MVP
