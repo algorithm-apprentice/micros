@@ -390,6 +390,12 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/pm_test.c
     )
     add_executable(
+        spawn_abi_test
+        lib/spawn/spawn_request.c
+        servers/vm/vm_image.c
+        tests/host/spawn_abi_test.c
+    )
+    add_executable(
         ramfs_seed_test
         servers/ramfs/ramfs_seed.c
         tests/host/ramfs_seed_test.c
@@ -657,6 +663,12 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        spawn_abi_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         ramfs_seed_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -735,6 +747,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
+    target_compile_features(spawn_abi_test PRIVATE c_std_17)
     target_compile_features(ramfs_seed_test PRIVATE c_std_17)
     target_compile_features(ramfs_test PRIVATE c_std_17)
     target_compile_features(ramfs_model_test PRIVATE c_std_17)
@@ -883,6 +896,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         pm_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        spawn_abi_test
         PRIVATE
             -Wall
             -Wextra
@@ -1142,6 +1165,17 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            spawn_abi_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            spawn_abi_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             ramfs_seed_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1332,6 +1366,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(NAME spawn-abi COMMAND spawn_abi_test)
     add_test(
         NAME ramfs-seed
         COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
@@ -1397,6 +1432,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            spawn_abi_test
             ramfs_seed_test
             ramfs_test
             vfs_test
@@ -1501,6 +1537,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            spawn_abi_test
             ramfs_seed_test
             ramfs_test
             ramfs_model_test
