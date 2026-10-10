@@ -147,6 +147,46 @@ workflow is `test-qemu-ramfs`; it uses no host input or sleep and accepts only
 the exact RAMFS pass marker after VFS readiness, launcher sealing, physical
 UART drain, and zero live grants.
 
+### VFS Step 13 evidence
+
+VFS owns application-visible identity and coordinates two backend protocols,
+so its implementation must split evidence as follows:
+
+- native grant tests cover non-copying validation of exact grantor/grantee
+  generations, zero length, dual-invalid precedence, direction, bounds,
+  complete resident mappings, zero mutation, runtime-wrapper registers, and
+  existing checked-copy compatibility;
+- native manifest/VM tests cover the exact 128-byte capacity-seven service
+  configuration, 364,704-byte VM boot object and dependent offsets/digest,
+  an unchanged exact six-entry production manifest, and one isolated
+  seven-entry VFS fixture;
+- native VFS tests cover trusted process attach/detach, descriptor and
+  open-file ownership, shared positions, root/cwd routing, vnode and backend
+  reference aggregation, open/create/close, sequential read/write, translated
+  getdents, mkdir, chdir, every stable result, and complete rollback;
+- native console tests cover grant preflight before consuming reads, pending
+  completion, exact `CANCEL/REQUEST -> COLLECT/OK` races, accepted writes,
+  physical-drain backpressure, writable retry, coalesced event bits,
+  request-ID exhaustion, full global grant capacity, and cleanup;
+- one slow replayable model performs at least 8,192 mixed process,
+  descriptor, path, regular-I/O, directory, console, malformed, capacity,
+  grant-failure, and backend-failure transitions while comparing complete
+  production state with an independent reference after each operation;
+- host post-link and manifest tests cover the complete 64-page VFS service
+  limit and retained aggregate 4,096-static-mapping limit; and
+- one QEMU component scenario uses the six real production services plus one
+  isolated application probe. It proves one mount, trusted console descriptors,
+  relative directory creation, absolute and relative paths, regular-file data
+  through both grant hops, fixed application directory-record translation,
+  marker-triggered canonical input, TTY-routed output, the no-authority
+  test-only drain barrier, zero live grants, launcher sealing, physical UART
+  drain, and clean shutdown.
+
+The implementation must expose `test-vfs-model`, `build-vfs-service-image`,
+and `test-qemu-vfs`. The QEMU harness must send its configured input only after
+the exact VFS input-ready line, use no sleep, and accept only the exact final
+VFS pass marker.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:
@@ -373,6 +413,15 @@ and RAMFS service gates. RAMFS service sources, generated seed data, and seed
 embedding/generation inputs also select `build-ramfs-service-image`. Inventory
 regressions require every documented QEMU workflow to have exact preset,
 ownership-map, and representative-input parity.
+The VFS implementation extends that fail-closed map: VFS core/model changes
+select `test-vfs-model`; VFS protocol, service, fixture, or test-application
+changes select `test-qemu-vfs`; operation-15 changes retain the native grant,
+grant-syscall, handed-off grant, user-runtime, and VFS gates; bootstrap
+capacity or VM static-address-space changes retain every affected launcher,
+VM, PM, TTY, RAMFS, and VFS fixture; and VFS linker/table changes select
+`build-vfs-service-image`. The new QEMU workflow must have the same preset,
+ownership-map, and representative-input parity before it can enter the
+authoritative inventory.
 
 `test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
 readiness, FDT memory discovery, agreement between decoded range counts and
@@ -512,6 +561,10 @@ results without `errno`, success-only grant-token publication, unchanged
 outputs on failure, and stack-local blocking-buffer semantics. The same native
 target tests the production-prefixed `memcpy` and `memset` bodies under ASan
 and UBSan.
+
+Step 13 extends the same host and real-runtime evidence with operation 15,
+including zero length, dual-invalid precedence, and unchanged non-result
+registers.
 
 `tools/check_user_elf.py` parses ELF64 headers, program headers, sections,
 symbols, and RISC-V instructions. Its malformed-fixture regressions reject
@@ -843,11 +896,14 @@ Integration scenarios include:
 - malformed message type, endpoint, grant, and request identifier;
 - later, service restart and endpoint replacement.
 
-ADR-0045 VM-handoff evidence now includes native validation of the exact
-364672-byte boot-information ABI, canonical ranges, address spaces, mappings,
-frame states, independent counts and digest, failure-atomic all-user-frame
-wired staging, operation-12 shape and summary authority, irreversible commit,
-and the retained replayable 4096-transition ownership model.
+The currently implemented ADR-0045 VM-handoff evidence validates the exact
+364672-byte six-address-space boot-information ABI, canonical ranges, address
+spaces, mappings, frame states, independent counts and digest,
+failure-atomic all-user-frame wired staging, operation-12 shape and summary
+authority, irreversible commit, and the retained replayable 4096-transition
+ownership model. Step 13 must atomically update that same evidence to the
+364704-byte, seven-address-space ADR-0049 layout before any capacity-seven
+fixture can pass.
 
 The successful workflow is implemented:
 

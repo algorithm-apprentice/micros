@@ -253,6 +253,17 @@ stack remain within one fail-closed 192-page RAMFS service budget. The exact
 contract is
 [ADR-0048](../adr/0048-ramfs-service-and-vfs-filesystem-protocol.md).
 
+VFS mounts that root once before readiness and owns fixed process records,
+descriptor tables, shared open-file descriptions, vnode/backend-reference
+aggregation, root and working-directory routing, and one synthetic console
+object. Applications use versioned open, close, read, write, getdents, mkdir,
+and chdir calls. VFS terminates each application grant in one of two resident
+bounce pages, then creates a separate exact RAMFS or TTY grant. A non-copying
+grant-range preflight validates a consuming read destination before TTY can
+remove input. RAMFS directory records are translated into a fixed
+application-facing record that exposes no backend handle. The exact contract
+is [ADR-0049](../adr/0049-vfs-service-and-application-io-protocol.md).
+
 Malformed, foreign, early, duplicate, missing, or expired readiness is fatal.
 There is no restart, alternate profile, skipped dependency, or recovery
 fallback. After the last static service is ready, the launcher seals bootstrap
@@ -331,9 +342,10 @@ accidental return executes a labeled user breakpoint and cannot fall through
 into arbitrary image bytes.
 
 One raw RV64 function consumes `a0` through `a7`, executes `ecall`, and returns
-the signed `a0` result. Stateless C wrappers expose operations 1 through 10,
-return stable results directly without `errno`, and publish a created grant
-token only after success. The only compiler support is `memcpy` and `memset`.
+the signed `a0` result. Stateless C wrappers expose operations 1 through 10
+plus non-copying grant validation operation 15, return stable results directly
+without `errno`, and publish a created grant token only after success. The only
+compiler support is `memcpy` and `memset`.
 
 Launcher release, manifest privileges, readiness, VM handoff, service
 initialization, and recovery remain above this boundary. The runtime itself
@@ -344,12 +356,20 @@ owns no lifecycle or protocol authority.
 [ADR-0043](../adr/0043-static-bootstrap-launcher.md) defines the implemented
 Step 8 contract.
 
-The immutable manifest has a six-entry capacity for the launcher, VM, PM, TTY,
-RAMFS, and VFS. Each active entry carries an exact service ID and name,
+The immutable manifest stores at most seven entries. The production image uses
+exactly six for launcher, VM, PM, TTY, RAMFS, and VFS; the seventh storage slot
+exists only for dependency-closed fixtures such as the isolated VFS
+application probe. Each active entry carries an exact service ID and name,
 process slot, generated embedded-image ID, profile ID and name, user-page and
 stack limits, explicit prerequisite mask, readiness timeout, and one narrowly
 defined bootstrap role. Only the TTY role may carry the fixed UART page and
 PLIC source required by ADR-0012.
+
+The version-1 service configuration remains exactly 128 bytes by storing seven
+endpoint records and five reserved words; its manifest-view field is at offset
+80. The version-1 VM boot object stores seven 32-byte address-space records and
+is exactly 364,704 bytes. Production reports six active records and the VFS
+fixture reports seven.
 
 The manifest never contains a pointer or mutable privilege mask. The kernel
 resolves each image through an immutable checked image catalog and each
@@ -367,8 +387,9 @@ same commit that installs the profile and publishes the endpoint.
 RISC-V syscall operation 11 is implemented for launcher-only
 bootstrap control. It releases the exact next service, atomically accepts one
 token-bound ready call, reports a fatal launcher-detected protocol failure, or
-irreversibly completes bootstrap. The generic freestanding runtime remains
-operations 1 through 10; launcher code owns a private wrapper.
+irreversibly completes bootstrap. The generic freestanding runtime exposes
+operations 1 through 10 plus operation 15; launcher code owns a private
+bootstrap-control wrapper.
 
 The readiness request and acknowledgment are fixed 64-byte IPC messages. The
 request's kernel-written source and reply token, not its payload, prove the
@@ -576,6 +597,19 @@ seize UART permanently in polled mode.
   and a write publishes all requested bytes and metadata or none.
 - RAMFS retains no VFS grant after a reply, and every grant direction matches
   the exact path, name, read, write, or getdents data flow.
+- Every VFS descriptor belongs to one exact application process record and
+  names one live shared open-file description.
+- VFS local vnode references and accumulated RAMFS references remain separate;
+  final local release balances the exact backend count while the root keeps
+  its mount pin.
+- Absolute application paths start at the process root, relative paths start
+  at its working directory, and both remain confined to that root.
+- Application file and terminal data cross two separately authorized grant
+  hops through resident VFS pages; no application grant becomes backend
+  authority.
+- A consuming console read begins only after VFS validates the complete
+  application destination grant and mapping.
+- Application directory records contain no RAMFS node handle or pointer.
 - Init receives descriptors 0, 1, and 2 from one VFS-owned synthetic console
   object, and children receive them only through explicit descriptor actions.
 - Console begin, exact VM mapping, TTY release, console commit, and TTY
@@ -588,9 +622,9 @@ seize UART permanently in polled mode.
 - Direct application access to TTY, UART, PLIC, or IRQ completion is
   impossible under the immutable profiles.
 - Bootstrap-only privileges become unavailable after their transition point.
-- The immutable bootstrap manifest is versioned, pointer-free, bounded to six
-  entries, and completely validated before manifest-directed service
-  mutation.
+- The immutable bootstrap manifest is versioned, pointer-free, stores at most
+  seven entries, and is completely validated before manifest-directed service
+  mutation; the production manifest has exactly six active entries.
 - Service IDs, process slots, thread handles, image IDs, profile IDs, and
   endpoint generations remain distinct identities.
 - Every static service image, stack, and execution context exists before the

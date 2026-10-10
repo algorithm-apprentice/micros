@@ -53,6 +53,9 @@ This directory contains the design baseline for `micros`.
   traces VFS-only filesystem authority, mount and lookup, node references,
   file and directory mutation, directional grants, sparse I/O, and directory
   cursors.
+- [MINIX VFS process, descriptor, and device-routing study](research/minix-vfs-process-descriptor-and-device-routing.md)
+  traces caller binding, descriptor/open-file/vnode ownership, root and
+  working-directory routing, character-device suspension, and process cleanup.
 
 ## Planning and verification
 

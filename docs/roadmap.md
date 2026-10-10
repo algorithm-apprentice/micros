@@ -209,9 +209,22 @@ getdents, and putnode calls. Generation-safe node handles, separate link and
 reference counts, root-confined whole-path traversal, exact-direction
 one-page grants, all-or-error writes, and complete-record directory cursors
 preserve the selected MINIX behavior without adding a block layer. The design
-requires native seed/state tests, a replayable 8,192-transition model, and one
-six-service QEMU scenario. Implementation remains blocked until the design is
-merged.
+is implemented with native seed/state tests, a replayable 8,192-transition
+model, one six-service QEMU scenario, a standalone image check, and fail-closed
+validation ownership.
+
+ADR-0049 defines the dependency-ready production VFS boundary. VFS mounts
+RAMFS once, owns fixed per-process descriptors, shared open-file descriptions,
+vnode/backend-reference aggregation, root and working-directory routing, and
+one synthetic console object. Application open, close, read, write, getdents,
+mkdir, and chdir calls use one application grant hop and one separately
+authorized RAMFS or TTY hop through two resident pages. A non-copying
+grant-range preflight protects consuming reads, and VFS translates backend
+directory records into a stable application format. The design requires a
+replayable 8,192-transition model, a bounded standalone image, and one isolated
+seven-process QEMU application probe while the production manifest remains
+six services. Capacity seven preserves a 128-byte service configuration and
+moves the VM boot object to an exact 364,704-byte layout.
 
 ## v0.1 completion goal
 
@@ -327,7 +340,8 @@ model, IPC reply model, or global current-execution representation.
 
 ### Deliverables
 
-- pointer-free, versioned embedded service manifest with a six-entry bound;
+- pointer-free, versioned embedded service manifest with seven-entry storage
+  and an exact six-entry production chain;
 - generated immutable references to already checked service images;
 - deterministic explicit-prerequisite topology and cycle rejection;
 - kernel preparation of every static root, image, stack, context, reserved
@@ -346,6 +360,9 @@ model, IPC reply model, or global current-execution representation.
 - manifest validation rejects unknown versions, malformed entries, missing
   profiles or images, invalid resource fields, missing prerequisites, and
   cycles before manifest-directed service mutation;
+- capacity-seven consumers agree on the exact 128-byte service configuration
+  and 364,704-byte VM boot-information offsets, active counts, zero tails, and
+  digest extent;
 - launcher order is deterministic and independent from source array order;
 - unreleased endpoints remain hidden and held services remain off ready queues;
 - release installs only the exact named immutable profile and publishes one
@@ -416,7 +433,29 @@ model, IPC reply model, or global current-execution representation.
 - one QEMU integration proves the real RAMFS service's seed lookup, writable
   sparse file, complete-record directory cursor, exact grants, balanced
   references, VFS readiness, launcher sealing, and TTY-routed pass marker;
-- VFS resolves absolute and relative paths and enforces descriptor ownership.
+- VFS resolves absolute and relative paths and enforces exact process-local
+  descriptor ownership;
+- shared open-file descriptions own regular-file offsets and directory
+  cursors, while vnode-local and RAMFS reference counts remain balanced;
+- application read destinations are completely prevalidated before a
+  consuming TTY hop;
+- non-copying grant validation preserves checked-copy error precedence, and
+  global second-hop grant exhaustion returns `NO_SPACE` without backend
+  submission;
+- file and terminal data cross application-to-VFS and VFS-to-backend grants
+  through resident pages without transitive authority;
+- complete RAMFS directory records become complete fixed application records
+  with no exposed backend handle;
+- pending console reads, completions, cancellation, and writable retry leave
+  the VFS receive loop available, including exact
+  `CANCEL/REQUEST -> COLLECT/OK` cleanup;
+- a replayable VFS model covers at least 8,192 mixed lifecycle, descriptor,
+  path, I/O, directory, console, malformed, capacity, and injected-failure
+  transitions; and
+- one isolated QEMU application probe proves both grant hops, descriptor
+  access, absolute/relative routing, translated directories, canonical console
+  input, TTY output, a no-authority resident-output drain barrier, zero live
+  grants, and clean launcher sealing without claiming production spawn.
 
 ## Milestone 6: shell MVP
 
