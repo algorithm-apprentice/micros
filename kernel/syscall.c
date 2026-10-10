@@ -192,6 +192,7 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
     case MICROS_SYSCALL_ABI_GRANT_REVOKE:
     case MICROS_SYSCALL_ABI_GRANT_COPY_FROM:
     case MICROS_SYSCALL_ABI_GRANT_COPY_TO:
+    case MICROS_SYSCALL_ABI_GRANT_VALIDATE:
         return micros_grant_handle_captured_user_ecall(
             hart,
             frame,

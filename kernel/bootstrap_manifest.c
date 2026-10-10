@@ -267,7 +267,9 @@ static bool stable_service_profiles_match(
             ),
             MICROS_PRIVILEGE_PROFILE_VFS,
             "VFS",
-            bootstrap_service_operations,
+            bootstrap_service_operations
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
             launcher_target
                 | (
                     UINT32_C(1)
@@ -609,6 +611,15 @@ static enum micros_bootstrap_error validate_profile_relationships(
                     | (
                         entry->profile_id
                             == MICROS_PRIVILEGE_PROFILE_RAMFS
+                        ? (
+                            MICROS_PRIVILEGE_OPERATION_REPLY
+                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
+                        )
+                        : 0
+                    )
+                    | (
+                        entry->profile_id
+                            == MICROS_PRIVILEGE_PROFILE_VFS
                         ? (
                             MICROS_PRIVILEGE_OPERATION_REPLY
                             | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE

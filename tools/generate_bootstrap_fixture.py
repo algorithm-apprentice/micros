@@ -16,7 +16,7 @@ VM_BOOT_INFO_SYMBOL = "micros_vm_boot_info"
 IMAGE_END_SYMBOL = "__micros_user_image_end"
 IMAGE_SEGMENT_COUNT = 3
 PAGE_SIZE = 4096
-VM_BOOT_INFO_SIZE = 364672
+VM_BOOT_INFO_SIZE = 364704
 
 
 def _format_bytes(data):

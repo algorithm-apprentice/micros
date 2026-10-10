@@ -431,6 +431,28 @@ static bool test_grant_wrappers(void)
         )
     );
 
+    reset_capture(MICROS_SYSCALL_ABI_UNAUTHORIZED);
+    result = micros_runtime_grant_validate(
+        endpoint,
+        grant,
+        offset,
+        length,
+        MICROS_GRANT_PERMISSION_WRITE
+    );
+    EXPECT_TRUE(
+        result == MICROS_SYSCALL_ABI_UNAUTHORIZED
+        && arguments_match(
+            endpoint,
+            grant,
+            offset,
+            length,
+            MICROS_GRANT_PERMISSION_WRITE,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE
+        )
+    );
+
     for (
         error = MICROS_SYSCALL_ABI_ARGUMENT;
         error >= MICROS_SYSCALL_ABI_RANGE;

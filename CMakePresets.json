@@ -216,6 +216,15 @@
       }
     },
     {
+      "name": "riscv64-vfs-service-test",
+      "displayName": "RISC-V 64 VFS service integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vfs-service-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VFS_SERVICE_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
@@ -231,6 +240,15 @@
       "binaryDir": "${sourceDir}/build/riscv64-ramfs-service-image",
       "cacheVariables": {
         "MICROS_BUILD_RAMFS_SERVICE_IMAGE": "ON"
+      }
+    },
+    {
+      "name": "riscv64-vfs-service-image",
+      "displayName": "RISC-V 64 standalone VFS service image",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vfs-service-image",
+      "cacheVariables": {
+        "MICROS_BUILD_VFS_SERVICE_IMAGE": "ON"
       }
     },
     {
@@ -385,6 +403,13 @@
       "configurePreset": "host-debug",
       "targets": [
         "test-ramfs-model"
+      ]
+    },
+    {
+      "name": "test-vfs-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-vfs-model"
       ]
     },
     {
@@ -546,6 +571,13 @@
       ]
     },
     {
+      "name": "test-qemu-vfs",
+      "configurePreset": "riscv64-vfs-service-test",
+      "targets": [
+        "test-qemu-vfs"
+      ]
+    },
+    {
       "name": "build-tty-service-image",
       "configurePreset": "riscv64-tty-service-image",
       "targets": [
@@ -557,6 +589,13 @@
       "configurePreset": "riscv64-ramfs-service-image",
       "targets": [
         "micros_ramfs_service"
+      ]
+    },
+    {
+      "name": "build-vfs-service-image",
+      "configurePreset": "riscv64-vfs-service-image",
+      "targets": [
+        "micros_vfs_service"
       ]
     },
     {
@@ -719,6 +758,20 @@
         {
           "type": "build",
           "name": "test-ramfs-model"
+        }
+      ]
+    },
+    {
+      "name": "test-vfs-model",
+      "displayName": "Build and run persistent VFS model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-vfs-model"
         }
       ]
     },
@@ -1045,6 +1098,20 @@
       ]
     },
     {
+      "name": "test-qemu-vfs",
+      "displayName": "Build and run the VFS service integration test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vfs-service-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vfs"
+        }
+      ]
+    },
+    {
       "name": "build-tty-service-image",
       "displayName": "Build and validate the standalone TTY service image",
       "steps": [
@@ -1069,6 +1136,20 @@
         {
           "type": "build",
           "name": "build-ramfs-service-image"
+        }
+      ]
+    },
+    {
+      "name": "build-vfs-service-image",
+      "displayName": "Build and validate the standalone VFS service image",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vfs-service-image"
+        },
+        {
+          "type": "build",
+          "name": "build-vfs-service-image"
         }
       ]
     },

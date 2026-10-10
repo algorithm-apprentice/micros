@@ -55,6 +55,12 @@ enum grant_syscall_command {
     GRANT_COMMAND_REVOKE_STALE,
     GRANT_COMMAND_REVOKE_UPPER_TOKEN,
     GRANT_COMMAND_REVOKE_UNUSED,
+    GRANT_COMMAND_VALIDATE_READ,
+    GRANT_COMMAND_VALIDATE_ZERO,
+    GRANT_COMMAND_VALIDATE_WRONG_DIRECTION,
+    GRANT_COMMAND_VALIDATE_UNMAPPED,
+    GRANT_COMMAND_VALIDATE_OVERFLOW_STALE,
+    GRANT_COMMAND_VALIDATE_UPPER_PERMISSION,
     GRANT_COMMAND_COPY_FROM_CROSS,
     GRANT_COMMAND_COPY_TO_CROSS,
     GRANT_COMMAND_COPY_FROM_LOCAL,
@@ -1087,6 +1093,121 @@ static bool arm_command(
             MICROS_SYSCALL_RETURN_NORMAL
         );
         return true;
+    case GRANT_COMMAND_VALIDATE_READ:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            read_grant,
+            32,
+            64,
+            MICROS_GRANT_PERMISSION_READ,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
+    case GRANT_COMMAND_VALIDATE_ZERO:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            write_grant,
+            256,
+            0,
+            MICROS_GRANT_PERMISSION_WRITE,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
+    case GRANT_COMMAND_VALIDATE_WRONG_DIRECTION:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            read_grant,
+            0,
+            1,
+            MICROS_GRANT_PERMISSION_WRITE,
+            0,
+            0,
+            abi_result(MICROS_SYSCALL_ABI_UNAUTHORIZED),
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
+    case GRANT_COMMAND_VALIDATE_UNMAPPED:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            unmapped_grant,
+            0,
+            1,
+            MICROS_GRANT_PERMISSION_READ,
+            0,
+            0,
+            abi_result(MICROS_SYSCALL_ABI_MEMORY_FAULT),
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
+    case GRANT_COMMAND_VALIDATE_OVERFLOW_STALE:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            stale_grant,
+            UINT64_MAX,
+            2,
+            MICROS_GRANT_PERMISSION_READ,
+            0,
+            0,
+            abi_result(MICROS_SYSCALL_ABI_RANGE),
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
+    case GRANT_COMMAND_VALIDATE_UPPER_PERMISSION:
+        arm_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[GRANT_SYSCALL_GRANTOR],
+            read_grant,
+            0,
+            1,
+            (UINT64_C(1) << 32)
+                | MICROS_GRANT_PERMISSION_READ,
+            0,
+            0,
+            abi_result(MICROS_SYSCALL_ABI_ARGUMENT),
+            false,
+            true,
+            MICROS_SYSCALL_RETURN_NORMAL
+        );
+        return true;
     case GRANT_COMMAND_COPY_FROM_CROSS:
         write_pattern(
             GRANT_SYSCALL_GRANTOR,
@@ -1774,6 +1895,48 @@ static bool transition_after_return(
         return schedule_next(
             actor,
             GRANT_SYSCALL_GRANTEE,
+            GRANT_COMMAND_VALIDATE_READ,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_READ:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_VALIDATE_ZERO,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_ZERO:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_VALIDATE_WRONG_DIRECTION,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_WRONG_DIRECTION:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_VALIDATE_UNMAPPED,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_UNMAPPED:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_VALIDATE_OVERFLOW_STALE,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_OVERFLOW_STALE:
+        return schedule_next(
+            actor,
+            actor,
+            GRANT_COMMAND_VALIDATE_UPPER_PERMISSION,
+            frame
+        );
+    case GRANT_COMMAND_VALIDATE_UPPER_PERMISSION:
+        return schedule_next(
+            actor,
+            actor,
             GRANT_COMMAND_COPY_FROM_CROSS,
             frame
         );

@@ -286,7 +286,8 @@ static bool test_copy_authority_and_bounds(void)
     EXPECT_TRUE(expect_authority_failure_unchanged(
         MICROS_GRANT_ERROR_UNAUTHORIZED,
         processes[2],
-        endpoints[0],
+        endpoints[0]
+            + (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS),
         read_grant,
         0,
         1,
@@ -361,6 +362,24 @@ static bool test_copy_authority_and_bounds(void)
             read_grant,
             0,
             1,
+            MICROS_GRANT_PERMISSION_READ
+        )
+        && expect_authority_failure_unchanged(
+            MICROS_GRANT_ERROR_RANGE,
+            processes[1],
+            endpoints[0],
+            read_grant,
+            SIZE_MAX,
+            1,
+            MICROS_GRANT_PERMISSION_READ
+        )
+        && expect_authority_failure_unchanged(
+            MICROS_GRANT_ERROR_STALE_GRANT,
+            processes[1],
+            endpoints[0],
+            read_grant,
+            0,
+            0,
             MICROS_GRANT_PERMISSION_READ
         )
     );

@@ -905,6 +905,20 @@ read-only service data, cross-compiles the portable RAMFS core and production
 post-link budget check also requires the complete `PT_LOAD` footprint plus one
 external stack page to fit within the 192-page RAMFS process limit.
 
+## VFS service image validation
+
+Build and validate the standalone real VFS service ELF with:
+
+```bash
+cmake --workflow --preset build-vfs-service-image
+```
+
+The workflow cross-compiles the portable VFS core, exact application and
+backend wire adapters, and production receive/reply loop. The post-link
+checker enforces the freestanding service-ELF contract and requires the
+complete `PT_LOAD` footprint plus one external stack page to fit within the
+64-page VFS process limit.
+
 ## RAMFS service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/RAMFS/VFS gate with:
@@ -928,6 +942,29 @@ grants, waits for physical UART drain, and shuts down cleanly. The scenario
 uses no host input or sleep; the absolute host timeout is 180 seconds, leaving
 margin above the measured debug/TCG completion time while retaining a finite
 deadlock bound.
+
+## VFS service acceptance
+
+Build and run the dependency-closed
+launcher/VM/PM/TTY/RAMFS/VFS/application gate with:
+
+```bash
+cmake --workflow --preset test-qemu-vfs
+```
+
+The workflow links the six production services plus one isolated application
+probe. VFS mounts RAMFS, installs only the probe's trusted root, cwd, and
+descriptors 0 through 2, then reports readiness. The probe exercises seeded
+read and EOF, relative `mkdir`, relative create/write, absolute and relative
+reopen, cwd replacement, translated 80-byte directory records, and console
+I/O through both grant hops. The host sends
+`micros-vfsx<DEL>-input<CR>` only after the exact input-ready line and uses no
+sleep. After the exact pass marker, the private drain call waits for TTY
+resident output to empty without granting direct TTY authority. The kernel then
+waits for physical UART completion and accepts the report only from the probe
+thread after all seven services are ready, launcher authority is sealed, VM and
+TTY handoff state is valid, and the grant registry is empty. The absolute host
+timeout is 180 seconds.
 
 ## TTY service acceptance
 

@@ -301,6 +301,105 @@ done:
     return error;
 }
 
+enum micros_grant_error micros_grant_validate_range(
+    const struct micros_grant_registry *grant_registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle grantee,
+    micros_endpoint_t grantor_endpoint,
+    micros_grant_t grant,
+    size_t grant_offset,
+    size_t length,
+    uint32_t required_permission
+)
+{
+    const struct micros_frame_ownership *ledger;
+    struct micros_grant_copy_authority authority;
+    struct micros_grant_copy_range_plan remote_plan = {0};
+    struct micros_tty_device_authority device_authority;
+    enum micros_grant_error error;
+    enum micros_tty_device_authority_status device_status;
+    uintptr_t saved_status;
+
+    if (
+        grant_registry == NULL
+        || endpoint_registry == NULL
+        || objects == NULL
+        || grantor_endpoint == MICROS_ENDPOINT_NONE
+        || grantor_endpoint == MICROS_ENDPOINT_ANY
+        || (
+            required_permission != MICROS_GRANT_PERMISSION_READ
+            && required_permission != MICROS_GRANT_PERMISSION_WRITE
+        )
+    ) {
+        return MICROS_GRANT_ERROR_ARGUMENT;
+    }
+    if (length > MICROS_GRANT_COPY_MAX) {
+        return MICROS_GRANT_ERROR_RANGE;
+    }
+    saved_status = riscv_irq_save();
+    error = micros_grant_prepare_copy_authority(
+        grant_registry,
+        endpoint_registry,
+        objects,
+        grantee,
+        grantor_endpoint,
+        grant,
+        grant_offset,
+        length,
+        required_permission,
+        &authority
+    );
+    if (error != MICROS_GRANT_OK) {
+        goto done;
+    }
+    ledger = micros_frame_ownership_runtime_ledger();
+    if (ledger == NULL) {
+        error = MICROS_GRANT_ERROR_INVARIANT;
+        goto done;
+    }
+    if (
+        ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        && ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    ) {
+        error = MICROS_GRANT_ERROR_PHASE;
+        goto done;
+    }
+    if (length == 0) {
+        error = MICROS_GRANT_OK;
+        goto done;
+    }
+    device_status =
+        micros_tty_handoff_runtime_device_authority(
+            endpoint_registry,
+            objects,
+            &device_authority
+        );
+    if (
+        device_status
+            == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+    ) {
+        error = MICROS_GRANT_ERROR_INVARIANT;
+        goto done;
+    }
+    error = plan_range(
+        authority.grantor,
+        authority.remote_address,
+        length,
+        required_permission == MICROS_GRANT_PERMISSION_READ
+            ? MICROS_SV39_PERMISSION_READ
+            : MICROS_SV39_PERMISSION_WRITE,
+        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &device_authority
+            : NULL,
+        &remote_plan
+    );
+
+done:
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
 enum micros_grant_error micros_grant_copy_from(
     const struct micros_grant_registry *grant_registry,
     const struct micros_endpoint_registry *endpoint_registry,

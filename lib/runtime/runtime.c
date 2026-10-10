@@ -214,3 +214,23 @@ micros_runtime_result_t micros_runtime_grant_copy_to(
         MICROS_SYSCALL_ABI_GRANT_COPY_TO
     );
 }
+
+micros_runtime_result_t micros_runtime_grant_validate(
+    micros_endpoint_t grantor,
+    micros_grant_t grant,
+    size_t grant_offset,
+    size_t length,
+    uint32_t required_permission
+)
+{
+    return runtime_syscall(
+        (uint64_t)grantor,
+        (uint64_t)grant,
+        (uint64_t)grant_offset,
+        (uint64_t)length,
+        (uint64_t)required_permission,
+        0,
+        0,
+        MICROS_SYSCALL_ABI_GRANT_VALIDATE
+    );
+}

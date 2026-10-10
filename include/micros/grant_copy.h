@@ -77,4 +77,16 @@ enum micros_grant_error micros_grant_copy_to(
     size_t length
 );
 
+enum micros_grant_error micros_grant_validate_range(
+    const struct micros_grant_registry *grant_registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle grantee,
+    micros_endpoint_t grantor_endpoint,
+    micros_grant_t grant,
+    size_t grant_offset,
+    size_t length,
+    uint32_t required_permission
+);
+
 #endif

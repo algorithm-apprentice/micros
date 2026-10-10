@@ -110,6 +110,7 @@ bool micros_grant_syscall_core_test_run(void)
         && MICROS_SYSCALL_ABI_GRANT_REVOKE == 8
         && MICROS_SYSCALL_ABI_GRANT_COPY_FROM == 9
         && MICROS_SYSCALL_ABI_GRANT_COPY_TO == 10
+        && MICROS_SYSCALL_ABI_GRANT_VALIDATE == 15
         && (int)MICROS_IPC_ABI_SEND
             == (int)MICROS_SYSCALL_ABI_SEND
         && (int)MICROS_IPC_ABI_MESSAGE_FAULT
@@ -263,6 +264,42 @@ bool micros_grant_syscall_core_test_run(void)
             == MICROS_SYSCALL_ABI_OK
         && request.operation == MICROS_SYSCALL_ABI_GRANT_COPY_TO
     );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = UINT32_C(0x00123001),
+        .a1 = UINT32_C(0x12345678),
+        .a2 = UINT64_C(0xfedcba9876543210),
+        .a3 = UINT64_C(0x0000000100000001),
+        .a4 = MICROS_GRANT_PERMISSION_WRITE,
+        .a7 = MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+    };
+    EXPECT_TRUE(
+        micros_grant_syscall_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request_matches(
+            &request,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            UINT32_C(0x00123001),
+            UINT32_C(0x12345678),
+            UINT64_C(0xfedcba9876543210),
+            0,
+            UINT64_C(0x0000000100000001),
+            MICROS_GRANT_PERMISSION_WRITE
+        )
+    );
+    arguments.a0 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(arguments));
+    arguments.a0 = UINT32_C(0x00123001);
+    arguments.a1 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(arguments));
+    arguments.a1 = UINT32_C(0x12345678);
+    arguments.a4 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(arguments));
+    arguments.a4 = MICROS_GRANT_PERMISSION_WRITE;
+    arguments.a5 = 1;
+    EXPECT_TRUE(expect_decode_failure(arguments));
+    arguments.a5 = 0;
+    arguments.a6 = 1;
+    EXPECT_TRUE(expect_decode_failure(arguments));
 
     arguments.a0 = UINT64_C(1) << 32;
     EXPECT_TRUE(expect_decode_failure(arguments));

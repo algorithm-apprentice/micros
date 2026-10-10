@@ -88,6 +88,9 @@ static struct micros_privilege_profile profile(
                 MICROS_PRIVILEGE_OPERATION_REPLY
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
         } else if (id == MICROS_PRIVILEGE_PROFILE_VFS) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
             result.call_targets |=
                 (
                     UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
@@ -150,7 +153,7 @@ static bool test_manifest_contract(void)
         MICROS_BOOTSTRAP_MANIFEST_VERSION == 1
         && MICROS_BOOTSTRAP_MANIFEST_MAGIC
             == UINT32_C(0x3153424d)
-        && MICROS_BOOTSTRAP_SERVICE_CAPACITY == 6
+        && MICROS_BOOTSTRAP_SERVICE_CAPACITY == 7
         && MICROS_BOOTSTRAP_ROLE_PM == UINT32_C(0x8)
         && MICROS_BOOTSTRAP_ROLE_DEFINED_MASK == UINT32_C(0xf)
         && MICROS_KERNEL_OPERATION_PM_CONTROL == UINT64_C(0x4)
@@ -165,8 +168,8 @@ static bool test_manifest_contract(void)
         && MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED == UINT64_C(0x1)
         && sizeof(struct micros_bootstrap_manifest_header) == 64
         && sizeof(struct micros_bootstrap_manifest_entry) == 192
-        && sizeof(struct micros_bootstrap_manifest) == 1216
-        && sizeof(struct micros_bootstrap_manifest_plan) == 60
+        && sizeof(struct micros_bootstrap_manifest) == 1408
+        && sizeof(struct micros_bootstrap_manifest_plan) == 68
         && sizeof(struct micros_bootstrap_service_config) == 128
         && offsetof(
             struct micros_bootstrap_manifest_entry,
@@ -176,6 +179,17 @@ static bool test_manifest_contract(void)
             struct micros_bootstrap_service_config,
             services
         ) == 24
+        && offsetof(
+            struct micros_bootstrap_service_config,
+            manifest_view_address
+        ) == 80
+        && offsetof(
+            struct micros_bootstrap_service_config,
+            reserved
+        ) == 88
+        && sizeof(
+            ((struct micros_bootstrap_service_config *)0)->reserved
+        ) == 40
         && offsetof(
             struct micros_bootstrap_manifest_plan,
             pm_service_id
@@ -336,6 +350,13 @@ static bool test_tty_service_contract(void)
             == (
                 UINT32_C(1)
                 << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            )
+        && profiles[5].operations
+            == (
+                MICROS_PRIVILEGE_OPERATION_RECEIVE
+                | MICROS_PRIVILEGE_OPERATION_CALL
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
             )
         && profiles[5].call_targets
             == (

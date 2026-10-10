@@ -54,6 +54,7 @@ enum handoff_syscall_command {
     HANDOFF_SYSCALL_COPY_FROM_CROSS,
     HANDOFF_SYSCALL_COPY_TO_LOCAL,
     HANDOFF_SYSCALL_COPY_TO_CROSS,
+    HANDOFF_SYSCALL_VALIDATE_READ,
     HANDOFF_SYSCALL_COPY_FROM_ZERO,
     HANDOFF_SYSCALL_COPY_TO_ZERO,
     HANDOFF_SYSCALL_WRONG_DIRECTION,
@@ -1189,6 +1190,22 @@ static bool arm_handoff_syscall(
             false
         );
         return true;
+    case HANDOFF_SYSCALL_VALIDATE_READ:
+        arm_handoff_syscall_raw(
+            actor,
+            context,
+            command,
+            MICROS_SYSCALL_ABI_GRANT_VALIDATE,
+            endpoints[HANDOFF_GRANTOR],
+            syscall_read_grant,
+            0,
+            128,
+            MICROS_GRANT_PERMISSION_READ,
+            MICROS_SYSCALL_ABI_OK,
+            false,
+            true
+        );
+        return true;
     case HANDOFF_SYSCALL_COPY_FROM_ZERO:
     case HANDOFF_SYSCALL_COPY_TO_ZERO:
         arm_handoff_syscall_raw(
@@ -1422,6 +1439,13 @@ static bool transition_handoff_syscall(
             frame
         );
     case HANDOFF_SYSCALL_COPY_TO_CROSS:
+        return schedule_handoff_syscall(
+            actor,
+            actor,
+            HANDOFF_SYSCALL_VALIDATE_READ,
+            frame
+        );
+    case HANDOFF_SYSCALL_VALIDATE_READ:
         return schedule_handoff_syscall(
             actor,
             actor,
