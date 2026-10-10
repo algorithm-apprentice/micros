@@ -1,5 +1,6 @@
 import contextlib
 import io
+import sys
 import unittest
 
 from tools import run_qemu_smoke
@@ -2381,6 +2382,90 @@ class QemuCommandTest(unittest.TestCase):
         )
 
         self.assertEqual("256M", command[command.index("-m") + 1])
+
+
+class QemuSerialInputTest(unittest.TestCase):
+    def test_writes_serial_input_once_after_complete_trigger_line(self):
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import sys;"
+                "sys.stdout.write('READY\\n');"
+                "sys.stdout.flush();"
+                "data=sys.stdin.buffer.read(3);"
+                "sys.stdout.write(data.hex()+'\\n');"
+                "sys.stdout.flush()"
+            ),
+        ]
+
+        result = run_qemu_smoke.run_qemu(
+            command,
+            2.0,
+            serial_input_trigger="READY",
+            serial_input=b"x\x7f\r",
+        )
+
+        self.assertFalse(result.timed_out)
+        self.assertEqual(0, result.return_code)
+        self.assertTrue(result.serial_input_sent)
+        self.assertEqual("READY\n787f0d\n", result.output)
+
+    def test_default_execution_keeps_stdin_closed(self):
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import sys;"
+                "data=sys.stdin.buffer.read(1);"
+                "sys.stdout.write('EOF\\n' if not data else 'DATA\\n')"
+            ),
+        ]
+
+        result = run_qemu_smoke.run_qemu(command, 2.0)
+
+        self.assertFalse(result.timed_out)
+        self.assertEqual(0, result.return_code)
+        self.assertFalse(result.serial_input_sent)
+        self.assertEqual("EOF\n", result.output)
+
+    def test_closed_serial_input_pipe_returns_a_normal_result(self):
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import os,sys;"
+                "os.close(0);"
+                "sys.stdout.write('READY\\n');"
+                "sys.stdout.flush()"
+            ),
+        ]
+
+        result = run_qemu_smoke.run_qemu(
+            command,
+            2.0,
+            serial_input_trigger="READY",
+            serial_input=b"x",
+        )
+
+        self.assertFalse(result.timed_out)
+        self.assertEqual(0, result.return_code)
+        self.assertFalse(result.serial_input_sent)
+        self.assertEqual("READY\n", result.output)
+
+    def test_trigger_requires_an_exact_terminated_line(self):
+        self.assertFalse(
+            run_qemu_smoke._serial_trigger_observed(
+                b"prefix READY\nREADY",
+                "READY",
+            )
+        )
+        self.assertTrue(
+            run_qemu_smoke._serial_trigger_observed(
+                b"prefix READY\nREADY\r\n",
+                "READY",
+            )
+        )
 
 
 class TapOutputTest(unittest.TestCase):

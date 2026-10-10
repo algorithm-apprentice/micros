@@ -49,6 +49,22 @@ static struct micros_syscall_arguments valid_arguments(void)
     };
 }
 
+static struct micros_syscall_arguments valid_tty_mapping_arguments(void)
+{
+    return (struct micros_syscall_arguments){
+        .a0 = MICROS_VM_HANDOFF_MAP_TTY_UART,
+        .a1 = MICROS_TTY_MAPPING_VERSION,
+        .a2 = MICROS_TTY_SERVICE_ID,
+        .a3 = UINT32_C(0x00007003),
+        .a4 = MICROS_TTY_UART_VIRTUAL_BASE,
+        .a5 = MICROS_TTY_UART_PHYSICAL_BASE,
+        .a6 = (
+            (uint64_t)MICROS_TTY_UART_IRQ_SOURCE << 32
+        ) | MICROS_TTY_UART_MAPPED_LENGTH,
+        .a7 = MICROS_SYSCALL_ABI_VM_HANDOFF,
+    };
+}
+
 static bool decode_preserves_output(
     struct micros_syscall_arguments arguments
 )
@@ -65,14 +81,34 @@ static bool decode_preserves_output(
     );
 }
 
+static bool tty_mapping_decode_preserves_output(
+    struct micros_syscall_arguments arguments
+)
+{
+    struct micros_vm_tty_mapping_request request;
+    struct micros_vm_tty_mapping_request sentinel;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    request = sentinel;
+    return (
+        micros_vm_handoff_decode_tty_mapping(&arguments, &request)
+            == MICROS_SYSCALL_ABI_ARGUMENT
+        && memcmp(&request, &sentinel, sizeof(request)) == 0
+    );
+}
+
 static bool test_decodes_exact_shape(void)
 {
     struct micros_syscall_arguments arguments = valid_arguments();
     struct micros_vm_handoff_request request;
+    uint32_t command = 0;
     size_t index;
 
     EXPECT_TRUE(
-        micros_vm_handoff_decode(&arguments, &request)
+        micros_vm_handoff_decode_command(&arguments, &command)
+            == MICROS_SYSCALL_ABI_OK
+        && command == MICROS_VM_HANDOFF_READY
+        && micros_vm_handoff_decode(&arguments, &request)
             == MICROS_SYSCALL_ABI_OK
         && request.command == MICROS_VM_HANDOFF_READY
         && request.version == MICROS_VM_BOOT_INFO_VERSION
@@ -83,7 +119,7 @@ static bool test_decodes_exact_shape(void)
         && request.mapping_count == 97
         && request.digest == UINT64_C(0x0123456789abcdef)
     );
-    arguments.a0 = 2;
+    arguments.a0 = MICROS_VM_HANDOFF_MAP_TTY_UART;
     EXPECT_TRUE(decode_preserves_output(arguments));
     arguments = valid_arguments();
     arguments.a7 = MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL;
@@ -112,6 +148,82 @@ static bool test_decodes_exact_shape(void)
         }
         EXPECT_TRUE(decode_preserves_output(arguments));
     }
+    return true;
+}
+
+static bool test_decodes_exact_tty_mapping(void)
+{
+    struct micros_syscall_arguments arguments =
+        valid_tty_mapping_arguments();
+    struct micros_vm_tty_mapping_request request;
+    uint32_t command = 0;
+    size_t index;
+
+    EXPECT_TRUE(
+        micros_vm_handoff_decode_command(&arguments, &command)
+            == MICROS_SYSCALL_ABI_OK
+        && command == MICROS_VM_HANDOFF_MAP_TTY_UART
+        && micros_vm_handoff_decode_tty_mapping(
+            &arguments,
+            &request
+        ) == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_VM_HANDOFF_MAP_TTY_UART
+        && request.version == MICROS_TTY_MAPPING_VERSION
+        && request.service_id == MICROS_TTY_SERVICE_ID
+        && request.endpoint == UINT32_C(0x00007003)
+        && request.virtual_base == MICROS_TTY_UART_VIRTUAL_BASE
+        && request.physical_base == MICROS_TTY_UART_PHYSICAL_BASE
+        && request.irq_source == MICROS_TTY_UART_IRQ_SOURCE
+        && request.mapped_length == MICROS_TTY_UART_MAPPED_LENGTH
+        && micros_vm_tty_mapping_matches(
+            &request,
+            UINT32_C(0x00007003)
+        )
+    );
+    ++request.version;
+    EXPECT_TRUE(
+        !micros_vm_tty_mapping_matches(
+            &request,
+            UINT32_C(0x00007003)
+        )
+    );
+    --request.version;
+    EXPECT_TRUE(
+        !micros_vm_tty_mapping_matches(
+            &request,
+            UINT32_C(0x00008003)
+        )
+    );
+
+    arguments.a0 = UINT64_C(3);
+    EXPECT_TRUE(tty_mapping_decode_preserves_output(arguments));
+    command = UINT32_C(0xa5a5a5a5);
+    EXPECT_TRUE(
+        micros_vm_handoff_decode_command(&arguments, &command)
+            == MICROS_SYSCALL_ABI_ARGUMENT
+        && command == UINT32_C(0xa5a5a5a5)
+    );
+    for (index = 0; index <= 3; ++index) {
+        arguments = valid_tty_mapping_arguments();
+        switch (index) {
+        case 0:
+            arguments.a0 |= UINT64_C(1) << 32;
+            break;
+        case 1:
+            arguments.a1 |= UINT64_C(1) << 32;
+            break;
+        case 2:
+            arguments.a2 |= UINT64_C(1) << 32;
+            break;
+        default:
+            arguments.a3 |= UINT64_C(1) << 32;
+            break;
+        }
+        EXPECT_TRUE(tty_mapping_decode_preserves_output(arguments));
+    }
+    arguments = valid_tty_mapping_arguments();
+    arguments.a7 = MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL;
+    EXPECT_TRUE(tty_mapping_decode_preserves_output(arguments));
     return true;
 }
 
@@ -260,6 +372,7 @@ bool micros_vm_handoff_test_run(void)
 {
     return (
         test_decodes_exact_shape()
+        && test_decodes_exact_tty_mapping()
         && test_prepares_matches_and_commits()
         && test_rejects_invalid_state_without_mutation()
         && test_classifies_vm_self_fault_phase()

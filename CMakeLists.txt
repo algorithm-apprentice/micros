@@ -7,6 +7,11 @@ option(MICROS_BUILD_PANIC_TEST "Build the intentional panic image" OFF)
 option(MICROS_BUILD_TRAP_TEST "Build the trap recovery test image" OFF)
 option(MICROS_BUILD_TIMER_TEST "Build the timer interrupt test image" OFF)
 option(
+    MICROS_BUILD_UART_CONSOLE_TEST
+    "Build the UART console ownership handoff test image"
+    OFF
+)
+option(
     MICROS_BUILD_FRAME_ALLOCATOR_TEST
     "Build the bootstrap frame allocator test image"
     OFF
@@ -88,6 +93,16 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_TTY_SERVICE_TEST
+    "Build the real TTY service integration image"
+    OFF
+)
+option(
+    MICROS_BUILD_TTY_SERVICE_IMAGE
+    "Build the standalone real TTY service ELF"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -149,6 +164,7 @@ set(
     MICROS_BUILD_PANIC_TEST
     MICROS_BUILD_TRAP_TEST
     MICROS_BUILD_TIMER_TEST
+    MICROS_BUILD_UART_CONSOLE_TEST
     MICROS_BUILD_FRAME_ALLOCATOR_TEST
     MICROS_BUILD_TRAP_PANIC_TEST
     MICROS_BUILD_MMU_TEST
@@ -166,6 +182,8 @@ set(
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
     MICROS_BUILD_PM_SERVICE_TEST
+    MICROS_BUILD_TTY_SERVICE_TEST
+    MICROS_BUILD_TTY_SERVICE_IMAGE
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -280,6 +298,7 @@ if(MICROS_BUILD_HOST_TESTS)
         runtime_test
         lib/runtime/memory.c
         lib/runtime/runtime.c
+        tests/qemu/bootstrap_launcher_control.c
         tests/host/runtime_test.c
     )
     add_executable(
@@ -318,6 +337,164 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/pm_control_test.c
         tests/host/pm_test.c
     )
+    add_executable(
+        tty_test
+        kernel/plic_core.c
+        kernel/tty_control_core.c
+        kernel/tty_control_syscall_core.c
+        kernel/tty_handoff_core.c
+        kernel/tty_handoff_runtime.c
+        kernel/uart_console_core.c
+        servers/tty/tty_core.c
+        tests/host/plic_test.c
+        tests/host/tty_control_test.c
+        tests/host/tty_handoff_test.c
+        tests/host/tty_test.c
+    )
+    add_executable(
+        tty_service_test
+        servers/tty/tty_core.c
+        servers/tty/tty_service_core.c
+        tests/host/tty_service_test.c
+    )
+    add_executable(
+        tty_uart_test
+        servers/tty/tty_core.c
+        servers/tty/tty_uart.c
+        tests/host/tty_uart_test.c
+    )
+    add_executable(
+        tty_model_test
+        servers/tty/tty_core.c
+        servers/tty/tty_service_core.c
+        servers/tty/tty_uart.c
+        tests/host/tty_model_test.c
+    )
+    add_executable(
+        tty_service_control_test
+        servers/tty/tty_control.c
+        tests/host/tty_service_control_test.c
+    )
+    add_executable(
+        vm_handoff_syscall_test
+        kernel/tty_handoff_core.c
+        kernel/vm_handoff_core.c
+        kernel/vm_handoff_syscall.c
+        tests/host/vm_handoff_syscall_test.c
+    )
+    add_executable(
+        tty_interrupt_test
+        kernel/tty_handoff_core.c
+        kernel/tty_interrupt.c
+        tests/host/tty_interrupt_test.c
+    )
+    add_executable(
+        tty_control_syscall_test
+        kernel/tty_control_core.c
+        kernel/tty_control_syscall.c
+        kernel/tty_handoff_core.c
+        tests/host/tty_control_syscall_test.c
+    )
+    add_executable(
+        tty_fault_test
+        kernel/tty_fault.c
+        tests/host/tty_fault_test.c
+    )
+    add_executable(
+        trap_route_test
+        kernel/trap_route_core.c
+        tests/host/trap_route_test.c
+    )
+    target_include_directories(
+        vm_handoff_syscall_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_interrupt_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        trap_route_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_control_syscall_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/host/stubs"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_fault_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(
+        vm_handoff_syscall_test
+        PRIVATE
+            c_std_17
+    )
+    target_compile_features(tty_interrupt_test PRIVATE c_std_17)
+    target_compile_features(trap_route_test PRIVATE c_std_17)
+    target_compile_features(tty_control_syscall_test PRIVATE c_std_17)
+    target_compile_features(tty_fault_test PRIVATE c_std_17)
+    target_compile_options(
+        vm_handoff_syscall_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_interrupt_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        trap_route_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_control_syscall_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_fault_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
     target_include_directories(
         fdt_test
         PRIVATE
@@ -384,6 +561,36 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_include_directories(
         pm_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_service_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_uart_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_model_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
+        tty_service_control_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -401,6 +608,11 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(bootstrap_control_test PRIVATE c_std_17)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
+    target_compile_features(tty_test PRIVATE c_std_17)
+    target_compile_features(tty_service_test PRIVATE c_std_17)
+    target_compile_features(tty_uart_test PRIVATE c_std_17)
+    target_compile_features(tty_model_test PRIVATE c_std_17)
+    target_compile_features(tty_service_control_test PRIVATE c_std_17)
     target_compile_options(
         fdt_test
         PRIVATE
@@ -523,6 +735,56 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         pm_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_service_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_uart_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_model_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        tty_service_control_test
         PRIVATE
             -Wall
             -Wextra
@@ -671,6 +933,116 @@ if(MICROS_BUILD_HOST_TESTS)
             PRIVATE
                 -fsanitize=address,undefined
         )
+        target_compile_options(
+            tty_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_service_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_service_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_uart_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_uart_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_model_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_model_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_service_control_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_service_control_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            vm_handoff_syscall_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            vm_handoff_syscall_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_interrupt_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_interrupt_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            trap_route_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            trap_route_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_control_syscall_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_control_syscall_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
+            tty_fault_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            tty_fault_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
     endif()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
@@ -686,7 +1058,24 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(NAME tty-core COMMAND tty_test)
+    add_test(NAME tty-service-core COMMAND tty_service_test)
+    add_test(NAME tty-uart COMMAND tty_uart_test)
+    add_test(NAME tty-model COMMAND tty_model_test)
+    add_test(NAME tty-service-control COMMAND tty_service_control_test)
+    add_test(
+        NAME vm-handoff-syscall
+        COMMAND vm_handoff_syscall_test
+    )
+    add_test(NAME tty-interrupt COMMAND tty_interrupt_test)
+    add_test(NAME trap-route COMMAND trap_route_test)
+    add_test(
+        NAME tty-control-syscall
+        COMMAND tty_control_syscall_test
+    )
+    add_test(NAME tty-owner-fault COMMAND tty_fault_test)
     set_tests_properties(ipc-model PROPERTIES LABELS slow)
+    set_tests_properties(tty-model PROPERTIES LABELS slow)
 
     add_custom_target(
         test-unit-fast
@@ -720,6 +1109,15 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            tty_test
+            tty_service_test
+            tty_uart_test
+            tty_service_control_test
+            vm_handoff_syscall_test
+            tty_interrupt_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -734,6 +1132,20 @@ if(MICROS_BUILD_HOST_TESTS)
             -R
             ipc-model
         DEPENDS ipc_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
+        test-tty-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            tty-model
+        DEPENDS tty_model_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -769,6 +1181,16 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            tty_test
+            tty_service_test
+            tty_uart_test
+            tty_model_test
+            tty_service_control_test
+            vm_handoff_syscall_test
+            tty_interrupt_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
@@ -902,6 +1324,8 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
     OR MICROS_BUILD_PM_SERVICE_TEST
+    OR MICROS_BUILD_TTY_SERVICE_TEST
+    OR MICROS_BUILD_TTY_SERVICE_IMAGE
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -979,14 +1403,44 @@ if(
         )
     endfunction()
 
+    if(
+        MICROS_BUILD_TTY_SERVICE_IMAGE
+        OR MICROS_BUILD_TTY_SERVICE_TEST
+    )
+        micros_add_bootstrap_user(
+            micros_tty_service
+            micros-tty-service
+            servers/tty/tty_control.c
+            servers/tty/tty_core.c
+            servers/tty/tty_service.c
+            servers/tty/tty_service_core.c
+            servers/tty/tty_uart.c
+        )
+        if(MICROS_BUILD_TTY_SERVICE_TEST)
+            target_sources(
+                micros_tty_service
+                PRIVATE
+                    tests/qemu/tty_service_claim_wait.S
+            )
+            target_compile_definitions(
+                micros_tty_service
+                PRIVATE
+                    MICROS_BUILD_TTY_SERVICE_TEST=1
+                    MICROS_TTY_CONFIGURED_VFS_SERVICE_ID=5
+            )
+        endif()
+    endif()
+
     micros_add_bootstrap_user(
         micros_bootstrap_launcher
         micros-bootstrap-launcher
+        tests/qemu/bootstrap_launcher_control.c
         tests/qemu/bootstrap_launcher.c
     )
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
         OR MICROS_BUILD_PM_SERVICE_TEST
+        OR MICROS_BUILD_TTY_SERVICE_TEST
         OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -997,7 +1451,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
-        if(MICROS_BUILD_PM_SERVICE_TEST)
+        if(MICROS_BUILD_TTY_SERVICE_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_TTY_HANDOFF_TEST=1
+            )
+        elseif(MICROS_BUILD_PM_SERVICE_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -1074,6 +1534,58 @@ if(
             )
             set_source_files_properties(
                 "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        elseif(MICROS_BUILD_TTY_SERVICE_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                servers/pm/pm_core.c
+                servers/pm/pm_service.c
+            )
+            micros_add_bootstrap_user(
+                micros_tty_service_vfs
+                micros-tty-service-vfs
+                tests/qemu/tty_service_report.S
+                tests/qemu/tty_service_vfs.c
+            )
+            set(
+                MICROS_TTY_SERVICE_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/tty_service_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf
+                    "$<TARGET_FILE:micros_pm_service>"
+                    --tty-elf
+                    "$<TARGET_FILE:micros_tty_service>"
+                    --vfs-elf
+                    "$<TARGET_FILE:micros_tty_service_vfs>"
+                    --output
+                    "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_tty_service
+                    micros_tty_service_vfs
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
                 PROPERTIES GENERATED TRUE
             )
         else()
@@ -1202,6 +1714,8 @@ add_executable(
     kernel/scheduler.c
     kernel/main.c
     kernel/panic.c
+    kernel/plic.c
+    kernel/plic_core.c
     kernel/pm_control_core.c
     kernel/pm_control_runtime.c
     kernel/pm_control_syscall.c
@@ -1209,6 +1723,15 @@ add_executable(
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
+    kernel/trap_route_core.c
+    kernel/tty_control_core.c
+    kernel/tty_control_syscall.c
+    kernel/tty_control_syscall_core.c
+    kernel/tty_fault.c
+    kernel/tty_handoff_core.c
+    kernel/tty_handoff_runtime.c
+    kernel/tty_interrupt.c
+    kernel/uart_console_core.c
     kernel/user_address_space.c
     kernel/user_address_space_core.c
     kernel/user_execution.c
@@ -1218,6 +1741,19 @@ add_executable(
     kernel/vm_handoff_syscall.c
     kernel/vm_snapshot.c
 )
+
+if(MICROS_BUILD_UART_CONSOLE_TEST)
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_UART_CONSOLE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            kernel/uart_console_test.c
+    )
+endif()
 
 if(MICROS_BUILD_USER_RUNTIME_TEST)
     add_dependencies(micros micros_user_runtime_service)
@@ -1335,6 +1871,28 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
         PRIVATE
             "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
             kernel/pm_service_test.c
+    )
+endif()
+
+if(MICROS_BUILD_TTY_SERVICE_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_tty_service
+        micros_tty_service_vfs
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_TTY_SERVICE_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+            kernel/tty_service_test.c
     )
 endif()
 
@@ -1718,7 +2276,7 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            30
+            45
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -1752,7 +2310,45 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            30
+            45
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_TTY_SERVICE_TEST)
+    add_custom_target(
+        test-qemu-tty
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked"
+            --serial-input-trigger
+            "MICROS_TTY_INPUT_READY"
+            --serial-input-hex
+            "6d6963726f732d747479787f2d696e7075740d"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            60
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
@@ -2291,6 +2887,8 @@ if(MICROS_BUILD_SCHEDULER_TEST)
             "MICROS_IPC_RETURN completions=shared paths=start,user,captured,idle buffers=bounded"
             --marker
             "MICROS_SCHEDULER_TEST_PASS queues=minix-priority current=reachable accounting=separate switches=alternating idle=resumed registers=preserved"
+            --marker
+            "MICROS_TTY_TRAP_TEST_PASS user=cause9-scheduled supervisor=cause9-direct idle=cause9-selected"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready
@@ -2639,6 +3237,44 @@ add_custom_target(
     USES_TERMINAL
 )
 
+if(MICROS_BUILD_UART_CONSOLE_TEST)
+    add_custom_target(
+        test-qemu-uart-console
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_UART_CONSOLE_TEST begin=early"
+            --marker
+            "MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized"
+            --marker
+            "MICROS_TTY_IRQ_TEST_PASS route=state-before-enable claim=source10 retained=in-service completion=explicit"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            8
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
 if(MICROS_BUILD_PANIC_TEST)
     add_custom_target(
         test-qemu-panic
@@ -2866,6 +3502,8 @@ if(MICROS_BUILD_MMU_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002"
+            --marker
+            "MICROS_TTY_CONTROLLER_TEST_PASS mapping=exact priority=disabled enable=disabled context=supervisor seie=independent"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

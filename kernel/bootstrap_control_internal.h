@@ -104,6 +104,18 @@ enum micros_bootstrap_error micros_bootstrap_control_release(
     bool role_gate_ready
 );
 
+enum micros_bootstrap_error
+micros_bootstrap_control_release_console(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t retained_deadline,
+    bool role_gate_ready
+);
+
 enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
     const struct micros_bootstrap_control_state *state,
     const struct micros_endpoint_registry *registry,

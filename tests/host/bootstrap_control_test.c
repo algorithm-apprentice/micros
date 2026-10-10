@@ -119,11 +119,40 @@ static bool test_valid_commands(void)
             == MICROS_SYSCALL_ABI_OK
         && request.command == MICROS_BOOTSTRAP_COMMAND_COMPLETE
     );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN,
+        .a1 = MICROS_TTY_SERVICE_ID,
+        .a7 = MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_bootstrap_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command
+            == MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN
+        && request.service_id == MICROS_TTY_SERVICE_ID
+        && request.endpoint == 0
+        && request.reply_token == 0
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_BOOTSTRAP_COMMAND_FAIL,
+        .a1 = MICROS_TTY_SERVICE_ID,
+        .a2 = MICROS_ENDPOINT_NONE,
+        .a3 = MICROS_BOOTSTRAP_FAILURE_CONSOLE_PROTOCOL,
+        .a7 = MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_bootstrap_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && micros_bootstrap_control_validate_failure_detail(
+            &request
+        ) == MICROS_SYSCALL_ABI_OK
+    );
     return true;
 }
 
 static bool test_malformed_commands(void)
 {
+    struct micros_bootstrap_control_request request;
     struct micros_syscall_arguments arguments = {
         .a0 = MICROS_BOOTSTRAP_COMMAND_RELEASE,
         .a1 = 2,
@@ -179,7 +208,7 @@ static bool test_malformed_commands(void)
             MICROS_SYSCALL_ABI_ARGUMENT
         )
     );
-    arguments.a3 = MICROS_BOOTSTRAP_FAILURE_READY_ROLE_GATE + 1;
+    arguments.a3 = MICROS_BOOTSTRAP_FAILURE_CONSOLE_PROTOCOL + 1;
     EXPECT_TRUE(
         failure_detail_result(
             arguments,
@@ -233,8 +262,32 @@ static bool test_malformed_commands(void)
     arguments.a3 = 0;
     arguments.a4 = 1;
     EXPECT_TRUE(decode_preserves_output_on_error(arguments));
-    arguments.a0 = 5;
+    arguments.a0 = MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN;
     arguments.a4 = 0;
+    arguments.a1 = MICROS_TTY_SERVICE_ID;
+    EXPECT_TRUE(
+        micros_bootstrap_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+    );
+    arguments.a2 = 1;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a2 = 0;
+    arguments.a3 = 1;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a3 = 0;
+    arguments.a4 = 1;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a4 = 0;
+    arguments.a5 = 1;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a5 = 0;
+    arguments.a6 = 1;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a6 = 0;
+    arguments.a1 = 0;
+    EXPECT_TRUE(decode_preserves_output_on_error(arguments));
+    arguments.a1 = MICROS_TTY_SERVICE_ID;
+    arguments.a0 = MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN + 1;
     EXPECT_TRUE(decode_preserves_output_on_error(arguments));
     return true;
 }

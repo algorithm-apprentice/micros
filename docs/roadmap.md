@@ -108,9 +108,8 @@ accepted return buffer and proves the
 exact `invalid-bootstrap-ipc-buffer` panic before scheduler commit.
 ADR-0037's kernel-origin IPC mechanism now injects source-`NONE` event masks,
 wakes `ANY` receivers without a notifier thread, OR-coalesces deferred masks,
-and returns them through the shared selected-thread completion path. PLIC
-routing, manifest authority, `irq_complete`, console handoff, and TTY remain
-separate later work. Arbitrary-address
+and returns them through the shared selected-thread completion path.
+Arbitrary-address
 generation-bound translation and bounded two-page IPC message snapshot/write
 are now implemented for that target boundary. The scheduler now provides a
 reversible current-thread IPC guard with exact ready-queue and trap-stack
@@ -188,6 +187,20 @@ process-owned frame. The complete spawn and exit transactions are modeled with
 explicit reverse rollback, but dynamic mappings, executable loading, running
 child publication, and running-process target teardown remain later
 integrations.
+
+ADR-0047's static TTY boundary is now implemented. VM installs one exact
+post-handoff UART device leaf before TTY release; TTY then initializes the
+NS16550A, commits console ownership through operation 14, and acknowledges
+readiness under the original begin-time deadline. The kernel claims PLIC
+source 10, notifies only the bound TTY generation, and retains the source in
+service until TTY drains the device and explicitly completes it. The real TTY
+service provides bounded canonical input, interrupt-driven output, strict
+request identifiers, explicit completion collection, and exact-direction
+VFS grants. A five-service QEMU gate injects serial input only after an exact
+TTY marker and proves canonical erase/CR handling, checked grants, retained
+claim/completion evidence, physical UART drain, and clean shutdown. This
+completes the Step 11 boundary; production VFS descriptors, RAMFS, init, and
+shell integration remain later steps.
 
 ## v0.1 completion goal
 

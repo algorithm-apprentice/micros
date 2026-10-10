@@ -6,6 +6,7 @@
 
 #include "lib/runtime/raw_syscall.h"
 #include "micros/bootstrap_control.h"
+#include "tests/qemu/bootstrap_launcher_control.h"
 #include "tests/qemu/bootstrap_protocol.h"
 
 volatile struct micros_bootstrap_service_config
@@ -29,6 +30,17 @@ static uint32_t read_u32_le(const uint8_t *bytes)
         | (uint32_t)bytes[2] << 16
         | (uint32_t)bytes[3] << 24
     );
+}
+
+static uint64_t read_u64_le(const uint8_t *bytes)
+{
+    uint64_t value = 0;
+    size_t index;
+
+    for (index = 0; index < 8; ++index) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
 }
 
 static bool bytes_are_zero(const void *storage, size_t size)
@@ -77,6 +89,23 @@ static bool names_equal(
         }
     }
     return true;
+}
+
+static bool console_mapped_notification_is_canonical(
+    const struct micros_ipc_message *message
+)
+{
+    return (
+        message->source == MICROS_ENDPOINT_NONE
+        && message->type == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+        && message->reply_token == 0
+        && read_u64_le(&message->payload[0])
+            == MICROS_KERNEL_EVENT_CONSOLE_MAPPED
+        && bytes_are_zero(
+            &message->payload[8],
+            sizeof(message->payload) - 8
+        )
+    );
 }
 
 static int64_t bootstrap_control(
@@ -532,9 +561,43 @@ void micros_service_main(void)
         uint32_t detail;
         int64_t result;
 
+        if (expected_index < 0) {
+            fail(
+                service_id,
+                MICROS_ENDPOINT_NONE,
+                MICROS_BOOTSTRAP_FAILURE_AUTHORITY,
+                0
+            );
+        }
         if (
-            expected_index < 0
-            || bootstrap_control(
+            (
+                manifest->entries[expected_index].role_flags
+                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+            ) != 0
+        ) {
+            struct micros_ipc_message mapped = {0};
+
+            if (
+                micros_bootstrap_launcher_console_begin(service_id)
+                    != MICROS_SYSCALL_ABI_OK
+                || micros_runtime_receive(
+                    MICROS_ENDPOINT_ANY,
+                    &mapped
+                ) != MICROS_SYSCALL_ABI_OK
+                || !console_mapped_notification_is_canonical(
+                    &mapped
+                )
+            ) {
+                fail(
+                    service_id,
+                    MICROS_ENDPOINT_NONE,
+                    MICROS_BOOTSTRAP_FAILURE_CONSOLE_PROTOCOL,
+                    0
+                );
+            }
+        }
+        if (
+            bootstrap_control(
                 MICROS_BOOTSTRAP_COMMAND_RELEASE,
                 service_id,
                 0,

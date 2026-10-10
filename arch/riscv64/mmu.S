@@ -13,3 +13,12 @@ micros_riscv_activate_sv39:
     csrr a0, satp
     ret
 .size micros_riscv_activate_sv39, . - micros_riscv_activate_sv39
+
+.balign 4
+.globl micros_riscv_publish_page_table
+.type micros_riscv_publish_page_table, @function
+micros_riscv_publish_page_table:
+    fence rw, rw
+    sfence.vma x0, x0
+    ret
+.size micros_riscv_publish_page_table, . - micros_riscv_publish_page_table

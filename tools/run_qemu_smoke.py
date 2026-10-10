@@ -4,9 +4,11 @@ import argparse
 import enum
 import os
 import re
+import selectors
 import shlex
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -226,6 +228,7 @@ class QemuResult:
     output: str
     return_code: Optional[int]
     timed_out: bool
+    serial_input_sent: bool = False
 
 
 def _has_complete_fdt_events(output_lines, require_reservations):
@@ -1382,7 +1385,117 @@ def _decode_output(output):
     return output
 
 
-def run_qemu(command, timeout_seconds):
+def _serial_trigger_observed(output, trigger):
+    output_lines, terminated = _split_output_records(
+        _decode_output(output)
+    )
+    return any(
+        line == trigger and is_terminated
+        for line, is_terminated in zip(output_lines, terminated)
+    )
+
+
+def _run_qemu_with_serial_input(
+    command,
+    timeout_seconds,
+    serial_input_trigger,
+    serial_input,
+):
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=False,
+    )
+    if process.stdin is None or process.stdout is None:
+        raise RuntimeError("failed to open QEMU serial pipes")
+
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    output = bytearray()
+    serial_input_sent = False
+    stdout_open = True
+    deadline = time.monotonic() + timeout_seconds
+
+    try:
+        while process.poll() is None or stdout_open:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                process.kill()
+                trailing_output, _ = process.communicate()
+                if trailing_output:
+                    output.extend(trailing_output)
+                return QemuResult(
+                    output=_decode_output(bytes(output)),
+                    return_code=None,
+                    timed_out=True,
+                    serial_input_sent=serial_input_sent,
+                )
+
+            events = selector.select(remaining)
+            if not events:
+                continue
+            for key, _ in events:
+                chunk = os.read(key.fd, 4096)
+                if not chunk:
+                    selector.unregister(process.stdout)
+                    stdout_open = False
+                    continue
+                output.extend(chunk)
+                if (
+                    not serial_input_sent
+                    and _serial_trigger_observed(
+                        bytes(output),
+                        serial_input_trigger,
+                    )
+                ):
+                    try:
+                        written = process.stdin.write(serial_input)
+                        process.stdin.flush()
+                    except BrokenPipeError:
+                        written = 0
+                    serial_input_sent = written == len(serial_input)
+    finally:
+        selector.close()
+        if process.stdin is not None:
+            try:
+                process.stdin.close()
+            except BrokenPipeError:
+                pass
+        if process.stdout is not None:
+            process.stdout.close()
+
+    return QemuResult(
+        output=_decode_output(bytes(output)),
+        return_code=process.returncode,
+        timed_out=False,
+        serial_input_sent=serial_input_sent,
+    )
+
+
+def run_qemu(
+    command,
+    timeout_seconds,
+    serial_input_trigger=None,
+    serial_input=None,
+):
+    if (serial_input_trigger is None) != (serial_input is None):
+        raise ValueError(
+            "serial input trigger and payload must be provided together"
+        )
+    if serial_input_trigger is not None:
+        if not serial_input_trigger:
+            raise ValueError("serial input trigger must not be empty")
+        if not serial_input:
+            raise ValueError("serial input payload must not be empty")
+        return _run_qemu_with_serial_input(
+            command,
+            timeout_seconds,
+            serial_input_trigger,
+            serial_input,
+        )
+
     try:
         completed = subprocess.run(
             command,
@@ -1504,6 +1617,14 @@ def parse_arguments(argv):
         action="append",
         default=[],
         help="Full-line regex required in the given order; may be repeated",
+    )
+    parser.add_argument(
+        "--serial-input-trigger",
+        help="Exact complete serial line after which input is written once",
+    )
+    parser.add_argument(
+        "--serial-input-hex",
+        help="Hexadecimal serial bytes written after the input trigger",
     )
     parser.add_argument(
         "--expect",
@@ -1681,6 +1802,27 @@ def parse_arguments(argv):
     if any(not memory for memory in arguments.memory):
         parser.error("--memory must not be empty")
     if (
+        arguments.serial_input_trigger is None
+    ) != (
+        arguments.serial_input_hex is None
+    ):
+        parser.error(
+            "--serial-input-trigger and --serial-input-hex "
+            "must be provided together"
+        )
+    arguments.serial_input = None
+    if arguments.serial_input_hex is not None:
+        if not arguments.serial_input_trigger:
+            parser.error("--serial-input-trigger must not be empty")
+        try:
+            arguments.serial_input = bytes.fromhex(
+                arguments.serial_input_hex
+            )
+        except ValueError as error:
+            parser.error(f"invalid --serial-input-hex: {error}")
+        if not arguments.serial_input:
+            parser.error("--serial-input-hex must not be empty")
+    if (
         arguments.expected_frame_allocator_managed_delta is not None
         and (
             len(arguments.memory) != 2
@@ -1788,7 +1930,12 @@ def main(argv=None):
             memory=memory,
         )
         try:
-            result = run_qemu(command, arguments.timeout)
+            result = run_qemu(
+                command,
+                arguments.timeout,
+                serial_input_trigger=arguments.serial_input_trigger,
+                serial_input=arguments.serial_input,
+            )
         except FileNotFoundError:
             print(
                 f"QEMU executable not found: {arguments.qemu}",
@@ -1874,6 +2021,13 @@ def main(argv=None):
             expected_vm_self_fault_ownership=(
                 arguments.vm_self_fault_ownership
             ),
+        )
+        accepted = (
+            accepted
+            and (
+                arguments.serial_input_trigger is None
+                or result.serial_input_sent
+            )
         )
         if not accepted:
             return print_tap_result(

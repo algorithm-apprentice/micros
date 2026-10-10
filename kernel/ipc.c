@@ -164,6 +164,21 @@ static void canonicalize_notification(
     }
 }
 
+bool micros_ipc_thread_has_staged_kernel_notification(
+    const struct micros_thread *thread
+)
+{
+    return (
+        thread != NULL
+        && thread->ipc_delivery_pending
+        && thread->ipc_staged_result == MICROS_IPC_OK
+        && thread->ipc_inbound_message.source
+            == MICROS_ENDPOINT_NONE
+        && thread->ipc_inbound_message.type
+            == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+    );
+}
+
 struct pending_notification_plan {
     bool kernel_origin;
     size_t source_slot;

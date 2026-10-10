@@ -25,6 +25,7 @@ enum {
 #define MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL UINT64_C(0x1)
 #define MICROS_KERNEL_OPERATION_VM_HANDOFF UINT64_C(0x2)
 #define MICROS_KERNEL_OPERATION_PM_CONTROL UINT64_C(0x4)
+#define MICROS_KERNEL_OPERATION_TTY_CONTROL UINT64_C(0x8)
 #define MICROS_BOOTSTRAP_ROLE_CONTROLLER UINT32_C(0x00000001)
 #define MICROS_BOOTSTRAP_ROLE_VM UINT32_C(0x00000002)
 #define MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER UINT32_C(0x00000004)
@@ -37,6 +38,9 @@ enum {
         | MICROS_BOOTSTRAP_ROLE_PM \
     )
 #define MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED UINT64_C(0x1)
+#define MICROS_KERNEL_EVENT_CONSOLE_MAP_REQUEST UINT64_C(0x2)
+#define MICROS_KERNEL_EVENT_CONSOLE_MAPPED UINT64_C(0x4)
+#define MICROS_KERNEL_EVENT_TTY_IRQ UINT64_C(0x8)
 #define MICROS_BOOTSTRAP_MANIFEST_VIEW UINT64_C(0x000000007fffe000)
 #define MICROS_BOOTSTRAP_UART_BASE UINT64_C(0x0000000010000000)
 #define MICROS_BOOTSTRAP_UART_LENGTH UINT64_C(0x0000000000001000)
@@ -158,6 +162,8 @@ enum micros_bootstrap_diagnostic_reason {
     MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
     MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
     MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_MAP_GATE,
+    MICROS_BOOTSTRAP_DIAGNOSTIC_CONSOLE_PROTOCOL,
 };
 
 struct micros_bootstrap_diagnostic {
@@ -252,6 +258,14 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
     uint64_t now
+);
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_release_retaining_deadline(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t deadline
 );
 
 enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(

@@ -93,9 +93,10 @@ its evidence is split at the real authority boundaries:
 - native kernel-transition tests cover the exact TTY tuple and profiles,
   console begin, one-shot operation-12 mapping, the non-managed device-leaf
   exception, managed-memory rejection, operation-14 authority, PLIC source-10
-  claim/in-service/complete state, `SEIE` independence, external-interrupt
-  return, begin-time deadline coverage, failure preservation, and DLAB-safe
-  panic seizure; and
+  claim/in-service/complete state, production syscall commit ordering and
+  failure preservation, cause-9 origin classification, `SEIE` independence,
+  begin-time deadline coverage, DLAB-safe panic seizure, and sealed owner-fault
+  diagnostics that retain the pre-seizure route/source snapshot; and
 - one QEMU component test uses the real launcher, VM, PM, and TTY plus an exact
   test VFS peer. It proves begin before mapping, mapping before release, commit
   before ready, one unextended guest deadline, marker-triggered host input,
@@ -107,7 +108,7 @@ input-ready line. It uses no sleep, preserves the guest-owned readiness
 deadlines and host absolute timeout, and leaves every other QEMU workflow's
 stdin disconnected.
 
-The implementation must expose one stable `test-qemu-tty` workflow. The final
+The implementation exposes one stable `test-qemu-tty` workflow. The final
 marker is emitted by TTY after the probe's grant-backed write, and isolated
 test shutdown occurs only after the UART has physically drained and the
 kernel has validated matching source-10 claim/completion evidence.
@@ -134,15 +135,18 @@ Performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The native validation tiers are `test-unit-fast`, `test-ipc-model`, and the
-complete `test-unit` gate. The implemented QEMU targets are `test-qemu-smoke`,
+The native validation tiers are `test-unit-fast`, `test-ipc-model`,
+`test-tty-model`, and the complete `test-unit` gate. The implemented QEMU
+targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
+`test-qemu-uart-console`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
 `test-qemu-pm-service`,
+`test-qemu-tty`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -161,11 +165,13 @@ the implemented configure, build, and execution gates are:
 ```bash
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
+cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
+cmake --workflow --preset test-qemu-uart-console
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu
@@ -177,6 +183,7 @@ cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
+cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -595,7 +602,16 @@ wake; deferred message copy through a validated user buffer; stable success and
 dead-endpoint `a0` results; retained prevalidated physical chunks with no
 post-timer address-space revalidation; rejection of malformed residual
 non-pending state; timer-before-completion ordering; and exact completion
-clearing.
+clearing. It additionally raises real source-10 UART interrupts while U-mode
+and S-mode are active, proving that user-origin cause 9 captures and returns
+through ordinary scheduler selection while supervisor-origin cause 9 returns
+directly. A third source-10 interrupt from the idle enable window proves
+`IDLE`-to-`KERNEL` accounting and immediate idle-wake selection. The exact
+additional marker is:
+
+```text
+MICROS_TTY_TRAP_TEST_PASS user=cause9-scheduled supervisor=cause9-direct idle=cause9-selected
+```
 The two isolated invalid-context gates require a U-origin timer panic with
 exact diagnostics proving the outgoing or selected context failed before any
 return-plan mutation.
@@ -709,9 +725,35 @@ These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
 - static launcher preparation, reserved endpoint visibility, exact-profile
   release, versioned readiness acknowledgment, internal timeout failure, and
   final authority sealing.
+- UART transmitter drain, interrupt-disable quiescence, ordinary ownership
+  transfer away from the kernel, state-before-delivery PLIC enable, retained
+  source-10 claim ownership, explicit completion, and terminal panic seizure.
 
 Most component tests may run in one test kernel to avoid repeated QEMU startup.
 Tests expected to panic or corrupt their own address space use isolated images.
+
+The isolated UART ownership workflow is:
+
+```text
+cmake --workflow --preset test-qemu-uart-console
+```
+
+It enables the NS16550A interrupt-enable register, executes the production
+console-begin quiesce and ownership transition, proves `IER = 0`, and then
+simulates TTY-side interrupt programming while ownership remains with TTY. It
+publishes the owned/idle route before enabling PLIC source 10 and `sie.SEIE`,
+checks timer and global interrupt state are preserved, triggers a real UART
+THRE interrupt, retains the PLIC claim while the route is in service, and
+requires an explicit completion write before publishing the idle route. It
+finally seizes the terminal through the production panic path. The panic check
+proves supervisor-external delivery and PLIC source 10 are disabled, the
+runtime console and route are both `PANIC`, and the fixed 8N1 divisor is
+restored before reporting success. It accepts only the exact markers:
+
+```text
+MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized
+MICROS_TTY_IRQ_TEST_PASS route=state-before-enable claim=source10 retained=in-service completion=explicit
+```
 
 ## Integration tests
 
@@ -791,12 +833,15 @@ test-qemu-vm-self-fault-sealed
 ```
 
 The running image commits the same handoff and faults before generic VM
-readiness. It requires the exact VM identity, fault registers,
-`ownership=handed-off`, the authoritative `RUNNING+STARTING` service-fault
-record, ordered trap-context panic, and no success marker. The sealed variant
-first completes VM readiness, the real grant exchange, and launcher sealing;
-it then requires `MICROS_PANIC reason=vm-self-fault`, exact trap context, no
-success marker, and no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
+readiness. The fixture first quiesces the UART and transfers ordinary output
+ownership to TTY, so the exact VM self-fault record also proves that fatal
+diagnostics seize panic ownership before their first byte. The workflow
+requires the exact VM identity, fault registers, `ownership=handed-off`, the
+authoritative `RUNNING+STARTING` service-fault record, ordered trap-context
+panic, and no success marker. The sealed variant first completes VM readiness,
+the real grant exchange, and launcher sealing; it then requires
+`MICROS_PANIC reason=vm-self-fault`, exact trap context, no success marker, and
+no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
 
 The PM Step 10 workflow is implemented:
 
@@ -819,6 +864,27 @@ advanced and stale. Only the exact marker is accepted:
 
 ```text
 MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
+```
+
+The TTY Step 11 workflow is implemented:
+
+```text
+test-qemu-tty
+```
+
+It links the production launcher, VM, PM, and TTY service with one exact VFS
+test peer. VM installs only the manifest-bound UART leaf before release, TTY
+commits ownership before readiness, and a deliberately pending transmit
+interrupt proves that readiness retains the claimed source until TTY's exact
+completion. The host sends `micros-ttyx<DEL>-input<CR>` only after the complete
+input-ready line. The VFS peer receives `micros-tty-input<LF>` through a
+write-direction grant and submits the final marker through a read-direction
+grant. The kernel requires matching nonzero source-10 claim/completion counts,
+one retained pre-ready claim, no live grants, a physically drained UART, and
+clean SBI shutdown. Only the exact marker is accepted:
+
+```text
+MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked
 ```
 
 Every blocking scenario has a host-side timeout. A timeout is a test failure

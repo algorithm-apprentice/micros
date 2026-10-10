@@ -71,6 +71,16 @@ enum micros_syscall_abi_result micros_bootstrap_control_decode(
             return MICROS_SYSCALL_ABI_ARGUMENT;
         }
         break;
+    case MICROS_BOOTSTRAP_COMMAND_CONSOLE_BEGIN:
+        if (
+            arguments->a1 != MICROS_TTY_SERVICE_ID
+            || arguments->a2 != 0
+            || arguments->a3 != 0
+            || arguments->a4 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        break;
     default:
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }
@@ -89,7 +99,7 @@ micros_bootstrap_control_validate_failure_detail(
         || request->failure_reason
             < MICROS_BOOTSTRAP_FAILURE_READY_MALFORMED
         || request->failure_reason
-            > MICROS_BOOTSTRAP_FAILURE_READY_ROLE_GATE
+            > MICROS_BOOTSTRAP_FAILURE_CONSOLE_PROTOCOL
     ) {
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }

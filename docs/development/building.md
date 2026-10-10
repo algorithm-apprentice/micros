@@ -287,10 +287,11 @@ Run the fast native development loop with:
 cmake --workflow --preset test-unit-fast
 ```
 
-Run the persistent IPC and endpoint models separately with:
+Run the persistent IPC/endpoint and TTY models separately with:
 
 ```bash
 cmake --workflow --preset test-ipc-model
+cmake --workflow --preset test-tty-model
 ```
 
 The complete native milestone gate remains:
@@ -877,6 +878,34 @@ scheduler, and trap-stack baseline. Only the complete sequence emits:
 ```text
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
+
+## TTY service image validation
+
+Build and validate the standalone real TTY service ELF with:
+
+```bash
+cmake --workflow --preset build-tty-service-image
+```
+
+The workflow cross-compiles the portable request/completion state machine,
+fixed NS16550A backend, operation-14 wrappers, and production service loop. The
+post-link checker enforces the repository's freestanding service-ELF contract.
+
+## TTY service acceptance
+
+Build and run the dependency-closed launcher/VM/PM/TTY/VFS gate with:
+
+```bash
+cmake --workflow --preset test-qemu-tty
+```
+
+The host harness keeps ordinary QEMU workflows disconnected from stdin. For
+this gate only, it waits for the exact complete `MICROS_TTY_INPUT_READY` line
+and writes the configured serial bytes once. The guest proves the one-shot
+UART mapping, console commit before readiness, a retained source-10 claim,
+canonical erase and CR-to-LF processing, checked read/write grants,
+interrupt-driven output, physical UART drain, and matching claim/completion
+counts before clean SBI shutdown. The absolute host timeout is 60 seconds.
 
 ## PM service acceptance
 

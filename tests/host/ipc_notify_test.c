@@ -2632,6 +2632,53 @@ static bool test_seeded_notify_model(void)
     return true;
 }
 
+static bool test_staged_kernel_notification_is_detected(void)
+{
+    const struct micros_thread *destination;
+
+    EXPECT_TRUE(
+        setup_notify_fixture()
+        && micros_thread_resolve(
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            &destination
+        ) == MICROS_KERNEL_OBJECT_OK
+        && !micros_ipc_thread_has_staged_kernel_notification(
+            destination
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_receive(
+            &registry,
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x6100a000)
+        )
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_inject_kernel_notification(
+            &registry,
+            &objects,
+            endpoints[NOTIFY_PROCESS_DESTINATION],
+            UINT64_C(0x0000000000000400)
+        )
+    );
+    EXPECT_TRUE(
+        micros_thread_resolve(
+            &objects,
+            primary_threads[NOTIFY_PROCESS_DESTINATION],
+            &destination
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_thread_has_staged_kernel_notification(
+            destination
+        )
+    );
+    return true;
+}
+
 bool micros_ipc_notify_test_run(void)
 {
     static const struct {
@@ -2653,6 +2700,10 @@ bool micros_ipc_notify_test_run(void)
         {
             "kernel notify prepare commit is retained",
             test_kernel_notify_prepare_commit_is_retained,
+        },
+        {
+            "staged kernel notification is detected",
+            test_staged_kernel_notification_is_detected,
         },
         {
             "kernel notify rejections are atomic",

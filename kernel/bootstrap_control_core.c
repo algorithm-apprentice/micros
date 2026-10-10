@@ -517,13 +517,15 @@ static enum micros_bootstrap_error map_endpoint_error(
     }
 }
 
-enum micros_bootstrap_error micros_bootstrap_control_release(
+static enum micros_bootstrap_error control_release(
     struct micros_bootstrap_control_state *state,
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
     struct micros_hart_handle hart,
     uint32_t service_id,
     uint64_t now,
+    uint64_t retained_deadline,
+    bool retain_deadline,
     bool role_gate_ready
 )
 {
@@ -554,7 +556,8 @@ enum micros_bootstrap_error micros_bootstrap_control_release(
     if (
         (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER)
             != 0
-        && !role_gate_ready
+        ? (!retain_deadline || !role_gate_ready)
+        : retain_deadline
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
@@ -563,11 +566,18 @@ enum micros_bootstrap_error micros_bootstrap_control_release(
         &state->transitions,
         sizeof(transitions)
     );
-    error = micros_bootstrap_runtime_release(
-        &transitions,
-        service_id,
-        now
-    );
+    error = retain_deadline
+        ? micros_bootstrap_runtime_release_retaining_deadline(
+            &transitions,
+            service_id,
+            now,
+            retained_deadline
+        )
+        : micros_bootstrap_runtime_release(
+            &transitions,
+            service_id,
+            now
+        );
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
     }
@@ -625,6 +635,54 @@ enum micros_bootstrap_error micros_bootstrap_control_release(
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_control_release(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint32_t service_id,
+    uint64_t now,
+    bool role_gate_ready
+)
+{
+    return control_release(
+        state,
+        registry,
+        objects,
+        hart,
+        service_id,
+        now,
+        0,
+        false,
+        role_gate_ready
+    );
+}
+
+enum micros_bootstrap_error
+micros_bootstrap_control_release_console(
+    struct micros_bootstrap_control_state *state,
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t retained_deadline,
+    bool role_gate_ready
+)
+{
+    return control_release(
+        state,
+        registry,
+        objects,
+        hart,
+        service_id,
+        now,
+        retained_deadline,
+        true,
+        role_gate_ready
+    );
 }
 
 static void write_u32_le(unsigned char *bytes, uint32_t value)

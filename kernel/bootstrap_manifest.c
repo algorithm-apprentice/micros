@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "micros/sv39.h"
+#include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
 
 static void copy_bytes(void *destination, const void *source, size_t size)
@@ -159,6 +160,7 @@ static bool profile_matches(
     const char *name,
     uint32_t operations,
     uint32_t call_targets,
+    uint32_t notify_targets,
     uint64_t kernel_operations
 )
 {
@@ -168,11 +170,11 @@ static bool profile_matches(
         && profile->operations == operations
         && profile->call_targets == call_targets
         && profile->send_targets == 0
-        && profile->notify_targets == 0
+        && profile->notify_targets == notify_targets
         && profile->kernel_operations == kernel_operations;
 }
 
-static bool stable_pm_profiles_match(
+static bool stable_service_profiles_match(
     const struct micros_privilege_profile *profiles,
     size_t profile_count
 )
@@ -195,6 +197,7 @@ static bool stable_pm_profiles_match(
         MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_REPLY,
         0,
+        0,
         MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
     )
         && profile_matches(
@@ -208,6 +211,7 @@ static bool stable_pm_profiles_match(
             bootstrap_service_operations
                 | MICROS_PRIVILEGE_OPERATION_REPLY,
             launcher_target,
+            0,
             MICROS_KERNEL_OPERATION_VM_HANDOFF
         )
         && profile_matches(
@@ -222,6 +226,7 @@ static bool stable_pm_profiles_match(
                 | MICROS_PRIVILEGE_OPERATION_REPLY
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
             launcher_target,
+            0,
             MICROS_KERNEL_OPERATION_PM_CONTROL
         )
         && profile_matches(
@@ -232,9 +237,12 @@ static bool stable_pm_profiles_match(
             ),
             MICROS_PRIVILEGE_PROFILE_TTY,
             "TTY",
-            bootstrap_service_operations,
+            bootstrap_service_operations
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_NOTIFY,
             launcher_target,
-            0
+            UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
+            MICROS_KERNEL_OPERATION_TTY_CONTROL
         )
         && profile_matches(
             find_profile(
@@ -246,6 +254,7 @@ static bool stable_pm_profiles_match(
             "RAMFS",
             bootstrap_service_operations,
             launcher_target,
+            0,
             0
         )
         && profile_matches(
@@ -257,7 +266,12 @@ static bool stable_pm_profiles_match(
             MICROS_PRIVILEGE_PROFILE_VFS,
             "VFS",
             bootstrap_service_operations,
-            launcher_target,
+            launcher_target
+                | (
+                    UINT32_C(1)
+                    << MICROS_PRIVILEGE_PROFILE_TTY
+                ),
+            0,
             0
         )
         && profile_matches(
@@ -276,6 +290,7 @@ static bool stable_pm_profiles_match(
                 UINT32_C(1)
                 << MICROS_PRIVILEGE_PROFILE_VFS
             ),
+            0,
             0
         );
 }
@@ -377,6 +392,7 @@ static enum micros_bootstrap_error validate_profile_relationships(
     uint32_t installed_profile_targets = 0;
     uint8_t vm_profile_id = 0;
     uint8_t pm_profile_id = 0;
+    uint8_t console_profile_id = 0;
     size_t index;
 
     if (controller == NULL) {
@@ -429,6 +445,15 @@ static enum micros_bootstrap_error validate_profile_relationships(
         ) {
             pm_profile_id = manifest->entries[index].profile_id;
         }
+        if (
+            (
+                manifest->entries[index].role_flags
+                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+            ) != 0
+        ) {
+            console_profile_id =
+                manifest->entries[index].profile_id;
+        }
     }
     if (
         pm_profile_id != 0
@@ -437,7 +462,10 @@ static enum micros_bootstrap_error validate_profile_relationships(
                 != MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
             || vm_profile_id != MICROS_PRIVILEGE_PROFILE_VM
             || pm_profile_id != MICROS_PRIVILEGE_PROFILE_PM
-            || !stable_pm_profiles_match(profiles, profile_count)
+            || !stable_service_profiles_match(
+                profiles,
+                profile_count
+            )
         )
     ) {
         return MICROS_BOOTSTRAP_ERROR_PROFILE;
@@ -452,7 +480,13 @@ static enum micros_bootstrap_error validate_profile_relationships(
                 : (
                     profiles[index].id == pm_profile_id
                     ? MICROS_KERNEL_OPERATION_PM_CONTROL
-                    : 0
+                    : (
+                        pm_profile_id != 0
+                        && profiles[index].id
+                            == MICROS_PRIVILEGE_PROFILE_TTY
+                        ? MICROS_KERNEL_OPERATION_TTY_CONTROL
+                        : 0
+                    )
                 )
             );
 
@@ -474,6 +508,42 @@ static enum micros_bootstrap_error validate_profile_relationships(
                     entry->role_flags
                     & MICROS_BOOTSTRAP_ROLE_CONTROLLER
                 ) == 0
+            ) {
+                return MICROS_BOOTSTRAP_ERROR_PROFILE;
+            }
+            continue;
+        }
+        if (
+            (
+                entry->role_flags
+                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+            ) != 0
+        ) {
+            profile = find_profile(
+                profiles,
+                profile_count,
+                entry->profile_id
+            );
+            if (
+                console_profile_id
+                    != MICROS_PRIVILEGE_PROFILE_TTY
+                || profile == NULL
+                || profile->operations
+                    != (
+                        MICROS_PRIVILEGE_OPERATION_RECEIVE
+                        | MICROS_PRIVILEGE_OPERATION_CALL
+                        | MICROS_PRIVILEGE_OPERATION_REPLY
+                        | MICROS_PRIVILEGE_OPERATION_NOTIFY
+                    )
+                || profile->call_targets != controller_target
+                || profile->send_targets != 0
+                || profile->notify_targets
+                    != (
+                        UINT32_C(1)
+                        << MICROS_PRIVILEGE_PROFILE_VFS
+                    )
+                || profile->kernel_operations
+                    != MICROS_KERNEL_OPERATION_TTY_CONTROL
             ) {
                 return MICROS_BOOTSTRAP_ERROR_PROFILE;
             }
@@ -625,7 +695,8 @@ static enum micros_bootstrap_error validate_entry_shape(
         (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER) != 0
     ) {
         if (
-            entry->device_base != MICROS_BOOTSTRAP_UART_BASE
+            entry->stack_page_count != 1
+            || entry->device_base != MICROS_BOOTSTRAP_UART_BASE
             || entry->device_length != MICROS_BOOTSTRAP_UART_LENGTH
             || entry->irq_source != MICROS_BOOTSTRAP_UART_IRQ
         ) {
@@ -718,11 +789,19 @@ static enum micros_bootstrap_error validate_image_bound(
         return MICROS_BOOTSTRAP_ERROR_RANGE;
     }
     stack_bottom = MICROS_USER_VIRTUAL_END - stack_bytes;
-    maximum_image_end = (
-        entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER
-    )
-        ? MICROS_BOOTSTRAP_MANIFEST_VIEW
-        : stack_bottom;
+    if (
+        (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER)
+        != 0
+    ) {
+        maximum_image_end = MICROS_BOOTSTRAP_MANIFEST_VIEW;
+    } else if (
+        (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER)
+        != 0
+    ) {
+        maximum_image_end = MICROS_TTY_UART_VIRTUAL_BASE;
+    } else {
+        maximum_image_end = stack_bottom;
+    }
     if (
         image->image_end > maximum_image_end
         || image->config_address < MICROS_USER_VIRTUAL_BASE
@@ -773,6 +852,9 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
     const struct micros_bootstrap_manifest_entry *pm_entry = NULL;
     const struct micros_bootstrap_manifest_entry *pm_identity_entry =
         NULL;
+    const struct micros_bootstrap_manifest_entry *console_entry = NULL;
+    const struct micros_bootstrap_manifest_entry
+        *console_identity_entry = NULL;
     size_t index;
     enum micros_bootstrap_error error;
 
@@ -1017,6 +1099,15 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         ) {
             pm_identity_entry = entry;
         }
+        if (
+            entry->service_id == MICROS_TTY_SERVICE_ID
+            && entry->process_slot == MICROS_TTY_PROCESS_SLOT
+            && entry->profile_id == MICROS_PRIVILEGE_PROFILE_TTY
+            && fixed_name_matches_literal(entry->service_name, "tty")
+            && fixed_name_matches_literal(entry->profile_name, "TTY")
+        ) {
+            console_identity_entry = entry;
+        }
         if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER) {
             candidate.controller_service_id = entry->service_id;
             controller_profile_id = entry->profile_id;
@@ -1026,6 +1117,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         }
         if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER) {
             candidate.console_service_id = entry->service_id;
+            console_entry = entry;
         }
         if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) {
             candidate.pm_service_id = entry->service_id;
@@ -1057,6 +1149,43 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
             aggregate_error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             0,
+            0
+        );
+    }
+    if (
+        (console_entry == NULL && console_identity_entry != NULL)
+        || (
+            console_entry != NULL
+            && (
+                pm_entry == NULL
+                || console_entry->service_id
+                    != MICROS_TTY_SERVICE_ID
+                || console_entry->process_slot
+                    != MICROS_TTY_PROCESS_SLOT
+                || console_entry->profile_id
+                    != MICROS_PRIVILEGE_PROFILE_TTY
+                || !fixed_name_matches_literal(
+                    console_entry->service_name,
+                    "tty"
+                )
+                || !fixed_name_matches_literal(
+                    console_entry->profile_name,
+                    "TTY"
+                )
+                || console_entry->prerequisites
+                    != (
+                        UINT64_C(1)
+                        << (candidate.pm_service_id - 1)
+                    )
+            )
+        )
+    ) {
+        RETURN_DIAGNOSTIC(
+            MICROS_BOOTSTRAP_ERROR_ROLE,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+            console_entry != NULL
+                ? console_entry->service_id
+                : MICROS_TTY_SERVICE_ID,
             0
         );
     }
@@ -1332,10 +1461,12 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
     return MICROS_BOOTSTRAP_OK;
 }
 
-enum micros_bootstrap_error micros_bootstrap_runtime_release(
+static enum micros_bootstrap_error runtime_release(
     struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
-    uint64_t now
+    uint64_t now,
+    uint64_t retained_deadline,
+    bool retain_deadline
 )
 {
     struct micros_bootstrap_runtime candidate;
@@ -1384,9 +1515,15 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     if ((entry->prerequisites & ~ready_ids) != 0) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    if (
-        entry->ready_timeout_counter_ticks == 0
-        || UINT64_MAX - now < entry->ready_timeout_counter_ticks
+    if (entry->ready_timeout_counter_ticks == 0) {
+        return MICROS_BOOTSTRAP_ERROR_RANGE;
+    }
+    if (retain_deadline) {
+        if (retained_deadline == 0 || now >= retained_deadline) {
+            return MICROS_BOOTSTRAP_ERROR_STATE;
+        }
+    } else if (
+        UINT64_MAX - now < entry->ready_timeout_counter_ticks
     ) {
         return MICROS_BOOTSTRAP_ERROR_RANGE;
     }
@@ -1394,11 +1531,38 @@ enum micros_bootstrap_error micros_bootstrap_runtime_release(
     entry->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
     entry->scheduler_assigned = true;
     entry->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
-    entry->ready_deadline = now
-        + entry->ready_timeout_counter_ticks;
+    entry->ready_deadline = retain_deadline
+        ? retained_deadline
+        : now + entry->ready_timeout_counter_ticks;
     candidate.starting_service_id = service_id;
     copy_bytes(runtime, &candidate, sizeof(*runtime));
     return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_runtime_release(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now
+)
+{
+    return runtime_release(runtime, service_id, now, 0, false);
+}
+
+enum micros_bootstrap_error
+micros_bootstrap_runtime_release_retaining_deadline(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t deadline
+)
+{
+    return runtime_release(
+        runtime,
+        service_id,
+        now,
+        deadline,
+        true
+    );
 }
 
 enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(

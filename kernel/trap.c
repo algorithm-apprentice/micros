@@ -10,6 +10,10 @@
 #include "kernel/ipc_ecall_test.h"
 #endif
 #include "kernel/syscall.h"
+#include "kernel/trap_route_core.h"
+#include "kernel/tty_fault.h"
+#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty_interrupt.h"
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
 #endif
@@ -23,6 +27,9 @@
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
+#endif
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
 #include "kernel/ipc_syscall_test.h"
@@ -55,7 +62,6 @@ enum {
     MICROS_EXCEPTION_INSTRUCTION_PAGE_FAULT = 12,
     MICROS_EXCEPTION_LOAD_PAGE_FAULT = 13,
     MICROS_EXCEPTION_STORE_PAGE_FAULT = 15,
-    MICROS_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
 extern unsigned char __trap_stack_bottom[];
@@ -77,7 +83,10 @@ static void fail_active_bootstrap_service_trap(
 
     if (
         state == NULL
-        || state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
+        || (
+            state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
+            && state->phase != MICROS_BOOTSTRAP_PHASE_SEALED
+        )
         || micros_hart_current_thread(
             micros_kernel_object_runtime_registry(),
             micros_kernel_object_runtime_boot_hart_handle(),
@@ -92,15 +101,47 @@ static void fail_active_bootstrap_service_trap(
             && state->bindings[index].thread.generation
                 == current.generation
         ) {
-            micros_bootstrap_runtime_fail(
-                MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
-                state->bindings[index].service_id,
-                state->bindings[index].endpoint,
-                0
-            );
+            if (state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING) {
+                micros_bootstrap_runtime_fail(
+                    MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
+                    state->bindings[index].service_id,
+                    state->bindings[index].endpoint,
+                    0
+                );
+            }
+            if (
+                state->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+                && state->bindings[index].service_id
+                    == MICROS_TTY_SERVICE_ID
+            ) {
+                micros_tty_owner_fault_record();
+            }
+            return;
         }
     }
     (void)hart;
+}
+
+static void record_tty_owner_failure(void)
+{
+    const struct micros_bootstrap_control_state *bootstrap =
+        micros_bootstrap_runtime_state();
+    const struct micros_tty_handoff_runtime_state *state =
+        micros_tty_handoff_runtime_state();
+
+    if (
+        bootstrap != NULL
+        && bootstrap->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+        && state != NULL
+    ) {
+        micros_bootstrap_runtime_fail(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_SERVICE_FAULT,
+            state->service_id,
+            state->endpoint,
+            0
+        );
+    }
+    micros_tty_owner_fault_record();
 }
 
 static bool handle_vm_self_fault(
@@ -197,6 +238,7 @@ static bool handle_vm_self_fault(
             frame
         );
     }
+    micros_panic_seize();
     uart_write("MICROS_VM_SELF_FAULT service=");
     uart_write_hex64(handoff->service_id);
     uart_write(" process-slot=");
@@ -604,6 +646,7 @@ static bool trap_panic_test_has_expected_exception(
 void micros_trap_dispatch(struct micros_trap_frame *frame)
 {
     struct micros_hart *hart = resolve_trap_hart(frame);
+    enum micros_trap_interrupt_route interrupt_route;
     uint64_t cause_code;
 
     if (hart == NULL) {
@@ -619,12 +662,16 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
         );
     }
     cause_code = frame->scause & MICROS_SCAUSE_CODE_MASK;
+    interrupt_route = micros_trap_interrupt_route_classify(
+        (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0,
+        frame->scause
+    );
 
     if ((frame->sstatus & MICROS_RISCV_SSTATUS_SPP) == 0) {
-        bool user_timer = (
-            (frame->scause & MICROS_SCAUSE_INTERRUPT) != 0
-            && cause_code == MICROS_INTERRUPT_SUPERVISOR_TIMER
-        );
+        bool user_timer =
+            interrupt_route == MICROS_TRAP_INTERRUPT_USER_TIMER;
+        bool user_external =
+            interrupt_route == MICROS_TRAP_INTERRUPT_USER_EXTERNAL;
 
         if (
             micros_scheduler_user_trap_enter(hart, frame)
@@ -661,10 +708,26 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
         }
         if (
             !user_timer
+            && !user_external
             && cause_code != MICROS_EXCEPTION_USER_ECALL
         ) {
             (void)handle_vm_self_fault(hart, frame, cause_code);
             fail_active_bootstrap_service_trap(hart);
+        }
+        if (user_external) {
+            (void)micros_tty_interrupt_dispatch(hart, frame);
+            if (
+                micros_scheduler_select_user_return(hart, frame)
+                    != MICROS_SCHEDULER_OK
+            ) {
+                record_tty_owner_failure();
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "scheduler-external-return",
+                    frame
+                );
+            }
+            return;
         }
         if (user_timer) {
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
@@ -738,6 +801,14 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             && cause_code != MICROS_EXCEPTION_USER_ECALL
         ) {
             micros_pm_service_test_handle_trap(hart, frame);
+        }
+#endif
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+        if (
+            !user_timer
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            micros_tty_service_test_handle_trap(hart, frame);
         }
 #endif
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST
@@ -1049,6 +1120,11 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                         0
                     );
                 }
+                if (
+                    frame->a7 == MICROS_SYSCALL_ABI_TTY_CONTROL
+                ) {
+                    record_tty_owner_failure();
+                }
                 MICROS_TRAP_PANIC(
                     hart->hardware_id,
                     "ipc-syscall-return",
@@ -1301,7 +1377,28 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
 #endif
 
     if ((frame->scause & MICROS_SCAUSE_INTERRUPT) != 0) {
-        if (cause_code == MICROS_INTERRUPT_SUPERVISOR_TIMER) {
+        if (
+            interrupt_route
+                == MICROS_TRAP_INTERRUPT_SUPERVISOR_EXTERNAL
+        ) {
+            if (
+                micros_scheduler_enter_supervisor_interrupt(hart)
+                    != MICROS_SCHEDULER_OK
+            ) {
+                record_tty_owner_failure();
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "scheduler-external-entry",
+                    frame
+                );
+            }
+            (void)micros_tty_interrupt_dispatch(hart, frame);
+            return;
+        }
+        if (
+            interrupt_route
+                == MICROS_TRAP_INTERRUPT_SUPERVISOR_TIMER
+        ) {
             if (micros_scheduler_is_initialized()) {
                 handle_scheduler_timer_error(
                     hart,

@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
+#include "tty_handoff_runtime.h"
+#include "user_address_space_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
@@ -36,12 +38,14 @@ static enum micros_grant_error plan_range(
     uintptr_t address,
     size_t length,
     uint32_t required_permission,
+    const struct micros_tty_device_authority *device_authority,
     struct micros_grant_copy_range_plan *plan
 )
 {
     struct micros_grant_copy_range_plan candidate = {0};
     uintptr_t current = address;
     size_t remaining = length;
+    bool device_fault = false;
 
     while (remaining != 0) {
         uint64_t physical_address;
@@ -50,6 +54,45 @@ static enum micros_grant_error plan_range(
         size_t chunk_length;
         enum micros_user_address_space_error address_error;
 
+        if (
+            device_authority != NULL
+            && micros_tty_device_range_intersects(
+                device_authority,
+                process,
+                current,
+                1
+            )
+        ) {
+            address_error =
+                micros_user_address_space_validate_tty_uart_mapping(
+                    process,
+                    device_authority->root_physical_address
+                );
+            if (
+                address_error
+                    == MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+            ) {
+                return MICROS_GRANT_ERROR_PHASE;
+            }
+            if (
+                address_error
+                    != MICROS_USER_ADDRESS_SPACE_OK
+            ) {
+                return MICROS_GRANT_ERROR_INVARIANT;
+            }
+            chunk_length =
+                (
+                    (uintptr_t)MICROS_TTY_UART_VIRTUAL_BASE
+                    + MICROS_TTY_UART_MAPPED_LENGTH
+                ) - current;
+            if (chunk_length > remaining) {
+                chunk_length = remaining;
+            }
+            current += chunk_length;
+            remaining -= chunk_length;
+            device_fault = true;
+            continue;
+        }
         if (candidate.chunk_count >= 2) {
             return MICROS_GRANT_ERROR_INVARIANT;
         }
@@ -78,6 +121,9 @@ static enum micros_grant_error plan_range(
         current += chunk_length;
         remaining -= chunk_length;
     }
+    if (device_fault) {
+        return MICROS_GRANT_ERROR_FAULT;
+    }
     *plan = candidate;
     return MICROS_GRANT_OK;
 }
@@ -99,11 +145,13 @@ static enum micros_grant_error copy_grant(
     struct micros_grant_copy_authority authority;
     struct micros_grant_copy_range_plan remote_plan = {0};
     struct micros_grant_copy_range_plan local_plan = {0};
+    struct micros_tty_device_authority device_authority;
     const struct micros_grant_copy_range_plan *source_plan;
     const struct micros_grant_copy_range_plan *destination_plan;
     enum micros_grant_error remote_error;
     enum micros_grant_error local_error;
     enum micros_grant_error error;
+    enum micros_tty_device_authority_status device_status;
     uintptr_t saved_status;
 
     if (
@@ -168,6 +216,19 @@ static enum micros_grant_error copy_grant(
         error = MICROS_GRANT_OK;
         goto done;
     }
+    device_status =
+        micros_tty_handoff_runtime_device_authority(
+            endpoint_registry,
+            objects,
+            &device_authority
+        );
+    if (
+        device_status
+            == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+    ) {
+        error = MICROS_GRANT_ERROR_INVARIANT;
+        goto done;
+    }
 
     remote_error = plan_range(
         authority.grantor,
@@ -176,6 +237,9 @@ static enum micros_grant_error copy_grant(
         required_permission == MICROS_GRANT_PERMISSION_READ
             ? MICROS_SV39_PERMISSION_READ
             : MICROS_SV39_PERMISSION_WRITE,
+        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &device_authority
+            : NULL,
         &remote_plan
     );
     local_error = plan_range(
@@ -185,6 +249,9 @@ static enum micros_grant_error copy_grant(
         required_permission == MICROS_GRANT_PERMISSION_READ
             ? MICROS_SV39_PERMISSION_WRITE
             : MICROS_SV39_PERMISSION_READ,
+        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &device_authority
+            : NULL,
         &local_plan
     );
     if (

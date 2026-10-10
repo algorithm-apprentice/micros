@@ -6,8 +6,11 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
+#include "kernel/tty_handoff_runtime.h"
+#include "kernel/user_address_space_internal.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership_runtime.h"
+#include "micros/ipc_runtime.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -466,6 +469,115 @@ static enum micros_user_address_space_error decode_pte(
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
+static enum micros_user_address_space_error
+load_tty_device_authority(
+    bool *active,
+    struct micros_tty_device_authority *authority
+)
+{
+    const struct micros_endpoint_registry *registry =
+        micros_ipc_runtime_registry();
+    const struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_registry();
+    enum micros_tty_device_authority_status status;
+
+    if (active == NULL || authority == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    *active = false;
+    status = micros_tty_handoff_runtime_device_authority(
+        registry,
+        objects,
+        authority
+    );
+    if (status == MICROS_TTY_DEVICE_AUTHORITY_NONE) {
+        return MICROS_USER_ADDRESS_SPACE_OK;
+    }
+    if (status != MICROS_TTY_DEVICE_AUTHORITY_ACTIVE) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    *active = true;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error
+classify_tty_device_leaf(
+    bool authority_active,
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf,
+    bool *is_device
+)
+{
+    enum micros_tty_device_leaf_class classification;
+
+    if (leaf == NULL || is_device == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    *is_device = false;
+    if (!authority_active) {
+        return MICROS_USER_ADDRESS_SPACE_OK;
+    }
+    if (
+        micros_tty_device_leaf_classify(
+            authority,
+            process,
+            root_physical_address,
+            virtual_address,
+            leaf->physical_address,
+            leaf->permissions,
+            &classification
+        ) != MICROS_TTY_HANDOFF_OK
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    if (classification == MICROS_TTY_DEVICE_LEAF_INVALID) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    *is_device = classification == MICROS_TTY_DEVICE_LEAF_EXACT;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error
+reject_tty_device_leaf(
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf
+)
+{
+    struct micros_tty_device_authority authority;
+    enum micros_user_address_space_error error;
+    bool authority_active;
+    bool is_device;
+
+    error = load_tty_device_authority(
+        &authority_active,
+        &authority
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = classify_tty_device_leaf(
+        authority_active,
+        &authority,
+        process,
+        root_physical_address,
+        virtual_address
+            - virtual_address % MICROS_SV39_PAGE_SIZE,
+        leaf,
+        &is_device
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    return is_device
+        ? MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        : MICROS_USER_ADDRESS_SPACE_OK;
+}
+
 static enum micros_user_address_space_error validate_locked(
     struct micros_process_handle process,
     const struct micros_process **resolved_process
@@ -478,10 +590,13 @@ static enum micros_user_address_space_error validate_locked(
     const struct user_page_table *kernel_root;
     const struct user_page_table *root;
     struct micros_sv39_decoded_pte root_entry;
+    struct micros_tty_device_authority device_authority;
     enum micros_frame_owner_kind leaf_owner_kind;
     enum micros_user_address_space_error error;
     size_t root_index;
     uint64_t frame_index;
+    bool device_authority_active;
+    bool device_leaf_found = false;
 
     clear_bitmap(reachable_bitmap);
     error = require_read_authority(
@@ -489,6 +604,13 @@ static enum micros_user_address_space_error validate_locked(
         &objects,
         &kernel_report,
         &leaf_owner_kind
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = load_tty_device_authority(
+        &device_authority_active,
+        &device_authority
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
@@ -599,6 +721,8 @@ static enum micros_user_address_space_error validate_locked(
                     ++leaf_index
                 ) {
                     struct micros_sv39_decoded_pte leaf_entry;
+                    uint64_t virtual_address;
+                    bool is_device;
 
                     error = decode_pte(
                         leaf->entries[leaf_index],
@@ -620,6 +744,34 @@ static enum micros_user_address_space_error validate_locked(
                     ) {
                         return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
                     }
+                    virtual_address =
+                        MICROS_USER_VIRTUAL_BASE
+                        + (
+                            (
+                                (uint64_t)middle_index
+                                * MICROS_SV39_TABLE_ENTRY_COUNT
+                            ) + leaf_index
+                        ) * MICROS_SV39_PAGE_SIZE;
+                    error = classify_tty_device_leaf(
+                        device_authority_active,
+                        &device_authority,
+                        process,
+                        resolved->address_space_root,
+                        virtual_address,
+                        &leaf_entry,
+                        &is_device
+                    );
+                    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+                        return error;
+                    }
+                    if (is_device) {
+                        if (device_leaf_found) {
+                            return
+                                MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+                        }
+                        device_leaf_found = true;
+                        continue;
+                    }
                     error = mark_owned_frame(
                         ledger,
                         leaf_entry.physical_address,
@@ -634,6 +786,17 @@ static enum micros_user_address_space_error validate_locked(
         }
     }
 
+    if (
+        device_authority_active
+        && micros_tty_device_leaf_required(
+            &device_authority,
+            process,
+            resolved->address_space_root
+        )
+        && !device_leaf_found
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
     for (
         frame_index = 0;
         frame_index < ledger->managed_frame_count;
@@ -672,6 +835,7 @@ static enum micros_user_address_space_error validate_locked(
 
 static enum micros_user_address_space_error
 visit_user_mappings_locked(
+    struct micros_process_handle process_handle,
     const struct micros_process *process,
     micros_user_mapping_visitor visitor,
     void *context,
@@ -681,8 +845,18 @@ visit_user_mappings_locked(
     const struct user_page_table *root =
         table_at(process->address_space_root);
     struct micros_sv39_decoded_pte root_entry;
+    struct micros_tty_device_authority device_authority;
     size_t count = 0;
     enum micros_user_address_space_error error;
+    bool device_authority_active;
+
+    error = load_tty_device_authority(
+        &device_authority_active,
+        &device_authority
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
 
     error = decode_pte(
         root->entries[USER_ROOT_INDEX],
@@ -735,6 +909,7 @@ visit_user_mappings_locked(
                 ) {
                     struct micros_sv39_decoded_pte leaf_entry;
                     uint64_t virtual_address;
+                    bool is_device;
 
                     error = decode_pte(
                         leaf->entries[leaf_index],
@@ -767,6 +942,21 @@ visit_user_mappings_locked(
                                 * MICROS_SV39_TABLE_ENTRY_COUNT
                             ) + leaf_index
                         ) * MICROS_SV39_PAGE_SIZE;
+                    error = classify_tty_device_leaf(
+                        device_authority_active,
+                        &device_authority,
+                        process_handle,
+                        process->address_space_root,
+                        virtual_address,
+                        &leaf_entry,
+                        &is_device
+                    );
+                    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+                        return error;
+                    }
+                    if (is_device) {
+                        continue;
+                    }
                     if (
                         !visitor(
                             context,
@@ -1338,9 +1528,17 @@ micros_user_address_space_lookup(
         NULL
     );
     if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-        *physical_address = leaf_entry.physical_address;
-        *permissions = leaf_entry.permissions
-            & ~MICROS_SV39_PERMISSION_USER;
+        error = reject_tty_device_leaf(
+            process,
+            resolved->address_space_root,
+            virtual_address,
+            &leaf_entry
+        );
+        if (error == MICROS_USER_ADDRESS_SPACE_OK) {
+            *physical_address = leaf_entry.physical_address;
+            *permissions = leaf_entry.permissions
+                & ~MICROS_SV39_PERMISSION_USER;
+        }
     }
 
 done_with_scratch:
@@ -1412,12 +1610,21 @@ micros_user_address_space_translate(
         NULL
     );
     if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-        offset = user_address % MICROS_SV39_PAGE_SIZE;
-        *physical_address = leaf_entry.physical_address + offset;
-        *permissions =
-            leaf_entry.permissions & ~MICROS_SV39_PERMISSION_USER;
-        *contiguous_bytes =
-            (size_t)(MICROS_SV39_PAGE_SIZE - offset);
+        error = reject_tty_device_leaf(
+            process,
+            resolved->address_space_root,
+            user_address,
+            &leaf_entry
+        );
+        if (error == MICROS_USER_ADDRESS_SPACE_OK) {
+            offset = user_address % MICROS_SV39_PAGE_SIZE;
+            *physical_address = leaf_entry.physical_address + offset;
+            *permissions =
+                leaf_entry.permissions
+                & ~MICROS_SV39_PERMISSION_USER;
+            *contiguous_bytes =
+                (size_t)(MICROS_SV39_PAGE_SIZE - offset);
+        }
     }
 
 done_with_scratch:
@@ -1476,6 +1683,7 @@ micros_user_address_space_inventory(
         goto done_with_scratch;
     }
     error = visit_user_mappings_locked(
+        process,
         resolved,
         visitor,
         context,
@@ -2069,6 +2277,316 @@ micros_user_address_space_complete_wired_handoff(void)
 done_with_scratch:
     release_scratch();
 done:
+    (void)kernel_report;
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_prepare_tty_uart_mapping(
+    struct micros_process_handle process,
+    uint64_t expected_root_physical_address,
+    struct micros_user_address_space_tty_uart_plan *plan
+)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    struct micros_user_address_space_tty_uart_plan candidate = {0};
+    struct micros_sv39_decoded_pte root_entry;
+    struct micros_sv39_decoded_pte middle_entry;
+    struct micros_sv39_decoded_pte leaf_entry;
+    struct micros_frame_owner ignored_owner;
+    struct user_page_table *root;
+    struct user_page_table *middle;
+    struct user_page_table *leaf;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_user_address_space_error error;
+    uint64_t leaf_pte;
+    uint16_t root_index;
+    uint16_t middle_index;
+    uint16_t leaf_index;
+    uintptr_t saved_status;
+
+    if (
+        plan == NULL
+        || expected_root_physical_address == 0
+        || expected_root_physical_address
+            % MICROS_SV39_PAGE_SIZE != 0
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = riscv_irq_save();
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (
+        ledger->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
+        goto done;
+    }
+    error = resolve_process_with_root(objects, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (
+        resolved->address_space_root
+            != expected_root_physical_address
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    if (!acquire_scratch()) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+        goto done;
+    }
+    error = validate_locked(process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    if (active_root() == resolved->address_space_root) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done_with_scratch;
+    }
+    if (
+        micros_sv39_vpn_index(
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            2,
+            &root_index
+        ) != MICROS_SV39_OK
+        || root_index != USER_ROOT_INDEX
+        || micros_sv39_vpn_index(
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            1,
+            &middle_index
+        ) != MICROS_SV39_OK
+        || micros_sv39_vpn_index(
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            0,
+            &leaf_index
+        ) != MICROS_SV39_OK
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done_with_scratch;
+    }
+    root = table_at(resolved->address_space_root);
+    error = decode_pte(root->entries[root_index], &root_entry);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    if (root_entry.kind == MICROS_SV39_PTE_ABSENT) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
+        goto done_with_scratch;
+    }
+    if (root_entry.kind != MICROS_SV39_PTE_TABLE) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        goto done_with_scratch;
+    }
+    middle = table_at(root_entry.physical_address);
+    error = decode_pte(
+        middle->entries[middle_index],
+        &middle_entry
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    if (middle_entry.kind == MICROS_SV39_PTE_ABSENT) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
+        goto done_with_scratch;
+    }
+    if (middle_entry.kind != MICROS_SV39_PTE_TABLE) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        goto done_with_scratch;
+    }
+    leaf = table_at(middle_entry.physical_address);
+    error = decode_pte(leaf->entries[leaf_index], &leaf_entry);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    if (leaf_entry.kind != MICROS_SV39_PTE_ABSENT) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT;
+        goto done_with_scratch;
+    }
+    ownership_error = micros_frame_ownership_lookup(
+        ledger,
+        MICROS_TTY_UART_PHYSICAL_BASE,
+        &ignored_owner
+    );
+    if (
+        ownership_error
+            != MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED
+    ) {
+        error = ownership_error == MICROS_FRAME_OWNERSHIP_OK
+            ? MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+            : MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done_with_scratch;
+    }
+    if (
+        micros_sv39_make_leaf_pte(
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE
+                | MICROS_SV39_PERMISSION_USER,
+            &leaf_pte
+        ) != MICROS_SV39_OK
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        goto done_with_scratch;
+    }
+    candidate.active = true;
+    candidate.leaf_index = leaf_index;
+    candidate.process = process;
+    candidate.root_physical_address =
+        resolved->address_space_root;
+    candidate.leaf_table_physical_address =
+        middle_entry.physical_address;
+    candidate.leaf_pte = leaf_pte;
+    *plan = candidate;
+    error = MICROS_USER_ADDRESS_SPACE_OK;
+
+done_with_scratch:
+    release_scratch();
+done:
+    (void)kernel_report;
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+void micros_user_address_space_commit_tty_uart_mapping(
+    struct micros_user_address_space_tty_uart_plan *plan
+)
+{
+    struct user_page_table *leaf;
+
+    if (
+        plan == NULL
+        || !plan->active
+        || plan->process.slot >= MICROS_PROCESS_CAPACITY
+        || plan->process.generation == 0
+        || plan->root_physical_address == 0
+        || plan->leaf_table_physical_address == 0
+        || plan->leaf_index >= MICROS_SV39_TABLE_ENTRY_COUNT
+        || plan->leaf_pte == 0
+    ) {
+        panic_invariant("tty-uart-map-commit-plan");
+    }
+    leaf = table_at(plan->leaf_table_physical_address);
+    if (leaf->entries[plan->leaf_index] != 0) {
+        panic_invariant("tty-uart-map-commit-conflict");
+    }
+    leaf->entries[plan->leaf_index] = plan->leaf_pte;
+    micros_riscv_publish_page_table();
+    *plan = (struct micros_user_address_space_tty_uart_plan){0};
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_validate_tty_uart_mapping(
+    struct micros_process_handle process,
+    uint64_t expected_root_physical_address
+)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    struct micros_tty_device_authority authority;
+    struct micros_sv39_decoded_pte leaf_entry;
+    enum micros_user_address_space_error error;
+    bool authority_active;
+    bool is_device;
+    uintptr_t saved_status;
+
+    if (
+        expected_root_physical_address == 0
+        || expected_root_physical_address
+            % MICROS_SV39_PAGE_SIZE != 0
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = riscv_irq_save();
+    error = require_read_authority(
+        &ledger,
+        &objects,
+        &kernel_report,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process_with_root(objects, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (
+        resolved->address_space_root
+            != expected_root_physical_address
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    if (!acquire_scratch()) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+        goto done;
+    }
+    error = validate_locked(process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    error = load_tty_device_authority(
+        &authority_active,
+        &authority
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    if (
+        !authority_active
+        || !micros_tty_device_leaf_required(
+            &authority,
+            process,
+            resolved->address_space_root
+        )
+    ) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done_with_scratch;
+    }
+    error = lookup_leaf_locked(
+        resolved,
+        MICROS_TTY_UART_VIRTUAL_BASE,
+        &leaf_entry,
+        NULL,
+        NULL,
+        NULL
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done_with_scratch;
+    }
+    error = classify_tty_device_leaf(
+        true,
+        &authority,
+        process,
+        resolved->address_space_root,
+        MICROS_TTY_UART_VIRTUAL_BASE,
+        &leaf_entry,
+        &is_device
+    );
+    if (error == MICROS_USER_ADDRESS_SPACE_OK && !is_device) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+
+done_with_scratch:
+    release_scratch();
+done:
+    (void)ledger;
     (void)kernel_report;
     riscv_irq_restore(saved_status);
     return error;

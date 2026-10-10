@@ -100,6 +100,7 @@ Then run:
 ```bash
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
+cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
@@ -115,6 +116,7 @@ cmake --workflow --preset test-qemu-grant-syscall
 cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
+cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed
@@ -165,6 +167,11 @@ It proves VM handoff before PM readiness, stable malformed and unmanaged-caller
 protocol results without lifecycle-table mutation, one exact bootstrap-sealed
 kernel event, and a real PM-only reserve/abort transaction with no leaked
 process resources and consumed generation and transaction identities.
+The TTY service gate starts the real launcher, VM, PM, and TTY with an exact
+test VFS peer. It proves the one-shot UART mapping and two-phase console
+handoff, retained source-10 claim through TTY completion, marker-triggered
+canonical input, checked-grant reads and writes, interrupt-driven output,
+physical UART drain, and clean SBI shutdown.
 The early-VM-readiness gate proves that a VM readiness call before operation
 12 emits the exact `ready-role-gate` bootstrap failure for the bound VM
 endpoint rather than a generic launcher transition failure.

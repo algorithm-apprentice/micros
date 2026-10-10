@@ -1,4 +1,5 @@
 #include "micros/bootstrap.h"
+#include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
 
 #include <stdbool.h>
@@ -74,6 +75,17 @@ static struct micros_privilege_profile profile(
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_PM_CONTROL;
+        } else if (id == MICROS_PRIVILEGE_PROFILE_TTY) {
+            result.operations |=
+                MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_NOTIFY;
+            result.notify_targets =
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS;
+            result.kernel_operations =
+                MICROS_KERNEL_OPERATION_TTY_CONTROL;
+        } else if (id == MICROS_PRIVILEGE_PROFILE_VFS) {
+            result.call_targets |=
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY;
         }
     }
     return result;
@@ -134,6 +146,7 @@ static bool test_manifest_contract(void)
         && MICROS_BOOTSTRAP_ROLE_PM == UINT32_C(0x8)
         && MICROS_BOOTSTRAP_ROLE_DEFINED_MASK == UINT32_C(0xf)
         && MICROS_KERNEL_OPERATION_PM_CONTROL == UINT64_C(0x4)
+        && MICROS_KERNEL_OPERATION_TTY_CONTROL == UINT64_C(0x8)
         && MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER == 1
         && MICROS_PRIVILEGE_PROFILE_VM == 2
         && MICROS_PRIVILEGE_PROFILE_PM == 3
@@ -162,6 +175,264 @@ static bool test_manifest_contract(void)
         && MICROS_BOOTSTRAP_MANIFEST_VIEW
             == UINT64_C(0x000000007fffe000)
     );
+}
+
+static bool test_tty_service_contract(void)
+{
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_expected_service expected[4] = {0};
+    struct micros_bootstrap_image_info images[4] = {0};
+    struct micros_privilege_profile profiles[7] = {0};
+    struct micros_bootstrap_manifest_plan plan;
+    struct micros_bootstrap_manifest_plan sentinel;
+    size_t index;
+
+    memset(&manifest, 0, sizeof(manifest));
+    manifest.header.magic = MICROS_BOOTSTRAP_MANIFEST_MAGIC;
+    manifest.header.version = MICROS_BOOTSTRAP_MANIFEST_VERSION;
+    manifest.header.header_size =
+        MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE;
+    manifest.header.entry_size =
+        MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE;
+    manifest.header.entry_capacity =
+        MICROS_BOOTSTRAP_SERVICE_CAPACITY;
+    manifest.header.entry_count = 4;
+    manifest.header.total_user_page_limit = 13;
+    manifest.header.manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE;
+
+    for (index = 0; index < 4; ++index) {
+        struct micros_bootstrap_manifest_entry *entry =
+            &manifest.entries[index];
+
+        entry->service_id = (uint32_t)index + 1;
+        entry->image_id = (uint32_t)index + 101;
+        entry->process_slot = (uint16_t)index;
+        entry->stack_page_count = 1;
+        entry->profile_id = (uint8_t)index + 1;
+        entry->ready_timeout_counter_ticks = index == 0 ? 0 : 100;
+        entry->user_page_limit = index == 0 ? 4 : 3;
+        if (index != 0) {
+            entry->prerequisites =
+                UINT64_C(1) << (index - 1);
+        }
+
+        expected[index] =
+            (struct micros_bootstrap_expected_service){
+                .service_id = entry->service_id,
+                .image_id = entry->image_id,
+                .process_slot = entry->process_slot,
+                .profile_id = entry->profile_id,
+                .prerequisites = entry->prerequisites,
+            };
+        images[index] =
+            (struct micros_bootstrap_image_info){
+                .version = MICROS_BOOTSTRAP_IMAGE_VERSION,
+                .image_id = entry->image_id,
+                .entry = MICROS_USER_VIRTUAL_BASE,
+                .config_address =
+                    MICROS_USER_VIRTUAL_BASE + 0x1000,
+                .config_size =
+                    sizeof(struct micros_bootstrap_service_config),
+                .page_count = 2,
+                .image_end = MICROS_USER_VIRTUAL_BASE + 0x2000,
+                .config_initially_zero = true,
+            };
+    }
+
+    set_name(manifest.entries[0].service_name, "bootstrap-launcher");
+    set_name(manifest.entries[0].profile_name, "BOOTSTRAP_LAUNCHER");
+    manifest.entries[0].role_flags = MICROS_BOOTSTRAP_ROLE_CONTROLLER;
+    set_name(expected[0].service_name, "bootstrap-launcher");
+    set_name(expected[0].profile_name, "BOOTSTRAP_LAUNCHER");
+    expected[0].role_flags = MICROS_BOOTSTRAP_ROLE_CONTROLLER;
+
+    set_name(manifest.entries[1].service_name, "vm");
+    set_name(manifest.entries[1].profile_name, "VM");
+    manifest.entries[1].role_flags = MICROS_BOOTSTRAP_ROLE_VM;
+    set_name(expected[1].service_name, "vm");
+    set_name(expected[1].profile_name, "VM");
+    expected[1].role_flags = MICROS_BOOTSTRAP_ROLE_VM;
+    expected[1].call_targets =
+        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+    images[1].vm_boot_info_address =
+        MICROS_USER_VIRTUAL_BASE + 0x2000;
+    images[1].vm_boot_info_size = MICROS_VM_BOOT_INFO_SIZE;
+    images[1].vm_boot_info_initially_zero = true;
+
+    set_name(manifest.entries[2].service_name, "pm");
+    set_name(manifest.entries[2].profile_name, "PM");
+    manifest.entries[2].role_flags = MICROS_BOOTSTRAP_ROLE_PM;
+    set_name(expected[2].service_name, "pm");
+    set_name(expected[2].profile_name, "PM");
+    expected[2].role_flags = MICROS_BOOTSTRAP_ROLE_PM;
+    expected[2].call_targets =
+        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+
+    set_name(manifest.entries[3].service_name, "tty");
+    set_name(manifest.entries[3].profile_name, "TTY");
+    manifest.entries[3].role_flags =
+        MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER;
+    manifest.entries[3].device_base =
+        MICROS_TTY_UART_PHYSICAL_BASE;
+    manifest.entries[3].device_length =
+        MICROS_TTY_UART_MAPPED_LENGTH;
+    manifest.entries[3].irq_source =
+        MICROS_TTY_UART_IRQ_SOURCE;
+    set_name(expected[3].service_name, "tty");
+    set_name(expected[3].profile_name, "TTY");
+    expected[3].role_flags =
+        MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER;
+    expected[3].call_targets =
+        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+    expected[3].device_base =
+        MICROS_TTY_UART_PHYSICAL_BASE;
+    expected[3].device_length =
+        MICROS_TTY_UART_MAPPED_LENGTH;
+    expected[3].irq_source = MICROS_TTY_UART_IRQ_SOURCE;
+
+    profiles[0] = profile(1, "BOOTSTRAP_LAUNCHER");
+    profiles[1] = profile(2, "VM");
+    profiles[2] = profile(3, "PM");
+    profiles[3] = profile(4, "TTY");
+    profiles[4] = profile(5, "RAMFS");
+    profiles[5] = profile(6, "VFS");
+    profiles[6] = profile(7, "APPLICATION");
+
+    EXPECT_TRUE(
+        profiles[3].operations
+            == (
+                MICROS_PRIVILEGE_OPERATION_RECEIVE
+                | MICROS_PRIVILEGE_OPERATION_CALL
+                | MICROS_PRIVILEGE_OPERATION_REPLY
+                | MICROS_PRIVILEGE_OPERATION_NOTIFY
+            )
+        && profiles[3].call_targets
+            == (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            )
+        && profiles[3].notify_targets
+            == (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS
+            )
+        && profiles[3].kernel_operations
+            == MICROS_KERNEL_OPERATION_TTY_CONTROL
+        && profiles[5].call_targets
+            == (
+                (
+                    UINT32_C(1)
+                    << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+                ) | (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+                )
+            )
+        && micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_OK
+        && plan.console_service_id == 4
+        && plan.ordered_service_ids[3] == 4
+    );
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    manifest.entries[3].stack_page_count = 2;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    manifest.entries[3].stack_page_count = 1;
+
+    images[3].image_end = MICROS_TTY_UART_VIRTUAL_BASE + 0x1000;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_IMAGE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    images[3].image_end = MICROS_USER_VIRTUAL_BASE + 0x2000;
+
+    profiles[3].notify_targets = 0;
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[3] = profile(4, "TTY");
+
+    profiles[5].call_targets &=
+        ~(UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY);
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_PROFILE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    profiles[5] = profile(6, "VFS");
+
+    manifest.entries[3].prerequisites = UINT64_C(1);
+    expected[3].prerequisites = UINT64_C(1);
+    plan = sentinel;
+    EXPECT_TRUE(
+        micros_bootstrap_manifest_validate(
+            &manifest,
+            expected,
+            4,
+            images,
+            4,
+            profiles,
+            7,
+            32,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_ROLE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+    );
+    return true;
 }
 
 static bool test_manifest_validation(void)
@@ -1444,6 +1715,75 @@ static bool test_runtime_transitions(void)
     return true;
 }
 
+static bool test_retained_runtime_deadline(void)
+{
+    struct micros_bootstrap_manifest manifest;
+    struct micros_bootstrap_manifest_plan plan = {
+        .entry_count = 2,
+        .total_user_page_limit = 7,
+        .controller_service_id = 1,
+        .vm_service_id = 2,
+        .ordered_service_ids = {1, 2},
+        .ordered_manifest_indices = {1, 0},
+    };
+    struct micros_bootstrap_runtime runtime;
+    struct micros_bootstrap_runtime snapshot;
+
+    initialize_manifest(&manifest);
+    memset(&runtime, 0, sizeof(runtime));
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_initialize(
+            &manifest,
+            &plan,
+            &runtime
+        ) == MICROS_BOOTSTRAP_OK
+    );
+    snapshot = runtime;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            120,
+            150
+        ) == MICROS_BOOTSTRAP_OK
+        && runtime.entries[0].ready_deadline == 150
+        && runtime.starting_service_id == 2
+    );
+
+    runtime = snapshot;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release(&runtime, 2, 120)
+            == MICROS_BOOTSTRAP_OK
+        && runtime.entries[0].ready_deadline == 220
+    );
+
+    runtime = snapshot;
+    EXPECT_TRUE(
+        micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            150,
+            150
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+        && micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            151,
+            150
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+        && micros_bootstrap_runtime_release_retaining_deadline(
+            &runtime,
+            2,
+            120,
+            0
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&runtime, &snapshot, sizeof(runtime)) == 0
+    );
+    return true;
+}
+
 struct reference_runtime_entry {
     uint32_t service_id;
     uint64_t prerequisites;
@@ -2072,8 +2412,16 @@ int main(void)
         fprintf(stderr, "three-service topology failed\n");
         return 1;
     }
+    if (!test_tty_service_contract()) {
+        fprintf(stderr, "TTY service contract failed\n");
+        return 1;
+    }
     if (!test_runtime_transitions()) {
         fprintf(stderr, "runtime transitions failed\n");
+        return 1;
+    }
+    if (!test_retained_runtime_deadline()) {
+        fprintf(stderr, "retained runtime deadline failed\n");
         return 1;
     }
     if (!test_replayable_runtime_model()) {

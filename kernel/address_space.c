@@ -482,6 +482,18 @@ static bool range_matches(
     return true;
 }
 
+static bool mapping_is_absent(uint64_t virtual_address)
+{
+    uint64_t physical_address;
+    uint32_t permissions;
+
+    return !lookup_mapping(
+        virtual_address,
+        &physical_address,
+        &permissions
+    );
+}
+
 static bool mark_reachable_table(
     uint64_t physical_address,
     bool *reachable
@@ -787,6 +799,43 @@ static bool expected_mappings_are_valid(
             MICROS_SV39_PERMISSION_READ
                 | MICROS_SV39_PERMISSION_WRITE
         )
+        || !range_matches(
+            MICROS_RISCV_PLIC_PRIORITY_PAGE_BASE,
+            MICROS_RISCV_PLIC_PRIORITY_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE
+        )
+        || !range_matches(
+            MICROS_RISCV_PLIC_SUPERVISOR_ENABLE_PAGE_BASE,
+            MICROS_RISCV_PLIC_SUPERVISOR_ENABLE_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE
+        )
+        || !range_matches(
+            MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE,
+            MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE,
+            MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_WRITE
+        )
+        || !mapping_is_absent(
+            MICROS_RISCV_PLIC_PRIORITY_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE
+        )
+        || !mapping_is_absent(
+            MICROS_RISCV_PLIC_SUPERVISOR_ENABLE_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE
+        )
+        || !mapping_is_absent(
+            MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE
+                - MICROS_SV39_PAGE_SIZE
+        )
+        || !mapping_is_absent(
+            MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE
+                + MICROS_SV39_PAGE_SIZE
+        )
     ) {
         return false;
     }
@@ -875,6 +924,36 @@ micros_kernel_address_space_initialize(void)
     error = map_identity_range(
         MICROS_RISCV_UART0_BASE,
         MICROS_RISCV_UART0_BASE + MICROS_SV39_PAGE_SIZE,
+        MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_WRITE
+    );
+    if (error != MICROS_KERNEL_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = map_identity_range(
+        MICROS_RISCV_PLIC_PRIORITY_PAGE_BASE,
+        MICROS_RISCV_PLIC_PRIORITY_PAGE_BASE
+            + MICROS_SV39_PAGE_SIZE,
+        MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_WRITE
+    );
+    if (error != MICROS_KERNEL_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = map_identity_range(
+        MICROS_RISCV_PLIC_SUPERVISOR_ENABLE_PAGE_BASE,
+        MICROS_RISCV_PLIC_SUPERVISOR_ENABLE_PAGE_BASE
+            + MICROS_SV39_PAGE_SIZE,
+        MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_WRITE
+    );
+    if (error != MICROS_KERNEL_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = map_identity_range(
+        MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE,
+        MICROS_RISCV_PLIC_SUPERVISOR_CONTEXT_PAGE_BASE
+            + MICROS_SV39_PAGE_SIZE,
         MICROS_SV39_PERMISSION_READ
             | MICROS_SV39_PERMISSION_WRITE
     );

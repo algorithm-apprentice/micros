@@ -527,7 +527,11 @@ follows the first route mutation.
 
 The operation is one-shot. It does not reply to the launcher. TTY sends the
 ordinary ADR-0043 ready call afterward, and `ACCEPT_READY(TTY)` requires
-`TTY_OWNED` plus the complete route and mapping invariants.
+`TTY_OWNED` plus the complete route and mapping invariants. It accepts either
+an idle route or one valid retained source-10 claim. In the latter case,
+readiness clears only the deadline; it preserves `IN_SERVICE`, the claimed
+source, and the queued notification so TTY drains and completes that interrupt
+immediately after `READY_ACK`.
 
 #### IRQ completion
 

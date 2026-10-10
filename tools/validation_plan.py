@@ -11,6 +11,7 @@ import subprocess
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
 UNIT_FULL = ("cmake", "--workflow", "--preset", "test-unit")
 IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
+TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -19,6 +20,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-panic",
     "test-qemu-trap",
     "test-qemu-timer",
+    "test-qemu-uart-console",
     "test-qemu-frame-allocator",
     "test-qemu-trap-panic",
     "test-qemu-mmu",
@@ -30,6 +32,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-tty",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -48,6 +51,22 @@ QEMU_WORKFLOWS = (
     "test-qemu-scheduler-invalid-outgoing",
     "test-qemu-scheduler-invalid-next",
 )
+
+IMAGE_WORKFLOWS = (
+    "build-tty-service-image",
+)
+
+IMAGE_INPUTS = {
+    "build-tty-service-image": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "servers/tty/",
+        "tools/check_user_elf.py",
+    ),
+}
 
 PLANNER_INPUTS = (
     "tools/validation_plan.py",
@@ -79,6 +98,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-tty",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -93,6 +113,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-address-space-handoff",
     "test-qemu-user-execution",
     "test-qemu-scheduler",
+    "test-qemu-uart-console",
 )
 
 SHARED_QEMU_PATHS = (
@@ -197,6 +218,48 @@ USER_RUNTIME_INPUTS = (
     "tools/generate_user_runtime_fixture.py",
 )
 
+TTY_CONTROL_INPUTS = (
+    "kernel/panic.c",
+    "kernel/plic.c",
+    "kernel/plic.h",
+    "kernel/plic_core.c",
+    "kernel/plic_core.h",
+    "kernel/syscall.c",
+    "kernel/trap_route_core.c",
+    "kernel/trap_route_core.h",
+    "kernel/tty_control_core.c",
+    "kernel/tty_control_core.h",
+    "kernel/tty_control_syscall.c",
+    "kernel/tty_control_syscall.h",
+    "kernel/tty_control_syscall_core.c",
+    "kernel/tty_control_syscall_core.h",
+    "kernel/tty_fault.c",
+    "kernel/tty_fault.h",
+    "kernel/tty_handoff_core.c",
+    "kernel/tty_handoff_core.h",
+    "kernel/tty_handoff_runtime.c",
+    "kernel/tty_handoff_runtime.h",
+    "kernel/tty_interrupt.c",
+    "kernel/tty_interrupt.h",
+    "tests/host/plic_test.c",
+    "tests/host/stubs/arch/riscv64/interrupt.h",
+    "tests/host/tty_control_test.c",
+    "tests/host/tty_control_syscall_test.c",
+    "tests/host/tty_fault_test.c",
+    "tests/host/tty_handoff_test.c",
+    "tests/host/tty_interrupt_test.c",
+    "tests/host/tty_test.c",
+    "tests/host/trap_route_test.c",
+)
+
+TTY_TRAP_INPUTS = (
+    "kernel/trap_route_core.c",
+    "kernel/trap_route_core.h",
+    "kernel/tty_interrupt.c",
+    "kernel/tty_interrupt.h",
+    "tests/host/trap_route_test.c",
+)
+
 GATE_INPUTS = {
     "test-qemu-smoke": (
         "kernel/fdt.c",
@@ -206,6 +269,14 @@ GATE_INPUTS = {
     "test-qemu-panic": ("kernel/panic.c", "arch/riscv64/panic.S"),
     "test-qemu-trap": ("arch/riscv64/trap_test.S",),
     "test-qemu-timer": ("arch/riscv64/sbi.c",),
+    "test-qemu-uart-console": (
+        "arch/riscv64/platform.h",
+        "arch/riscv64/uart.c",
+        "kernel/uart_console_core.c",
+        "kernel/uart_console_core.h",
+        "kernel/uart_console_test.c",
+        "kernel/uart_console_test.h",
+    ) + TTY_CONTROL_INPUTS,
     "test-qemu-frame-allocator": (
         "kernel/frame_allocator.c",
         "kernel/frame_allocator_test.c",
@@ -316,6 +387,8 @@ GATE_INPUTS = {
         "lib/runtime/user.ld",
         "tests/host/test_generate_bootstrap_fixture.py",
         "tests/qemu/bootstrap_launcher.c",
+        "tests/qemu/bootstrap_launcher_control.c",
+        "tests/qemu/bootstrap_launcher_control.h",
         "tests/qemu/bootstrap_probe.c",
         "tests/qemu/bootstrap_probe.S",
         "tests/qemu/bootstrap_protocol.h",
@@ -405,7 +478,7 @@ GATE_INPUTS = {
         "kernel/scheduler_test.c",
         "kernel/kernel_objects.c",
         "arch/riscv64/scheduler_test.S",
-    ) + WIRED_HANDOFF_INPUTS,
+    ) + WIRED_HANDOFF_INPUTS + TTY_TRAP_INPUTS,
     "test-qemu-scheduler-invalid-outgoing": (
         "kernel/scheduler_invalid_test.c",
         "arch/riscv64/scheduler_test.S",
@@ -481,6 +554,21 @@ GATE_INPUTS["test-qemu-pm-service"] = GATE_INPUTS[
     "tests/qemu/pm_service_report.S",
     "tools/generate_pm_service_fixture.py",
 )
+GATE_INPUTS["test-qemu-tty"] = GATE_INPUTS[
+    "test-qemu-pm-service"
+] + TTY_CONTROL_INPUTS + (
+    "include/micros/tty.h",
+    "kernel/tty_service_test.c",
+    "kernel/tty_service_test.h",
+    "kernel/tty_service_test_fixture.h",
+    "servers/tty/",
+    "tests/host/test_generate_tty_service_fixture.py",
+    "tests/qemu/tty_handoff_protocol.h",
+    "tests/qemu/tty_service_claim_wait.S",
+    "tests/qemu/tty_service_report.S",
+    "tests/qemu/tty_service_vfs.c",
+    "tools/generate_tty_service_fixture.py",
+)
 GATE_INPUTS["test-qemu-vm-ready-early"] = GATE_INPUTS[
     "test-qemu-vm-handoff"
 ] + (
@@ -533,10 +621,25 @@ SLOW_MODEL_INPUTS = {
         "tests/host/ipc_notify_test.c",
         "tests/host/ipc_close_test.c",
     ) + WIRED_HANDOFF_INPUTS,
+    "test-tty-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/grant.h",
+        "include/micros/ipc.h",
+        "include/micros/tty.h",
+        "servers/tty/tty_core.c",
+        "servers/tty/tty_core.h",
+        "servers/tty/tty_service_core.c",
+        "servers/tty/tty_service_core.h",
+        "servers/tty/tty_uart.c",
+        "servers/tty/tty_uart.h",
+        "tests/host/tty_model_test.c",
+    ),
 }
 
 SLOW_MODEL_CTESTS = {
     "test-ipc-model": ("ipc-model", "ipc_model_test"),
+    "test-tty-model": ("tty-model", "tty_model_test"),
 }
 
 
@@ -620,6 +723,14 @@ def affected_slow_models(paths):
     ]
 
 
+def affected_image_workflows(paths):
+    return [
+        name
+        for name, inputs in IMAGE_INPUTS.items()
+        if any(path_matches(path, inputs) for path in paths)
+    ]
+
+
 def requires_full_tier(paths):
     if any(path_matches(path, SHARED_QEMU_PATHS) for path in paths):
         return True
@@ -632,6 +743,7 @@ def requires_full_tier(paths):
                 for name in QEMU_WORKFLOWS
             )
             or bool(affected_slow_models([path]))
+            or bool(affected_image_workflows([path]))
             or path_matches(path, PLANNER_INPUTS)
         )
         if not known:
@@ -652,6 +764,7 @@ def plan(paths, tier, base="origin/main"):
     if tier == "full":
         commands = [UNIT_FULL]
         commands.extend(workflow(name) for name in QEMU_WORKFLOWS)
+        commands.extend(workflow(name) for name in IMAGE_WORKFLOWS)
         commands.append(DOCS)
         commands.extend(diff_commands(base))
         return commands
@@ -670,15 +783,20 @@ def plan(paths, tier, base="origin/main"):
         return plan(paths, "full", base)
 
     workflows = affected_workflows(code_paths)
+    image_workflows = affected_image_workflows(code_paths)
     if tier == "fast":
         for name in affected_slow_models(code_paths):
             append_unique(commands, workflow(name))
         for name in workflows:
             append_unique(commands, workflow(name))
+        for name in image_workflows:
+            append_unique(commands, workflow(name))
     else:
         commands[0] = UNIT_FULL
         append_unique(commands, SMOKE)
         for name in workflows:
+            append_unique(commands, workflow(name))
+        for name in image_workflows:
             append_unique(commands, workflow(name))
     commands.extend(diff_commands(base))
     return commands
@@ -773,6 +891,20 @@ def documented_slow_workflows(root):
     }
 
 
+def documented_image_workflows(root):
+    with open(
+        os.path.join(root, "docs/development/building.md"),
+        encoding="utf-8",
+    ) as source:
+        content = source.read()
+    return set(
+        re.findall(
+            r"cmake --workflow --preset (build-[a-z0-9-]+-image)",
+            content,
+        )
+    )
+
+
 def custom_target_block(cmake, target):
     marker = f"add_custom_target(\n        {target}\n"
     start = cmake.find(marker)
@@ -806,6 +938,17 @@ def validate_inventory(root):
         raise ValueError("slow-model CTest map is out of sync")
     if set(GATE_INPUTS) != qemu_inventory:
         raise ValueError("QEMU ownership map is out of sync")
+    image_inventory = {
+        name
+        for name in workflows
+        if name.startswith("build-") and name.endswith("-image")
+    }
+    if image_inventory != set(IMAGE_WORKFLOWS):
+        raise ValueError("image workflow inventory is out of sync")
+    if image_inventory != documented_image_workflows(root):
+        raise ValueError("documented image matrix is out of sync")
+    if set(IMAGE_INPUTS) != image_inventory:
+        raise ValueError("image ownership map is out of sync")
 
     with open(
         os.path.join(root, "CMakeLists.txt"),

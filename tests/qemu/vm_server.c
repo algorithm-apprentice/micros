@@ -6,9 +6,20 @@
 
 #include "lib/runtime/raw_syscall.h"
 #include "micros/bootstrap_control.h"
+#include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
 #include "tests/qemu/vm_handoff_protocol.h"
-#ifdef MICROS_PM_SERVICE_TEST
+#ifdef MICROS_TTY_HANDOFF_TEST
+#include "tests/qemu/tty_handoff_protocol.h"
+#define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
+    MICROS_TTY_HANDOFF_TEST_LAUNCHER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID \
+    MICROS_TTY_HANDOFF_TEST_VM_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_PROBE_SERVICE_ID \
+    MICROS_TTY_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
+    MICROS_TTY_HANDOFF_TEST_SERVICE_COUNT
+#elif defined(MICROS_PM_SERVICE_TEST)
 #include "tests/qemu/pm_service_protocol.h"
 #define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
     MICROS_PM_TEST_LAUNCHER_SERVICE_ID
@@ -28,11 +39,26 @@ __attribute__((section(".data.vm_boot_info"), used))
 struct micros_vm_boot_info micros_vm_boot_info = {0};
 
 static volatile uint64_t vm_data = UINT64_C(0x564d44415441564d);
-#ifndef MICROS_PM_SERVICE_TEST
+#if !defined(MICROS_PM_SERVICE_TEST) \
+    && !defined(MICROS_TTY_HANDOFF_TEST)
 static uint8_t grant_buffer[MICROS_VM_HANDOFF_TEST_DATA_SIZE];
 #endif
 
 void micros_vm_trigger_self_fault(void);
+static int find_service(uint32_t service_id);
+
+#ifdef MICROS_TTY_HANDOFF_TEST
+struct vm_tty_mapping_descriptor {
+    bool mapped;
+    micros_endpoint_t endpoint;
+    uint64_t virtual_base;
+    uint64_t physical_base;
+    uint32_t irq_source;
+    uint32_t mapped_length;
+};
+
+static struct vm_tty_mapping_descriptor tty_mapping;
+#endif
 
 #define VM_FNV_OFFSET UINT64_C(14695981039346656037)
 #define VM_FNV_PRIME UINT64_C(1099511628211)
@@ -78,7 +104,81 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-#ifndef MICROS_PM_SERVICE_TEST
+#ifdef MICROS_TTY_HANDOFF_TEST
+static bool notification_is_canonical(
+    const struct micros_ipc_message *message,
+    uint64_t event_mask
+)
+{
+    size_t index;
+    uint64_t observed = 0;
+
+    if (
+        message->source != MICROS_ENDPOINT_NONE
+        || message->type != MICROS_IPC_TYPE_KERNEL_NOTIFICATION
+        || message->reply_token != 0
+    ) {
+        return false;
+    }
+    for (index = 0; index < 8; ++index) {
+        observed |= (uint64_t)message->payload[index]
+            << (index * 8);
+    }
+    return (
+        observed == event_mask
+        && bytes_are_zero(
+            &message->payload[8],
+            sizeof(message->payload) - 8
+        )
+    );
+}
+
+static bool map_tty_uart(void)
+{
+    struct micros_ipc_message message;
+    int tty_index = find_service(MICROS_TTY_SERVICE_ID);
+    uint64_t irq_and_length =
+        (uint64_t)MICROS_TTY_UART_IRQ_SOURCE << 32
+        | MICROS_TTY_UART_MAPPED_LENGTH;
+
+    if (tty_index < 0 || tty_mapping.mapped) {
+        return false;
+    }
+    clear_bytes(&message, sizeof(message));
+    if (
+        micros_runtime_receive(MICROS_ENDPOINT_ANY, &message)
+            != MICROS_SYSCALL_ABI_OK
+        || !notification_is_canonical(
+            &message,
+            MICROS_KERNEL_EVENT_CONSOLE_MAP_REQUEST
+        )
+        || micros_runtime_raw_syscall(
+            MICROS_VM_HANDOFF_MAP_TTY_UART,
+            MICROS_TTY_MAPPING_VERSION,
+            MICROS_TTY_SERVICE_ID,
+            micros_bootstrap_service_config.services[tty_index]
+                .endpoint,
+            MICROS_TTY_UART_VIRTUAL_BASE,
+            MICROS_TTY_UART_PHYSICAL_BASE,
+            irq_and_length,
+            MICROS_SYSCALL_ABI_VM_HANDOFF
+        ) != MICROS_SYSCALL_ABI_OK
+    ) {
+        return false;
+    }
+    tty_mapping.mapped = true;
+    tty_mapping.endpoint =
+        micros_bootstrap_service_config.services[tty_index].endpoint;
+    tty_mapping.virtual_base = MICROS_TTY_UART_VIRTUAL_BASE;
+    tty_mapping.physical_base = MICROS_TTY_UART_PHYSICAL_BASE;
+    tty_mapping.irq_source = MICROS_TTY_UART_IRQ_SOURCE;
+    tty_mapping.mapped_length = MICROS_TTY_UART_MAPPED_LENGTH;
+    return true;
+}
+#endif
+
+#if !defined(MICROS_PM_SERVICE_TEST) \
+    && !defined(MICROS_TTY_HANDOFF_TEST)
 static uint64_t read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
@@ -835,7 +935,8 @@ static bool complete_handoff(void)
     ) == MICROS_SYSCALL_ABI_OK;
 }
 
-#ifndef MICROS_PM_SERVICE_TEST
+#if !defined(MICROS_PM_SERVICE_TEST) \
+    && !defined(MICROS_TTY_HANDOFF_TEST)
 static bool serve_probe(void)
 {
     struct micros_ipc_message request;
@@ -941,7 +1042,11 @@ void micros_service_main(void)
     if (!send_ready()) {
         __builtin_trap();
     }
-#ifndef MICROS_PM_SERVICE_TEST
+#ifdef MICROS_TTY_HANDOFF_TEST
+    if (!map_tty_uart()) {
+        __builtin_trap();
+    }
+#elif !defined(MICROS_PM_SERVICE_TEST)
     if (!serve_probe()) {
         __builtin_trap();
     }
@@ -959,5 +1064,8 @@ void micros_service_main(void)
         ) {
             __builtin_trap();
         }
+#ifdef MICROS_TTY_HANDOFF_TEST
+        __builtin_trap();
+#endif
     }
 }

@@ -40,6 +40,18 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_fast_tty_runs_persistent_model(self):
+        commands = validation_plan.plan(
+            ["servers/tty/tty_core.c"],
+            "fast",
+        )
+        self.assertEqual(validation_plan.UNIT_FAST, commands[0])
+        self.assertIn(validation_plan.TTY_MODEL, commands)
+        self.assertIn(
+            validation_plan.workflow("test-qemu-tty"),
+            commands,
+        )
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",
@@ -86,6 +98,8 @@ class ValidationPlanTests(unittest.TestCase):
             "kernel/user_address_space_core.c",
             "lib/runtime/memory.h",
             "lib/runtime/raw_syscall.h",
+            "tests/qemu/bootstrap_launcher_control.c",
+            "tests/qemu/bootstrap_launcher_control.h",
         ):
             with self.subTest(path=path):
                 self.assert_workflow_selected(
@@ -107,6 +121,67 @@ class ValidationPlanTests(unittest.TestCase):
                 self.assert_workflow_selected(
                     path,
                     "test-qemu-vm-ready-early",
+                )
+
+    def test_uart_console_paths_own_component_gate(self):
+        for path in (
+            "arch/riscv64/platform.h",
+            "arch/riscv64/uart.c",
+            "kernel/uart_console_core.c",
+            "kernel/uart_console_core.h",
+            "kernel/uart_console_test.c",
+            "kernel/uart_console_test.h",
+            *validation_plan.TTY_CONTROL_INPUTS,
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-uart-console",
+                )
+
+    def test_tty_service_paths_own_image_gate(self):
+        for path in (
+            "servers/tty/tty_service.c",
+            "servers/tty/tty_service_core.c",
+            "servers/tty/tty_uart.c",
+            "servers/tty/tty_control.c",
+            "tools/check_user_elf.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "build-tty-service-image",
+                )
+
+    def test_tty_production_and_fixture_paths_own_qemu_gate(self):
+        for path in (
+            *validation_plan.TTY_CONTROL_INPUTS,
+            "include/micros/tty.h",
+            "kernel/tty_service_test.c",
+            "kernel/tty_service_test.h",
+            "kernel/tty_service_test_fixture.h",
+            "servers/tty/tty_service.c",
+            "servers/tty/tty_service_core.c",
+            "servers/tty/tty_uart.c",
+            "tests/host/test_generate_tty_service_fixture.py",
+            "tests/qemu/tty_handoff_protocol.h",
+            "tests/qemu/tty_service_claim_wait.S",
+            "tests/qemu/tty_service_report.S",
+            "tests/qemu/tty_service_vfs.c",
+            "tools/generate_tty_service_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-tty",
+                )
+
+    def test_tty_trap_paths_own_scheduler_gate(self):
+        for path in validation_plan.TTY_TRAP_INPUTS:
+            with self.subTest(path=path):
+                self.assert_workflow_selected(
+                    path,
+                    "test-qemu-scheduler",
                 )
 
     def test_bootstrap_production_paths_select_cross_gate_union(self):
@@ -388,6 +463,8 @@ class ValidationPlanTests(unittest.TestCase):
         self.assertEqual(validation_plan.UNIT_FULL, commands[0])
         for name in validation_plan.QEMU_WORKFLOWS:
             self.assertIn(validation_plan.workflow(name), commands)
+        for name in validation_plan.IMAGE_WORKFLOWS:
+            self.assertIn(validation_plan.workflow(name), commands)
 
     def test_pr_endpoint_uses_complete_native_and_ipc(self):
         commands = validation_plan.plan(["kernel/endpoint.c"], "pr")
@@ -632,7 +709,9 @@ class ValidationPlanTests(unittest.TestCase):
         commands = validation_plan.plan([], "full")
         self.assertEqual(validation_plan.UNIT_FULL, commands[0])
         self.assertEqual(
-            len(validation_plan.QEMU_WORKFLOWS) + 5,
+            len(validation_plan.QEMU_WORKFLOWS)
+            + len(validation_plan.IMAGE_WORKFLOWS)
+            + 5,
             len(commands),
         )
 

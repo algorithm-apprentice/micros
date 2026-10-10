@@ -9,6 +9,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/ipc_runtime_internal.h"
+#include "kernel/plic.h"
 #include "micros/endpoint.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_abi.h"
@@ -34,6 +35,13 @@ enum {
     TEST_INTERRUPT_SUPERVISOR_TIMER = 5,
 };
 
+enum test_external_origin {
+    TEST_EXTERNAL_NONE = 0,
+    TEST_EXTERNAL_USER,
+    TEST_EXTERNAL_SUPERVISOR,
+    TEST_EXTERNAL_IDLE,
+};
+
 enum test_completion_kind {
     TEST_COMPLETION_NONE = 0,
     TEST_COMPLETION_START,
@@ -41,6 +49,7 @@ enum test_completion_kind {
     TEST_COMPLETION_CAPTURED,
     TEST_COMPLETION_ERROR,
     TEST_COMPLETION_IDLE,
+    TEST_COMPLETION_EXTERNAL_IDLE,
 };
 
 static const uint64_t TEST_CODE_VIRTUAL_ADDRESS =
@@ -57,6 +66,10 @@ static const uint64_t TEST_QUANTUM =
     UINT64_C(0x0000000000030000);
 static const uint64_t TEST_START_TIMER_DELAY =
     UINT64_C(0x0000000000001000);
+static const uint32_t TEST_EXTERNAL_ATTEMPTS = UINT32_C(100000);
+static const uintptr_t TEST_UART_INTERRUPT_ENABLE =
+    MICROS_RISCV_UART0_BASE + UINT64_C(1);
+static const uint8_t TEST_UART_INTERRUPT_TX_EMPTY = UINT8_C(0x02);
 
 extern const unsigned char micros_scheduler_payload_start[];
 extern const unsigned char micros_scheduler_payload_ecall[];
@@ -110,8 +123,78 @@ static bool captured_completion_observed;
 static bool error_completion_observed;
 static bool error_completion_staged;
 static bool idle_completion_observed;
+static volatile enum test_external_origin external_origin;
+static bool user_external_started;
+static bool user_external_observed;
+static bool user_external_return_observed;
+static bool supervisor_external_observed;
+static bool idle_external_started;
+static bool idle_external_observed;
+static bool idle_external_completion_observed;
 volatile uint64_t micros_scheduler_test_idle_bypass_once;
 volatile uint64_t micros_scheduler_test_idle_bypass_observed;
+
+static volatile uint8_t *test_uart_interrupt_enable(void)
+{
+    return (volatile uint8_t *)TEST_UART_INTERRUPT_ENABLE;
+}
+
+static bool arm_external_interrupt(
+    enum test_external_origin origin
+)
+{
+    struct micros_plic_tty_enable_plan plan;
+
+    if (
+        origin == TEST_EXTERNAL_NONE
+        || external_origin != TEST_EXTERNAL_NONE
+        || !micros_plic_prepare_tty_enable(&plan)
+    ) {
+        return false;
+    }
+    external_origin = origin;
+    micros_plic_commit_tty_prepare_prevalidated(&plan);
+    micros_plic_commit_tty_enable_prevalidated(&plan);
+    riscv_external_interrupt_enable();
+    *test_uart_interrupt_enable() =
+        TEST_UART_INTERRUPT_TX_EMPTY;
+    riscv_mmio_fence();
+    return (
+        micros_plic_validate(MICROS_PLIC_ENABLED)
+        && riscv_external_interrupt_is_enabled()
+    );
+}
+
+static bool run_supervisor_external_test(void)
+{
+    uintptr_t saved_status;
+    uint32_t attempt;
+
+    if (
+        !user_external_return_observed
+        || !arm_external_interrupt(TEST_EXTERNAL_SUPERVISOR)
+    ) {
+        return false;
+    }
+    saved_status = riscv_irq_save();
+    riscv_irq_restore(MICROS_RISCV_SSTATUS_SIE);
+    for (
+        attempt = 0;
+        attempt < TEST_EXTERNAL_ATTEMPTS
+            && !supervisor_external_observed;
+        ++attempt
+    ) {
+        __asm__ volatile("" : : : "memory");
+    }
+    (void)riscv_irq_save();
+    riscv_irq_restore(saved_status);
+    return (
+        supervisor_external_observed
+        && external_origin == TEST_EXTERNAL_NONE
+        && !riscv_external_interrupt_is_enabled()
+        && micros_plic_validate(MICROS_PLIC_DISABLED)
+    );
+}
 
 static bool thread_handles_equal(
     struct micros_thread_handle left,
@@ -232,6 +315,9 @@ static bool observe_completion(
         break;
     case TEST_COMPLETION_IDLE:
         idle_completion_observed = true;
+        break;
+    case TEST_COMPLETION_EXTERNAL_IDLE:
+        idle_external_completion_observed = true;
         break;
     case TEST_COMPLETION_NONE:
         return false;
@@ -561,6 +647,103 @@ bool micros_scheduler_test_after_user_return(
         last_running = thread_index;
         ++switch_count;
     }
+    if (
+        user_external_observed
+        && !user_external_return_observed
+    ) {
+        user_external_return_observed = true;
+    }
+    return true;
+}
+
+bool micros_scheduler_test_handle_external_interrupt(
+    struct micros_hart *hart,
+    const struct micros_trap_frame *frame
+)
+{
+    enum test_external_origin origin = external_origin;
+    bool supervisor_origin;
+    uint32_t source = 0;
+
+    if (origin == TEST_EXTERNAL_NONE) {
+        return false;
+    }
+    supervisor_origin = (
+        frame != NULL
+        && (frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0
+    );
+    if (
+        hart == NULL
+        || frame == NULL
+        || (
+            origin == TEST_EXTERNAL_USER
+            && supervisor_origin
+        )
+        || (
+            (
+                origin == TEST_EXTERNAL_SUPERVISOR
+                || origin == TEST_EXTERNAL_IDLE
+            )
+            && !supervisor_origin
+        )
+        || (
+            origin == TEST_EXTERNAL_IDLE
+            && (
+                !idle_external_started
+                || idle_external_observed
+                || hart->accounting_owner
+                    != MICROS_SCHEDULER_ACCOUNTING_KERNEL
+                || hart->current_thread.generation != 0
+                || selector_entry_count
+                    != selector_entries_before_spurious + 1
+            )
+        )
+        || !micros_plic_claim(&source)
+        || source != MICROS_TTY_UART_IRQ_SOURCE
+    ) {
+        return false;
+    }
+    *test_uart_interrupt_enable() = 0;
+    riscv_mmio_fence();
+    riscv_external_interrupt_disable();
+    if (
+        !micros_plic_complete(MICROS_TTY_UART_IRQ_SOURCE)
+        || !micros_plic_disable_tty()
+    ) {
+        return false;
+    }
+    external_origin = TEST_EXTERNAL_NONE;
+    if (origin == TEST_EXTERNAL_USER) {
+        user_external_observed = true;
+    } else if (origin == TEST_EXTERNAL_SUPERVISOR) {
+        supervisor_external_observed = true;
+    } else {
+        struct micros_kernel_objects *objects =
+            micros_kernel_object_runtime_test_registry();
+
+        if (objects == NULL) {
+            return false;
+        }
+        objects->threads[threads[0].slot].user_context.sepc =
+            user_address_of(micros_scheduler_payload_ecall);
+        objects->threads[threads[0].slot].user_context.s1 = 0;
+        if (
+            !expect_no_message_completion(
+                objects,
+                0,
+                MICROS_IPC_OK,
+                TEST_COMPLETION_EXTERNAL_IDLE
+            )
+            || micros_thread_runtime_flags_unset(
+                objects,
+                threads[0],
+                MICROS_THREAD_RTS_INACTIVE
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            return false;
+        }
+        idle_external_observed = true;
+    }
     return true;
 }
 
@@ -619,13 +802,30 @@ micros_scheduler_test_handle_user_trap(
             return MICROS_SCHEDULER_TEST_MISMATCH;
         }
         ++ecall_count[thread_index];
-        if (idle_woke_thread) {
+        if (idle_woke_thread && !idle_external_started) {
             if (
                 thread_index != 0
                 || !spurious_idle_bypassed
                 || !idle_completion_observed
                 || selector_entry_count
                     != selector_entries_before_spurious + 1
+                || !arm_external_interrupt(TEST_EXTERNAL_IDLE)
+                || micros_thread_scheduler_hold(
+                    objects,
+                    threads[0]
+                ) != MICROS_KERNEL_OBJECT_OK
+            ) {
+                return MICROS_SCHEDULER_TEST_MISMATCH;
+            }
+            idle_external_started = true;
+            return MICROS_SCHEDULER_TEST_CONTINUE;
+        }
+        if (idle_external_observed) {
+            if (
+                thread_index != 0
+                || !idle_external_completion_observed
+                || selector_entry_count
+                    != selector_entries_before_spurious + 2
                 || micros_scheduler_test_prepare_supervisor_return(
                     hart,
                     frame
@@ -745,6 +945,18 @@ micros_scheduler_test_handle_user_trap(
     if (
         switch_count >= 6
         && error_completion_observed
+        && !user_external_started
+    ) {
+        if (!arm_external_interrupt(TEST_EXTERNAL_USER)) {
+            return MICROS_SCHEDULER_TEST_MISMATCH;
+        }
+        user_external_started = true;
+        return MICROS_SCHEDULER_TEST_CONTINUE;
+    }
+    if (
+        switch_count >= 6
+        && error_completion_observed
+        && user_external_return_observed
         && !idle_requested
     ) {
         size_t other = thread_index == 0 ? 1 : 0;
@@ -840,6 +1052,9 @@ static _Noreturn void finish_test(void)
     uint64_t released;
     size_t index;
 
+    if (!run_supervisor_external_test()) {
+        goto failure;
+    }
     if (
         !supervisor_returned
         || !start_boundary_observed
@@ -854,8 +1069,15 @@ static _Noreturn void finish_test(void)
         || !idle_requested
         || !spurious_idle_bypassed
         || !idle_woke_thread
+        || !user_external_started
+        || !user_external_observed
+        || !user_external_return_observed
+        || !supervisor_external_observed
+        || !idle_external_started
+        || !idle_external_observed
+        || !idle_external_completion_observed
         || selector_entry_count
-            != selector_entries_before_spurious + 1
+            != selector_entries_before_spurious + 2
         || ledger == NULL
         || objects == NULL
         || previous_counter[0] == 0
@@ -942,6 +1164,11 @@ static _Noreturn void finish_test(void)
         "queues=minix-priority current=reachable "
         "accounting=separate switches=alternating "
         "idle=resumed registers=preserved\n"
+    );
+    uart_write(
+        "MICROS_TTY_TRAP_TEST_PASS "
+        "user=cause9-scheduled supervisor=cause9-direct "
+        "idle=cause9-selected\n"
     );
     uart_flush();
     (void)sbi_system_reset(

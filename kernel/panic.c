@@ -2,12 +2,44 @@
 
 #include <stdint.h>
 
+#include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
+#include "kernel/plic.h"
+#include "kernel/tty_handoff_runtime.h"
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
 #endif
+
+static bool panic_seizure_failure_emitted;
+
+void micros_panic_seize(void)
+{
+    bool plic_disabled;
+    bool tty_panicked;
+
+    (void)riscv_irq_save();
+    riscv_external_interrupt_disable();
+    plic_disabled = micros_plic_panic_disable();
+    tty_panicked = (
+        micros_tty_handoff_runtime_panic()
+            == MICROS_TTY_HANDOFF_OK
+    );
+    uart_panic_seize();
+    if (
+        (!plic_disabled || !tty_panicked)
+        && !panic_seizure_failure_emitted
+    ) {
+        uart_write("MICROS_PANIC_SEIZURE_FAILURE plic=");
+        uart_write(plic_disabled ? "disabled" : "failed");
+        uart_write(" tty=");
+        uart_write(tty_panicked ? "panic" : "failed");
+        uart_write("\n");
+        uart_flush();
+        panic_seizure_failure_emitted = true;
+    }
+}
 
 _Noreturn void micros_panic_report(
     uintptr_t hart_id,
@@ -18,7 +50,7 @@ _Noreturn void micros_panic_report(
     const struct micros_panic_machine_context *context
 )
 {
-    uart_panic_seize();
+    micros_panic_seize();
 
     uart_write("MICROS_PANIC reason=");
     uart_write(reason);

@@ -118,10 +118,15 @@ static const struct micros_privilege_profile profiles[] = {
         .name = "TTY",
         .operations =
             MICROS_PRIVILEGE_OPERATION_RECEIVE
-            | MICROS_PRIVILEGE_OPERATION_CALL,
+            | MICROS_PRIVILEGE_OPERATION_CALL
+            | MICROS_PRIVILEGE_OPERATION_REPLY
+            | MICROS_PRIVILEGE_OPERATION_NOTIFY,
         .call_targets =
             UINT32_C(1)
             << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+        .notify_targets =
+            UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
+        .kernel_operations = MICROS_KERNEL_OPERATION_TTY_CONTROL,
     },
     {
         .id = MICROS_PRIVILEGE_PROFILE_RAMFS,
@@ -140,8 +145,12 @@ static const struct micros_privilege_profile profiles[] = {
             MICROS_PRIVILEGE_OPERATION_RECEIVE
             | MICROS_PRIVILEGE_OPERATION_CALL,
         .call_targets =
-            UINT32_C(1)
-            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+            (
+                UINT32_C(1)
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            ) | (
+                UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_TTY
+            ),
     },
     {
         .id = MICROS_PRIVILEGE_PROFILE_APPLICATION,

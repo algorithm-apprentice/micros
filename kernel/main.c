@@ -7,6 +7,7 @@
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
+#include "kernel/plic.h"
 #include "micros/timer.h"
 #include "micros/trap.h"
 
@@ -26,6 +27,12 @@
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
+#endif
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "kernel/tty_service_test.h"
+#endif
+#ifdef MICROS_BUILD_UART_CONSOLE_TEST
+#include "kernel/uart_console_test.h"
 #endif
 
 #ifndef MICROS_VERSION
@@ -252,6 +259,9 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     ) {
         MICROS_PANIC(hart_id, "mmu-init");
     }
+    if (!micros_plic_initialize()) {
+        MICROS_PANIC(hart_id, "plic-init");
+    }
     address_space = micros_kernel_address_space_report();
     if (address_space == NULL) {
         MICROS_PANIC(hart_id, "mmu-state");
@@ -289,6 +299,10 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
     );
     uart_write(" phase=bootstrap\n");
     uart_flush();
+
+#ifdef MICROS_BUILD_UART_CONSOLE_TEST
+    micros_uart_console_runtime_run_self_test(hart_id);
+#endif
 
 #ifdef MICROS_BUILD_PANIC_TEST
     MICROS_PANIC(hart_id, "intentional-test");
@@ -347,13 +361,21 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #endif
 
 #ifdef MICROS_BUILD_MMU_TEST
-    if (!micros_kernel_address_space_run_self_test()) {
+    if (
+        !micros_kernel_address_space_run_self_test()
+        || !micros_plic_runtime_run_self_test()
+    ) {
         MICROS_PANIC(hart_id, "mmu-test-failed");
     }
     uart_write(
         "MICROS_MMU_TEST_PASS "
         "store-fault=text execute-fault=writable "
         "traps=0x0000000000000002\n"
+    );
+    uart_write(
+        "MICROS_TTY_CONTROLLER_TEST_PASS "
+        "mapping=exact priority=disabled enable=disabled "
+        "context=supervisor seie=independent\n"
     );
     uart_flush();
 #endif
@@ -452,6 +474,11 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
     micros_pm_service_test_launch();
     MICROS_PANIC(hart_id, "pm-service-test-returned");
+#endif
+
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+    micros_tty_service_test_launch();
+    MICROS_PANIC(hart_id, "tty-service-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

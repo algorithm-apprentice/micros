@@ -3,8 +3,10 @@
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
+#include "grant_internal.h"
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc_runtime_internal.h"
+#include "tty_handoff_runtime.h"
 #include "micros/grant_copy.h"
 #include "micros/grant_runtime.h"
 #include "micros/grant_syscall_core.h"
@@ -34,10 +36,13 @@ micros_grant_handle_captured_user_ecall(
 {
     struct micros_grant_registry *grant_registry;
     struct micros_endpoint_registry *endpoint_registry;
+    struct micros_grant_create_plan create_plan;
     struct micros_grant_syscall_request request;
+    struct micros_tty_device_authority device_authority;
     micros_grant_t created = MICROS_GRANT_NONE;
     enum micros_syscall_abi_result decode_result;
     enum micros_grant_error error;
+    enum micros_tty_device_authority_status device_status;
     uint64_t abi_result;
 
     if (
@@ -71,7 +76,7 @@ micros_grant_handle_captured_user_ecall(
     }
     switch (request.operation) {
     case MICROS_SYSCALL_ABI_GRANT_CREATE:
-        error = micros_grant_create(
+        error = micros_grant_prepare_create(
             grant_registry,
             endpoint_registry,
             context->objects,
@@ -80,6 +85,42 @@ micros_grant_handle_captured_user_ecall(
             request.local_address,
             request.length,
             request.permissions,
+            &create_plan
+        );
+        if (error != MICROS_GRANT_OK) {
+            break;
+        }
+        device_status =
+            micros_tty_handoff_runtime_device_authority(
+                endpoint_registry,
+                context->objects,
+                &device_authority
+            );
+        if (
+            device_status
+                == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+        ) {
+            panic_grant_syscall(
+                hart,
+                frame,
+                "grant-device-authority-invariant"
+            );
+        }
+        if (
+            device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            && micros_tty_device_range_intersects(
+                &device_authority,
+                context->process,
+                request.local_address,
+                request.length
+            )
+        ) {
+            error = MICROS_GRANT_ERROR_FAULT;
+            break;
+        }
+        micros_grant_commit_create_prevalidated(
+            grant_registry,
+            &create_plan,
             &created
         );
         break;

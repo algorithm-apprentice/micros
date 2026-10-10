@@ -20,10 +20,12 @@ enum micros_syscall_abi_operation {
     MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL = 11,
     MICROS_SYSCALL_ABI_VM_HANDOFF = 12,
     MICROS_SYSCALL_ABI_PM_CONTROL = 13,
+    MICROS_SYSCALL_ABI_TTY_CONTROL = 14,
 };
 
 enum micros_vm_handoff_command {
     MICROS_VM_HANDOFF_READY = 1,
+    MICROS_VM_HANDOFF_MAP_TTY_UART = 2,
 };
 
 enum micros_syscall_abi_result {
