@@ -27,7 +27,7 @@ enum {
     MICROS_VM_MAX_STATIC_MAPPINGS = 4096,
     MICROS_VM_MAX_MANAGED_FRAMES =
         MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
-    MICROS_VM_BOOT_INFO_SIZE = 364672,
+    MICROS_VM_BOOT_INFO_SIZE = 364704,
 };
 
 #define MICROS_VM_BOOT_INFO_ALIGNMENT UINT64_C(4096)
@@ -371,8 +371,8 @@ _Static_assert(
         && offsetof(struct micros_vm_boot_info, reserved_ranges) == 448
         && offsetof(struct micros_vm_boot_info, managed_ranges) == 1728
         && offsetof(struct micros_vm_boot_info, address_spaces) == 4032
-        && offsetof(struct micros_vm_boot_info, mappings) == 4224
-        && offsetof(struct micros_vm_boot_info, frame_states) == 102528,
+        && offsetof(struct micros_vm_boot_info, mappings) == 4256
+        && offsetof(struct micros_vm_boot_info, frame_states) == 102560,
     "VM boot information offsets changed"
 );
 _Static_assert(

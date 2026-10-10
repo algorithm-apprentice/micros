@@ -159,6 +159,19 @@ micros_grant_handle_captured_user_ecall(
             request.length
         );
         break;
+    case MICROS_SYSCALL_ABI_GRANT_VALIDATE:
+        error = micros_grant_validate_range(
+            grant_registry,
+            endpoint_registry,
+            context->objects,
+            context->process,
+            request.endpoint,
+            request.grant,
+            request.offset,
+            request.length,
+            request.permissions
+        );
+        break;
     default:
         panic_grant_syscall(hart, frame, "grant-request-invariant");
     }

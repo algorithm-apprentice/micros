@@ -150,7 +150,7 @@ static bool test_manifest_contract(void)
         MICROS_BOOTSTRAP_MANIFEST_VERSION == 1
         && MICROS_BOOTSTRAP_MANIFEST_MAGIC
             == UINT32_C(0x3153424d)
-        && MICROS_BOOTSTRAP_SERVICE_CAPACITY == 6
+        && MICROS_BOOTSTRAP_SERVICE_CAPACITY == 7
         && MICROS_BOOTSTRAP_ROLE_PM == UINT32_C(0x8)
         && MICROS_BOOTSTRAP_ROLE_DEFINED_MASK == UINT32_C(0xf)
         && MICROS_KERNEL_OPERATION_PM_CONTROL == UINT64_C(0x4)
@@ -165,8 +165,8 @@ static bool test_manifest_contract(void)
         && MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED == UINT64_C(0x1)
         && sizeof(struct micros_bootstrap_manifest_header) == 64
         && sizeof(struct micros_bootstrap_manifest_entry) == 192
-        && sizeof(struct micros_bootstrap_manifest) == 1216
-        && sizeof(struct micros_bootstrap_manifest_plan) == 60
+        && sizeof(struct micros_bootstrap_manifest) == 1408
+        && sizeof(struct micros_bootstrap_manifest_plan) == 68
         && sizeof(struct micros_bootstrap_service_config) == 128
         && offsetof(
             struct micros_bootstrap_manifest_entry,
@@ -176,6 +176,17 @@ static bool test_manifest_contract(void)
             struct micros_bootstrap_service_config,
             services
         ) == 24
+        && offsetof(
+            struct micros_bootstrap_service_config,
+            manifest_view_address
+        ) == 80
+        && offsetof(
+            struct micros_bootstrap_service_config,
+            reserved
+        ) == 88
+        && sizeof(
+            ((struct micros_bootstrap_service_config *)0)->reserved
+        ) == 40
         && offsetof(
             struct micros_bootstrap_manifest_plan,
             pm_service_id

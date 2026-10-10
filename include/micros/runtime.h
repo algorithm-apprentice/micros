@@ -104,4 +104,12 @@ micros_runtime_result_t micros_runtime_grant_copy_to(
     size_t length
 );
 
+micros_runtime_result_t micros_runtime_grant_validate(
+    micros_endpoint_t grantor,
+    micros_grant_t grant,
+    size_t grant_offset,
+    size_t length,
+    uint32_t required_permission
+);
+
 #endif

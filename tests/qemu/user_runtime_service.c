@@ -623,6 +623,31 @@ static uint64_t run_server(void)
     }
     read_grant = get_u32(message.payload);
     write_grant = get_u32(message.payload + 4);
+    if (
+        micros_runtime_grant_validate(
+            micros_user_runtime_test_config.client_endpoint,
+            read_grant,
+            0,
+            TEST_TRANSFER_SIZE,
+            MICROS_GRANT_PERMISSION_READ
+        ) != MICROS_SYSCALL_ABI_OK
+        || micros_runtime_grant_validate(
+            micros_user_runtime_test_config.client_endpoint,
+            write_grant,
+            0,
+            TEST_TRANSFER_SIZE,
+            MICROS_GRANT_PERMISSION_WRITE
+        ) != MICROS_SYSCALL_ABI_OK
+        || micros_runtime_grant_validate(
+            micros_user_runtime_test_config.client_endpoint,
+            read_grant,
+            0,
+            0,
+            MICROS_GRANT_PERMISSION_WRITE
+        ) != MICROS_SYSCALL_ABI_UNAUTHORIZED
+    ) {
+        return UINT64_C(0x40a);
+    }
     micros_user_runtime_test_server_region.before =
         MICROS_USER_RUNTIME_TEST_CANARY_BEFORE;
     micros_user_runtime_test_server_region.after =
@@ -688,7 +713,14 @@ static uint64_t run_server(void)
     }
     read_grant = get_u32(message.payload);
     if (
-        micros_runtime_grant_copy_from(
+        micros_runtime_grant_validate(
+            micros_user_runtime_test_config.client_endpoint,
+            read_grant,
+            0,
+            TEST_TRANSFER_SIZE,
+            MICROS_GRANT_PERMISSION_READ
+        ) != MICROS_SYSCALL_ABI_STALE_GRANT
+        || micros_runtime_grant_copy_from(
             micros_user_runtime_test_config.client_endpoint,
             read_grant,
             0,

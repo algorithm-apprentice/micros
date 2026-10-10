@@ -102,8 +102,12 @@ static bool validate_configuration(
             != MICROS_BOOTSTRAP_MANIFEST_VERSION
         || micros_bootstrap_service_config.service_id
             != MICROS_RAMFS_SERVICE_ID
-        || micros_bootstrap_service_config.service_count
-            != MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        || (
+            micros_bootstrap_service_config.service_count
+                != MICROS_RAMFS_SERVICE_ID + 1
+            && micros_bootstrap_service_config.service_count
+                != MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        )
         || micros_bootstrap_service_config.self_endpoint
             != micros_bootstrap_service_config
                 .services[MICROS_RAMFS_SERVICE_ID - 1].endpoint
@@ -135,6 +139,18 @@ static bool validate_configuration(
             ) {
                 return false;
             }
+        }
+    }
+    for (
+        index = micros_bootstrap_service_config.service_count;
+        index < MICROS_BOOTSTRAP_SERVICE_CAPACITY;
+        ++index
+    ) {
+        if (
+            micros_bootstrap_service_config.services[index].service_id != 0
+            || micros_bootstrap_service_config.services[index].endpoint != 0
+        ) {
+            return false;
         }
     }
     for (

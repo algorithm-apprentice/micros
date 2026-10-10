@@ -72,6 +72,25 @@ enum micros_syscall_abi_result micros_grant_syscall_decode(
         candidate.local_address = (uintptr_t)arguments->a3;
         candidate.length = (size_t)arguments->a4;
         break;
+    case MICROS_SYSCALL_ABI_GRANT_VALIDATE:
+        if (
+            arguments->a5 != 0
+            || arguments->a6 != 0
+            || !capture_u32(arguments->a0, &captured)
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.endpoint = captured;
+        if (!capture_u32(arguments->a1, &captured)) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.grant = captured;
+        candidate.offset = arguments->a2;
+        candidate.length = (size_t)arguments->a3;
+        if (!capture_u32(arguments->a4, &candidate.permissions)) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        break;
     default:
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }

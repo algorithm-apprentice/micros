@@ -49,7 +49,7 @@ def vm_image():
             symbol_type=1,
             section_index=4,
             value=check_user_elf.USER_BASE + 3 * 4096,
-            size=364672,
+            size=364704,
         )
     )
     return replace(
@@ -88,7 +88,7 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
             output,
         )
         self.assertIn(
-            ".vm_boot_info_size = UINT32_C(0x00059080)",
+            ".vm_boot_info_size = UINT32_C(0x000590a0)",
             output,
         )
         self.assertIn(".total_user_page_limit = 103", output)

@@ -10,7 +10,7 @@
 
 enum {
     MICROS_BOOTSTRAP_MANIFEST_VERSION = 1,
-    MICROS_BOOTSTRAP_SERVICE_CAPACITY = 6,
+    MICROS_BOOTSTRAP_SERVICE_CAPACITY = 7,
     MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE = 64,
     MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE = 192,
     MICROS_BOOTSTRAP_MANIFEST_SIZE =
@@ -300,7 +300,7 @@ struct micros_bootstrap_service_config {
     struct micros_bootstrap_service_endpoint
         services[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
     uint64_t manifest_view_address;
-    uint64_t reserved[6];
+    uint64_t reserved[5];
 };
 
 _Static_assert(
@@ -485,11 +485,11 @@ _Static_assert(
         && offsetof(
             struct micros_bootstrap_service_config,
             manifest_view_address
-        ) == 72
+        ) == 80
         && offsetof(
             struct micros_bootstrap_service_config,
             reserved
-        ) == 80,
+        ) == 88,
     "bootstrap service configuration offsets changed"
 );
 
