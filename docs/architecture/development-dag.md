@@ -240,6 +240,39 @@ Step 12 does not add production VFS descriptors, application I/O, unlink,
 rename, truncate, block storage, executable loading, init, or shell behavior.
 Those remain at their later DAG nodes.
 
+Step 13 is internally serialized:
+
+1. fix the local MINIX VFS caller, process, descriptor, open-file, vnode,
+   pathname, character-device, directory-record, and exit-cleanup baseline;
+2. add one non-copying grantee-only grant-range preflight so a consuming
+   second hop cannot lose terminal input on an invalid application
+   destination, and atomically move manifest storage, service configuration,
+   and VM boot information to their exact capacity-seven layouts;
+3. define fixed process, descriptor, open-file, vnode, root/cwd, bounce-page,
+   directory-record, and asynchronous-operation bounds;
+4. implement and model exact application open, close, read, write, getdents,
+   mkdir, and chdir calls;
+5. mount RAMFS once, aggregate backend references, and bind trusted process
+   descriptors 0, 1, and 2 to one synthetic console object;
+6. compose TTY submit, completion, collection, cancellation, and writable
+   retry without blocking VFS's receive loop;
+7. run one replayable mixed VFS model that compares complete production and
+   independent reference state after every operation; and
+8. run one seven-process QEMU scenario with the six real production services
+   plus an isolated application probe that proves both grant hops, pathname
+   routing, translated directories, console I/O, zero live grants, and clean
+   launcher sealing.
+
+The bootstrap object may store seven entries for that isolated fixture, but
+the production manifest remains exactly the six-service chain. The probe is
+not `init`, cannot call RAMFS or TTY, and does not implement production spawn.
+
+Step 13 does not add PM/VFS transaction messages, executable buffering,
+dynamic mapping, application activation, target exit teardown, seek, truncate,
+unlink, rename, named devices, pipes, sockets, block devices, signals, init, or
+the shell. Step 14 adds those dependency-ready integrations around the
+reviewed VFS state owner.
+
 `init` is not a static manifest service. Step 14 creates it through the
 ADR-0009 PM/VFS/VM spawn transaction after launcher authority is sealed.
 

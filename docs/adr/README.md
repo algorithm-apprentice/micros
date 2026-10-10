@@ -64,3 +64,4 @@ to make the project appear more consistent than it was.
 | [0046](0046-pm-process-lifecycle-and-spawn-metadata.md) | PM process lifecycle and spawn metadata | Accepted |
 | [0047](0047-tty-console-handoff-and-serial-protocol.md) | TTY console handoff and serial protocol | Accepted |
 | [0048](0048-ramfs-service-and-vfs-filesystem-protocol.md) | RAMFS service and VFS filesystem protocol | Accepted |
+| [0049](0049-vfs-service-and-application-io-protocol.md) | VFS service and application I/O protocol | Accepted |
