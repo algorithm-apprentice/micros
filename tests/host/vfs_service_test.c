@@ -34,6 +34,8 @@ static const micros_endpoint_t pm_endpoint =
     UINT32_C(0x00001002);
 static const micros_endpoint_t application_endpoint =
     UINT32_C(0x00002006);
+static const micros_endpoint_t spawn_child_endpoint =
+    UINT32_C(0x00003007);
 
 static struct micros_vfs_state state;
 static struct vfs_test_fixture fixture;
@@ -1559,6 +1561,53 @@ static bool service_dispatches_pm_control(void)
         && read_u64_le(&action.message.payload[16]) != 0
     );
     descriptor_token = read_u64_le(&action.message.payload[16]);
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_COMMIT_HIDDEN
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x501));
+    write_u64_le(&message.payload[16], image_token);
+    write_u64_le(&message.payload[24], descriptor_token);
+    write_u32_le(&message.payload[32], spawn_child_endpoint);
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_CONTROL_COMMIT_HIDDEN
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_OK
+        && read_u64_le(&action.message.payload[16]) == 0
+        && read_u64_le(&action.message.payload[24]) == 0
+        && read_u64_le(&action.message.payload[32]) == 0
+        && read_u64_le(&action.message.payload[40]) == 0
+    );
+
+    write_u32_le(
+        &message.payload[4],
+        MICROS_VFS_CONTROL_REVERT_HIDDEN
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_CONTROL_REVERT_HIDDEN
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_OK
+        && read_u64_le(&action.message.payload[16]) == 0
+        && read_u64_le(&action.message.payload[24]) == 0
+        && read_u64_le(&action.message.payload[32]) == 0
+        && read_u64_le(&action.message.payload[40]) == 0
+    );
 
     message = pm_control_message(
         MICROS_VFS_CONTROL_ABORT_DESCRIPTORS

@@ -198,7 +198,7 @@ struct micros_vfs_spawn_transaction {
     uint16_t child_root_vnode;
     uint16_t child_working_directory_vnode;
     uint16_t child_descriptors[MICROS_VFS_DESCRIPTOR_CAPACITY];
-    uint32_t reserved1;
+    micros_endpoint_t child_endpoint;
 };
 
 struct micros_vfs_state {
