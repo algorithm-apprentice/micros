@@ -67,3 +67,4 @@ to make the project appear more consistent than it was.
 | [0049](0049-vfs-service-and-application-io-protocol.md) | VFS service and application I/O protocol | Accepted |
 | [0050](0050-post-handoff-elf-spawn.md) | Post-handoff ELF spawn and normal exit | Accepted |
 | [0051](0051-responsibility-based-source-modules.md) | Responsibility-based source modules | Accepted |
+| [0052](0052-vfs-test-source-decomposition.md) | VFS test source decomposition | Accepted |

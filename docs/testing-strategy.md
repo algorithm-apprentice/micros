@@ -55,6 +55,16 @@ Review must also inspect module ownership, private declarations, dependency
 direction, validation order, rollback order, and build source lists. Runtime
 test success alone does not prove that a responsibility split is correct.
 
+The VFS test-source decomposition defined by ADR-0052 applies the same rule
+to the evidence implementation itself. It retains the existing `vfs-core`,
+`vfs-service-core`, `vfs-model`, standalone-image, and QEMU VFS identities;
+splitting a source file does not create another CTest or workflow. During
+extraction, only the narrow existing gate for the active slice runs. Before
+review, the author executes the authoritative pull-request plan once and
+verifies that it includes complete native validation, the standalone VFS
+image, and the QEMU VFS gate. A workflow already selected by that plan is not
+run separately. The reviewer does not routinely rerun those suites.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

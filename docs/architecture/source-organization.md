@@ -221,3 +221,10 @@ in-scope implementation and test review-signal file at its audited base
 commit, records cohesive exceptions, and defines separate dependency-ordered
 design and implementation task pairs. Existing large files are technical debt
 to assess; this policy does not authorize one broad repository rewrite.
+
+The first audit correction is the VFS test-source design. Its exact fixture,
+behavior, protocol, model, target, tooling, private-contract, and function
+boundaries are defined in
+[VFS Test Source Organization](vfs-test-source-organization.md). The design
+preserves the current test executables and workflows; it does not equate a
+source-file split with an additional test job.

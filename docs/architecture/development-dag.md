@@ -309,8 +309,10 @@ Step 14 is internally serialized:
 The repository source-module audit adds behavior-preserving maintenance gates
 to this sequence without changing the runtime dependency graph:
 
-- the VFS test-source decomposition must merge before item 7 adds exit-cleanup
-  coverage to the currently signaled VFS test files; and
+- the VFS test-source decomposition defined by
+  [ADR-0052](../adr/0052-vfs-test-source-decomposition.md) must merge before
+  item 7 adds exit-cleanup coverage to the currently signaled VFS test files;
+  and
 - the address-space, frame-ownership, kernel VM-handoff, kernel PM-control,
   VM-service, and PM-service correction implementations must merge before the
   cross-service coordinator composes the remaining spawn and exit transaction.
