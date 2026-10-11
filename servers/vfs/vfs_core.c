@@ -335,25 +335,13 @@ enum micros_vfs_core_error micros_vfs_handle_control(
     return error;
 }
 
-enum micros_vfs_core_error micros_vfs_handle_request(
+static enum micros_vfs_core_error prepare_application_request(
     struct micros_vfs_state *state,
     const struct micros_vfs_request *request,
-    const struct micros_vfs_io *io,
+    size_t *process_slot,
     struct micros_vfs_result_action *action
 )
 {
-    size_t process_slot;
-    enum micros_vfs_core_error error;
-
-    if (
-        state == NULL
-        || request == NULL
-        || action == NULL
-        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
-    vfs_zero_bytes(action, sizeof(*action));
     if (request->reply_token == 0) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
@@ -386,7 +374,7 @@ enum micros_vfs_core_error micros_vfs_handle_request(
         || !vfs_find_process(
             state,
             request->source,
-            &process_slot
+            process_slot
         )
     ) {
         vfs_prepare_result(
@@ -404,57 +392,103 @@ enum micros_vfs_core_error micros_vfs_handle_request(
         );
         return MICROS_VFS_CORE_OK;
     }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error dispatch_application_request(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
     switch (request->type) {
     case MICROS_VFS_MESSAGE_OPEN:
-        error = vfs_namespace_handle_open(
+        return vfs_namespace_handle_open(
             state,
             process_slot,
             request,
             io,
             action
         );
-        break;
     case MICROS_VFS_MESSAGE_CLOSE:
-        error = vfs_io_handle_close(
+        return vfs_io_handle_close(
             state,
             process_slot,
             request,
             io,
             action
         );
-        break;
     case MICROS_VFS_MESSAGE_READ:
     case MICROS_VFS_MESSAGE_WRITE:
     case MICROS_VFS_MESSAGE_GETDENTS:
-        error = vfs_io_handle_transfer(
+        return vfs_io_handle_transfer(
             state,
             process_slot,
             request,
             io,
             action
         );
-        break;
     case MICROS_VFS_MESSAGE_MKDIR:
-        error = vfs_namespace_handle_mkdir(
+        return vfs_namespace_handle_mkdir(
             state,
             process_slot,
             request,
             io,
             action
         );
-        break;
     case MICROS_VFS_MESSAGE_CHDIR:
-        error = vfs_namespace_handle_chdir(
+        return vfs_namespace_handle_chdir(
             state,
             process_slot,
             request,
             io,
             action
         );
-        break;
     default:
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
+}
+
+enum micros_vfs_core_error micros_vfs_handle_request(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
+    size_t process_slot;
+    enum micros_vfs_core_error error;
+
+    if (
+        state == NULL
+        || request == NULL
+        || action == NULL
+        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    vfs_zero_bytes(action, sizeof(*action));
+    error = prepare_application_request(
+        state,
+        request,
+        &process_slot,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || action->active
+    ) {
+        return error;
+    }
+    error = dispatch_application_request(
+        state,
+        process_slot,
+        request,
+        io,
+        action
+    );
     if (
         error == MICROS_VFS_CORE_OK
         && micros_vfs_state_validate(state)
