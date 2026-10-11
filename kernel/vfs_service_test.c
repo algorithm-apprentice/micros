@@ -363,54 +363,65 @@ _Noreturn void micros_vfs_service_test_launch(void)
     micros_bootstrap_runtime_launch(&runtime_config);
 }
 
-enum micros_vfs_service_test_trap_result
-micros_vfs_service_test_handle_trap(
+struct vfs_test_terminal_state {
+    const struct micros_bootstrap_control_state *bootstrap;
+    const struct micros_vm_handoff_state *vm;
+    const struct micros_tty_handoff_runtime_state *tty;
+    const struct micros_endpoint_registry *registry;
+    const struct micros_grant_registry *grants;
+    const struct micros_kernel_objects *objects;
+    const struct micros_bootstrap_binding *application;
+    struct micros_thread_handle current;
+};
+
+static bool vfs_test_match_report_trap(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    struct vfs_test_terminal_state *state
+)
+{
+    state->bootstrap = micros_bootstrap_runtime_state();
+    state->vm = micros_vm_handoff_runtime_state();
+    state->tty = micros_tty_handoff_runtime_state();
+    state->registry = micros_ipc_runtime_registry();
+    state->grants = micros_grant_runtime_registry();
+    state->objects = micros_kernel_object_runtime_registry();
+    return (
+        hart != NULL
+        && frame != NULL
+        && frame->scause == MICROS_VFS_TEST_EXCEPTION_BREAKPOINT
+        && frame->sepc == micros_vfs_service_test_report_address
+        && state->bootstrap != NULL
+        && state->objects != NULL
+    );
+}
+
+static bool vfs_test_authenticate_reporter(
+    struct vfs_test_terminal_state *state
+)
+{
+    state->application = micros_bootstrap_control_find_binding(
+        state->bootstrap,
+        MICROS_VFS_TEST_APPLICATION_SERVICE_ID
+    );
+    return (
+        state->application != NULL
+        && micros_hart_current_thread(
+            state->objects,
+            micros_kernel_object_runtime_boot_hart_handle(),
+            &state->current
+        ) == MICROS_KERNEL_OBJECT_OK
+        && state->current.slot == state->application->thread.slot
+        && state->current.generation
+            == state->application->thread.generation
+    );
+}
+
+static void vfs_test_classify_report(
     struct micros_hart *hart,
     struct micros_trap_frame *frame
 )
 {
-    const struct micros_bootstrap_control_state *bootstrap =
-        micros_bootstrap_runtime_state();
-    const struct micros_vm_handoff_state *vm =
-        micros_vm_handoff_runtime_state();
-    const struct micros_tty_handoff_runtime_state *tty =
-        micros_tty_handoff_runtime_state();
-    const struct micros_endpoint_registry *registry =
-        micros_ipc_runtime_registry();
-    const struct micros_grant_registry *grants =
-        micros_grant_runtime_registry();
-    const struct micros_kernel_objects *objects =
-        micros_kernel_object_runtime_registry();
-    const struct micros_bootstrap_binding *application;
-    struct micros_thread_handle current;
-    size_t index;
-
-    if (
-        hart == NULL
-        || frame == NULL
-        || frame->scause != MICROS_VFS_TEST_EXCEPTION_BREAKPOINT
-        || frame->sepc != micros_vfs_service_test_report_address
-        || bootstrap == NULL
-        || objects == NULL
-    ) {
-        return MICROS_VFS_SERVICE_TEST_TRAP_MISMATCH;
-    }
-    application = micros_bootstrap_control_find_binding(
-        bootstrap,
-        MICROS_VFS_TEST_APPLICATION_SERVICE_ID
-    );
-    if (
-        application == NULL
-        || micros_hart_current_thread(
-            objects,
-            micros_kernel_object_runtime_boot_hart_handle(),
-            &current
-        ) != MICROS_KERNEL_OBJECT_OK
-        || current.slot != application->thread.slot
-        || current.generation != application->thread.generation
-    ) {
-        return MICROS_VFS_SERVICE_TEST_TRAP_MISMATCH;
-    }
     switch (frame->a0) {
     case MICROS_VFS_TEST_FAILURE_CONFIGURATION:
         vfs_test_failure(hart, frame, "vfs-service-test-configuration");
@@ -425,66 +436,72 @@ micros_vfs_service_test_handle_trap(
     case MICROS_VFS_TEST_FAILURE_DRAIN:
         vfs_test_failure(hart, frame, "vfs-service-test-drain");
     case MICROS_VFS_TEST_REPORT_MAGIC:
-        break;
+        return;
     default:
         vfs_test_failure(hart, frame, "vfs-service-test-report");
     }
-    if (
-        vm == NULL
-        || tty == NULL
-        || registry == NULL
-        || grants == NULL
-        || bootstrap->entry_count != MICROS_VFS_TEST_SERVICE_COUNT
-        || bootstrap->phase != MICROS_BOOTSTRAP_PHASE_SEALED
-        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
-        || tty->handoff.console_phase != MICROS_TTY_CONSOLE_OWNED
-        || tty->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
-        || tty->handoff.claimed_source != 0
-        || tty->handoff.deadline_armed
-        || tty->service_id != MICROS_VFS_TEST_TTY_SERVICE_ID
-        || !uart_console_handoff_is_active()
-        || !riscv_external_interrupt_is_enabled()
-        || !micros_plic_validate(MICROS_PLIC_ENABLED)
-        || grants->active_count != 0
-        || micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
-        || micros_vm_handoff_runtime_validate(
-            bootstrap,
-            registry,
-            objects
-        ) != MICROS_VM_HANDOFF_OK
-        || micros_tty_handoff_runtime_validate(
-            bootstrap,
-            registry,
-            objects
-        ) != MICROS_TTY_HANDOFF_OK
-        || micros_user_address_space_validate_tty_uart_mapping(
-            tty->process,
-            tty->root_physical_address
-        ) != MICROS_USER_ADDRESS_SPACE_OK
-        || micros_grant_runtime_validate() != MICROS_GRANT_OK
-    ) {
-        vfs_test_failure(hart, frame, "vfs-service-test-state");
-    }
+}
+
+static bool vfs_test_terminal_state_is_valid(
+    const struct vfs_test_terminal_state *state
+)
+{
+    return (
+        state->vm != NULL
+        && state->tty != NULL
+        && state->registry != NULL
+        && state->grants != NULL
+        && state->bootstrap->entry_count
+            == MICROS_VFS_TEST_SERVICE_COUNT
+        && state->bootstrap->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+        && state->vm->phase == MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        && state->tty->handoff.console_phase == MICROS_TTY_CONSOLE_OWNED
+        && state->tty->handoff.route_phase == MICROS_TTY_ROUTE_IDLE
+        && state->tty->handoff.claimed_source == 0
+        && !state->tty->handoff.deadline_armed
+        && state->tty->service_id == MICROS_VFS_TEST_TTY_SERVICE_ID
+        && uart_console_handoff_is_active()
+        && riscv_external_interrupt_is_enabled()
+        && micros_plic_validate(MICROS_PLIC_ENABLED)
+        && state->grants->active_count == 0
+        && micros_bootstrap_runtime_validate() == MICROS_BOOTSTRAP_OK
+        && micros_vm_handoff_runtime_validate(
+            state->bootstrap,
+            state->registry,
+            state->objects
+        ) == MICROS_VM_HANDOFF_OK
+        && micros_tty_handoff_runtime_validate(
+            state->bootstrap,
+            state->registry,
+            state->objects
+        ) == MICROS_TTY_HANDOFF_OK
+        && micros_user_address_space_validate_tty_uart_mapping(
+            state->tty->process,
+            state->tty->root_physical_address
+        ) == MICROS_USER_ADDRESS_SPACE_OK
+        && micros_grant_runtime_validate() == MICROS_GRANT_OK
+    );
+}
+
+static bool vfs_test_all_services_are_ready(
+    const struct micros_bootstrap_control_state *bootstrap
+)
+{
+    size_t index;
+
     for (index = 0; index < bootstrap->entry_count; ++index) {
         if (
             bootstrap->transitions.entries[index].state
                 != MICROS_BOOTSTRAP_SERVICE_READY
         ) {
-            vfs_test_failure(
-                hart,
-                frame,
-                "vfs-service-test-readiness"
-            );
+            return false;
         }
     }
-    if (!vfs_test_uart_is_physically_drained()) {
-        vfs_test_failure(
-            hart,
-            frame,
-            "vfs-service-test-uart-drain"
-        );
-    }
+    return true;
+}
+
+static _Noreturn void vfs_test_shutdown(void)
+{
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
@@ -492,4 +509,31 @@ micros_vfs_service_test_handle_trap(
     for (;;) {
         __asm__ volatile("wfi");
     }
+}
+
+enum micros_vfs_service_test_trap_result
+micros_vfs_service_test_handle_trap(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame
+)
+{
+    struct vfs_test_terminal_state state;
+
+    if (!vfs_test_match_report_trap(hart, frame, &state)) {
+        return MICROS_VFS_SERVICE_TEST_TRAP_MISMATCH;
+    }
+    if (!vfs_test_authenticate_reporter(&state)) {
+        return MICROS_VFS_SERVICE_TEST_TRAP_MISMATCH;
+    }
+    vfs_test_classify_report(hart, frame);
+    if (!vfs_test_terminal_state_is_valid(&state)) {
+        vfs_test_failure(hart, frame, "vfs-service-test-state");
+    }
+    if (!vfs_test_all_services_are_ready(state.bootstrap)) {
+        vfs_test_failure(hart, frame, "vfs-service-test-readiness");
+    }
+    if (!vfs_test_uart_is_physically_drained()) {
+        vfs_test_failure(hart, frame, "vfs-service-test-uart-drain");
+    }
+    vfs_test_shutdown();
 }
