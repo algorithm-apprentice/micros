@@ -12,6 +12,9 @@ This directory contains the design baseline for `micros`.
   classifies every in-scope tracked implementation/test source review signal
   at the audited base and records dependency-ordered correction units and
   cohesive exceptions.
+- [VFS test source organization](architecture/vfs-test-source-organization.md)
+  defines the exact behavior, fixture, model, target, and tooling boundaries
+  required before VFS exit-cleanup coverage is added.
 - [Development dependency DAG](architecture/development-dag.md) converts the
   cyclic runtime architecture into an acyclic implementation sequence.
 
@@ -65,6 +68,10 @@ This directory contains the design baseline for `micros`.
 - [MINIX VFS source-organization baseline](research/minix-vfs-source-organization.md)
   maps MINIX VFS responsibilities to the required `micros` adaptations before
   the portable VFS core is decomposed.
+- [MINIX VFS test-organization baseline](research/minix-vfs-test-organization.md)
+  traces the shared harness, behavior-oriented test programs, helper
+  executables, and required `micros` evidence extensions before the VFS test
+  sources are decomposed.
 
 ## Planning and verification
 

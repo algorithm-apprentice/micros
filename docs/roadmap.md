@@ -234,7 +234,10 @@ the accepted VFS behavior. The VFS decomposition is now merged, and the
 [repository source-module audit](architecture/source-module-audit.md)
 classifies the remaining in-scope implementation/test source review signals
 into separate subsystem design and implementation pairs rather than one
-repository-wide rewrite.
+repository-wide rewrite. ADR-0052 defines the first correction: preserve the
+existing VFS test executions while separating fixture, core, spawn, service,
+model, target, kernel-hook, and fixture-generation source ownership before
+exit-cleanup coverage is added.
 
 ## v0.1 completion goal
 

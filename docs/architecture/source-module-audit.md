@@ -82,7 +82,7 @@ new behavior in the same signaled sources.
 
 | Unit | Signal files | Required outcome | Task pair |
 | --- | ---: | --- | --- |
-| VFS tests | 8 | Separate shared fixtures, core descriptor/namespace behavior, spawn transactions, service codec cases, replayable model logic, and target scenarios before adding exit-cleanup coverage. | `vfs-test-decomposition-design` / `vfs-test-decomposition-implementation` |
+| VFS tests | 8 | Apply the exact [VFS test source organization](vfs-test-source-organization.md): separate shared fixtures, core behavior, spawn transactions, service protocols, replayable model logic, target scenarios, and fixture generation before adding exit-cleanup coverage. | `vfs-test-decomposition-design` / `vfs-test-decomposition-implementation` |
 | Kernel address spaces | 7 | Separate ordinary root/mapping ownership, complete validation, VM scratch, freeze/teardown, activation, execution validation, and their target scenarios. | `kernel-address-space-decomposition-design` / `kernel-address-space-decomposition-implementation` |
 | Frame ownership | 4 | Separate allocator-ledger validation, bootstrap handoff, VM claim/freeze/release transitions, and model/target scenarios. | `frame-ownership-decomposition-design` / `frame-ownership-decomposition-implementation` |
 | Kernel VM handoff | 7 | Separate ABI decoding, static handoff, dynamic load/scratch/freeze/commit/exit state, syscall adaptation, and tests. | `kernel-vm-handoff-decomposition-design` / `kernel-vm-handoff-decomposition-implementation` |
