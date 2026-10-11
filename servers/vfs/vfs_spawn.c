@@ -304,74 +304,53 @@ static enum micros_vfs_core_error read_spawn_executable(
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error vfs_spawn_prepare_image(
-    struct micros_vfs_state *state,
-    const struct micros_vfs_control_request *request,
-    const struct micros_vfs_io *io,
-    struct micros_vfs_control_result_action *action
+static bool spawn_image_request_is_valid(
+    const struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request
 )
 {
-    struct micros_spawn_request decoded;
-    struct micros_spawn_stack_layout stack_layout;
-    struct micros_vfs_process_record *parent = NULL;
-    struct micros_vfs_ramfs_response lookup = {0};
-    micros_grant_t executable_grant = MICROS_GRANT_NONE;
-    micros_grant_t request_grant = MICROS_GRANT_NONE;
-    uint16_t root_vnode = 1;
-    uint16_t start_vnode = 1;
-    size_t parent_slot = 0;
-    size_t reserved_vnode_slot = 0;
-    size_t executable_vnode_slot = 0;
-    bool existing_vnode;
-    enum micros_vfs_control_result result =
-        MICROS_VFS_CONTROL_RESULT_OK;
-    enum micros_vfs_client_result client_result;
-    enum micros_vfs_core_error error;
-
-    if (
-        request->version != MICROS_VFS_PROTOCOL_VERSION
-        || request->source != state->pm_endpoint
-        || request->reply_token == 0
-        || request->lifecycle_token == 0
-        || request->semantic_pid == 0
-        || request->request_grant == 0
-        || request->request_grant == MICROS_GRANT_NONE
-        || request->request_size
-            < MICROS_SPAWN_REQUEST_SIZE_MIN
-        || request->request_size
-            > MICROS_SPAWN_REQUEST_SIZE_MAX
-        || request->image_token != 0
-        || request->descriptor_token != 0
-        || request->child_endpoint != 0
-        || (
-            request->trusted_init
-            && request->parent_endpoint != 0
-        )
-        || (
+    return (
+        request->version == MICROS_VFS_PROTOCOL_VERSION
+        && request->source == state->pm_endpoint
+        && request->reply_token != 0
+        && request->lifecycle_token != 0
+        && request->semantic_pid != 0
+        && request->request_grant != 0
+        && request->request_grant != MICROS_GRANT_NONE
+        && request->request_size >= MICROS_SPAWN_REQUEST_SIZE_MIN
+        && request->request_size <= MICROS_SPAWN_REQUEST_SIZE_MAX
+        && request->image_token == 0
+        && request->descriptor_token == 0
+        && request->child_endpoint == 0
+        && (
             !request->trusted_init
-            && !vfs_endpoint_is_canonical(
+            || request->parent_endpoint == 0
+        )
+        && (
+            request->trusted_init
+            || vfs_endpoint_is_canonical(
                 request->parent_endpoint
             )
         )
-    ) {
-        vfs_prepare_control_result(
-            request,
-            MICROS_VFS_CONTROL_RESULT_STATE,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        state->phase != MICROS_VFS_PHASE_MOUNTED
-        || state->spawn.phase != MICROS_VFS_SPAWN_IDLE
-    ) {
-        vfs_prepare_control_result(
-            request,
-            MICROS_VFS_CONTROL_RESULT_STATE,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
+        && state->phase == MICROS_VFS_PHASE_MOUNTED
+        && state->spawn.phase == MICROS_VFS_SPAWN_IDLE
+    );
+}
+
+static enum micros_vfs_core_error load_spawn_request(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_spawn_request *decoded,
+    uint16_t *root_vnode,
+    uint16_t *start_vnode,
+    enum micros_vfs_control_result *result,
+    struct micros_vfs_control_result_action *action
+)
+{
+    struct micros_spawn_stack_layout stack_layout;
+    enum micros_vfs_client_result client_result;
+
     if (
         state->last_image_token == UINT64_MAX
         || io == NULL
@@ -381,6 +360,9 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     if (!request->trusted_init) {
+        size_t parent_slot;
+        const struct micros_vfs_process_record *parent;
+
         if (
             !vfs_find_process(
                 state,
@@ -388,16 +370,13 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
                 &parent_slot
             )
         ) {
-            vfs_prepare_control_result(
-                request,
-                MICROS_VFS_CONTROL_RESULT_STATE,
-                action
-            );
+            *result = MICROS_VFS_CONTROL_RESULT_STATE;
+            vfs_prepare_control_result(request, *result, action);
             return MICROS_VFS_CORE_OK;
         }
         parent = &state->processes[parent_slot];
-        root_vnode = parent->root_vnode;
-        start_vnode = parent->working_directory_vnode;
+        *root_vnode = parent->root_vnode;
+        *start_vnode = parent->working_directory_vnode;
     }
     client_result = io->client_validate(
         io->context,
@@ -424,10 +403,10 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
         || micros_spawn_request_decode(
             state->spawn_request_bytes,
             request->request_size,
-            &decoded
+            decoded
         ) != MICROS_SPAWN_REQUEST_OK
         || micros_spawn_stack_layout_plan(
-            &decoded,
+            decoded,
             &stack_layout
         ) != MICROS_SPAWN_STACK_LAYOUT_OK
     ) {
@@ -438,22 +417,22 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
             request->trusted_init
             && (
                 state->spawn_request_bytes[
-                    decoded.path.offset
+                    decoded->path.offset
                 ] != '/'
-                || decoded.descriptor_action_count != 0
+                || decoded->descriptor_action_count != 0
             )
         )
         || !spawn_path_components_fit(
-            &state->spawn_request_bytes[decoded.path.offset],
-            decoded.path.size
+            &state->spawn_request_bytes[decoded->path.offset],
+            decoded->path.size
         )
     ) {
-        result = request->trusted_init
+        *result = request->trusted_init
                 && (
                     state->spawn_request_bytes[
-                        decoded.path.offset
+                        decoded->path.offset
                     ] != '/'
-                    || decoded.descriptor_action_count != 0
+                    || decoded->descriptor_action_count != 0
                 )
             ? MICROS_VFS_CONTROL_RESULT_STATE
             : MICROS_VFS_CONTROL_RESULT_TOO_BIG;
@@ -461,13 +440,200 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
             state->spawn_request_bytes,
             sizeof(state->spawn_request_bytes)
         );
-        vfs_prepare_control_result(request, result, action);
+        vfs_prepare_control_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     if (
-        state->spawn_request_bytes[decoded.path.offset] == '/'
+        state->spawn_request_bytes[decoded->path.offset] == '/'
     ) {
-        start_vnode = root_vnode;
+        *start_vnode = *root_vnode;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static void classify_spawn_executable(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_ramfs_response *lookup,
+    size_t *reserved_vnode_slot,
+    size_t *executable_vnode_slot,
+    enum micros_vfs_control_result *result
+)
+{
+    bool existing_vnode;
+
+    if (
+        (
+            lookup->mode & MICROS_RAMFS_MODE_TYPE_MASK
+        ) != MICROS_RAMFS_MODE_REGULAR
+        || (lookup->mode & UINT32_C(0111)) == 0
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_ACCESS;
+    } else if (lookup->file_size == 0) {
+        *result = MICROS_VFS_CONTROL_RESULT_EXECUTABLE;
+    } else if (
+        lookup->file_size > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_TOO_BIG;
+    }
+    existing_vnode = vfs_find_vnode_by_node(
+        state,
+        lookup->node,
+        executable_vnode_slot
+    );
+    if (
+        *result == MICROS_VFS_CONTROL_RESULT_OK
+        && !existing_vnode
+        && !vfs_find_free_vnode(state, reserved_vnode_slot)
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+    }
+}
+
+static enum micros_vfs_core_error transfer_spawn_executable(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_ramfs_response *lookup,
+    const struct micros_vfs_io *io,
+    micros_grant_t *executable_grant,
+    micros_grant_t *request_grant,
+    enum micros_vfs_control_result *result
+)
+{
+    enum micros_vfs_core_error error;
+
+    if (*result == MICROS_VFS_CONTROL_RESULT_OK) {
+        error = read_spawn_executable(
+            state,
+            lookup,
+            io,
+            result
+        );
+        if (error != MICROS_VFS_CORE_OK) {
+            return error;
+        }
+    }
+    if (*result == MICROS_VFS_CONTROL_RESULT_OK) {
+        error = create_spawn_grant(
+            io,
+            state->vm_endpoint,
+            state->spawn_executable_bytes,
+            lookup->file_size,
+            MICROS_GRANT_PERMISSION_READ,
+            executable_grant,
+            result
+        );
+        if (error != MICROS_VFS_CORE_OK) {
+            return error;
+        }
+    }
+    if (*result == MICROS_VFS_CONTROL_RESULT_OK) {
+        return create_spawn_grant(
+            io,
+            state->vm_endpoint,
+            state->spawn_request_bytes,
+            request->request_size,
+            MICROS_GRANT_PERMISSION_READ,
+            request_grant,
+            result
+        );
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error commit_spawn_image(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_ramfs_response *lookup,
+    const struct micros_vfs_io *io,
+    size_t reserved_vnode_slot,
+    size_t executable_vnode_slot,
+    micros_grant_t executable_grant,
+    micros_grant_t request_grant,
+    struct micros_vfs_control_result_action *action
+)
+{
+    enum micros_vfs_core_error error;
+
+    error = vfs_namespace_integrate_vnode(
+        state,
+        lookup,
+        reserved_vnode_slot,
+        io,
+        &executable_vnode_slot
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    ++state->last_image_token;
+    state->spawn = (struct micros_vfs_spawn_transaction){
+        .phase = MICROS_VFS_SPAWN_IMAGE_PREPARED,
+        .trusted_init = request->trusted_init,
+        .parent_endpoint = request->parent_endpoint,
+        .pm_spawn_token = request->lifecycle_token,
+        .image_token = state->last_image_token,
+        .semantic_pid = request->semantic_pid,
+        .request_size = request->request_size,
+        .executable_vnode =
+            (uint16_t)(executable_vnode_slot + 1),
+        .executable_size = lookup->file_size,
+        .executable_grant = executable_grant,
+        .request_grant = request_grant,
+    };
+    vfs_prepare_control_result(
+        request,
+        MICROS_VFS_CONTROL_RESULT_OK,
+        action
+    );
+    action->image_token = state->spawn.image_token;
+    action->executable_grant = executable_grant;
+    action->request_grant = request_grant;
+    action->request_size = request->request_size;
+    action->executable_size = lookup->file_size;
+    return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error vfs_spawn_prepare_image(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+)
+{
+    struct micros_spawn_request decoded;
+    struct micros_vfs_ramfs_response lookup = {0};
+    micros_grant_t executable_grant = MICROS_GRANT_NONE;
+    micros_grant_t request_grant = MICROS_GRANT_NONE;
+    uint16_t root_vnode = 1;
+    uint16_t start_vnode = 1;
+    size_t reserved_vnode_slot = 0;
+    size_t executable_vnode_slot = 0;
+    enum micros_vfs_control_result result =
+        MICROS_VFS_CONTROL_RESULT_OK;
+    enum micros_vfs_core_error error;
+
+    if (!spawn_image_request_is_valid(state, request)) {
+        vfs_prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_STATE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    error = load_spawn_request(
+        state,
+        request,
+        io,
+        &decoded,
+        &root_vnode,
+        &start_vnode,
+        &result,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_CONTROL_RESULT_OK
+    ) {
+        return error;
     }
     error = call_spawn_lookup(
         state,
@@ -489,70 +655,24 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
         vfs_prepare_control_result(request, result, action);
         return MICROS_VFS_CORE_OK;
     }
-    if (
-        (
-            lookup.mode & MICROS_RAMFS_MODE_TYPE_MASK
-        ) != MICROS_RAMFS_MODE_REGULAR
-        || (lookup.mode & UINT32_C(0111)) == 0
-    ) {
-        result = MICROS_VFS_CONTROL_RESULT_ACCESS;
-    } else if (lookup.file_size == 0) {
-        result = MICROS_VFS_CONTROL_RESULT_EXECUTABLE;
-    } else if (
-        lookup.file_size > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
-    ) {
-        result = MICROS_VFS_CONTROL_RESULT_TOO_BIG;
-    }
-    existing_vnode = vfs_find_vnode_by_node(
+    classify_spawn_executable(
         state,
-        lookup.node,
-        &executable_vnode_slot
+        &lookup,
+        &reserved_vnode_slot,
+        &executable_vnode_slot,
+        &result
     );
-    if (
-        result == MICROS_VFS_CONTROL_RESULT_OK
-        && !existing_vnode
-        && !vfs_find_free_vnode(state, &reserved_vnode_slot)
-    ) {
-        result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
-    }
-    if (result == MICROS_VFS_CONTROL_RESULT_OK) {
-        error = read_spawn_executable(
-            state,
-            &lookup,
-            io,
-            &result
-        );
-        if (error != MICROS_VFS_CORE_OK) {
-            return error;
-        }
-    }
-    if (result == MICROS_VFS_CONTROL_RESULT_OK) {
-        error = create_spawn_grant(
-            io,
-            state->vm_endpoint,
-            state->spawn_executable_bytes,
-            lookup.file_size,
-            MICROS_GRANT_PERMISSION_READ,
-            &executable_grant,
-            &result
-        );
-        if (error != MICROS_VFS_CORE_OK) {
-            return error;
-        }
-    }
-    if (result == MICROS_VFS_CONTROL_RESULT_OK) {
-        error = create_spawn_grant(
-            io,
-            state->vm_endpoint,
-            state->spawn_request_bytes,
-            request->request_size,
-            MICROS_GRANT_PERMISSION_READ,
-            &request_grant,
-            &result
-        );
-        if (error != MICROS_VFS_CORE_OK) {
-            return error;
-        }
+    error = transfer_spawn_executable(
+        state,
+        request,
+        &lookup,
+        io,
+        &executable_grant,
+        &request_grant,
+        &result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
     }
     if (result != MICROS_VFS_CONTROL_RESULT_OK) {
         error = discard_spawn_preparation(
@@ -568,42 +688,276 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
         vfs_prepare_control_result(request, result, action);
         return MICROS_VFS_CORE_OK;
     }
-    error = vfs_namespace_integrate_vnode(
+    return commit_spawn_image(
         state,
-        &lookup,
-        reserved_vnode_slot,
-        io,
-        &executable_vnode_slot
-    );
-    if (error != MICROS_VFS_CORE_OK) {
-        return error;
-    }
-    ++state->last_image_token;
-    state->spawn = (struct micros_vfs_spawn_transaction){
-        .phase = MICROS_VFS_SPAWN_IMAGE_PREPARED,
-        .trusted_init = request->trusted_init,
-        .parent_endpoint = request->parent_endpoint,
-        .pm_spawn_token = request->lifecycle_token,
-        .image_token = state->last_image_token,
-        .semantic_pid = request->semantic_pid,
-        .request_size = request->request_size,
-        .executable_vnode =
-            (uint16_t)(executable_vnode_slot + 1),
-        .executable_size = lookup.file_size,
-        .executable_grant = executable_grant,
-        .request_grant = request_grant,
-    };
-    vfs_prepare_control_result(
         request,
-        MICROS_VFS_CONTROL_RESULT_OK,
+        &lookup,
+        io,
+        reserved_vnode_slot,
+        executable_vnode_slot,
+        executable_grant,
+        request_grant,
         action
     );
-    action->image_token = state->spawn.image_token;
-    action->executable_grant = executable_grant;
-    action->request_grant = request_grant;
-    action->request_size = request->request_size;
-    action->executable_size = lookup.file_size;
+}
+
+struct spawn_descriptor_preparation {
+    struct micros_spawn_request decoded;
+    uint16_t child_descriptors[MICROS_VFS_DESCRIPTOR_CAPACITY];
+    size_t open_file_slots[3];
+    size_t child_process_slot;
+    uint16_t root_vnode;
+    uint16_t working_directory_vnode;
+};
+
+static bool spawn_descriptor_request_is_valid(
+    const struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request
+)
+{
+    return (
+        request->version == MICROS_VFS_PROTOCOL_VERSION
+        && request->source == state->pm_endpoint
+        && request->reply_token != 0
+        && request->lifecycle_token != 0
+        && request->image_token != 0
+        && request->semantic_pid != 0
+        && !request->trusted_init
+        && request->parent_endpoint == 0
+        && request->request_grant == 0
+        && request->request_size == 0
+        && request->descriptor_token == 0
+        && request->child_endpoint == 0
+        && state->phase == MICROS_VFS_PHASE_MOUNTED
+        && state->spawn.phase
+            == MICROS_VFS_SPAWN_IMAGE_PREPARED
+        && request->lifecycle_token
+            == state->spawn.pm_spawn_token
+        && request->image_token == state->spawn.image_token
+        && request->semantic_pid == state->spawn.semantic_pid
+    );
+}
+
+static enum micros_vfs_core_error
+reserve_trusted_spawn_descriptors(
+    struct micros_vfs_state *state,
+    struct spawn_descriptor_preparation *preparation,
+    enum micros_vfs_control_result *result
+)
+{
+    preparation->root_vnode = 1;
+    preparation->working_directory_vnode = 1;
+    if (preparation->decoded.descriptor_action_count != 0) {
+        *result = MICROS_VFS_CONTROL_RESULT_STATE;
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        !vfs_find_free_open_files(
+            state,
+            3,
+            preparation->open_file_slots
+        )
+        || state->vnodes[0].local_reference_count
+            > UINT32_MAX - 2
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+        return MICROS_VFS_CORE_OK;
+    }
+    preparation->child_descriptors[0] =
+        (uint16_t)(preparation->open_file_slots[0] + 1);
+    preparation->child_descriptors[1] =
+        (uint16_t)(preparation->open_file_slots[1] + 1);
+    preparation->child_descriptors[2] =
+        (uint16_t)(preparation->open_file_slots[2] + 1);
     return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error
+reserve_public_spawn_descriptors(
+    struct micros_vfs_state *state,
+    struct spawn_descriptor_preparation *preparation,
+    enum micros_vfs_control_result *result
+)
+{
+    const struct micros_vfs_process_record *parent;
+    size_t parent_slot;
+    size_t descriptor;
+
+    if (
+        !vfs_find_process(
+            state,
+            state->spawn.parent_endpoint,
+            &parent_slot
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    parent = &state->processes[parent_slot];
+    preparation->root_vnode = parent->root_vnode;
+    preparation->working_directory_vnode =
+        parent->working_directory_vnode;
+    for (
+        descriptor = 0;
+        descriptor
+            < preparation->decoded.descriptor_action_count;
+        ++descriptor
+    ) {
+        const struct micros_spawn_descriptor_action *item =
+            &preparation->decoded.descriptor_actions[descriptor];
+        uint16_t reference =
+            parent->descriptors[item->source];
+        size_t same_reference_count = 1;
+        size_t prior;
+
+        if (reference == 0) {
+            *result = MICROS_VFS_CONTROL_RESULT_DESCRIPTOR;
+            return MICROS_VFS_CORE_OK;
+        }
+        for (prior = 0; prior < descriptor; ++prior) {
+            if (
+                parent->descriptors[
+                    preparation->decoded
+                        .descriptor_actions[prior].source
+                ] == reference
+            ) {
+                ++same_reference_count;
+            }
+        }
+        if (
+            state->open_files[reference - 1].reference_count
+                > UINT32_MAX - same_reference_count
+        ) {
+            *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+            return MICROS_VFS_CORE_OK;
+        }
+        preparation->child_descriptors[item->destination] =
+            reference;
+    }
+    if (
+        preparation->root_vnode
+            == preparation->working_directory_vnode
+        && state->vnodes[preparation->root_vnode - 1]
+            .local_reference_count > UINT32_MAX - 2
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        preparation->root_vnode
+            != preparation->working_directory_vnode
+        && (
+            state->vnodes[preparation->root_vnode - 1]
+                .local_reference_count == UINT32_MAX
+            || state->vnodes[
+                preparation->working_directory_vnode - 1
+            ].local_reference_count == UINT32_MAX
+        )
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error reserve_spawn_descriptor_state(
+    struct micros_vfs_state *state,
+    struct spawn_descriptor_preparation *preparation,
+    enum micros_vfs_control_result *result
+)
+{
+    enum micros_vfs_core_error error;
+
+    error = state->spawn.trusted_init
+        ? reserve_trusted_spawn_descriptors(
+            state,
+            preparation,
+            result
+        )
+        : reserve_public_spawn_descriptors(
+            state,
+            preparation,
+            result
+        );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || *result != MICROS_VFS_CONTROL_RESULT_OK
+    ) {
+        return error;
+    }
+    if (
+        !vfs_find_free_process(
+            state,
+            &preparation->child_process_slot
+        )
+    ) {
+        *result = MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static void commit_spawn_descriptors(
+    struct micros_vfs_state *state,
+    const struct spawn_descriptor_preparation *preparation
+)
+{
+    size_t descriptor;
+
+    if (state->spawn.trusted_init) {
+        state->open_files[preparation->open_file_slots[0]] =
+            (struct micros_vfs_open_file){
+                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
+                .kind = MICROS_VFS_OBJECT_CONSOLE,
+                .access = MICROS_VFS_ACCESS_READ,
+                .open_flags = MICROS_VFS_OPEN_READ,
+                .reference_count = 1,
+            };
+        state->open_files[preparation->open_file_slots[1]] =
+            (struct micros_vfs_open_file){
+                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
+                .kind = MICROS_VFS_OBJECT_CONSOLE,
+                .access = MICROS_VFS_ACCESS_WRITE,
+                .open_flags = MICROS_VFS_OPEN_WRITE,
+                .reference_count = 1,
+            };
+        state->open_files[preparation->open_file_slots[2]] =
+            state->open_files[preparation->open_file_slots[1]];
+    } else {
+        for (
+            descriptor = 0;
+            descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+            ++descriptor
+        ) {
+            uint16_t reference =
+                preparation->child_descriptors[descriptor];
+
+            if (reference != 0) {
+                ++state->open_files[reference - 1]
+                    .reference_count;
+            }
+        }
+    }
+    ++state->vnodes[preparation->root_vnode - 1]
+        .local_reference_count;
+    ++state->vnodes[
+        preparation->working_directory_vnode - 1
+    ].local_reference_count;
+    ++state->last_descriptor_token;
+    state->spawn.phase =
+        MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED;
+    state->spawn.child_process_reference =
+        (uint16_t)(preparation->child_process_slot + 1);
+    state->spawn.descriptor_token =
+        state->last_descriptor_token;
+    state->spawn.child_root_vnode = preparation->root_vnode;
+    state->spawn.child_working_directory_vnode =
+        preparation->working_directory_vnode;
+    for (
+        descriptor = 0;
+        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+        ++descriptor
+    ) {
+        state->spawn.child_descriptors[descriptor] =
+            preparation->child_descriptors[descriptor];
+    }
 }
 
 enum micros_vfs_core_error vfs_spawn_prepare_descriptors(
@@ -612,37 +966,12 @@ enum micros_vfs_core_error vfs_spawn_prepare_descriptors(
     struct micros_vfs_control_result_action *action
 )
 {
-    struct micros_spawn_request decoded;
-    struct micros_vfs_process_record *parent = NULL;
-    uint16_t child_descriptors[MICROS_VFS_DESCRIPTOR_CAPACITY] = {0};
-    size_t open_file_slots[3] = {0};
-    size_t child_process_slot;
-    size_t parent_slot = 0;
-    size_t descriptor;
-    uint16_t root_vnode;
-    uint16_t working_directory_vnode;
+    struct spawn_descriptor_preparation preparation = {0};
+    enum micros_vfs_control_result result =
+        MICROS_VFS_CONTROL_RESULT_OK;
+    enum micros_vfs_core_error error;
 
-    if (
-        request->version != MICROS_VFS_PROTOCOL_VERSION
-        || request->source != state->pm_endpoint
-        || request->reply_token == 0
-        || request->lifecycle_token == 0
-        || request->image_token == 0
-        || request->semantic_pid == 0
-        || request->trusted_init
-        || request->parent_endpoint != 0
-        || request->request_grant != 0
-        || request->request_size != 0
-        || request->descriptor_token != 0
-        || request->child_endpoint != 0
-        || state->phase != MICROS_VFS_PHASE_MOUNTED
-        || state->spawn.phase
-            != MICROS_VFS_SPAWN_IMAGE_PREPARED
-        || request->lifecycle_token
-            != state->spawn.pm_spawn_token
-        || request->image_token != state->spawn.image_token
-        || request->semantic_pid != state->spawn.semantic_pid
-    ) {
+    if (!spawn_descriptor_request_is_valid(state, request)) {
         vfs_prepare_control_result(
             request,
             MICROS_VFS_CONTROL_RESULT_STATE,
@@ -655,186 +984,24 @@ enum micros_vfs_core_error vfs_spawn_prepare_descriptors(
         || micros_spawn_request_decode(
             state->spawn_request_bytes,
             state->spawn.request_size,
-            &decoded
+            &preparation.decoded
         ) != MICROS_SPAWN_REQUEST_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    if (state->spawn.trusted_init) {
-        root_vnode = 1;
-        working_directory_vnode = 1;
-        if (
-            decoded.descriptor_action_count != 0
-            || !vfs_find_free_open_files(
-                state,
-                3,
-                open_file_slots
-            )
-            || state->vnodes[0].local_reference_count
-                > UINT32_MAX - 2
-        ) {
-            enum micros_vfs_control_result result =
-                decoded.descriptor_action_count != 0
-                    ? MICROS_VFS_CONTROL_RESULT_STATE
-                    : MICROS_VFS_CONTROL_RESULT_NO_SPACE;
-
-            vfs_prepare_control_result(request, result, action);
-            return MICROS_VFS_CORE_OK;
-        }
-        child_descriptors[0] =
-            (uint16_t)(open_file_slots[0] + 1);
-        child_descriptors[1] =
-            (uint16_t)(open_file_slots[1] + 1);
-        child_descriptors[2] =
-            (uint16_t)(open_file_slots[2] + 1);
-    } else {
-        if (
-            !vfs_find_process(
-                state,
-                state->spawn.parent_endpoint,
-                &parent_slot
-            )
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        parent = &state->processes[parent_slot];
-        root_vnode = parent->root_vnode;
-        working_directory_vnode =
-            parent->working_directory_vnode;
-        for (
-            descriptor = 0;
-            descriptor < decoded.descriptor_action_count;
-            ++descriptor
-        ) {
-            const struct micros_spawn_descriptor_action *item =
-                &decoded.descriptor_actions[descriptor];
-            uint16_t reference =
-                parent->descriptors[item->source];
-            size_t same_reference_count = 1;
-            size_t prior;
-
-            if (reference == 0) {
-                vfs_prepare_control_result(
-                    request,
-                    MICROS_VFS_CONTROL_RESULT_DESCRIPTOR,
-                    action
-                );
-                return MICROS_VFS_CORE_OK;
-            }
-            for (prior = 0; prior < descriptor; ++prior) {
-                if (
-                    parent->descriptors[
-                        decoded.descriptor_actions[prior].source
-                    ] == reference
-                ) {
-                    ++same_reference_count;
-                }
-            }
-            if (
-                state->open_files[reference - 1].reference_count
-                    > UINT32_MAX - same_reference_count
-            ) {
-                vfs_prepare_control_result(
-                    request,
-                    MICROS_VFS_CONTROL_RESULT_NO_SPACE,
-                    action
-                );
-                return MICROS_VFS_CORE_OK;
-            }
-            child_descriptors[item->destination] = reference;
-        }
-        if (
-            root_vnode == working_directory_vnode
-            && state->vnodes[root_vnode - 1]
-                .local_reference_count > UINT32_MAX - 2
-        ) {
-            vfs_prepare_control_result(
-                request,
-                MICROS_VFS_CONTROL_RESULT_NO_SPACE,
-                action
-            );
-            return MICROS_VFS_CORE_OK;
-        }
-        if (
-            root_vnode != working_directory_vnode
-            && (
-                state->vnodes[root_vnode - 1]
-                    .local_reference_count == UINT32_MAX
-                || state->vnodes[working_directory_vnode - 1]
-                    .local_reference_count == UINT32_MAX
-            )
-        ) {
-            vfs_prepare_control_result(
-                request,
-                MICROS_VFS_CONTROL_RESULT_NO_SPACE,
-                action
-            );
-            return MICROS_VFS_CORE_OK;
-        }
+    error = reserve_spawn_descriptor_state(
+        state,
+        &preparation,
+        &result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
     }
-    if (!vfs_find_free_process(state, &child_process_slot)) {
-        vfs_prepare_control_result(
-            request,
-            MICROS_VFS_CONTROL_RESULT_NO_SPACE,
-            action
-        );
+    if (result != MICROS_VFS_CONTROL_RESULT_OK) {
+        vfs_prepare_control_result(request, result, action);
         return MICROS_VFS_CORE_OK;
     }
-
-    if (state->spawn.trusted_init) {
-        state->open_files[open_file_slots[0]] =
-            (struct micros_vfs_open_file){
-                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
-                .kind = MICROS_VFS_OBJECT_CONSOLE,
-                .access = MICROS_VFS_ACCESS_READ,
-                .open_flags = MICROS_VFS_OPEN_READ,
-                .reference_count = 1,
-            };
-        state->open_files[open_file_slots[1]] =
-            (struct micros_vfs_open_file){
-                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
-                .kind = MICROS_VFS_OBJECT_CONSOLE,
-                .access = MICROS_VFS_ACCESS_WRITE,
-                .open_flags = MICROS_VFS_OPEN_WRITE,
-                .reference_count = 1,
-            };
-        state->open_files[open_file_slots[2]] =
-            state->open_files[open_file_slots[1]];
-    } else {
-        for (
-            descriptor = 0;
-            descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
-            ++descriptor
-        ) {
-            uint16_t reference = child_descriptors[descriptor];
-
-            if (reference != 0) {
-                ++state->open_files[reference - 1].reference_count;
-            }
-        }
-    }
-    ++state->vnodes[root_vnode - 1].local_reference_count;
-    ++state->vnodes[
-        working_directory_vnode - 1
-    ].local_reference_count;
-    ++state->last_descriptor_token;
-    state->spawn.phase =
-        MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED;
-    state->spawn.child_process_reference =
-        (uint16_t)(child_process_slot + 1);
-    state->spawn.descriptor_token =
-        state->last_descriptor_token;
-    state->spawn.child_root_vnode = root_vnode;
-    state->spawn.child_working_directory_vnode =
-        working_directory_vnode;
-    for (
-        descriptor = 0;
-        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
-        ++descriptor
-    ) {
-        state->spawn.child_descriptors[descriptor] =
-            child_descriptors[descriptor];
-    }
+    commit_spawn_descriptors(state, &preparation);
     vfs_prepare_control_result(
         request,
         MICROS_VFS_CONTROL_RESULT_OK,
