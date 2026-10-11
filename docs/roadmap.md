@@ -230,8 +230,11 @@ ADR-0051 defines responsibility-based source organization before the next VFS
 lifecycle increment. The portable VFS core must be decomposed by state
 validation, ownership, transfer, namespace, regular I/O, console, process, and
 spawn authority before Step 14 exit cleanup is added. The refactor preserves
-the accepted VFS behavior and starts a later subsystem-by-subsystem
-source-boundary audit rather than a repository-wide rewrite.
+the accepted VFS behavior. The VFS decomposition is now merged, and the
+[repository source-module audit](architecture/source-module-audit.md)
+classifies the remaining in-scope implementation/test source review signals
+into separate subsystem design and implementation pairs rather than one
+repository-wide rewrite.
 
 ## v0.1 completion goal
 

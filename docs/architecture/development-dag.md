@@ -306,6 +306,19 @@ Step 14 is internally serialized:
    rollback, spawns one child, verifies argv/env and inherited descriptors,
    waits for its exit status, and returns all child resources to baseline.
 
+The repository source-module audit adds behavior-preserving maintenance gates
+to this sequence without changing the runtime dependency graph:
+
+- the VFS test-source decomposition must merge before item 7 adds exit-cleanup
+  coverage to the currently signaled VFS test files; and
+- the address-space, frame-ownership, kernel VM-handoff, kernel PM-control,
+  VM-service, and PM-service correction implementations must merge before the
+  cross-service coordinator composes the remaining spawn and exit transaction.
+
+The exact correction units and paired task IDs are recorded in
+[the repository source-module audit](source-module-audit.md). They remain
+sequential, behavior-preserving tasks rather than one broad Step 14 rewrite.
+
 The Step 14 PID-1 program is an isolated integration fixture, not production
 init. It proves the production spawn, loader, application-runtime, exit, and
 wait mechanisms without combining them with shell policy or commands.

@@ -53,6 +53,28 @@ that hide authority behind globals do not satisfy this rule.
 
 ## Function boundaries
 
+A function is one task. When that task contains independently nameable
+subtasks, the function should orchestrate named helpers in the order those
+subtasks occur. A reader should be able to understand the task outline from
+the function names and control structure before reading each helper's
+implementation.
+
+A function is atomic only when further extraction would split one cohesive
+algorithm, invariant, or commit boundary rather than expose a meaningful
+subtask. Physical line count does not determine that boundary:
+
+- a short function that mixes validation, reservation, mutation, and rollback
+  still requires decomposition;
+- a longer cohesive algorithm may remain intact when splitting it would hide
+  rather than clarify its invariant;
+- the 120-line signal requires review but never justifies mechanical
+  line-count splitting.
+
+Named helpers must expose domain work rather than merely wrap syntax. They
+must not hide authority in mutable globals, duplicate ownership logic, or
+reorder validation, backend calls, publication, rollback, or token
+consumption.
+
 A function should normally perform one of the following:
 
 - decode and validate one request;
@@ -193,8 +215,9 @@ VFS is the first application of the policy because its core currently contains
 the largest number of independent responsibilities and Step 14 still requires
 additional lifecycle behavior.
 
-After the VFS decomposition is merged, a separate repository audit will
-classify other review-signal files. Each subsystem correction remains a
-separate dependency-ordered design and implementation task. Existing large
-files are technical debt to assess; this policy does not authorize one broad
-repository rewrite.
+The VFS decomposition is merged. The
+[repository source-module audit](source-module-audit.md) classifies every
+in-scope implementation and test review-signal file at its audited base
+commit, records cohesive exceptions, and defines separate dependency-ordered
+design and implementation task pairs. Existing large files are technical debt
+to assess; this policy does not authorize one broad repository rewrite.

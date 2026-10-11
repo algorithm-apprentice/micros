@@ -8,6 +8,10 @@ This directory contains the design baseline for `micros`.
   trust boundary, component responsibilities, boot phases, and invariants.
 - [Responsibility-based source organization](architecture/source-organization.md)
   defines cohesive module ownership, review signals, and staged decomposition.
+- [Repository source-module audit](architecture/source-module-audit.md)
+  classifies every in-scope tracked implementation/test source review signal
+  at the audited base and records dependency-ordered correction units and
+  cohesive exceptions.
 - [Development dependency DAG](architecture/development-dag.md) converts the
   cyclic runtime architecture into an acyclic implementation sequence.
 
