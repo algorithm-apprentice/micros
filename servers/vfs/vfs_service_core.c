@@ -844,6 +844,99 @@ enum micros_vfs_service_error micros_vfs_service_build_result(
     return MICROS_VFS_SERVICE_OK;
 }
 
+static bool pm_control_result_fields_are_zero(
+    const struct micros_vfs_control_result_action *result
+)
+{
+    return (
+        result->image_token == 0
+        && result->executable_grant == 0
+        && result->executable_size == 0
+        && result->request_grant == 0
+        && result->request_size == 0
+        && result->descriptor_token == 0
+    );
+}
+
+static bool pm_control_result_is_canonical(
+    const struct micros_vfs_control_result_action *result
+)
+{
+    if (result->result != MICROS_VFS_CONTROL_RESULT_OK) {
+        return pm_control_result_fields_are_zero(result);
+    }
+    if (result->command == MICROS_VFS_CONTROL_PREPARE_IMAGE) {
+        return (
+            result->image_token != 0
+            && result->executable_grant != 0
+            && result->executable_grant != MICROS_GRANT_NONE
+            && result->executable_size != 0
+            && result->executable_size
+                <= MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+            && result->request_grant != 0
+            && result->request_grant != MICROS_GRANT_NONE
+            && result->request_grant
+                != result->executable_grant
+            && result->request_size
+                >= MICROS_SPAWN_REQUEST_SIZE_MIN
+            && result->request_size
+                <= MICROS_SPAWN_REQUEST_SIZE_MAX
+            && result->descriptor_token == 0
+        );
+    }
+    if (
+        result->command
+            == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+    ) {
+        return (
+            result->descriptor_token != 0
+            && result->image_token == 0
+            && result->executable_grant == 0
+            && result->executable_size == 0
+            && result->request_grant == 0
+            && result->request_size == 0
+        );
+    }
+    return pm_control_result_fields_are_zero(result);
+}
+
+static void encode_pm_control_result_payload(
+    const struct micros_vfs_control_result_action *result,
+    struct micros_ipc_message *message
+)
+{
+    if (result->result != MICROS_VFS_CONTROL_RESULT_OK) {
+        return;
+    }
+    if (result->command == MICROS_VFS_CONTROL_PREPARE_IMAGE) {
+        write_u64_le(&message->payload[16], result->image_token);
+        write_u32_le(
+            &message->payload[24],
+            result->executable_grant
+        );
+        write_u32_le(
+            &message->payload[28],
+            result->executable_size
+        );
+        write_u32_le(
+            &message->payload[32],
+            result->request_grant
+        );
+        write_u32_le(
+            &message->payload[36],
+            result->request_size
+        );
+    } else if (
+        result->command
+            == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+    ) {
+        write_u64_le(
+            &message->payload[16],
+            result->descriptor_token
+        );
+    }
+}
+
 enum micros_vfs_service_error
 micros_vfs_service_build_pm_control_result(
     const struct micros_vfs_control_result_action *result,
@@ -851,7 +944,6 @@ micros_vfs_service_build_pm_control_result(
 )
 {
     struct micros_ipc_message built;
-    bool fields_are_zero;
 
     if (
         result == NULL
@@ -866,67 +958,7 @@ micros_vfs_service_build_pm_control_result(
     ) {
         return MICROS_VFS_SERVICE_ERROR_ARGUMENT;
     }
-    fields_are_zero = (
-        result->image_token == 0
-        && result->executable_grant == 0
-        && result->executable_size == 0
-        && result->request_grant == 0
-        && result->request_size == 0
-        && result->descriptor_token == 0
-    );
-    if (
-        (
-            result->result != MICROS_VFS_CONTROL_RESULT_OK
-            && !fields_are_zero
-        )
-        || (
-            result->result == MICROS_VFS_CONTROL_RESULT_OK
-            && (
-                (
-                    result->command
-                        == MICROS_VFS_CONTROL_PREPARE_IMAGE
-                    && (
-                        result->image_token == 0
-                        || result->executable_grant == 0
-                        || result->executable_grant
-                            == MICROS_GRANT_NONE
-                        || result->executable_size == 0
-                        || result->executable_size
-                            > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
-                        || result->request_grant == 0
-                        || result->request_grant
-                            == MICROS_GRANT_NONE
-                        || result->request_grant
-                            == result->executable_grant
-                        || result->request_size
-                            < MICROS_SPAWN_REQUEST_SIZE_MIN
-                        || result->request_size
-                            > MICROS_SPAWN_REQUEST_SIZE_MAX
-                        || result->descriptor_token != 0
-                    )
-                )
-                || (
-                    result->command
-                        == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
-                    && (
-                        result->descriptor_token == 0
-                        || result->image_token != 0
-                        || result->executable_grant != 0
-                        || result->executable_size != 0
-                        || result->request_grant != 0
-                        || result->request_size != 0
-                    )
-                )
-                || (
-                    result->command
-                        != MICROS_VFS_CONTROL_PREPARE_IMAGE
-                    && result->command
-                        != MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
-                    && !fields_are_zero
-                )
-            )
-        )
-    ) {
+    if (!pm_control_result_is_canonical(result)) {
         return MICROS_VFS_SERVICE_ERROR_INVARIANT;
     }
 
@@ -941,38 +973,7 @@ micros_vfs_service_build_pm_control_result(
         &built.payload[8],
         (uint32_t)(int32_t)result->result
     );
-    if (result->result == MICROS_VFS_CONTROL_RESULT_OK) {
-        if (result->command == MICROS_VFS_CONTROL_PREPARE_IMAGE) {
-            write_u64_le(
-                &built.payload[16],
-                result->image_token
-            );
-            write_u32_le(
-                &built.payload[24],
-                result->executable_grant
-            );
-            write_u32_le(
-                &built.payload[28],
-                result->executable_size
-            );
-            write_u32_le(
-                &built.payload[32],
-                result->request_grant
-            );
-            write_u32_le(
-                &built.payload[36],
-                result->request_size
-            );
-        } else if (
-            result->command
-                == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
-        ) {
-            write_u64_le(
-                &built.payload[16],
-                result->descriptor_token
-            );
-        }
-    }
+    encode_pm_control_result_payload(result, &built);
     *message = built;
     return MICROS_VFS_SERVICE_OK;
 }
@@ -1280,6 +1281,145 @@ static enum micros_vfs_service_error publish_control_result(
     return MICROS_VFS_SERVICE_OK;
 }
 
+static enum micros_vfs_service_error dispatch_pm_control_message(
+    struct micros_vfs_state *state,
+    const struct micros_ipc_message *message,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *result
+)
+{
+    struct micros_vfs_control_request request;
+    enum micros_vfs_control_protocol_status status;
+
+    status = micros_vfs_service_decode_pm_control(
+        state->pm_endpoint,
+        message,
+        &request
+    );
+    if (
+        status == MICROS_VFS_CONTROL_PROTOCOL_INVARIANT
+        || status == MICROS_VFS_CONTROL_PROTOCOL_BAD_TYPE
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    if (status != MICROS_VFS_CONTROL_PROTOCOL_OK) {
+        clear_bytes(result, sizeof(*result));
+        result->active = true;
+        result->reply_token = message->reply_token;
+        result->command =
+            (enum micros_vfs_control_command)read_u32_le(
+                &message->payload[4]
+            );
+        result->result =
+            status == MICROS_VFS_CONTROL_PROTOCOL_CALLER
+            ? MICROS_VFS_CONTROL_RESULT_CALLER
+            : MICROS_VFS_CONTROL_RESULT_MALFORMED;
+        return MICROS_VFS_SERVICE_OK;
+    }
+    if (
+        micros_vfs_handle_control(
+            state,
+            &request,
+            io,
+            result
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_SERVICE_OK;
+}
+
+static enum micros_vfs_service_error dispatch_tty_notification(
+    struct micros_vfs_state *state,
+    const struct micros_ipc_message *message,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *result
+)
+{
+    uint64_t events = read_u64_le(&message->payload[0]);
+
+    if (
+        message->source != state->tty_endpoint
+        || message->reply_token != 0
+        || events == 0
+        || (
+            events
+            & ~(
+                MICROS_TTY_EVENT_COMPLETION
+                | MICROS_TTY_EVENT_WRITABLE
+            )
+        ) != 0
+        || !bytes_are_zero(&message->payload[8], 40)
+        || micros_vfs_handle_tty_notification(
+            state,
+            events,
+            io,
+            result
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_SERVICE_OK;
+}
+
+static enum micros_vfs_service_error
+dispatch_application_message(
+    struct micros_vfs_state *state,
+    const struct micros_ipc_message *message,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *result
+)
+{
+    struct micros_vfs_request request;
+    enum micros_vfs_protocol_status status;
+
+    if (message->reply_token == 0) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+    if (message->type == MICROS_VFS_TEST_MESSAGE_DRAIN) {
+        if (
+            read_u32_le(&message->payload[0])
+                != MICROS_VFS_PROTOCOL_VERSION
+            || !bytes_are_zero(&message->payload[4], 44)
+            || micros_vfs_begin_test_drain(
+                state,
+                message->source,
+                message->reply_token,
+                io,
+                result
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+        }
+        return MICROS_VFS_SERVICE_OK;
+    }
+#endif
+    status = micros_vfs_service_decode_request(message, &request);
+    if (status == MICROS_VFS_PROTOCOL_INVARIANT) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    if (status != MICROS_VFS_PROTOCOL_OK) {
+        clear_bytes(result, sizeof(*result));
+        result->active = true;
+        result->reply_token = message->reply_token;
+        result->request_type = message->type;
+        result->result = protocol_result(status);
+        return MICROS_VFS_SERVICE_OK;
+    }
+    if (
+        micros_vfs_handle_request(
+            state,
+            &request,
+            io,
+            result
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_SERVICE_OK;
+}
+
 enum micros_vfs_service_error micros_vfs_service_handle_message(
     struct micros_vfs_state *state,
     const struct micros_ipc_message *message,
@@ -1288,6 +1428,7 @@ enum micros_vfs_service_error micros_vfs_service_handle_message(
 )
 {
     struct micros_vfs_result_action result;
+    enum micros_vfs_service_error error;
 
     if (
         state == NULL
@@ -1299,121 +1440,36 @@ enum micros_vfs_service_error micros_vfs_service_handle_message(
     }
     clear_bytes(action, sizeof(*action));
     if (message->type == MICROS_VFS_MESSAGE_PM_CONTROL) {
-        struct micros_vfs_control_request request;
-        struct micros_vfs_control_result_action result;
-        enum micros_vfs_control_protocol_status status;
+        struct micros_vfs_control_result_action control_result;
 
-        status = micros_vfs_service_decode_pm_control(
-            state->pm_endpoint,
+        error = dispatch_pm_control_message(
+            state,
             message,
-            &request
+            io,
+            &control_result
         );
-        if (
-            status == MICROS_VFS_CONTROL_PROTOCOL_INVARIANT
-            || status == MICROS_VFS_CONTROL_PROTOCOL_BAD_TYPE
-        ) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+        if (error != MICROS_VFS_SERVICE_OK) {
+            return error;
         }
-        if (status != MICROS_VFS_CONTROL_PROTOCOL_OK) {
-            clear_bytes(&result, sizeof(result));
-            result.active = true;
-            result.reply_token = message->reply_token;
-            result.command =
-                (enum micros_vfs_control_command)read_u32_le(
-                    &message->payload[4]
-                );
-            result.result =
-                status == MICROS_VFS_CONTROL_PROTOCOL_CALLER
-                ? MICROS_VFS_CONTROL_RESULT_CALLER
-                : MICROS_VFS_CONTROL_RESULT_MALFORMED;
-        } else if (
-            micros_vfs_handle_control(
-                state,
-                &request,
-                io,
-                &result
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-        }
-        return publish_control_result(&result, action);
+        return publish_control_result(&control_result, action);
     }
     if (message->type == MICROS_IPC_TYPE_KERNEL_NOTIFICATION) {
-        uint64_t events = read_u64_le(&message->payload[0]);
-
-        if (
-            message->source != state->tty_endpoint
-            || message->reply_token != 0
-            || events == 0
-            || (
-                events
-                & ~(
-                    MICROS_TTY_EVENT_COMPLETION
-                    | MICROS_TTY_EVENT_WRITABLE
-                )
-            ) != 0
-            || !bytes_are_zero(&message->payload[8], 40)
-            || micros_vfs_handle_tty_notification(
-                state,
-                events,
-                io,
-                &result
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-        }
-    } else {
-        struct micros_vfs_request request;
-        enum micros_vfs_protocol_status status;
-
-        if (message->reply_token == 0) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-        }
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
-        if (message->type == MICROS_VFS_TEST_MESSAGE_DRAIN) {
-            if (
-                read_u32_le(&message->payload[0])
-                    != MICROS_VFS_PROTOCOL_VERSION
-                || !bytes_are_zero(&message->payload[4], 44)
-                || micros_vfs_begin_test_drain(
-                    state,
-                    message->source,
-                    message->reply_token,
-                    io,
-                    &result
-                ) != MICROS_VFS_CORE_OK
-            ) {
-                return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-            }
-            if (!result.active) {
-                return MICROS_VFS_SERVICE_OK;
-            }
-            return publish_result(&result, action);
-        }
-#endif
-        status = micros_vfs_service_decode_request(
+        error = dispatch_tty_notification(
+            state,
             message,
-            &request
+            io,
+            &result
         );
-        if (status == MICROS_VFS_PROTOCOL_INVARIANT) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-        }
-        if (status != MICROS_VFS_PROTOCOL_OK) {
-            clear_bytes(&result, sizeof(result));
-            result.active = true;
-            result.reply_token = message->reply_token;
-            result.request_type = message->type;
-            result.result = protocol_result(status);
-        } else if (
-            micros_vfs_handle_request(
-                state,
-                &request,
-                io,
-                &result
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
-        }
+    } else {
+        error = dispatch_application_message(
+            state,
+            message,
+            io,
+            &result
+        );
+    }
+    if (error != MICROS_VFS_SERVICE_OK) {
+        return error;
     }
     if (!result.active) {
         return MICROS_VFS_SERVICE_OK;

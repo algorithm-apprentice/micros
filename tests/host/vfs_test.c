@@ -34,6 +34,12 @@ struct test_backend {
     uint32_t last_putnode_count;
 };
 
+struct corrupting_ramfs_context {
+    const struct micros_vfs_io *delegate;
+    struct micros_vfs_state *state;
+    bool corrupted;
+};
+
 static struct test_backend backend;
 
 static enum micros_vfs_backend_status test_ramfs_call(
@@ -69,6 +75,30 @@ static const struct micros_vfs_io test_io = {
     .ramfs_call = test_ramfs_call,
     .context = &backend,
 };
+
+static enum micros_vfs_backend_status corrupting_ramfs_call(
+    void *context,
+    const struct micros_vfs_ramfs_request *request,
+    struct micros_vfs_ramfs_response *response
+)
+{
+    struct corrupting_ramfs_context *selected = context;
+    enum micros_vfs_backend_status status =
+        selected->delegate->ramfs_call(
+            selected->delegate->context,
+            request,
+            response
+        );
+
+    if (
+        status == MICROS_VFS_BACKEND_OK
+        && request->operation == MICROS_VFS_RAMFS_PUTNODE
+    ) {
+        selected->state->reserved = 1;
+        selected->corrupted = true;
+    }
+    return status;
+}
 
 static const micros_endpoint_t vfs_endpoint =
     UINT32_C(0x00001006);
@@ -370,6 +400,50 @@ static bool mount_attach_share_and_detach_are_atomic(void)
         ) == MICROS_VFS_CORE_OK
         && result == MICROS_VFS_TRUSTED_NOT_FOUND
         && memcmp(&state, &snapshot, sizeof(state)) == 0
+    );
+    return true;
+}
+
+static bool trusted_result_waits_for_state_validation(void)
+{
+    struct micros_vfs_request selected;
+    struct micros_vfs_result_action action;
+    struct corrupting_ramfs_context context;
+    struct micros_vfs_io corrupting_io = {0};
+    enum micros_vfs_trusted_result result =
+        MICROS_VFS_TRUSTED_EXISTS;
+
+    EXPECT_TRUE(initialize_full_fixture());
+    selected = path_request(
+        MICROS_VFS_MESSAGE_OPEN,
+        "note",
+        MICROS_VFS_OPEN_READ | MICROS_VFS_OPEN_CREATE,
+        UINT32_C(0600)
+    );
+    EXPECT_TRUE(
+        micros_vfs_handle_request(
+            &state,
+            &selected,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && action.result == MICROS_VFS_RESULT_OK
+    );
+    context = (struct corrupting_ramfs_context){
+        .delegate = &fixture.io,
+        .state = &state,
+    };
+    corrupting_io.ramfs_call = corrupting_ramfs_call;
+    corrupting_io.context = &context;
+    EXPECT_TRUE(
+        micros_vfs_detach(
+            &state,
+            application_endpoint,
+            &corrupting_io,
+            &result
+        ) == MICROS_VFS_CORE_ERROR_INVARIANT
+        && context.corrupted
+        && result == MICROS_VFS_TRUSTED_EXISTS
     );
     return true;
 }
@@ -1366,6 +1440,7 @@ static bool console_async_and_cleanup_are_exact(void)
 {
     struct micros_vfs_request selected;
     struct micros_vfs_result_action action;
+    struct micros_vfs_result_action action_snapshot;
     enum micros_vfs_trusted_result trusted_result;
     micros_grant_t destination;
     micros_grant_t source;
@@ -1531,6 +1606,8 @@ static bool console_async_and_cleanup_are_exact(void)
             sizeof(output) - 1
         ) == 0
     );
+    memset(&action, UINT8_C(0xa5), sizeof(action));
+    action_snapshot = action;
     snapshot = state;
     EXPECT_TRUE(
         micros_vfs_handle_tty_notification(
@@ -1541,6 +1618,11 @@ static bool console_async_and_cleanup_are_exact(void)
             &action
         ) == MICROS_VFS_CORE_ERROR_INVARIANT
         && memcmp(&state, &snapshot, sizeof(state)) == 0
+        && memcmp(
+            &action,
+            &action_snapshot,
+            sizeof(action)
+        ) == 0
     );
     EXPECT_TRUE(
         micros_vfs_handle_tty_notification(
@@ -1966,6 +2048,7 @@ int main(void)
     return (
         constants_and_initial_state_are_exact()
         && mount_attach_share_and_detach_are_atomic()
+        && trusted_result_waits_for_state_validation()
         && complete_state_validation_rejects_dangling_state()
         && open_read_close_and_validation_are_exact()
         && path_grant_precedes_local_capacity()
