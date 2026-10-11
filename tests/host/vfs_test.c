@@ -3,7 +3,7 @@
 
 int main(void)
 {
-    struct vfs_core_test_context context;
+    static struct vfs_core_test_context context;
 
     vfs_core_test_context_initialize(&context);
     return (

@@ -308,6 +308,10 @@ RAMFS_RETAINED_GATE_WORKFLOWS = (
     "test-qemu-tty",
 )
 
+VFS_STRUCTURE_TEST_INPUTS = (
+    "tests/host/test_vfs_test_source_layout.py",
+)
+
 VFS_SHARED_FIXTURE_INPUTS = (
     "tests/host/vfs_test_fixture.c",
     "tests/host/vfs_test_fixture.h",
@@ -373,7 +377,8 @@ VFS_PROBE_INPUTS = (
 )
 
 VFS_QEMU_TEST_INPUTS = (
-    VFS_SHARED_FIXTURE_INPUTS
+    VFS_STRUCTURE_TEST_INPUTS
+    + VFS_SHARED_FIXTURE_INPUTS
     + VFS_CORE_TEST_INPUTS
     + VFS_SPAWN_TEST_INPUTS
     + VFS_SERVICE_TEST_INPUTS

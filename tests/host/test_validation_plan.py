@@ -27,7 +27,8 @@ VFS_MODEL_PATHS = (
 )
 
 VFS_QEMU_TEST_PATHS = (
-    VFS_SHARED_FIXTURE_PATHS
+    ("tests/host/test_vfs_test_source_layout.py",)
+    + VFS_SHARED_FIXTURE_PATHS
     + (
         "tests/host/vfs_test.c",
         "tests/host/vfs_test_suites.h",
@@ -350,6 +351,15 @@ class ValidationPlanTests(unittest.TestCase):
                     path,
                     "test-qemu-vfs",
                 )
+
+    def test_vfs_structural_test_has_explicit_qemu_ownership(self):
+        path = "tests/host/test_vfs_test_source_layout.py"
+
+        self.assertFalse(validation_plan.requires_full_tier([path]))
+        self.assertIn(
+            "test-qemu-vfs",
+            validation_plan.affected_workflows([path]),
+        )
 
     def test_vfs_fixture_and_model_paths_own_vfs_model(self):
         for path in VFS_SHARED_FIXTURE_PATHS + VFS_MODEL_PATHS:

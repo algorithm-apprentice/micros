@@ -67,7 +67,7 @@ static bool probe_validate_configuration(void) {
     return true;
 }
 
-static bool probe_send_ready(struct vfs_service_probe_context *context) {
+static bool probe_send_ready(micros_endpoint_t launcher_endpoint) {
     struct micros_ipc_message message;
 
     probe_clear_bytes(&message, sizeof(message));
@@ -76,10 +76,10 @@ static bool probe_send_ready(struct vfs_service_probe_context *context) {
     probe_write_u32_le(&message.payload[4], MICROS_VFS_TEST_APPLICATION_SERVICE_ID);
     probe_write_u32_le(&message.payload[8], MICROS_BOOTSTRAP_MANIFEST_VERSION);
     probe_write_u32_le(&message.payload[16], micros_bootstrap_service_config.self_endpoint);
-    if (micros_runtime_call(context->launcher_endpoint, &message) != MICROS_SYSCALL_ABI_OK) {
+    if (micros_runtime_call(launcher_endpoint, &message) != MICROS_SYSCALL_ABI_OK) {
         return false;
     }
-    return (message.source == context->launcher_endpoint &&
+    return (message.source == launcher_endpoint &&
             message.type == MICROS_BOOTSTRAP_MESSAGE_READY_ACK && message.reply_token == 0 &&
             probe_read_u32_le(&message.payload[0]) == MICROS_BOOTSTRAP_MANIFEST_VERSION &&
             probe_read_u32_le(&message.payload[4]) == MICROS_VFS_TEST_APPLICATION_SERVICE_ID &&
@@ -96,26 +96,29 @@ static void probe_report_failure(uint64_t magic) {
 }
 
 void micros_service_main(void) {
+    micros_endpoint_t launcher_endpoint;
+    micros_endpoint_t vfs_endpoint;
+
     if (probe_initialized_data[0] != MICROS_VFS_TEST_PROBE_DATA_MAGIC ||
         !probe_validate_configuration()) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_CONFIGURATION);
     }
-    probe_context.launcher_endpoint = micros_bootstrap_service_config.launcher_endpoint;
-    probe_context.vfs_endpoint =
+    launcher_endpoint = micros_bootstrap_service_config.launcher_endpoint;
+    vfs_endpoint =
         micros_bootstrap_service_config.services[MICROS_VFS_TEST_VFS_SERVICE_ID - 1].endpoint;
-    if (!probe_send_ready(&probe_context)) {
+    if (!probe_send_ready(launcher_endpoint)) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_READY);
     }
-    if (!probe_test_filesystem(&probe_context)) {
+    if (!probe_test_filesystem(&probe_context, vfs_endpoint)) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_FILESYSTEM);
     }
-    if (!probe_enumerate_root(&probe_context)) {
+    if (!probe_enumerate_root(&probe_context, vfs_endpoint)) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_DIRECTORY);
     }
-    if (!probe_test_console(&probe_context)) {
+    if (!probe_test_console(&probe_context, vfs_endpoint)) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_CONSOLE);
     }
-    if (!probe_request_drain(&probe_context)) {
+    if (!probe_request_drain(vfs_endpoint)) {
         probe_report_failure(MICROS_VFS_TEST_FAILURE_DRAIN);
     }
     micros_vfs_service_test_report(MICROS_VFS_TEST_REPORT_MAGIC);

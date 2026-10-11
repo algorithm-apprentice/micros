@@ -429,6 +429,26 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
             block.count("tests/qemu/vfs_service_report.S"),
         )
 
+    def test_entry_owned_aggregate_contexts_use_static_storage(
+        self,
+    ) -> None:
+        contexts = {
+            "tests/host/vfs_test.c": "vfs_core_test_context",
+            "tests/host/vfs_spawn_test.c": "vfs_spawn_test_context",
+            "tests/host/vfs_service_test.c": "vfs_service_test_context",
+        }
+
+        for relative_path, context_type in contexts.items():
+            text = (REPOSITORY_ROOT / relative_path).read_text(
+                encoding="utf-8"
+            )
+            with self.subTest(path=relative_path):
+                self.assertRegex(
+                    text,
+                    rf"\bstatic\s+struct\s+{context_type}"
+                    r"\s+context\s*;",
+                )
+
     def test_private_headers_contain_declarations_only(self) -> None:
         definitions = {}
 

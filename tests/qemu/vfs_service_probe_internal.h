@@ -18,9 +18,10 @@ struct probe_vfs_result {
 
 struct vfs_service_probe_context {
     uint8_t buffer[MICROS_VFS_TRANSFER_MAX];
-    micros_endpoint_t launcher_endpoint;
-    micros_endpoint_t vfs_endpoint;
 };
+
+_Static_assert(sizeof(struct vfs_service_probe_context) == MICROS_VFS_TRANSFER_MAX,
+               "VFS service probe context must remain one transfer page");
 
 void probe_clear_bytes(void *storage, size_t size);
 void probe_copy_bytes(uint8_t *destination, const uint8_t *source, size_t size);
@@ -32,23 +33,31 @@ void probe_write_u64_le(uint8_t *bytes, uint64_t value);
 uint32_t probe_read_u32_le(const uint8_t *bytes);
 uint64_t probe_read_u64_le(const uint8_t *bytes);
 
-bool probe_call_vfs(struct vfs_service_probe_context *context, struct micros_ipc_message *message,
-                    uint32_t request_type, struct probe_vfs_result *result);
-bool probe_open(struct vfs_service_probe_context *context, const char *path, uint32_t open_flags,
-                uint32_t mode, struct probe_vfs_result *result);
-bool probe_path_call(struct vfs_service_probe_context *context, uint32_t type, const char *path,
-                     uint32_t mode, struct probe_vfs_result *result);
-bool probe_close(struct vfs_service_probe_context *context, uint32_t descriptor);
-bool probe_transfer(struct vfs_service_probe_context *context, uint32_t type, uint32_t descriptor,
-                    uint32_t count, struct probe_vfs_result *result);
-bool probe_write(struct vfs_service_probe_context *context, uint32_t descriptor,
-                 const uint8_t *bytes, size_t size);
-bool probe_read_exact(struct vfs_service_probe_context *context, uint32_t descriptor,
-                      const uint8_t *expected, size_t expected_size, bool require_eof);
+bool probe_call_vfs(micros_endpoint_t vfs_endpoint, struct micros_ipc_message *message,
+                    uint32_t request_type,
+                    struct probe_vfs_result *result);
+bool probe_open(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                const char *path, uint32_t open_flags, uint32_t mode,
+                struct probe_vfs_result *result);
+bool probe_path_call(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                     uint32_t type, const char *path, uint32_t mode,
+                     struct probe_vfs_result *result);
+bool probe_close(micros_endpoint_t vfs_endpoint, uint32_t descriptor);
+bool probe_transfer(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                    uint32_t type, uint32_t descriptor, uint32_t count,
+                    struct probe_vfs_result *result);
+bool probe_write(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                 uint32_t descriptor, const uint8_t *bytes, size_t size);
+bool probe_read_exact(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                      uint32_t descriptor, const uint8_t *expected, size_t expected_size,
+                      bool require_eof);
 
-bool probe_test_filesystem(struct vfs_service_probe_context *context);
-bool probe_enumerate_root(struct vfs_service_probe_context *context);
-bool probe_test_console(struct vfs_service_probe_context *context);
-bool probe_request_drain(struct vfs_service_probe_context *context);
+bool probe_test_filesystem(struct vfs_service_probe_context *context,
+                           micros_endpoint_t vfs_endpoint);
+bool probe_enumerate_root(struct vfs_service_probe_context *context,
+                          micros_endpoint_t vfs_endpoint);
+bool probe_test_console(struct vfs_service_probe_context *context,
+                        micros_endpoint_t vfs_endpoint);
+bool probe_request_drain(micros_endpoint_t vfs_endpoint);
 
 #endif

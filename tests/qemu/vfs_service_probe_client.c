@@ -116,22 +116,25 @@ static bool probe_vfs_result_matches(const struct micros_ipc_message *message,
             result->position == 0);
 }
 
-bool probe_call_vfs(struct vfs_service_probe_context *context, struct micros_ipc_message *message,
-                    uint32_t request_type, struct probe_vfs_result *result) {
-    return (micros_runtime_call(context->vfs_endpoint, message) == MICROS_SYSCALL_ABI_OK &&
-            probe_vfs_result_matches(message, context->vfs_endpoint, request_type, result));
+bool probe_call_vfs(micros_endpoint_t vfs_endpoint, struct micros_ipc_message *message,
+                    uint32_t request_type,
+                    struct probe_vfs_result *result) {
+    return (micros_runtime_call(vfs_endpoint, message) == MICROS_SYSCALL_ABI_OK &&
+            probe_vfs_result_matches(message, vfs_endpoint, request_type, result));
 }
 
-static bool probe_create_grant(struct vfs_service_probe_context *context, size_t length,
+static bool probe_create_grant(struct vfs_service_probe_context *context,
+                               micros_endpoint_t vfs_endpoint, size_t length,
                                uint32_t permissions, micros_grant_t *grant) {
     return (length > 0 && length <= sizeof(context->buffer) &&
-            micros_runtime_grant_create(context->vfs_endpoint, (uintptr_t)context->buffer, length,
+            micros_runtime_grant_create(vfs_endpoint, (uintptr_t)context->buffer, length,
                                         permissions, grant) == MICROS_SYSCALL_ABI_OK &&
             *grant != MICROS_GRANT_NONE);
 }
 
-bool probe_open(struct vfs_service_probe_context *context, const char *path, uint32_t open_flags,
-                uint32_t mode, struct probe_vfs_result *result) {
+bool probe_open(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                const char *path, uint32_t open_flags, uint32_t mode,
+                struct probe_vfs_result *result) {
     struct micros_ipc_message message;
     micros_grant_t grant = MICROS_GRANT_NONE;
     size_t path_length = probe_string_size(path) + 1;
@@ -143,7 +146,8 @@ bool probe_open(struct vfs_service_probe_context *context, const char *path, uin
     }
     probe_clear_bytes(context->buffer, sizeof(context->buffer));
     probe_copy_bytes(context->buffer, (const uint8_t *)path, path_length);
-    if (!probe_create_grant(context, path_length, MICROS_GRANT_PERMISSION_READ, &grant)) {
+    if (!probe_create_grant(context, vfs_endpoint, path_length, MICROS_GRANT_PERMISSION_READ,
+                            &grant)) {
         return false;
     }
     probe_clear_bytes(&message, sizeof(message));
@@ -154,13 +158,14 @@ bool probe_open(struct vfs_service_probe_context *context, const char *path, uin
     probe_write_u64_le(&message.payload[16], 0);
     probe_write_u32_le(&message.payload[24], open_flags);
     probe_write_u32_le(&message.payload[28], mode);
-    call_ok = probe_call_vfs(context, &message, MICROS_VFS_MESSAGE_OPEN, result);
+    call_ok = probe_call_vfs(vfs_endpoint, &message, MICROS_VFS_MESSAGE_OPEN, result);
     revoke_ok = (micros_runtime_grant_revoke(grant) == MICROS_SYSCALL_ABI_OK);
     return call_ok && revoke_ok;
 }
 
-bool probe_path_call(struct vfs_service_probe_context *context, uint32_t type, const char *path,
-                     uint32_t mode, struct probe_vfs_result *result) {
+bool probe_path_call(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                     uint32_t type, const char *path, uint32_t mode,
+                     struct probe_vfs_result *result) {
     struct micros_ipc_message message;
     micros_grant_t grant = MICROS_GRANT_NONE;
     size_t path_length = probe_string_size(path) + 1;
@@ -172,7 +177,8 @@ bool probe_path_call(struct vfs_service_probe_context *context, uint32_t type, c
     }
     probe_clear_bytes(context->buffer, sizeof(context->buffer));
     probe_copy_bytes(context->buffer, (const uint8_t *)path, path_length);
-    if (!probe_create_grant(context, path_length, MICROS_GRANT_PERMISSION_READ, &grant)) {
+    if (!probe_create_grant(context, vfs_endpoint, path_length, MICROS_GRANT_PERMISSION_READ,
+                            &grant)) {
         return false;
     }
     probe_clear_bytes(&message, sizeof(message));
@@ -184,12 +190,12 @@ bool probe_path_call(struct vfs_service_probe_context *context, uint32_t type, c
     if (type == MICROS_VFS_MESSAGE_MKDIR) {
         probe_write_u32_le(&message.payload[24], mode);
     }
-    call_ok = probe_call_vfs(context, &message, type, result);
+    call_ok = probe_call_vfs(vfs_endpoint, &message, type, result);
     revoke_ok = (micros_runtime_grant_revoke(grant) == MICROS_SYSCALL_ABI_OK);
     return call_ok && revoke_ok;
 }
 
-bool probe_close(struct vfs_service_probe_context *context, uint32_t descriptor) {
+bool probe_close(micros_endpoint_t vfs_endpoint, uint32_t descriptor) {
     struct micros_ipc_message message;
     struct probe_vfs_result result;
 
@@ -197,13 +203,14 @@ bool probe_close(struct vfs_service_probe_context *context, uint32_t descriptor)
     message.type = MICROS_VFS_MESSAGE_CLOSE;
     probe_write_u32_le(&message.payload[0], MICROS_VFS_PROTOCOL_VERSION);
     probe_write_u32_le(&message.payload[8], descriptor);
-    return (probe_call_vfs(context, &message, MICROS_VFS_MESSAGE_CLOSE, &result) &&
+    return (probe_call_vfs(vfs_endpoint, &message, MICROS_VFS_MESSAGE_CLOSE, &result) &&
             result.result == MICROS_VFS_RESULT_OK && result.descriptor == 0 && result.mode == 0 &&
             result.transferred_count == 0 && result.position == 0);
 }
 
-bool probe_transfer(struct vfs_service_probe_context *context, uint32_t type, uint32_t descriptor,
-                    uint32_t count, struct probe_vfs_result *result) {
+bool probe_transfer(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                    uint32_t type, uint32_t descriptor, uint32_t count,
+                    struct probe_vfs_result *result) {
     struct micros_ipc_message message;
     micros_grant_t grant = MICROS_GRANT_NONE;
     uint32_t permissions;
@@ -212,7 +219,7 @@ bool probe_transfer(struct vfs_service_probe_context *context, uint32_t type, ui
 
     permissions = type == MICROS_VFS_MESSAGE_WRITE ? MICROS_GRANT_PERMISSION_READ
                                                    : MICROS_GRANT_PERMISSION_WRITE;
-    if (!probe_create_grant(context, count, permissions, &grant)) {
+    if (!probe_create_grant(context, vfs_endpoint, count, permissions, &grant)) {
         return false;
     }
     probe_clear_bytes(&message, sizeof(message));
@@ -222,13 +229,13 @@ bool probe_transfer(struct vfs_service_probe_context *context, uint32_t type, ui
     probe_write_u32_le(&message.payload[12], grant);
     probe_write_u64_le(&message.payload[16], 0);
     probe_write_u32_le(&message.payload[24], count);
-    call_ok = probe_call_vfs(context, &message, type, result);
+    call_ok = probe_call_vfs(vfs_endpoint, &message, type, result);
     revoke_ok = (micros_runtime_grant_revoke(grant) == MICROS_SYSCALL_ABI_OK);
     return call_ok && revoke_ok;
 }
 
-bool probe_write(struct vfs_service_probe_context *context, uint32_t descriptor,
-                 const uint8_t *bytes, size_t size) {
+bool probe_write(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                 uint32_t descriptor, const uint8_t *bytes, size_t size) {
     struct probe_vfs_result result;
 
     if (size == 0 || size > sizeof(context->buffer)) {
@@ -237,19 +244,21 @@ bool probe_write(struct vfs_service_probe_context *context, uint32_t descriptor,
     probe_clear_bytes(context->buffer, sizeof(context->buffer));
     probe_copy_bytes(context->buffer, bytes, size);
     return (
-        probe_transfer(context, MICROS_VFS_MESSAGE_WRITE, descriptor, (uint32_t)size, &result) &&
+        probe_transfer(context, vfs_endpoint, MICROS_VFS_MESSAGE_WRITE, descriptor,
+                       (uint32_t)size, &result) &&
         result.result == MICROS_VFS_RESULT_OK && result.descriptor == 0 && result.mode == 0 &&
         result.transferred_count == size && result.position == 0);
 }
 
-bool probe_read_exact(struct vfs_service_probe_context *context, uint32_t descriptor,
-                      const uint8_t *expected, size_t expected_size, bool require_eof) {
+bool probe_read_exact(struct vfs_service_probe_context *context, micros_endpoint_t vfs_endpoint,
+                      uint32_t descriptor, const uint8_t *expected, size_t expected_size,
+                      bool require_eof) {
     struct probe_vfs_result result;
     uint64_t position;
 
     probe_clear_bytes(context->buffer, sizeof(context->buffer));
-    if (!probe_transfer(context, MICROS_VFS_MESSAGE_READ, descriptor, sizeof(context->buffer),
-                        &result) ||
+    if (!probe_transfer(context, vfs_endpoint, MICROS_VFS_MESSAGE_READ, descriptor,
+                        sizeof(context->buffer), &result) ||
         result.result != MICROS_VFS_RESULT_OK || result.descriptor != 0 || result.mode != 0 ||
         result.transferred_count != expected_size || result.position != expected_size ||
         !probe_bytes_equal(context->buffer, expected, expected_size)) {
@@ -260,8 +269,8 @@ bool probe_read_exact(struct vfs_service_probe_context *context, uint32_t descri
         return true;
     }
     probe_clear_bytes(context->buffer, sizeof(context->buffer));
-    return (probe_transfer(context, MICROS_VFS_MESSAGE_READ, descriptor, sizeof(context->buffer),
-                           &result) &&
+    return (probe_transfer(context, vfs_endpoint, MICROS_VFS_MESSAGE_READ, descriptor,
+                           sizeof(context->buffer), &result) &&
             result.result == MICROS_VFS_RESULT_OK && result.transferred_count == 0 &&
             result.position == position);
 }

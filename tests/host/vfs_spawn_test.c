@@ -2,7 +2,7 @@
 #include "tests/host/vfs_test_suites.h"
 
 bool micros_vfs_spawn_test_run(void) {
-    struct vfs_spawn_test_context context;
+    static struct vfs_spawn_test_context context;
 
     vfs_spawn_test_context_initialize(&context);
     return (vfs_spawn_image_successful_prepare_release_run(&context) &&

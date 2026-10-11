@@ -2,7 +2,7 @@
 #include "tests/host/vfs_service_test_suites.h"
 
 int main(void) {
-    struct vfs_service_test_context context;
+    static struct vfs_service_test_context context;
 
     vfs_service_test_context_initialize(&context);
     return (vfs_service_public_constants_run(&context) &&
