@@ -150,10 +150,7 @@ INITIAL_MIGRATION_ALLOWLIST = (
     ("tools/generate_vfs_service_fixture.py", "render_fixture"),
 )
 
-MIGRATION_ALLOWLIST = (
-    INITIAL_MIGRATION_ALLOWLIST[12:14]
-    + INITIAL_MIGRATION_ALLOWLIST[20:]
-)
+MIGRATION_ALLOWLIST = INITIAL_MIGRATION_ALLOWLIST[20:]
 
 
 def cmake_command(text: str, command: str, first_argument: str) -> str:
@@ -467,6 +464,23 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
                         )
 
         self.assertEqual([], violations)
+
+    def test_model_trace_draws_random_once_per_step(self) -> None:
+        model_sources = SOURCE_SETS["MICROS_VFS_MODEL_TEST_SOURCES"]
+        trace_path = "tests/host/vfs_model_trace.c"
+        random_call = re.compile(r"\bmodel_random\s*\(")
+
+        for relative_path in model_sources:
+            if relative_path == "tests/host/vfs_model_context.c":
+                continue
+            text = (REPOSITORY_ROOT / relative_path).read_text(
+                encoding="utf-8"
+            )
+            self.assertEqual(
+                1 if relative_path == trace_path else 0,
+                len(random_call.findall(text)),
+                relative_path,
+            )
 
     def test_migration_allowlist_matches_all_over_limit_functions(
         self,
