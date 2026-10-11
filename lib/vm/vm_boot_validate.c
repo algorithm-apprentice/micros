@@ -19,24 +19,74 @@ static void vm_boot_copy_bytes(
 {
     uint8_t *output = destination;
     const uint8_t *input = source;
-    size_t index;
 
-    for (index = 0; index < size; ++index) {
-        output[index] = input[index];
+    while (size >= 8) {
+        output[0] = input[0];
+        output[1] = input[1];
+        output[2] = input[2];
+        output[3] = input[3];
+        output[4] = input[4];
+        output[5] = input[5];
+        output[6] = input[6];
+        output[7] = input[7];
+        output += 8;
+        input += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        *output++ = *input++;
+        --size;
     }
 }
 
 static bool vm_boot_bytes_are_zero(const void *storage, size_t size)
 {
     const uint8_t *bytes = storage;
-    size_t index;
 
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
+    while (size >= 8) {
+        if (
+            (
+                bytes[0] | bytes[1] | bytes[2] | bytes[3]
+                | bytes[4] | bytes[5] | bytes[6] | bytes[7]
+            ) != 0
+        ) {
             return false;
         }
+        bytes += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        if (*bytes++ != 0) {
+            return false;
+        }
+        --size;
     }
     return true;
+}
+
+static uint64_t vm_boot_digest_bytes(
+    uint64_t digest,
+    const uint8_t *bytes,
+    size_t size
+)
+{
+    while (size >= 8) {
+        digest = (digest ^ bytes[0]) * FNV_PRIME;
+        digest = (digest ^ bytes[1]) * FNV_PRIME;
+        digest = (digest ^ bytes[2]) * FNV_PRIME;
+        digest = (digest ^ bytes[3]) * FNV_PRIME;
+        digest = (digest ^ bytes[4]) * FNV_PRIME;
+        digest = (digest ^ bytes[5]) * FNV_PRIME;
+        digest = (digest ^ bytes[6]) * FNV_PRIME;
+        digest = (digest ^ bytes[7]) * FNV_PRIME;
+        bytes += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        digest = (digest ^ *bytes++) * FNV_PRIME;
+        --size;
+    }
+    return digest;
 }
 
 static bool vm_boot_range_is_valid(uint64_t base, uint64_t size)
@@ -296,17 +346,15 @@ enum micros_vm_boot_error micros_vm_boot_digest(
     ) {
         return MICROS_VM_BOOT_ERROR_ARGUMENT;
     }
-    for (index = 0; index < sizeof(*info); ++index) {
-        uint8_t byte = (
-            index >= digest_offset
-            && index < digest_offset + sizeof(info->header.digest)
-        )
-            ? 0
-            : bytes[index];
-
-        value ^= byte;
+    value = vm_boot_digest_bytes(value, bytes, digest_offset);
+    for (index = 0; index < sizeof(info->header.digest); ++index) {
         value *= FNV_PRIME;
     }
+    value = vm_boot_digest_bytes(
+        value,
+        &bytes[digest_offset + sizeof(info->header.digest)],
+        sizeof(*info) - digest_offset - sizeof(info->header.digest)
+    );
     *digest = value;
     return MICROS_VM_BOOT_OK;
 }

@@ -17,10 +17,22 @@
 static void vm_core_zero_bytes(void *storage, size_t size)
 {
     uint8_t *bytes = storage;
-    size_t index;
 
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
+    while (size >= 8) {
+        bytes[0] = 0;
+        bytes[1] = 0;
+        bytes[2] = 0;
+        bytes[3] = 0;
+        bytes[4] = 0;
+        bytes[5] = 0;
+        bytes[6] = 0;
+        bytes[7] = 0;
+        bytes += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        *bytes++ = 0;
+        --size;
     }
 }
 
@@ -32,22 +44,47 @@ static void vm_core_copy_bytes(
 {
     uint8_t *output = destination;
     const uint8_t *input = source;
-    size_t index;
 
-    for (index = 0; index < size; ++index) {
-        output[index] = input[index];
+    while (size >= 8) {
+        output[0] = input[0];
+        output[1] = input[1];
+        output[2] = input[2];
+        output[3] = input[3];
+        output[4] = input[4];
+        output[5] = input[5];
+        output[6] = input[6];
+        output[7] = input[7];
+        output += 8;
+        input += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        *output++ = *input++;
+        --size;
     }
 }
 
 static bool vm_core_bytes_are_zero(const void *storage, size_t size)
 {
     const uint8_t *bytes = storage;
-    size_t index;
 
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
+    while (size >= 8) {
+        if (
+            (
+                bytes[0] | bytes[1] | bytes[2] | bytes[3]
+                | bytes[4] | bytes[5] | bytes[6] | bytes[7]
+            ) != 0
+        ) {
             return false;
         }
+        bytes += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        if (*bytes++ != 0) {
+            return false;
+        }
+        --size;
     }
     return true;
 }
