@@ -129,24 +129,16 @@ enum micros_vfs_core_error vfs_console_handle_read(
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error vfs_console_handle_write(
+static enum micros_vfs_core_error prepare_console_write_transfer(
     struct micros_vfs_state *state,
-    size_t process_slot,
-    size_t open_file_slot,
     const struct micros_vfs_request *request,
     const struct micros_vfs_io *io,
-    enum micros_vfs_result *immediate_result
+    struct micros_vfs_tty_request *tty_request,
+    micros_grant_t *grant,
+    enum micros_vfs_result *result
 )
 {
-    struct micros_vfs_tty_request tty_request = {
-        .operation = MICROS_VFS_TTY_SUBMIT_WRITE,
-        .request_id = state->next_tty_request_id,
-        .count = request->count,
-    };
-    struct micros_vfs_tty_response response = {0};
     enum micros_vfs_client_result copy_result;
-    enum micros_vfs_result result;
-    micros_grant_t grant = MICROS_GRANT_NONE;
 
     if (io == NULL || io->client_copy == NULL) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
@@ -163,7 +155,7 @@ enum micros_vfs_core_error vfs_console_handle_write(
     );
     if (copy_result == MICROS_VFS_CLIENT_REJECTED) {
         state->backend_page_owner = MICROS_VFS_PAGE_FREE;
-        *immediate_result = MICROS_VFS_RESULT_GRANT;
+        *result = MICROS_VFS_RESULT_GRANT;
         return MICROS_VFS_CORE_OK;
     }
     if (copy_result != MICROS_VFS_CLIENT_OK) {
@@ -171,7 +163,7 @@ enum micros_vfs_core_error vfs_console_handle_write(
     }
     if (state->next_tty_request_id == 0) {
         state->backend_page_owner = MICROS_VFS_PAGE_FREE;
-        *immediate_result = MICROS_VFS_RESULT_NO_SPACE;
+        *result = MICROS_VFS_RESULT_NO_SPACE;
         return MICROS_VFS_CORE_OK;
     }
     if (
@@ -182,27 +174,50 @@ enum micros_vfs_core_error vfs_console_handle_write(
             state->backend_page,
             request->count,
             MICROS_GRANT_PERMISSION_READ,
-            &grant,
-            &result
+            grant,
+            result
         ) != MICROS_VFS_CORE_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    if (result != MICROS_VFS_RESULT_OK) {
+    if (*result != MICROS_VFS_RESULT_OK) {
         state->backend_page_owner = MICROS_VFS_PAGE_FREE;
-        *immediate_result = result;
         return MICROS_VFS_CORE_OK;
     }
-    tty_request.grant = grant;
+    tty_request->grant = *grant;
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error submit_console_write(
+    const struct micros_vfs_io *io,
+    const struct micros_vfs_tty_request *tty_request,
+    struct micros_vfs_tty_response *response
+)
+{
     if (
-        call_tty(io, &tty_request, &response)
+        call_tty(io, tty_request, response)
             != MICROS_VFS_CORE_OK
-        || response.request_id != tty_request.request_id
-        || response.transferred_count != 0
+        || response->request_id != tty_request->request_id
+        || response->transferred_count != 0
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    if (response.result == MICROS_TTY_RESULT_BUSY) {
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error publish_console_write(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    size_t open_file_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    const struct micros_vfs_tty_request *tty_request,
+    const struct micros_vfs_tty_response *response,
+    micros_grant_t grant,
+    enum micros_vfs_result *immediate_result
+)
+{
+    if (response->result == MICROS_TTY_RESULT_BUSY) {
         state->pending =
             (struct micros_vfs_pending_operation){
                 .state =
@@ -215,14 +230,14 @@ enum micros_vfs_core_error vfs_console_handle_write(
                 .application_grant = MICROS_GRANT_NONE,
                 .tty_grant = grant,
                 .count = request->count,
-                .request_id = tty_request.request_id,
+                .request_id = tty_request->request_id,
             };
         state->backend_page_owner =
             MICROS_VFS_PAGE_TTY_WRITE_RETRY;
         *immediate_result = MICROS_VFS_RESULT_OK;
         return MICROS_VFS_CORE_OK;
     }
-    if (response.result != MICROS_TTY_RESULT_OK) {
+    if (response->result != MICROS_TTY_RESULT_OK) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     if (
@@ -232,7 +247,7 @@ enum micros_vfs_core_error vfs_console_handle_write(
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     state->backend_page_owner = MICROS_VFS_PAGE_FREE;
-    advance_tty_request_id(state, tty_request.request_id);
+    advance_tty_request_id(state, tty_request->request_id);
     state->pending =
         (struct micros_vfs_pending_operation){
             .state =
@@ -245,10 +260,61 @@ enum micros_vfs_core_error vfs_console_handle_write(
             .application_grant = MICROS_GRANT_NONE,
             .tty_grant = MICROS_GRANT_NONE,
             .count = request->count,
-            .request_id = tty_request.request_id,
+            .request_id = tty_request->request_id,
         };
     *immediate_result = MICROS_VFS_RESULT_OK;
     return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error vfs_console_handle_write(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    size_t open_file_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_result *immediate_result
+)
+{
+    struct micros_vfs_tty_request tty_request = {
+        .operation = MICROS_VFS_TTY_SUBMIT_WRITE,
+        .request_id = state->next_tty_request_id,
+        .count = request->count,
+    };
+    struct micros_vfs_tty_response response = {0};
+    enum micros_vfs_core_error error;
+    enum micros_vfs_result result = MICROS_VFS_RESULT_OK;
+    micros_grant_t grant = MICROS_GRANT_NONE;
+
+    error = prepare_console_write_transfer(
+        state,
+        request,
+        io,
+        &tty_request,
+        &grant,
+        &result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    if (result != MICROS_VFS_RESULT_OK) {
+        *immediate_result = result;
+        return MICROS_VFS_CORE_OK;
+    }
+    error = submit_console_write(io, &tty_request, &response);
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    return publish_console_write(
+        state,
+        process_slot,
+        open_file_slot,
+        request,
+        io,
+        &tty_request,
+        &response,
+        grant,
+        immediate_result
+    );
 }
 
 static void clear_pending(struct micros_vfs_state *state)
