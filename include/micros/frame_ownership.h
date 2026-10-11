@@ -6,6 +6,8 @@
 
 #include "micros/frame_allocator.h"
 #include "micros/kernel_objects.h"
+#include "micros/spawn.h"
+#include "micros/vm.h"
 
 enum {
     MICROS_FRAME_OWNER_KIND_COUNT = 8,
@@ -67,6 +69,36 @@ struct micros_frame_ownership {
         owners[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
     uint8_t
         handoff_targets[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+};
+
+struct micros_frame_vm_claim_plan {
+    uint64_t frame_index;
+};
+
+struct micros_frame_vm_transferable_release_plan {
+    uint32_t frame_count;
+    uint32_t reserved;
+    uint64_t frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+};
+
+struct micros_frame_vm_freeze_plan {
+    struct micros_process_handle process;
+    uint32_t data_frame_count;
+    uint32_t reserved;
+    uint64_t
+        data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    uint64_t
+        table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT];
+};
+
+struct micros_frame_vm_process_release_plan {
+    struct micros_process_handle process;
+    uint32_t data_frame_count;
+    uint32_t reserved;
+    uint64_t
+        data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    uint64_t
+        table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT];
 };
 
 _Static_assert(
@@ -163,6 +195,63 @@ micros_frame_ownership_complete_handoff(
 
 enum micros_frame_ownership_error micros_frame_ownership_validate(
     const struct micros_frame_ownership *ownership
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_claim_preflight(
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    struct micros_frame_vm_claim_plan *plan
+);
+
+void micros_frame_ownership_vm_claim_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_claim_plan *plan
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_release_transferable_preflight(
+    const struct micros_frame_ownership *ownership,
+    const uint64_t *physical_addresses,
+    size_t physical_address_count,
+    struct micros_frame_vm_transferable_release_plan *plan
+);
+
+void micros_frame_ownership_vm_release_transferable_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_transferable_release_plan *plan
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_freeze_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_freeze_plan *plan
+);
+
+void micros_frame_ownership_vm_freeze_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_freeze_plan *plan
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_release_process_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_process_release_plan *plan
+);
+
+void micros_frame_ownership_vm_release_process_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_process_release_plan *plan
 );
 
 #endif

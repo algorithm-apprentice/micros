@@ -22,3 +22,12 @@ micros_riscv_publish_page_table:
     sfence.vma x0, x0
     ret
 .size micros_riscv_publish_page_table, . - micros_riscv_publish_page_table
+
+.balign 4
+.globl micros_riscv_publish_page_table_address
+.type micros_riscv_publish_page_table_address, @function
+micros_riscv_publish_page_table_address:
+    fence rw, rw
+    sfence.vma a0, x0
+    ret
+.size micros_riscv_publish_page_table_address, . - micros_riscv_publish_page_table_address

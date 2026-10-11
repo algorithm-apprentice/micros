@@ -47,6 +47,79 @@ static struct micros_syscall_arguments capture_arguments(
     };
 }
 
+union micros_vm_handoff_decoded_request {
+    struct micros_vm_handoff_request ready;
+    struct micros_vm_tty_mapping_request tty_mapping;
+    struct micros_vm_load_begin_request load_begin;
+    struct micros_vm_scratch_map_request scratch_map;
+    struct micros_vm_scratch_commit_request scratch_commit;
+    struct micros_vm_load_freeze_request load_freeze;
+    struct micros_vm_load_abort_request load_abort;
+    struct micros_vm_load_commit_request load_commit;
+    struct micros_vm_exit_release_request exit_release;
+};
+
+static enum micros_syscall_abi_result decode_vm_handoff_request(
+    const struct micros_syscall_arguments *arguments,
+    union micros_vm_handoff_decoded_request *request
+)
+{
+    uint32_t command;
+
+    if (
+        micros_vm_handoff_decode_command(arguments, &command)
+            != MICROS_SYSCALL_ABI_OK
+    ) {
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+    switch (command) {
+    case MICROS_VM_HANDOFF_READY:
+        return micros_vm_handoff_decode(arguments, &request->ready);
+    case MICROS_VM_HANDOFF_MAP_TTY_UART:
+        return micros_vm_handoff_decode_tty_mapping(
+            arguments,
+            &request->tty_mapping
+        );
+    case MICROS_VM_LOAD_BEGIN:
+        return micros_vm_load_begin_decode(
+            arguments,
+            &request->load_begin
+        );
+    case MICROS_VM_SCRATCH_MAP:
+        return micros_vm_scratch_map_decode(
+            arguments,
+            &request->scratch_map
+        );
+    case MICROS_VM_SCRATCH_COMMIT:
+        return micros_vm_scratch_commit_decode(
+            arguments,
+            &request->scratch_commit
+        );
+    case MICROS_VM_LOAD_FREEZE:
+        return micros_vm_load_freeze_decode(
+            arguments,
+            &request->load_freeze
+        );
+    case MICROS_VM_LOAD_ABORT:
+        return micros_vm_load_abort_decode(
+            arguments,
+            &request->load_abort
+        );
+    case MICROS_VM_LOAD_COMMIT:
+        return micros_vm_load_commit_decode(
+            arguments,
+            &request->load_commit
+        );
+    case MICROS_VM_EXIT_RELEASE:
+        return micros_vm_exit_release_decode(
+            arguments,
+            &request->exit_release
+        );
+    default:
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+}
+
 enum micros_syscall_return micros_syscall_handle_user_ecall(
     struct micros_hart *hart,
     struct micros_trap_frame *frame
@@ -55,8 +128,7 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
     struct micros_syscall_context context;
     struct micros_syscall_arguments arguments;
     struct micros_bootstrap_control_request bootstrap_request;
-    struct micros_vm_handoff_request vm_handoff_request;
-    struct micros_vm_tty_mapping_request vm_tty_mapping_request;
+    union micros_vm_handoff_decoded_request vm_handoff_request;
     struct micros_pm_control_request pm_control_request;
     struct micros_tty_control_request tty_control_request;
     const struct micros_thread *thread;
@@ -82,24 +154,11 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
         return MICROS_SYSCALL_RETURN_NORMAL;
     }
     if (arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF) {
-        uint32_t command;
-
         if (
-            micros_vm_handoff_decode_command(
+            decode_vm_handoff_request(
                 &arguments,
-                &command
+                &vm_handoff_request
             ) != MICROS_SYSCALL_ABI_OK
-            || (
-                command == MICROS_VM_HANDOFF_READY
-                    ? micros_vm_handoff_decode(
-                        &arguments,
-                        &vm_handoff_request
-                    ) != MICROS_SYSCALL_ABI_OK
-                    : micros_vm_handoff_decode_tty_mapping(
-                        &arguments,
-                        &vm_tty_mapping_request
-                    ) != MICROS_SYSCALL_ABI_OK
-            )
         ) {
             frame->a0 =
                 (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
@@ -152,25 +211,28 @@ enum micros_syscall_return micros_syscall_handle_user_ecall(
         ) != MICROS_KERNEL_OBJECT_OK
     ) {
         const struct micros_bootstrap_control_state *state =
-        micros_bootstrap_runtime_state();
+            micros_bootstrap_runtime_state();
 
         if (
-        (
-            arguments.a7
-                == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
-            || arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF
-            || arguments.a7 == MICROS_SYSCALL_ABI_PM_CONTROL
-            || arguments.a7 == MICROS_SYSCALL_ABI_TTY_CONTROL
-        )
-        && state != NULL
-        && state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+            (
+                arguments.a7
+                    == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+                || arguments.a7
+                    == MICROS_SYSCALL_ABI_VM_HANDOFF
+                || arguments.a7
+                    == MICROS_SYSCALL_ABI_PM_CONTROL
+                || arguments.a7
+                    == MICROS_SYSCALL_ABI_TTY_CONTROL
+            )
+            && state != NULL
+            && state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
         ) {
-        micros_bootstrap_runtime_fail(
-            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
-            0,
-            MICROS_ENDPOINT_NONE,
-            0
-        );
+            micros_bootstrap_runtime_fail(
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                0,
+                MICROS_ENDPOINT_NONE,
+                0
+            );
         }
         panic_syscall(hart, frame, "syscall-current-invariant");
     }

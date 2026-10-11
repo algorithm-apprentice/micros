@@ -6,6 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
+#include "micros/panic.h"
 
 extern const unsigned char __kernel_start[];
 extern const unsigned char __kernel_end[];
@@ -579,6 +580,155 @@ micros_frame_ownership_runtime_validate(
         return error;
     }
     return validate_process_owners(objects);
+}
+
+static void require_vm_ownership_commit(
+    const char *reason
+)
+{
+    if (!ownership_mutation_is_allowed()) {
+        MICROS_PANIC(0, reason);
+    }
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_vm_claim_preflight(
+    uint64_t physical_address,
+    struct micros_frame_vm_claim_plan *plan
+)
+{
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (!ownership_mutation_is_allowed()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    return micros_frame_ownership_vm_claim_preflight(
+        &bootstrap_ownership,
+        physical_address,
+        plan
+    );
+}
+
+void
+micros_frame_ownership_runtime_vm_claim_commit_prevalidated(
+    const struct micros_frame_vm_claim_plan *plan
+)
+{
+    require_vm_ownership_commit("vm-owner-claim-commit");
+    micros_frame_ownership_vm_claim_commit_prevalidated(
+        &bootstrap_ownership,
+        plan
+    );
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_vm_release_transferable_preflight(
+    const uint64_t *physical_addresses,
+    size_t physical_address_count,
+    struct micros_frame_vm_transferable_release_plan *plan
+)
+{
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (!ownership_mutation_is_allowed()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    return micros_frame_ownership_vm_release_transferable_preflight(
+        &bootstrap_ownership,
+        physical_addresses,
+        physical_address_count,
+        plan
+    );
+}
+
+void
+micros_frame_ownership_runtime_vm_release_transferable_commit_prevalidated(
+    const struct micros_frame_vm_transferable_release_plan *plan
+)
+{
+    require_vm_ownership_commit("vm-owner-rollback-commit");
+    micros_frame_ownership_vm_release_transferable_commit_prevalidated(
+        &bootstrap_ownership,
+        plan
+    );
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_vm_freeze_preflight(
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_freeze_plan *plan
+)
+{
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (!ownership_mutation_is_allowed()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    return micros_frame_ownership_vm_freeze_preflight(
+        &bootstrap_ownership,
+        process,
+        data_physical_addresses,
+        data_physical_address_count,
+        table_physical_addresses,
+        plan
+    );
+}
+
+void
+micros_frame_ownership_runtime_vm_freeze_commit_prevalidated(
+    const struct micros_frame_vm_freeze_plan *plan
+)
+{
+    require_vm_ownership_commit("vm-owner-freeze-commit");
+    micros_frame_ownership_vm_freeze_commit_prevalidated(
+        &bootstrap_ownership,
+        plan
+    );
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_vm_release_process_preflight(
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_process_release_plan *plan
+)
+{
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (!ownership_mutation_is_allowed()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    return micros_frame_ownership_vm_release_process_preflight(
+        &bootstrap_ownership,
+        process,
+        data_physical_addresses,
+        data_physical_address_count,
+        table_physical_addresses,
+        plan
+    );
+}
+
+void
+micros_frame_ownership_runtime_vm_release_process_commit_prevalidated(
+    const struct micros_frame_vm_process_release_plan *plan
+)
+{
+    require_vm_ownership_commit("vm-owner-release-commit");
+    micros_frame_ownership_vm_release_process_commit_prevalidated(
+        &bootstrap_ownership,
+        plan
+    );
 }
 
 enum micros_kernel_object_error

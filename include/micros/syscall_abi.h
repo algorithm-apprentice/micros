@@ -27,6 +27,13 @@ enum micros_syscall_abi_operation {
 enum micros_vm_handoff_command {
     MICROS_VM_HANDOFF_READY = 1,
     MICROS_VM_HANDOFF_MAP_TTY_UART = 2,
+    MICROS_VM_LOAD_BEGIN = 3,
+    MICROS_VM_SCRATCH_MAP = 4,
+    MICROS_VM_SCRATCH_COMMIT = 5,
+    MICROS_VM_LOAD_FREEZE = 6,
+    MICROS_VM_LOAD_ABORT = 7,
+    MICROS_VM_LOAD_COMMIT = 8,
+    MICROS_VM_EXIT_RELEASE = 9,
 };
 
 enum micros_syscall_abi_result {
@@ -56,9 +63,6 @@ struct micros_syscall_arguments {
     uint64_t a7;
 };
 
-bool micros_grant_abi_map_error(
-    enum micros_grant_error error,
-    uint64_t *result
-);
+bool micros_grant_abi_map_error(enum micros_grant_error error, uint64_t *result);
 
 #endif

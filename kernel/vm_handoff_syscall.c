@@ -9,6 +9,7 @@
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/endpoint_internal.h"
 #include "kernel/ipc_runtime_internal.h"
+#include "kernel/pm_control_runtime.h"
 #include "kernel/plic.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/user_address_space_internal.h"
@@ -17,7 +18,42 @@
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_core.h"
 #include "micros/panic.h"
+#include "micros/sv39.h"
 #include "micros/user_address_space.h"
+
+enum {
+    VM_FIXED_OBJECT_CHUNK_CAPACITY = 2,
+};
+
+enum vm_fixed_object_error {
+    VM_FIXED_OBJECT_OK = 0,
+    VM_FIXED_OBJECT_ERROR_MEMORY_FAULT,
+    VM_FIXED_OBJECT_ERROR_INVARIANT,
+};
+
+struct vm_fixed_object_chunk {
+    uintptr_t physical_address;
+    size_t size;
+};
+
+struct vm_fixed_object_plan {
+    size_t chunk_count;
+    size_t size;
+    struct vm_fixed_object_chunk
+        chunks[VM_FIXED_OBJECT_CHUNK_CAPACITY];
+};
+
+union vm_decoded_request {
+    struct micros_vm_handoff_request ready;
+    struct micros_vm_tty_mapping_request tty_mapping;
+    struct micros_vm_load_begin_request load_begin;
+    struct micros_vm_scratch_map_request scratch_map;
+    struct micros_vm_scratch_commit_request scratch_commit;
+    struct micros_vm_load_freeze_request load_freeze;
+    struct micros_vm_load_abort_request load_abort;
+    struct micros_vm_load_commit_request load_commit;
+    struct micros_vm_exit_release_request exit_release;
+};
 
 static void clear_bytes(void *storage, size_t size)
 {
@@ -27,6 +63,39 @@ static void clear_bytes(void *storage, size_t size)
     for (index = 0; index < size; ++index) {
         bytes[index] = 0;
     }
+}
+
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    uint8_t *output = destination;
+    const uint8_t *input = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        output[index] = input[index];
+    }
+}
+
+static bool process_handles_equal(
+    struct micros_process_handle left,
+    struct micros_process_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
+static bool process_is_empty(const struct micros_process *process)
+{
+    return (
+        process->live_thread_count == 0
+        && process->address_space_root == 0
+        && process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
+        && process->privilege_profile == 0
+        && !process->endpoint_lifecycle_consumed
+    );
 }
 
 static _Noreturn void panic_vm_handoff(
@@ -49,6 +118,198 @@ static enum micros_syscall_return return_result(
 {
     frame->a0 = (uint64_t)(int64_t)result;
     return MICROS_SYSCALL_RETURN_NORMAL;
+}
+
+static enum micros_syscall_abi_result decode_request(
+    const struct micros_syscall_arguments *arguments,
+    uint32_t command,
+    union vm_decoded_request *request
+)
+{
+    switch (command) {
+    case MICROS_VM_HANDOFF_READY:
+        return micros_vm_handoff_decode(arguments, &request->ready);
+    case MICROS_VM_HANDOFF_MAP_TTY_UART:
+        return micros_vm_handoff_decode_tty_mapping(
+            arguments,
+            &request->tty_mapping
+        );
+    case MICROS_VM_LOAD_BEGIN:
+        return micros_vm_load_begin_decode(
+            arguments,
+            &request->load_begin
+        );
+    case MICROS_VM_SCRATCH_MAP:
+        return micros_vm_scratch_map_decode(
+            arguments,
+            &request->scratch_map
+        );
+    case MICROS_VM_SCRATCH_COMMIT:
+        return micros_vm_scratch_commit_decode(
+            arguments,
+            &request->scratch_commit
+        );
+    case MICROS_VM_LOAD_FREEZE:
+        return micros_vm_load_freeze_decode(
+            arguments,
+            &request->load_freeze
+        );
+    case MICROS_VM_LOAD_ABORT:
+        return micros_vm_load_abort_decode(
+            arguments,
+            &request->load_abort
+        );
+    case MICROS_VM_LOAD_COMMIT:
+        return micros_vm_load_commit_decode(
+            arguments,
+            &request->load_commit
+        );
+    case MICROS_VM_EXIT_RELEASE:
+        return micros_vm_exit_release_decode(
+            arguments,
+            &request->exit_release
+        );
+    default:
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+}
+
+static enum vm_fixed_object_error prepare_fixed_object(
+    struct micros_process_handle process,
+    uint64_t user_address,
+    size_t size,
+    uint32_t required_permission,
+    struct vm_fixed_object_plan *plan
+)
+{
+    struct vm_fixed_object_plan candidate = {0};
+    uint64_t current = user_address;
+    size_t remaining = size;
+
+    if (
+        plan == NULL
+        || size == 0
+        || user_address < MICROS_USER_VIRTUAL_BASE
+        || size > MICROS_USER_VIRTUAL_END - MICROS_USER_VIRTUAL_BASE
+        || user_address > MICROS_USER_VIRTUAL_END - size
+    ) {
+        return VM_FIXED_OBJECT_ERROR_MEMORY_FAULT;
+    }
+    while (remaining != 0) {
+        uint64_t physical_address = 0;
+        uint32_t permissions = 0;
+        size_t contiguous = 0;
+        size_t chunk;
+        enum micros_user_address_space_error error;
+
+        if (
+            candidate.chunk_count
+                >= VM_FIXED_OBJECT_CHUNK_CAPACITY
+        ) {
+            return VM_FIXED_OBJECT_ERROR_INVARIANT;
+        }
+        error = micros_user_address_space_translate(
+            process,
+            current,
+            &physical_address,
+            &permissions,
+            &contiguous
+        );
+        if (
+            error == MICROS_USER_ADDRESS_SPACE_ERROR_RANGE
+            || error == MICROS_USER_ADDRESS_SPACE_ERROR_PERMISSION
+            || error == MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED
+            || error == MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+            || (
+                error == MICROS_USER_ADDRESS_SPACE_OK
+                && (
+                    permissions & required_permission
+                ) != required_permission
+            )
+        ) {
+            return VM_FIXED_OBJECT_ERROR_MEMORY_FAULT;
+        }
+        if (
+            error != MICROS_USER_ADDRESS_SPACE_OK
+            || physical_address == 0
+            || contiguous == 0
+            || physical_address > UINTPTR_MAX
+        ) {
+            return VM_FIXED_OBJECT_ERROR_INVARIANT;
+        }
+        chunk = contiguous < remaining ? contiguous : remaining;
+        if (
+            physical_address > UINTPTR_MAX - (chunk - 1)
+            || current > UINT64_MAX - chunk
+        ) {
+            return VM_FIXED_OBJECT_ERROR_INVARIANT;
+        }
+        candidate.chunks[candidate.chunk_count].physical_address =
+            (uintptr_t)physical_address;
+        candidate.chunks[candidate.chunk_count].size = chunk;
+        ++candidate.chunk_count;
+        current += chunk;
+        remaining -= chunk;
+    }
+    candidate.size = size;
+    *plan = candidate;
+    return VM_FIXED_OBJECT_OK;
+}
+
+static void read_fixed_object_prevalidated(
+    const struct vm_fixed_object_plan *plan,
+    void *output
+)
+{
+    uint8_t *destination = output;
+    size_t offset = 0;
+    size_t index;
+
+    for (index = 0; index < plan->chunk_count; ++index) {
+        copy_bytes(
+            &destination[offset],
+            (const void *)plan->chunks[index].physical_address,
+            plan->chunks[index].size
+        );
+        offset += plan->chunks[index].size;
+    }
+}
+
+static void write_fixed_object_prevalidated(
+    const struct vm_fixed_object_plan *plan,
+    const void *input
+)
+{
+    const uint8_t *source = input;
+    size_t offset = 0;
+    size_t index;
+
+    for (index = 0; index < plan->chunk_count; ++index) {
+        copy_bytes(
+            (void *)plan->chunks[index].physical_address,
+            &source[offset],
+            plan->chunks[index].size
+        );
+        offset += plan->chunks[index].size;
+    }
+}
+
+static bool map_vm_error(
+    enum micros_vm_handoff_error error,
+    enum micros_syscall_abi_result *result
+)
+{
+    switch (error) {
+    case MICROS_VM_HANDOFF_ERROR_ARGUMENT:
+    case MICROS_VM_HANDOFF_ERROR_SUMMARY:
+        *result = MICROS_SYSCALL_ABI_ARGUMENT;
+        return true;
+    case MICROS_VM_HANDOFF_ERROR_STATE:
+        *result = MICROS_SYSCALL_ABI_STATE;
+        return true;
+    default:
+        return false;
+    }
 }
 
 static _Noreturn void fail_vm_handoff(
@@ -153,6 +414,78 @@ static bool vm_phase_is_ready(
         }
     }
     return false;
+}
+
+static bool vm_post_handoff_phase_is_ready(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership
+)
+{
+    return (
+        bootstrap != NULL
+        && state != NULL
+        && ownership != NULL
+        && bootstrap->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+        && state->phase == MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        && ownership->phase
+            == MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    );
+}
+
+enum reservation_check_result {
+    RESERVATION_CHECK_OK = 0,
+    RESERVATION_CHECK_STATE,
+    RESERVATION_CHECK_INVARIANT,
+};
+
+static enum reservation_check_result check_reservation(
+    const struct micros_pm_control_state *pm,
+    const struct micros_kernel_objects *objects,
+    uint64_t token,
+    const struct micros_process_handle *expected_process,
+    bool require_empty,
+    struct micros_process_handle *process_handle
+)
+{
+    const struct micros_process *process;
+
+    if (
+        pm == NULL
+        || objects == NULL
+        || process_handle == NULL
+        || token == 0
+        || micros_pm_control_state_validate(pm)
+            != MICROS_PM_CONTROL_OK
+    ) {
+        return RESERVATION_CHECK_INVARIANT;
+    }
+    if (
+        pm->active_transaction != token
+        || (
+            expected_process != NULL
+            && !process_handles_equal(
+                pm->reserved_process,
+                *expected_process
+            )
+        )
+    ) {
+        return RESERVATION_CHECK_STATE;
+    }
+    if (
+        micros_process_resolve(
+            objects,
+            pm->reserved_process,
+            &process
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return RESERVATION_CHECK_INVARIANT;
+    }
+    if (require_empty && !process_is_empty(process)) {
+        return RESERVATION_CHECK_INVARIANT;
+    }
+    *process_handle = pm->reserved_process;
+    return RESERVATION_CHECK_OK;
 }
 
 enum tty_map_phase_result {
@@ -531,6 +864,680 @@ static enum micros_syscall_return handle_tty_mapping_command(
     return return_result(frame, MICROS_SYSCALL_ABI_OK);
 }
 
+static enum micros_syscall_return handle_load_begin_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_syscall_context *context,
+    struct micros_vm_handoff_state *state,
+    const struct micros_pm_control_state *pm,
+    const struct micros_vm_load_begin_request *request
+)
+{
+    struct micros_process_handle process;
+    struct micros_vm_load_begin_plan load_plan;
+    struct vm_fixed_object_plan output_plan;
+    enum reservation_check_result reservation;
+    enum vm_fixed_object_error object_error;
+    enum micros_vm_handoff_error vm_error;
+    enum micros_syscall_abi_result result;
+
+    clear_bytes(&load_plan, sizeof(load_plan));
+    clear_bytes(&output_plan, sizeof(output_plan));
+    object_error = prepare_fixed_object(
+        context->process,
+        request->output_address,
+        sizeof(struct micros_vm_load_begin_result),
+        MICROS_SV39_PERMISSION_WRITE,
+        &output_plan
+    );
+    if (object_error == VM_FIXED_OBJECT_ERROR_MEMORY_FAULT) {
+        return return_result(
+            frame,
+            MICROS_SYSCALL_ABI_MEMORY_FAULT
+        );
+    }
+    if (object_error != VM_FIXED_OBJECT_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    reservation = check_reservation(
+        pm,
+        context->objects,
+        request->process_reservation_token,
+        NULL,
+        true,
+        &process
+    );
+    if (reservation == RESERVATION_CHECK_STATE) {
+        return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+    }
+    if (reservation != RESERVATION_CHECK_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    vm_error = micros_vm_load_begin_preflight(
+        state,
+        request->process_reservation_token,
+        process,
+        true,
+        &load_plan
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+
+    micros_vm_load_begin_commit_prevalidated(state, &load_plan);
+    write_fixed_object_prevalidated(
+        &output_plan,
+        &load_plan.result
+    );
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_scratch_map_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_scratch_map_request *request
+)
+{
+    struct micros_vm_scratch_plan scratch;
+    struct micros_frame_vm_claim_plan ownership_plan;
+    struct micros_user_address_space_vm_scratch_plan address_plan;
+    enum micros_vm_handoff_error vm_error;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_user_address_space_error address_error;
+    enum micros_syscall_abi_result result;
+
+    clear_bytes(&scratch, sizeof(scratch));
+    clear_bytes(&ownership_plan, sizeof(ownership_plan));
+    clear_bytes(&address_plan, sizeof(address_plan));
+    vm_error = micros_vm_scratch_map_preflight(
+        state,
+        request,
+        &scratch
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    ownership_error =
+        micros_frame_ownership_runtime_vm_claim_preflight(
+            request->physical_address,
+            &ownership_plan
+        );
+        if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    address_error =
+        micros_user_address_space_prepare_vm_scratch_mapping(
+            state->process,
+            state->root_physical_address,
+            request->physical_address,
+            &address_plan
+        );
+        if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+
+    micros_vm_scratch_map_bind_prevalidated(state, &scratch);
+    micros_frame_ownership_runtime_vm_claim_commit_prevalidated(
+        &ownership_plan
+    );
+    micros_user_address_space_commit_vm_scratch_mapping(
+        &address_plan
+    );
+    micros_vm_scratch_map_finish_prevalidated(state);
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_scratch_commit_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_scratch_commit_request *request
+)
+{
+    struct micros_vm_scratch_plan scratch;
+    struct micros_user_address_space_vm_scratch_plan address_plan;
+    enum micros_vm_handoff_error vm_error;
+    enum micros_user_address_space_error address_error;
+    enum micros_syscall_abi_result result;
+
+    clear_bytes(&scratch, sizeof(scratch));
+    clear_bytes(&address_plan, sizeof(address_plan));
+    vm_error = micros_vm_scratch_commit_preflight(
+        state,
+        request,
+        &scratch
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    address_error =
+        micros_user_address_space_prepare_vm_scratch_removal(
+            state->process,
+            state->root_physical_address,
+            request->physical_address,
+            &address_plan
+        );
+        if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+
+    micros_user_address_space_commit_vm_scratch_removal(
+        &address_plan
+    );
+    micros_vm_scratch_commit_commit_prevalidated(
+        state,
+        &scratch
+    );
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_load_freeze_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_syscall_context *context,
+    struct micros_vm_handoff_state *state,
+    const struct micros_pm_control_state *pm,
+    const struct micros_vm_load_freeze_request *request
+)
+{
+    struct micros_vm_load_freeze_plan freeze_request;
+    struct micros_vm_load_freeze_state_plan state_plan;
+    struct micros_frame_vm_freeze_plan ownership_plan;
+    struct micros_user_address_space_vm_freeze_plan address_plan;
+    struct vm_fixed_object_plan input_plan;
+    struct vm_fixed_object_plan output_plan;
+    struct micros_process_handle reserved_process;
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    enum vm_fixed_object_error object_error;
+    enum micros_vm_handoff_error vm_error;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_user_address_space_error address_error;
+    enum reservation_check_result reservation;
+    enum micros_syscall_abi_result result;
+    size_t index;
+
+    clear_bytes(&freeze_request, sizeof(freeze_request));
+    clear_bytes(&state_plan, sizeof(state_plan));
+    clear_bytes(&ownership_plan, sizeof(ownership_plan));
+    clear_bytes(&address_plan, sizeof(address_plan));
+    clear_bytes(&input_plan, sizeof(input_plan));
+    clear_bytes(&output_plan, sizeof(output_plan));
+    clear_bytes(data_frames, sizeof(data_frames));
+    object_error = prepare_fixed_object(
+        context->process,
+        request->plan_address,
+        sizeof(freeze_request),
+        MICROS_SV39_PERMISSION_READ,
+        &input_plan
+    );
+    if (object_error == VM_FIXED_OBJECT_ERROR_MEMORY_FAULT) {
+        return return_result(
+            frame,
+            MICROS_SYSCALL_ABI_MEMORY_FAULT
+        );
+    }
+    if (object_error != VM_FIXED_OBJECT_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    read_fixed_object_prevalidated(&input_plan, &freeze_request);
+    object_error = prepare_fixed_object(
+        context->process,
+        request->output_address,
+        sizeof(struct micros_vm_load_freeze_result),
+        MICROS_SV39_PERMISSION_WRITE,
+        &output_plan
+    );
+    if (object_error == VM_FIXED_OBJECT_ERROR_MEMORY_FAULT) {
+        return return_result(
+            frame,
+            MICROS_SYSCALL_ABI_MEMORY_FAULT
+        );
+    }
+    if (object_error != VM_FIXED_OBJECT_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    vm_error = micros_vm_load_freeze_preflight(
+        state,
+        &freeze_request,
+        &state_plan
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    reservation = check_reservation(
+        pm,
+        context->objects,
+        state->load.process_reservation_token,
+        &state_plan.action.process,
+        true,
+        &reserved_process
+    );
+    if (reservation == RESERVATION_CHECK_STATE) {
+        return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+    }
+    if (reservation != RESERVATION_CHECK_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    for (index = 0; index < state_plan.action.entry_count; ++index) {
+        data_frames[index] =
+            state_plan.action.entries[index].physical_address;
+    }
+    ownership_error =
+        micros_frame_ownership_runtime_vm_freeze_preflight(
+            reserved_process,
+            data_frames,
+            state_plan.action.entry_count,
+            state_plan.action.table_frames,
+            &ownership_plan
+        );
+        if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    address_error = micros_user_address_space_prepare_vm_freeze(
+        &state_plan.action,
+        &address_plan
+    );
+    if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+
+    micros_user_address_space_construct_vm_freeze_prevalidated(
+        &address_plan
+    );
+    micros_frame_ownership_runtime_vm_freeze_commit_prevalidated(
+        &ownership_plan
+    );
+    micros_user_address_space_install_vm_freeze_prevalidated(
+        &address_plan
+    );
+    micros_vm_load_freeze_commit_prevalidated(state, &state_plan);
+    write_fixed_object_prevalidated(
+        &output_plan,
+        &state_plan.result
+    );
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_load_abort_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_syscall_context *context,
+    struct micros_vm_handoff_state *state,
+    const struct micros_pm_control_state *pm,
+    const struct micros_vm_load_abort_request *request
+)
+{
+    struct micros_vm_load_abort_action action;
+    struct micros_user_address_space_vm_scratch_plan scratch_plan;
+    struct micros_user_address_space_vm_teardown_plan teardown_plan;
+    struct micros_frame_vm_transferable_release_plan
+        transferable_plan;
+    struct micros_frame_vm_process_release_plan process_plan;
+    struct micros_process_handle reserved_process;
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    enum micros_vm_handoff_error vm_error;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_user_address_space_error address_error;
+    enum reservation_check_result reservation;
+    enum micros_syscall_abi_result result;
+    size_t data_frame_count;
+    size_t index;
+
+    clear_bytes(&action, sizeof(action));
+    clear_bytes(&scratch_plan, sizeof(scratch_plan));
+    clear_bytes(&teardown_plan, sizeof(teardown_plan));
+    clear_bytes(&transferable_plan, sizeof(transferable_plan));
+    clear_bytes(&process_plan, sizeof(process_plan));
+    clear_bytes(data_frames, sizeof(data_frames));
+    vm_error = micros_vm_load_abort_preflight(
+        state,
+        request->load_token,
+        request->mapping_generation,
+        &action
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    reservation = check_reservation(
+        pm,
+        context->objects,
+        state->load.process_reservation_token,
+        &action.process,
+        !action.frozen,
+        &reserved_process
+    );
+    if (reservation == RESERVATION_CHECK_STATE) {
+        return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+    }
+    if (reservation != RESERVATION_CHECK_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    if (action.frozen) {
+        address_error = micros_user_address_space_prepare_vm_teardown(
+            reserved_process,
+            action.root_physical_address,
+            action.table_frames,
+            action.entries,
+            action.entry_count,
+            &teardown_plan
+        );
+        if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                state
+            );
+        }
+        for (index = 0; index < action.entry_count; ++index) {
+            data_frames[index] =
+                action.entries[index].physical_address;
+        }
+        ownership_error =
+            micros_frame_ownership_runtime_vm_release_process_preflight(
+                reserved_process,
+                data_frames,
+                action.entry_count,
+                action.table_frames,
+                &process_plan
+            );
+            if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+                fail_vm_handoff(
+                    hart,
+                    frame,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                state
+            );
+        }
+    } else {
+        data_frame_count = action.entry_count;
+        for (index = 0; index < action.entry_count; ++index) {
+            data_frames[index] =
+                action.entries[index].physical_address;
+        }
+        if (action.scratch_mapped) {
+            if (
+                data_frame_count
+                    >= MICROS_APPLICATION_RESIDENT_PAGE_MAX
+            ) {
+                fail_vm_handoff(
+                    hart,
+                    frame,
+                    MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                    state
+                );
+            }
+            data_frames[data_frame_count] =
+                action.scratch_physical_address;
+            ++data_frame_count;
+            address_error =
+                micros_user_address_space_prepare_vm_scratch_removal(
+                    state->process,
+                    state->root_physical_address,
+                    action.scratch_physical_address,
+                    &scratch_plan
+                );
+                if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+                    fail_vm_handoff(
+                        hart,
+                        frame,
+                    MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                    state
+                );
+            }
+        }
+        ownership_error =
+            micros_frame_ownership_runtime_vm_release_transferable_preflight(
+                data_frames,
+                data_frame_count,
+                &transferable_plan
+            );
+            if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+                fail_vm_handoff(
+                    hart,
+                    frame,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+                state
+            );
+        }
+    }
+
+    if (action.frozen) {
+        micros_user_address_space_commit_vm_teardown_prevalidated(
+            &teardown_plan
+        );
+        micros_frame_ownership_runtime_vm_release_process_commit_prevalidated(
+            &process_plan
+        );
+    } else {
+        if (action.scratch_mapped) {
+            micros_user_address_space_commit_vm_scratch_removal(
+                &scratch_plan
+            );
+        }
+        micros_frame_ownership_runtime_vm_release_transferable_commit_prevalidated(
+            &transferable_plan
+        );
+    }
+    micros_vm_load_abort_commit_prevalidated(state);
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_load_commit_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_load_commit_request *request
+)
+{
+    enum micros_vm_handoff_error vm_error;
+    enum micros_syscall_abi_result result;
+
+    vm_error = micros_vm_load_commit_preflight(
+        state,
+        request->load_token,
+        request->mapping_generation
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    micros_vm_load_commit_commit_prevalidated(state);
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
+static enum micros_syscall_return handle_exit_release_command(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_exit_release_request *request
+)
+{
+    struct micros_vm_exit_release_action action;
+    struct micros_user_address_space_vm_teardown_plan address_plan;
+    struct micros_frame_vm_process_release_plan ownership_plan;
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    enum micros_vm_handoff_error vm_error;
+    enum micros_user_address_space_error address_error;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_syscall_abi_result result;
+    size_t index;
+
+    clear_bytes(&action, sizeof(action));
+    clear_bytes(&address_plan, sizeof(address_plan));
+    clear_bytes(&ownership_plan, sizeof(ownership_plan));
+    clear_bytes(data_frames, sizeof(data_frames));
+    vm_error = micros_vm_exit_release_preflight(
+        state,
+        request->exit_token,
+        request->load_token,
+        request->mapping_generation,
+        &action
+    );
+    if (vm_error != MICROS_VM_HANDOFF_OK) {
+        if (map_vm_error(vm_error, &result)) {
+            return return_result(frame, result);
+        }
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    address_error = micros_user_address_space_prepare_vm_teardown(
+        action.process,
+        action.root_physical_address,
+        action.table_frames,
+        action.entries,
+        action.entry_count,
+        &address_plan
+    );
+    if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    for (index = 0; index < action.entry_count; ++index) {
+        data_frames[index] =
+            action.entries[index].physical_address;
+    }
+    ownership_error =
+        micros_frame_ownership_runtime_vm_release_process_preflight(
+            action.process,
+            data_frames,
+            action.entry_count,
+            action.table_frames,
+            &ownership_plan
+        );
+        if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+            fail_vm_handoff(
+                hart,
+                frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+
+    micros_user_address_space_commit_vm_teardown_prevalidated(
+        &address_plan
+    );
+    micros_frame_ownership_runtime_vm_release_process_commit_prevalidated(
+        &ownership_plan
+    );
+    micros_vm_exit_release_commit_prevalidated(
+        state,
+        action.process
+    );
+    return return_result(frame, MICROS_SYSCALL_ABI_OK);
+}
+
 enum micros_syscall_return
 micros_vm_handoff_handle_captured_user_ecall(
     struct micros_hart *hart,
@@ -539,12 +1546,12 @@ micros_vm_handoff_handle_captured_user_ecall(
     const struct micros_syscall_arguments *arguments
 )
 {
-    struct micros_vm_handoff_request ready_request;
-    struct micros_vm_tty_mapping_request mapping_request;
+    union vm_decoded_request request;
     struct micros_vm_handoff_state *state;
     struct micros_bootstrap_control_state *bootstrap;
     struct micros_endpoint_registry *registry;
     const struct micros_frame_ownership *ownership;
+    const struct micros_pm_control_state *pm;
     const struct micros_thread *current_thread;
     uint32_t command;
 
@@ -564,15 +1571,8 @@ micros_vm_handoff_handle_captured_user_ecall(
         return return_result(frame, MICROS_SYSCALL_ABI_ARGUMENT);
     }
     if (
-        command == MICROS_VM_HANDOFF_READY
-            ? micros_vm_handoff_decode(
-                arguments,
-                &ready_request
-            ) != MICROS_SYSCALL_ABI_OK
-            : micros_vm_handoff_decode_tty_mapping(
-                arguments,
-                &mapping_request
-            ) != MICROS_SYSCALL_ABI_OK
+        decode_request(arguments, command, &request)
+            != MICROS_SYSCALL_ABI_OK
     ) {
         return return_result(frame, MICROS_SYSCALL_ABI_ARGUMENT);
     }
@@ -632,17 +1632,111 @@ micros_vm_handoff_handle_captured_user_ecall(
             state,
             bootstrap,
             ownership,
-            &ready_request
+            &request.ready
         );
     }
-    return handle_tty_mapping_command(
-        hart,
-        frame,
-        context,
-        state,
-        bootstrap,
-        registry,
-        ownership,
-        &mapping_request
-    );
+    if (command == MICROS_VM_HANDOFF_MAP_TTY_UART) {
+        return handle_tty_mapping_command(
+            hart,
+            frame,
+            context,
+            state,
+            bootstrap,
+            registry,
+            ownership,
+            &request.tty_mapping
+        );
+    }
+    if (
+        !vm_post_handoff_phase_is_ready(
+            bootstrap,
+            state,
+            ownership
+        )
+    ) {
+        return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+    }
+    pm = micros_pm_control_runtime_state();
+    if (
+        micros_bootstrap_runtime_validate()
+            != MICROS_BOOTSTRAP_OK
+        || micros_vm_handoff_runtime_validate(
+            bootstrap,
+            registry,
+            context->objects
+        ) != MICROS_VM_HANDOFF_OK
+        || micros_pm_control_runtime_validate(
+            bootstrap,
+            registry,
+            context->objects
+        ) != MICROS_PM_CONTROL_OK
+        || micros_user_address_space_validate(state->process)
+            != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        fail_vm_handoff(
+            hart,
+            frame,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            state
+        );
+    }
+    switch (command) {
+    case MICROS_VM_LOAD_BEGIN:
+        return handle_load_begin_command(
+            hart,
+            frame,
+            context,
+            state,
+            pm,
+            &request.load_begin
+        );
+    case MICROS_VM_SCRATCH_MAP:
+        return handle_scratch_map_command(
+            hart,
+            frame,
+            state,
+            &request.scratch_map
+        );
+    case MICROS_VM_SCRATCH_COMMIT:
+        return handle_scratch_commit_command(
+            hart,
+            frame,
+            state,
+            &request.scratch_commit
+        );
+    case MICROS_VM_LOAD_FREEZE:
+        return handle_load_freeze_command(
+            hart,
+            frame,
+            context,
+            state,
+            pm,
+            &request.load_freeze
+        );
+    case MICROS_VM_LOAD_ABORT:
+        return handle_load_abort_command(
+            hart,
+            frame,
+            context,
+            state,
+            pm,
+            &request.load_abort
+        );
+    case MICROS_VM_LOAD_COMMIT:
+        return handle_load_commit_command(
+            hart,
+            frame,
+            state,
+            &request.load_commit
+        );
+    case MICROS_VM_EXIT_RELEASE:
+        return handle_exit_release_command(
+            hart,
+            frame,
+            state,
+            &request.exit_release
+        );
+    default:
+        return return_result(frame, MICROS_SYSCALL_ABI_ARGUMENT);
+    }
 }

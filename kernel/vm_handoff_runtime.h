@@ -7,6 +7,13 @@
 #include "kernel/bootstrap_image.h"
 #include "kernel/vm_handoff_core.h"
 #include "kernel/vm_snapshot.h"
+#include "micros/user_address_space_core.h"
+
+enum micros_vm_scratch_authority_status {
+    MICROS_VM_SCRATCH_AUTHORITY_INVALID = 0,
+    MICROS_VM_SCRATCH_AUTHORITY_NONE,
+    MICROS_VM_SCRATCH_AUTHORITY_ACTIVE,
+};
 
 enum micros_vm_handoff_error micros_vm_handoff_runtime_prepare(
     const struct micros_bootstrap_binding *binding,
@@ -36,6 +43,12 @@ bool micros_vm_handoff_runtime_role_ready(
     uint32_t service_id,
     struct micros_process_handle process,
     micros_endpoint_t endpoint
+);
+
+enum micros_vm_scratch_authority_status
+micros_vm_handoff_runtime_scratch_authority(
+    struct micros_user_address_space_vm_scratch_authority
+        *authority
 );
 
 #endif
