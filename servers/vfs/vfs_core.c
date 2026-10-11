@@ -196,6 +196,25 @@ static size_t descriptor_user_count(
             }
         }
     }
+    if (
+        state->spawn.phase
+            == MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED
+    ) {
+        size_t descriptor;
+
+        for (
+            descriptor = 0;
+            descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+            ++descriptor
+        ) {
+            if (
+                state->spawn.child_descriptors[descriptor]
+                    == open_file_slot + 1
+            ) {
+                ++count;
+            }
+        }
+    }
     return count;
 }
 
@@ -213,6 +232,20 @@ static size_t vnode_user_count(
         && state->spawn.executable_vnode == vnode_slot + 1
     ) {
         ++count;
+    }
+    if (
+        state->spawn.phase
+            == MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED
+    ) {
+        if (state->spawn.child_root_vnode == vnode_slot + 1) {
+            ++count;
+        }
+        if (
+            state->spawn.child_working_directory_vnode
+                == vnode_slot + 1
+        ) {
+            ++count;
+        }
     }
 
     for (
@@ -709,10 +742,15 @@ static enum micros_vfs_core_error validate_spawn(
 {
     const struct micros_vfs_spawn_transaction *spawn =
         &state->spawn;
+    const struct micros_vfs_process_record *parent = NULL;
     struct micros_spawn_request decoded;
     struct micros_spawn_stack_layout stack_layout;
     const struct micros_vfs_vnode *vnode;
-    bool parent_found = false;
+    uint16_t expected_descriptors[
+        MICROS_VFS_DESCRIPTOR_CAPACITY
+    ] = {0};
+    bool descriptors_prepared;
+    size_t descriptor;
     size_t process_slot;
 
     if (spawn->phase == MICROS_VFS_SPAWN_IDLE) {
@@ -731,8 +769,13 @@ static enum micros_vfs_core_error validate_spawn(
         }
         return MICROS_VFS_CORE_OK;
     }
+    descriptors_prepared =
+        spawn->phase == MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED;
     if (
-        spawn->phase != MICROS_VFS_SPAWN_IMAGE_PREPARED
+        (
+            spawn->phase != MICROS_VFS_SPAWN_IMAGE_PREPARED
+            && !descriptors_prepared
+        )
         || !vfs_bytes_are_zero(
             spawn->reserved0,
             sizeof(spawn->reserved0)
@@ -787,6 +830,19 @@ static enum micros_vfs_core_error validate_spawn(
             &decoded,
             &stack_layout
         ) != MICROS_SPAWN_STACK_LAYOUT_OK
+        || (
+            !descriptors_prepared
+            && (
+                spawn->child_process_reference != 0
+                || spawn->descriptor_token != 0
+                || spawn->child_root_vnode != 0
+                || spawn->child_working_directory_vnode != 0
+                || !vfs_bytes_are_zero(
+                    spawn->child_descriptors,
+                    sizeof(spawn->child_descriptors)
+                )
+            )
+        )
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
@@ -810,29 +866,153 @@ static enum micros_vfs_core_error validate_spawn(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
+    } else {
+        if (!vfs_endpoint_is_canonical(spawn->parent_endpoint)) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        for (
+            process_slot = 0;
+            process_slot < MICROS_VFS_PROCESS_CAPACITY;
+            ++process_slot
+        ) {
+            if (
+                state->processes[process_slot].state
+                    == MICROS_VFS_PROCESS_ACTIVE
+                && state->processes[process_slot].endpoint
+                    == spawn->parent_endpoint
+            ) {
+                parent = &state->processes[process_slot];
+                break;
+            }
+        }
+        if (parent == NULL) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+    }
+    if (!descriptors_prepared) {
         return MICROS_VFS_CORE_OK;
     }
-    if (!vfs_endpoint_is_canonical(spawn->parent_endpoint)) {
+    if (
+        spawn->descriptor_token == 0
+        || spawn->descriptor_token != state->last_descriptor_token
+        || !reference_is_valid(
+            spawn->child_process_reference,
+            MICROS_VFS_PROCESS_CAPACITY
+        )
+        || !free_process_is_canonical(
+            &state->processes[
+                spawn->child_process_reference - 1
+            ]
+        )
+        || !reference_is_valid(
+            spawn->child_root_vnode,
+            MICROS_VFS_VNODE_CAPACITY
+        )
+        || !reference_is_valid(
+            spawn->child_working_directory_vnode,
+            MICROS_VFS_VNODE_CAPACITY
+        )
+        || !mode_is_directory(
+            state->vnodes[spawn->child_root_vnode - 1].mode
+        )
+        || !mode_is_directory(
+            state->vnodes[
+                spawn->child_working_directory_vnode - 1
+            ].mode
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (spawn->trusted_init) {
+        if (
+            spawn->child_root_vnode != 1
+            || spawn->child_working_directory_vnode != 1
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        for (
+            descriptor = 0;
+            descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+            ++descriptor
+        ) {
+            uint16_t reference =
+                spawn->child_descriptors[descriptor];
+            const struct micros_vfs_open_file *open_file;
+            size_t prior;
+
+            if (descriptor >= 3) {
+                if (reference != 0) {
+                    return MICROS_VFS_CORE_ERROR_INVARIANT;
+                }
+                continue;
+            }
+            if (
+                !reference_is_valid(
+                    reference,
+                    MICROS_VFS_OPEN_FILE_CAPACITY
+                )
+            ) {
+                return MICROS_VFS_CORE_ERROR_INVARIANT;
+            }
+            open_file = &state->open_files[reference - 1];
+            if (
+                open_file->state
+                    != MICROS_VFS_OPEN_FILE_ACTIVE
+                || open_file->kind != MICROS_VFS_OBJECT_CONSOLE
+                || open_file->access
+                    != (
+                        descriptor == 0
+                            ? MICROS_VFS_ACCESS_READ
+                            : MICROS_VFS_ACCESS_WRITE
+                    )
+            ) {
+                return MICROS_VFS_CORE_ERROR_INVARIANT;
+            }
+            for (prior = 0; prior < descriptor; ++prior) {
+                if (
+                    spawn->child_descriptors[prior]
+                        == reference
+                ) {
+                    return MICROS_VFS_CORE_ERROR_INVARIANT;
+                }
+            }
+        }
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        spawn->child_root_vnode != parent->root_vnode
+        || spawn->child_working_directory_vnode
+            != parent->working_directory_vnode
+    ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     for (
-        process_slot = 0;
-        process_slot < MICROS_VFS_PROCESS_CAPACITY;
-        ++process_slot
+        descriptor = 0;
+        descriptor < decoded.descriptor_action_count;
+        ++descriptor
+    ) {
+        const struct micros_spawn_descriptor_action *item =
+            &decoded.descriptor_actions[descriptor];
+        uint16_t reference = parent->descriptors[item->source];
+
+        if (reference == 0) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        expected_descriptors[item->destination] = reference;
+    }
+    for (
+        descriptor = 0;
+        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+        ++descriptor
     ) {
         if (
-            state->processes[process_slot].state
-                == MICROS_VFS_PROCESS_ACTIVE
-            && state->processes[process_slot].endpoint
-                == spawn->parent_endpoint
+            spawn->child_descriptors[descriptor]
+                != expected_descriptors[descriptor]
         ) {
-            parent_found = true;
-            break;
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
     }
-    return parent_found
-        ? MICROS_VFS_CORE_OK
-        : MICROS_VFS_CORE_ERROR_INVARIANT;
+    return MICROS_VFS_CORE_OK;
 }
 
 static bool find_process(
@@ -875,6 +1055,11 @@ static bool find_free_process(
         if (
             state->processes[index].state
                 == MICROS_VFS_PROCESS_FREE
+            && (
+                state->spawn.child_process_reference == 0
+                || state->spawn.child_process_reference
+                    != index + 1
+            )
         ) {
             *process_slot = index;
             return true;
@@ -3800,6 +3985,7 @@ enum micros_vfs_core_error micros_vfs_state_validate(
                 sizeof(state->pending)
             )
             || state->last_image_token != 0
+            || state->last_descriptor_token != 0
             || !vfs_bytes_are_zero(
                 &state->spawn,
                 sizeof(state->spawn)
@@ -4066,7 +4252,7 @@ enum micros_vfs_core_error micros_vfs_detach(
         return MICROS_VFS_CORE_OK;
     }
     if (
-        state->spawn.phase == MICROS_VFS_SPAWN_IMAGE_PREPARED
+        state->spawn.phase != MICROS_VFS_SPAWN_IDLE
         && !state->spawn.trusted_init
         && state->spawn.parent_endpoint == endpoint
     ) {
@@ -4765,6 +4951,361 @@ static enum micros_vfs_core_error prepare_spawn_image(
     return MICROS_VFS_CORE_OK;
 }
 
+static enum micros_vfs_core_error prepare_spawn_descriptors(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    struct micros_vfs_control_result_action *action
+)
+{
+    struct micros_spawn_request decoded;
+    struct micros_vfs_process_record *parent = NULL;
+    uint16_t child_descriptors[MICROS_VFS_DESCRIPTOR_CAPACITY] = {0};
+    size_t open_file_slots[3] = {0};
+    size_t child_process_slot;
+    size_t parent_slot = 0;
+    size_t descriptor;
+    uint16_t root_vnode;
+    uint16_t working_directory_vnode;
+
+    if (
+        request->version != MICROS_VFS_PROTOCOL_VERSION
+        || request->source != state->pm_endpoint
+        || request->reply_token == 0
+        || request->lifecycle_token == 0
+        || request->image_token == 0
+        || request->semantic_pid == 0
+        || request->trusted_init
+        || request->parent_endpoint != 0
+        || request->request_grant != 0
+        || request->request_size != 0
+        || request->descriptor_token != 0
+        || request->child_endpoint != 0
+        || state->phase != MICROS_VFS_PHASE_MOUNTED
+        || state->spawn.phase
+            != MICROS_VFS_SPAWN_IMAGE_PREPARED
+        || request->lifecycle_token
+            != state->spawn.pm_spawn_token
+        || request->image_token != state->spawn.image_token
+        || request->semantic_pid != state->spawn.semantic_pid
+    ) {
+        prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_STATE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        state->last_descriptor_token == UINT64_MAX
+        || micros_spawn_request_decode(
+            state->spawn_request_bytes,
+            state->spawn.request_size,
+            &decoded
+        ) != MICROS_SPAWN_REQUEST_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (state->spawn.trusted_init) {
+        root_vnode = 1;
+        working_directory_vnode = 1;
+        if (
+            decoded.descriptor_action_count != 0
+            || !find_free_open_files(
+                state,
+                3,
+                open_file_slots
+            )
+            || state->vnodes[0].local_reference_count
+                > UINT32_MAX - 2
+        ) {
+            enum micros_vfs_control_result result =
+                decoded.descriptor_action_count != 0
+                    ? MICROS_VFS_CONTROL_RESULT_STATE
+                    : MICROS_VFS_CONTROL_RESULT_NO_SPACE;
+
+            prepare_control_result(request, result, action);
+            return MICROS_VFS_CORE_OK;
+        }
+        child_descriptors[0] =
+            (uint16_t)(open_file_slots[0] + 1);
+        child_descriptors[1] =
+            (uint16_t)(open_file_slots[1] + 1);
+        child_descriptors[2] =
+            (uint16_t)(open_file_slots[2] + 1);
+    } else {
+        if (
+            !find_process(
+                state,
+                state->spawn.parent_endpoint,
+                &parent_slot
+            )
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        parent = &state->processes[parent_slot];
+        root_vnode = parent->root_vnode;
+        working_directory_vnode =
+            parent->working_directory_vnode;
+        for (
+            descriptor = 0;
+            descriptor < decoded.descriptor_action_count;
+            ++descriptor
+        ) {
+            const struct micros_spawn_descriptor_action *item =
+                &decoded.descriptor_actions[descriptor];
+            uint16_t reference =
+                parent->descriptors[item->source];
+            size_t same_reference_count = 1;
+            size_t prior;
+
+            if (reference == 0) {
+                prepare_control_result(
+                    request,
+                    MICROS_VFS_CONTROL_RESULT_DESCRIPTOR,
+                    action
+                );
+                return MICROS_VFS_CORE_OK;
+            }
+            for (prior = 0; prior < descriptor; ++prior) {
+                if (
+                    parent->descriptors[
+                        decoded.descriptor_actions[prior].source
+                    ] == reference
+                ) {
+                    ++same_reference_count;
+                }
+            }
+            if (
+                state->open_files[reference - 1].reference_count
+                    > UINT32_MAX - same_reference_count
+            ) {
+                prepare_control_result(
+                    request,
+                    MICROS_VFS_CONTROL_RESULT_NO_SPACE,
+                    action
+                );
+                return MICROS_VFS_CORE_OK;
+            }
+            child_descriptors[item->destination] = reference;
+        }
+        if (
+            root_vnode == working_directory_vnode
+            && state->vnodes[root_vnode - 1]
+                .local_reference_count > UINT32_MAX - 2
+        ) {
+            prepare_control_result(
+                request,
+                MICROS_VFS_CONTROL_RESULT_NO_SPACE,
+                action
+            );
+            return MICROS_VFS_CORE_OK;
+        }
+        if (
+            root_vnode != working_directory_vnode
+            && (
+                state->vnodes[root_vnode - 1]
+                    .local_reference_count == UINT32_MAX
+                || state->vnodes[working_directory_vnode - 1]
+                    .local_reference_count == UINT32_MAX
+            )
+        ) {
+            prepare_control_result(
+                request,
+                MICROS_VFS_CONTROL_RESULT_NO_SPACE,
+                action
+            );
+            return MICROS_VFS_CORE_OK;
+        }
+    }
+    if (!find_free_process(state, &child_process_slot)) {
+        prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_NO_SPACE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+
+    if (state->spawn.trusted_init) {
+        state->open_files[open_file_slots[0]] =
+            (struct micros_vfs_open_file){
+                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
+                .kind = MICROS_VFS_OBJECT_CONSOLE,
+                .access = MICROS_VFS_ACCESS_READ,
+                .open_flags = MICROS_VFS_OPEN_READ,
+                .reference_count = 1,
+            };
+        state->open_files[open_file_slots[1]] =
+            (struct micros_vfs_open_file){
+                .state = MICROS_VFS_OPEN_FILE_ACTIVE,
+                .kind = MICROS_VFS_OBJECT_CONSOLE,
+                .access = MICROS_VFS_ACCESS_WRITE,
+                .open_flags = MICROS_VFS_OPEN_WRITE,
+                .reference_count = 1,
+            };
+        state->open_files[open_file_slots[2]] =
+            state->open_files[open_file_slots[1]];
+    } else {
+        for (
+            descriptor = 0;
+            descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+            ++descriptor
+        ) {
+            uint16_t reference = child_descriptors[descriptor];
+
+            if (reference != 0) {
+                ++state->open_files[reference - 1].reference_count;
+            }
+        }
+    }
+    ++state->vnodes[root_vnode - 1].local_reference_count;
+    ++state->vnodes[
+        working_directory_vnode - 1
+    ].local_reference_count;
+    ++state->last_descriptor_token;
+    state->spawn.phase =
+        MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED;
+    state->spawn.child_process_reference =
+        (uint16_t)(child_process_slot + 1);
+    state->spawn.descriptor_token =
+        state->last_descriptor_token;
+    state->spawn.child_root_vnode = root_vnode;
+    state->spawn.child_working_directory_vnode =
+        working_directory_vnode;
+    for (
+        descriptor = 0;
+        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+        ++descriptor
+    ) {
+        state->spawn.child_descriptors[descriptor] =
+            child_descriptors[descriptor];
+    }
+    prepare_control_result(
+        request,
+        MICROS_VFS_CONTROL_RESULT_OK,
+        action
+    );
+    action->descriptor_token = state->spawn.descriptor_token;
+    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error abort_spawn_descriptors(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+)
+{
+    struct micros_spawn_request decoded;
+    size_t descriptor;
+
+    if (
+        request->version != MICROS_VFS_PROTOCOL_VERSION
+        || request->source != state->pm_endpoint
+        || request->reply_token == 0
+        || request->lifecycle_token == 0
+        || request->image_token == 0
+        || request->descriptor_token == 0
+        || request->semantic_pid != 0
+        || request->trusted_init
+        || request->parent_endpoint != 0
+        || request->request_grant != 0
+        || request->request_size != 0
+        || request->child_endpoint != 0
+        || state->phase != MICROS_VFS_PHASE_MOUNTED
+        || state->spawn.phase
+            != MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED
+        || request->lifecycle_token
+            != state->spawn.pm_spawn_token
+        || request->image_token != state->spawn.image_token
+        || request->descriptor_token
+            != state->spawn.descriptor_token
+    ) {
+        prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_STATE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (io == NULL || io->ramfs_call == NULL) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        micros_spawn_request_decode(
+            state->spawn_request_bytes,
+            state->spawn.request_size,
+            &decoded
+        ) != MICROS_SPAWN_REQUEST_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    descriptor = state->spawn.trusted_init
+        ? 3
+        : decoded.descriptor_action_count;
+    while (descriptor != 0) {
+        uint16_t reference;
+
+        --descriptor;
+        if (state->spawn.trusted_init) {
+            reference =
+                state->spawn.child_descriptors[descriptor];
+        } else {
+            reference = state->spawn.child_descriptors[
+                decoded.descriptor_actions[descriptor].destination
+            ];
+        }
+        if (
+            !reference_is_valid(
+                reference,
+                MICROS_VFS_OPEN_FILE_CAPACITY
+            )
+            || release_open_file_reference(
+                state,
+                reference - 1,
+                io
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+    }
+    if (
+        release_vnode_reference(
+            state,
+            state->spawn.child_working_directory_vnode - 1,
+            io
+        ) != MICROS_VFS_CORE_OK
+        || release_vnode_reference(
+            state,
+            state->spawn.child_root_vnode - 1,
+            io
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    state->spawn.phase = MICROS_VFS_SPAWN_IMAGE_PREPARED;
+    state->spawn.child_process_reference = 0;
+    state->spawn.descriptor_token = 0;
+    state->spawn.child_root_vnode = 0;
+    state->spawn.child_working_directory_vnode = 0;
+    zero_bytes(
+        state->spawn.child_descriptors,
+        sizeof(state->spawn.child_descriptors)
+    );
+    prepare_control_result(
+        request,
+        MICROS_VFS_CONTROL_RESULT_OK,
+        action
+    );
+    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
 static enum micros_vfs_core_error release_spawn_image(
     struct micros_vfs_state *state,
     const struct micros_vfs_control_request *request,
@@ -4871,6 +5412,27 @@ enum micros_vfs_core_error micros_vfs_handle_control(
     }
     if (request->command == MICROS_VFS_CONTROL_RELEASE_IMAGE) {
         return release_spawn_image(
+            state,
+            request,
+            io,
+            action
+        );
+    }
+    if (
+        request->command
+            == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+    ) {
+        return prepare_spawn_descriptors(
+            state,
+            request,
+            action
+        );
+    }
+    if (
+        request->command
+            == MICROS_VFS_CONTROL_ABORT_DESCRIPTORS
+    ) {
+        return abort_spawn_descriptors(
             state,
             request,
             io,
