@@ -15,19 +15,36 @@ struct vfs_core_test_backend {
     uint32_t last_putnode_count;
 };
 
+struct vfs_core_test_corrupting_ramfs {
+    const struct micros_vfs_io *delegate;
+    struct micros_vfs_state *state;
+    bool corrupted;
+};
+
 struct vfs_core_test_context {
     struct micros_vfs_state state;
     struct micros_vfs_state snapshot;
     struct vfs_test_fixture fixture;
     struct vfs_core_test_backend backend;
+    struct micros_vfs_io backend_io;
+    struct vfs_core_test_corrupting_ramfs corrupting_ramfs;
+    struct micros_vfs_io corrupting_io;
+    micros_endpoint_t application_endpoint;
     uint64_t note;
 };
+
+void vfs_core_test_context_initialize(
+    struct vfs_core_test_context *context
+);
 
 bool vfs_core_test_initialize_full(
     struct vfs_core_test_context *context
 );
 
-struct micros_vfs_request vfs_core_test_request(uint32_t type);
+struct micros_vfs_request vfs_core_test_request(
+    const struct vfs_core_test_context *context,
+    uint32_t type
+);
 
 struct micros_vfs_request vfs_core_test_path_request(
     struct vfs_core_test_context *context,
