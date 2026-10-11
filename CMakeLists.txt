@@ -376,6 +376,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_ownership.c
         kernel/vm_bootstrap.c
         kernel/vm_handoff_core.c
+        lib/vm/vm_boot_validate.c
         tests/host/vm_bootstrap_test.c
         tests/host/vm_handoff_test.c
     )
@@ -394,6 +395,17 @@ if(MICROS_BUILD_HOST_TESTS)
         lib/spawn/spawn_request.c
         servers/vm/vm_image.c
         tests/host/spawn_abi_test.c
+    )
+    add_executable(
+        vm_core_test
+        kernel/frame_allocator.c
+        kernel/frame_ownership.c
+        kernel/vm_bootstrap.c
+        lib/vm/vm_boot_validate.c
+        lib/spawn/spawn_request.c
+        servers/vm/vm_core.c
+        servers/vm/vm_image.c
+        tests/host/vm_core_test.c
     )
     add_executable(
         ramfs_seed_test
@@ -669,6 +681,12 @@ if(MICROS_BUILD_HOST_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
+        vm_core_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_include_directories(
         ramfs_seed_test
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -748,6 +766,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_compile_features(vm_bootstrap_test PRIVATE c_std_17)
     target_compile_features(pm_test PRIVATE c_std_17)
     target_compile_features(spawn_abi_test PRIVATE c_std_17)
+    target_compile_features(vm_core_test PRIVATE c_std_17)
     target_compile_features(ramfs_seed_test PRIVATE c_std_17)
     target_compile_features(ramfs_test PRIVATE c_std_17)
     target_compile_features(ramfs_model_test PRIVATE c_std_17)
@@ -906,6 +925,16 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     target_compile_options(
         spawn_abi_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    target_compile_options(
+        vm_core_test
         PRIVATE
             -Wall
             -Wextra
@@ -1176,6 +1205,17 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
         target_compile_options(
+            vm_core_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            vm_core_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+        target_compile_options(
             ramfs_seed_test
             PRIVATE
                 -fno-omit-frame-pointer
@@ -1367,6 +1407,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
     add_test(NAME spawn-abi COMMAND spawn_abi_test)
+    add_test(NAME vm-core COMMAND vm_core_test)
     add_test(
         NAME ramfs-seed
         COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
@@ -1433,6 +1474,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             spawn_abi_test
+            vm_core_test
             ramfs_seed_test
             ramfs_test
             vfs_test
@@ -1538,6 +1580,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             spawn_abi_test
+            vm_core_test
             ramfs_seed_test
             ramfs_test
             ramfs_model_test
@@ -1911,8 +1954,28 @@ if(
         micros_add_bootstrap_user(
             micros_vm_server
             micros-vm-server
+            lib/spawn/spawn_request.c
+            lib/vm/vm_boot_validate.c
+            servers/vm/vm_core.c
+            servers/vm/vm_image.c
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
+        )
+        add_custom_command(
+            TARGET micros_vm_server
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}"
+                -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                --elf
+                "$<TARGET_FILE:micros_vm_server>"
+                --resident-page-limit
+                160
+                --stack-page-count
+                1
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
         )
         if(MICROS_BUILD_VFS_SERVICE_TEST)
             target_compile_definitions(
@@ -2328,6 +2391,7 @@ add_executable(
     kernel/vm_handoff_runtime.c
     kernel/vm_handoff_syscall.c
     kernel/vm_snapshot.c
+    lib/vm/vm_boot_validate.c
 )
 
 if(MICROS_BUILD_UART_CONSOLE_TEST)

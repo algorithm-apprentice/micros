@@ -26,7 +26,7 @@ enum {
         MICROS_APPLICATION_AUXV_COUNT * 2 * sizeof(uint64_t),
 };
 
-static uint16_t read_u16_le(const uint8_t *bytes)
+static uint16_t vm_image_read_u16_le(const uint8_t *bytes)
 {
     return (uint16_t)(
         (uint16_t)bytes[0]
@@ -34,7 +34,7 @@ static uint16_t read_u16_le(const uint8_t *bytes)
     );
 }
 
-static uint32_t read_u32_le(const uint8_t *bytes)
+static uint32_t vm_image_read_u32_le(const uint8_t *bytes)
 {
     return (
         (uint32_t)bytes[0]
@@ -44,7 +44,7 @@ static uint32_t read_u32_le(const uint8_t *bytes)
     );
 }
 
-static uint64_t read_u64_le(const uint8_t *bytes)
+static uint64_t vm_image_read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
     size_t index;
@@ -55,7 +55,7 @@ static uint64_t read_u64_le(const uint8_t *bytes)
     return value;
 }
 
-static void write_u64_le(uint8_t *bytes, uint64_t value)
+static void vm_image_write_u64_le(uint8_t *bytes, uint64_t value)
 {
     size_t index;
 
@@ -64,7 +64,7 @@ static void write_u64_le(uint8_t *bytes, uint64_t value)
     }
 }
 
-static void zero_bytes(uint8_t *bytes, size_t size)
+static void vm_image_zero_bytes(uint8_t *bytes, size_t size)
 {
     size_t index;
 
@@ -73,7 +73,11 @@ static void zero_bytes(uint8_t *bytes, size_t size)
     }
 }
 
-static void copy_bytes(uint8_t *destination, const uint8_t *source, size_t size)
+static void vm_image_copy_bytes(
+    uint8_t *destination,
+    const uint8_t *source,
+    size_t size
+)
 {
     size_t index;
 
@@ -82,7 +86,7 @@ static void copy_bytes(uint8_t *destination, const uint8_t *source, size_t size)
     }
 }
 
-static bool bytes_are_zero(const uint8_t *bytes, size_t size)
+static bool vm_image_bytes_are_zero(const uint8_t *bytes, size_t size)
 {
     size_t index;
 
@@ -94,7 +98,7 @@ static bool bytes_are_zero(const uint8_t *bytes, size_t size)
     return true;
 }
 
-static bool add_size(size_t left, size_t right, size_t *result)
+static bool vm_image_add_size(size_t left, size_t right, size_t *result)
 {
     if (right > SIZE_MAX - left) {
         return false;
@@ -103,7 +107,7 @@ static bool add_size(size_t left, size_t right, size_t *result)
     return true;
 }
 
-static bool add_u64(uint64_t left, uint64_t right, uint64_t *result)
+static bool vm_image_add_u64(uint64_t left, uint64_t right, uint64_t *result)
 {
     if (right > UINT64_MAX - left) {
         return false;
@@ -112,18 +116,18 @@ static bool add_u64(uint64_t left, uint64_t right, uint64_t *result)
     return true;
 }
 
-static bool align_size_16(size_t value, size_t *result)
+static bool vm_image_align_size_16(size_t value, size_t *result)
 {
     size_t added;
 
-    if (!add_size(value, 15, &added)) {
+    if (!vm_image_add_size(value, 15, &added)) {
         return false;
     }
     *result = added & ~(size_t)15;
     return true;
 }
 
-static bool ranges_overlap(
+static bool vm_image_ranges_overlap(
     const void *left,
     size_t left_size,
     const void *right,
@@ -146,7 +150,7 @@ static bool ranges_overlap(
     return left_start < right_end && right_start < left_end;
 }
 
-static bool address_ranges_overlap(
+static bool vm_image_address_ranges_overlap(
     uint64_t left_start,
     uint64_t left_end,
     uint64_t right_start,
@@ -156,7 +160,7 @@ static bool address_ranges_overlap(
     return left_start < right_end && right_start < left_end;
 }
 
-static enum micros_application_stack_error plan_decoded_stack(
+static enum micros_application_stack_error vm_image_plan_decoded_stack(
     const struct micros_spawn_request *request,
     struct micros_application_stack_plan *plan
 )
@@ -169,7 +173,7 @@ static enum micros_application_stack_error plan_decoded_stack(
     size_t index;
 
     if (
-        !add_size(
+        !vm_image_add_size(
             relative_offset,
             ((size_t)request->argument_count + 1) * sizeof(uint64_t),
             &relative_offset
@@ -179,19 +183,19 @@ static enum micros_application_stack_error plan_decoded_stack(
     }
     candidate.environment_offset = (uint32_t)relative_offset;
     if (
-        !add_size(
+        !vm_image_add_size(
             relative_offset,
             ((size_t)request->environment_count + 1)
                 * sizeof(uint64_t),
             &relative_offset
         )
-        || !align_size_16(relative_offset, &relative_offset)
+        || !vm_image_align_size_16(relative_offset, &relative_offset)
     ) {
         return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
     }
     candidate.auxiliary_offset = (uint32_t)relative_offset;
     if (
-        !add_size(
+        !vm_image_add_size(
             relative_offset,
             APPLICATION_AUXILIARY_BYTES,
             &relative_offset
@@ -202,7 +206,7 @@ static enum micros_application_stack_error plan_decoded_stack(
     candidate.strings_offset = (uint32_t)relative_offset;
 
     for (index = 0; index < request->argument_count; ++index) {
-        if (!add_size(
+        if (!vm_image_add_size(
             strings_size,
             request->arguments[index].size,
             &strings_size
@@ -211,7 +215,7 @@ static enum micros_application_stack_error plan_decoded_stack(
         }
     }
     for (index = 0; index < request->environment_count; ++index) {
-        if (!add_size(
+        if (!vm_image_add_size(
             strings_size,
             request->environment[index].size,
             &strings_size
@@ -220,8 +224,8 @@ static enum micros_application_stack_error plan_decoded_stack(
         }
     }
     if (
-        !add_size(relative_offset, strings_size, &relative_offset)
-        || !align_size_16(relative_offset, &occupied_size)
+        !vm_image_add_size(relative_offset, strings_size, &relative_offset)
+        || !vm_image_align_size_16(relative_offset, &occupied_size)
         || occupied_size > MICROS_APPLICATION_STACK_OCCUPIED_MAX
         || occupied_size > MICROS_APPLICATION_STACK_PAGE_SIZE
     ) {
@@ -243,7 +247,7 @@ static enum micros_application_stack_error plan_decoded_stack(
     return MICROS_APPLICATION_STACK_OK;
 }
 
-static enum micros_application_stack_error decode_and_plan_stack(
+static enum micros_application_stack_error vm_image_decode_and_plan_stack(
     const uint8_t *request_bytes,
     size_t request_size,
     struct micros_spawn_request *request,
@@ -263,7 +267,7 @@ static enum micros_application_stack_error decode_and_plan_stack(
     if (error != MICROS_SPAWN_REQUEST_OK) {
         return MICROS_APPLICATION_STACK_ERROR_MALFORMED;
     }
-    return plan_decoded_stack(request, plan);
+    return vm_image_plan_decoded_stack(request, plan);
 }
 
 enum micros_application_stack_error micros_application_stack_plan(
@@ -279,7 +283,7 @@ enum micros_application_stack_error micros_application_stack_plan(
     if (plan == NULL) {
         return MICROS_APPLICATION_STACK_ERROR_ARGUMENT;
     }
-    error = decode_and_plan_stack(
+    error = vm_image_decode_and_plan_stack(
         request_bytes,
         request_size,
         &request,
@@ -326,7 +330,7 @@ enum micros_application_stack_error micros_application_stack_build(
         || values->vfs_endpoint == MICROS_ENDPOINT_NONE
         || values->vfs_endpoint == MICROS_ENDPOINT_ANY
         || values->pid == 0
-        || ranges_overlap(
+        || vm_image_ranges_overlap(
             request_bytes,
             request_size,
             stack_page,
@@ -335,7 +339,7 @@ enum micros_application_stack_error micros_application_stack_build(
     ) {
         return MICROS_APPLICATION_STACK_ERROR_ARGUMENT;
     }
-    error = decode_and_plan_stack(
+    error = vm_image_decode_and_plan_stack(
         request_bytes,
         request_size,
         &request,
@@ -351,8 +355,8 @@ enum micros_application_stack_error micros_application_stack_build(
     auxiliary_values[3] = MICROS_APPLICATION_STACK_PAGE_SIZE;
     auxiliary_values[4] = 0;
 
-    zero_bytes(stack_page, stack_page_size);
-    write_u64_le(
+    vm_image_zero_bytes(stack_page, stack_page_size);
+    vm_image_write_u64_le(
         &stack_page[candidate.argc_offset],
         request.argument_count
     );
@@ -361,12 +365,12 @@ enum micros_application_stack_error micros_application_stack_build(
         const struct micros_spawn_string_reference *reference =
             &request.arguments[index];
 
-        write_u64_le(
+        vm_image_write_u64_le(
             &stack_page[candidate.arguments_offset
                 + index * sizeof(uint64_t)],
             MICROS_APPLICATION_STACK_BASE + string_offset
         );
-        copy_bytes(
+        vm_image_copy_bytes(
             &stack_page[string_offset],
             &request_bytes[reference->offset],
             reference->size
@@ -377,12 +381,12 @@ enum micros_application_stack_error micros_application_stack_build(
         const struct micros_spawn_string_reference *reference =
             &request.environment[index];
 
-        write_u64_le(
+        vm_image_write_u64_le(
             &stack_page[candidate.environment_offset
                 + index * sizeof(uint64_t)],
             MICROS_APPLICATION_STACK_BASE + string_offset
         );
-        copy_bytes(
+        vm_image_copy_bytes(
             &stack_page[string_offset],
             &request_bytes[reference->offset],
             reference->size
@@ -393,8 +397,8 @@ enum micros_application_stack_error micros_application_stack_build(
         size_t offset = candidate.auxiliary_offset
             + index * 2 * sizeof(uint64_t);
 
-        write_u64_le(&stack_page[offset], auxiliary_types[index]);
-        write_u64_le(
+        vm_image_write_u64_le(&stack_page[offset], auxiliary_types[index]);
+        vm_image_write_u64_le(
             &stack_page[offset + sizeof(uint64_t)],
             auxiliary_values[index]
         );
@@ -453,19 +457,19 @@ enum micros_vm_elf_error micros_vm_elf_plan(
         || file_bytes[6] != ELF_VERSION_CURRENT
         || file_bytes[7] != ELF_OS_ABI_SYSV
         || file_bytes[8] != 0
-        || !bytes_are_zero(&file_bytes[9], 7)
-        || read_u16_le(&file_bytes[16]) != ELF_TYPE_EXECUTABLE
-        || read_u16_le(&file_bytes[18]) != ELF_MACHINE_RISCV
-        || read_u32_le(&file_bytes[20]) != ELF_VERSION_CURRENT
-        || read_u64_le(&file_bytes[24]) != MICROS_APPLICATION_ENTRY
-        || read_u64_le(&file_bytes[32]) != ELF_PROGRAM_HEADER_OFFSET
+        || !vm_image_bytes_are_zero(&file_bytes[9], 7)
+        || vm_image_read_u16_le(&file_bytes[16]) != ELF_TYPE_EXECUTABLE
+        || vm_image_read_u16_le(&file_bytes[18]) != ELF_MACHINE_RISCV
+        || vm_image_read_u32_le(&file_bytes[20]) != ELF_VERSION_CURRENT
+        || vm_image_read_u64_le(&file_bytes[24]) != MICROS_APPLICATION_ENTRY
+        || vm_image_read_u64_le(&file_bytes[32]) != ELF_PROGRAM_HEADER_OFFSET
         || (
-            read_u32_le(&file_bytes[48])
+            vm_image_read_u32_le(&file_bytes[48])
             & ~(uint32_t)ELF_FLAG_RISCV_RVC
         ) != 0
-        || read_u16_le(&file_bytes[52]) != ELF_HEADER_SIZE
-        || read_u16_le(&file_bytes[54]) != ELF_PROGRAM_HEADER_SIZE
-        || read_u16_le(&file_bytes[56])
+        || vm_image_read_u16_le(&file_bytes[52]) != ELF_HEADER_SIZE
+        || vm_image_read_u16_le(&file_bytes[54]) != ELF_PROGRAM_HEADER_SIZE
+        || vm_image_read_u16_le(&file_bytes[56])
             != MICROS_APPLICATION_ELF_SEGMENT_COUNT
         || file_size
             < ELF_PROGRAM_HEADER_OFFSET
@@ -482,21 +486,21 @@ enum micros_vm_elf_error micros_vm_elf_plan(
             &candidate.segments[index];
         size_t offset = ELF_PROGRAM_HEADER_OFFSET
             + index * ELF_PROGRAM_HEADER_SIZE;
-        uint32_t flags = read_u32_le(&file_bytes[offset + 4]);
+        uint32_t flags = vm_image_read_u32_le(&file_bytes[offset + 4]);
         uint64_t physical_address =
-            read_u64_le(&file_bytes[offset + 24]);
-        uint64_t alignment = read_u64_le(&file_bytes[offset + 48]);
+            vm_image_read_u64_le(&file_bytes[offset + 24]);
+        uint64_t alignment = vm_image_read_u64_le(&file_bytes[offset + 48]);
         uint64_t virtual_end;
         uint64_t file_end;
 
-        segment->file_offset = read_u64_le(&file_bytes[offset + 8]);
+        segment->file_offset = vm_image_read_u64_le(&file_bytes[offset + 8]);
         segment->virtual_address =
-            read_u64_le(&file_bytes[offset + 16]);
-        segment->file_size = read_u64_le(&file_bytes[offset + 32]);
-        segment->memory_size = read_u64_le(&file_bytes[offset + 40]);
+            vm_image_read_u64_le(&file_bytes[offset + 16]);
+        segment->file_size = vm_image_read_u64_le(&file_bytes[offset + 32]);
+        segment->memory_size = vm_image_read_u64_le(&file_bytes[offset + 40]);
         segment->permissions = permissions[index];
         if (
-            read_u32_le(&file_bytes[offset]) != ELF_PROGRAM_TYPE_LOAD
+            vm_image_read_u32_le(&file_bytes[offset]) != ELF_PROGRAM_TYPE_LOAD
             || flags != expected_flags[index]
             || alignment != MICROS_APPLICATION_STACK_PAGE_SIZE
             || segment->file_offset
@@ -514,13 +518,13 @@ enum micros_vm_elf_error micros_vm_elf_plan(
                 % MICROS_APPLICATION_STACK_PAGE_SIZE
                 != segment->virtual_address
                     % MICROS_APPLICATION_STACK_PAGE_SIZE
-            || !add_u64(
+            || !vm_image_add_u64(
                 segment->file_offset,
                 segment->file_size,
                 &file_end
             )
             || file_end > file_size
-            || !add_u64(
+            || !vm_image_add_u64(
                 segment->virtual_address,
                 segment->memory_size,
                 &virtual_end
@@ -537,14 +541,14 @@ enum micros_vm_elf_error micros_vm_elf_plan(
                 && segment->virtual_address != previous_virtual_end
             )
             || (index != 0 && segment->file_offset < previous_file_end)
-            || address_ranges_overlap(
+            || vm_image_address_ranges_overlap(
                 segment->virtual_address,
                 virtual_end,
                 MICROS_VM_SCRATCH_VIRTUAL_ADDRESS,
                 MICROS_VM_SCRATCH_VIRTUAL_ADDRESS
                     + MICROS_APPLICATION_STACK_PAGE_SIZE
             )
-            || address_ranges_overlap(
+            || vm_image_address_ranges_overlap(
                 segment->virtual_address,
                 virtual_end,
                 MICROS_APPLICATION_STACK_BASE,
