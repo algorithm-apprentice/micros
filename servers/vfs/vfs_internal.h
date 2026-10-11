@@ -6,143 +6,47 @@
 #define MICROS_VFS_RAMFS_ROOT_NODE \
     UINT64_C(0x0000000100000000)
 
-static inline void vfs_zero_bytes(void *storage, size_t size)
-{
-    uint8_t *bytes = storage;
-    size_t index;
+void vfs_zero_bytes(void *storage, size_t size);
 
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static inline bool vfs_bytes_are_zero(
+bool vfs_bytes_are_zero(
     const void *storage,
     size_t size
-)
-{
-    const uint8_t *bytes = storage;
-    size_t index;
+);
 
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static inline bool vfs_endpoint_is_canonical(
+bool vfs_endpoint_is_canonical(
     micros_endpoint_t endpoint
-)
-{
-    uint32_t slot_mask =
-        (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) - 1;
-    uint32_t slot = endpoint & slot_mask;
-    uint32_t generation = endpoint >> MICROS_ENDPOINT_SLOT_BITS;
+);
 
-    return (
-        endpoint != MICROS_ENDPOINT_NONE
-        && endpoint != MICROS_ENDPOINT_ANY
-        && slot < MICROS_PROCESS_CAPACITY
-        && generation != 0
-        && generation <= MICROS_ENDPOINT_GENERATION_MAX
-    );
-}
+bool vfs_ramfs_handle_is_canonical(uint64_t node);
 
-static inline bool vfs_ramfs_handle_is_canonical(uint64_t node)
-{
-    uint16_t slot = (uint16_t)node;
-    uint16_t reserved = (uint16_t)(node >> 16);
-    uint32_t generation = (uint32_t)(node >> 32);
+bool vfs_mode_is_canonical(uint32_t mode);
 
-    return (
-        node != 0
-        && slot < MICROS_RAMFS_NODE_CAPACITY
-        && reserved == 0
-        && generation != 0
-    );
-}
+bool vfs_mode_is_directory(uint32_t mode);
 
-static inline bool vfs_mode_is_canonical(uint32_t mode)
-{
-    uint32_t type = mode & MICROS_RAMFS_MODE_TYPE_MASK;
-
-    return (
-        (
-            type == MICROS_RAMFS_MODE_DIRECTORY
-            || type == MICROS_RAMFS_MODE_REGULAR
-        )
-        && (
-            mode
-            & ~(
-                MICROS_RAMFS_MODE_TYPE_MASK
-                | MICROS_RAMFS_MODE_PERMISSIONS
-            )
-        ) == 0
-    );
-}
-
-static inline bool vfs_mode_is_directory(uint32_t mode)
-{
-    return (
-        mode & MICROS_RAMFS_MODE_TYPE_MASK
-    ) == MICROS_RAMFS_MODE_DIRECTORY;
-}
-
-static inline bool vfs_reference_is_valid(
+bool vfs_reference_is_valid(
     uint16_t reference,
     size_t capacity
-)
-{
-    return reference != 0 && (size_t)(reference - 1) < capacity;
-}
+);
 
-static inline uint64_t vfs_tty_request_id_successor(
+uint64_t vfs_tty_request_id_successor(
     uint64_t request_id
-)
-{
-    return request_id == UINT64_MAX ? 0 : request_id + 1;
-}
+);
 
-static inline bool vfs_ramfs_response_fields_are_zero(
+bool vfs_ramfs_response_fields_are_zero(
     const struct micros_vfs_ramfs_response *response
-)
-{
-    return (
-        response->node == 0
-        && response->file_size == 0
-        && response->position == 0
-        && response->count == 0
-        && response->mode == 0
-    );
-}
+);
 
-static inline void vfs_prepare_result(
+void vfs_prepare_result(
     const struct micros_vfs_request *request,
     enum micros_vfs_result result,
     struct micros_vfs_result_action *action
-)
-{
-    vfs_zero_bytes(action, sizeof(*action));
-    action->active = true;
-    action->reply_token = request->reply_token;
-    action->request_type = request->type;
-    action->result = result;
-}
+);
 
-static inline void vfs_prepare_control_result(
+void vfs_prepare_control_result(
     const struct micros_vfs_control_request *request,
     enum micros_vfs_control_result result,
     struct micros_vfs_control_result_action *action
-)
-{
-    vfs_zero_bytes(action, sizeof(*action));
-    action->active = true;
-    action->reply_token = request->reply_token;
-    action->command = request->command;
-    action->result = result;
-}
+);
 
 size_t vfs_descriptor_user_count(
     const struct micros_vfs_state *state,

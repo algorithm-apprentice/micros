@@ -5,6 +5,7 @@ import unittest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CMAKE_PATH = REPOSITORY_ROOT / "CMakeLists.txt"
+INTERNAL_HEADER_PATH = REPOSITORY_ROOT / "servers/vfs/vfs_internal.h"
 PORTABLE_SOURCE_SET = "MICROS_VFS_PORTABLE_SOURCES"
 PORTABLE_SOURCES = (
     "servers/vfs/vfs_core.c",
@@ -154,6 +155,29 @@ def function_line_count(text: str, name: str) -> int:
     raise AssertionError(f"missing function definition for {name}")
 
 
+def static_function_definitions(text: str) -> list[str]:
+    definitions = []
+    signatures = re.finditer(
+        r"(?m)^static\b[^;{}=]*?\b"
+        r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+        text,
+    )
+
+    for signature in signatures:
+        open_parenthesis = signature.end() - 1
+        close_parenthesis = matching_c_delimiter(
+            text,
+            open_parenthesis,
+            "(",
+            ")",
+        )
+        body = skip_c_ignored(text, close_parenthesis + 1)
+        if body < len(text) and text[body] == "{":
+            definitions.append(signature.group("name"))
+
+    return definitions
+
+
 class VfsSourceLayoutTest(unittest.TestCase):
     def test_function_line_count_skips_forward_declarations(
         self,
@@ -180,6 +204,26 @@ static enum sample_error helper(void)
             function_line_count(source, "target_function"),
         )
 
+    def test_static_function_definition_detection(self) -> None:
+        source = """static bool declaration_only(int value);
+
+static bool ordinary_body(int value)
+{
+    return value != 0;
+}
+
+static
+inline bool split_inline_body(void)
+{
+    return true;
+}
+"""
+
+        self.assertEqual(
+            ["ordinary_body", "split_inline_body"],
+            static_function_definitions(source),
+        )
+
     def test_portable_modules_exist(self) -> None:
         missing = [
             source
@@ -188,6 +232,13 @@ static enum sample_error helper(void)
         ]
 
         self.assertEqual([], missing)
+
+    def test_private_contract_has_no_static_function_bodies(
+        self,
+    ) -> None:
+        header = INTERNAL_HEADER_PATH.read_text(encoding="utf-8")
+
+        self.assertEqual([], static_function_definitions(header))
 
     def test_consumers_use_complete_portable_source_set(self) -> None:
         cmake = CMAKE_PATH.read_text(encoding="utf-8")
