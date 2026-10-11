@@ -279,6 +279,67 @@ set(
     servers/vfs/vfs_spawn.c
 )
 
+set(
+    MICROS_VFS_TEST_FIXTURE_SOURCES
+    tests/host/vfs_test_fixture.c
+    tests/host/vfs_test_fixture_grant.c
+    tests/host/vfs_test_fixture_ramfs.c
+    tests/host/vfs_test_fixture_tty.c
+)
+
+set(
+    MICROS_VFS_CORE_TEST_SOURCES
+    tests/host/vfs_test.c
+    tests/host/vfs_core_test_fixture.c
+    tests/host/vfs_core_state_test.c
+    tests/host/vfs_core_process_test.c
+    tests/host/vfs_core_namespace_test.c
+    tests/host/vfs_core_io_test.c
+    tests/host/vfs_core_directory_test.c
+    tests/host/vfs_core_console_test.c
+)
+
+set(
+    MICROS_VFS_SPAWN_TEST_SOURCES
+    tests/host/vfs_spawn_test.c
+    tests/host/vfs_spawn_test_fixture.c
+    tests/host/vfs_spawn_image_test.c
+    tests/host/vfs_spawn_descriptor_test.c
+    tests/host/vfs_spawn_publication_test.c
+)
+
+set(
+    MICROS_VFS_MODEL_TEST_SOURCES
+    tests/host/vfs_model_test.c
+    tests/host/vfs_model_context.c
+    tests/host/vfs_model_reference.c
+    tests/host/vfs_model_compare.c
+    tests/host/vfs_model_process_operations.c
+    tests/host/vfs_model_file_operations.c
+    tests/host/vfs_model_console_operations.c
+    tests/host/vfs_model_pressure.c
+    tests/host/vfs_model_trace.c
+)
+
+set(
+    MICROS_VFS_SERVICE_TEST_SOURCES
+    tests/host/vfs_service_test.c
+    tests/host/vfs_service_test_fixture.c
+    tests/host/vfs_service_application_protocol_test.c
+    tests/host/vfs_service_backend_protocol_test.c
+    tests/host/vfs_service_pm_control_protocol_test.c
+    tests/host/vfs_service_configuration_test.c
+    tests/host/vfs_service_dispatch_test.c
+)
+
+set(
+    MICROS_VFS_PROBE_SOURCES
+    tests/qemu/vfs_service_probe.c
+    tests/qemu/vfs_service_probe_client.c
+    tests/qemu/vfs_service_probe_filesystem.c
+    tests/qemu/vfs_service_probe_console.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -458,24 +519,24 @@ if(MICROS_BUILD_HOST_TESTS)
         vfs_test
         lib/spawn/spawn_request.c
         ${MICROS_VFS_PORTABLE_SOURCES}
-        tests/host/vfs_test_fixture.c
-        tests/host/vfs_spawn_test.c
-        tests/host/vfs_test.c
+        ${MICROS_VFS_TEST_FIXTURE_SOURCES}
+        ${MICROS_VFS_CORE_TEST_SOURCES}
+        ${MICROS_VFS_SPAWN_TEST_SOURCES}
     )
     add_executable(
         vfs_model_test
         lib/spawn/spawn_request.c
         ${MICROS_VFS_PORTABLE_SOURCES}
-        tests/host/vfs_test_fixture.c
-        tests/host/vfs_model_test.c
+        ${MICROS_VFS_TEST_FIXTURE_SOURCES}
+        ${MICROS_VFS_MODEL_TEST_SOURCES}
     )
     add_executable(
         vfs_service_test
         lib/spawn/spawn_request.c
         ${MICROS_VFS_PORTABLE_SOURCES}
         servers/vfs/vfs_service_core.c
-        tests/host/vfs_test_fixture.c
-        tests/host/vfs_service_test.c
+        ${MICROS_VFS_TEST_FIXTURE_SOURCES}
+        ${MICROS_VFS_SERVICE_TEST_SOURCES}
     )
     add_executable(
         tty_test
@@ -2245,7 +2306,7 @@ if(
                 micros_vfs_service_probe
                 micros-vfs-service-probe
                 tests/qemu/vfs_service_report.S
-                tests/qemu/vfs_service_probe.c
+                ${MICROS_VFS_PROBE_SOURCES}
             )
             set(
                 MICROS_VFS_SERVICE_FIXTURE_SOURCE
