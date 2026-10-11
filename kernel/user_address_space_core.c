@@ -3,6 +3,27 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static void clear_bytes(void *storage, size_t size)
+{
+    uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    uint8_t *output = destination;
+    const uint8_t *input = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        output[index] = input[index];
+    }
+}
+
 static bool process_is_valid(struct micros_process_handle process)
 {
     return (
@@ -249,7 +270,7 @@ micros_user_address_space_prepare_vm_table_plan(
     struct micros_user_address_space_vm_table_plan *plan
 )
 {
-    struct micros_user_address_space_vm_table_plan candidate = {0};
+    struct micros_user_address_space_vm_table_plan candidate;
     size_t image_page_count;
     size_t index;
     bool saw_read_only = false;
@@ -266,6 +287,7 @@ micros_user_address_space_prepare_vm_table_plan(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     image_page_count = mapping_count - 1;
     for (
         index = 0;
@@ -426,6 +448,6 @@ micros_user_address_space_prepare_vm_table_plan(
     }
     candidate.process = process;
     candidate.entry_count = (uint32_t)mapping_count;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_USER_ADDRESS_SPACE_OK;
 }

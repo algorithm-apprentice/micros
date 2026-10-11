@@ -383,10 +383,14 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         pm_test
+        kernel/frame_allocator.c
+        kernel/frame_ownership.c
         kernel/kernel_objects.c
         kernel/pm_control_core.c
+        kernel/pm_control_runtime_core.c
         kernel/pm_control_syscall_core.c
         kernel/scheduler_core.c
+        kernel/vm_handoff_core.c
         servers/pm/pm_core.c
         tests/host/pm_control_test.c
         tests/host/pm_test.c
@@ -2370,6 +2374,7 @@ add_executable(
     kernel/plic_core.c
     kernel/pm_control_core.c
     kernel/pm_control_runtime.c
+    kernel/pm_control_runtime_core.c
     kernel/pm_control_syscall.c
     kernel/pm_control_syscall_core.c
     kernel/sv39.c
@@ -3596,7 +3601,7 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            8
+            10
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

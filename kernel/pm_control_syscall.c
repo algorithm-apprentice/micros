@@ -8,6 +8,7 @@
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/pm_control_core.h"
 #include "kernel/pm_control_runtime.h"
+#include "kernel/pm_control_runtime_core.h"
 #include "kernel/pm_control_syscall_core.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
@@ -206,8 +207,16 @@ micros_pm_control_handle_captured_user_ecall(
         struct micros_pm_control_output_plan output;
         enum micros_pm_control_output_error output_error;
 
-        if (state->active_transaction != 0) {
+        control_error =
+            micros_pm_control_runtime_reserve_preflight(
+                state,
+                handoff
+            );
+        if (control_error == MICROS_PM_CONTROL_ERROR_STATE) {
             return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+        }
+        if (control_error != MICROS_PM_CONTROL_OK) {
+            fail_pm_control(hart, frame, state);
         }
         output_error = micros_pm_control_output_prepare(
             request.output_address,
@@ -258,6 +267,17 @@ micros_pm_control_handle_captured_user_ecall(
     if (request.command == MICROS_PM_CONTROL_ABORT_RESERVED) {
         struct micros_pm_control_abort_plan abort;
 
+        control_error =
+            micros_pm_control_runtime_abort_preflight(
+                state,
+                handoff
+            );
+        if (control_error == MICROS_PM_CONTROL_ERROR_STATE) {
+            return return_result(frame, MICROS_SYSCALL_ABI_STATE);
+        }
+        if (control_error != MICROS_PM_CONTROL_OK) {
+            fail_pm_control(hart, frame, state);
+        }
         control_error = micros_pm_control_abort_preflight(
             state,
             objects,

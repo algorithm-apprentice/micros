@@ -6,6 +6,27 @@
 
 #define MICROS_FRAME_OWNERSHIP_MAGIC UINT64_C(0x4d4943524f53464f)
 
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    unsigned char *output = destination;
+    const unsigned char *input = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        output[index] = input[index];
+    }
+}
+
 static bool bytes_are_zero(const void *storage, size_t size)
 {
     const unsigned char *bytes = storage;
@@ -869,11 +890,12 @@ micros_frame_ownership_release_process_set(
     size_t release_word_count
 )
 {
-    uint64_t release_counts[MICROS_FRAME_OWNER_KIND_COUNT] = {0};
+    uint64_t release_counts[MICROS_FRAME_OWNER_KIND_COUNT];
     uint64_t release_count = 0;
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
+    clear_bytes(release_counts, sizeof(release_counts));
     error = require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
@@ -992,11 +1014,12 @@ micros_frame_ownership_complete_handoff(
     struct micros_frame_ownership *ownership
 )
 {
-    uint64_t resulting_counts[MICROS_FRAME_OWNER_KIND_COUNT] = {0};
+    uint64_t resulting_counts[MICROS_FRAME_OWNER_KIND_COUNT];
     uint64_t resulting_owned_count = 0;
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
+    clear_bytes(resulting_counts, sizeof(resulting_counts));
     error = require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
@@ -1078,12 +1101,13 @@ enum micros_frame_ownership_error micros_frame_ownership_validate(
     const struct micros_frame_ownership *ownership
 )
 {
-    uint64_t observed_counts[MICROS_FRAME_OWNER_KIND_COUNT] = {0};
+    uint64_t observed_counts[MICROS_FRAME_OWNER_KIND_COUNT];
     uint64_t observed_owned_count = 0;
     uint64_t observed_allocated_count = 0;
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
+    clear_bytes(observed_counts, sizeof(observed_counts));
     error = require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
@@ -1292,7 +1316,7 @@ micros_frame_ownership_vm_claim_preflight(
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
     candidate.frame_index = frame_index;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1330,7 +1354,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
     struct micros_frame_vm_transferable_release_plan *plan
 )
 {
-    struct micros_frame_vm_transferable_release_plan candidate = {0};
+    struct micros_frame_vm_transferable_release_plan candidate;
     enum micros_frame_ownership_error error;
     size_t index;
 
@@ -1345,6 +1369,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     error = vm_transition_preflight(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
@@ -1400,7 +1425,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
     candidate.frame_count = (uint32_t)physical_address_count;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1575,12 +1600,13 @@ micros_frame_ownership_vm_freeze_preflight(
     struct micros_frame_vm_freeze_plan *plan
 )
 {
-    struct micros_frame_vm_freeze_plan candidate = {0};
+    struct micros_frame_vm_freeze_plan candidate;
     enum micros_frame_ownership_error error;
 
     if (plan == NULL) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     error = vm_process_set_preflight(
         ownership,
         process,
@@ -1621,7 +1647,7 @@ micros_frame_ownership_vm_freeze_preflight(
     candidate.process = process;
     candidate.data_frame_count =
         (uint32_t)data_physical_address_count;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1684,13 +1710,14 @@ micros_frame_ownership_vm_release_process_preflight(
     struct micros_frame_vm_process_release_plan *plan
 )
 {
-    struct micros_frame_vm_process_release_plan candidate = {0};
+    struct micros_frame_vm_process_release_plan candidate;
     enum micros_frame_ownership_error error;
     size_t release_count;
 
     if (plan == NULL) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     error = vm_process_set_preflight(
         ownership,
         process,
@@ -1726,7 +1753,7 @@ micros_frame_ownership_vm_release_process_preflight(
     candidate.process = process;
     candidate.data_frame_count =
         (uint32_t)data_physical_address_count;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 

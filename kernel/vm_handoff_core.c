@@ -974,7 +974,20 @@ micros_vm_scratch_map_preflight(const struct micros_vm_handoff_state *state,
 
 void micros_vm_scratch_map_commit_prevalidated(struct micros_vm_handoff_state *state,
                                                const struct micros_vm_scratch_plan *plan) {
+    micros_vm_scratch_map_bind_prevalidated(state, plan);
+    micros_vm_scratch_map_finish_prevalidated(state);
+}
+
+void micros_vm_scratch_map_bind_prevalidated(
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_scratch_plan *plan
+) {
     state->load.scratch = plan->entry;
+}
+
+void micros_vm_scratch_map_finish_prevalidated(
+    struct micros_vm_handoff_state *state
+) {
     state->load.scratch_phase = MICROS_VM_SCRATCH_MAPPED;
 }
 
@@ -1051,6 +1064,55 @@ static bool freeze_table_frames_are_valid(const struct micros_vm_handoff_state *
     return true;
 }
 
+static bool freeze_request_fields_are_valid(
+    const struct micros_vm_load_freeze_plan *request
+)
+{
+    size_t table_index;
+    size_t prior_index;
+
+    if (
+        request->version != MICROS_VM_LOAD_FREEZE_PLAN_VERSION
+        || request->size != MICROS_VM_LOAD_FREEZE_PLAN_SIZE
+        || request->reserved[0] != 0
+        || request->reserved[1] != 0
+        || request->entry != MICROS_APPLICATION_ENTRY
+        || !stack_pointer_is_valid(request->stack_pointer)
+        || request->image_page_count
+            < MICROS_APPLICATION_IMAGE_PAGE_MIN
+        || request->image_page_count
+            > MICROS_APPLICATION_IMAGE_PAGE_MAX
+        || request->data_page_count
+            != request->image_page_count + 1
+    ) {
+        return false;
+    }
+    for (
+        table_index = 0;
+        table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++table_index
+    ) {
+        if (!address_is_page_aligned(
+            request->table_frames[table_index]
+        )) {
+            return false;
+        }
+        for (
+            prior_index = 0;
+            prior_index < table_index;
+            ++prior_index
+        ) {
+            if (
+                request->table_frames[prior_index]
+                    == request->table_frames[table_index]
+            ) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 enum micros_vm_handoff_error
 micros_vm_load_freeze_preflight(const struct micros_vm_handoff_state *state,
                                 const struct micros_vm_load_freeze_plan *request,
@@ -1069,6 +1131,9 @@ micros_vm_load_freeze_preflight(const struct micros_vm_handoff_state *state,
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }
+    if (!freeze_request_fields_are_valid(request)) {
+        return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
+    }
     if (state->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF ||
         state->load.phase != MICROS_VM_LOAD_PHASE_LOADING ||
         state->load.scratch_phase != MICROS_VM_SCRATCH_CLEAR ||
@@ -1076,14 +1141,7 @@ micros_vm_load_freeze_preflight(const struct micros_vm_handoff_state *state,
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
     record = &state->mappings[state->load.process.slot];
-    if (request->version != MICROS_VM_LOAD_FREEZE_PLAN_VERSION ||
-        request->size != MICROS_VM_LOAD_FREEZE_PLAN_SIZE || request->reserved[0] != 0 ||
-        request->reserved[1] != 0 || request->entry != MICROS_APPLICATION_ENTRY ||
-        !stack_pointer_is_valid(request->stack_pointer) ||
-        request->image_page_count < MICROS_APPLICATION_IMAGE_PAGE_MIN ||
-        request->image_page_count > MICROS_APPLICATION_IMAGE_PAGE_MAX ||
-        request->data_page_count != request->image_page_count + 1 ||
-        request->data_page_count != record->entry_count ||
+    if (request->data_page_count != record->entry_count ||
         !record_entries_are_frozen_shape(record) ||
         !freeze_table_frames_are_valid(state, record, request)) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;

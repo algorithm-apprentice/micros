@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "kernel/pm_control_runtime_core.h"
+#include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 
 static struct micros_pm_control_state control_state;
@@ -151,20 +153,19 @@ enum micros_pm_control_error micros_pm_control_runtime_validate(
     const struct micros_endpoint_record *endpoint;
     const struct micros_frame_ownership *ownership =
         micros_frame_ownership_runtime_ledger();
-    uint64_t frame_count = 0;
 
     if (
         bootstrap == NULL
         || registry == NULL
         || objects == NULL
         || ownership == NULL
-        || micros_frame_ownership_validate(ownership)
-            != MICROS_FRAME_OWNERSHIP_OK
-        || !process_frame_owners_are_live(ownership, objects)
-        || micros_pm_control_state_validate_objects(
+        || micros_pm_control_runtime_validate_reservation(
             &control_state,
-            objects
+            objects,
+            ownership,
+            micros_vm_handoff_runtime_state()
         ) != MICROS_PM_CONTROL_OK
+        || !process_frame_owners_are_live(ownership, objects)
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
@@ -232,19 +233,6 @@ enum micros_pm_control_error micros_pm_control_runtime_validate(
             (uint8_t)control_state.profile_id,
             2
         ) != MICROS_ENDPOINT_OK
-    ) {
-        return MICROS_PM_CONTROL_ERROR_INVARIANT;
-    }
-    if (
-        control_state.active_transaction != 0
-        && (
-            micros_frame_ownership_count_process(
-                ownership,
-                control_state.reserved_process,
-                &frame_count
-            ) != MICROS_FRAME_OWNERSHIP_OK
-            || frame_count != 0
-        )
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }

@@ -292,6 +292,15 @@ micros_vm_scratch_map_preflight(const struct micros_vm_handoff_state *state,
 void micros_vm_scratch_map_commit_prevalidated(struct micros_vm_handoff_state *state,
                                                const struct micros_vm_scratch_plan *plan);
 
+void micros_vm_scratch_map_bind_prevalidated(
+    struct micros_vm_handoff_state *state,
+    const struct micros_vm_scratch_plan *plan
+);
+
+void micros_vm_scratch_map_finish_prevalidated(
+    struct micros_vm_handoff_state *state
+);
+
 enum micros_vm_handoff_error
 micros_vm_scratch_commit_preflight(const struct micros_vm_handoff_state *state,
                                    const struct micros_vm_scratch_commit_request *request,

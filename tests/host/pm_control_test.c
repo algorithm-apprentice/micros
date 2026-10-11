@@ -1,4 +1,5 @@
 #include "kernel/pm_control_core.h"
+#include "kernel/pm_control_runtime_core.h"
 #include "kernel/pm_control_syscall_core.h"
 
 #include <stdbool.h>
@@ -7,9 +8,16 @@
 #include <string.h>
 
 #include "micros/endpoint.h"
+#include "micros/frame_allocator.h"
+#include "micros/frame_ownership.h"
+#include "micros/sv39.h"
 #include "micros/user_address_space.h"
 
 bool micros_pm_control_test_run(void);
+
+static struct micros_frame_allocator runtime_allocator;
+static struct micros_frame_ownership runtime_ownership;
+static struct micros_vm_handoff_state runtime_vm;
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -1093,6 +1101,343 @@ static bool test_invariant_rejection(void)
     return true;
 }
 
+static bool test_runtime_accepts_exact_frozen_vm_reservation(void)
+{
+    const uint64_t frame_base = UINT64_C(0x00100000);
+    struct micros_kernel_objects objects;
+    struct micros_pm_control_state state;
+    struct micros_pm_control_state state_snapshot;
+    struct micros_pm_control_reserve_plan reserve;
+    struct micros_frame_vm_claim_plan claim;
+    struct micros_frame_vm_freeze_plan ownership_freeze;
+    struct micros_vm_load_begin_plan begin;
+    struct micros_vm_load_freeze_state_plan vm_freeze;
+    struct micros_vm_load_freeze_plan freeze_request;
+    struct micros_physical_range range = {
+        .base = frame_base,
+        .size = 8 * MICROS_FRAME_SIZE,
+    };
+    struct micros_vm_boot_summary summary = {
+        .version = MICROS_VM_BOOT_INFO_VERSION,
+        .managed_range_count = 1,
+        .address_space_count = 1,
+        .mapping_count = 1,
+        .managed_frame_count = 8,
+        .free_frame_count = 8,
+        .vm_self_wired_frame_count = 1,
+        .digest = UINT64_C(0x1234),
+    };
+    const uint32_t permissions[] = {
+        MICROS_SV39_PERMISSION_USER
+            | MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_EXECUTE,
+        MICROS_SV39_PERMISSION_USER
+            | MICROS_SV39_PERMISSION_READ,
+        MICROS_SV39_PERMISSION_USER
+            | MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_WRITE,
+        MICROS_SV39_PERMISSION_USER
+            | MICROS_SV39_PERMISSION_READ
+            | MICROS_SV39_PERMISSION_WRITE,
+    };
+    const uint64_t virtual_addresses[] = {
+        MICROS_APPLICATION_ENTRY,
+        MICROS_APPLICATION_ENTRY + MICROS_SV39_PAGE_SIZE,
+        MICROS_APPLICATION_ENTRY + 2 * MICROS_SV39_PAGE_SIZE,
+        MICROS_APPLICATION_STACK_BASE,
+    };
+    uint64_t data_frames[4];
+    uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT];
+    struct micros_process_handle vm_process;
+    struct micros_thread_handle vm_thread = {
+        .slot = 4,
+        .generation = 9,
+    };
+    size_t index;
+
+    EXPECT_TRUE(initialize_fixture(&objects, &state));
+    EXPECT_TRUE(
+        micros_pm_control_reserve_preflight(
+            &state,
+            &objects,
+            &reserve
+        ) == MICROS_PM_CONTROL_OK
+    );
+    micros_pm_control_reserve_commit_prevalidated(
+        &state,
+        &objects,
+        &reserve
+    );
+    memset(&runtime_allocator, 0, sizeof(runtime_allocator));
+    memset(&runtime_ownership, 0, sizeof(runtime_ownership));
+    EXPECT_TRUE(
+        micros_frame_allocator_initialize(
+            &runtime_allocator,
+            &range,
+            1,
+            NULL,
+            0
+        ) == MICROS_FRAME_ALLOCATOR_OK
+        && micros_frame_ownership_initialize(
+            &runtime_ownership,
+            &runtime_allocator
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_frame_ownership_complete_handoff(
+            &runtime_ownership
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_pm_control_runtime_validate_reservation(
+            &state,
+            &objects,
+            &runtime_ownership,
+            NULL
+        ) == MICROS_PM_CONTROL_OK
+    );
+
+    vm_process = (struct micros_process_handle){
+        .slot = 1,
+        .generation = objects.processes[1].generation,
+    };
+    memset(&runtime_vm, 0, sizeof(runtime_vm));
+    EXPECT_TRUE(
+        micros_vm_handoff_state_prepare(
+            &runtime_vm,
+            2,
+            process_endpoint(vm_process),
+            1,
+            MICROS_PRIVILEGE_PROFILE_VM,
+            vm_process,
+            vm_thread,
+            UINT64_C(0x00200000),
+            UINT64_C(0x00300000),
+            MICROS_VM_BOOT_INFO_SIZE,
+            &summary
+        ) == MICROS_VM_HANDOFF_OK
+    );
+    micros_vm_handoff_commit_prevalidated(&runtime_vm);
+    state_snapshot = state;
+    state_snapshot.active_transaction = 0;
+    state_snapshot.reserved_process =
+        (struct micros_process_handle){0};
+    EXPECT_TRUE(
+        micros_pm_control_runtime_reserve_preflight(
+            &state_snapshot,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_OK
+        && micros_pm_control_runtime_reserve_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+        && micros_pm_control_runtime_abort_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_OK
+        &&
+        micros_vm_load_begin_preflight(
+            &runtime_vm,
+            state.active_transaction,
+            reserve.process,
+            true,
+            &begin
+        ) == MICROS_VM_HANDOFF_OK
+    );
+    micros_vm_load_begin_commit_prevalidated(&runtime_vm, &begin);
+    EXPECT_TRUE(
+        micros_pm_control_runtime_validate_reservation(
+            &state,
+            &objects,
+            &runtime_ownership,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_OK
+        && micros_pm_control_runtime_reserve_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+        && micros_pm_control_runtime_abort_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+    );
+
+    for (index = 0; index < 4; ++index) {
+        struct micros_vm_scratch_map_request map_request = {
+            .load_token = runtime_vm.load.load_token,
+            .virtual_address = virtual_addresses[index],
+            .physical_address =
+                frame_base + index * MICROS_FRAME_SIZE,
+            .permissions = permissions[index],
+        };
+        struct micros_vm_scratch_commit_request commit_request = {
+            .load_token = runtime_vm.load.load_token,
+            .virtual_address = virtual_addresses[index],
+            .physical_address =
+                frame_base + index * MICROS_FRAME_SIZE,
+        };
+        struct micros_vm_scratch_plan scratch;
+
+        data_frames[index] = map_request.physical_address;
+        EXPECT_TRUE(
+            micros_frame_ownership_vm_claim_preflight(
+                &runtime_ownership,
+                map_request.physical_address,
+                &claim
+            ) == MICROS_FRAME_OWNERSHIP_OK
+            && micros_vm_scratch_map_preflight(
+                &runtime_vm,
+                &map_request,
+                &scratch
+            ) == MICROS_VM_HANDOFF_OK
+        );
+        micros_frame_ownership_vm_claim_commit_prevalidated(
+            &runtime_ownership,
+            &claim
+        );
+        micros_vm_scratch_map_commit_prevalidated(
+            &runtime_vm,
+            &scratch
+        );
+        EXPECT_TRUE(
+            micros_vm_scratch_commit_preflight(
+                &runtime_vm,
+                &commit_request,
+                &scratch
+            ) == MICROS_VM_HANDOFF_OK
+        );
+        micros_vm_scratch_commit_commit_prevalidated(
+            &runtime_vm,
+            &scratch
+        );
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        table_frames[index] =
+            frame_base + (4 + index) * MICROS_FRAME_SIZE;
+    }
+    freeze_request = (struct micros_vm_load_freeze_plan){
+        .version = MICROS_VM_LOAD_FREEZE_PLAN_VERSION,
+        .size = MICROS_VM_LOAD_FREEZE_PLAN_SIZE,
+        .load_token = runtime_vm.load.load_token,
+        .table_frames = {
+            table_frames[0],
+            table_frames[1],
+            table_frames[2],
+            table_frames[3],
+        },
+        .entry = MICROS_APPLICATION_ENTRY,
+        .stack_pointer = MICROS_APPLICATION_STACK_TOP - 16,
+        .image_page_count = 3,
+        .data_page_count = 4,
+    };
+    freeze_request.page_plan_digest = micros_vm_load_page_plan_digest(
+        freeze_request.image_page_count,
+        freeze_request.data_page_count,
+        runtime_vm.mappings[reserve.process.slot].entries
+    );
+    EXPECT_TRUE(
+        micros_vm_load_freeze_preflight(
+            &runtime_vm,
+            &freeze_request,
+            &vm_freeze
+        ) == MICROS_VM_HANDOFF_OK
+        && micros_frame_ownership_vm_freeze_preflight(
+            &runtime_ownership,
+            reserve.process,
+            data_frames,
+            4,
+            table_frames,
+            &ownership_freeze
+        ) == MICROS_FRAME_OWNERSHIP_OK
+    );
+    micros_frame_ownership_vm_freeze_commit_prevalidated(
+        &runtime_ownership,
+        &ownership_freeze
+    );
+    objects.processes[reserve.process.slot].address_space_root =
+        table_frames[0];
+    micros_vm_load_freeze_commit_prevalidated(
+        &runtime_vm,
+        &vm_freeze
+    );
+    EXPECT_TRUE(
+        micros_pm_control_state_validate_objects(
+            &state,
+            &objects
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
+        && micros_pm_control_runtime_validate_reservation(
+            &state,
+            &objects,
+            &runtime_ownership,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_OK
+        && micros_pm_control_runtime_reserve_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+        && micros_pm_control_runtime_abort_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+    );
+    objects.processes[reserve.process.slot].address_space_root +=
+        MICROS_FRAME_SIZE;
+    EXPECT_TRUE(
+        micros_pm_control_runtime_validate_reservation(
+            &state,
+            &objects,
+            &runtime_ownership,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
+    );
+    objects.processes[reserve.process.slot].address_space_root =
+        table_frames[0];
+    state_snapshot = state;
+    state_snapshot.active_transaction = 0;
+    state_snapshot.reserved_process =
+        (struct micros_process_handle){0};
+    EXPECT_TRUE(
+        micros_pm_control_runtime_validate_reservation(
+            &state_snapshot,
+            &objects,
+            &runtime_ownership,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
+        && micros_pm_control_runtime_abort_preflight(
+            &state_snapshot,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
+    );
+    EXPECT_TRUE(
+        micros_vm_load_mark_activated(
+            &runtime_vm,
+            reserve.process,
+            state.active_transaction,
+            runtime_vm.load.load_token,
+            vm_freeze.mapping_generation
+        ) == MICROS_VM_HANDOFF_OK
+    );
+    state.active_transaction = 0;
+    state.reserved_process = (struct micros_process_handle){0};
+    EXPECT_TRUE(
+        micros_pm_control_runtime_validate_reservation(
+            &state,
+            &objects,
+            &runtime_ownership,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_OK
+        && micros_pm_control_runtime_reserve_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+        && micros_pm_control_runtime_abort_preflight(
+            &state,
+            &runtime_vm
+        ) == MICROS_PM_CONTROL_ERROR_STATE
+    );
+    return true;
+}
+
 bool micros_pm_control_test_run(void)
 {
     return (
@@ -1104,5 +1449,6 @@ bool micros_pm_control_test_run(void)
         && test_reserve_abort_lifecycle()
         && test_capacity_and_quarantine()
         && test_invariant_rejection()
+        && test_runtime_accepts_exact_frozen_vm_reservation()
     );
 }

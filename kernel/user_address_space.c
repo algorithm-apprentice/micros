@@ -38,6 +38,27 @@ static bool process_handles_equal(
     struct micros_process_handle right
 );
 
+static void clear_bytes(void *storage, size_t size)
+{
+    uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    uint8_t *output = destination;
+    const uint8_t *input = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        output[index] = input[index];
+    }
+}
+
 #ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
 static size_t test_fail_after_allocations = SIZE_MAX;
 static size_t test_successful_allocations;
@@ -537,8 +558,7 @@ load_vm_scratch_authority(
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
     *active = false;
-    *authority =
-        (struct micros_user_address_space_vm_scratch_authority){0};
+    clear_bytes(authority, sizeof(*authority));
     status = micros_vm_handoff_runtime_scratch_authority(
         authority
     );
@@ -2619,7 +2639,7 @@ micros_user_address_space_prepare_tty_uart_mapping(
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;
     const struct micros_process *resolved;
-    struct micros_user_address_space_tty_uart_plan candidate = {0};
+    struct micros_user_address_space_tty_uart_plan candidate;
     struct micros_sv39_decoded_pte root_entry;
     struct micros_sv39_decoded_pte middle_entry;
     struct micros_sv39_decoded_pte leaf_entry;
@@ -2643,6 +2663,7 @@ micros_user_address_space_prepare_tty_uart_mapping(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     saved_status = riscv_irq_save();
     error = require_read_authority(
         &ledger,
@@ -2776,7 +2797,7 @@ micros_user_address_space_prepare_tty_uart_mapping(
     candidate.leaf_table_physical_address =
         middle_entry.physical_address;
     candidate.leaf_pte = leaf_pte;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:
@@ -2811,7 +2832,7 @@ void micros_user_address_space_commit_tty_uart_mapping(
     }
     leaf->entries[plan->leaf_index] = plan->leaf_pte;
     micros_riscv_publish_page_table();
-    *plan = (struct micros_user_address_space_tty_uart_plan){0};
+    clear_bytes(plan, sizeof(*plan));
 }
 
 enum micros_user_address_space_error
@@ -2997,7 +3018,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;
     const struct micros_process *resolved;
-    struct micros_user_address_space_vm_scratch_plan candidate = {0};
+    struct micros_user_address_space_vm_scratch_plan candidate;
     struct micros_sv39_decoded_pte leaf_entry;
     struct micros_frame_owner owner;
     uint64_t *leaf_pte;
@@ -3014,6 +3035,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     saved_status = riscv_irq_save();
     error = require_read_authority(
         &ledger,
@@ -3125,7 +3147,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
         leaf_table_physical_address;
     candidate.physical_address = physical_address;
     candidate.leaf_pte = encoded_pte;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:
@@ -3165,7 +3187,7 @@ void micros_user_address_space_commit_vm_scratch_mapping(
     micros_riscv_publish_page_table_address(
         MICROS_VM_SCRATCH_VIRTUAL_ADDRESS
     );
-    *plan = (struct micros_user_address_space_vm_scratch_plan){0};
+    clear_bytes(plan, sizeof(*plan));
 }
 
 enum micros_user_address_space_error
@@ -3180,7 +3202,7 @@ micros_user_address_space_prepare_vm_scratch_removal(
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;
     const struct micros_process *resolved;
-    struct micros_user_address_space_vm_scratch_plan candidate = {0};
+    struct micros_user_address_space_vm_scratch_plan candidate;
     struct micros_sv39_decoded_pte leaf_entry;
     struct micros_frame_owner owner;
     uint64_t *leaf_pte;
@@ -3197,6 +3219,7 @@ micros_user_address_space_prepare_vm_scratch_removal(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(&candidate, sizeof(candidate));
     saved_status = riscv_irq_save();
     error = require_read_authority(
         &ledger,
@@ -3299,7 +3322,7 @@ micros_user_address_space_prepare_vm_scratch_removal(
         leaf_table_physical_address;
     candidate.physical_address = physical_address;
     candidate.leaf_pte = expected_pte;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:
@@ -3339,7 +3362,7 @@ void micros_user_address_space_commit_vm_scratch_removal(
     micros_riscv_publish_page_table_address(
         MICROS_VM_SCRATCH_VIRTUAL_ADDRESS
     );
-    *plan = (struct micros_user_address_space_vm_scratch_plan){0};
+    clear_bytes(plan, sizeof(*plan));
 }
 
 static bool freeze_action_matches_runtime(
@@ -3519,8 +3542,8 @@ micros_user_address_space_prepare_vm_freeze(
     const struct micros_vm_handoff_state *state;
     const struct micros_process *process;
     struct micros_user_address_space_vm_mapping
-        mappings[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
-    struct micros_user_address_space_vm_freeze_plan candidate = {0};
+        mappings[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    struct micros_user_address_space_vm_freeze_plan candidate;
     struct micros_frame_owner owner;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
@@ -3529,6 +3552,8 @@ micros_user_address_space_prepare_vm_freeze(
     if (action == NULL || plan == NULL) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(mappings, sizeof(mappings));
+    clear_bytes(&candidate, sizeof(candidate));
     saved_status = riscv_irq_save();
     error = require_read_authority(
         &ledger,
@@ -3643,7 +3668,7 @@ micros_user_address_space_prepare_vm_freeze(
     }
     candidate.phase =
         MICROS_USER_ADDRESS_SPACE_VM_FREEZE_PLAN_PREPARED;
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:
@@ -3778,7 +3803,7 @@ void micros_user_address_space_install_vm_freeze_prevalidated(
     ) {
         panic_invariant("vm-freeze-install");
     }
-    *plan = (struct micros_user_address_space_vm_freeze_plan){0};
+    clear_bytes(plan, sizeof(*plan));
 }
 
 static bool teardown_record_matches(
@@ -3842,9 +3867,9 @@ micros_user_address_space_prepare_vm_teardown(
     const struct micros_vm_handoff_state *state;
     const struct micros_process *resolved;
     struct micros_user_address_space_vm_mapping
-        mappings[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
+        mappings[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
     struct micros_user_address_space_vm_table_plan table_plan;
-    struct micros_user_address_space_vm_teardown_plan candidate = {0};
+    struct micros_user_address_space_vm_teardown_plan candidate;
     struct micros_frame_owner owner;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
@@ -3858,6 +3883,8 @@ micros_user_address_space_prepare_vm_teardown(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
+    clear_bytes(mappings, sizeof(mappings));
+    clear_bytes(&candidate, sizeof(candidate));
     saved_status = riscv_irq_save();
     error = require_read_authority(
         &ledger,
@@ -3984,7 +4011,7 @@ micros_user_address_space_prepare_vm_teardown(
         candidate.data_frames[index] =
             entries[index].physical_address;
     }
-    *plan = candidate;
+    copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:
@@ -4028,7 +4055,7 @@ void micros_user_address_space_commit_vm_teardown_prevalidated(
         clear_page(plan->table_frames[index]);
     }
     micros_riscv_publish_page_table();
-    *plan = (struct micros_user_address_space_vm_teardown_plan){0};
+    clear_bytes(plan, sizeof(*plan));
 }
 
 enum micros_user_address_space_error
