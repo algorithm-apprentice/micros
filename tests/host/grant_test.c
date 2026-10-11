@@ -687,6 +687,13 @@ static bool test_endpoint_cancellation_and_reuse(void)
             &unrelated
         )
     );
+    EXPECT_TRUE(
+        micros_endpoint_seal_source_only(
+            &endpoint_registry,
+            &objects,
+            endpoints[0]
+        ) == MICROS_ENDPOINT_OK
+    );
     memset(&plan, 0xa5, sizeof(plan));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,

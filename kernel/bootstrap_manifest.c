@@ -225,7 +225,14 @@ static bool stable_service_profiles_match(
             bootstrap_service_operations
                 | MICROS_PRIVILEGE_OPERATION_REPLY
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
-            launcher_target,
+            launcher_target
+                | (
+                    UINT32_C(1)
+                    << MICROS_PRIVILEGE_PROFILE_VM
+                ) | (
+                    UINT32_C(1)
+                    << MICROS_PRIVILEGE_PROFILE_VFS
+                ),
             0,
             MICROS_KERNEL_OPERATION_PM_CONTROL
         )

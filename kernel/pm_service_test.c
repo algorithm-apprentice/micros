@@ -39,7 +39,7 @@ static const struct micros_bootstrap_expected_service
             .prerequisites = UINT64_C(1),
             .call_targets =
                 UINT32_C(1)
-                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+                    << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
             .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
         },
         {
@@ -54,7 +54,9 @@ static const struct micros_bootstrap_expected_service
                 << (MICROS_PM_TEST_VM_SERVICE_ID - 1),
             .call_targets =
                 UINT32_C(1)
-                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+                | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM
+                | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
             .role_flags = MICROS_BOOTSTRAP_ROLE_PM,
         },
         {
@@ -110,7 +112,9 @@ static const struct micros_privilege_profile profiles[] = {
             | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
         .call_targets =
             UINT32_C(1)
-            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM
+            | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
         .kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL,
     },
     {
@@ -266,6 +270,19 @@ static bool process_has_no_thread(
     return true;
 }
 
+static bool bytes_are_zero(const void *storage, size_t size)
+{
+    const uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 _Noreturn void micros_pm_service_test_launch(void)
 {
     micros_bootstrap_runtime_launch(&runtime_config);
@@ -323,6 +340,20 @@ _Noreturn void micros_pm_service_test_handle_trap(
         || control->active_transaction != 0
         || control->reserved_process.slot != 0
         || control->reserved_process.generation != 0
+        || control->last_prepared_token != UINT64_C(2)
+        || !bytes_are_zero(
+            &control->prepared,
+            sizeof(control->prepared)
+        )
+        || control->last_exit_token != UINT64_C(1)
+        || !bytes_are_zero(&control->exit, sizeof(control->exit))
+        || handoff->last_load_token != UINT64_C(1)
+        || handoff->last_mapping_generation != UINT64_C(1)
+        || handoff->load.phase != MICROS_VM_LOAD_PHASE_IDLE
+        || !bytes_are_zero(
+            &handoff->mappings[consumed.slot],
+            sizeof(handoff->mappings[consumed.slot])
+        )
         || objects->live_process_count != MICROS_PM_TEST_SERVICE_COUNT
         || objects->live_thread_count != MICROS_PM_TEST_SERVICE_COUNT
         || objects->processes[consumed.slot].slot_state
@@ -338,6 +369,15 @@ _Noreturn void micros_pm_service_test_handle_trap(
             .endpoint_lifecycle_consumed
         || registry->endpoints[consumed.slot].state
             != MICROS_ENDPOINT_STATE_FREE
+        || !bytes_are_zero(
+            (const uint8_t *)&registry->endpoints[consumed.slot]
+                + sizeof(registry->endpoints[consumed.slot].state),
+            sizeof(registry->endpoints[consumed.slot])
+                - sizeof(registry->endpoints[consumed.slot].state)
+        )
+        || objects->threads[MICROS_PM_TEST_SERVICE_COUNT].slot_state
+            != MICROS_KERNEL_OBJECT_SLOT_FREE
+        || objects->threads[MICROS_PM_TEST_SERVICE_COUNT].generation != 2
         || !process_has_no_thread(objects, consumed)
         || grants->active_count != 0
         || micros_frame_ownership_count_process(
@@ -398,8 +438,10 @@ _Noreturn void micros_pm_service_test_handle_trap(
     uart_write(
         "MICROS_PM_SERVICE_TEST_PASS "
         "handoff=complete readiness=acknowledged protocol=stable "
-        "sealed=received reserve=aborted resources=clean "
-        "generation=advanced transaction=advanced\n"
+        "sealed=received prepare=aborted-reprepared activate=committed "
+        "exit=detached-released resources=clean "
+        "process-generation=advanced thread-generation=advanced "
+        "tokens=advanced\n"
     );
     uart_flush();
     (void)sbi_system_reset(

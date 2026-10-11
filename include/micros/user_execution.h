@@ -24,9 +24,29 @@ enum micros_user_execution_error {
     MICROS_USER_EXECUTION_ERROR_SATP,
 };
 
+struct micros_user_execution_binding {
+    struct micros_thread_handle thread;
+    struct micros_hart_handle hart;
+    uintptr_t kernel_stack_bottom;
+    uintptr_t kernel_stack_top;
+    struct micros_user_context context;
+};
+
 enum micros_user_execution_error micros_user_execution_prepare(
     struct micros_thread_handle thread,
     const struct micros_user_context *initial_context
+);
+
+enum micros_user_execution_error
+micros_user_execution_preflight_post_handoff(
+    struct micros_process_handle process,
+    struct micros_thread_handle thread,
+    const struct micros_user_context *initial_context,
+    struct micros_user_execution_binding *binding
+);
+
+void micros_user_execution_commit_post_handoff_prevalidated(
+    const struct micros_user_execution_binding *binding
 );
 
 enum micros_user_execution_error micros_user_execution_inspect(

@@ -60,7 +60,9 @@ static const struct micros_privilege_profile profiles[] = {
             | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
         .call_targets =
             UINT32_C(1)
-            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+            | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM
+            | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
         .kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL,
     },
     {
@@ -160,7 +162,9 @@ static const struct micros_bootstrap_expected_service
                 << (MICROS_TTY_HANDOFF_TEST_VM_SERVICE_ID - 1),
             .call_targets =
                 UINT32_C(1)
-                << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
+                    << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
+                | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM
+                | UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
             .role_flags = MICROS_BOOTSTRAP_ROLE_PM,
         },
         {

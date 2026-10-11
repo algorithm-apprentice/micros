@@ -128,14 +128,15 @@ The current implementation provides:
 - a fixed-capacity PM lifecycle model with semantic PIDs, generation-safe
   parent/child records, staged spawn rollback, exit, zombie, wait, and
   reparenting transitions;
-- PM-only operation 13 for hidden empty-process reservation and exact abort,
-  with retained output translation, stale identity rejection, and terminal
-  quarantine on generation exhaustion;
+- PM-only operation 13 for hidden empty-process reservation, prepared
+  execution rollback, atomic activation, ordered exit detach, and final
+  process release, with retained output translation, stale identity rejection,
+  and terminal quarantine on generation exhaustion;
 - a real freestanding PM service gated by the exact bootstrap-sealed kernel
   notification after VM handoff;
 - an isolated launcher/VM/PM/probe QEMU gate proving stable protocol rejection,
-  one real reserve/abort transaction, zero leaked process resources, and
-  consumed generation and transaction identities;
+  real prepare/abort/re-prepare, activation, child-to-PM exit, VM release, zero
+  leaked process resources, and consumed generation and token identities;
 - shutdown through the SBI System Reset extension;
 - a deterministic host harness that reports TAP output.
 
@@ -1012,14 +1013,18 @@ the portable lifecycle table.
 
 After all four services are ready, launcher sealing delivers one exact
 kernel-origin bootstrap-sealed event to PM. The isolated PM build consumes the
-event, performs one real operation-13 reserve and abort, and reports the opaque
-transaction through its test breakpoint. The kernel accepts success only when
-the reserved process slot has no root, thread, endpoint, profile, grant,
-scheduler state, or process-owned frame, and when the consumed process
-generation and PM-control transaction remain advanced and stale:
+event, reserves a process, and asks the real VM to freeze a four-page
+application containing a position-independent child. PM proves stale prepare
+output preservation, prepare/abort/re-prepare, activation, and load commit; the
+child then calls PM so PM can prove stale exit output preservation, exit
+begin/detach, premature-release rejection, VM exit release, and final process
+release. The kernel requires no remaining child root, mapping, thread,
+endpoint, profile, grant, scheduler state, or process-owned frame, while
+process/thread generations and reservation/prepared/exit tokens remain
+advanced:
 
 ```text
-MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
+MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received prepare=aborted-reprepared activate=committed exit=detached-released resources=clean process-generation=advanced thread-generation=advanced tokens=advanced
 ```
 
 ## Blocking IPC acceptance test

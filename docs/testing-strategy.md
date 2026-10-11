@@ -1045,15 +1045,19 @@ lifecycle-table initialization before sending readiness. Before sealing, the
 probe receives stable bad-version, malformed, and unmanaged-caller results,
 and the test compares the complete PM table byte for byte to prove rejection
 did not mutate lifecycle state. Launcher completion then commits the exact
-kernel-origin bootstrap-sealed notification. PM consumes that event, performs
-one real operation-13 reservation and exact abort, and reports the opaque
-transaction to the kernel. The kernel requires the reserved slot to retain no
-root, thread, endpoint, profile, grant, scheduler state, or process-owned
-frame, while the consumed process generation and PM-control transaction remain
-advanced and stale. Only the exact marker is accepted:
+kernel-origin bootstrap-sealed notification. PM consumes that event, reserves
+a process, and asks VM to freeze a four-page application containing a
+position-independent child. PM proves stale prepare output preservation,
+prepare/abort/re-prepare, activation, and load commit; the child then calls PM
+so PM can prove stale exit output preservation, exit begin/detach,
+premature-release rejection, VM exit release, and final process release. The
+kernel requires no remaining child root, mapping, thread, endpoint, profile,
+grant, scheduler state, or process-owned frame, while process/thread
+generations and reservation/prepared/exit tokens remain advanced. Only the
+exact marker is accepted:
 
 ```text
-MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
+MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received prepare=aborted-reprepared activate=committed exit=detached-released resources=clean process-generation=advanced thread-generation=advanced tokens=advanced
 ```
 
 The first ELF-spawn Step 14 QEMU component is implemented:
@@ -1064,7 +1068,7 @@ test-qemu-vm-scratch-preemption
 
 It starts the production launcher, VM, and PM service plus one test-only
 orchestration driver. PM performs a real operation-13 reservation and replies
-to the driver, preserving PM's launcher-only call authority; the driver then
+to the driver, preserving PM's exact launcher/VM/VFS call authority; the driver then
 calls VM with the opaque transaction. VM performs real `LOAD_BEGIN` and
 `SCRATCH_MAP` operation-12 calls, writes the scratch sentinel, and reaches the
 labeled test hook. The hook releases PM as the measured peer, reduces VM's

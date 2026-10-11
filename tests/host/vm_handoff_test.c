@@ -518,6 +518,7 @@ static bool test_load_transaction_lifecycle(void)
     struct micros_vm_handoff_state state = handed_off_state();
     struct micros_vm_load_freeze_plan request;
     struct micros_vm_load_freeze_state_plan freeze;
+    struct micros_vm_load_abort_action abort;
     struct micros_vm_exit_release_action release;
     struct micros_process_handle process = dynamic_process();
     uint64_t load_token;
@@ -547,6 +548,34 @@ static bool test_load_transaction_lifecycle(void)
         && micros_vm_load_commit_preflight(&state,
             load_token,
             mapping_generation) == MICROS_VM_HANDOFF_ERROR_STATE
+        && micros_vm_load_mark_activated(&state,
+            process,
+            UINT64_C(0x44),
+            load_token,
+            mapping_generation) == MICROS_VM_HANDOFF_ERROR_STATE
+        && micros_vm_load_mark_prepared(&state,
+            process,
+            UINT64_C(0x44),
+            load_token,
+            mapping_generation) == MICROS_VM_HANDOFF_OK
+        && state.mappings[process.slot].phase
+            == MICROS_VM_KERNEL_MAPPING_PREPARED
+        && micros_vm_load_abort_preflight(&state,
+            load_token,
+            mapping_generation,
+            &abort) == MICROS_VM_HANDOFF_ERROR_STATE
+        && micros_vm_load_mark_unprepared(&state,
+            process,
+            UINT64_C(0x44),
+            load_token,
+            mapping_generation) == MICROS_VM_HANDOFF_OK
+        && state.mappings[process.slot].phase
+            == MICROS_VM_KERNEL_MAPPING_FROZEN
+        && micros_vm_load_mark_prepared(&state,
+            process,
+            UINT64_C(0x44),
+            load_token,
+            mapping_generation) == MICROS_VM_HANDOFF_OK
         && micros_vm_load_mark_activated(&state,
             process,
             UINT64_C(0x44),
@@ -726,7 +755,13 @@ static bool test_rejects_oversized_later_mapping_record(void)
     );
     micros_vm_load_freeze_commit_prevalidated(&state, &freeze);
     EXPECT_TRUE(
-        micros_vm_load_mark_activated(
+        micros_vm_load_mark_prepared(
+            &state,
+            process,
+            UINT64_C(0x91),
+            state.load.load_token,
+            freeze.mapping_generation) == MICROS_VM_HANDOFF_OK
+        && micros_vm_load_mark_activated(
             &state,
             process,
             UINT64_C(0x91),

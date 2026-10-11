@@ -864,7 +864,14 @@ static bool test_load_lifecycle_commit_and_exit_release(void)
     }
     load_token = vm_state.load.load_token;
     if (
-        micros_vm_load_mark_activated(
+        micros_vm_load_mark_prepared(
+            &vm_state,
+            child_process,
+            pm_state.active_transaction,
+            load_token,
+            mapping_generation
+        ) != MICROS_VM_HANDOFF_OK
+        || micros_vm_load_mark_activated(
             &vm_state,
             child_process,
             pm_state.active_transaction,

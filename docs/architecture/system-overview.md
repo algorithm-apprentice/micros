@@ -282,14 +282,20 @@ bootstrap, the kernel injects one exact `BOOTSTRAP_SEALED` event into the
 manifest PM endpoint. That event enables PM's runtime process policy without
 transferring or reviving launcher authority.
 
-The initial PM outcome may reserve and abort one hidden empty kernel process
-after that event. The reservation has no address space, thread, endpoint,
-profile, scheduler state, grant, or process-owned frame. It proves PM's narrow
-ordinary-runtime authority and rollback boundary without claiming that a
-dynamic child can already run.
+The PM kernel lifecycle can reserve one hidden empty process, bind a VM-frozen
+mapping to one held application thread and unpublished endpoint, roll that
+prepared state back, or atomically publish it. Normal exit first seals the
+application endpoint source-only while retaining its exact reply-blocked call,
+then detaches IPC, grants, thread, context, and scheduler state before VM
+releases the root and frames and PM retires the empty process. An isolated QEMU
+fixture proves this complete kernel lifecycle with a synthetic dynamic child;
+the production PM/VFS coordinator, argv/env startup, and PID-1 integration
+remain later Step 14 slices.
 
-The exact initial PM contract is
-[ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md).
+The PM model contract is
+[ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md), and the
+post-handoff kernel lifecycle is fixed by
+[ADR-0050](../adr/0050-post-handoff-elf-spawn.md).
 
 ### Phase 6: first user environment
 

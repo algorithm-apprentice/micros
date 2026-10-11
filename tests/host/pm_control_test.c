@@ -108,8 +108,32 @@ static bool test_contract_and_decode(void)
         MICROS_SYSCALL_ABI_PM_CONTROL == 13
         && MICROS_PM_CONTROL_RESERVE == 1
         && MICROS_PM_CONTROL_ABORT_RESERVED == 2
+        && MICROS_PM_CONTROL_PREPARE_EXECUTION == 3
+        && MICROS_PM_CONTROL_ABORT_PREPARED == 4
+        && MICROS_PM_CONTROL_ACTIVATE == 5
+        && MICROS_PM_CONTROL_EXIT_BEGIN == 6
+        && MICROS_PM_CONTROL_EXIT_DETACH == 7
+        && MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS == 8
         && MICROS_PM_RESERVATION_VERSION == 1
         && MICROS_PM_RESERVATION_SIZE == 32
+        && MICROS_PM_PREPARED_VERSION == 1
+        && MICROS_PM_PREPARED_SIZE == 32
+        && MICROS_PM_EXIT_BEGIN_VERSION == 1
+        && MICROS_PM_EXIT_BEGIN_SIZE == 32
+        && sizeof(struct micros_pm_prepared_result) == 32
+        && offsetof(
+            struct micros_pm_prepared_result,
+            prepared_token
+        ) == 8
+        && offsetof(
+            struct micros_pm_prepared_result,
+            endpoint
+        ) == 16
+        && sizeof(struct micros_pm_exit_begin_result) == 32
+        && offsetof(
+            struct micros_pm_exit_begin_result,
+            exit_token
+        ) == 8
     );
     EXPECT_TRUE(
         micros_pm_control_decode(&arguments, &request)
@@ -129,6 +153,109 @@ static bool test_contract_and_decode(void)
         && request.command == MICROS_PM_CONTROL_ABORT_RESERVED
         && request.output_address == 0
         && request.transaction == arguments.a1
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_PM_CONTROL_PREPARE_EXECUTION,
+        .a1 = UINT64_C(0x10),
+        .a2 = UINT64_C(0x20),
+        .a3 = UINT64_C(0x30),
+        .a4 = MICROS_USER_VIRTUAL_BASE + 8,
+        .a5 = MICROS_PM_PREPARED_SIZE,
+        .a7 = MICROS_SYSCALL_ABI_PM_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_PM_CONTROL_PREPARE_EXECUTION
+        && request.transaction == arguments.a1
+        && request.load_token == arguments.a2
+        && request.mapping_generation == arguments.a3
+        && request.output_address == arguments.a4
+        && request.prepared_token == 0
+        && request.endpoint == MICROS_ENDPOINT_NONE
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_PM_CONTROL_ABORT_PREPARED,
+        .a1 = UINT64_C(0x10),
+        .a2 = UINT64_C(0x20),
+        .a3 = UINT64_C(0x30),
+        .a4 = UINT64_C(0x40),
+        .a7 = MICROS_SYSCALL_ABI_PM_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_PM_CONTROL_ABORT_PREPARED
+        && request.transaction == arguments.a1
+        && request.load_token == arguments.a2
+        && request.mapping_generation == arguments.a3
+        && request.prepared_token == arguments.a4
+        && request.output_address == 0
+        && request.endpoint == MICROS_ENDPOINT_NONE
+    );
+    arguments.a0 = MICROS_PM_CONTROL_ACTIVATE;
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_PM_CONTROL_ACTIVATE
+        && request.transaction == arguments.a1
+        && request.load_token == arguments.a2
+        && request.mapping_generation == arguments.a3
+        && request.prepared_token == arguments.a4
+        && request.output_address == 0
+        && request.endpoint == MICROS_ENDPOINT_NONE
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_PM_CONTROL_EXIT_BEGIN,
+        .a1 = UINT32_C(0x00123004),
+        .a2 = MICROS_USER_VIRTUAL_BASE + 8,
+        .a3 = MICROS_PM_EXIT_BEGIN_SIZE,
+        .a7 = MICROS_SYSCALL_ABI_PM_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_PM_CONTROL_EXIT_BEGIN
+        && request.endpoint == arguments.a1
+        && request.output_address == arguments.a2
+        && request.transaction == 0
+        && request.load_token == 0
+        && request.mapping_generation == 0
+        && request.prepared_token == 0
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_PM_CONTROL_EXIT_DETACH,
+        .a1 = UINT64_C(0x50),
+        .a2 = UINT32_C(0x00123004),
+        .a7 = MICROS_SYSCALL_ABI_PM_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command == MICROS_PM_CONTROL_EXIT_DETACH
+        && request.transaction == arguments.a1
+        && request.endpoint == arguments.a2
+        && request.output_address == 0
+        && request.load_token == 0
+        && request.mapping_generation == 0
+        && request.prepared_token == 0
+    );
+    arguments = (struct micros_syscall_arguments){
+        .a0 = MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS,
+        .a1 = UINT64_C(0x50),
+        .a7 = MICROS_SYSCALL_ABI_PM_CONTROL,
+    };
+    EXPECT_TRUE(
+        micros_pm_control_decode(&arguments, &request)
+            == MICROS_SYSCALL_ABI_OK
+        && request.command
+            == MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS
+        && request.transaction == arguments.a1
+        && request.endpoint == MICROS_ENDPOINT_NONE
+        && request.output_address == 0
+        && request.load_token == 0
+        && request.mapping_generation == 0
+        && request.prepared_token == 0
     );
 
     arguments = (struct micros_syscall_arguments){
@@ -203,7 +330,7 @@ static bool test_contract_and_decode(void)
     }
     arguments.a1 = 0;
     EXPECT_TRUE(decode_failure_preserves_request(arguments));
-    arguments.a0 = 3;
+    arguments.a0 = 9;
     arguments.a1 = 1;
     EXPECT_TRUE(
         decode_failure_preserves_request(arguments)
@@ -761,7 +888,7 @@ static bool test_syscall_phase_and_retained_output(void)
             &state,
             &objects,
             &reserve
-        ) == MICROS_PM_CONTROL_ERROR_CAPACITY
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
         && output_chunks_are(&fixture, 0xa5)
     );
     return true;
@@ -983,7 +1110,7 @@ static bool test_capacity_and_quarantine(void)
             &state,
             &objects,
             &reserve
-        ) == MICROS_PM_CONTROL_ERROR_CAPACITY
+        ) == MICROS_PM_CONTROL_ERROR_INVARIANT
         && memcmp(&reserve, &sentinel, sizeof(reserve)) == 0
         && memcmp(&state, &state_snapshot, sizeof(state)) == 0
         && memcmp(&objects, &snapshot, sizeof(objects)) == 0
@@ -1409,7 +1536,14 @@ static bool test_runtime_accepts_exact_frozen_vm_reservation(void)
         ) == MICROS_PM_CONTROL_ERROR_INVARIANT
     );
     EXPECT_TRUE(
-        micros_vm_load_mark_activated(
+        micros_vm_load_mark_prepared(
+            &runtime_vm,
+            reserve.process,
+            state.active_transaction,
+            runtime_vm.load.load_token,
+            vm_freeze.mapping_generation
+        ) == MICROS_VM_HANDOFF_OK
+        && micros_vm_load_mark_activated(
             &runtime_vm,
             reserve.process,
             state.active_transaction,

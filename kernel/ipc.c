@@ -493,7 +493,11 @@ static enum micros_ipc_error resolve_dependency_endpoint(
     record = &registry->endpoints[unpacked.slot];
     process = &objects->processes[unpacked.slot];
     if (
-        record->state != MICROS_ENDPOINT_STATE_ACTIVE
+        (
+            record->state != MICROS_ENDPOINT_STATE_ACTIVE
+            && record->state
+                != MICROS_ENDPOINT_STATE_SOURCE_ONLY
+        )
         || record->value != endpoint
         || !process_handles_equal(record->owner, unpacked)
         || process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
@@ -793,15 +797,19 @@ static enum micros_ipc_error preflight_reply(
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    if (expected_caller_endpoint != MICROS_ENDPOINT_NONE) {
+    {
         const struct micros_endpoint_record *caller_endpoint =
             &registry->endpoints[caller->owner.slot];
 
         if (
             caller_endpoint->state
                 != MICROS_ENDPOINT_STATE_ACTIVE
-            || caller_endpoint->value
-                != expected_caller_endpoint
+            || (
+                expected_caller_endpoint
+                    != MICROS_ENDPOINT_NONE
+                && caller_endpoint->value
+                    != expected_caller_endpoint
+            )
             || caller_endpoint->owner.slot != caller->owner.slot
             || caller_endpoint->owner.generation
                 != caller->owner.generation

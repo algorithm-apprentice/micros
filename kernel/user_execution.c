@@ -59,6 +59,45 @@ static void copy_context(
     }
 }
 
+static void copy_bytes(void *destination, const void *source, size_t size)
+{
+    unsigned char *destination_bytes = destination;
+    const unsigned char *source_bytes = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        destination_bytes[index] = source_bytes[index];
+    }
+}
+
+static void clear_bytes(void *storage, size_t size)
+{
+    unsigned char *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static bool bytes_equal(
+    const void *left_storage,
+    const void *right_storage,
+    size_t size
+)
+{
+    const unsigned char *left = left_storage;
+    const unsigned char *right = right_storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (left[index] != right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static uint64_t read_sstatus(void)
 {
     uint64_t status;
@@ -269,6 +308,168 @@ static enum micros_user_execution_error resolve_thread_and_process(
     *thread = resolved_thread;
     *process = resolved_process;
     return MICROS_USER_EXECUTION_OK;
+}
+
+enum micros_user_execution_error
+micros_user_execution_preflight_post_handoff(
+    struct micros_process_handle process_handle,
+    struct micros_thread_handle thread_handle,
+    const struct micros_user_context *initial_context,
+    struct micros_user_execution_binding *binding
+)
+{
+    const struct micros_frame_ownership *ledger;
+    struct micros_kernel_objects *objects =
+        micros_kernel_object_runtime_authoritative_registry();
+    struct micros_user_execution_binding candidate;
+    struct micros_user_context canonical;
+    const struct micros_process *process;
+    const struct micros_hart *hart;
+    struct micros_hart_handle hart_handle;
+    uint32_t next_generation;
+    uint64_t live_status;
+    enum micros_kernel_object_error object_error;
+    enum micros_user_execution_error error;
+    uintptr_t saved_status;
+
+    if (
+        initial_context == NULL
+        || binding == NULL
+        || (uintptr_t)binding
+            % _Alignof(struct micros_user_execution_binding)
+            != 0
+    ) {
+        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
+    }
+    if (objects == NULL) {
+        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
+    }
+    saved_status = riscv_irq_save();
+    ledger = micros_frame_ownership_runtime_ledger();
+    if (ledger == NULL) {
+        error = MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
+        goto done;
+    }
+    if (
+        ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_PHASE;
+        goto done;
+    }
+    object_error = micros_process_resolve(
+        objects,
+        process_handle,
+        &process
+    );
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        error = map_object_error(object_error);
+        goto done;
+    }
+    if (
+        process->live_thread_count != 0
+        || thread_handle.slot >= MICROS_THREAD_CAPACITY
+        || objects->threads[thread_handle.slot].slot_state
+            != MICROS_KERNEL_OBJECT_SLOT_FREE
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_STATE;
+        goto done;
+    }
+    object_error = micros_thread_next_generation(
+        objects->threads[thread_handle.slot].generation,
+        &next_generation
+    );
+    if (
+        object_error != MICROS_KERNEL_OBJECT_OK
+        || next_generation != thread_handle.generation
+    ) {
+        error = object_error
+                == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+            ? MICROS_USER_EXECUTION_ERROR_STATE
+            : map_object_error(object_error);
+        if (
+            object_error == MICROS_KERNEL_OBJECT_OK
+            && next_generation != thread_handle.generation
+        ) {
+            error = MICROS_USER_EXECUTION_ERROR_STALE;
+        }
+        goto done;
+    }
+    clear_bytes(&canonical, sizeof(canonical));
+    canonical.sp = initial_context->sp;
+    canonical.sepc = initial_context->sepc;
+    if (
+        initial_context->sstatus != 0
+        || !bytes_equal(
+            initial_context,
+            &canonical,
+            sizeof(canonical)
+        )
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
+        goto done;
+    }
+    if (
+        micros_user_address_space_validate(process_handle)
+            != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_MAPPING;
+        goto done;
+    }
+    error = validate_user_mappings(
+        process_handle,
+        initial_context
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
+        goto done;
+    }
+    live_status = read_sstatus();
+    if (
+        (live_status & USER_SSTATUS_UXL_MASK)
+            != USER_SSTATUS_UXL_64
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
+        goto done;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.thread = thread_handle;
+    hart_handle = micros_kernel_object_runtime_boot_hart_handle();
+    if (
+        micros_hart_resolve(objects, hart_handle, &hart)
+            != MICROS_KERNEL_OBJECT_OK
+        || hart_handle.slot != 0
+        || hart->hardware_id != 0
+        || !derive_stack_bounds(
+            thread_handle,
+            &candidate.kernel_stack_bottom,
+            &candidate.kernel_stack_top
+        )
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_STACK;
+        goto done;
+    }
+    candidate.hart = hart_handle;
+    copy_context(&candidate.context, &canonical);
+    candidate.context.sstatus = derive_user_status(live_status);
+    if (
+        micros_kernel_objects_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        error = MICROS_USER_EXECUTION_ERROR_INVARIANT;
+        goto done;
+    }
+    copy_bytes(binding, &candidate, sizeof(candidate));
+    error = MICROS_USER_EXECUTION_OK;
+
+done:
+    riscv_irq_restore(saved_status);
+    return error;
+}
+
+void micros_user_execution_commit_post_handoff_prevalidated(
+    const struct micros_user_execution_binding *binding
+)
+{
+    clear_stack(binding->kernel_stack_bottom);
 }
 
 enum micros_user_execution_error micros_user_execution_prepare(

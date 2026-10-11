@@ -1266,6 +1266,149 @@ static bool test_pm_completion_rejections_are_atomic(void)
     return true;
 }
 
+static bool test_completion_rejects_launcher_ipc_dependencies(void)
+{
+    struct micros_bootstrap_control_state state;
+    struct micros_bootstrap_control_state state_snapshot;
+    struct micros_bootstrap_manifest manifest;
+    struct micros_endpoint_registry registry;
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_hart_handle hart;
+    struct micros_bootstrap_binding
+        bindings[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    struct micros_bootstrap_complete_plan plan;
+    struct micros_bootstrap_complete_plan sentinel;
+    struct micros_ipc_message request = {
+        .type = UINT32_C(0x1234),
+    };
+    struct micros_thread *launcher_thread;
+    const struct micros_thread *pm_thread;
+
+    EXPECT_TRUE(
+        setup_ready_pm_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings
+        )
+        && micros_thread_scheduler_hold(
+            &objects,
+            bindings[2].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_call(
+            &registry,
+            &objects,
+            bindings[2].thread,
+            bindings[1].endpoint,
+            &request,
+            UINT64_C(0x4000)
+        ) == MICROS_IPC_OK
+    );
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+
+    EXPECT_TRUE(
+        setup_ready_pm_fixture(
+            &state,
+            &manifest,
+            &registry,
+            &objects,
+            &hart,
+            bindings
+        )
+        && micros_thread_scheduler_hold(
+            &objects,
+            bindings[1].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_receive(
+            &registry,
+            &objects,
+            bindings[1].thread,
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x5000)
+        ) == MICROS_IPC_OK
+        && micros_thread_scheduler_hold(
+            &objects,
+            bindings[2].thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && micros_ipc_call(
+            &registry,
+            &objects,
+            bindings[2].thread,
+            bindings[1].endpoint,
+            &request,
+            UINT64_C(0x6000)
+        ) == MICROS_IPC_OK
+    );
+    launcher_thread = &objects.threads[bindings[1].thread.slot];
+    pm_thread = &objects.threads[bindings[2].thread.slot];
+    EXPECT_TRUE(
+        launcher_thread->ipc_delivery_pending
+        && pm_thread->ipc_reply_token != 0
+        && pm_thread->ipc_reply_callee == bindings[1].endpoint
+    );
+    launcher_thread->ipc_receive_buffer = 0;
+    launcher_thread->ipc_delivery_pending = false;
+    memset(
+        &launcher_thread->ipc_inbound_message,
+        0,
+        sizeof(launcher_thread->ipc_inbound_message)
+    );
+    launcher_thread->ipc_staged_result = MICROS_IPC_OK;
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    plan = sentinel;
+    state_snapshot = state;
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_bootstrap_control_prepare_complete(
+            &state,
+            &registry,
+            &objects,
+            NULL,
+            &plan
+        ) == MICROS_BOOTSTRAP_ERROR_STATE
+        && memcmp(&plan, &sentinel, sizeof(plan)) == 0
+        && memcmp(&state, &state_snapshot, sizeof(state)) == 0
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(&objects, &objects_snapshot, sizeof(objects)) == 0
+    );
+    return true;
+}
+
 static bool test_pm_completion_queues_sealed_event_once(void)
 {
     struct micros_bootstrap_control_state state;
@@ -1758,6 +1901,7 @@ int main(void)
         && test_binding_lookup_rejects_oversized_count()
         && test_control_transitions()
         && test_pm_completion_rejections_are_atomic()
+        && test_completion_rejects_launcher_ipc_dependencies()
         && test_pm_completion_queues_sealed_event_once()
         && test_pm_completion_wakes_only_any_receiver()
         && test_pm_completion_preserves_specific_receiver()

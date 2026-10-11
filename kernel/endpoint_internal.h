@@ -24,6 +24,13 @@ micros_endpoint_preflight_source_only(
     micros_endpoint_t endpoint
 );
 
+enum micros_endpoint_error
+micros_endpoint_preflight_source_only_for_teardown(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+);
+
 void micros_endpoint_commit_source_only_prevalidated(
     struct micros_endpoint_registry *registry,
     micros_endpoint_t endpoint

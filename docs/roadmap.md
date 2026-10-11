@@ -177,16 +177,16 @@ delivery remain outside that minimal boundary.
 PM's later tokenized preparation transition remains the only post-handoff
 context-creation replacement.
 
-ADR-0046 defines the dependency-ready PM boundary. PM owns a bounded
+ADR-0046 defines the dependency-ready PM model boundary. PM owns a bounded
 application table, monotonic semantic PIDs, parent/child and init-reaper
 relationships, spawn metadata, exit, zombie, and wait state. Launcher sealing
-delivers one exact kernel-origin event that enables runtime PM policy. The
-first PM kernel operation may reserve and abort only an empty hidden process
-with no root, thread, endpoint, profile, grant, mapping, scheduler state, or
-process-owned frame. The complete spawn and exit transactions are modeled with
-explicit reverse rollback, but dynamic mappings, executable loading, running
-child publication, and running-process target teardown remain later
-integrations.
+delivers one exact kernel-origin event that enables runtime PM policy.
+ADR-0050 now extends PM-only kernel control across hidden process reservation,
+token-bound execution preparation and rollback, atomic activation, ordered
+exit detach, and empty-process release. An isolated launcher/VM/PM QEMU fixture
+loads and runs a synthetic four-page child and returns every child resource to
+baseline. VFS transaction coordination, argv/env startup, PM table commit, and
+the final dynamic PID-1 spawn/wait fixture remain later Step 14 integrations.
 
 ADR-0047's static TTY boundary is now implemented. VM installs one exact
 post-handoff UART device leaf before TTY release; TTY then initializes the

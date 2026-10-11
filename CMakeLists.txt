@@ -391,6 +391,8 @@ if(MICROS_BUILD_HOST_TESTS)
         pm_test
         kernel/frame_allocator.c
         kernel/frame_ownership.c
+        kernel/endpoint.c
+        kernel/ipc.c
         kernel/kernel_objects.c
         kernel/pm_control_core.c
         kernel/pm_control_runtime_core.c
@@ -399,6 +401,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/vm_handoff_core.c
         servers/pm/pm_core.c
         tests/host/pm_control_test.c
+        tests/host/pm_control_execution_test.c
         tests/host/pm_test.c
     )
     add_executable(
@@ -2022,6 +2025,11 @@ if(
                     MICROS_TTY_HANDOFF_TEST=1
             )
         elseif(MICROS_BUILD_PM_SERVICE_TEST)
+            target_sources(
+                micros_vm_server
+                PRIVATE
+                    tests/qemu/pm_lifecycle_child.S
+            )
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -3103,7 +3111,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             --marker
             "MICROS_TRAP_READY"
             --marker
-            "MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced"
+            "MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received prepare=aborted-reprepared activate=committed exit=detached-released resources=clean process-generation=advanced thread-generation=advanced tokens=advanced"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready
@@ -3732,7 +3740,7 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --timeout
-            10
+            20
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

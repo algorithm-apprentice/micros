@@ -1397,6 +1397,77 @@ static bool test_reply_scheduler_failure_preserves_token(void)
     return true;
 }
 
+static bool test_reply_rejects_source_only_caller(void)
+{
+    struct micros_ipc_message request =
+        message_pattern(
+            MICROS_ENDPOINT_ANY,
+            UINT32_C(0x4008),
+            UINT64_C(0x1111222233334444),
+            UINT8_C(0x68)
+        );
+    struct micros_ipc_message reply =
+        message_pattern(
+            MICROS_ENDPOINT_ANY,
+            UINT32_C(0x4009),
+            UINT64_C(0x5555666677778888),
+            UINT8_C(0x78)
+        );
+    struct micros_thread *caller;
+    uint64_t reply_token;
+
+    EXPECT_TRUE(
+        setup_reply_fixture()
+        && prepare_delivered_call(
+            primary_threads[REPLY_PROCESS_CLIENT],
+            REPLY_PROCESS_SERVER,
+            &request,
+            UINT64_C(0x50008000),
+            &reply_token
+        )
+    );
+    caller = &objects.threads[
+        primary_threads[REPLY_PROCESS_CLIENT].slot
+    ];
+    registry.endpoints[
+        processes[REPLY_PROCESS_CLIENT].slot
+    ].state = MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    caller->runtime_flags |= MICROS_THREAD_RTS_INACTIVE;
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+        && expect_reply_failure_unchanged(
+            MICROS_IPC_ERROR_REPLY_TOKEN,
+            primary_threads[REPLY_PROCESS_SERVER],
+            reply_token,
+            &reply
+        )
+        && expect_reply_receive_failure_unchanged(
+            MICROS_IPC_ERROR_REPLY_TOKEN,
+            primary_threads[REPLY_PROCESS_SERVER],
+            reply_token,
+            &reply,
+            MICROS_ENDPOINT_ANY,
+            UINT64_C(0x50009000)
+        )
+        && micros_ipc_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[REPLY_PROCESS_CLIENT]
+        ) == MICROS_IPC_OK
+        && registry.endpoints[
+            processes[REPLY_PROCESS_CLIENT].slot
+        ].state == MICROS_ENDPOINT_STATE_FREE
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
 static bool test_reply_receive_blocks_and_later_receives(void)
 {
     struct micros_ipc_message request = message_pattern(
@@ -2096,6 +2167,10 @@ bool micros_ipc_reply_test_run(void)
         {
             "reply scheduler failure preserves token",
             test_reply_scheduler_failure_preserves_token,
+        },
+        {
+            "reply rejects source-only caller",
+            test_reply_rejects_source_only_caller,
         },
         {
             "reply receive blocks and later receives",
