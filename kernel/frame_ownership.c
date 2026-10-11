@@ -1190,3 +1190,582 @@ enum micros_frame_ownership_error micros_frame_ownership_validate(
     }
     return MICROS_FRAME_OWNERSHIP_OK;
 }
+
+static enum micros_frame_ownership_error
+vm_transition_preflight(
+    const struct micros_frame_ownership *ownership
+)
+{
+    enum micros_frame_ownership_error error =
+        require_initialized(ownership);
+
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (
+        ownership->phase
+            != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
+    }
+    return micros_frame_ownership_validate(ownership);
+}
+
+static bool frame_index_is_duplicate(
+    const uint64_t *frame_indices,
+    size_t frame_index_count,
+    uint64_t frame_index
+)
+{
+    size_t index;
+
+    for (index = 0; index < frame_index_count; ++index) {
+        if (frame_indices[index] == frame_index) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void allocator_mark_allocated(
+    struct micros_frame_allocator *allocator,
+    uint64_t frame_index
+)
+{
+    size_t word_index = (size_t)(frame_index / 64);
+    uint64_t bit = UINT64_C(1) << (frame_index % 64);
+
+    allocator->allocated_bitmap[word_index] |= bit;
+}
+
+static void allocator_mark_free(
+    struct micros_frame_allocator *allocator,
+    uint64_t frame_index
+)
+{
+    size_t word_index = (size_t)(frame_index / 64);
+    uint64_t bit = UINT64_C(1) << (frame_index % 64);
+
+    allocator->allocated_bitmap[word_index] &= ~bit;
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_claim_preflight(
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    struct micros_frame_vm_claim_plan *plan
+)
+{
+    struct micros_frame_vm_claim_plan candidate;
+    uint64_t frame_index;
+    enum micros_frame_ownership_error error;
+
+    if (plan == NULL) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = vm_transition_preflight(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    error = physical_address_to_index(
+        ownership,
+        physical_address,
+        &frame_index
+    );
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (
+        ownership->owners[frame_index].kind
+            != MICROS_FRAME_OWNER_FREE
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+    }
+    if (
+        ownership->allocator->free_frame_count == 0
+        || ownership->owned_frame_count
+            == ownership->managed_frame_count
+        || ownership->owner_counts[
+            MICROS_FRAME_OWNER_VM_TRANSFERABLE
+        ] == ownership->managed_frame_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    candidate.frame_index = frame_index;
+    *plan = candidate;
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+void micros_frame_ownership_vm_claim_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_claim_plan *plan
+)
+{
+    const struct micros_frame_owner transferable = {
+        0,
+        0,
+        MICROS_FRAME_OWNER_VM_TRANSFERABLE,
+        0,
+    };
+
+    allocator_mark_allocated(
+        ownership->allocator,
+        plan->frame_index
+    );
+    ownership->owners[plan->frame_index] = transferable;
+    ownership->handoff_targets[plan->frame_index] =
+        MICROS_FRAME_HANDOFF_NONE;
+    --ownership->allocator->free_frame_count;
+    ++ownership->owned_frame_count;
+    ++ownership->owner_counts[
+        MICROS_FRAME_OWNER_VM_TRANSFERABLE
+    ];
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_release_transferable_preflight(
+    const struct micros_frame_ownership *ownership,
+    const uint64_t *physical_addresses,
+    size_t physical_address_count,
+    struct micros_frame_vm_transferable_release_plan *plan
+)
+{
+    struct micros_frame_vm_transferable_release_plan candidate = {0};
+    enum micros_frame_ownership_error error;
+    size_t index;
+
+    if (
+        plan == NULL
+        || physical_address_count
+            > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        || (
+            physical_address_count != 0
+            && physical_addresses == NULL
+        )
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = vm_transition_preflight(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    for (index = 0; index < physical_address_count; ++index) {
+        uint64_t frame_index;
+        struct micros_frame_owner owner;
+
+        error = physical_address_to_index(
+            ownership,
+            physical_addresses[index],
+            &frame_index
+        );
+        if (error != MICROS_FRAME_OWNERSHIP_OK) {
+            return error;
+        }
+        if (frame_index_is_duplicate(
+            candidate.frame_indices,
+            index,
+            frame_index
+        )) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
+        }
+        owner = ownership->owners[frame_index];
+        if (owner.kind == MICROS_FRAME_OWNER_FREE) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
+        }
+        if (
+            !owner_is_equal(
+                owner,
+                (struct micros_frame_owner){
+                    0,
+                    0,
+                    MICROS_FRAME_OWNER_VM_TRANSFERABLE,
+                    0,
+                }
+            )
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+        candidate.frame_indices[index] = frame_index;
+    }
+    if (
+        physical_address_count > ownership->owned_frame_count
+        || physical_address_count
+            > ownership->owner_counts[
+                MICROS_FRAME_OWNER_VM_TRANSFERABLE
+            ]
+        || physical_address_count
+            > ownership->managed_frame_count
+                - ownership->allocator->free_frame_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    candidate.frame_count = (uint32_t)physical_address_count;
+    *plan = candidate;
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+void micros_frame_ownership_vm_release_transferable_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_transferable_release_plan *plan
+)
+{
+    size_t index;
+
+    for (index = 0; index < plan->frame_count; ++index) {
+        uint64_t frame_index = plan->frame_indices[index];
+
+        allocator_mark_free(ownership->allocator, frame_index);
+        ownership->owners[frame_index] =
+            (struct micros_frame_owner){0, 0, 0, 0};
+        ownership->handoff_targets[frame_index] =
+            MICROS_FRAME_HANDOFF_NONE;
+    }
+    ownership->allocator->free_frame_count += plan->frame_count;
+    ownership->owned_frame_count -= plan->frame_count;
+    ownership->owner_counts[
+        MICROS_FRAME_OWNER_VM_TRANSFERABLE
+    ] -= plan->frame_count;
+}
+
+static enum micros_frame_ownership_error
+vm_process_set_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    enum micros_frame_owner_kind data_owner_kind,
+    enum micros_frame_owner_kind table_owner_kind,
+    uint64_t
+        data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX],
+    uint64_t
+        table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT]
+)
+{
+    struct micros_frame_owner expected_data_owner;
+    struct micros_frame_owner expected_table_owner;
+    enum micros_frame_ownership_error error;
+    size_t index;
+
+    if (
+        data_physical_addresses == NULL
+        || table_physical_addresses == NULL
+        || data_physical_address_count == 0
+        || data_physical_address_count
+            > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    if (!process_handle_is_valid(process)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
+    }
+    error = vm_transition_preflight(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    expected_data_owner =
+        data_owner_kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE
+        ? (struct micros_frame_owner){
+            0,
+            0,
+            MICROS_FRAME_OWNER_VM_TRANSFERABLE,
+            0,
+        }
+        : (struct micros_frame_owner){
+            process.generation,
+            process.slot,
+            (uint8_t)data_owner_kind,
+            0,
+        };
+    expected_table_owner =
+        table_owner_kind == MICROS_FRAME_OWNER_FREE
+        ? (struct micros_frame_owner){0, 0, 0, 0}
+        : (struct micros_frame_owner){
+            process.generation,
+            process.slot,
+            (uint8_t)table_owner_kind,
+            0,
+        };
+
+    for (index = 0; index < data_physical_address_count; ++index) {
+        uint64_t frame_index;
+        struct micros_frame_owner owner;
+
+        error = physical_address_to_index(
+            ownership,
+            data_physical_addresses[index],
+            &frame_index
+        );
+        if (error != MICROS_FRAME_OWNERSHIP_OK) {
+            return error;
+        }
+        if (frame_index_is_duplicate(
+            data_frame_indices,
+            index,
+            frame_index
+        )) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
+        }
+        owner = ownership->owners[frame_index];
+        if (owner.kind == MICROS_FRAME_OWNER_FREE) {
+            return data_owner_kind
+                    == MICROS_FRAME_OWNER_VM_TRANSFERABLE
+                ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
+                : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+        if (!owner_is_equal(owner, expected_data_owner)) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+        data_frame_indices[index] = frame_index;
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        uint64_t frame_index;
+        struct micros_frame_owner owner;
+
+        error = physical_address_to_index(
+            ownership,
+            table_physical_addresses[index],
+            &frame_index
+        );
+        if (error != MICROS_FRAME_OWNERSHIP_OK) {
+            return error;
+        }
+        if (
+            frame_index_is_duplicate(
+                data_frame_indices,
+                data_physical_address_count,
+                frame_index
+            )
+            || frame_index_is_duplicate(
+                table_frame_indices,
+                index,
+                frame_index
+            )
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
+        }
+        owner = ownership->owners[frame_index];
+        if (
+            table_owner_kind != MICROS_FRAME_OWNER_FREE
+            && owner.kind == MICROS_FRAME_OWNER_FREE
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
+        }
+        if (!owner_is_equal(owner, expected_table_owner)) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+        table_frame_indices[index] = frame_index;
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_freeze_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_freeze_plan *plan
+)
+{
+    struct micros_frame_vm_freeze_plan candidate = {0};
+    enum micros_frame_ownership_error error;
+
+    if (plan == NULL) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = vm_process_set_preflight(
+        ownership,
+        process,
+        data_physical_addresses,
+        data_physical_address_count,
+        table_physical_addresses,
+        MICROS_FRAME_OWNER_VM_TRANSFERABLE,
+        MICROS_FRAME_OWNER_FREE,
+        candidate.data_frame_indices,
+        candidate.table_frame_indices
+    );
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (
+        data_physical_address_count
+            > ownership->owner_counts[
+                MICROS_FRAME_OWNER_VM_TRANSFERABLE
+            ]
+        || MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+            > ownership->allocator->free_frame_count
+        || MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+            > ownership->managed_frame_count
+                - ownership->owned_frame_count
+        || data_physical_address_count
+            > ownership->managed_frame_count
+                - ownership->owner_counts[
+                    MICROS_FRAME_OWNER_VM_WIRED
+                ]
+        || MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+            > ownership->managed_frame_count
+                - ownership->owner_counts[
+                    MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+                ]
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    candidate.process = process;
+    candidate.data_frame_count =
+        (uint32_t)data_physical_address_count;
+    *plan = candidate;
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+void micros_frame_ownership_vm_freeze_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_freeze_plan *plan
+)
+{
+    const struct micros_frame_owner wired = {
+        plan->process.generation,
+        plan->process.slot,
+        MICROS_FRAME_OWNER_VM_WIRED,
+        0,
+    };
+    const struct micros_frame_owner table = {
+        plan->process.generation,
+        plan->process.slot,
+        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+        0,
+    };
+    size_t index;
+
+    for (index = 0; index < plan->data_frame_count; ++index) {
+        ownership->owners[plan->data_frame_indices[index]] = wired;
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        uint64_t frame_index = plan->table_frame_indices[index];
+
+        allocator_mark_allocated(ownership->allocator, frame_index);
+        ownership->owners[frame_index] = table;
+        ownership->handoff_targets[frame_index] =
+            MICROS_FRAME_HANDOFF_NONE;
+    }
+    ownership->allocator->free_frame_count -=
+        MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+    ownership->owned_frame_count +=
+        MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+    ownership->owner_counts[
+        MICROS_FRAME_OWNER_VM_TRANSFERABLE
+    ] -= plan->data_frame_count;
+    ownership->owner_counts[MICROS_FRAME_OWNER_VM_WIRED] +=
+        plan->data_frame_count;
+    ownership->owner_counts[
+        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+    ] += MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+}
+
+enum micros_frame_ownership_error
+micros_frame_ownership_vm_release_process_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_physical_addresses,
+    size_t data_physical_address_count,
+    const uint64_t
+        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    struct micros_frame_vm_process_release_plan *plan
+)
+{
+    struct micros_frame_vm_process_release_plan candidate = {0};
+    enum micros_frame_ownership_error error;
+    size_t release_count;
+
+    if (plan == NULL) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = vm_process_set_preflight(
+        ownership,
+        process,
+        data_physical_addresses,
+        data_physical_address_count,
+        table_physical_addresses,
+        MICROS_FRAME_OWNER_VM_WIRED,
+        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+        candidate.data_frame_indices,
+        candidate.table_frame_indices
+    );
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    release_count = data_physical_address_count
+        + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+    if (
+        data_physical_address_count
+            > ownership->owner_counts[
+                MICROS_FRAME_OWNER_VM_WIRED
+            ]
+        || MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+            > ownership->owner_counts[
+                MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+            ]
+        || release_count > ownership->owned_frame_count
+        || release_count
+            > ownership->managed_frame_count
+                - ownership->allocator->free_frame_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    candidate.process = process;
+    candidate.data_frame_count =
+        (uint32_t)data_physical_address_count;
+    *plan = candidate;
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+void micros_frame_ownership_vm_release_process_commit_prevalidated(
+    struct micros_frame_ownership *ownership,
+    const struct micros_frame_vm_process_release_plan *plan
+)
+{
+    size_t release_count = plan->data_frame_count
+        + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+    size_t index;
+
+    for (index = 0; index < plan->data_frame_count; ++index) {
+        uint64_t frame_index = plan->data_frame_indices[index];
+
+        allocator_mark_free(ownership->allocator, frame_index);
+        ownership->owners[frame_index] =
+            (struct micros_frame_owner){0, 0, 0, 0};
+        ownership->handoff_targets[frame_index] =
+            MICROS_FRAME_HANDOFF_NONE;
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        uint64_t frame_index = plan->table_frame_indices[index];
+
+        allocator_mark_free(ownership->allocator, frame_index);
+        ownership->owners[frame_index] =
+            (struct micros_frame_owner){0, 0, 0, 0};
+        ownership->handoff_targets[frame_index] =
+            MICROS_FRAME_HANDOFF_NONE;
+    }
+    ownership->allocator->free_frame_count += release_count;
+    ownership->owned_frame_count -= release_count;
+    ownership->owner_counts[MICROS_FRAME_OWNER_VM_WIRED] -=
+        plan->data_frame_count;
+    ownership->owner_counts[
+        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+    ] -= MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+}

@@ -3165,6 +3165,382 @@ static bool test_matches_seeded_reference_model(void)
     return true;
 }
 
+static bool test_commits_post_handoff_vm_ownership_lifecycle(void)
+{
+    const struct micros_process_handle process = {3, 5};
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT];
+    const uint64_t rollback_frame =
+        TEST_BASE
+        + (
+            MICROS_APPLICATION_RESIDENT_PAGE_MAX
+            + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+        ) * MICROS_FRAME_SIZE;
+    struct micros_frame_vm_claim_plan claim;
+    struct micros_frame_vm_transferable_release_plan rollback;
+    struct micros_frame_vm_freeze_plan freeze;
+    struct micros_frame_vm_process_release_plan release;
+    struct micros_frame_owner observed;
+    size_t index;
+
+    EXPECT_TRUE(initialize_fixture(TEST_FRAME_COUNT));
+    for (
+        index = 0;
+        index < MICROS_APPLICATION_RESIDENT_PAGE_MAX;
+        ++index
+    ) {
+        data_frames[index] =
+            TEST_BASE + index * MICROS_FRAME_SIZE;
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        table_frames[index] = TEST_BASE
+            + (
+                MICROS_APPLICATION_RESIDENT_PAGE_MAX
+                + index
+            ) * MICROS_FRAME_SIZE;
+    }
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_complete_handoff(&ownership)
+    );
+
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_claim_preflight(
+            &ownership,
+            rollback_frame,
+            &claim
+        )
+    );
+    micros_frame_ownership_vm_claim_commit_prevalidated(
+        &ownership,
+        &claim
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_release_transferable_preflight(
+            &ownership,
+            &rollback_frame,
+            1,
+            &rollback
+        )
+    );
+    micros_frame_ownership_vm_release_transferable_commit_prevalidated(
+        &ownership,
+        &rollback
+    );
+
+    for (
+        index = 0;
+        index < sizeof(data_frames) / sizeof(data_frames[0]);
+        ++index
+    ) {
+        EXPECT_ERROR(
+            MICROS_FRAME_OWNERSHIP_OK,
+            micros_frame_ownership_vm_claim_preflight(
+                &ownership,
+                data_frames[index],
+                &claim
+            )
+        );
+        micros_frame_ownership_vm_claim_commit_prevalidated(
+            &ownership,
+            &claim
+        );
+    }
+    EXPECT_TRUE(
+        allocator.free_frame_count
+            == TEST_FRAME_COUNT
+                - MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        && ownership.owned_frame_count
+            == MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        && ownership.owner_counts[
+            MICROS_FRAME_OWNER_VM_TRANSFERABLE
+        ] == MICROS_APPLICATION_RESIDENT_PAGE_MAX
+    );
+
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_freeze_preflight(
+            &ownership,
+            process,
+            data_frames,
+            sizeof(data_frames) / sizeof(data_frames[0]),
+            table_frames,
+            &freeze
+        )
+    );
+    micros_frame_ownership_vm_freeze_commit_prevalidated(
+        &ownership,
+        &freeze
+    );
+    EXPECT_TRUE(
+        allocator.free_frame_count
+            == TEST_FRAME_COUNT
+                - MICROS_APPLICATION_RESIDENT_PAGE_MAX
+                - MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+        && ownership.owned_frame_count
+            == MICROS_APPLICATION_RESIDENT_PAGE_MAX
+                + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+        && ownership.owner_counts[
+            MICROS_FRAME_OWNER_VM_TRANSFERABLE
+        ] == 0
+        && ownership.owner_counts[MICROS_FRAME_OWNER_VM_WIRED]
+            == MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        && ownership.owner_counts[
+            MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+        ] == 4
+        && micros_frame_ownership_validate(&ownership)
+            == MICROS_FRAME_OWNERSHIP_OK
+    );
+    for (
+        index = 0;
+        index < sizeof(data_frames) / sizeof(data_frames[0]);
+        ++index
+    ) {
+        EXPECT_ERROR(
+            MICROS_FRAME_OWNERSHIP_OK,
+            micros_frame_ownership_lookup(
+                &ownership,
+                data_frames[index],
+                &observed
+            )
+        );
+        EXPECT_TRUE(
+            owners_equal(
+                observed,
+                raw_process_owner(
+                    MICROS_FRAME_OWNER_VM_WIRED,
+                    process.slot,
+                    process.generation
+                )
+            )
+        );
+    }
+    for (
+        index = 0;
+        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+        ++index
+    ) {
+        EXPECT_ERROR(
+            MICROS_FRAME_OWNERSHIP_OK,
+            micros_frame_ownership_lookup(
+                &ownership,
+                table_frames[index],
+                &observed
+            )
+        );
+        EXPECT_TRUE(
+            owners_equal(
+                observed,
+                raw_process_owner(
+                    MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
+                    process.slot,
+                    process.generation
+                )
+            )
+        );
+    }
+
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_release_process_preflight(
+            &ownership,
+            process,
+            data_frames,
+            sizeof(data_frames) / sizeof(data_frames[0]),
+            table_frames,
+            &release
+        )
+    );
+    micros_frame_ownership_vm_release_process_commit_prevalidated(
+        &ownership,
+        &release
+    );
+    EXPECT_TRUE(
+        allocator.free_frame_count == TEST_FRAME_COUNT
+        && ownership.owned_frame_count == 0
+        && micros_frame_ownership_validate(&ownership)
+            == MICROS_FRAME_OWNERSHIP_OK
+    );
+    return true;
+}
+
+static bool test_post_handoff_vm_ownership_preflight_is_atomic(void)
+{
+    const struct micros_process_handle process = {4, 7};
+    const struct micros_process_handle wrong_process = {4, 8};
+    const uint64_t data_frames[] = {
+        TEST_BASE,
+        TEST_BASE + MICROS_FRAME_SIZE,
+    };
+    uint64_t duplicate_frames[] = {
+        TEST_BASE,
+        TEST_BASE,
+    };
+    uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT] = {
+        TEST_BASE + (2 * MICROS_FRAME_SIZE),
+        TEST_BASE + (3 * MICROS_FRAME_SIZE),
+        TEST_BASE + (4 * MICROS_FRAME_SIZE),
+        TEST_BASE + (5 * MICROS_FRAME_SIZE),
+    };
+    struct micros_frame_vm_claim_plan claim;
+    struct micros_frame_vm_claim_plan claim_sentinel;
+    struct micros_frame_vm_transferable_release_plan rollback;
+    struct micros_frame_vm_freeze_plan freeze;
+    struct micros_frame_vm_process_release_plan release;
+    size_t index;
+
+    EXPECT_TRUE(initialize_fixture(TEST_FRAME_COUNT));
+    memset(&claim_sentinel, 0xa5, sizeof(claim_sentinel));
+    claim = claim_sentinel;
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_PHASE,
+        micros_frame_ownership_vm_claim_preflight(
+            &ownership,
+            data_frames[0],
+            &claim
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(&claim, &claim_sentinel, sizeof(claim)) == 0
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_complete_handoff(&ownership)
+    );
+    for (
+        index = 0;
+        index < sizeof(data_frames) / sizeof(data_frames[0]);
+        ++index
+    ) {
+        EXPECT_ERROR(
+            MICROS_FRAME_OWNERSHIP_OK,
+            micros_frame_ownership_vm_claim_preflight(
+                &ownership,
+                data_frames[index],
+                &claim
+            )
+        );
+        micros_frame_ownership_vm_claim_commit_prevalidated(
+            &ownership,
+            &claim
+        );
+    }
+
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    memcpy(
+        &allocator_snapshot,
+        &allocator,
+        sizeof(allocator_snapshot)
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION,
+        micros_frame_ownership_vm_release_transferable_preflight(
+            &ownership,
+            duplicate_frames,
+            2,
+            &rollback
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+        && memcmp(
+            &allocator,
+            &allocator_snapshot,
+            sizeof(allocator)
+        ) == 0
+    );
+
+    table_frames[3] = table_frames[2];
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION,
+        micros_frame_ownership_vm_freeze_preflight(
+            &ownership,
+            process,
+            data_frames,
+            sizeof(data_frames) / sizeof(data_frames[0]),
+            table_frames,
+            &freeze
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+        && memcmp(
+            &allocator,
+            &allocator_snapshot,
+            sizeof(allocator)
+        ) == 0
+    );
+
+    table_frames[3] = TEST_BASE + (5 * MICROS_FRAME_SIZE);
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_freeze_preflight(
+            &ownership,
+            process,
+            data_frames,
+            sizeof(data_frames) / sizeof(data_frames[0]),
+            table_frames,
+            &freeze
+        )
+    );
+    micros_frame_ownership_vm_freeze_commit_prevalidated(
+        &ownership,
+        &freeze
+    );
+    memcpy(
+        &ownership_snapshot,
+        &ownership,
+        sizeof(ownership_snapshot)
+    );
+    memcpy(
+        &allocator_snapshot,
+        &allocator,
+        sizeof(allocator_snapshot)
+    );
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER,
+        micros_frame_ownership_vm_release_process_preflight(
+            &ownership,
+            wrong_process,
+            data_frames,
+            sizeof(data_frames) / sizeof(data_frames[0]),
+            table_frames,
+            &release
+        )
+    );
+    EXPECT_TRUE(
+        memcmp(
+            &ownership,
+            &ownership_snapshot,
+            sizeof(ownership)
+        ) == 0
+        && memcmp(
+            &allocator,
+            &allocator_snapshot,
+            sizeof(allocator)
+        ) == 0
+    );
+    return true;
+}
+
 struct test_case {
     const char *name;
     bool (*run)(void);
@@ -3220,6 +3596,14 @@ int main(void)
         {
             "matches seeded reference model",
             test_matches_seeded_reference_model,
+        },
+        {
+            "commits post-handoff VM ownership lifecycle",
+            test_commits_post_handoff_vm_ownership_lifecycle,
+        },
+        {
+            "keeps post-handoff VM preflight atomic",
+            test_post_handoff_vm_ownership_preflight_is_atomic,
         },
     };
     size_t index;
