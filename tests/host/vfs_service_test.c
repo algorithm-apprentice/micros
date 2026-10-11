@@ -1,3 +1,4 @@
+#include "micros/spawn.h"
 #include "micros/vfs.h"
 #include "servers/vfs/vfs_service_core.h"
 #include "tests/host/vfs_test_fixture.h"
@@ -27,6 +28,8 @@ static const micros_endpoint_t ramfs_endpoint =
     UINT32_C(0x00001004);
 static const micros_endpoint_t tty_endpoint =
     UINT32_C(0x00001003);
+static const micros_endpoint_t pm_endpoint =
+    UINT32_C(0x00001002);
 static const micros_endpoint_t application_endpoint =
     UINT32_C(0x00002006);
 
@@ -88,6 +91,24 @@ static struct micros_ipc_message request_message(uint32_t type)
         &message.payload[0],
         MICROS_VFS_PROTOCOL_VERSION
     );
+    return message;
+}
+
+static struct micros_ipc_message pm_control_message(
+    enum micros_vfs_control_command command
+)
+{
+    struct micros_ipc_message message = {
+        .source = pm_endpoint,
+        .type = MICROS_VFS_MESSAGE_PM_CONTROL,
+        .reply_token = UINT64_C(0x66),
+    };
+
+    write_u32_le(
+        &message.payload[0],
+        MICROS_VFS_PROTOCOL_VERSION
+    );
+    write_u32_le(&message.payload[4], (uint32_t)command);
     return message;
 }
 
@@ -170,8 +191,463 @@ static bool public_constants_are_exact(void)
         && MICROS_VFS_MESSAGE_MKDIR == UINT32_C(0x00040006)
         && MICROS_VFS_MESSAGE_CHDIR == UINT32_C(0x00040007)
         && MICROS_VFS_MESSAGE_RESULT == UINT32_C(0x00040008)
+        && MICROS_VFS_MESSAGE_PM_CONTROL
+            == UINT32_C(0x00040009)
+        && MICROS_VFS_MESSAGE_PM_CONTROL_RESULT
+            == UINT32_C(0x0004000a)
         && MICROS_VFS_RESULT_RANGE == -15
         && MICROS_VFS_RESULT_OK == 0
+        && MICROS_VFS_CONTROL_PREPARE_IMAGE == 1
+        && MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS == 2
+        && MICROS_VFS_CONTROL_COMMIT_HIDDEN == 3
+        && MICROS_VFS_CONTROL_REVERT_HIDDEN == 4
+        && MICROS_VFS_CONTROL_ABORT_DESCRIPTORS == 5
+        && MICROS_VFS_CONTROL_RELEASE_IMAGE == 6
+        && MICROS_VFS_CONTROL_EXIT_PROCESS == 7
+        && MICROS_VFS_CONTROL_RESULT_MALFORMED == -1
+        && MICROS_VFS_CONTROL_RESULT_CALLER == -2
+        && MICROS_VFS_CONTROL_RESULT_STATE == -3
+        && MICROS_VFS_CONTROL_RESULT_NO_SPACE == -4
+        && MICROS_VFS_CONTROL_RESULT_NOT_FOUND == -5
+        && MICROS_VFS_CONTROL_RESULT_ACCESS == -6
+        && MICROS_VFS_CONTROL_RESULT_TOO_BIG == -7
+        && MICROS_VFS_CONTROL_RESULT_IO == -8
+        && MICROS_VFS_CONTROL_RESULT_DESCRIPTOR == -9
+        && MICROS_VFS_CONTROL_RESULT_EXECUTABLE == -10
+        && MICROS_VFS_CONTROL_RESULT_OK == 0
+    );
+    return true;
+}
+
+static bool pm_control_requests_are_exact(void)
+{
+    struct micros_ipc_message message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_IMAGE
+    );
+    struct micros_vfs_control_request decoded;
+    struct micros_vfs_control_request preserved;
+
+    write_u64_le(&message.payload[8], UINT64_C(0x101));
+    write_u64_le(
+        &message.payload[16],
+        UINT64_C(0x0000000100000007)
+    );
+    write_u32_le(&message.payload[24], application_endpoint);
+    write_u32_le(&message.payload[32], 9);
+    write_u32_le(
+        &message.payload[36],
+        MICROS_SPAWN_REQUEST_SIZE_MIN
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.version == MICROS_VFS_PROTOCOL_VERSION
+        && decoded.command == MICROS_VFS_CONTROL_PREPARE_IMAGE
+        && decoded.source == pm_endpoint
+        && decoded.reply_token == UINT64_C(0x66)
+        && decoded.lifecycle_token == UINT64_C(0x101)
+        && decoded.image_token == 0
+        && decoded.descriptor_token == 0
+        && decoded.semantic_pid
+            == UINT64_C(0x0000000100000007)
+        && decoded.parent_endpoint == application_endpoint
+        && decoded.request_grant == 9
+        && decoded.request_size == MICROS_SPAWN_REQUEST_SIZE_MIN
+        && !decoded.trusted_init
+        && decoded.child_endpoint == 0
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_IMAGE
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x102));
+    write_u64_le(
+        &message.payload[16],
+        UINT64_C(0x0000000200000001)
+    );
+    write_u32_le(&message.payload[32], 10);
+    write_u32_le(
+        &message.payload[36],
+        MICROS_SPAWN_REQUEST_SIZE_MAX
+    );
+    write_u64_le(&message.payload[40], 1);
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.lifecycle_token == UINT64_C(0x102)
+        && decoded.semantic_pid
+            == UINT64_C(0x0000000200000001)
+        && decoded.parent_endpoint == 0
+        && decoded.request_grant == 10
+        && decoded.request_size == MICROS_SPAWN_REQUEST_SIZE_MAX
+        && decoded.trusted_init
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x103));
+    write_u64_le(&message.payload[16], UINT64_C(0x201));
+    write_u64_le(
+        &message.payload[24],
+        UINT64_C(0x0000000300000008)
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command
+            == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+        && decoded.lifecycle_token == UINT64_C(0x103)
+        && decoded.image_token == UINT64_C(0x201)
+        && decoded.semantic_pid
+            == UINT64_C(0x0000000300000008)
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_COMMIT_HIDDEN
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x104));
+    write_u64_le(&message.payload[16], UINT64_C(0x202));
+    write_u64_le(&message.payload[24], UINT64_C(0x301));
+    write_u32_le(&message.payload[32], application_endpoint);
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command == MICROS_VFS_CONTROL_COMMIT_HIDDEN
+        && decoded.lifecycle_token == UINT64_C(0x104)
+        && decoded.image_token == UINT64_C(0x202)
+        && decoded.descriptor_token == UINT64_C(0x301)
+        && decoded.child_endpoint == application_endpoint
+    );
+    write_u32_le(
+        &message.payload[4],
+        MICROS_VFS_CONTROL_REVERT_HIDDEN
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command == MICROS_VFS_CONTROL_REVERT_HIDDEN
+        && decoded.child_endpoint == application_endpoint
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_ABORT_DESCRIPTORS
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x105));
+    write_u64_le(&message.payload[16], UINT64_C(0x203));
+    write_u64_le(&message.payload[24], UINT64_C(0x302));
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command
+            == MICROS_VFS_CONTROL_ABORT_DESCRIPTORS
+        && decoded.lifecycle_token == UINT64_C(0x105)
+        && decoded.image_token == UINT64_C(0x203)
+        && decoded.descriptor_token == UINT64_C(0x302)
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_RELEASE_IMAGE
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x106));
+    write_u64_le(&message.payload[16], UINT64_C(0x204));
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command == MICROS_VFS_CONTROL_RELEASE_IMAGE
+        && decoded.lifecycle_token == UINT64_C(0x106)
+        && decoded.image_token == UINT64_C(0x204)
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_EXIT_PROCESS
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x401));
+    write_u32_le(&message.payload[16], application_endpoint);
+    write_u64_le(
+        &message.payload[24],
+        UINT64_C(0x0000000400000009)
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_OK
+        && decoded.command == MICROS_VFS_CONTROL_EXIT_PROCESS
+        && decoded.lifecycle_token == UINT64_C(0x401)
+        && decoded.child_endpoint == application_endpoint
+        && decoded.semantic_pid
+            == UINT64_C(0x0000000400000009)
+    );
+
+    memset(&decoded, 0xa5, sizeof(decoded));
+    memcpy(&preserved, &decoded, sizeof(preserved));
+    message.source = application_endpoint;
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_CALLER
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    message.source = pm_endpoint;
+    message.type = MICROS_VFS_MESSAGE_OPEN;
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_BAD_TYPE
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    message.type = MICROS_VFS_MESSAGE_PM_CONTROL;
+    write_u32_le(&message.payload[0], 2);
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_BAD_VERSION
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    write_u32_le(
+        &message.payload[0],
+        MICROS_VFS_PROTOCOL_VERSION
+    );
+    write_u32_le(&message.payload[4], 8);
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_MALFORMED
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    write_u32_le(
+        &message.payload[4],
+        MICROS_VFS_CONTROL_EXIT_PROCESS
+    );
+    write_u32_le(&message.payload[20], 1);
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_MALFORMED
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    write_u32_le(&message.payload[20], 0);
+    message.reply_token = 0;
+    EXPECT_TRUE(
+        micros_vfs_service_decode_pm_control(
+            pm_endpoint,
+            &message,
+            &decoded
+        ) == MICROS_VFS_CONTROL_PROTOCOL_INVARIANT
+        && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+    );
+    return true;
+}
+
+static bool pm_control_reserved_words_are_rejected(void)
+{
+    static const struct {
+        enum micros_vfs_control_command command;
+        size_t reserved_offset;
+    } cases[] = {
+        {MICROS_VFS_CONTROL_PREPARE_IMAGE, 28},
+        {MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS, 32},
+        {MICROS_VFS_CONTROL_COMMIT_HIDDEN, 36},
+        {MICROS_VFS_CONTROL_REVERT_HIDDEN, 40},
+        {MICROS_VFS_CONTROL_ABORT_DESCRIPTORS, 32},
+        {MICROS_VFS_CONTROL_RELEASE_IMAGE, 24},
+        {MICROS_VFS_CONTROL_EXIT_PROCESS, 20},
+    };
+    struct micros_vfs_control_request decoded;
+    struct micros_vfs_control_request preserved;
+    size_t index;
+
+    memset(&decoded, 0x5a, sizeof(decoded));
+    memcpy(&preserved, &decoded, sizeof(preserved));
+    for (index = 0; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        struct micros_ipc_message message =
+            pm_control_message(cases[index].command);
+
+        message.payload[cases[index].reserved_offset] = 1;
+        EXPECT_TRUE(
+            micros_vfs_service_decode_pm_control(
+                pm_endpoint,
+                &message,
+                &decoded
+            ) == MICROS_VFS_CONTROL_PROTOCOL_MALFORMED
+            && memcmp(&decoded, &preserved, sizeof(decoded)) == 0
+        );
+    }
+    return true;
+}
+
+static bool pm_control_results_are_exact(void)
+{
+    struct micros_vfs_control_result_action result = {
+        .active = true,
+        .reply_token = UINT64_C(0x77),
+        .command = MICROS_VFS_CONTROL_PREPARE_IMAGE,
+        .result = MICROS_VFS_CONTROL_RESULT_OK,
+        .image_token = UINT64_C(0x201),
+        .executable_grant = 11,
+        .executable_size = 4097,
+        .request_grant = 12,
+        .request_size = MICROS_SPAWN_REQUEST_SIZE_MIN,
+    };
+    struct micros_ipc_message message;
+    struct micros_ipc_message preserved;
+
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_OK
+        && message.source == 0
+        && message.type == MICROS_VFS_MESSAGE_PM_CONTROL_RESULT
+        && message.reply_token == 0
+        && read_u32_le(&message.payload[0])
+            == MICROS_VFS_PROTOCOL_VERSION
+        && read_u32_le(&message.payload[4])
+            == MICROS_VFS_CONTROL_PREPARE_IMAGE
+        && read_i32_le(&message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_OK
+        && read_u32_le(&message.payload[12]) == 0
+        && read_u64_le(&message.payload[16])
+            == UINT64_C(0x201)
+        && read_u32_le(&message.payload[24]) == 11
+        && read_u32_le(&message.payload[28]) == 4097
+        && read_u32_le(&message.payload[32]) == 12
+        && read_u32_le(&message.payload[36])
+            == MICROS_SPAWN_REQUEST_SIZE_MIN
+        && read_u64_le(&message.payload[40]) == 0
+    );
+
+    result = (struct micros_vfs_control_result_action){
+        .active = true,
+        .reply_token = UINT64_C(0x78),
+        .command = MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS,
+        .result = MICROS_VFS_CONTROL_RESULT_OK,
+        .descriptor_token = UINT64_C(0x301),
+    };
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_OK
+        && read_u64_le(&message.payload[16])
+            == UINT64_C(0x301)
+        && read_u64_le(&message.payload[24]) == 0
+        && read_u64_le(&message.payload[32]) == 0
+        && read_u64_le(&message.payload[40]) == 0
+    );
+
+    result = (struct micros_vfs_control_result_action){
+        .active = true,
+        .reply_token = UINT64_C(0x79),
+        .command = MICROS_VFS_CONTROL_EXIT_PROCESS,
+        .result = MICROS_VFS_CONTROL_RESULT_OK,
+    };
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_OK
+        && read_u64_le(&message.payload[16]) == 0
+        && read_u64_le(&message.payload[24]) == 0
+        && read_u64_le(&message.payload[32]) == 0
+        && read_u64_le(&message.payload[40]) == 0
+    );
+
+    result.result = MICROS_VFS_CONTROL_RESULT_NOT_FOUND;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_OK
+        && read_i32_le(&message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_NOT_FOUND
+        && read_u32_le(&message.payload[12]) == 0
+        && read_u64_le(&message.payload[16]) == 0
+        && read_u64_le(&message.payload[24]) == 0
+        && read_u64_le(&message.payload[32]) == 0
+        && read_u64_le(&message.payload[40]) == 0
+    );
+
+    memset(&message, 0xa5, sizeof(message));
+    memcpy(&preserved, &message, sizeof(preserved));
+    result.result = (enum micros_vfs_control_result)-11;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_ERROR_ARGUMENT
+        && memcmp(&message, &preserved, sizeof(message)) == 0
+    );
+    result.result = MICROS_VFS_CONTROL_RESULT_OK;
+    result.command = (enum micros_vfs_control_command)8;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_ERROR_ARGUMENT
+        && memcmp(&message, &preserved, sizeof(message)) == 0
+    );
+    result.command = MICROS_VFS_CONTROL_RELEASE_IMAGE;
+    result.image_token = 1;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_ERROR_INVARIANT
+        && memcmp(&message, &preserved, sizeof(message)) == 0
+    );
+    result.image_token = 0;
+    result.result = MICROS_VFS_CONTROL_RESULT_IO;
+    result.request_size = 1;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_ERROR_INVARIANT
+        && memcmp(&message, &preserved, sizeof(message)) == 0
+    );
+    result.result = MICROS_VFS_CONTROL_RESULT_OK;
+    result.request_size = 0;
+    result.reply_token = 0;
+    EXPECT_TRUE(
+        micros_vfs_service_build_pm_control_result(
+            &result,
+            &message
+        ) == MICROS_VFS_SERVICE_ERROR_ARGUMENT
+        && memcmp(&message, &preserved, sizeof(message)) == 0
     );
     return true;
 }
@@ -939,6 +1415,9 @@ int main(void)
 {
     return (
         public_constants_are_exact()
+        && pm_control_requests_are_exact()
+        && pm_control_reserved_words_are_rejected()
+        && pm_control_results_are_exact()
         && application_protocol_is_exact()
         && backend_protocol_is_exact()
         && production_configuration_is_exact()
