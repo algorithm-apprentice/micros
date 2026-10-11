@@ -266,6 +266,19 @@ add_custom_target(
     DEPENDS "${MICROS_RAMFS_SEED_IMAGE}"
 )
 
+set(
+    MICROS_VFS_PORTABLE_SOURCES
+    servers/vfs/vfs_core.c
+    servers/vfs/vfs_state.c
+    servers/vfs/vfs_ownership.c
+    servers/vfs/vfs_transfer.c
+    servers/vfs/vfs_namespace.c
+    servers/vfs/vfs_io.c
+    servers/vfs/vfs_console.c
+    servers/vfs/vfs_process.c
+    servers/vfs/vfs_spawn.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -444,7 +457,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         vfs_test
         lib/spawn/spawn_request.c
-        servers/vfs/vfs_core.c
+        ${MICROS_VFS_PORTABLE_SOURCES}
         tests/host/vfs_test_fixture.c
         tests/host/vfs_spawn_test.c
         tests/host/vfs_test.c
@@ -452,14 +465,14 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         vfs_model_test
         lib/spawn/spawn_request.c
-        servers/vfs/vfs_core.c
+        ${MICROS_VFS_PORTABLE_SOURCES}
         tests/host/vfs_test_fixture.c
         tests/host/vfs_model_test.c
     )
     add_executable(
         vfs_service_test
         lib/spawn/spawn_request.c
-        servers/vfs/vfs_core.c
+        ${MICROS_VFS_PORTABLE_SOURCES}
         servers/vfs/vfs_service_core.c
         tests/host/vfs_test_fixture.c
         tests/host/vfs_service_test.c
@@ -1926,7 +1939,7 @@ if(
             micros_vfs_service
             micros-vfs-service
             lib/spawn/spawn_request.c
-            servers/vfs/vfs_core.c
+            ${MICROS_VFS_PORTABLE_SOURCES}
             servers/vfs/vfs_service_core.c
             servers/vfs/vfs_service.c
         )
