@@ -309,6 +309,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant_abi.c
         kernel/grant_copy_core.c
         kernel/grant_syscall_core.c
+        kernel/sv39.c
         kernel/user_address_space_core.c
         kernel/ipc_abi.c
         kernel/ipc.c

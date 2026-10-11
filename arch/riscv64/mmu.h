@@ -7,5 +7,8 @@
 
 uint64_t micros_riscv_activate_sv39(uint64_t root_physical_address);
 void micros_riscv_publish_page_table(void);
+void micros_riscv_publish_page_table_address(
+    uint64_t virtual_address
+);
 
 #endif

@@ -231,3 +231,51 @@ bool micros_vm_handoff_runtime_role_ready(
         ) == MICROS_VM_HANDOFF_OK
     );
 }
+
+enum micros_vm_scratch_authority_status
+micros_vm_handoff_runtime_scratch_authority(
+    struct micros_user_address_space_vm_scratch_authority
+        *authority
+)
+{
+    struct micros_user_address_space_vm_scratch_authority
+        candidate = {0};
+
+    if (authority == NULL) {
+        return MICROS_VM_SCRATCH_AUTHORITY_INVALID;
+    }
+    if (
+        handoff_state.phase
+            == MICROS_VM_HANDOFF_PHASE_UNINITIALIZED
+    ) {
+        *authority = candidate;
+        return MICROS_VM_SCRATCH_AUTHORITY_NONE;
+    }
+    if (
+        micros_vm_handoff_state_validate(&handoff_state)
+            != MICROS_VM_HANDOFF_OK
+    ) {
+        return MICROS_VM_SCRATCH_AUTHORITY_INVALID;
+    }
+    if (
+        handoff_state.phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        || handoff_state.load.phase
+            != MICROS_VM_LOAD_PHASE_LOADING
+        || handoff_state.load.scratch_phase
+            != MICROS_VM_SCRATCH_MAPPED
+    ) {
+        *authority = candidate;
+        return MICROS_VM_SCRATCH_AUTHORITY_NONE;
+    }
+    candidate.active = true;
+    candidate.load_token = handoff_state.load.load_token;
+    candidate.process = handoff_state.process;
+    candidate.root_physical_address =
+        handoff_state.root_physical_address;
+    candidate.virtual_address =
+        MICROS_VM_SCRATCH_VIRTUAL_ADDRESS;
+    candidate.physical_address =
+        handoff_state.load.scratch.physical_address;
+    *authority = candidate;
+    return MICROS_VM_SCRATCH_AUTHORITY_ACTIVE;
+}
