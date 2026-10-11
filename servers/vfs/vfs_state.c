@@ -54,7 +54,6 @@ static enum micros_vfs_core_error validate_processes(
         const struct micros_vfs_process_record *process =
             &state->processes[process_slot];
         size_t other_slot;
-        size_t descriptor;
 
         if (process->state == MICROS_VFS_PROCESS_FREE) {
             if (!free_process_is_canonical(process)) {
@@ -112,6 +111,140 @@ static enum micros_vfs_core_error validate_processes(
                 return MICROS_VFS_CORE_ERROR_INVARIANT;
             }
         }
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_open_file_shape(
+    const struct micros_vfs_state *state,
+    size_t open_file_slot
+)
+{
+    const struct micros_vfs_open_file *open_file =
+        &state->open_files[open_file_slot];
+    const struct micros_vfs_vnode *vnode;
+
+    if (open_file->state == MICROS_VFS_OPEN_FILE_FREE) {
+        return free_open_file_is_canonical(open_file)
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        open_file->state != MICROS_VFS_OPEN_FILE_ACTIVE
+        || (
+            open_file->kind != MICROS_VFS_OBJECT_RAMFS
+            && open_file->kind != MICROS_VFS_OBJECT_CONSOLE
+        )
+        || open_file->access == 0
+        || (
+            open_file->access
+                & ~MICROS_VFS_ACCESS_DEFINED_MASK
+        ) != 0
+        || (
+            open_file->open_flags
+                & ~MICROS_VFS_OPEN_DEFINED_MASK
+        ) != 0
+        || open_file->access
+            != (
+                open_file->open_flags
+                & MICROS_VFS_ACCESS_DEFINED_MASK
+            )
+        || (
+            (
+                open_file->open_flags
+                & MICROS_VFS_OPEN_EXCLUSIVE
+            ) != 0
+            && (
+                open_file->open_flags
+                & MICROS_VFS_OPEN_CREATE
+            ) == 0
+        )
+        || (
+            open_file->open_flags
+                & (
+                    MICROS_VFS_OPEN_CREATE
+                    | MICROS_VFS_OPEN_DIRECTORY
+                )
+        ) == (
+            MICROS_VFS_OPEN_CREATE
+            | MICROS_VFS_OPEN_DIRECTORY
+        )
+        || open_file->reserved != 0
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (open_file->kind == MICROS_VFS_OBJECT_CONSOLE) {
+        return (
+            open_file->vnode == 0
+            && open_file->open_flags == open_file->access
+            && open_file->position == 0
+        )
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        !vfs_reference_is_valid(
+            open_file->vnode,
+            MICROS_VFS_VNODE_CAPACITY
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    vnode = &state->vnodes[open_file->vnode - 1];
+    if (
+        vnode->state != MICROS_VFS_VNODE_ACTIVE
+        || (
+            vfs_mode_is_directory(vnode->mode)
+            && (
+                (open_file->access & MICROS_VFS_ACCESS_WRITE)
+                    != 0
+                || (
+                    open_file->open_flags
+                    & MICROS_VFS_OPEN_CREATE
+                ) != 0
+            )
+        )
+        || (
+            !vfs_mode_is_directory(vnode->mode)
+            && (
+                open_file->open_flags
+                & MICROS_VFS_OPEN_DIRECTORY
+            ) != 0
+        )
+        || (
+            vfs_mode_is_directory(vnode->mode)
+            && open_file->position
+                > MICROS_RAMFS_DIRECTORY_CURSOR_END
+        )
+        || (
+            !vfs_mode_is_directory(vnode->mode)
+            && open_file->position
+                > MICROS_RAMFS_FILE_SIZE_MAX
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_descriptor_references(
+    const struct micros_vfs_state *state
+)
+{
+    size_t process_slot;
+
+    for (
+        process_slot = 0;
+        process_slot < MICROS_VFS_PROCESS_CAPACITY;
+        ++process_slot
+    ) {
+        const struct micros_vfs_process_record *process =
+            &state->processes[process_slot];
+        size_t descriptor;
+
+        if (process->state != MICROS_VFS_PROCESS_ACTIVE) {
+            continue;
+        }
         for (
             descriptor = 0;
             descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
@@ -138,6 +271,53 @@ static enum micros_vfs_core_error validate_processes(
     return MICROS_VFS_CORE_OK;
 }
 
+static enum micros_vfs_core_error validate_reference_counts(
+    const struct micros_vfs_state *state
+)
+{
+    size_t slot;
+
+    for (
+        slot = 0;
+        slot < MICROS_VFS_OPEN_FILE_CAPACITY;
+        ++slot
+    ) {
+        const struct micros_vfs_open_file *open_file =
+            &state->open_files[slot];
+
+        if (
+            open_file->state == MICROS_VFS_OPEN_FILE_ACTIVE
+            && (
+                open_file->reference_count == 0
+                || vfs_descriptor_user_count(state, slot)
+                    != open_file->reference_count
+            )
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+    }
+    for (
+        slot = 0;
+        slot < MICROS_VFS_VNODE_CAPACITY;
+        ++slot
+    ) {
+        const struct micros_vfs_vnode *vnode =
+            &state->vnodes[slot];
+
+        if (
+            vnode->state == MICROS_VFS_VNODE_ACTIVE
+            && (
+                vnode->local_reference_count == 0
+                || vnode->local_reference_count
+                    != vfs_vnode_user_count(state, slot)
+            )
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
 static enum micros_vfs_core_error validate_open_files(
     const struct micros_vfs_state *state
 )
@@ -149,115 +329,20 @@ static enum micros_vfs_core_error validate_open_files(
         open_file_slot < MICROS_VFS_OPEN_FILE_CAPACITY;
         ++open_file_slot
     ) {
-        const struct micros_vfs_open_file *open_file =
-            &state->open_files[open_file_slot];
-        const struct micros_vfs_vnode *vnode;
-
-        if (open_file->state == MICROS_VFS_OPEN_FILE_FREE) {
-            if (!free_open_file_is_canonical(open_file)) {
-                return MICROS_VFS_CORE_ERROR_INVARIANT;
-            }
-            continue;
-        }
         if (
-            open_file->state != MICROS_VFS_OPEN_FILE_ACTIVE
-            || (
-                open_file->kind != MICROS_VFS_OBJECT_RAMFS
-                && open_file->kind != MICROS_VFS_OBJECT_CONSOLE
-            )
-            || open_file->access == 0
-            || (
-                open_file->access
-                    & ~MICROS_VFS_ACCESS_DEFINED_MASK
-            ) != 0
-            || (
-                open_file->open_flags
-                    & ~MICROS_VFS_OPEN_DEFINED_MASK
-            ) != 0
-            || open_file->access
-                != (
-                    open_file->open_flags
-                    & MICROS_VFS_ACCESS_DEFINED_MASK
-                )
-            || (
-                (
-                    open_file->open_flags
-                    & MICROS_VFS_OPEN_EXCLUSIVE
-                ) != 0
-                && (
-                    open_file->open_flags
-                    & MICROS_VFS_OPEN_CREATE
-                ) == 0
-            )
-            || (
-                open_file->open_flags
-                    & (
-                        MICROS_VFS_OPEN_CREATE
-                        | MICROS_VFS_OPEN_DIRECTORY
-                    )
-            ) == (
-                MICROS_VFS_OPEN_CREATE
-                | MICROS_VFS_OPEN_DIRECTORY
-            )
-            || open_file->reference_count == 0
-            || vfs_descriptor_user_count(state, open_file_slot)
-                != open_file->reference_count
-            || open_file->reserved != 0
+            validate_open_file_shape(state, open_file_slot)
+                != MICROS_VFS_CORE_OK
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        if (open_file->kind == MICROS_VFS_OBJECT_CONSOLE) {
-            if (
-                open_file->vnode != 0
-                || open_file->open_flags != open_file->access
-                || open_file->position != 0
-            ) {
-                return MICROS_VFS_CORE_ERROR_INVARIANT;
-            }
-            continue;
-        }
-        if (
-            !vfs_reference_is_valid(
-                open_file->vnode,
-                MICROS_VFS_VNODE_CAPACITY
-            )
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        vnode = &state->vnodes[open_file->vnode - 1];
-        if (
-            vnode->state != MICROS_VFS_VNODE_ACTIVE
-            || (
-                vfs_mode_is_directory(vnode->mode)
-                && (
-                    (open_file->access & MICROS_VFS_ACCESS_WRITE)
-                        != 0
-                    || (
-                        open_file->open_flags
-                        & MICROS_VFS_OPEN_CREATE
-                    ) != 0
-                )
-            )
-            || (
-                !vfs_mode_is_directory(vnode->mode)
-                && (
-                    open_file->open_flags
-                    & MICROS_VFS_OPEN_DIRECTORY
-                ) != 0
-            )
-            || (
-                vfs_mode_is_directory(vnode->mode)
-                && open_file->position
-                    > MICROS_RAMFS_DIRECTORY_CURSOR_END
-            )
-            || (
-                !vfs_mode_is_directory(vnode->mode)
-                && open_file->position
-                    > MICROS_RAMFS_FILE_SIZE_MAX
-            )
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
+    }
+    if (
+        validate_descriptor_references(state)
+            != MICROS_VFS_CORE_OK
+        || validate_reference_counts(state)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     return MICROS_VFS_CORE_OK;
 }
@@ -296,9 +381,6 @@ static enum micros_vfs_core_error validate_vnodes(
                 && vnode->node != MICROS_VFS_RAMFS_ROOT_NODE
             )
             || !vfs_mode_is_canonical(vnode->mode)
-            || vnode->local_reference_count
-                != vfs_vnode_user_count(state, vnode_slot)
-            || vnode->local_reference_count == 0
             || vnode->backend_reference_count == 0
             || vnode->backend_reference_count
                 >= MICROS_VFS_BACKEND_REFERENCE_THRESHOLD
@@ -334,26 +416,25 @@ static enum micros_vfs_core_error validate_vnodes(
     return MICROS_VFS_CORE_OK;
 }
 
-static enum micros_vfs_core_error validate_pending(
-    const struct micros_vfs_state *state
+static bool pending_has_process_owner(uint32_t pending_state)
+{
+    return (
+        pending_state == MICROS_VFS_PENDING_TTY_READ_WAIT_COMPLETION
+        || pending_state
+            == MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE
+        || pending_state
+            == MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION
+    );
+}
+
+static enum micros_vfs_core_error validate_pending_shape(
+    const struct micros_vfs_pending_operation *pending
 )
 {
-    const struct micros_vfs_pending_operation *pending =
-        &state->pending;
-    const struct micros_vfs_process_record *process;
-    const struct micros_vfs_open_file *open_file;
-
-    if (state->client_page_owner != MICROS_VFS_PAGE_FREE) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     if (pending->state == MICROS_VFS_PENDING_NONE) {
-        if (
-            !vfs_bytes_are_zero(pending, sizeof(*pending))
-            || state->backend_page_owner != MICROS_VFS_PAGE_FREE
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        return MICROS_VFS_CORE_OK;
+        return vfs_bytes_are_zero(pending, sizeof(*pending))
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     if (
         pending->state
@@ -361,12 +442,6 @@ static enum micros_vfs_core_error validate_pending(
         || pending->state
             == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
     ) {
-        if (
-            !pending_debt_is_canonical(pending)
-            || state->backend_page_owner != MICROS_VFS_PAGE_FREE
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
         return MICROS_VFS_CORE_OK;
     }
 #if defined(MICROS_BUILD_VFS_SERVICE_TEST)
@@ -374,38 +449,26 @@ static enum micros_vfs_core_error validate_pending(
         pending->state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
     ) {
-        if (
-            pending->reply_token == 0
-            || pending->request_id == 0
-            || pending->application_grant != MICROS_GRANT_NONE
-            || pending->tty_grant != MICROS_GRANT_NONE
-            || pending->process_slot != 0
-            || pending->descriptor != 0
-            || pending->open_file != 0
-            || pending->reserved != 0
-            || pending->endpoint != 0
-            || pending->application_offset != 0
-            || pending->count != 0
-            || state->next_tty_request_id != pending->request_id
-            || state->backend_page_owner != MICROS_VFS_PAGE_FREE
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        return MICROS_VFS_CORE_OK;
+        return (
+            pending->reply_token != 0
+            && pending->request_id != 0
+            && pending->application_grant == MICROS_GRANT_NONE
+            && pending->tty_grant == MICROS_GRANT_NONE
+            && pending->process_slot == 0
+            && pending->descriptor == 0
+            && pending->open_file == 0
+            && pending->reserved == 0
+            && pending->endpoint == 0
+            && pending->application_offset == 0
+            && pending->count == 0
+        )
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
     }
 #endif
     if (
-        pending->state
-            != MICROS_VFS_PENDING_TTY_READ_WAIT_COMPLETION
-        && pending->state
-            != MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE
-        && pending->state
-            != MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION
-    ) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
-    if (
-        pending->process_slot >= MICROS_VFS_PROCESS_CAPACITY
+        !pending_has_process_owner(pending->state)
+        || pending->process_slot >= MICROS_VFS_PROCESS_CAPACITY
         || pending->descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
         || pending->open_file >= MICROS_VFS_OPEN_FILE_CAPACITY
         || pending->reserved != 0
@@ -416,6 +479,21 @@ static enum micros_vfs_core_error validate_pending(
         || pending->request_id == 0
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_pending_owner(
+    const struct micros_vfs_state *state
+)
+{
+    const struct micros_vfs_pending_operation *pending =
+        &state->pending;
+    const struct micros_vfs_process_record *process;
+    const struct micros_vfs_open_file *open_file;
+
+    if (!pending_has_process_owner(pending->state)) {
+        return MICROS_VFS_CORE_OK;
     }
     process = &state->processes[pending->process_slot];
     open_file = &state->open_files[pending->open_file];
@@ -429,6 +507,52 @@ static enum micros_vfs_core_error validate_pending(
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_pending_resources(
+    const struct micros_vfs_state *state
+)
+{
+    const struct micros_vfs_pending_operation *pending =
+        &state->pending;
+    const struct micros_vfs_open_file *open_file;
+
+    if (state->client_page_owner != MICROS_VFS_PAGE_FREE) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (pending->state == MICROS_VFS_PENDING_NONE) {
+        return state->backend_page_owner == MICROS_VFS_PAGE_FREE
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        pending->state
+            == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
+        || pending->state
+            == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
+    ) {
+        return (
+            pending_debt_is_canonical(pending)
+            && state->backend_page_owner == MICROS_VFS_PAGE_FREE
+        )
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+    if (
+        pending->state
+            == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
+    ) {
+        return (
+            state->next_tty_request_id == pending->request_id
+            && state->backend_page_owner == MICROS_VFS_PAGE_FREE
+        )
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+#endif
+    open_file = &state->open_files[pending->open_file];
     switch (pending->state) {
     case MICROS_VFS_PENDING_TTY_READ_WAIT_COMPLETION:
         if (
@@ -448,7 +572,7 @@ static enum micros_vfs_core_error validate_pending(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        break;
+        return MICROS_VFS_CORE_OK;
     case MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE:
         if (
             pending->application_grant != MICROS_GRANT_NONE
@@ -464,7 +588,7 @@ static enum micros_vfs_core_error validate_pending(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        break;
+        return MICROS_VFS_CORE_OK;
     case MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION:
         if (
             pending->application_grant != MICROS_GRANT_NONE
@@ -481,8 +605,22 @@ static enum micros_vfs_core_error validate_pending(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        break;
+        return MICROS_VFS_CORE_OK;
     default:
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+}
+
+static enum micros_vfs_core_error validate_pending(
+    const struct micros_vfs_state *state
+)
+{
+    if (
+        validate_pending_shape(&state->pending)
+            != MICROS_VFS_CORE_OK
+        || validate_pending_owner(state) != MICROS_VFS_CORE_OK
+        || validate_pending_resources(state) != MICROS_VFS_CORE_OK
+    ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     return MICROS_VFS_CORE_OK;
@@ -722,46 +860,27 @@ validate_spawn_descriptor_state(
     return MICROS_VFS_CORE_OK;
 }
 
-static enum micros_vfs_core_error validate_spawn(
-    const struct micros_vfs_state *state
+static enum micros_vfs_core_error validate_spawn_stage_metadata(
+    const struct micros_vfs_state *state,
+    struct micros_spawn_request *decoded,
+    bool *descriptors_reserved,
+    bool *hidden_committed
 )
 {
     const struct micros_vfs_spawn_transaction *spawn =
         &state->spawn;
-    const struct micros_vfs_process_record *parent = NULL;
-    struct micros_spawn_request decoded;
     struct micros_spawn_stack_layout stack_layout;
-    const struct micros_vfs_vnode *vnode;
-    bool descriptors_reserved;
-    bool hidden_committed;
-    size_t process_slot;
 
-    if (spawn->phase == MICROS_VFS_SPAWN_IDLE) {
-        if (
-            !vfs_bytes_are_zero(spawn, sizeof(*spawn))
-            || !vfs_bytes_are_zero(
-                state->spawn_request_bytes,
-                sizeof(state->spawn_request_bytes)
-            )
-            || !vfs_bytes_are_zero(
-                state->spawn_executable_bytes,
-                sizeof(state->spawn_executable_bytes)
-            )
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        return MICROS_VFS_CORE_OK;
-    }
-    hidden_committed =
+    *hidden_committed =
         spawn->phase == MICROS_VFS_SPAWN_HIDDEN_COMMITTED;
-    descriptors_reserved =
+    *descriptors_reserved =
         spawn->phase == MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED;
-    descriptors_reserved =
-        descriptors_reserved || hidden_committed;
+    *descriptors_reserved =
+        *descriptors_reserved || *hidden_committed;
     if (
         (
             spawn->phase != MICROS_VFS_SPAWN_IMAGE_PREPARED
-            && !descriptors_reserved
+            && !*descriptors_reserved
         )
         || !vfs_bytes_are_zero(
             spawn->reserved0,
@@ -776,7 +895,38 @@ static enum micros_vfs_core_error validate_spawn(
         || spawn->executable_size == 0
         || spawn->executable_size
             > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
-        || !vfs_reference_is_valid(
+        || micros_spawn_request_decode(
+            state->spawn_request_bytes,
+            spawn->request_size,
+            decoded
+        ) != MICROS_SPAWN_REQUEST_OK
+        || micros_spawn_stack_layout_plan(
+            decoded,
+            &stack_layout
+        ) != MICROS_SPAWN_STACK_LAYOUT_OK
+        || (
+            !*descriptors_reserved
+            && !spawn_descriptor_metadata_is_zero(spawn)
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_spawn_image_ownership(
+    const struct micros_vfs_state *state,
+    const struct micros_spawn_request *decoded,
+    const struct micros_vfs_process_record **parent
+)
+{
+    const struct micros_vfs_spawn_transaction *spawn =
+        &state->spawn;
+    const struct micros_vfs_vnode *vnode;
+    size_t process_slot;
+
+    if (
+        !vfs_reference_is_valid(
             spawn->executable_vnode,
             MICROS_VFS_VNODE_CAPACITY
         )
@@ -807,19 +957,6 @@ static enum micros_vfs_core_error validate_spawn(
             sizeof(state->spawn_executable_bytes)
                 - spawn->executable_size
         )
-        || micros_spawn_request_decode(
-            state->spawn_request_bytes,
-            spawn->request_size,
-            &decoded
-        ) != MICROS_SPAWN_REQUEST_OK
-        || micros_spawn_stack_layout_plan(
-            &decoded,
-            &stack_layout
-        ) != MICROS_SPAWN_STACK_LAYOUT_OK
-        || (
-            !descriptors_reserved
-            && !spawn_descriptor_metadata_is_zero(spawn)
-        )
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
@@ -837,9 +974,9 @@ static enum micros_vfs_core_error validate_spawn(
     if (spawn->trusted_init) {
         if (
             spawn->parent_endpoint != 0
-            || state->spawn_request_bytes[decoded.path.offset]
+            || state->spawn_request_bytes[decoded->path.offset]
                 != '/'
-            || decoded.descriptor_action_count != 0
+            || decoded->descriptor_action_count != 0
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
@@ -856,7 +993,51 @@ static enum micros_vfs_core_error validate_spawn(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        parent = &state->processes[process_slot];
+        *parent = &state->processes[process_slot];
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_spawn(
+    const struct micros_vfs_state *state
+)
+{
+    const struct micros_vfs_spawn_transaction *spawn =
+        &state->spawn;
+    const struct micros_vfs_process_record *parent = NULL;
+    struct micros_spawn_request decoded;
+    bool descriptors_reserved;
+    bool hidden_committed;
+
+    if (spawn->phase == MICROS_VFS_SPAWN_IDLE) {
+        return (
+            vfs_bytes_are_zero(spawn, sizeof(*spawn))
+            && vfs_bytes_are_zero(
+                state->spawn_request_bytes,
+                sizeof(state->spawn_request_bytes)
+            )
+            && vfs_bytes_are_zero(
+                state->spawn_executable_bytes,
+                sizeof(state->spawn_executable_bytes)
+            )
+        )
+            ? MICROS_VFS_CORE_OK
+            : MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        validate_spawn_stage_metadata(
+            state,
+            &decoded,
+            &descriptors_reserved,
+            &hidden_committed
+        ) != MICROS_VFS_CORE_OK
+        || validate_spawn_image_ownership(
+            state,
+            &decoded,
+            &parent
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     if (!descriptors_reserved) {
         return MICROS_VFS_CORE_OK;
