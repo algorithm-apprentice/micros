@@ -5,6 +5,11 @@
 
 #include "micros/spawn.h"
 
+enum {
+    VFS_VM_SERVICE_ID = 2,
+    VFS_PM_SERVICE_ID = 3,
+};
+
 static void clear_bytes(void *storage, size_t size)
 {
     uint8_t *bytes = storage;
@@ -488,6 +493,10 @@ static bool validate_configuration_shape(
         }
     }
     selected.launcher = config->services[0].endpoint;
+    selected.vm =
+        config->services[VFS_VM_SERVICE_ID - 1].endpoint;
+    selected.pm =
+        config->services[VFS_PM_SERVICE_ID - 1].endpoint;
     selected.tty = config->services[MICROS_TTY_SERVICE_ID - 1].endpoint;
     selected.ramfs =
         config->services[MICROS_RAMFS_SERVICE_ID - 1].endpoint;
@@ -849,7 +858,10 @@ micros_vfs_service_build_pm_control_result(
         || message == NULL
         || !result->active
         || result->reply_token == 0
-        || !vfs_control_command_is_defined(result->command)
+        || (
+            result->result == MICROS_VFS_CONTROL_RESULT_OK
+            && !vfs_control_command_is_defined(result->command)
+        )
         || !vfs_control_result_is_defined(result->result)
     ) {
         return MICROS_VFS_SERVICE_ERROR_ARGUMENT;
@@ -1246,6 +1258,28 @@ static enum micros_vfs_service_error publish_result(
     return MICROS_VFS_SERVICE_OK;
 }
 
+static enum micros_vfs_service_error publish_control_result(
+    const struct micros_vfs_control_result_action *result,
+    struct micros_vfs_service_reply_action *action
+)
+{
+    struct micros_vfs_service_reply_action candidate;
+
+    clear_bytes(&candidate, sizeof(candidate));
+    if (
+        micros_vfs_service_build_pm_control_result(
+            result,
+            &candidate.message
+        ) != MICROS_VFS_SERVICE_OK
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+    candidate.active = true;
+    candidate.reply_token = result->reply_token;
+    *action = candidate;
+    return MICROS_VFS_SERVICE_OK;
+}
+
 enum micros_vfs_service_error micros_vfs_service_handle_message(
     struct micros_vfs_state *state,
     const struct micros_ipc_message *message,
@@ -1264,6 +1298,46 @@ enum micros_vfs_service_error micros_vfs_service_handle_message(
         return MICROS_VFS_SERVICE_ERROR_ARGUMENT;
     }
     clear_bytes(action, sizeof(*action));
+    if (message->type == MICROS_VFS_MESSAGE_PM_CONTROL) {
+        struct micros_vfs_control_request request;
+        struct micros_vfs_control_result_action result;
+        enum micros_vfs_control_protocol_status status;
+
+        status = micros_vfs_service_decode_pm_control(
+            state->pm_endpoint,
+            message,
+            &request
+        );
+        if (
+            status == MICROS_VFS_CONTROL_PROTOCOL_INVARIANT
+            || status == MICROS_VFS_CONTROL_PROTOCOL_BAD_TYPE
+        ) {
+            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+        }
+        if (status != MICROS_VFS_CONTROL_PROTOCOL_OK) {
+            clear_bytes(&result, sizeof(result));
+            result.active = true;
+            result.reply_token = message->reply_token;
+            result.command =
+                (enum micros_vfs_control_command)read_u32_le(
+                    &message->payload[4]
+                );
+            result.result =
+                status == MICROS_VFS_CONTROL_PROTOCOL_CALLER
+                ? MICROS_VFS_CONTROL_RESULT_CALLER
+                : MICROS_VFS_CONTROL_RESULT_MALFORMED;
+        } else if (
+            micros_vfs_handle_control(
+                state,
+                &request,
+                io,
+                &result
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+        }
+        return publish_control_result(&result, action);
+    }
     if (message->type == MICROS_IPC_TYPE_KERNEL_NOTIFICATION) {
         uint64_t events = read_u64_le(&message->payload[0]);
 

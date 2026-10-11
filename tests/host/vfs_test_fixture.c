@@ -204,13 +204,30 @@ fixture_backend_grant_create(
         fixture->force_backend_grant_invariant
         || local == NULL
         || length == 0
-        || length > MICROS_VFS_TRANSFER_MAX
         || (
-            permission != MICROS_GRANT_PERMISSION_READ
-            && permission != MICROS_GRANT_PERMISSION_WRITE
+            (
+                endpoint == fixture->vm_endpoint
+                && (
+                    permission != MICROS_GRANT_PERMISSION_READ
+                    || length
+                        > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+                )
+            )
+            || (
+                endpoint != fixture->vm_endpoint
+                && (
+                    length > MICROS_VFS_TRANSFER_MAX
+                    || (
+                        permission != MICROS_GRANT_PERMISSION_READ
+                        && permission
+                            != MICROS_GRANT_PERMISSION_WRITE
+                    )
+                )
+            )
         )
         || (
-            endpoint != fixture->ramfs_endpoint
+            endpoint != fixture->vm_endpoint
+            && endpoint != fixture->ramfs_endpoint
             && endpoint != fixture->tty_endpoint
         )
         || grant == NULL
@@ -219,6 +236,11 @@ fixture_backend_grant_create(
     }
     if (
         fixture->force_backend_grant_capacity
+        || (
+            fixture->backend_capacity_on_create_call != 0
+            && fixture->backend_create_calls
+                == fixture->backend_capacity_on_create_call
+        )
         || fixture->backend_grant_count >= MICROS_GRANT_CAPACITY
     ) {
         return MICROS_VFS_BACKEND_GRANT_CAPACITY;
@@ -1175,6 +1197,8 @@ static void seed_node(
 void vfs_test_fixture_initialize(
     struct vfs_test_fixture *fixture,
     micros_endpoint_t vfs_endpoint,
+    micros_endpoint_t vm_endpoint,
+    micros_endpoint_t pm_endpoint,
     micros_endpoint_t ramfs_endpoint,
     micros_endpoint_t tty_endpoint
 )
@@ -1183,6 +1207,8 @@ void vfs_test_fixture_initialize(
 
     memset(fixture, 0, sizeof(*fixture));
     fixture->vfs_endpoint = vfs_endpoint;
+    fixture->vm_endpoint = vm_endpoint;
+    fixture->pm_endpoint = pm_endpoint;
     fixture->ramfs_endpoint = ramfs_endpoint;
     fixture->tty_endpoint = tty_endpoint;
     fixture->io.client_validate = fixture_client_validate;
@@ -1344,6 +1370,23 @@ bool vfs_test_fixture_add_root_file(
     size_t length
 )
 {
+    return vfs_test_fixture_add_root_file_with_mode(
+        fixture,
+        name,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        bytes,
+        length
+    );
+}
+
+bool vfs_test_fixture_add_root_file_with_mode(
+    struct vfs_test_fixture *fixture,
+    const char *name,
+    uint32_t mode,
+    const uint8_t *bytes,
+    size_t length
+)
+{
     size_t name_length = strlen(name);
     size_t slot;
     size_t existing;
@@ -1352,6 +1395,16 @@ bool vfs_test_fixture_add_root_file(
         name_length == 0
         || name_length > MICROS_RAMFS_NAME_MAX
         || length > VFS_TEST_NODE_DATA_CAPACITY
+        || (
+            mode
+            & ~(
+                MICROS_RAMFS_MODE_TYPE_MASK
+                | MICROS_RAMFS_MODE_PERMISSIONS
+            )
+        ) != 0
+        || (
+            mode & MICROS_RAMFS_MODE_TYPE_MASK
+        ) != MICROS_RAMFS_MODE_REGULAR
         || memchr(name, '/', name_length) != NULL
         || find_child(
             fixture,
@@ -1370,7 +1423,7 @@ bool vfs_test_fixture_add_root_file(
                 slot,
                 0,
                 name,
-                MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+                mode,
                 bytes,
                 length
             );
@@ -1378,6 +1431,27 @@ bool vfs_test_fixture_add_root_file(
         }
     }
     return false;
+}
+
+const struct vfs_test_backend_grant *
+vfs_test_fixture_backend_grant(
+    const struct vfs_test_fixture *fixture,
+    micros_grant_t grant
+)
+{
+    size_t slot;
+
+    if (grant < UINT32_C(0x100)) {
+        return NULL;
+    }
+    slot = grant - UINT32_C(0x100);
+    if (
+        slot >= MICROS_GRANT_CAPACITY
+        || !fixture->backend_grants[slot].active
+    ) {
+        return NULL;
+    }
+    return &fixture->backend_grants[slot];
 }
 
 bool vfs_test_fixture_complete_read(

@@ -24,6 +24,8 @@
 
 static const micros_endpoint_t vfs_endpoint =
     UINT32_C(0x00001005);
+static const micros_endpoint_t vm_endpoint =
+    UINT32_C(0x00001001);
 static const micros_endpoint_t ramfs_endpoint =
     UINT32_C(0x00001004);
 static const micros_endpoint_t tty_endpoint =
@@ -72,6 +74,44 @@ static uint64_t read_u64_le(const uint8_t *bytes)
         value |= (uint64_t)bytes[index] << (index * 8);
     }
     return value;
+}
+
+static size_t build_control_spawn_request(
+    uint8_t *bytes,
+    const char *path
+)
+{
+    static const char argument[] = "child";
+    size_t path_size = strlen(path) + 1;
+    size_t argument_size = sizeof(argument);
+    size_t cursor = MICROS_SPAWN_REQUEST_HEADER_SIZE;
+
+    memset(bytes, 0, MICROS_SPAWN_REQUEST_SIZE_MAX);
+    write_u32_le(&bytes[0], MICROS_SPAWN_REQUEST_VERSION);
+    write_u32_le(&bytes[4], MICROS_SPAWN_REQUEST_HEADER_SIZE);
+    bytes[MICROS_SPAWN_ARGUMENT_COUNT_OFFSET] = 1;
+    bytes[MICROS_SPAWN_PATH_REFERENCE_OFFSET] =
+        (uint8_t)cursor;
+    bytes[MICROS_SPAWN_PATH_REFERENCE_OFFSET + 1] =
+        (uint8_t)(cursor >> 8);
+    bytes[MICROS_SPAWN_PATH_REFERENCE_OFFSET + 2] =
+        (uint8_t)path_size;
+    bytes[MICROS_SPAWN_PATH_REFERENCE_OFFSET + 3] =
+        (uint8_t)(path_size >> 8);
+    memcpy(&bytes[cursor], path, path_size);
+    cursor += path_size;
+    bytes[MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET] =
+        (uint8_t)cursor;
+    bytes[MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET + 1] =
+        (uint8_t)(cursor >> 8);
+    bytes[MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET + 2] =
+        (uint8_t)argument_size;
+    bytes[MICROS_SPAWN_ARGUMENT_REFERENCES_OFFSET + 3] =
+        (uint8_t)(argument_size >> 8);
+    memcpy(&bytes[cursor], argument, argument_size);
+    cursor += argument_size;
+    write_u32_le(&bytes[8], (uint32_t)cursor);
+    return cursor;
 }
 
 static int32_t read_i32_le(const uint8_t *bytes)
@@ -150,6 +190,8 @@ static bool initialize_service_fixture(void)
     vfs_test_fixture_initialize(
         &fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -157,6 +199,8 @@ static bool initialize_service_fixture(void)
         micros_vfs_state_initialize(
             &state,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) == MICROS_VFS_CORE_OK
@@ -178,7 +222,7 @@ static bool public_constants_are_exact(void)
         MICROS_VFS_PROTOCOL_VERSION == 1
         && MICROS_VFS_SERVICE_ID == 6
         && MICROS_VFS_PROCESS_SLOT == 5
-        && MICROS_VFS_RESIDENT_PAGE_LIMIT == 64
+        && MICROS_VFS_RESIDENT_PAGE_LIMIT == 80
         && MICROS_VFS_TRANSFER_MAX == 4096
         && MICROS_VFS_PATH_MAX == 4096
         && MICROS_VFS_NAME_MAX == 60
@@ -1157,6 +1201,8 @@ static bool production_configuration_is_exact(void)
             &endpoints
         )
         && endpoints.launcher == UINT32_C(0x00001000)
+        && endpoints.vm == UINT32_C(0x00001001)
+        && endpoints.pm == UINT32_C(0x00001002)
         && endpoints.tty == UINT32_C(0x00001003)
         && endpoints.ramfs == UINT32_C(0x00001004)
         && endpoints.self == UINT32_C(0x00001005)
@@ -1209,6 +1255,8 @@ static bool test_configuration_is_exact(void)
             &selected_application
         )
         && endpoints.launcher == UINT32_C(0x00001000)
+        && endpoints.vm == UINT32_C(0x00001001)
+        && endpoints.pm == UINT32_C(0x00001002)
         && endpoints.tty == UINT32_C(0x00001003)
         && endpoints.ramfs == UINT32_C(0x00001004)
         && endpoints.self == UINT32_C(0x00001005)
@@ -1411,6 +1459,174 @@ static bool service_dispatches_test_drain_only_for_application(void)
     return true;
 }
 
+static bool service_dispatches_pm_control(void)
+{
+    uint8_t spawn_request[MICROS_SPAWN_REQUEST_SIZE_MAX];
+    uint8_t executable[MICROS_VFS_TRANSFER_MAX + 1];
+    struct micros_ipc_message message;
+    struct micros_vfs_service_reply_action action;
+    micros_grant_t grant;
+    size_t request_size;
+    size_t index;
+    uint64_t image_token;
+
+    EXPECT_TRUE(initialize_service_fixture());
+    for (index = 0; index < sizeof(executable); ++index) {
+        executable[index] = (uint8_t)(index * 29 + 7);
+    }
+    EXPECT_TRUE(
+        vfs_test_fixture_add_root_file_with_mode(
+            &fixture,
+            "child",
+            MICROS_RAMFS_MODE_REGULAR | UINT32_C(0755),
+            executable,
+            sizeof(executable)
+        )
+    );
+    request_size = build_control_spawn_request(
+        spawn_request,
+        "/child"
+    );
+    grant = vfs_test_fixture_add_application_grant(
+        &fixture,
+        pm_endpoint,
+        MICROS_GRANT_PERMISSION_READ,
+        spawn_request,
+        request_size
+    );
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_IMAGE
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x501));
+    write_u64_le(
+        &message.payload[16],
+        UINT64_C(0x0000000500000007)
+    );
+    write_u32_le(&message.payload[24], application_endpoint);
+    write_u32_le(&message.payload[32], grant);
+    write_u32_le(
+        &message.payload[36],
+        (uint32_t)request_size
+    );
+    EXPECT_TRUE(
+        grant != MICROS_GRANT_NONE
+        && micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && action.reply_token == UINT64_C(0x66)
+        && action.message.type
+            == MICROS_VFS_MESSAGE_PM_CONTROL_RESULT
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_CONTROL_PREPARE_IMAGE
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_OK
+        && read_u64_le(&action.message.payload[16]) != 0
+        && read_u32_le(&action.message.payload[24]) != 0
+        && read_u32_le(&action.message.payload[28])
+            == sizeof(executable)
+        && read_u32_le(&action.message.payload[32]) != 0
+        && read_u32_le(&action.message.payload[36])
+            == request_size
+    );
+    image_token = read_u64_le(&action.message.payload[16]);
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x501));
+    write_u64_le(&message.payload[16], image_token);
+    write_u64_le(
+        &message.payload[24],
+        UINT64_C(0x0000000500000007)
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_STATE
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_RELEASE_IMAGE
+    );
+    write_u64_le(&message.payload[8], UINT64_C(0x501));
+    write_u64_le(&message.payload[16], image_token);
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_u32_le(&action.message.payload[4])
+            == MICROS_VFS_CONTROL_RELEASE_IMAGE
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_OK
+        && state.spawn.phase == MICROS_VFS_SPAWN_IDLE
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_RELEASE_IMAGE
+    );
+    message.source = application_endpoint;
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_CALLER
+    );
+
+    message = pm_control_message(
+        MICROS_VFS_CONTROL_PREPARE_IMAGE
+    );
+    message.payload[28] = 1;
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_MALFORMED
+    );
+
+    message = pm_control_message(
+        (enum micros_vfs_control_command)8
+    );
+    EXPECT_TRUE(
+        micros_vfs_service_handle_message(
+            &state,
+            &message,
+            &fixture.io,
+            &action
+        ) == MICROS_VFS_SERVICE_OK
+        && action.active
+        && read_u32_le(&action.message.payload[4]) == 8
+        && read_i32_le(&action.message.payload[8])
+            == MICROS_VFS_CONTROL_RESULT_MALFORMED
+    );
+    return true;
+}
+
 int main(void)
 {
     return (
@@ -1424,5 +1640,6 @@ int main(void)
         && test_configuration_is_exact()
         && service_dispatches_calls_and_notifications()
         && service_dispatches_test_drain_only_for_application()
+        && service_dispatches_pm_control()
     ) ? 0 : 1;
 }

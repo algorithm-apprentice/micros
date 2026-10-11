@@ -101,6 +101,10 @@ struct vfs_model {
 
 static const micros_endpoint_t vfs_endpoint =
     UINT32_C(0x00001006);
+static const micros_endpoint_t vm_endpoint =
+    UINT32_C(0x00001002);
+static const micros_endpoint_t pm_endpoint =
+    UINT32_C(0x00001003);
 static const micros_endpoint_t ramfs_endpoint =
     UINT32_C(0x00001005);
 static const micros_endpoint_t tty_endpoint =
@@ -937,6 +941,8 @@ static bool initialize_model(struct vfs_model *selected)
     vfs_test_fixture_initialize(
         &selected->fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -944,6 +950,8 @@ static bool initialize_model(struct vfs_model *selected)
         micros_vfs_state_initialize(
             &selected->production,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) != MICROS_VFS_CORE_OK
@@ -2095,6 +2103,8 @@ static bool run_vnode_pressure(struct vfs_model *selected)
     vfs_test_fixture_initialize(
         &pressure_fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -2103,6 +2113,8 @@ static bool run_vnode_pressure(struct vfs_model *selected)
         micros_vfs_state_initialize(
             &pressure_state,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) == MICROS_VFS_CORE_OK
@@ -2227,6 +2239,8 @@ static bool run_process_pressure(struct vfs_model *selected)
     vfs_test_fixture_initialize(
         &pressure_fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -2235,6 +2249,8 @@ static bool run_process_pressure(struct vfs_model *selected)
         micros_vfs_state_initialize(
             &pressure_state,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) == MICROS_VFS_CORE_OK
@@ -2315,6 +2331,8 @@ static bool run_fatal_backend_case(struct vfs_model *selected)
     vfs_test_fixture_initialize(
         &fatal_fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -2323,6 +2341,8 @@ static bool run_fatal_backend_case(struct vfs_model *selected)
         micros_vfs_state_initialize(
             &fatal_state,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) == MICROS_VFS_CORE_OK

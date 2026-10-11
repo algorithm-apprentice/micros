@@ -172,7 +172,7 @@ so its implementation must split evidence as follows:
   descriptor, path, regular-I/O, directory, console, malformed, capacity,
   grant-failure, and backend-failure transitions while comparing complete
   production state with an independent reference after each operation;
-- host post-link and manifest tests cover the complete 64-page VFS service
+- host post-link and manifest tests cover the complete 80-page VFS service
   limit and retained aggregate 4,096-static-mapping limit; and
 - one QEMU component scenario uses the six real production services plus one
   isolated application probe. It proves one mount, trusted console descriptors,
