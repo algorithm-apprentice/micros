@@ -302,4 +302,29 @@ enum micros_vfs_core_error vfs_io_handle_getdents(
     struct micros_vfs_result_action *action
 );
 
+enum micros_vfs_core_error vfs_console_handle_read(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    size_t open_file_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_result *immediate_result
+);
+
+enum micros_vfs_core_error vfs_console_handle_write(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    size_t open_file_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_result *immediate_result
+);
+
+enum micros_vfs_core_error vfs_console_cleanup_pending_operation(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    const struct micros_vfs_io *io,
+    bool *debt
+);
+
 #endif
