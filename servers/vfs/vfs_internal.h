@@ -105,6 +105,32 @@ static inline uint64_t vfs_tty_request_id_successor(
     return request_id == UINT64_MAX ? 0 : request_id + 1;
 }
 
+static inline bool vfs_ramfs_response_fields_are_zero(
+    const struct micros_vfs_ramfs_response *response
+)
+{
+    return (
+        response->node == 0
+        && response->file_size == 0
+        && response->position == 0
+        && response->count == 0
+        && response->mode == 0
+    );
+}
+
+static inline void vfs_prepare_result(
+    const struct micros_vfs_request *request,
+    enum micros_vfs_result result,
+    struct micros_vfs_result_action *action
+)
+{
+    vfs_zero_bytes(action, sizeof(*action));
+    action->active = true;
+    action->reply_token = request->reply_token;
+    action->request_type = request->type;
+    action->result = result;
+}
+
 size_t vfs_descriptor_user_count(
     const struct micros_vfs_state *state,
     size_t open_file_slot
@@ -206,6 +232,74 @@ enum micros_vfs_core_error vfs_validate_application_range(
     const struct micros_vfs_io *io,
     uint32_t permission,
     enum micros_vfs_result *result
+);
+
+bool vfs_namespace_response_node_is_valid(
+    const struct micros_vfs_ramfs_response *response
+);
+
+enum micros_vfs_core_error vfs_namespace_integrate_vnode(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_ramfs_response *response,
+    size_t reserved_vnode_slot,
+    const struct micros_vfs_io *io,
+    size_t *vnode_slot
+);
+
+enum micros_vfs_core_error vfs_namespace_handle_open(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_namespace_handle_mkdir(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_namespace_handle_chdir(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_io_handle_close(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_io_handle_regular_read(
+    struct micros_vfs_state *state,
+    struct micros_vfs_open_file *open_file,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_io_handle_regular_write(
+    struct micros_vfs_state *state,
+    struct micros_vfs_open_file *open_file,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error vfs_io_handle_getdents(
+    struct micros_vfs_state *state,
+    struct micros_vfs_open_file *open_file,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
 );
 
 #endif
