@@ -1,5 +1,131 @@
 #include "servers/vfs/vfs_internal.h"
 
+static bool pending_cleanup_debt_exists(
+    const struct micros_vfs_state *state
+)
+{
+    return (
+        state->pending.state
+            == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
+        || state->pending.state
+            == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+        || state->pending.state
+            == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
+#endif
+    );
+}
+
+static bool spawn_names_process(
+    const struct micros_vfs_state *state,
+    micros_endpoint_t endpoint
+)
+{
+    return (
+        (
+            state->spawn.phase != MICROS_VFS_SPAWN_IDLE
+            && !state->spawn.trusted_init
+            && state->spawn.parent_endpoint == endpoint
+        )
+        || (
+            state->spawn.phase
+                == MICROS_VFS_SPAWN_HIDDEN_COMMITTED
+            && state->spawn.child_endpoint == endpoint
+        )
+    );
+}
+
+static enum micros_vfs_core_error release_process_descriptors(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_io *io
+)
+{
+    size_t descriptor;
+
+    for (
+        descriptor = 0;
+        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
+        ++descriptor
+    ) {
+        uint16_t reference = process->descriptors[descriptor];
+
+        if (reference == 0) {
+            continue;
+        }
+        process->descriptors[descriptor] = 0;
+        if (
+            vfs_release_open_file_reference(
+                state,
+                reference - 1,
+                io
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error
+release_process_directories(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_process_record *process,
+    const struct micros_vfs_io *io
+)
+{
+    if (
+        vfs_release_vnode_reference(
+            state,
+            process->working_directory_vnode - 1,
+            io
+        ) != MICROS_VFS_CORE_OK
+        || vfs_release_vnode_reference(
+            state,
+            process->root_vnode - 1,
+            io
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error release_process_owned_state(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    micros_endpoint_t endpoint,
+    const struct micros_vfs_io *io,
+    bool *debt
+)
+{
+    struct micros_vfs_process_record *process =
+        &state->processes[process_slot];
+
+    if (
+        vfs_console_cleanup_pending_operation(
+            state,
+            endpoint,
+            io,
+            debt
+        ) != MICROS_VFS_CORE_OK
+        || release_process_descriptors(
+            state,
+            process,
+            io
+        ) != MICROS_VFS_CORE_OK
+        || release_process_directories(
+            state,
+            process,
+            io
+        ) != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    vfs_zero_bytes(process, sizeof(*process));
+    return MICROS_VFS_CORE_OK;
+}
+
 enum micros_vfs_core_error vfs_process_attach_console(
     struct micros_vfs_state *state,
     micros_endpoint_t endpoint,
@@ -142,48 +268,24 @@ enum micros_vfs_core_error vfs_process_detach(
 )
 {
     size_t process_slot;
-    struct micros_vfs_process_record *process;
-    size_t descriptor;
-    size_t root_vnode;
-    size_t working_directory_vnode;
     bool debt;
 
     if (!vfs_find_process(state, endpoint, &process_slot)) {
         *result = MICROS_VFS_TRUSTED_NOT_FOUND;
         return MICROS_VFS_CORE_OK;
     }
-    if (
-        state->spawn.phase != MICROS_VFS_SPAWN_IDLE
-        && !state->spawn.trusted_init
-        && state->spawn.parent_endpoint == endpoint
-    ) {
+    if (spawn_names_process(state, endpoint)) {
+        *result = MICROS_VFS_TRUSTED_BUSY;
+        return MICROS_VFS_CORE_OK;
+    }
+    if (pending_cleanup_debt_exists(state)) {
         *result = MICROS_VFS_TRUSTED_BUSY;
         return MICROS_VFS_CORE_OK;
     }
     if (
-        state->spawn.phase
-            == MICROS_VFS_SPAWN_HIDDEN_COMMITTED
-        && state->spawn.child_endpoint == endpoint
-    ) {
-        *result = MICROS_VFS_TRUSTED_BUSY;
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        state->pending.state
-            == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
-        || state->pending.state
-            == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
-        || state->pending.state
-            == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
-#endif
-    ) {
-        *result = MICROS_VFS_TRUSTED_BUSY;
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        vfs_console_cleanup_pending_operation(
+        release_process_owned_state(
             state,
+            process_slot,
             endpoint,
             io,
             &debt
@@ -191,48 +293,105 @@ enum micros_vfs_core_error vfs_process_detach(
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    process = &state->processes[process_slot];
-    root_vnode = process->root_vnode - 1;
-    working_directory_vnode =
-        process->working_directory_vnode - 1;
-    for (
-        descriptor = 0;
-        descriptor < MICROS_VFS_DESCRIPTOR_CAPACITY;
-        ++descriptor
-    ) {
-        uint16_t reference = process->descriptors[descriptor];
-
-        if (reference == 0) {
-            continue;
-        }
-        process->descriptors[descriptor] = 0;
-        if (
-            vfs_release_open_file_reference(
-                state,
-                reference - 1,
-                io
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-    }
-    if (
-        vfs_release_vnode_reference(
-            state,
-            working_directory_vnode,
-            io
-        ) != MICROS_VFS_CORE_OK
-        || vfs_release_vnode_reference(
-            state,
-            root_vnode,
-            io
-        ) != MICROS_VFS_CORE_OK
-    ) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
-    vfs_zero_bytes(process, sizeof(*process));
     *result = debt
         ? MICROS_VFS_TRUSTED_PENDING
         : MICROS_VFS_TRUSTED_OK;
+    return MICROS_VFS_CORE_OK;
+}
+
+static bool exit_request_is_canonical(
+    const struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request
+)
+{
+    /* VFS validates token/PID shape; its cleanup identity is the endpoint. */
+    return (
+        request->version == MICROS_VFS_PROTOCOL_VERSION
+        && request->command == MICROS_VFS_CONTROL_EXIT_PROCESS
+        && request->source == state->pm_endpoint
+        && request->reply_token != 0
+        && request->lifecycle_token != 0
+        && request->image_token == 0
+        && request->descriptor_token == 0
+        && request->semantic_pid != 0
+        && request->parent_endpoint == 0
+        && request->request_grant == 0
+        && request->request_size == 0
+        && !request->trusted_init
+        && vfs_endpoint_is_canonical(request->child_endpoint)
+        && request->child_endpoint != state->self_endpoint
+        && request->child_endpoint != state->vm_endpoint
+        && request->child_endpoint != state->pm_endpoint
+        && request->child_endpoint != state->ramfs_endpoint
+        && request->child_endpoint != state->tty_endpoint
+        && state->phase == MICROS_VFS_PHASE_MOUNTED
+    );
+}
+
+static bool vfs_state_names_process(
+    const struct micros_vfs_state *state,
+    micros_endpoint_t endpoint
+)
+{
+    size_t process_slot;
+
+    return (
+        vfs_find_process(state, endpoint, &process_slot)
+        || state->pending.endpoint == endpoint
+        || state->spawn.parent_endpoint == endpoint
+        || state->spawn.child_endpoint == endpoint
+    );
+}
+
+enum micros_vfs_core_error vfs_process_exit(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+)
+{
+    size_t process_slot;
+    bool debt;
+
+    if (
+        !exit_request_is_canonical(state, request)
+        || state->spawn.phase != MICROS_VFS_SPAWN_IDLE
+        || !vfs_find_process(
+            state,
+            request->child_endpoint,
+            &process_slot
+        )
+    ) {
+        vfs_prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_STATE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (io == NULL || io->ramfs_call == NULL) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    if (
+        release_process_owned_state(
+            state,
+            process_slot,
+            request->child_endpoint,
+            io,
+            &debt
+        ) != MICROS_VFS_CORE_OK
+        || vfs_state_names_process(
+            state,
+            request->child_endpoint
+        )
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    (void)debt;
+    vfs_prepare_control_result(
+        request,
+        MICROS_VFS_CONTROL_RESULT_OK,
+        action
+    );
     return MICROS_VFS_CORE_OK;
 }

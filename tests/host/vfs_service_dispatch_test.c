@@ -275,8 +275,73 @@ static bool service_dispatches_pm_control(struct vfs_service_test_context *conte
             reject_invalid_pm_control_messages(context));
 }
 
+static bool service_process_exists(const struct micros_vfs_state *state,
+                                   micros_endpoint_t endpoint) {
+    size_t index;
+
+    for (index = 0; index < MICROS_VFS_PROCESS_CAPACITY; ++index) {
+        if (state->processes[index].state == MICROS_VFS_PROCESS_ACTIVE &&
+            state->processes[index].endpoint == endpoint) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool service_dispatches_exit_process(struct vfs_service_test_context *context) {
+    static struct micros_vfs_state snapshot;
+    struct pm_control_dispatch_scenario scenario = {0};
+    struct micros_ipc_message message;
+    struct micros_vfs_service_reply_action action;
+
+    EXPECT_TRUE(prepare_pm_control_image(context, &scenario) &&
+                prepare_pm_control_descriptors(context, &scenario));
+    message = vfs_service_test_pm_control_message(context, MICROS_VFS_CONTROL_COMMIT_HIDDEN);
+    vfs_service_test_write_u64_le(&message.payload[8], UINT64_C(0x501));
+    vfs_service_test_write_u64_le(&message.payload[16], scenario.image_token);
+    vfs_service_test_write_u64_le(&message.payload[24], scenario.descriptor_token);
+    vfs_service_test_write_u32_le(&message.payload[32], context->spawn_child_endpoint);
+    EXPECT_TRUE(micros_vfs_service_handle_message(&context->state, &message, &context->fixture.io,
+                                                  &action) == MICROS_VFS_SERVICE_OK &&
+                action.active &&
+                vfs_service_test_read_i32_le(&action.message.payload[8]) ==
+                    MICROS_VFS_CONTROL_RESULT_OK);
+    message = vfs_service_test_pm_control_message(context, MICROS_VFS_CONTROL_RELEASE_IMAGE);
+    vfs_service_test_write_u64_le(&message.payload[8], UINT64_C(0x501));
+    vfs_service_test_write_u64_le(&message.payload[16], scenario.image_token);
+    EXPECT_TRUE(micros_vfs_service_handle_message(&context->state, &message, &context->fixture.io,
+                                                  &action) == MICROS_VFS_SERVICE_OK &&
+                vfs_service_test_read_i32_le(&action.message.payload[8]) ==
+                    MICROS_VFS_CONTROL_RESULT_OK &&
+                service_process_exists(&context->state, context->spawn_child_endpoint));
+
+    message = vfs_service_test_pm_control_message(context, MICROS_VFS_CONTROL_EXIT_PROCESS);
+    vfs_service_test_write_u64_le(&message.payload[8], UINT64_C(0x601));
+    vfs_service_test_write_u32_le(&message.payload[16], context->spawn_child_endpoint);
+    vfs_service_test_write_u64_le(&message.payload[24], UINT64_C(0x0000000500000007));
+    EXPECT_TRUE(micros_vfs_service_handle_message(&context->state, &message, &context->fixture.io,
+                                                  &action) == MICROS_VFS_SERVICE_OK &&
+                action.active && action.reply_token == UINT64_C(0x66) &&
+                action.message.type == MICROS_VFS_MESSAGE_PM_CONTROL_RESULT &&
+                vfs_service_test_read_u32_le(&action.message.payload[4]) ==
+                    MICROS_VFS_CONTROL_EXIT_PROCESS &&
+                vfs_service_test_read_u64_le(&action.message.payload[8]) == 0 &&
+                vfs_service_test_read_u64_le(&action.message.payload[16]) == 0 &&
+                vfs_service_test_read_u64_le(&action.message.payload[24]) == 0 &&
+                vfs_service_test_read_u64_le(&action.message.payload[32]) == 0 &&
+                vfs_service_test_read_u64_le(&action.message.payload[40]) == 0 &&
+                !service_process_exists(&context->state, context->spawn_child_endpoint));
+    snapshot = context->state;
+    EXPECT_TRUE(micros_vfs_service_handle_message(&context->state, &message, &context->fixture.io,
+                                                  &action) == MICROS_VFS_SERVICE_OK &&
+                vfs_service_test_read_i32_le(&action.message.payload[8]) ==
+                    MICROS_VFS_CONTROL_RESULT_STATE &&
+                memcmp(&context->state, &snapshot, sizeof(snapshot)) == 0);
+    return true;
+}
+
 bool vfs_service_dispatch_run(struct vfs_service_test_context *context) {
     return (service_dispatches_calls_and_notifications(context) &&
             service_dispatches_test_drain_only_for_application(context) &&
-            service_dispatches_pm_control(context));
+            service_dispatches_pm_control(context) && service_dispatches_exit_process(context));
 }

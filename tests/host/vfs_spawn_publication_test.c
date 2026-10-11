@@ -26,6 +26,42 @@ struct public_hidden_case {
     uint64_t descriptor_token;
 };
 
+static struct micros_vfs_control_request publication_exit_request(
+    const struct vfs_spawn_test_context *context,
+    micros_endpoint_t endpoint
+)
+{
+    return (struct micros_vfs_control_request){
+        .version = MICROS_VFS_PROTOCOL_VERSION,
+        .command = MICROS_VFS_CONTROL_EXIT_PROCESS,
+        .source = context->pm_endpoint,
+        .reply_token = UINT64_C(0x76),
+        .lifecycle_token = UINT64_C(0x601),
+        .semantic_pid = UINT64_C(0x0000000100000007),
+        .child_endpoint = endpoint,
+    };
+}
+
+static bool publication_exit_action_is_exact(
+    const struct micros_vfs_control_result_action *action,
+    const struct micros_vfs_control_request *request,
+    enum micros_vfs_control_result result
+)
+{
+    return (
+        action->active
+        && action->reply_token == request->reply_token
+        && action->command == MICROS_VFS_CONTROL_EXIT_PROCESS
+        && action->result == result
+        && action->image_token == 0
+        && action->executable_grant == 0
+        && action->executable_size == 0
+        && action->request_grant == 0
+        && action->request_size == 0
+        && action->descriptor_token == 0
+    );
+}
+
 static bool prepare_public_hidden_case(struct vfs_spawn_test_context *context,
                                        struct public_hidden_case *selected) {
     static const struct micros_spawn_descriptor_action actions[] = {
@@ -138,6 +174,11 @@ static bool hidden_commit_is_exact(struct vfs_spawn_test_context *context,
 static bool hidden_process_is_immutable(struct vfs_spawn_test_context *context,
                                         const struct public_hidden_case *selected) {
     struct micros_vfs_control_request wrong_revert = selected->revert;
+    struct micros_vfs_control_request exit =
+        publication_exit_request(
+            context,
+            selected->commit.child_endpoint
+        );
     struct micros_vfs_control_result_action action;
     enum micros_vfs_trusted_result trusted_result;
 
@@ -149,6 +190,11 @@ static bool hidden_process_is_immutable(struct vfs_spawn_test_context *context,
     EXPECT_TRUE(micros_vfs_handle_control(&context->state, &selected->abort, &context->fixture.io,
                                           &action) == MICROS_VFS_CORE_OK &&
                 action.result == MICROS_VFS_CONTROL_RESULT_STATE &&
+                memcmp(&context->state, &context->snapshot, sizeof(context->state)) == 0);
+    EXPECT_TRUE(micros_vfs_handle_control(&context->state, &exit, &context->fixture.io,
+                                          &action) == MICROS_VFS_CORE_OK &&
+                publication_exit_action_is_exact(
+                    &action, &exit, MICROS_VFS_CONTROL_RESULT_STATE) &&
                 memcmp(&context->state, &context->snapshot, sizeof(context->state)) == 0);
     EXPECT_TRUE(micros_vfs_detach(&context->state, selected->commit.child_endpoint,
                                   &context->fixture.io, &trusted_result) == MICROS_VFS_CORE_OK &&
@@ -209,7 +255,11 @@ static bool hidden_revert_is_exact(struct vfs_spawn_test_context *context,
 static bool hidden_release_retains_child(struct vfs_spawn_test_context *context,
                                          const struct public_hidden_case *selected) {
     struct micros_vfs_control_result_action action;
-    enum micros_vfs_trusted_result trusted_result;
+    struct micros_vfs_control_request exit =
+        publication_exit_request(
+            context,
+            selected->commit.child_endpoint
+        );
 
     EXPECT_TRUE(micros_vfs_handle_control(&context->state, &selected->commit, &context->fixture.io,
                                           &action) == MICROS_VFS_CORE_OK &&
@@ -224,9 +274,10 @@ static bool hidden_release_retains_child(struct vfs_spawn_test_context *context,
                 context->state.last_descriptor_token == selected->descriptor_token &&
                 context->fixture.backend_grant_count == 0 &&
                 micros_vfs_state_validate(&context->state) == MICROS_VFS_CORE_OK);
-    EXPECT_TRUE(micros_vfs_detach(&context->state, selected->commit.child_endpoint,
-                                  &context->fixture.io, &trusted_result) == MICROS_VFS_CORE_OK &&
-                trusted_result == MICROS_VFS_TRUSTED_OK &&
+    EXPECT_TRUE(micros_vfs_handle_control(&context->state, &exit, &context->fixture.io, &action) ==
+                    MICROS_VFS_CORE_OK &&
+                publication_exit_action_is_exact(
+                    &action, &exit, MICROS_VFS_CONTROL_RESULT_OK) &&
                 vfs_spawn_test_active_process_count(context) == 1 &&
                 context->state.vnodes[0].local_reference_count == selected->root_references &&
                 context->state.open_files[selected->parent_read - 1].reference_count == 1 &&
@@ -252,8 +303,8 @@ bool vfs_spawn_publication_trusted_init_release_run(struct vfs_spawn_test_contex
     struct micros_vfs_control_request descriptors;
     struct micros_vfs_control_request commit;
     struct micros_vfs_control_request release;
+    struct micros_vfs_control_request exit;
     struct micros_vfs_control_result_action action;
-    enum micros_vfs_trusted_result trusted_result;
     uint16_t process_reference;
     uint32_t root_references;
     uint64_t descriptor_token;
@@ -283,6 +334,7 @@ bool vfs_spawn_publication_trusted_init_release_run(struct vfs_spawn_test_contex
     commit =
         vfs_spawn_test_hidden_request(context, MICROS_VFS_CONTROL_COMMIT_HIDDEN, UINT64_C(0x118),
                                       release.image_token, descriptor_token, child_endpoint);
+    exit = publication_exit_request(context, child_endpoint);
     EXPECT_TRUE(
         micros_vfs_handle_control(&context->state, &commit, &context->fixture.io, &action) ==
             MICROS_VFS_CORE_OK &&
@@ -302,9 +354,17 @@ bool vfs_spawn_publication_trusted_init_release_run(struct vfs_spawn_test_contex
                 context->state.last_descriptor_token == descriptor_token &&
                 micros_vfs_state_validate(&context->state) == MICROS_VFS_CORE_OK);
     EXPECT_TRUE(
-        micros_vfs_detach(&context->state, child_endpoint, &context->fixture.io, &trusted_result) ==
-            MICROS_VFS_CORE_OK &&
-        trusted_result == MICROS_VFS_TRUSTED_OK &&
+        micros_vfs_handle_control(
+            &context->state,
+            &exit,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK &&
+        publication_exit_action_is_exact(
+            &action,
+            &exit,
+            MICROS_VFS_CONTROL_RESULT_OK
+        ) &&
         context->state.vnodes[0].local_reference_count == root_references &&
         vfs_spawn_test_active_console_open_file_count(context, MICROS_VFS_ACCESS_READ) == 1 &&
         vfs_spawn_test_active_console_open_file_count(context, MICROS_VFS_ACCESS_WRITE) == 2 &&

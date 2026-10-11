@@ -545,6 +545,298 @@ static bool detach_during_writable_wait_is_exact(
     return true;
 }
 
+static bool exit_before_read_completion_is_exact(
+    struct vfs_core_test_context *context
+)
+{
+    struct micros_vfs_request selected;
+    struct micros_vfs_result_action action;
+    struct micros_vfs_control_request exit;
+    struct micros_vfs_control_result_action control_action;
+    micros_grant_t destination;
+
+    EXPECT_TRUE(vfs_core_test_initialize_full(context));
+    destination = vfs_test_fixture_add_application_grant(
+        &context->fixture,
+        context->application_endpoint,
+        MICROS_GRANT_PERMISSION_WRITE,
+        NULL,
+        8
+    );
+    selected = vfs_core_test_request(
+        context,
+        MICROS_VFS_MESSAGE_READ
+    );
+    selected.descriptor = 0;
+    selected.grant = destination;
+    selected.count = 8;
+    exit = vfs_core_test_exit_request(
+        context,
+        context->application_endpoint
+    );
+    EXPECT_TRUE(
+        destination != MICROS_GRANT_NONE
+        && micros_vfs_handle_request(
+            &context->state,
+            &selected,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && !action.active
+        && micros_vfs_handle_control(
+            &context->state,
+            &exit,
+            &context->fixture.io,
+            &control_action
+        ) == MICROS_VFS_CORE_OK
+        && vfs_core_test_control_action_is_exact(
+            &control_action,
+            &exit,
+            MICROS_VFS_CONTROL_RESULT_OK
+        )
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_NONE
+        && context->fixture.backend_grant_count == 0
+        && !vfs_core_test_state_names_endpoint(
+            &context->state,
+            context->application_endpoint
+        )
+    );
+    return true;
+}
+
+static bool exit_after_read_completion_is_exact(
+    struct vfs_core_test_context *context
+)
+{
+    struct micros_vfs_request selected;
+    struct micros_vfs_result_action action;
+    struct micros_vfs_control_request exit;
+    struct micros_vfs_control_result_action control_action;
+    micros_grant_t destination;
+
+    EXPECT_TRUE(vfs_core_test_initialize_full(context));
+    destination = vfs_test_fixture_add_application_grant(
+        &context->fixture,
+        context->application_endpoint,
+        MICROS_GRANT_PERMISSION_WRITE,
+        NULL,
+        8
+    );
+    selected = vfs_core_test_request(
+        context,
+        MICROS_VFS_MESSAGE_READ
+    );
+    selected.descriptor = 0;
+    selected.grant = destination;
+    selected.count = 8;
+    exit = vfs_core_test_exit_request(
+        context,
+        context->application_endpoint
+    );
+    EXPECT_TRUE(
+        destination != MICROS_GRANT_NONE
+        && micros_vfs_handle_request(
+            &context->state,
+            &selected,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && vfs_test_fixture_complete_read(
+            &context->fixture,
+            input,
+            sizeof(input) - 1
+        )
+        && micros_vfs_handle_control(
+            &context->state,
+            &exit,
+            &context->fixture.io,
+            &control_action
+        ) == MICROS_VFS_CORE_OK
+        && vfs_core_test_control_action_is_exact(
+            &control_action,
+            &exit,
+            MICROS_VFS_CONTROL_RESULT_OK
+        )
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
+        && context->state.pending.endpoint == 0
+        && context->fixture.backend_grant_count == 0
+        && !vfs_core_test_state_names_endpoint(
+            &context->state,
+            context->application_endpoint
+        )
+        && micros_vfs_handle_tty_notification(
+            &context->state,
+            MICROS_TTY_EVENT_COMPLETION,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && !action.active
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_NONE
+    );
+    return true;
+}
+
+static bool exit_during_write_completion_is_exact(
+    struct vfs_core_test_context *context
+)
+{
+    struct micros_vfs_request selected;
+    struct micros_vfs_result_action action;
+    struct micros_vfs_control_request exit;
+    struct micros_vfs_control_result_action control_action;
+    micros_grant_t source;
+
+    EXPECT_TRUE(vfs_core_test_initialize_full(context));
+    source = vfs_test_fixture_add_application_grant(
+        &context->fixture,
+        context->application_endpoint,
+        MICROS_GRANT_PERMISSION_READ,
+        output,
+        sizeof(output) - 1
+    );
+    selected = vfs_core_test_request(
+        context,
+        MICROS_VFS_MESSAGE_WRITE
+    );
+    selected.descriptor = 1;
+    selected.grant = source;
+    selected.count = sizeof(output) - 1;
+    exit = vfs_core_test_exit_request(
+        context,
+        context->application_endpoint
+    );
+    EXPECT_TRUE(
+        source != MICROS_GRANT_NONE
+        && micros_vfs_handle_request(
+            &context->state,
+            &selected,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION
+        && micros_vfs_handle_control(
+            &context->state,
+            &exit,
+            &context->fixture.io,
+            &control_action
+        ) == MICROS_VFS_CORE_OK
+        && vfs_core_test_control_action_is_exact(
+            &control_action,
+            &exit,
+            MICROS_VFS_CONTROL_RESULT_OK
+        )
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
+        && context->state.pending.endpoint == 0
+        && !vfs_core_test_state_names_endpoint(
+            &context->state,
+            context->application_endpoint
+        )
+        && micros_vfs_handle_tty_notification(
+            &context->state,
+            MICROS_TTY_EVENT_COMPLETION,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && !action.active
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_NONE
+    );
+    return true;
+}
+
+static bool exit_during_writable_wait_is_exact(
+    struct vfs_core_test_context *context
+)
+{
+    struct micros_vfs_request selected;
+    struct micros_vfs_result_action action;
+    struct micros_vfs_control_request exit;
+    struct micros_vfs_control_result_action control_action;
+    micros_grant_t source;
+
+    EXPECT_TRUE(vfs_core_test_initialize_full(context));
+    context->fixture.tty_output_busy = true;
+    source = vfs_test_fixture_add_application_grant(
+        &context->fixture,
+        context->application_endpoint,
+        MICROS_GRANT_PERMISSION_READ,
+        output,
+        sizeof(output) - 1
+    );
+    selected = vfs_core_test_request(
+        context,
+        MICROS_VFS_MESSAGE_WRITE
+    );
+    selected.descriptor = 1;
+    selected.grant = source;
+    selected.count = sizeof(output) - 1;
+    exit = vfs_core_test_exit_request(
+        context,
+        context->application_endpoint
+    );
+    EXPECT_TRUE(
+        source != MICROS_GRANT_NONE
+        && micros_vfs_handle_request(
+            &context->state,
+            &selected,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE
+        && context->fixture.backend_grant_count == 1
+        && micros_vfs_handle_control(
+            &context->state,
+            &exit,
+            &context->fixture.io,
+            &control_action
+        ) == MICROS_VFS_CORE_OK
+        && vfs_core_test_control_action_is_exact(
+            &control_action,
+            &exit,
+            MICROS_VFS_CONTROL_RESULT_OK
+        )
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
+        && context->state.pending.endpoint == 0
+        && context->fixture.backend_grant_count == 0
+        && !vfs_core_test_state_names_endpoint(
+            &context->state,
+            context->application_endpoint
+        )
+    );
+    context->fixture.tty_output_busy = false;
+    EXPECT_TRUE(
+        micros_vfs_handle_tty_notification(
+            &context->state,
+            MICROS_TTY_EVENT_WRITABLE,
+            &context->fixture.io,
+            &action
+        ) == MICROS_VFS_CORE_OK
+        && !action.active
+        && context->state.pending.state
+            == MICROS_VFS_PENDING_NONE
+    );
+    return true;
+}
+
+bool vfs_core_console_exit_cleanup_run(
+    struct vfs_core_test_context *context
+)
+{
+    return (
+        exit_before_read_completion_is_exact(context)
+        && exit_after_read_completion_is_exact(context)
+        && exit_during_write_completion_is_exact(context)
+        && exit_during_writable_wait_is_exact(context)
+    );
+}
+
 static bool grant_and_request_id_failures_are_exact(
     struct vfs_core_test_context *context
 )

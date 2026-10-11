@@ -163,6 +163,69 @@ struct micros_vfs_request vfs_core_test_path_request(
     return selected;
 }
 
+struct micros_vfs_control_request vfs_core_test_exit_request(
+    const struct vfs_core_test_context *context,
+    micros_endpoint_t endpoint
+)
+{
+    return (struct micros_vfs_control_request){
+        .version = MICROS_VFS_PROTOCOL_VERSION,
+        .command = MICROS_VFS_CONTROL_EXIT_PROCESS,
+        .source = context->fixture.pm_endpoint,
+        .reply_token = UINT64_C(0x76),
+        .lifecycle_token = UINT64_C(0x601),
+        .semantic_pid = UINT64_C(0x0000000100000007),
+        .child_endpoint = endpoint,
+    };
+}
+
+bool vfs_core_test_control_action_is_exact(
+    const struct micros_vfs_control_result_action *action,
+    const struct micros_vfs_control_request *request,
+    enum micros_vfs_control_result result
+)
+{
+    return (
+        action->active
+        && action->reply_token == request->reply_token
+        && action->command == MICROS_VFS_CONTROL_EXIT_PROCESS
+        && action->result == result
+        && action->image_token == 0
+        && action->executable_grant == 0
+        && action->executable_size == 0
+        && action->request_grant == 0
+        && action->request_size == 0
+        && action->descriptor_token == 0
+    );
+}
+
+bool vfs_core_test_state_names_endpoint(
+    const struct micros_vfs_state *state,
+    micros_endpoint_t endpoint
+)
+{
+    size_t process_slot;
+
+    for (
+        process_slot = 0;
+        process_slot < MICROS_VFS_PROCESS_CAPACITY;
+        ++process_slot
+    ) {
+        if (
+            state->processes[process_slot].state
+                == MICROS_VFS_PROCESS_ACTIVE
+            && state->processes[process_slot].endpoint == endpoint
+        ) {
+            return true;
+        }
+    }
+    return (
+        state->pending.endpoint == endpoint
+        || state->spawn.parent_endpoint == endpoint
+        || state->spawn.child_endpoint == endpoint
+    );
+}
+
 uint32_t vfs_core_test_read_u32_le(const uint8_t *bytes)
 {
     return (
