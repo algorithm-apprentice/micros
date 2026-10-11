@@ -17,6 +17,9 @@ bool vfs_core_process_attach_share_detach_run(
 bool vfs_core_process_trusted_result_validation_run(
     struct vfs_core_test_context *context
 );
+bool vfs_core_process_exit_run(
+    struct vfs_core_test_context *context
+);
 bool vfs_core_state_corruption_run(
     struct vfs_core_test_context *context
 );
@@ -48,6 +51,9 @@ bool vfs_core_directory_translation_run(
     struct vfs_core_test_context *context
 );
 bool vfs_core_console_async_cleanup_run(
+    struct vfs_core_test_context *context
+);
+bool vfs_core_console_exit_cleanup_run(
     struct vfs_core_test_context *context
 );
 bool vfs_core_io_backend_reference_cleanup_run(

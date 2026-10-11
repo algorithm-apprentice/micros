@@ -54,6 +54,22 @@ struct micros_vfs_request vfs_core_test_path_request(
     uint32_t mode
 );
 
+struct micros_vfs_control_request vfs_core_test_exit_request(
+    const struct vfs_core_test_context *context,
+    micros_endpoint_t endpoint
+);
+
+bool vfs_core_test_control_action_is_exact(
+    const struct micros_vfs_control_result_action *action,
+    const struct micros_vfs_control_request *request,
+    enum micros_vfs_control_result result
+);
+
+bool vfs_core_test_state_names_endpoint(
+    const struct micros_vfs_state *state,
+    micros_endpoint_t endpoint
+);
+
 uint32_t vfs_core_test_read_u32_le(const uint8_t *bytes);
 
 #endif

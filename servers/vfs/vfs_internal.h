@@ -296,6 +296,13 @@ enum micros_vfs_core_error vfs_process_detach(
     enum micros_vfs_trusted_result *result
 );
 
+enum micros_vfs_core_error vfs_process_exit(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+);
+
 enum micros_vfs_core_error vfs_spawn_prepare_image(
     struct micros_vfs_state *state,
     const struct micros_vfs_control_request *request,

@@ -13,6 +13,7 @@ int main(void)
         && vfs_core_process_trusted_result_validation_run(
             &context
         )
+        && vfs_core_process_exit_run(&context)
         && vfs_core_state_corruption_run(&context)
         && vfs_core_io_open_read_close_run(&context)
         && vfs_core_namespace_path_grant_precedence_run(
@@ -26,6 +27,7 @@ int main(void)
         && vfs_core_namespace_mutation_finish(&context)
         && vfs_core_directory_translation_run(&context)
         && vfs_core_console_async_cleanup_run(&context)
+        && vfs_core_console_exit_cleanup_run(&context)
         && vfs_core_io_backend_reference_cleanup_run(&context)
         && vfs_core_console_test_drain_run(&context)
         && micros_vfs_spawn_test_run()

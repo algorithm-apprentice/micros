@@ -317,6 +317,15 @@ enum micros_vfs_core_error micros_vfs_handle_control(
             request,
             action
         );
+    } else if (
+        request->command == MICROS_VFS_CONTROL_EXIT_PROCESS
+    ) {
+        error = vfs_process_exit(
+            state,
+            request,
+            io,
+            action
+        );
     } else {
         vfs_prepare_control_result(
             request,
