@@ -150,7 +150,7 @@ INITIAL_MIGRATION_ALLOWLIST = (
     ("tools/generate_vfs_service_fixture.py", "render_fixture"),
 )
 
-MIGRATION_ALLOWLIST = INITIAL_MIGRATION_ALLOWLIST[22:]
+MIGRATION_ALLOWLIST = ()
 
 
 def cmake_command(text: str, command: str, first_argument: str) -> str:

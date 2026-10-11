@@ -308,6 +308,79 @@ RAMFS_RETAINED_GATE_WORKFLOWS = (
     "test-qemu-tty",
 )
 
+VFS_SHARED_FIXTURE_INPUTS = (
+    "tests/host/vfs_test_fixture.c",
+    "tests/host/vfs_test_fixture.h",
+    "tests/host/vfs_test_fixture_grant.c",
+    "tests/host/vfs_test_fixture_internal.h",
+    "tests/host/vfs_test_fixture_ramfs.c",
+    "tests/host/vfs_test_fixture_tty.c",
+)
+
+VFS_CORE_TEST_INPUTS = (
+    "tests/host/vfs_test.c",
+    "tests/host/vfs_test_suites.h",
+    "tests/host/vfs_core_test_fixture.c",
+    "tests/host/vfs_core_test_fixture.h",
+    "tests/host/vfs_core_state_test.c",
+    "tests/host/vfs_core_process_test.c",
+    "tests/host/vfs_core_namespace_test.c",
+    "tests/host/vfs_core_io_test.c",
+    "tests/host/vfs_core_directory_test.c",
+    "tests/host/vfs_core_console_test.c",
+)
+
+VFS_SPAWN_TEST_INPUTS = (
+    "tests/host/vfs_spawn_test.c",
+    "tests/host/vfs_spawn_test_fixture.c",
+    "tests/host/vfs_spawn_test_fixture.h",
+    "tests/host/vfs_spawn_image_test.c",
+    "tests/host/vfs_spawn_descriptor_test.c",
+    "tests/host/vfs_spawn_publication_test.c",
+)
+
+VFS_SERVICE_TEST_INPUTS = (
+    "tests/host/vfs_service_test.c",
+    "tests/host/vfs_service_test_fixture.c",
+    "tests/host/vfs_service_test_fixture.h",
+    "tests/host/vfs_service_test_suites.h",
+    "tests/host/vfs_service_application_protocol_test.c",
+    "tests/host/vfs_service_backend_protocol_test.c",
+    "tests/host/vfs_service_pm_control_protocol_test.c",
+    "tests/host/vfs_service_configuration_test.c",
+    "tests/host/vfs_service_dispatch_test.c",
+)
+
+VFS_MODEL_TEST_INPUTS = (
+    "tests/host/vfs_model_test.c",
+    "tests/host/vfs_model_internal.h",
+    "tests/host/vfs_model_context.c",
+    "tests/host/vfs_model_reference.c",
+    "tests/host/vfs_model_compare.c",
+    "tests/host/vfs_model_process_operations.c",
+    "tests/host/vfs_model_file_operations.c",
+    "tests/host/vfs_model_console_operations.c",
+    "tests/host/vfs_model_pressure.c",
+    "tests/host/vfs_model_trace.c",
+)
+
+VFS_PROBE_INPUTS = (
+    "tests/qemu/vfs_service_probe.c",
+    "tests/qemu/vfs_service_probe_internal.h",
+    "tests/qemu/vfs_service_probe_client.c",
+    "tests/qemu/vfs_service_probe_filesystem.c",
+    "tests/qemu/vfs_service_probe_console.c",
+)
+
+VFS_QEMU_TEST_INPUTS = (
+    VFS_SHARED_FIXTURE_INPUTS
+    + VFS_CORE_TEST_INPUTS
+    + VFS_SPAWN_TEST_INPUTS
+    + VFS_SERVICE_TEST_INPUTS
+    + VFS_MODEL_TEST_INPUTS
+    + VFS_PROBE_INPUTS
+)
+
 GATE_INPUTS = {
     "test-qemu-smoke": (
         "kernel/fdt.c",
@@ -658,19 +731,13 @@ GATE_INPUTS["test-qemu-ramfs"] = GATE_INPUTS[
 )
 GATE_INPUTS["test-qemu-vfs"] = GATE_INPUTS[
     "test-qemu-ramfs"
-] + (
+] + VFS_QEMU_TEST_INPUTS + (
     "include/micros/vfs.h",
     "kernel/vfs_service_test.c",
     "kernel/vfs_service_test.h",
     "kernel/vfs_service_test_fixture.h",
     "servers/vfs/",
     "tests/host/test_generate_vfs_service_fixture.py",
-    "tests/host/vfs_model_test.c",
-    "tests/host/vfs_service_test.c",
-    "tests/host/vfs_test.c",
-    "tests/host/vfs_test_fixture.c",
-    "tests/host/vfs_test_fixture.h",
-    "tests/qemu/vfs_service_probe.c",
     "tests/qemu/vfs_service_protocol.h",
     "tests/qemu/vfs_service_report.S",
     "tools/generate_vfs_service_fixture.py",
@@ -758,11 +825,7 @@ SLOW_MODEL_INPUTS = {
         "include/micros/tty.h",
         "include/micros/vfs.h",
         "servers/vfs/",
-        "tests/host/vfs_model_test.c",
-        "tests/host/vfs_test.c",
-        "tests/host/vfs_test_fixture.c",
-        "tests/host/vfs_test_fixture.h",
-    ),
+    ) + VFS_SHARED_FIXTURE_INPUTS + VFS_MODEL_TEST_INPUTS,
 }
 
 SLOW_MODEL_CTESTS = {

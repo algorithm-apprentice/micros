@@ -4,6 +4,68 @@ from unittest import mock
 from tools import validation_plan
 
 
+VFS_SHARED_FIXTURE_PATHS = (
+    "tests/host/vfs_test_fixture.c",
+    "tests/host/vfs_test_fixture.h",
+    "tests/host/vfs_test_fixture_grant.c",
+    "tests/host/vfs_test_fixture_internal.h",
+    "tests/host/vfs_test_fixture_ramfs.c",
+    "tests/host/vfs_test_fixture_tty.c",
+)
+
+VFS_MODEL_PATHS = (
+    "tests/host/vfs_model_test.c",
+    "tests/host/vfs_model_internal.h",
+    "tests/host/vfs_model_context.c",
+    "tests/host/vfs_model_reference.c",
+    "tests/host/vfs_model_compare.c",
+    "tests/host/vfs_model_process_operations.c",
+    "tests/host/vfs_model_file_operations.c",
+    "tests/host/vfs_model_console_operations.c",
+    "tests/host/vfs_model_pressure.c",
+    "tests/host/vfs_model_trace.c",
+)
+
+VFS_QEMU_TEST_PATHS = (
+    VFS_SHARED_FIXTURE_PATHS
+    + (
+        "tests/host/vfs_test.c",
+        "tests/host/vfs_test_suites.h",
+        "tests/host/vfs_core_test_fixture.c",
+        "tests/host/vfs_core_test_fixture.h",
+        "tests/host/vfs_core_state_test.c",
+        "tests/host/vfs_core_process_test.c",
+        "tests/host/vfs_core_namespace_test.c",
+        "tests/host/vfs_core_io_test.c",
+        "tests/host/vfs_core_directory_test.c",
+        "tests/host/vfs_core_console_test.c",
+        "tests/host/vfs_spawn_test.c",
+        "tests/host/vfs_spawn_test_fixture.c",
+        "tests/host/vfs_spawn_test_fixture.h",
+        "tests/host/vfs_spawn_image_test.c",
+        "tests/host/vfs_spawn_descriptor_test.c",
+        "tests/host/vfs_spawn_publication_test.c",
+        "tests/host/vfs_service_test.c",
+        "tests/host/vfs_service_test_fixture.c",
+        "tests/host/vfs_service_test_fixture.h",
+        "tests/host/vfs_service_test_suites.h",
+        "tests/host/vfs_service_application_protocol_test.c",
+        "tests/host/vfs_service_backend_protocol_test.c",
+        "tests/host/vfs_service_pm_control_protocol_test.c",
+        "tests/host/vfs_service_configuration_test.c",
+        "tests/host/vfs_service_dispatch_test.c",
+    )
+    + VFS_MODEL_PATHS
+    + (
+        "tests/qemu/vfs_service_probe.c",
+        "tests/qemu/vfs_service_probe_internal.h",
+        "tests/qemu/vfs_service_probe_client.c",
+        "tests/qemu/vfs_service_probe_filesystem.c",
+        "tests/qemu/vfs_service_probe_console.c",
+    )
+)
+
+
 class ValidationPlanTests(unittest.TestCase):
     def assert_workflow_selected(self, path, expected):
         commands = validation_plan.plan([path], "pr")
@@ -270,7 +332,7 @@ class ValidationPlanTests(unittest.TestCase):
         )
 
     def test_vfs_production_and_fixture_paths_own_qemu_gate(self):
-        for path in (
+        for path in VFS_QEMU_TEST_PATHS + (
             "include/micros/vfs.h",
             "kernel/vfs_service_test.c",
             "kernel/vfs_service_test.h",
@@ -279,11 +341,6 @@ class ValidationPlanTests(unittest.TestCase):
             "servers/vfs/vfs_service.c",
             "servers/vfs/vfs_service_core.c",
             "tests/host/test_generate_vfs_service_fixture.py",
-            "tests/host/vfs_model_test.c",
-            "tests/host/vfs_service_test.c",
-            "tests/host/vfs_test.c",
-            "tests/host/vfs_test_fixture.c",
-            "tests/qemu/vfs_service_probe.c",
             "tests/qemu/vfs_service_protocol.h",
             "tests/qemu/vfs_service_report.S",
             "tools/generate_vfs_service_fixture.py",
@@ -292,6 +349,14 @@ class ValidationPlanTests(unittest.TestCase):
                 self.assert_workflow_selected(
                     path,
                     "test-qemu-vfs",
+                )
+
+    def test_vfs_fixture_and_model_paths_own_vfs_model(self):
+        for path in VFS_SHARED_FIXTURE_PATHS + VFS_MODEL_PATHS:
+            with self.subTest(path=path):
+                self.assertIn(
+                    "test-vfs-model",
+                    validation_plan.affected_slow_models([path]),
                 )
 
     def test_ramfs_startup_paths_select_retained_service_gates(self):
