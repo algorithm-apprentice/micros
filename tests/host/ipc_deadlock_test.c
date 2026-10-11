@@ -817,6 +817,65 @@ static bool test_reply_receive_uses_post_reply_graph(void)
     return true;
 }
 
+static bool test_source_only_dependency_is_traversed(void)
+{
+    struct micros_ipc_message request =
+        message_pattern(UINT32_C(0x7700), UINT8_C(0x80));
+    const struct micros_thread *queued_caller;
+    struct micros_thread *exiting;
+    uint64_t reply_token;
+
+    EXPECT_TRUE(
+        setup_fixture(4, 1)
+        && micros_ipc_receive(
+            &registry,
+            &objects,
+            primary_threads[1],
+            endpoints[2],
+            UINT64_C(0x55000000)
+        ) == MICROS_IPC_OK
+        && prepare_delivered_call(2, 3, &reply_token)
+        && reply_token == 1
+    );
+    exiting = &objects.threads[primary_threads[2].slot];
+    registry.endpoints[processes[2].slot].state =
+        MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    exiting->runtime_flags |= MICROS_THREAD_RTS_INACTIVE;
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_call(
+            &registry,
+            &objects,
+            primary_threads[0],
+            endpoints[1],
+            &request,
+            (uintptr_t)&request
+        )
+    );
+    queued_caller = &objects.threads[primary_threads[0].slot];
+    EXPECT_TRUE(
+        (
+            queued_caller->runtime_flags
+            & MICROS_THREAD_RTS_IPC_MASK
+        ) == (
+            MICROS_THREAD_RTS_IPC_SEND
+            | MICROS_THREAD_RTS_IPC_REPLY
+        )
+        && queued_caller->ipc_send_destination == endpoints[1]
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
 static bool test_projection_and_corruption_are_atomic(void)
 {
     struct micros_thread_handle extra_thread;
@@ -911,6 +970,10 @@ bool micros_ipc_deadlock_test_run(void)
         {
             "reply_receive post-reply graph",
             test_reply_receive_uses_post_reply_graph,
+        },
+        {
+            "source-only dependency traversal",
+            test_source_only_dependency_is_traversed,
         },
         {
             "projection and corruption atomicity",

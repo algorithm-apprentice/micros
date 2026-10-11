@@ -863,6 +863,140 @@ static bool test_cascading_close_discards_owned_dead_endpoint_result(void)
     return true;
 }
 
+static bool test_source_only_close_cancels_queued_sender(void)
+{
+    struct micros_ipc_message message =
+        message_pattern(UINT32_C(0x1751), UINT8_C(0x5c));
+
+    EXPECT_TRUE(
+        setup_fixture(2, 1)
+        && hold_thread_for_close(primary_threads[0])
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_send(
+            &registry,
+            &objects,
+            primary_threads[1],
+            endpoints[0],
+            &message
+        )
+    );
+    EXPECT_TRUE(
+        registry.endpoints[processes[0].slot].sender_head.slot
+            == primary_threads[1].slot
+        && registry.endpoints[processes[0].slot].sender_tail.slot
+            == primary_threads[1].slot
+    );
+    registry.endpoints[processes[0].slot].state =
+        MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    EXPECT_TRUE(
+        registry.endpoints[processes[0].slot].state
+            == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[0]
+        )
+    );
+    EXPECT_TRUE(
+        thread_has_dead_endpoint_result(primary_threads[1])
+        && registry.endpoints[processes[0].slot].state
+            == MICROS_ENDPOINT_STATE_FREE
+        && micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    return true;
+}
+
+static bool test_source_only_notification_dependency_blocks_strict_close(
+    void
+)
+{
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+    struct micros_endpoint_record *destination;
+    uint64_t source_bit;
+
+    EXPECT_TRUE(setup_fixture(2, 1));
+    destination =
+        &registry.endpoints[processes[1].slot];
+    source_bit = UINT64_C(1) << processes[0].slot;
+    destination->state = MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    destination->pending_notification_sources = source_bit;
+    destination->pending_events[processes[0].slot] =
+        UINT64_C(0x80);
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_endpoint_seal_source_only(
+            &registry,
+            &objects,
+            endpoints[0]
+        ) == MICROS_ENDPOINT_ERROR_STATE
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(
+            &objects,
+            &objects_snapshot,
+            sizeof(objects)
+        ) == 0
+    );
+
+    EXPECT_TRUE(setup_fixture(2, 1));
+    destination =
+        &registry.endpoints[processes[1].slot];
+    source_bit = UINT64_C(1) << processes[0].slot;
+    destination->state = MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    destination->pending_notification_sources = source_bit;
+    destination->pending_events[processes[0].slot] =
+        UINT64_C(0x80);
+    EXPECT_TRUE(
+        micros_endpoint_registry_validate_objects(
+            &registry,
+            &objects
+        ) == MICROS_ENDPOINT_OK
+    );
+    registry_snapshot = registry;
+    objects_snapshot = objects;
+    EXPECT_TRUE(
+        micros_endpoint_close(
+            &registry,
+            &objects,
+            endpoints[0]
+        ) == MICROS_ENDPOINT_ERROR_STATE
+        && memcmp(
+            &registry,
+            &registry_snapshot,
+            sizeof(registry)
+        ) == 0
+        && memcmp(
+            &objects,
+            &objects_snapshot,
+            sizeof(objects)
+        ) == 0
+    );
+    return true;
+}
+
 static bool test_successful_staged_deliveries_block_close_atomically(void)
 {
     struct micros_ipc_message message =
@@ -1619,6 +1753,14 @@ bool micros_ipc_close_test_run(void)
         {
             "cascading close discards owned dead-endpoint result",
             test_cascading_close_discards_owned_dead_endpoint_result,
+        },
+        {
+            "source-only close cancels queued sender",
+            test_source_only_close_cancels_queued_sender,
+        },
+        {
+            "source-only notification dependency blocks strict close",
+            test_source_only_notification_dependency_blocks_strict_close,
         },
         {
             "successful staged deliveries block close atomically",

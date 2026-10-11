@@ -3,9 +3,34 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arch/riscv64/trap_context.h"
+#include "kernel/endpoint_internal.h"
+#include "kernel/vm_handoff_core.h"
 #include "micros/endpoint.h"
+#include "micros/scheduler_core.h"
+#include "micros/spawn.h"
 
 #define MICROS_PM_CONTROL_MAGIC UINT64_C(0x4d4943524f535043)
+#define MICROS_PM_USER_SSTATUS_UBE (UINT64_C(1) << 6)
+#define MICROS_PM_USER_SSTATUS_VS (UINT64_C(3) << 9)
+#define MICROS_PM_USER_SSTATUS_FS (UINT64_C(3) << 13)
+#define MICROS_PM_USER_SSTATUS_XS (UINT64_C(3) << 15)
+#define MICROS_PM_USER_SSTATUS_MXR (UINT64_C(1) << 19)
+#define MICROS_PM_USER_SSTATUS_UXL_MASK (UINT64_C(3) << 32)
+#define MICROS_PM_USER_SSTATUS_UXL_64 (UINT64_C(2) << 32)
+#define MICROS_PM_USER_SSTATUS_SD (UINT64_C(1) << 63)
+#define MICROS_PM_USER_SSTATUS_CONTROL_MASK \
+    ( \
+        MICROS_RISCV_SSTATUS_SIE \
+        | MICROS_RISCV_SSTATUS_SPIE \
+        | MICROS_RISCV_SSTATUS_SPP \
+        | MICROS_PM_USER_SSTATUS_UBE \
+        | MICROS_PM_USER_SSTATUS_VS \
+        | MICROS_PM_USER_SSTATUS_FS \
+        | MICROS_PM_USER_SSTATUS_XS \
+        | MICROS_RISCV_SSTATUS_SUM \
+        | MICROS_PM_USER_SSTATUS_MXR \
+    )
 
 static bool bytes_are_zero(const void *storage, size_t size)
 {
@@ -39,6 +64,45 @@ static void copy_bytes(void *destination, const void *source, size_t size)
     for (index = 0; index < size; ++index) {
         output[index] = input[index];
     }
+}
+
+static bool prepared_context_matches(
+    const struct micros_user_context *context,
+    const struct micros_vm_kernel_mapping_record *record,
+    uint64_t initial_sstatus
+)
+{
+    struct micros_user_context remaining;
+
+    if (
+        context == NULL
+        || record == NULL
+        || context->sp != record->stack_pointer
+        || context->sstatus != initial_sstatus
+        || context->sepc != record->entry
+    ) {
+        return false;
+    }
+    copy_bytes(&remaining, context, sizeof(remaining));
+    remaining.sp = 0;
+    remaining.sstatus = 0;
+    remaining.sepc = 0;
+    return bytes_are_zero(&remaining, sizeof(remaining));
+}
+
+static bool prepared_status_is_canonical(uint64_t status)
+{
+    return (
+        (status & MICROS_PM_USER_SSTATUS_UXL_MASK)
+            == MICROS_PM_USER_SSTATUS_UXL_64
+        && (
+            status
+            & (
+                MICROS_PM_USER_SSTATUS_CONTROL_MASK
+                | MICROS_PM_USER_SSTATUS_SD
+            )
+        ) == MICROS_RISCV_SSTATUS_SPIE
+    );
 }
 
 static bool pointer_is_aligned(const void *pointer, size_t alignment)
@@ -75,6 +139,17 @@ static bool process_handles_equal(
     );
 }
 
+static bool hart_handles_equal(
+    struct micros_hart_handle left,
+    struct micros_hart_handle right
+)
+{
+    return (
+        left.slot == right.slot
+        && left.generation == right.generation
+    );
+}
+
 static bool thread_handle_is_valid(
     struct micros_thread_handle thread
 )
@@ -83,6 +158,41 @@ static bool thread_handle_is_valid(
         thread.slot < MICROS_THREAD_CAPACITY
         && thread.generation != 0
     );
+}
+
+static bool thread_handle_is_zero(
+    struct micros_thread_handle thread
+)
+{
+    return thread.slot == 0 && thread.generation == 0;
+}
+
+static bool hart_handle_is_valid(struct micros_hart_handle hart)
+{
+    return (
+        hart.slot < MICROS_HART_CAPACITY
+        && hart.generation != 0
+    );
+}
+
+static bool prepared_state_is_zero(
+    const struct micros_pm_control_state *state
+)
+{
+    const unsigned char *bytes =
+        (const unsigned char *)&state->prepared;
+
+    return bytes_are_zero(bytes, sizeof(state->prepared));
+}
+
+static bool exit_state_is_zero(
+    const struct micros_pm_control_state *state
+)
+{
+    const unsigned char *bytes =
+        (const unsigned char *)&state->exit;
+
+    return bytes_are_zero(bytes, sizeof(state->exit));
 }
 
 static bool endpoint_matches_process(
@@ -135,6 +245,7 @@ enum micros_syscall_abi_result micros_pm_control_decode(
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }
     clear_bytes(&candidate, sizeof(candidate));
+    candidate.endpoint = MICROS_ENDPOINT_NONE;
     if (arguments->a7 != MICROS_SYSCALL_ABI_PM_CONTROL) {
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }
@@ -165,6 +276,75 @@ enum micros_syscall_abi_result micros_pm_control_decode(
             return MICROS_SYSCALL_ABI_ARGUMENT;
         }
         candidate.command = MICROS_PM_CONTROL_ABORT_RESERVED;
+        candidate.transaction = arguments->a1;
+    } else if (
+        arguments->a0 == MICROS_PM_CONTROL_PREPARE_EXECUTION
+    ) {
+        if (
+            arguments->a4 % 8 != 0
+            || arguments->a5 != MICROS_PM_PREPARED_SIZE
+            || arguments->a6 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.command = MICROS_PM_CONTROL_PREPARE_EXECUTION;
+        candidate.transaction = arguments->a1;
+        candidate.load_token = arguments->a2;
+        candidate.mapping_generation = arguments->a3;
+        candidate.output_address = arguments->a4;
+    } else if (
+        arguments->a0 == MICROS_PM_CONTROL_ABORT_PREPARED
+        || arguments->a0 == MICROS_PM_CONTROL_ACTIVATE
+    ) {
+        if (arguments->a5 != 0 || arguments->a6 != 0) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.command = (uint32_t)arguments->a0;
+        candidate.transaction = arguments->a1;
+        candidate.load_token = arguments->a2;
+        candidate.mapping_generation = arguments->a3;
+        candidate.prepared_token = arguments->a4;
+    } else if (arguments->a0 == MICROS_PM_CONTROL_EXIT_BEGIN) {
+        if (
+            arguments->a1 > UINT32_MAX
+            || arguments->a2 % 8 != 0
+            || arguments->a3 != MICROS_PM_EXIT_BEGIN_SIZE
+            || arguments->a4 != 0
+            || arguments->a5 != 0
+            || arguments->a6 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.command = MICROS_PM_CONTROL_EXIT_BEGIN;
+        candidate.endpoint = (uint32_t)arguments->a1;
+        candidate.output_address = arguments->a2;
+    } else if (arguments->a0 == MICROS_PM_CONTROL_EXIT_DETACH) {
+        if (
+            arguments->a2 > UINT32_MAX
+            || arguments->a3 != 0
+            || arguments->a4 != 0
+            || arguments->a5 != 0
+            || arguments->a6 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.command = MICROS_PM_CONTROL_EXIT_DETACH;
+        candidate.transaction = arguments->a1;
+        candidate.endpoint = (uint32_t)arguments->a2;
+    } else if (
+        arguments->a0 == MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS
+    ) {
+        if (
+            arguments->a2 != 0
+            || arguments->a3 != 0
+            || arguments->a4 != 0
+            || arguments->a5 != 0
+            || arguments->a6 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.command =
+            MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS;
         candidate.transaction = arguments->a1;
     } else {
         return MICROS_SYSCALL_ABI_ARGUMENT;
@@ -242,22 +422,80 @@ enum micros_pm_control_error micros_pm_control_state_validate(
             state->process
         )
         || !thread_handle_is_valid(state->thread)
-        || (
-            state->active_transaction == 0
-            && !process_handle_is_zero(state->reserved_process)
+        || state->exit.phase > MICROS_PM_CONTROL_EXIT_DETACHED
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (state->exit.phase == MICROS_PM_CONTROL_EXIT_NONE) {
+        if (!exit_state_is_zero(state)) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+    } else if (
+        state->exit.reserved != 0
+        || state->exit.reserved_tail != 0
+        || state->exit.token == 0
+        || state->exit.token != state->last_exit_token
+        || state->exit.load_token == 0
+        || state->exit.mapping_generation == 0
+        || !process_handle_is_valid(state->exit.process)
+        || process_handles_equal(
+            state->exit.process,
+            state->process
+        )
+        || !thread_handle_is_valid(state->exit.thread)
+        || !endpoint_matches_process(
+            state->exit.endpoint,
+            state->exit.process
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (state->active_transaction == 0) {
+        if (
+            !process_handle_is_zero(state->reserved_process)
+            || !prepared_state_is_zero(state)
+        ) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+    } else if (
+        state->exit.phase != MICROS_PM_CONTROL_EXIT_NONE
+        || state->active_transaction != state->last_transaction
+        || !process_handle_is_valid(state->reserved_process)
+        || process_handles_equal(
+            state->reserved_process,
+            state->process
         )
         || (
-            state->active_transaction != 0
+            state->prepared.token == 0
+            && !prepared_state_is_zero(state)
+        )
+        || (
+            state->prepared.token != 0
             && (
-                state->active_transaction
-                    != state->last_transaction
-                || !process_handle_is_valid(
+                state->prepared.token
+                    != state->last_prepared_token
+                || state->prepared.reservation_token
+                    != state->active_transaction
+                || state->prepared.load_token == 0
+                || state->prepared.mapping_generation == 0
+                || !prepared_status_is_canonical(
+                    state->prepared.initial_sstatus
+                )
+                || !process_handles_equal(
+                    state->prepared.process,
                     state->reserved_process
                 )
-                || process_handles_equal(
-                    state->reserved_process,
-                    state->process
+                || !thread_handle_is_valid(
+                    state->prepared.thread
                 )
+                || !hart_handle_is_valid(
+                    state->prepared.hart
+                )
+                || !endpoint_matches_process(
+                    state->prepared.endpoint,
+                    state->prepared.process
+                )
+                || state->prepared.reserved != 0
             )
         )
     ) {
@@ -292,6 +530,75 @@ enum micros_pm_control_error micros_pm_control_state_validate_objects(
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
     if (state->active_transaction == 0) {
+        const struct micros_thread *thread;
+
+        if (state->exit.phase == MICROS_PM_CONTROL_EXIT_NONE) {
+            return MICROS_PM_CONTROL_OK;
+        }
+        if (
+            micros_process_resolve(
+                objects,
+                state->exit.process,
+                &process
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+        if (state->exit.phase == MICROS_PM_CONTROL_EXIT_DETACHED) {
+            const struct micros_thread *released =
+                &objects->threads[state->exit.thread.slot];
+
+            return (
+                process->live_thread_count == 0
+                && process->primary_endpoint
+                    == MICROS_PROCESS_ENDPOINT_NONE
+                && process->privilege_profile == 0
+                && process->endpoint_lifecycle_consumed
+                && released->slot_state
+                    != MICROS_KERNEL_OBJECT_SLOT_LIVE
+                && released->generation
+                    == state->exit.thread.generation
+            ) ? MICROS_PM_CONTROL_OK
+              : MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+        if (
+            process->live_thread_count != 1
+            || process->address_space_root == 0
+            || process->primary_endpoint != state->exit.endpoint
+            || process->privilege_profile
+                != MICROS_PRIVILEGE_PROFILE_APPLICATION
+            || !process->endpoint_lifecycle_consumed
+            || micros_thread_resolve(
+                objects,
+                state->exit.thread,
+                &thread
+            ) != MICROS_KERNEL_OBJECT_OK
+            || !process_handles_equal(
+                thread->owner,
+                state->exit.process
+            )
+            || !thread->context_attached
+            || thread->runtime_flags
+                != (
+                    MICROS_THREAD_RTS_INACTIVE
+                    | MICROS_THREAD_RTS_IPC_REPLY
+                )
+            || !thread->scheduler_assigned
+            || !thread->scheduler_preemptible
+            || thread->scheduler_priority
+                != MICROS_APPLICATION_SCHEDULER_PRIORITY
+            || thread->quantum_counter_ticks
+                != MICROS_APPLICATION_SCHEDULER_QUANTUM
+            || thread->ready_linked
+            || !thread_handle_is_zero(thread->ready_next)
+            || thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+            || thread->ipc_reply_token == 0
+            || thread->ipc_reply_callee != state->endpoint
+            || thread->ipc_receive_buffer == 0
+            || thread->ipc_receive_buffer % 8 != 0
+        ) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
         return MICROS_PM_CONTROL_OK;
     }
     if (
@@ -300,9 +607,57 @@ enum micros_pm_control_error micros_pm_control_state_validate_objects(
             state->reserved_process,
             &process
         ) != MICROS_KERNEL_OBJECT_OK
-        || !process_is_empty(process)
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (state->prepared.token == 0) {
+        return process_is_empty(process)
+            ? MICROS_PM_CONTROL_OK
+            : MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        process->live_thread_count != 1
+        || process->address_space_root == 0
+        || process->primary_endpoint != state->prepared.endpoint
+        || process->privilege_profile
+            != MICROS_PRIVILEGE_PROFILE_APPLICATION
+        || !process->endpoint_lifecycle_consumed
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    {
+        const struct micros_thread *thread;
+
+        if (
+            micros_thread_resolve(
+                objects,
+                state->prepared.thread,
+                &thread
+            ) != MICROS_KERNEL_OBJECT_OK
+            || !process_handles_equal(
+                thread->owner,
+                state->prepared.process
+            )
+            || !thread->context_attached
+            || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
+            || !thread->scheduler_assigned
+            || !thread->scheduler_preemptible
+            || thread->scheduler_priority
+                != MICROS_APPLICATION_SCHEDULER_PRIORITY
+            || !hart_handles_equal(
+                thread->scheduler_hart,
+                state->prepared.hart
+            )
+            || thread->quantum_counter_ticks
+                != MICROS_APPLICATION_SCHEDULER_QUANTUM
+            || thread->remaining_counter_ticks
+                != MICROS_APPLICATION_SCHEDULER_QUANTUM
+            || thread->ready_linked
+            || !thread_handle_is_zero(thread->ready_next)
+            || !micros_thread_ipc_state_is_clear(thread)
+        ) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
     }
     return MICROS_PM_CONTROL_OK;
 }
@@ -331,11 +686,15 @@ enum micros_pm_control_error micros_pm_control_reserve_preflight(
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
-    if (state->active_transaction != 0) {
+    if (
+        state->active_transaction != 0
+        || state->prepared.token != 0
+        || state->exit.phase != MICROS_PM_CONTROL_EXIT_NONE
+    ) {
         return MICROS_PM_CONTROL_ERROR_STATE;
     }
     if (state->last_transaction == UINT64_MAX) {
-        return MICROS_PM_CONTROL_ERROR_CAPACITY;
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
     clear_bytes(&candidate, sizeof(candidate));
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
@@ -465,4 +824,1041 @@ void micros_pm_control_abort_commit_prevalidated(
     state->active_transaction = 0;
     state->reserved_process.slot = 0;
     state->reserved_process.generation = 0;
+}
+
+static bool application_profile_is_exact(
+    const struct micros_endpoint_registry *registry
+)
+{
+    const struct micros_privilege_profile *profile;
+
+    return (
+        micros_privilege_profile_resolve(
+            registry,
+            MICROS_PRIVILEGE_PROFILE_APPLICATION,
+            &profile
+        ) == MICROS_ENDPOINT_OK
+        && profile->id == MICROS_PRIVILEGE_PROFILE_APPLICATION
+        && profile->operations == MICROS_PRIVILEGE_OPERATION_CALL
+        && profile->call_targets
+            == (
+                (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_PM
+                ) | (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS
+                )
+            )
+        && profile->send_targets == 0
+        && profile->notify_targets == 0
+        && profile->kernel_operations == 0
+    );
+}
+
+static enum micros_pm_control_error validate_frozen_mapping(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation
+)
+{
+    const struct micros_vm_kernel_mapping_record *record;
+    const struct micros_process *process;
+
+    if (
+        state->prepared.token != 0
+        || reservation_token == 0
+        || load_token == 0
+        || mapping_generation == 0
+        || state->active_transaction != reservation_token
+        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        || vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    if (
+        vm->load.process_reservation_token
+            != state->active_transaction
+        || !process_handles_equal(
+            vm->load.process,
+            state->reserved_process
+        )
+        || micros_process_resolve(
+            objects,
+            state->reserved_process,
+            &process
+        ) != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    record = &vm->mappings[state->reserved_process.slot];
+    if (
+        vm->load.load_token != load_token
+        || record->mapping_generation != mapping_generation
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    return (
+        record->phase == MICROS_VM_KERNEL_MAPPING_FROZEN
+        && record->load_token == vm->load.load_token
+        && process_handles_equal(
+            record->process,
+            state->reserved_process
+        )
+        && record->root_physical_address != 0
+        && process->live_thread_count == 0
+        && process->address_space_root
+            == record->root_physical_address
+        && process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
+        && process->privilege_profile == 0
+        && !process->endpoint_lifecycle_consumed
+    ) ? MICROS_PM_CONTROL_OK
+      : MICROS_PM_CONTROL_ERROR_INVARIANT;
+}
+
+static enum micros_pm_control_error validate_prepared_shape(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation,
+    uint64_t prepared_token
+)
+{
+    const struct micros_vm_kernel_mapping_record *record;
+    const struct micros_endpoint_record *endpoint;
+    const struct micros_thread *thread;
+
+    if (
+        micros_pm_control_state_validate_objects(state, objects)
+            != MICROS_PM_CONTROL_OK
+        || micros_endpoint_registry_validate_objects(registry, objects)
+            != MICROS_ENDPOINT_OK
+        || micros_vm_handoff_state_validate(vm)
+            != MICROS_VM_HANDOFF_OK
+        || micros_scheduler_core_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+        || !application_profile_is_exact(registry)
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        prepared_token == 0
+        || state->prepared.token != prepared_token
+        || state->prepared.reservation_token != reservation_token
+        || state->prepared.load_token != load_token
+        || state->prepared.mapping_generation != mapping_generation
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    if (
+        vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
+        || vm->load.process_reservation_token != reservation_token
+        || vm->load.load_token != load_token
+        || !process_handles_equal(
+            vm->load.process,
+            state->prepared.process
+        )
+        || micros_endpoint_resolve_internal(
+            registry,
+            objects,
+            state->prepared.endpoint,
+            &endpoint
+        ) != MICROS_ENDPOINT_OK
+        || endpoint->state != MICROS_ENDPOINT_STATE_RESERVED
+        || !process_handles_equal(
+            endpoint->owner,
+            state->prepared.process
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    record = &vm->mappings[state->prepared.process.slot];
+    return (
+        record->phase == MICROS_VM_KERNEL_MAPPING_PREPARED
+        && record->mapping_generation == mapping_generation
+        && record->load_token == load_token
+        && process_handles_equal(
+            record->process,
+            state->prepared.process
+        )
+        && micros_thread_resolve(
+            objects,
+            state->prepared.thread,
+            &thread
+        ) == MICROS_KERNEL_OBJECT_OK
+        && prepared_context_matches(
+            &thread->user_context,
+            record,
+            state->prepared.initial_sstatus
+        )
+    ) ? MICROS_PM_CONTROL_OK
+      : MICROS_PM_CONTROL_ERROR_INVARIANT;
+}
+
+enum micros_pm_control_error micros_pm_control_prepare_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation,
+    struct micros_pm_control_prepare_plan *plan
+)
+{
+    struct micros_pm_control_prepare_plan candidate;
+    const struct micros_endpoint_record *endpoint;
+    enum micros_pm_control_error mapping_error;
+    size_t index;
+
+    if (
+        state == NULL
+        || objects == NULL
+        || registry == NULL
+        || vm == NULL
+        || plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_prepare_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    if (
+        micros_pm_control_state_validate(state)
+            != MICROS_PM_CONTROL_OK
+        || micros_kernel_objects_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+        || micros_endpoint_registry_validate_objects(registry, objects)
+            != MICROS_ENDPOINT_OK
+        || micros_vm_handoff_state_validate(vm)
+            != MICROS_VM_HANDOFF_OK
+        || micros_scheduler_core_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+        || !application_profile_is_exact(registry)
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    mapping_error = validate_frozen_mapping(
+        state,
+        objects,
+        vm,
+        reservation_token,
+        load_token,
+        mapping_generation
+    );
+    if (mapping_error != MICROS_PM_CONTROL_OK) {
+        return mapping_error;
+    }
+    if (state->last_prepared_token == UINT64_MAX) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        objects->registered_hart_count != 1
+        || objects->harts[MICROS_APPLICATION_SCHEDULER_HART].slot_state
+            != MICROS_KERNEL_OBJECT_SLOT_LIVE
+        || objects->harts[MICROS_APPLICATION_SCHEDULER_HART].hardware_id
+            != MICROS_APPLICATION_SCHEDULER_HART
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    endpoint = &registry->endpoints[state->reserved_process.slot];
+    if (
+        endpoint->state != MICROS_ENDPOINT_STATE_FREE
+        || !bytes_are_zero(
+            (const unsigned char *)endpoint
+                + sizeof(endpoint->state),
+            sizeof(*endpoint) - sizeof(endpoint->state)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+
+    clear_bytes(&candidate, sizeof(candidate));
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        enum micros_kernel_object_error generation_error;
+        uint32_t generation;
+
+        if (
+            objects->threads[index].slot_state
+                != MICROS_KERNEL_OBJECT_SLOT_FREE
+        ) {
+            continue;
+        }
+        generation_error = micros_thread_next_generation(
+            objects->threads[index].generation,
+            &generation
+        );
+        if (
+            generation_error
+                == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+        ) {
+            continue;
+        }
+        if (generation_error != MICROS_KERNEL_OBJECT_OK) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+        candidate.thread.slot = (uint16_t)index;
+        candidate.thread.generation = generation;
+        break;
+    }
+    if (candidate.thread.generation == 0) {
+        return MICROS_PM_CONTROL_ERROR_CAPACITY;
+    }
+    candidate.process = state->reserved_process;
+    candidate.endpoint = (
+        candidate.process.generation << MICROS_ENDPOINT_SLOT_BITS
+    ) | candidate.process.slot;
+    candidate.reservation_token = reservation_token;
+    candidate.load_token = load_token;
+    candidate.mapping_generation = mapping_generation;
+    candidate.prepared_token = state->last_prepared_token + 1;
+    candidate.initial_context.sp =
+        vm->mappings[candidate.process.slot].stack_pointer;
+    candidate.initial_context.sepc =
+        vm->mappings[candidate.process.slot].entry;
+    candidate.result.version = MICROS_PM_PREPARED_VERSION;
+    candidate.result.size = MICROS_PM_PREPARED_SIZE;
+    candidate.result.prepared_token = candidate.prepared_token;
+    candidate.result.endpoint = candidate.endpoint;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_prepare_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    struct micros_endpoint_registry *registry,
+    struct micros_vm_handoff_state *vm,
+    const struct micros_pm_control_prepare_plan *plan,
+    const struct micros_pm_control_execution_binding *binding
+)
+{
+    struct micros_process *process =
+        &objects->processes[plan->process.slot];
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+    struct micros_endpoint_record *endpoint =
+        &registry->endpoints[plan->process.slot];
+
+    clear_bytes(thread, sizeof(*thread));
+    thread->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
+    thread->generation = plan->thread.generation;
+    thread->owner = plan->process;
+    thread->context_attached = true;
+    thread->kernel_stack_bottom = binding->kernel_stack_bottom;
+    thread->kernel_stack_top = binding->kernel_stack_top;
+    copy_bytes(
+        &thread->user_context,
+        &binding->context,
+        sizeof(thread->user_context)
+    );
+    thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
+    thread->scheduler_assigned = true;
+    thread->scheduler_preemptible = true;
+    thread->scheduler_priority =
+        MICROS_APPLICATION_SCHEDULER_PRIORITY;
+    thread->scheduler_hart = binding->hart;
+    thread->quantum_counter_ticks =
+        MICROS_APPLICATION_SCHEDULER_QUANTUM;
+    thread->remaining_counter_ticks =
+        MICROS_APPLICATION_SCHEDULER_QUANTUM;
+    ++process->live_thread_count;
+    ++objects->live_thread_count;
+
+    clear_bytes(endpoint, sizeof(*endpoint));
+    endpoint->state = MICROS_ENDPOINT_STATE_RESERVED;
+    endpoint->owner = plan->process;
+    endpoint->value = plan->endpoint;
+    process->primary_endpoint = plan->endpoint;
+    process->privilege_profile =
+        MICROS_PRIVILEGE_PROFILE_APPLICATION;
+    process->endpoint_lifecycle_consumed = true;
+
+    vm->mappings[plan->process.slot].phase =
+        MICROS_VM_KERNEL_MAPPING_PREPARED;
+    state->last_prepared_token = plan->prepared_token;
+    state->prepared.token = plan->prepared_token;
+    state->prepared.reservation_token =
+        plan->reservation_token;
+    state->prepared.load_token = plan->load_token;
+    state->prepared.mapping_generation =
+        plan->mapping_generation;
+    state->prepared.initial_sstatus = binding->context.sstatus;
+    state->prepared.process = plan->process;
+    state->prepared.thread = plan->thread;
+    state->prepared.hart = binding->hart;
+    state->prepared.endpoint = plan->endpoint;
+}
+
+enum micros_pm_control_error
+micros_pm_control_abort_prepared_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation,
+    uint64_t prepared_token,
+    struct micros_pm_control_abort_prepared_plan *plan
+)
+{
+    struct micros_pm_control_abort_prepared_plan candidate;
+    enum micros_pm_control_error shape_error;
+    uint32_t unused_generation;
+    enum micros_kernel_object_error generation_error;
+
+    if (
+        plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_abort_prepared_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    shape_error = validate_prepared_shape(
+        state,
+        objects,
+        registry,
+        vm,
+        reservation_token,
+        load_token,
+        mapping_generation,
+        prepared_token
+    );
+    if (shape_error != MICROS_PM_CONTROL_OK) {
+        return shape_error;
+    }
+    generation_error = micros_thread_next_generation(
+        state->prepared.thread.generation,
+        &unused_generation
+    );
+    if (
+        generation_error != MICROS_KERNEL_OBJECT_OK
+        && generation_error
+            != MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.process = state->prepared.process;
+    candidate.thread = state->prepared.thread;
+    candidate.endpoint = state->prepared.endpoint;
+    candidate.quarantine_thread =
+        generation_error
+            == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_abort_prepared_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    struct micros_endpoint_registry *registry,
+    struct micros_vm_handoff_state *vm,
+    const struct micros_pm_control_abort_prepared_plan *plan
+)
+{
+    struct micros_process *process =
+        &objects->processes[plan->process.slot];
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+    uint32_t generation = thread->generation;
+
+    clear_bytes(thread, sizeof(*thread));
+    thread->slot_state = plan->quarantine_thread
+        ? MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
+        : MICROS_KERNEL_OBJECT_SLOT_FREE;
+    thread->generation = generation;
+    --process->live_thread_count;
+    --objects->live_thread_count;
+    clear_bytes(
+        &registry->endpoints[plan->process.slot],
+        sizeof(registry->endpoints[plan->process.slot])
+    );
+    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    process->privilege_profile = 0;
+    process->endpoint_lifecycle_consumed = false;
+    vm->mappings[plan->process.slot].phase =
+        MICROS_VM_KERNEL_MAPPING_FROZEN;
+    clear_bytes(&state->prepared, sizeof(state->prepared));
+}
+
+enum micros_pm_control_error micros_pm_control_activate_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation,
+    uint64_t prepared_token,
+    struct micros_pm_control_activate_plan *plan
+)
+{
+    struct micros_pm_control_activate_plan candidate;
+    enum micros_pm_control_error shape_error;
+
+    if (
+        plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_activate_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    shape_error = validate_prepared_shape(
+        state,
+        objects,
+        registry,
+        vm,
+        reservation_token,
+        load_token,
+        mapping_generation,
+        prepared_token
+    );
+    if (shape_error != MICROS_PM_CONTROL_OK) {
+        return shape_error;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.process = state->prepared.process;
+    candidate.thread = state->prepared.thread;
+    candidate.hart = state->prepared.hart;
+    candidate.endpoint = state->prepared.endpoint;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_activate_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    struct micros_endpoint_registry *registry,
+    struct micros_vm_handoff_state *vm,
+    const struct micros_pm_control_activate_plan *plan
+)
+{
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+    struct micros_hart *hart = &objects->harts[plan->hart.slot];
+    struct micros_thread_handle *head =
+        &hart->ready_head[MICROS_APPLICATION_SCHEDULER_PRIORITY];
+    struct micros_thread_handle *tail =
+        &hart->ready_tail[MICROS_APPLICATION_SCHEDULER_PRIORITY];
+
+    registry->endpoints[plan->process.slot].state =
+        MICROS_ENDPOINT_STATE_ACTIVE;
+    vm->mappings[plan->process.slot].phase =
+        MICROS_VM_KERNEL_MAPPING_ACTIVATED_PENDING_COMMIT;
+    thread->runtime_flags = 0;
+    thread->ready_linked = true;
+    if (thread_handle_is_zero(*head)) {
+        *head = plan->thread;
+    } else {
+        objects->threads[tail->slot].ready_next = plan->thread;
+    }
+    *tail = plan->thread;
+    state->active_transaction = 0;
+    state->reserved_process =
+        (struct micros_process_handle){0, 0};
+    clear_bytes(&state->prepared, sizeof(state->prepared));
+}
+
+static bool running_application_resolve(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint32_t endpoint_value,
+    struct micros_process_handle *process_handle,
+    struct micros_thread_handle *thread_handle,
+    uint64_t *load_token,
+    uint64_t *mapping_generation
+)
+{
+    const struct micros_endpoint_record *endpoint;
+    const struct micros_process *process;
+    const struct micros_vm_kernel_mapping_record *record;
+    const struct micros_thread *thread = NULL;
+    size_t index;
+
+    if (
+        state->active_transaction != 0
+        || state->prepared.token != 0
+        || state->exit.phase != MICROS_PM_CONTROL_EXIT_NONE
+        || endpoint_value == MICROS_ENDPOINT_NONE
+        || endpoint_value == MICROS_ENDPOINT_ANY
+        || micros_endpoint_resolve_active(
+            registry,
+            objects,
+            endpoint_value,
+            &endpoint
+        ) != MICROS_ENDPOINT_OK
+        || process_handles_equal(endpoint->owner, state->process)
+        || micros_process_resolve(
+            objects,
+            endpoint->owner,
+            &process
+        ) != MICROS_KERNEL_OBJECT_OK
+        || process->live_thread_count != 1
+        || process->address_space_root == 0
+        || process->primary_endpoint != endpoint_value
+        || process->privilege_profile
+            != MICROS_PRIVILEGE_PROFILE_APPLICATION
+        || !process->endpoint_lifecycle_consumed
+        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        || vm->load.phase != MICROS_VM_LOAD_PHASE_IDLE
+    ) {
+        return false;
+    }
+    record = &vm->mappings[endpoint->owner.slot];
+    if (
+        record->phase != MICROS_VM_KERNEL_MAPPING_ACTIVE
+        || !process_handles_equal(record->process, endpoint->owner)
+        || record->root_physical_address
+            != process->address_space_root
+        || record->load_token == 0
+        || record->mapping_generation == 0
+        || record->exit_token != 0
+    ) {
+        return false;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *candidate =
+            &objects->threads[index];
+
+        if (
+            candidate->slot_state
+                != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || !process_handles_equal(
+                candidate->owner,
+                endpoint->owner
+            )
+        ) {
+            continue;
+        }
+        if (thread != NULL) {
+            return false;
+        }
+        thread = candidate;
+        thread_handle->slot = (uint16_t)index;
+        thread_handle->generation = candidate->generation;
+    }
+    if (
+        thread == NULL
+        || !thread->context_attached
+        || !thread->scheduler_assigned
+        || !thread->scheduler_preemptible
+        || thread->scheduler_priority
+            != MICROS_APPLICATION_SCHEDULER_PRIORITY
+        || thread->scheduler_hart.slot
+            != MICROS_APPLICATION_SCHEDULER_HART
+        || thread->scheduler_hart.generation
+            != objects->harts[
+                MICROS_APPLICATION_SCHEDULER_HART
+            ].generation
+        || thread->quantum_counter_ticks
+            != MICROS_APPLICATION_SCHEDULER_QUANTUM
+        || thread->runtime_flags != MICROS_THREAD_RTS_IPC_REPLY
+        || thread->ready_linked
+        || !thread_handle_is_zero(thread->ready_next)
+        || thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
+        || !thread_handle_is_zero(thread->ipc_next)
+        || !bytes_are_zero(
+            &thread->ipc_outbound_message,
+            sizeof(thread->ipc_outbound_message)
+        )
+        || thread->ipc_send_destination != 0
+        || thread->ipc_receive_source != 0
+        || thread->ipc_receive_buffer == 0
+        || thread->ipc_receive_buffer % 8 != 0
+        || thread->ipc_delivery_pending
+        || !bytes_are_zero(
+            &thread->ipc_inbound_message,
+            sizeof(thread->ipc_inbound_message)
+        )
+        || thread->ipc_staged_result != MICROS_IPC_OK
+        || thread->ipc_reply_token == 0
+        || thread->ipc_reply_callee != state->endpoint
+    ) {
+        return false;
+    }
+    *process_handle = endpoint->owner;
+    *load_token = record->load_token;
+    *mapping_generation = record->mapping_generation;
+    return true;
+}
+
+enum micros_pm_control_error micros_pm_control_exit_begin_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint32_t endpoint,
+    struct micros_pm_control_exit_begin_plan *plan
+)
+{
+    struct micros_pm_control_exit_begin_plan candidate;
+
+    if (
+        state == NULL
+        || objects == NULL
+        || registry == NULL
+        || vm == NULL
+        || plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_exit_begin_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    if (
+        micros_pm_control_state_validate_objects(state, objects)
+            != MICROS_PM_CONTROL_OK
+        || micros_endpoint_registry_validate_objects(registry, objects)
+            != MICROS_ENDPOINT_OK
+        || micros_vm_handoff_state_validate(vm)
+            != MICROS_VM_HANDOFF_OK
+        || micros_scheduler_core_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+        || !application_profile_is_exact(registry)
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        state->last_exit_token == UINT64_MAX
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    if (
+        !running_application_resolve(
+            state,
+            objects,
+            registry,
+            vm,
+            endpoint,
+            &candidate.process,
+            &candidate.thread,
+            &candidate.load_token,
+            &candidate.mapping_generation
+        )
+        || micros_endpoint_preflight_source_only_for_teardown(
+            registry,
+            objects,
+            endpoint
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    candidate.endpoint = endpoint;
+    candidate.exit_token = state->last_exit_token + 1;
+    candidate.result.version = MICROS_PM_EXIT_BEGIN_VERSION;
+    candidate.result.size = MICROS_PM_EXIT_BEGIN_SIZE;
+    candidate.result.exit_token = candidate.exit_token;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_exit_begin_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    struct micros_endpoint_registry *registry,
+    const struct micros_pm_control_exit_begin_plan *plan
+)
+{
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+
+    micros_endpoint_commit_source_only_prevalidated(
+        registry,
+        plan->endpoint
+    );
+    thread->runtime_flags |= MICROS_THREAD_RTS_INACTIVE;
+    state->last_exit_token = plan->exit_token;
+    state->exit.phase = MICROS_PM_CONTROL_EXIT_STOPPED;
+    state->exit.token = plan->exit_token;
+    state->exit.load_token = plan->load_token;
+    state->exit.mapping_generation = plan->mapping_generation;
+    state->exit.process = plan->process;
+    state->exit.thread = plan->thread;
+    state->exit.endpoint = plan->endpoint;
+}
+
+static enum micros_pm_control_error validate_stopped_exit(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t exit_token,
+    uint32_t endpoint_value
+)
+{
+    const struct micros_endpoint_record *endpoint;
+    const struct micros_vm_kernel_mapping_record *record;
+
+    if (
+        micros_pm_control_state_validate_objects(state, objects)
+            != MICROS_PM_CONTROL_OK
+        || micros_endpoint_registry_validate_objects(registry, objects)
+            != MICROS_ENDPOINT_OK
+        || micros_vm_handoff_state_validate(vm)
+            != MICROS_VM_HANDOFF_OK
+        || micros_scheduler_core_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        state->exit.phase != MICROS_PM_CONTROL_EXIT_STOPPED
+        || state->exit.token != exit_token
+        || exit_token == 0
+        || state->exit.endpoint != endpoint_value
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    if (
+        micros_endpoint_resolve_internal(
+            registry,
+            objects,
+            endpoint_value,
+            &endpoint
+        ) != MICROS_ENDPOINT_OK
+        || endpoint->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY
+        || !process_handles_equal(
+            endpoint->owner,
+            state->exit.process
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    record = &vm->mappings[state->exit.process.slot];
+    return (
+        vm->load.phase == MICROS_VM_LOAD_PHASE_IDLE
+        && record->phase == MICROS_VM_KERNEL_MAPPING_ACTIVE
+        && record->load_token == state->exit.load_token
+        && record->mapping_generation
+            == state->exit.mapping_generation
+        && process_handles_equal(
+            record->process,
+            state->exit.process
+        )
+    ) ? MICROS_PM_CONTROL_OK
+      : MICROS_PM_CONTROL_ERROR_INVARIANT;
+}
+
+enum micros_pm_control_error micros_pm_control_exit_detach_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t exit_token,
+    uint32_t endpoint,
+    struct micros_pm_control_exit_detach_plan *plan
+)
+{
+    struct micros_pm_control_exit_detach_plan candidate;
+    uint32_t unused_generation;
+    enum micros_kernel_object_error generation_error;
+    enum micros_pm_control_error exit_error;
+
+    if (
+        state == NULL
+        || objects == NULL
+        || registry == NULL
+        || vm == NULL
+        || plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_exit_detach_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    exit_error = validate_stopped_exit(
+        state,
+        objects,
+        registry,
+        vm,
+        exit_token,
+        endpoint
+    );
+    if (exit_error != MICROS_PM_CONTROL_OK) {
+        return exit_error;
+    }
+    generation_error = micros_thread_next_generation(
+        state->exit.thread.generation,
+        &unused_generation
+    );
+    if (
+        generation_error != MICROS_KERNEL_OBJECT_OK
+        && generation_error
+            != MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.process = state->exit.process;
+    candidate.thread = state->exit.thread;
+    candidate.endpoint = state->exit.endpoint;
+    candidate.quarantine_thread =
+        generation_error
+            == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
+    candidate.exit_token = state->exit.token;
+    candidate.load_token = state->exit.load_token;
+    candidate.mapping_generation =
+        state->exit.mapping_generation;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_exit_detach_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    struct micros_vm_handoff_state *vm,
+    const struct micros_pm_control_exit_detach_plan *plan
+)
+{
+    struct micros_thread *thread =
+        &objects->threads[plan->thread.slot];
+    struct micros_process *process =
+        &objects->processes[plan->process.slot];
+    uint32_t generation = thread->generation;
+
+    thread->scheduler_assigned = false;
+    thread->scheduler_preemptible = false;
+    thread->scheduler_priority = 0;
+    thread->scheduler_hart = (struct micros_hart_handle){0, 0};
+    thread->quantum_counter_ticks = 0;
+    thread->remaining_counter_ticks = 0;
+    thread->ready_linked = false;
+    thread->ready_next = (struct micros_thread_handle){0, 0};
+    thread->context_attached = false;
+    thread->kernel_stack_bottom = 0;
+    thread->kernel_stack_top = 0;
+    clear_bytes(&thread->user_context, sizeof(thread->user_context));
+    clear_bytes(thread, sizeof(*thread));
+    thread->slot_state = plan->quarantine_thread
+        ? MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
+        : MICROS_KERNEL_OBJECT_SLOT_FREE;
+    thread->generation = generation;
+    --process->live_thread_count;
+    --objects->live_thread_count;
+    (void)micros_vm_load_mark_exit_detached(
+        vm,
+        plan->process,
+        plan->exit_token,
+        plan->load_token,
+        plan->mapping_generation
+    );
+    state->exit.phase = MICROS_PM_CONTROL_EXIT_DETACHED;
+}
+
+enum micros_pm_control_error
+micros_pm_control_release_exited_preflight(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t exit_token,
+    struct micros_pm_control_release_exited_plan *plan
+)
+{
+    struct micros_pm_control_release_exited_plan candidate;
+    const struct micros_process *process;
+    uint32_t unused_generation;
+    enum micros_kernel_object_error generation_error;
+
+    if (
+        state == NULL
+        || objects == NULL
+        || vm == NULL
+        || plan == NULL
+        || !pointer_is_aligned(
+            plan,
+            _Alignof(struct micros_pm_control_release_exited_plan)
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    if (
+        micros_pm_control_state_validate_objects(state, objects)
+            != MICROS_PM_CONTROL_OK
+        || micros_vm_handoff_state_validate(vm)
+            != MICROS_VM_HANDOFF_OK
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (
+        state->exit.phase != MICROS_PM_CONTROL_EXIT_DETACHED
+        || state->exit.token != exit_token
+        || exit_token == 0
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    if (
+        micros_process_resolve(
+            objects,
+            state->exit.process,
+            &process
+        ) != MICROS_KERNEL_OBJECT_OK
+        || process->live_thread_count != 0
+        || process->address_space_root != 0
+        || process->primary_endpoint
+            != MICROS_PROCESS_ENDPOINT_NONE
+        || process->privilege_profile != 0
+        || !process->endpoint_lifecycle_consumed
+        || !bytes_are_zero(
+            &vm->mappings[state->exit.process.slot],
+            sizeof(vm->mappings[state->exit.process.slot])
+        )
+    ) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    generation_error = micros_process_next_generation(
+        state->exit.process.slot,
+        state->exit.process.generation,
+        &unused_generation
+    );
+    if (
+        generation_error != MICROS_KERNEL_OBJECT_OK
+        && generation_error
+            != MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+    ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    clear_bytes(&candidate, sizeof(candidate));
+    candidate.process = state->exit.process;
+    candidate.quarantine_process =
+        generation_error
+            == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
+    copy_bytes(plan, &candidate, sizeof(candidate));
+    return MICROS_PM_CONTROL_OK;
+}
+
+void micros_pm_control_release_exited_commit_prevalidated(
+    struct micros_pm_control_state *state,
+    struct micros_kernel_objects *objects,
+    const struct micros_pm_control_release_exited_plan *plan
+)
+{
+    struct micros_process *process =
+        &objects->processes[plan->process.slot];
+
+    process->slot_state = plan->quarantine_process
+        ? MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
+        : MICROS_KERNEL_OBJECT_SLOT_FREE;
+    process->live_thread_count = 0;
+    process->address_space_root = 0;
+    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    process->privilege_profile = 0;
+    process->endpoint_lifecycle_consumed = false;
+    --objects->live_process_count;
+    clear_bytes(&state->exit, sizeof(state->exit));
 }

@@ -177,6 +177,50 @@ static enum micros_grant_error resolve_active_process_endpoint(
     return MICROS_GRANT_OK;
 }
 
+static enum micros_grant_error resolve_live_process_endpoint(
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    const struct micros_process **process,
+    const struct micros_endpoint_record **endpoint
+)
+{
+    const struct micros_process *resolved_process;
+    const struct micros_endpoint_record *resolved_endpoint;
+
+    if (
+        micros_process_resolve(
+            objects,
+            process_handle,
+            &resolved_process
+        ) != MICROS_KERNEL_OBJECT_OK
+        || resolved_process->primary_endpoint
+            == MICROS_PROCESS_ENDPOINT_NONE
+        || resolved_process->privilege_profile == 0
+        || micros_endpoint_resolve_internal(
+            endpoint_registry,
+            objects,
+            resolved_process->primary_endpoint,
+            &resolved_endpoint
+        ) != MICROS_ENDPOINT_OK
+        || (
+            resolved_endpoint->state
+                != MICROS_ENDPOINT_STATE_ACTIVE
+            && resolved_endpoint->state
+                != MICROS_ENDPOINT_STATE_SOURCE_ONLY
+        )
+        || !process_handles_equal(
+            resolved_endpoint->owner,
+            process_handle
+        )
+    ) {
+        return MICROS_GRANT_ERROR_INVARIANT;
+    }
+    *process = resolved_process;
+    *endpoint = resolved_endpoint;
+    return MICROS_GRANT_OK;
+}
+
 enum micros_grant_error micros_grant_pack(
     size_t slot,
     uint32_t generation,
@@ -384,11 +428,10 @@ enum micros_grant_error micros_grant_registry_validate(
         if (record->state != MICROS_GRANT_SLOT_ACTIVE) {
             continue;
         }
-        error = resolve_active_process_endpoint(
+        error = resolve_live_process_endpoint(
             endpoint_registry,
             objects,
             record->grantor,
-            MICROS_GRANT_ERROR_STATE,
             &grantor_process,
             &grantor_endpoint
         );
@@ -398,12 +441,18 @@ enum micros_grant_error micros_grant_registry_validate(
                 != record->grantor_endpoint
             || grantor_endpoint->value
                 != record->grantor_endpoint
-            || micros_endpoint_resolve_active(
+            || micros_endpoint_resolve_internal(
                 endpoint_registry,
                 objects,
                 record->grantee_endpoint,
                 &grantee_endpoint
             ) != MICROS_ENDPOINT_OK
+            || (
+                grantee_endpoint->state
+                    != MICROS_ENDPOINT_STATE_ACTIVE
+                && grantee_endpoint->state
+                    != MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            )
             || grantee_endpoint->value
                 == record->grantor_endpoint
         ) {
@@ -762,7 +811,7 @@ enum micros_grant_error micros_grant_prepare_endpoint_cancel(
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    endpoint_error = micros_endpoint_resolve_active(
+    endpoint_error = micros_endpoint_resolve_internal(
         endpoint_registry,
         objects,
         endpoint,
@@ -770,6 +819,13 @@ enum micros_grant_error micros_grant_prepare_endpoint_cancel(
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
         return map_endpoint_error(endpoint_error);
+    }
+    if (
+        resolved_endpoint->state != MICROS_ENDPOINT_STATE_ACTIVE
+        && resolved_endpoint->state
+            != MICROS_ENDPOINT_STATE_SOURCE_ONLY
+    ) {
+        return MICROS_GRANT_ERROR_STATE;
     }
     clear_bytes(&candidate, sizeof(candidate));
     candidate.active = true;

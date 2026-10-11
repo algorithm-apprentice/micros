@@ -6,6 +6,7 @@
 #include <string.h>
 
 bool micros_pm_control_test_run(void);
+bool micros_pm_control_execution_test_run(void);
 
 #define EXPECT_TRUE(expression) \
     do { \
@@ -2665,6 +2666,7 @@ int main(void)
 {
     if (
         !micros_pm_control_test_run()
+        || !micros_pm_control_execution_test_run()
         || !test_protocol_contract()
         || !test_runtime_gate_and_spawn()
         || !test_reverse_rollback_and_identity()

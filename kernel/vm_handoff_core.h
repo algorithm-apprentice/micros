@@ -54,6 +54,7 @@ enum micros_vm_kernel_mapping_phase {
     MICROS_VM_KERNEL_MAPPING_UNUSED = 0,
     MICROS_VM_KERNEL_MAPPING_LOADING,
     MICROS_VM_KERNEL_MAPPING_FROZEN,
+    MICROS_VM_KERNEL_MAPPING_PREPARED,
     MICROS_VM_KERNEL_MAPPING_ACTIVATED_PENDING_COMMIT,
     MICROS_VM_KERNEL_MAPPING_ACTIVE,
     MICROS_VM_KERNEL_MAPPING_EXIT_DETACHED,
@@ -372,6 +373,22 @@ enum micros_vm_handoff_error micros_vm_load_abort_preflight(
 
 void micros_vm_load_abort_commit_prevalidated(
     struct micros_vm_handoff_state *state
+);
+
+enum micros_vm_handoff_error micros_vm_load_mark_prepared(
+    struct micros_vm_handoff_state *state,
+    struct micros_process_handle process,
+    uint64_t process_reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation
+);
+
+enum micros_vm_handoff_error micros_vm_load_mark_unprepared(
+    struct micros_vm_handoff_state *state,
+    struct micros_process_handle process,
+    uint64_t process_reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation
 );
 
 enum micros_vm_handoff_error micros_vm_load_mark_activated(

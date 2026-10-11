@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "micros/bootstrap_control.h"
+#include "micros/endpoint.h"
 #include "micros/pm.h"
 #include "servers/pm/pm_control.h"
 #include "servers/pm/pm_core.h"
@@ -80,6 +81,38 @@ static bool pm_service_bytes_equal(
     }
     return true;
 }
+
+static void pm_service_fill_bytes(
+    void *storage,
+    size_t size,
+    uint8_t value
+)
+{
+    uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        bytes[index] = value;
+    }
+}
+
+static bool pm_service_bytes_have_value(
+    const void *storage,
+    size_t size,
+    uint8_t value
+)
+{
+    const uint8_t *bytes = storage;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        if (bytes[index] != value) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #endif
 
 static bool pm_service_bytes_are_zero(
@@ -108,7 +141,8 @@ static void pm_service_write_u32_le(
     bytes[3] = (uint8_t)(value >> 24);
 }
 
-#ifdef MICROS_VM_SCRATCH_PREEMPTION_TEST
+#if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST) \
+    || defined(MICROS_PM_SERVICE_TEST)
 static void pm_service_write_u64_le(
     uint8_t *bytes,
     uint64_t value
@@ -119,6 +153,19 @@ static void pm_service_write_u64_le(
     for (index = 0; index < 8; ++index) {
         bytes[index] = (uint8_t)(value >> (index * 8));
     }
+}
+#endif
+
+#ifdef MICROS_PM_SERVICE_TEST
+static uint64_t pm_service_read_u64_le(const uint8_t *bytes)
+{
+    uint64_t value = 0;
+    size_t index;
+
+    for (index = 0; index < 8; ++index) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
 }
 #endif
 
@@ -340,11 +387,169 @@ static void serve_request(
 #endif
 
 #ifdef MICROS_PM_SERVICE_TEST
+static bool pm_service_vm_load(
+    uint64_t transaction,
+    uint64_t *load_token,
+    uint64_t *mapping_generation
+)
+{
+    struct micros_ipc_message message;
+    micros_endpoint_t vm_endpoint =
+        micros_bootstrap_service_config.services[
+            MICROS_PM_TEST_VM_SERVICE_ID - 1
+        ].endpoint;
+
+    if (
+        transaction == 0
+        || load_token == NULL
+        || mapping_generation == NULL
+    ) {
+        return false;
+    }
+    pm_service_clear_bytes(&message, sizeof(message));
+    message.type = MICROS_PM_TEST_VM_LOAD;
+    pm_service_write_u32_le(
+        &message.payload[0],
+        MICROS_PM_TEST_PROTOCOL_VERSION
+    );
+    pm_service_write_u64_le(&message.payload[8], transaction);
+    if (
+        micros_runtime_call(vm_endpoint, &message)
+            != MICROS_SYSCALL_ABI_OK
+        || message.source != vm_endpoint
+        || message.type != MICROS_PM_TEST_VM_LOADED
+        || message.reply_token != 0
+        || pm_service_read_u32_le(&message.payload[0])
+            != MICROS_PM_TEST_PROTOCOL_VERSION
+        || pm_service_read_u64_le(&message.payload[8])
+            != transaction
+        || pm_service_read_u32_le(&message.payload[32])
+            != MICROS_PM_TEST_RESERVED_PROCESS_SLOT
+        || pm_service_read_u32_le(&message.payload[36]) != 1
+    ) {
+        return false;
+    }
+    *load_token = pm_service_read_u64_le(&message.payload[16]);
+    *mapping_generation =
+        pm_service_read_u64_le(&message.payload[24]);
+    return *load_token != 0 && *mapping_generation != 0;
+}
+
+static bool pm_service_vm_commit(
+    uint64_t load_token,
+    uint64_t mapping_generation
+)
+{
+    struct micros_ipc_message message;
+    micros_endpoint_t vm_endpoint =
+        micros_bootstrap_service_config.services[
+            MICROS_PM_TEST_VM_SERVICE_ID - 1
+        ].endpoint;
+
+    pm_service_clear_bytes(&message, sizeof(message));
+    message.type = MICROS_PM_TEST_VM_COMMIT;
+    pm_service_write_u32_le(
+        &message.payload[0],
+        MICROS_PM_TEST_PROTOCOL_VERSION
+    );
+    pm_service_write_u64_le(&message.payload[8], load_token);
+    pm_service_write_u64_le(
+        &message.payload[16],
+        mapping_generation
+    );
+    if (
+        micros_runtime_call(vm_endpoint, &message)
+            != MICROS_SYSCALL_ABI_OK
+        || message.source != vm_endpoint
+        || message.type != MICROS_PM_TEST_VM_COMMITTED
+        || message.reply_token != 0
+        || pm_service_read_u32_le(&message.payload[0])
+            != MICROS_PM_TEST_PROTOCOL_VERSION
+        || pm_service_read_u64_le(&message.payload[8])
+            != load_token
+        || pm_service_read_u64_le(&message.payload[16])
+            != mapping_generation
+        || !pm_service_bytes_are_zero(
+            &message.payload[24],
+            sizeof(message.payload) - 24
+        )
+    ) {
+        return false;
+    }
+    return true;
+}
+
+static bool pm_service_vm_exit_release(
+    uint64_t exit_token,
+    uint64_t load_token,
+    uint64_t mapping_generation
+)
+{
+    struct micros_ipc_message message;
+    micros_endpoint_t vm_endpoint =
+        micros_bootstrap_service_config.services[
+            MICROS_PM_TEST_VM_SERVICE_ID - 1
+        ].endpoint;
+
+    pm_service_clear_bytes(&message, sizeof(message));
+    message.type = MICROS_PM_TEST_VM_EXIT_RELEASE;
+    pm_service_write_u32_le(
+        &message.payload[0],
+        MICROS_PM_TEST_PROTOCOL_VERSION
+    );
+    pm_service_write_u64_le(&message.payload[8], exit_token);
+    pm_service_write_u64_le(&message.payload[16], load_token);
+    pm_service_write_u64_le(
+        &message.payload[24],
+        mapping_generation
+    );
+    if (
+        micros_runtime_call(vm_endpoint, &message)
+            != MICROS_SYSCALL_ABI_OK
+        || message.source != vm_endpoint
+        || message.type != MICROS_PM_TEST_VM_EXIT_RELEASED
+        || message.reply_token != 0
+        || pm_service_read_u32_le(&message.payload[0])
+            != MICROS_PM_TEST_PROTOCOL_VERSION
+        || pm_service_read_u64_le(&message.payload[8])
+            != exit_token
+        || !pm_service_bytes_are_zero(
+            &message.payload[16],
+            sizeof(message.payload) - 16
+        )
+    ) {
+        return false;
+    }
+    return true;
+}
+
 static _Noreturn void run_self_test(void)
 {
     struct micros_pm_reservation_result reservation;
+    struct micros_pm_prepared_result first_prepared;
+    struct micros_pm_prepared_result prepared;
+    struct micros_pm_prepared_result preserved_prepared;
+    struct micros_pm_exit_begin_result exit_begin;
+    struct micros_pm_exit_begin_result preserved_exit;
+    struct micros_ipc_message child_request;
+    uint64_t load_token = 0;
+    uint64_t mapping_generation = 0;
 
     pm_service_clear_bytes(&reservation, sizeof(reservation));
+    pm_service_clear_bytes(&first_prepared, sizeof(first_prepared));
+    pm_service_clear_bytes(&prepared, sizeof(prepared));
+    pm_service_fill_bytes(
+        &preserved_prepared,
+        sizeof(preserved_prepared),
+        UINT8_C(0xa5)
+    );
+    pm_service_clear_bytes(&exit_begin, sizeof(exit_begin));
+    pm_service_fill_bytes(
+        &preserved_exit,
+        sizeof(preserved_exit),
+        UINT8_C(0x5a)
+    );
+    pm_service_clear_bytes(&child_request, sizeof(child_request));
     if (
         micros_pm_control_reserve(&reservation)
             != MICROS_SYSCALL_ABI_OK
@@ -353,8 +558,125 @@ static _Noreturn void run_self_test(void)
         || reservation.transaction == 0
         || reservation.reserved[0] != 0
         || reservation.reserved[1] != 0
+        || !pm_service_vm_load(
+            reservation.transaction,
+            &load_token,
+            &mapping_generation
+        )
+        || micros_pm_control_prepare_execution(
+            reservation.transaction + 1,
+            load_token,
+            mapping_generation,
+            &preserved_prepared
+        ) != MICROS_SYSCALL_ABI_STATE
+        || !pm_service_bytes_have_value(
+            &preserved_prepared,
+            sizeof(preserved_prepared),
+            UINT8_C(0xa5)
+        )
+        || micros_pm_control_prepare_execution(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            &first_prepared
+        ) != MICROS_SYSCALL_ABI_OK
+        || first_prepared.version != MICROS_PM_PREPARED_VERSION
+        || first_prepared.size != MICROS_PM_PREPARED_SIZE
+        || first_prepared.prepared_token == 0
+        || first_prepared.endpoint == MICROS_ENDPOINT_NONE
+        || first_prepared.endpoint == MICROS_ENDPOINT_ANY
+        || first_prepared.reserved0 != 0
+        || first_prepared.reserved1 != 0
+        || micros_pm_control_abort_prepared(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            first_prepared.prepared_token + 1
+        ) != MICROS_SYSCALL_ABI_STATE
+        || micros_pm_control_abort_prepared(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            first_prepared.prepared_token
+        ) != MICROS_SYSCALL_ABI_OK
+        || micros_pm_control_prepare_execution(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            &prepared
+        ) != MICROS_SYSCALL_ABI_OK
+        || prepared.version != MICROS_PM_PREPARED_VERSION
+        || prepared.size != MICROS_PM_PREPARED_SIZE
+        || prepared.prepared_token
+            <= first_prepared.prepared_token
+        || prepared.endpoint == MICROS_ENDPOINT_NONE
+        || prepared.endpoint == MICROS_ENDPOINT_ANY
+        || prepared.reserved0 != 0
+        || prepared.reserved1 != 0
+        || micros_pm_control_activate(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            prepared.prepared_token + 1
+        ) != MICROS_SYSCALL_ABI_STATE
+        || micros_pm_control_activate(
+            reservation.transaction,
+            load_token,
+            mapping_generation,
+            prepared.prepared_token
+        ) != MICROS_SYSCALL_ABI_OK
+        || !pm_service_vm_commit(load_token, mapping_generation)
+        || micros_runtime_receive(
+            prepared.endpoint,
+            &child_request
+        ) != MICROS_SYSCALL_ABI_OK
+        || child_request.source != prepared.endpoint
+        || child_request.type != MICROS_PM_MESSAGE_EXIT
+        || child_request.reply_token == 0
+        || !pm_service_bytes_are_zero(
+            child_request.payload,
+            sizeof(child_request.payload)
+        )
+        || micros_pm_control_exit_begin(
+            prepared.endpoint
+                + (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS),
+            &preserved_exit
+        ) != MICROS_SYSCALL_ABI_STATE
+        || !pm_service_bytes_have_value(
+            &preserved_exit,
+            sizeof(preserved_exit),
+            UINT8_C(0x5a)
+        )
+        || micros_pm_control_exit_begin(
+            prepared.endpoint,
+            &exit_begin
+        ) != MICROS_SYSCALL_ABI_OK
+        || exit_begin.version != MICROS_PM_EXIT_BEGIN_VERSION
+        || exit_begin.size != MICROS_PM_EXIT_BEGIN_SIZE
+        || exit_begin.exit_token == 0
+        || exit_begin.reserved[0] != 0
+        || exit_begin.reserved[1] != 0
+        || micros_pm_control_exit_detach(
+            exit_begin.exit_token + 1,
+            prepared.endpoint
+        ) != MICROS_SYSCALL_ABI_STATE
+        || micros_pm_control_exit_detach(
+            exit_begin.exit_token,
+            prepared.endpoint
+        ) != MICROS_SYSCALL_ABI_OK
+        || micros_pm_control_release_exited_process(
+            exit_begin.exit_token
+        ) != MICROS_SYSCALL_ABI_STATE
+        || !pm_service_vm_exit_release(
+            exit_begin.exit_token,
+            load_token,
+            mapping_generation
+        )
+        || micros_pm_control_release_exited_process(
+            exit_begin.exit_token
+        ) != MICROS_SYSCALL_ABI_OK
         || micros_pm_control_abort(reservation.transaction)
-            != MICROS_SYSCALL_ABI_OK
+            != MICROS_SYSCALL_ABI_STATE
         || micros_pm_table_validate(&process_table)
             != MICROS_PM_MODEL_OK
     ) {

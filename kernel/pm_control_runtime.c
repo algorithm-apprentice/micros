@@ -119,7 +119,10 @@ enum micros_pm_control_error micros_pm_control_runtime_reset(void)
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
-    if (control_state.active_transaction != 0) {
+    if (
+        control_state.active_transaction != 0
+        || control_state.exit.phase != MICROS_PM_CONTROL_EXIT_NONE
+    ) {
         return MICROS_PM_CONTROL_ERROR_STATE;
     }
     clear_bytes(&control_state, sizeof(control_state));

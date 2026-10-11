@@ -73,6 +73,12 @@ static struct micros_privilege_profile profile(
             result.operations |=
                 MICROS_PRIVILEGE_OPERATION_REPLY
                 | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
+            result.call_targets |=
+                (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM
+                ) | (
+                    UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS
+                );
             result.kernel_operations =
                 MICROS_KERNEL_OPERATION_PM_CONTROL;
         } else if (id == MICROS_PRIVILEGE_PROFILE_TTY) {
@@ -288,7 +294,9 @@ static bool test_tty_service_contract(void)
     set_name(expected[2].profile_name, "PM");
     expected[2].role_flags = MICROS_BOOTSTRAP_ROLE_PM;
     expected[2].call_targets =
-        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
+        (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER)
+        | (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM)
+        | (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS);
 
     set_name(manifest.entries[3].service_name, "tty");
     set_name(manifest.entries[3].profile_name, "TTY");
@@ -629,7 +637,9 @@ static bool test_manifest_validation(void)
         .process_slot = 1,
         .profile_id = 2,
         .prerequisites = UINT64_C(1),
-        .call_targets = UINT32_C(1) << 1,
+        .call_targets =
+            UINT32_C(1)
+            << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
         .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
     };
     set_name(expected[1].service_name, "vm");
@@ -1269,7 +1279,10 @@ static bool test_three_service_topology(void)
         .process_slot = 2,
         .profile_id = 3,
         .prerequisites = UINT64_C(1) << 1,
-        .call_targets = UINT32_C(1) << 1,
+        .call_targets =
+            (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER)
+            | (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM)
+            | (UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS),
         .role_flags = MICROS_BOOTSTRAP_ROLE_PM,
     };
     set_name(expected[2].service_name, "pm");
@@ -1399,7 +1412,7 @@ static bool test_three_service_topology(void)
     );
     memcpy(profiles, valid_profiles, sizeof(profiles));
     profiles[2].call_targets |=
-        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VM;
+        UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_RAMFS;
     plan = sentinel;
     EXPECT_TRUE(
         micros_bootstrap_manifest_validate(

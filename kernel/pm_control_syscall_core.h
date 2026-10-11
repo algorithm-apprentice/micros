@@ -97,7 +97,7 @@ micros_pm_control_output_prepare(
 
 void micros_pm_control_output_commit_prevalidated(
     const struct micros_pm_control_output_plan *plan,
-    const struct micros_pm_reservation_result *result
+    const void *result
 );
 
 #endif

@@ -11,6 +11,10 @@ enum {
     MICROS_PM_PROCESS_CAPACITY = MICROS_PROCESS_CAPACITY,
     MICROS_PM_RESERVATION_VERSION = 1,
     MICROS_PM_RESERVATION_SIZE = 32,
+    MICROS_PM_PREPARED_VERSION = 1,
+    MICROS_PM_PREPARED_SIZE = 32,
+    MICROS_PM_EXIT_BEGIN_VERSION = 1,
+    MICROS_PM_EXIT_BEGIN_SIZE = 32,
 };
 
 #define MICROS_PM_MESSAGE_EXIT UINT32_C(0x00010001)
@@ -47,6 +51,12 @@ enum micros_pm_exit_kind {
 enum micros_pm_control_command {
     MICROS_PM_CONTROL_RESERVE = 1,
     MICROS_PM_CONTROL_ABORT_RESERVED = 2,
+    MICROS_PM_CONTROL_PREPARE_EXECUTION = 3,
+    MICROS_PM_CONTROL_ABORT_PREPARED = 4,
+    MICROS_PM_CONTROL_ACTIVATE = 5,
+    MICROS_PM_CONTROL_EXIT_BEGIN = 6,
+    MICROS_PM_CONTROL_EXIT_DETACH = 7,
+    MICROS_PM_CONTROL_RELEASE_EXITED_PROCESS = 8,
 };
 
 struct micros_pm_process_handle {
@@ -59,6 +69,22 @@ struct micros_pm_reservation_result {
     uint32_t version;
     uint32_t size;
     uint64_t transaction;
+    uint64_t reserved[2];
+};
+
+struct micros_pm_prepared_result {
+    uint32_t version;
+    uint32_t size;
+    uint64_t prepared_token;
+    uint32_t endpoint;
+    uint32_t reserved0;
+    uint64_t reserved1;
+};
+
+struct micros_pm_exit_begin_result {
+    uint32_t version;
+    uint32_t size;
+    uint64_t exit_token;
     uint64_t reserved[2];
 };
 
@@ -89,6 +115,40 @@ _Static_assert(
             reserved
         ) == 16,
     "PM reservation result offsets changed"
+);
+_Static_assert(
+    sizeof(struct micros_pm_prepared_result) == MICROS_PM_PREPARED_SIZE,
+    "PM prepared result ABI changed"
+);
+_Static_assert(
+    offsetof(struct micros_pm_prepared_result, version) == 0
+        && offsetof(struct micros_pm_prepared_result, size) == 4
+        && offsetof(
+            struct micros_pm_prepared_result,
+            prepared_token
+        ) == 8
+        && offsetof(struct micros_pm_prepared_result, endpoint) == 16
+        && offsetof(struct micros_pm_prepared_result, reserved0) == 20
+        && offsetof(struct micros_pm_prepared_result, reserved1) == 24,
+    "PM prepared result offsets changed"
+);
+_Static_assert(
+    sizeof(struct micros_pm_exit_begin_result)
+        == MICROS_PM_EXIT_BEGIN_SIZE,
+    "PM exit-begin result ABI changed"
+);
+_Static_assert(
+    offsetof(struct micros_pm_exit_begin_result, version) == 0
+        && offsetof(struct micros_pm_exit_begin_result, size) == 4
+        && offsetof(
+            struct micros_pm_exit_begin_result,
+            exit_token
+        ) == 8
+        && offsetof(
+            struct micros_pm_exit_begin_result,
+            reserved
+        ) == 16,
+    "PM exit-begin result offsets changed"
 );
 
 #endif
