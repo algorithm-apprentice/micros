@@ -6,6 +6,8 @@ This directory contains the design baseline for `micros`.
 
 - [System overview](architecture/system-overview.md) defines the target system,
   trust boundary, component responsibilities, boot phases, and invariants.
+- [Responsibility-based source organization](architecture/source-organization.md)
+  defines cohesive module ownership, review signals, and staged decomposition.
 - [Development dependency DAG](architecture/development-dag.md) converts the
   cyclic runtime architecture into an acyclic implementation sequence.
 
@@ -56,6 +58,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX VFS process, descriptor, and device-routing study](research/minix-vfs-process-descriptor-and-device-routing.md)
   traces caller binding, descriptor/open-file/vnode ownership, root and
   working-directory routing, character-device suspension, and process cleanup.
+- [MINIX VFS source-organization baseline](research/minix-vfs-source-organization.md)
+  maps MINIX VFS responsibilities to the required `micros` adaptations before
+  the portable VFS core is decomposed.
 
 ## Planning and verification
 

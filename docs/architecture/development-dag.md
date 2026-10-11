@@ -285,14 +285,24 @@ Step 14 is internally serialized:
 4. extend PM-only kernel control with token-bound execution preparation,
    activation, exit-begin, execution detach, and empty-process release;
 5. add VFS executable buffering, VM-targeted direct grants, hidden descriptor
-   preparation, hidden commit, and exit cleanup;
-6. add one separate argv/env application startup path and normal-return exit;
-7. prove every preactivation rollback stage and both affected-parent
+   preparation, hidden commit, rollback, abort, and image release;
+6. decompose the portable VFS implementation into the responsibility modules
+   defined by
+   [ADR-0051](../adr/0051-responsibility-based-source-modules.md) without
+   changing accepted runtime behavior;
+7. integrate the exact ADR-0050 exit transaction: PM commits and retains the
+   `EXITING` record and exit token, VFS cancels pending TTY work and releases
+   descriptors and vnode references, the kernel detaches endpoint, grant,
+   scheduler, reply, profile, and thread authority, VM destroys the address
+   space, the kernel releases the empty process slot, and only then PM
+   publishes the zombie and completes affected-parent wait discovery;
+8. add one separate argv/env application startup path and normal-return exit;
+9. prove every preactivation rollback stage and both affected-parent
    exit/wait sets in native state models and kernel component tests;
-8. run one isolated QEMU component that preempts VM between scratch map and
+10. run one isolated QEMU component that preempts VM between scratch map and
    commit, activates another Sv39 root, reactivates VM, and proves the removed
    scratch translation cannot remain usable; and
-9. run one QEMU fixture whose dynamic PID 1 forces a post-freeze spawn
+11. run one QEMU fixture whose dynamic PID 1 forces a post-freeze spawn
    rollback, spawns one child, verifies argv/env and inherited descriptors,
    waits for its exit status, and returns all child resources to baseline.
 

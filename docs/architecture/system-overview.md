@@ -29,10 +29,16 @@ user request through IPC, memory management, filesystem lookup, and back.
    implementing those features before they are needed.
 9. Optimize or redesign semantics only after the corresponding baseline works
    end to end.
+10. Organize source modules by cohesive authority, resource lifecycle,
+    protocol layer, or algorithm rather than accumulating unrelated behavior
+    in central core files.
 
 The classification and research gate are defined by
 [ADR-0025](../adr/0025-minix-behavioral-baseline-before-optimization.md).
 Accepted subsystem ADRs remain authoritative until explicitly superseded.
+The source-organization rules and current VFS module map are defined by
+[ADR-0051](../adr/0051-responsibility-based-source-modules.md) and
+[Responsibility-Based Source Organization](source-organization.md).
 
 ## Target environment
 

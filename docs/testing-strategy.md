@@ -35,6 +35,26 @@ do not require an invented runtime test. Exploratory spikes are not merged.
 The full task and review loop is defined in
 [the AI-native development workflow](development/ai-native-workflow.md).
 
+## Behavior-preserving source decomposition
+
+A source-organization refactor starts with a structural Red test for the
+accepted module set and build integration. It then uses the existing behavior
+tests as the semantic oracle; a refactor must not weaken, replace, or silently
+skip those tests.
+
+For the VFS decomposition defined by ADR-0051:
+
+- each coherent extraction commit runs `vfs_test`, `vfs_service_test`, and
+  `vfs_model_test`;
+- the final candidate runs the complete native unit workflow;
+- the final candidate builds the standalone VFS service image;
+- the final candidate passes the isolated QEMU VFS gate;
+- the final candidate passes the complete pull-request validation tier.
+
+Review must also inspect module ownership, private declarations, dependency
+direction, validation order, rollback order, and build source lists. Runtime
+test success alone does not prove that a responsibility split is correct.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

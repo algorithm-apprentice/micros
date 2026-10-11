@@ -226,6 +226,13 @@ seven-process QEMU application probe while the production manifest remains
 six services. Capacity seven preserves a 128-byte service configuration and
 moves the VM boot object to an exact 364,704-byte layout.
 
+ADR-0051 defines responsibility-based source organization before the next VFS
+lifecycle increment. The portable VFS core must be decomposed by state
+validation, ownership, transfer, namespace, regular I/O, console, process, and
+spawn authority before Step 14 exit cleanup is added. The refactor preserves
+the accepted VFS behavior and starts a later subsystem-by-subsystem
+source-boundary audit rather than a repository-wide rewrite.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented

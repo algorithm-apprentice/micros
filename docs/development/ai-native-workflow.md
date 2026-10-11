@@ -110,6 +110,7 @@ Before implementation, record:
 - scope and explicit non-goals;
 - relevant ADRs and invariants;
 - expected files or interfaces;
+- source-module ownership and applicable review signals;
 - failing test or acceptance scenario;
 - exact completion gate.
 
@@ -125,7 +126,8 @@ Every implementation-bearing outcome uses two separately reviewed phases.
    on design, leave implementation pending, and activate only design.
 2. Research the relevant source and platform behavior.
 3. Define the baseline, goal, non-goals, ownership, state, failure, and
-   acceptance contracts in canonical documents and a Proposed ADR.
+   acceptance contracts, including responsibility boundaries when source
+   organization changes, in canonical documents and a Proposed ADR.
 4. Keep production code, executable tests/models/harnesses, build scaffolding,
    dependencies, and reusable prototypes out of the design pull request.
 5. Stage the complete design change, verify no unstaged/untracked task files
@@ -146,15 +148,17 @@ and the evidence used to make the design implementation-ready.
 3. Plan the small green commit sequence.
 4. Write the smallest failing test at the correct layer.
 5. Implement the minimum production behavior that makes it pass.
-6. Commit that coherent green slice.
-7. Refactor in a separate green commit when useful.
-8. Run the narrow suite and then the milestone gate.
-9. Stage the complete change, verify `git diff --quiet`, verify no untracked
+6. Preserve the accepted responsibility boundaries and private dependency
+   direction.
+7. Commit that coherent green slice.
+8. Refactor in a separate green commit when useful.
+9. Run the narrow suite and then the milestone gate.
+10. Stage the complete change, verify `git diff --quiet`, verify no untracked
    task files remain, and record `HEAD`, `git write-tree`, commands, and
    results.
-10. Independently review the complete implementation.
-11. Correct justified findings, update the staged evidence, and repeat review.
-12. Squash-merge the implementation task into one `main` commit.
+11. Independently review the complete implementation.
+12. Correct justified findings, update the staged evidence, and repeat review.
+13. Squash-merge the implementation task into one `main` commit.
 
 The implementation pull request records `Phase: Implementation`, its merged
 design reference, Red-Green-Refactor evidence, exact author-run validation,
