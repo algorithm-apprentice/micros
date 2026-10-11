@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "micros/spawn.h"
+
 static void clear_bytes(void *storage, size_t size)
 {
     uint8_t *bytes = storage;
@@ -99,6 +101,26 @@ static bool vfs_result_is_defined(enum micros_vfs_result result)
     return (
         result >= MICROS_VFS_RESULT_RANGE
         && result <= MICROS_VFS_RESULT_OK
+    );
+}
+
+static bool vfs_control_command_is_defined(
+    enum micros_vfs_control_command command
+)
+{
+    return (
+        command >= MICROS_VFS_CONTROL_PREPARE_IMAGE
+        && command <= MICROS_VFS_CONTROL_EXIT_PROCESS
+    );
+}
+
+static bool vfs_control_result_is_defined(
+    enum micros_vfs_control_result result
+)
+{
+    return (
+        result >= MICROS_VFS_CONTROL_RESULT_EXECUTABLE
+        && result <= MICROS_VFS_CONTROL_RESULT_OK
     );
 }
 
@@ -604,6 +626,124 @@ enum micros_vfs_protocol_status micros_vfs_service_decode_request(
     return MICROS_VFS_PROTOCOL_OK;
 }
 
+enum micros_vfs_control_protocol_status
+micros_vfs_service_decode_pm_control(
+    micros_endpoint_t pm_endpoint,
+    const struct micros_ipc_message *message,
+    struct micros_vfs_control_request *request
+)
+{
+    struct micros_vfs_control_request decoded;
+    enum micros_vfs_control_command command;
+    uint32_t version;
+    uint64_t trusted_init;
+
+    if (
+        message == NULL
+        || request == NULL
+        || !endpoint_is_canonical(pm_endpoint)
+    ) {
+        return MICROS_VFS_CONTROL_PROTOCOL_INVARIANT;
+    }
+    if (message->type != MICROS_VFS_MESSAGE_PM_CONTROL) {
+        return MICROS_VFS_CONTROL_PROTOCOL_BAD_TYPE;
+    }
+    if (message->reply_token == 0) {
+        return MICROS_VFS_CONTROL_PROTOCOL_INVARIANT;
+    }
+    if (message->source != pm_endpoint) {
+        return MICROS_VFS_CONTROL_PROTOCOL_CALLER;
+    }
+    version = read_u32_le(&message->payload[0]);
+    if (version != MICROS_VFS_PROTOCOL_VERSION) {
+        return MICROS_VFS_CONTROL_PROTOCOL_BAD_VERSION;
+    }
+    command = (enum micros_vfs_control_command)read_u32_le(
+        &message->payload[4]
+    );
+    if (!vfs_control_command_is_defined(command)) {
+        return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+    }
+
+    clear_bytes(&decoded, sizeof(decoded));
+    decoded.version = version;
+    decoded.command = command;
+    decoded.source = message->source;
+    decoded.reply_token = message->reply_token;
+    decoded.lifecycle_token = read_u64_le(&message->payload[8]);
+    switch (command) {
+    case MICROS_VFS_CONTROL_PREPARE_IMAGE:
+        trusted_init = read_u64_le(&message->payload[40]);
+        if (
+            read_u32_le(&message->payload[28]) != 0
+            || trusted_init > 1
+        ) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.semantic_pid = read_u64_le(&message->payload[16]);
+        decoded.parent_endpoint =
+            read_u32_le(&message->payload[24]);
+        decoded.request_grant =
+            read_u32_le(&message->payload[32]);
+        decoded.request_size =
+            read_u32_le(&message->payload[36]);
+        decoded.trusted_init = trusted_init != 0;
+        break;
+    case MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS:
+        if (!bytes_are_zero(&message->payload[32], 16)) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.image_token =
+            read_u64_le(&message->payload[16]);
+        decoded.semantic_pid = read_u64_le(&message->payload[24]);
+        break;
+    case MICROS_VFS_CONTROL_COMMIT_HIDDEN:
+    case MICROS_VFS_CONTROL_REVERT_HIDDEN:
+        if (
+            read_u32_le(&message->payload[36]) != 0
+            || !bytes_are_zero(&message->payload[40], 8)
+        ) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.image_token =
+            read_u64_le(&message->payload[16]);
+        decoded.descriptor_token =
+            read_u64_le(&message->payload[24]);
+        decoded.child_endpoint =
+            read_u32_le(&message->payload[32]);
+        break;
+    case MICROS_VFS_CONTROL_ABORT_DESCRIPTORS:
+        if (!bytes_are_zero(&message->payload[32], 16)) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.image_token =
+            read_u64_le(&message->payload[16]);
+        decoded.descriptor_token =
+            read_u64_le(&message->payload[24]);
+        break;
+    case MICROS_VFS_CONTROL_RELEASE_IMAGE:
+        if (!bytes_are_zero(&message->payload[24], 24)) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.image_token =
+            read_u64_le(&message->payload[16]);
+        break;
+    case MICROS_VFS_CONTROL_EXIT_PROCESS:
+        if (
+            read_u32_le(&message->payload[20]) != 0
+            || !bytes_are_zero(&message->payload[32], 16)
+        ) {
+            return MICROS_VFS_CONTROL_PROTOCOL_MALFORMED;
+        }
+        decoded.child_endpoint =
+            read_u32_le(&message->payload[16]);
+        decoded.semantic_pid = read_u64_le(&message->payload[24]);
+        break;
+    }
+    *request = decoded;
+    return MICROS_VFS_CONTROL_PROTOCOL_OK;
+}
+
 enum micros_vfs_service_error micros_vfs_service_build_result(
     const struct micros_vfs_result_action *result,
     struct micros_ipc_message *message
@@ -691,6 +831,136 @@ enum micros_vfs_service_error micros_vfs_service_build_result(
         result->transferred_count
     );
     write_u64_le(&built.payload[32], result->position);
+    *message = built;
+    return MICROS_VFS_SERVICE_OK;
+}
+
+enum micros_vfs_service_error
+micros_vfs_service_build_pm_control_result(
+    const struct micros_vfs_control_result_action *result,
+    struct micros_ipc_message *message
+)
+{
+    struct micros_ipc_message built;
+    bool fields_are_zero;
+
+    if (
+        result == NULL
+        || message == NULL
+        || !result->active
+        || result->reply_token == 0
+        || !vfs_control_command_is_defined(result->command)
+        || !vfs_control_result_is_defined(result->result)
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_ARGUMENT;
+    }
+    fields_are_zero = (
+        result->image_token == 0
+        && result->executable_grant == 0
+        && result->executable_size == 0
+        && result->request_grant == 0
+        && result->request_size == 0
+        && result->descriptor_token == 0
+    );
+    if (
+        (
+            result->result != MICROS_VFS_CONTROL_RESULT_OK
+            && !fields_are_zero
+        )
+        || (
+            result->result == MICROS_VFS_CONTROL_RESULT_OK
+            && (
+                (
+                    result->command
+                        == MICROS_VFS_CONTROL_PREPARE_IMAGE
+                    && (
+                        result->image_token == 0
+                        || result->executable_grant == 0
+                        || result->executable_grant
+                            == MICROS_GRANT_NONE
+                        || result->executable_size == 0
+                        || result->executable_size
+                            > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+                        || result->request_grant == 0
+                        || result->request_grant
+                            == MICROS_GRANT_NONE
+                        || result->request_grant
+                            == result->executable_grant
+                        || result->request_size
+                            < MICROS_SPAWN_REQUEST_SIZE_MIN
+                        || result->request_size
+                            > MICROS_SPAWN_REQUEST_SIZE_MAX
+                        || result->descriptor_token != 0
+                    )
+                )
+                || (
+                    result->command
+                        == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+                    && (
+                        result->descriptor_token == 0
+                        || result->image_token != 0
+                        || result->executable_grant != 0
+                        || result->executable_size != 0
+                        || result->request_grant != 0
+                        || result->request_size != 0
+                    )
+                )
+                || (
+                    result->command
+                        != MICROS_VFS_CONTROL_PREPARE_IMAGE
+                    && result->command
+                        != MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+                    && !fields_are_zero
+                )
+            )
+        )
+    ) {
+        return MICROS_VFS_SERVICE_ERROR_INVARIANT;
+    }
+
+    clear_bytes(&built, sizeof(built));
+    built.type = MICROS_VFS_MESSAGE_PM_CONTROL_RESULT;
+    write_u32_le(
+        &built.payload[0],
+        MICROS_VFS_PROTOCOL_VERSION
+    );
+    write_u32_le(&built.payload[4], (uint32_t)result->command);
+    write_u32_le(
+        &built.payload[8],
+        (uint32_t)(int32_t)result->result
+    );
+    if (result->result == MICROS_VFS_CONTROL_RESULT_OK) {
+        if (result->command == MICROS_VFS_CONTROL_PREPARE_IMAGE) {
+            write_u64_le(
+                &built.payload[16],
+                result->image_token
+            );
+            write_u32_le(
+                &built.payload[24],
+                result->executable_grant
+            );
+            write_u32_le(
+                &built.payload[28],
+                result->executable_size
+            );
+            write_u32_le(
+                &built.payload[32],
+                result->request_grant
+            );
+            write_u32_le(
+                &built.payload[36],
+                result->request_size
+            );
+        } else if (
+            result->command
+                == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
+        ) {
+            write_u64_le(
+                &built.payload[16],
+                result->descriptor_token
+            );
+        }
+    }
     *message = built;
     return MICROS_VFS_SERVICE_OK;
 }
