@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+bool micros_vfs_spawn_test_run(void);
+
 #define EXPECT_TRUE(expression) \
     do { \
         if (!(expression)) { \
@@ -70,6 +72,10 @@ static const struct micros_vfs_io test_io = {
 
 static const micros_endpoint_t vfs_endpoint =
     UINT32_C(0x00001006);
+static const micros_endpoint_t vm_endpoint =
+    UINT32_C(0x00001002);
+static const micros_endpoint_t pm_endpoint =
+    UINT32_C(0x00001003);
 static const micros_endpoint_t ramfs_endpoint =
     UINT32_C(0x00001005);
 static const micros_endpoint_t tty_endpoint =
@@ -84,6 +90,8 @@ static bool initialize_full_fixture(void)
     vfs_test_fixture_initialize(
         &fixture,
         vfs_endpoint,
+        vm_endpoint,
+        pm_endpoint,
         ramfs_endpoint,
         tty_endpoint
     );
@@ -91,6 +99,8 @@ static bool initialize_full_fixture(void)
         micros_vfs_state_initialize(
             &state,
             vfs_endpoint,
+            vm_endpoint,
+            pm_endpoint,
             ramfs_endpoint,
             tty_endpoint
         ) != MICROS_VFS_CORE_OK
@@ -169,7 +179,7 @@ static bool constants_and_initial_state_are_exact(void)
         && MICROS_VFS_DIRECTORY_RECORD_SIZE == 80
         && MICROS_VFS_BACKEND_REFERENCE_THRESHOLD == 256
         && MICROS_VFS_PENDING_OPERATION_CAPACITY == 1
-        && MICROS_VFS_RESIDENT_PAGE_LIMIT == 64
+        && MICROS_VFS_RESIDENT_PAGE_LIMIT == 80
     );
     EXPECT_TRUE(
         MICROS_VFS_RESULT_BAD_TYPE == -1
@@ -193,6 +203,8 @@ static bool constants_and_initial_state_are_exact(void)
         micros_vfs_state_initialize(
             &state,
             UINT32_C(0x00001006),
+            UINT32_C(0x00001002),
+            UINT32_C(0x00001003),
             UINT32_C(0x00001005),
             UINT32_C(0x00001004)
         ) == MICROS_VFS_CORE_OK
@@ -232,6 +244,25 @@ static bool mount_attach_share_and_detach_are_atomic(void)
         && state.vnodes[0].local_reference_count == 1
         && state.vnodes[0].backend_reference_count == 1
         && micros_vfs_state_validate(&state) == MICROS_VFS_CORE_OK
+    );
+    snapshot = state;
+    EXPECT_TRUE(
+        micros_vfs_attach_console(
+            &state,
+            vm_endpoint,
+            0,
+            &result
+        ) == MICROS_VFS_CORE_ERROR_ARGUMENT
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
+    );
+    EXPECT_TRUE(
+        micros_vfs_attach_console(
+            &state,
+            pm_endpoint,
+            0,
+            &result
+        ) == MICROS_VFS_CORE_ERROR_ARGUMENT
+        && memcmp(&state, &snapshot, sizeof(state)) == 0
     );
     EXPECT_TRUE(
         micros_vfs_attach_console(
@@ -1944,5 +1975,6 @@ int main(void)
         && console_async_and_cleanup_are_exact()
         && backend_reference_cleanup_is_exact()
         && test_drain_barrier_is_no_authority()
+        && micros_vfs_spawn_test_run()
     ) ? 0 : 1;
 }

@@ -31,37 +31,10 @@ enum micros_vfs_control_protocol_status {
     MICROS_VFS_CONTROL_PROTOCOL_INVARIANT,
 };
 
-struct micros_vfs_control_request {
-    uint32_t version;
-    enum micros_vfs_control_command command;
-    micros_endpoint_t source;
-    uint64_t reply_token;
-    uint64_t lifecycle_token;
-    uint64_t image_token;
-    uint64_t descriptor_token;
-    uint64_t semantic_pid;
-    micros_endpoint_t parent_endpoint;
-    micros_grant_t request_grant;
-    uint32_t request_size;
-    bool trusted_init;
-    micros_endpoint_t child_endpoint;
-};
-
-struct micros_vfs_control_result_action {
-    bool active;
-    uint64_t reply_token;
-    enum micros_vfs_control_command command;
-    enum micros_vfs_control_result result;
-    uint64_t image_token;
-    micros_grant_t executable_grant;
-    uint32_t executable_size;
-    micros_grant_t request_grant;
-    uint32_t request_size;
-    uint64_t descriptor_token;
-};
-
 struct micros_vfs_service_endpoints {
     micros_endpoint_t launcher;
+    micros_endpoint_t vm;
+    micros_endpoint_t pm;
     micros_endpoint_t tty;
     micros_endpoint_t ramfs;
     micros_endpoint_t self;

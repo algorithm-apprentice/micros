@@ -244,14 +244,26 @@ static enum micros_vfs_backend_grant_result backend_grant_create(
         || grant == NULL
         || local == NULL
         || length == 0
-        || length > MICROS_VFS_TRANSFER_MAX
         || (
             endpoint != runtime->endpoints.ramfs
             && endpoint != runtime->endpoints.tty
+            && endpoint != runtime->endpoints.vm
         )
         || (
             permission != MICROS_GRANT_PERMISSION_READ
             && permission != MICROS_GRANT_PERMISSION_WRITE
+        )
+        || (
+            endpoint == runtime->endpoints.vm
+            && (
+                permission != MICROS_GRANT_PERMISSION_READ
+                || length
+                    > MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+            )
+        )
+        || (
+            endpoint != runtime->endpoints.vm
+            && length > MICROS_VFS_TRANSFER_MAX
         )
     ) {
         return MICROS_VFS_BACKEND_GRANT_INVARIANT;
@@ -397,6 +409,8 @@ void micros_service_main(void)
         || micros_vfs_state_initialize(
             &vfs_state,
             runtime.endpoints.self,
+            runtime.endpoints.vm,
+            runtime.endpoints.pm,
             runtime.endpoints.ramfs,
             runtime.endpoints.tty
         ) != MICROS_VFS_CORE_OK

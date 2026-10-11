@@ -930,7 +930,7 @@ The workflow cross-compiles the portable VFS core, exact application and
 backend wire adapters, and production receive/reply loop. The post-link
 checker enforces the freestanding service-ELF contract and requires the
 complete `PT_LOAD` footprint plus one external stack page to fit within the
-64-page VFS process limit.
+80-page VFS process limit.
 
 ## RAMFS service acceptance
 

@@ -22,8 +22,6 @@ enum {
     ELF_PROGRAM_FLAG_EXECUTE = 1,
     ELF_PROGRAM_FLAG_WRITE = 2,
     ELF_PROGRAM_FLAG_READ = 4,
-    APPLICATION_AUXILIARY_BYTES =
-        MICROS_APPLICATION_AUXV_COUNT * 2 * sizeof(uint64_t),
 };
 
 static uint16_t vm_image_read_u16_le(const uint8_t *bytes)
@@ -98,32 +96,12 @@ static bool vm_image_bytes_are_zero(const uint8_t *bytes, size_t size)
     return true;
 }
 
-static bool vm_image_add_size(size_t left, size_t right, size_t *result)
-{
-    if (right > SIZE_MAX - left) {
-        return false;
-    }
-    *result = left + right;
-    return true;
-}
-
 static bool vm_image_add_u64(uint64_t left, uint64_t right, uint64_t *result)
 {
     if (right > UINT64_MAX - left) {
         return false;
     }
     *result = left + right;
-    return true;
-}
-
-static bool vm_image_align_size_16(size_t value, size_t *result)
-{
-    size_t added;
-
-    if (!vm_image_add_size(value, 15, &added)) {
-        return false;
-    }
-    *result = added & ~(size_t)15;
     return true;
 }
 
@@ -166,83 +144,36 @@ static enum micros_application_stack_error vm_image_plan_decoded_stack(
 )
 {
     struct micros_application_stack_plan candidate = {0};
-    size_t relative_offset = sizeof(uint64_t);
-    size_t strings_size = 0;
-    size_t occupied_size;
+    struct micros_spawn_stack_layout layout;
+    enum micros_spawn_stack_layout_error layout_error;
     size_t frame_offset;
-    size_t index;
 
-    if (
-        !vm_image_add_size(
-            relative_offset,
-            ((size_t)request->argument_count + 1) * sizeof(uint64_t),
-            &relative_offset
-        )
-    ) {
-        return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
+    layout_error = micros_spawn_stack_layout_plan(
+        request,
+        &layout
+    );
+    if (layout_error == MICROS_SPAWN_STACK_LAYOUT_ERROR_ARGUMENT) {
+        return MICROS_APPLICATION_STACK_ERROR_ARGUMENT;
     }
-    candidate.environment_offset = (uint32_t)relative_offset;
-    if (
-        !vm_image_add_size(
-            relative_offset,
-            ((size_t)request->environment_count + 1)
-                * sizeof(uint64_t),
-            &relative_offset
-        )
-        || !vm_image_align_size_16(relative_offset, &relative_offset)
-    ) {
-        return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
-    }
-    candidate.auxiliary_offset = (uint32_t)relative_offset;
-    if (
-        !vm_image_add_size(
-            relative_offset,
-            APPLICATION_AUXILIARY_BYTES,
-            &relative_offset
-        )
-    ) {
-        return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
-    }
-    candidate.strings_offset = (uint32_t)relative_offset;
-
-    for (index = 0; index < request->argument_count; ++index) {
-        if (!vm_image_add_size(
-            strings_size,
-            request->arguments[index].size,
-            &strings_size
-        )) {
-            return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
-        }
-    }
-    for (index = 0; index < request->environment_count; ++index) {
-        if (!vm_image_add_size(
-            strings_size,
-            request->environment[index].size,
-            &strings_size
-        )) {
-            return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
-        }
-    }
-    if (
-        !vm_image_add_size(relative_offset, strings_size, &relative_offset)
-        || !vm_image_align_size_16(relative_offset, &occupied_size)
-        || occupied_size > MICROS_APPLICATION_STACK_OCCUPIED_MAX
-        || occupied_size > MICROS_APPLICATION_STACK_PAGE_SIZE
-    ) {
+    if (layout_error != MICROS_SPAWN_STACK_LAYOUT_OK) {
         return MICROS_APPLICATION_STACK_ERROR_TOO_BIG;
     }
 
-    frame_offset = MICROS_APPLICATION_STACK_PAGE_SIZE - occupied_size;
+    frame_offset =
+        MICROS_APPLICATION_STACK_PAGE_SIZE - layout.occupied_size;
     candidate.stack_pointer =
-        MICROS_APPLICATION_STACK_TOP - occupied_size;
-    candidate.frame_size = (uint32_t)relative_offset;
-    candidate.occupied_size = (uint32_t)occupied_size;
+        MICROS_APPLICATION_STACK_TOP - layout.occupied_size;
+    candidate.frame_size = layout.frame_size;
+    candidate.occupied_size = layout.occupied_size;
     candidate.argc_offset = (uint32_t)frame_offset;
     candidate.arguments_offset =
         (uint32_t)(frame_offset + sizeof(uint64_t));
-    candidate.environment_offset += (uint32_t)frame_offset;
-    candidate.auxiliary_offset += (uint32_t)frame_offset;
-    candidate.strings_offset += (uint32_t)frame_offset;
+    candidate.environment_offset =
+        (uint32_t)frame_offset + layout.environment_offset;
+    candidate.auxiliary_offset =
+        (uint32_t)frame_offset + layout.auxiliary_offset;
+    candidate.strings_offset =
+        (uint32_t)frame_offset + layout.strings_offset;
     *plan = candidate;
     return MICROS_APPLICATION_STACK_OK;
 }

@@ -9,7 +9,8 @@
 
 enum {
     VFS_TEST_APPLICATION_GRANT_CAPACITY = 32,
-    VFS_TEST_NODE_DATA_CAPACITY = 8192,
+    VFS_TEST_NODE_DATA_CAPACITY =
+        MICROS_APPLICATION_EXECUTABLE_SIZE_MAX + 1,
 };
 
 struct vfs_test_application_grant {
@@ -56,6 +57,8 @@ struct vfs_test_tty_completion {
 struct vfs_test_fixture {
     struct micros_vfs_io io;
     micros_endpoint_t vfs_endpoint;
+    micros_endpoint_t vm_endpoint;
+    micros_endpoint_t pm_endpoint;
     micros_endpoint_t ramfs_endpoint;
     micros_endpoint_t tty_endpoint;
     struct vfs_test_application_grant
@@ -79,6 +82,7 @@ struct vfs_test_fixture {
     size_t client_copy_calls;
     size_t backend_create_calls;
     size_t backend_revoke_calls;
+    size_t backend_capacity_on_create_call;
     size_t ramfs_calls;
     size_t tty_calls;
     size_t putnode_calls;
@@ -105,6 +109,8 @@ struct vfs_test_fixture {
 void vfs_test_fixture_initialize(
     struct vfs_test_fixture *fixture,
     micros_endpoint_t vfs_endpoint,
+    micros_endpoint_t vm_endpoint,
+    micros_endpoint_t pm_endpoint,
     micros_endpoint_t ramfs_endpoint,
     micros_endpoint_t tty_endpoint
 );
@@ -137,6 +143,20 @@ bool vfs_test_fixture_add_root_file(
     const char *name,
     const uint8_t *bytes,
     size_t length
+);
+
+bool vfs_test_fixture_add_root_file_with_mode(
+    struct vfs_test_fixture *fixture,
+    const char *name,
+    uint32_t mode,
+    const uint8_t *bytes,
+    size_t length
+);
+
+const struct vfs_test_backend_grant *
+vfs_test_fixture_backend_grant(
+    const struct vfs_test_fixture *fixture,
+    micros_grant_t grant
 );
 
 bool vfs_test_fixture_complete_read(

@@ -9,6 +9,7 @@
 #include "micros/grant.h"
 #include "micros/kernel_objects.h"
 #include "micros/ramfs.h"
+#include "micros/spawn.h"
 #include "micros/tty.h"
 #include "micros/vfs.h"
 
@@ -75,6 +76,13 @@ enum micros_vfs_page_owner {
     MICROS_VFS_PAGE_SYNCHRONOUS,
     MICROS_VFS_PAGE_TTY_READ,
     MICROS_VFS_PAGE_TTY_WRITE_RETRY,
+};
+
+enum micros_vfs_spawn_phase {
+    MICROS_VFS_SPAWN_IDLE = 0,
+    MICROS_VFS_SPAWN_IMAGE_PREPARED,
+    MICROS_VFS_SPAWN_DESCRIPTORS_PREPARED,
+    MICROS_VFS_SPAWN_HIDDEN_COMMITTED,
 };
 
 enum micros_vfs_client_direction {
@@ -172,17 +180,37 @@ struct micros_vfs_pending_operation {
     uint64_t request_id;
 };
 
+struct micros_vfs_spawn_transaction {
+    enum micros_vfs_spawn_phase phase;
+    bool trusted_init;
+    uint8_t reserved0[3];
+    micros_endpoint_t parent_endpoint;
+    uint32_t request_size;
+    uint32_t executable_size;
+    uint16_t executable_vnode;
+    uint16_t reserved1;
+    micros_grant_t executable_grant;
+    micros_grant_t request_grant;
+    uint64_t pm_spawn_token;
+    uint64_t image_token;
+    uint64_t semantic_pid;
+};
+
 struct micros_vfs_state {
     uint64_t initialization_magic;
     enum micros_vfs_phase phase;
     micros_endpoint_t self_endpoint;
+    micros_endpoint_t vm_endpoint;
+    micros_endpoint_t pm_endpoint;
     micros_endpoint_t ramfs_endpoint;
     micros_endpoint_t tty_endpoint;
     uint32_t reserved;
     uint64_t next_tty_request_id;
+    uint64_t last_image_token;
     enum micros_vfs_page_owner client_page_owner;
     enum micros_vfs_page_owner backend_page_owner;
     struct micros_vfs_pending_operation pending;
+    struct micros_vfs_spawn_transaction spawn;
     struct micros_vfs_process_record
         processes[MICROS_VFS_PROCESS_CAPACITY];
     struct micros_vfs_open_file
@@ -190,6 +218,12 @@ struct micros_vfs_state {
     struct micros_vfs_vnode vnodes[MICROS_VFS_VNODE_CAPACITY];
     _Alignas(4096) uint8_t client_page[MICROS_VFS_TRANSFER_MAX];
     _Alignas(4096) uint8_t backend_page[MICROS_VFS_TRANSFER_MAX];
+    _Alignas(4096) uint8_t
+        spawn_request_bytes[MICROS_SPAWN_REQUEST_SIZE_MAX];
+    _Alignas(4096) uint8_t
+        spawn_executable_bytes[
+            MICROS_APPLICATION_EXECUTABLE_SIZE_MAX
+        ];
 };
 
 struct micros_vfs_request {
@@ -216,6 +250,35 @@ struct micros_vfs_result_action {
     uint32_t mode;
     uint64_t transferred_count;
     uint64_t position;
+};
+
+struct micros_vfs_control_request {
+    uint32_t version;
+    enum micros_vfs_control_command command;
+    micros_endpoint_t source;
+    uint64_t reply_token;
+    uint64_t lifecycle_token;
+    uint64_t image_token;
+    uint64_t descriptor_token;
+    uint64_t semantic_pid;
+    micros_endpoint_t parent_endpoint;
+    micros_grant_t request_grant;
+    uint32_t request_size;
+    bool trusted_init;
+    micros_endpoint_t child_endpoint;
+};
+
+struct micros_vfs_control_result_action {
+    bool active;
+    uint64_t reply_token;
+    enum micros_vfs_control_command command;
+    enum micros_vfs_control_result result;
+    uint64_t image_token;
+    micros_grant_t executable_grant;
+    uint32_t executable_size;
+    micros_grant_t request_grant;
+    uint32_t request_size;
+    uint64_t descriptor_token;
 };
 
 struct micros_vfs_ramfs_request {
@@ -318,6 +381,8 @@ struct micros_vfs_io {
 enum micros_vfs_core_error micros_vfs_state_initialize(
     struct micros_vfs_state *state,
     micros_endpoint_t self_endpoint,
+    micros_endpoint_t vm_endpoint,
+    micros_endpoint_t pm_endpoint,
     micros_endpoint_t ramfs_endpoint,
     micros_endpoint_t tty_endpoint
 );
@@ -359,6 +424,13 @@ enum micros_vfs_core_error micros_vfs_handle_request(
     const struct micros_vfs_request *request,
     const struct micros_vfs_io *io,
     struct micros_vfs_result_action *action
+);
+
+enum micros_vfs_core_error micros_vfs_handle_control(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
 );
 
 enum micros_vfs_core_error micros_vfs_handle_tty_notification(

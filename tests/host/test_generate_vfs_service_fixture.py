@@ -90,6 +90,10 @@ class VfsServiceFixtureGeneratorTest(unittest.TestCase):
     def test_renders_exact_seven_service_topology_and_profiles(self):
         output = self.render()
 
+        self.assertEqual(
+            generate_vfs_service_fixture.VFS_RESIDENT_PAGE_LIMIT,
+            80,
+        )
         self.assertIn("micros_vfs_service_test_images", output)
         self.assertIn(
             ".entry_count = MICROS_VFS_TEST_SERVICE_COUNT",

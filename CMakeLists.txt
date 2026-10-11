@@ -443,18 +443,22 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(ramfs_model_test ramfs_seed_image)
     add_executable(
         vfs_test
+        lib/spawn/spawn_request.c
         servers/vfs/vfs_core.c
         tests/host/vfs_test_fixture.c
+        tests/host/vfs_spawn_test.c
         tests/host/vfs_test.c
     )
     add_executable(
         vfs_model_test
+        lib/spawn/spawn_request.c
         servers/vfs/vfs_core.c
         tests/host/vfs_test_fixture.c
         tests/host/vfs_model_test.c
     )
     add_executable(
         vfs_service_test
+        lib/spawn/spawn_request.c
         servers/vfs/vfs_core.c
         servers/vfs/vfs_service_core.c
         tests/host/vfs_test_fixture.c
@@ -1921,6 +1925,7 @@ if(
         micros_add_bootstrap_user(
             micros_vfs_service
             micros-vfs-service
+            lib/spawn/spawn_request.c
             servers/vfs/vfs_core.c
             servers/vfs/vfs_service_core.c
             servers/vfs/vfs_service.c
@@ -1935,7 +1940,7 @@ if(
                 --elf
                 "$<TARGET_FILE:micros_vfs_service>"
                 --resident-page-limit
-                64
+                80
                 --stack-page-count
                 1
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
