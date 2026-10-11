@@ -1,0 +1,284 @@
+# Repository Source-Module Audit
+
+## Purpose
+
+This audit applies
+[ADR-0051](../adr/0051-responsibility-based-source-modules.md) after the
+portable VFS decomposition. It classifies the remaining source-organization
+review signals and creates bounded follow-up units. It does not authorize one
+repository-wide refactor.
+
+The audited base is:
+
+```text
+9d46b55ce2d1675838eeb37955a724943fda0a3c
+```
+
+## Method
+
+The inventory uses only files tracked by Git with C, header, assembly, or
+Python source suffixes. Build directories, generated build trees, and other
+untracked output are excluded. This avoids the false multi-thousand-line
+results produced when tools such as `cloc` include `build/`. These suffixes
+are the repository's current executable implementation and test languages.
+Declarative build metadata such as `CMakeLists.txt` is outside ADR-0051's
+implementation/test source scope and its numeric review signals.
+
+The review signals remain:
+
+- more than 1,500 physical lines in one implementation or test file;
+- more than 25 function definitions;
+- any function longer than 120 physical lines;
+- mixed authority, lifecycle, protocol, fixture, or scenario ownership even
+  below those numeric signals.
+
+At the audited base:
+
+| Signal | Count |
+| --- | ---: |
+| Files with at least one signal | 118 |
+| Files over 1,500 physical lines | 42 |
+| Files over 25 function definitions | 53 |
+| Functions over 120 physical lines | 268 |
+
+These counts locate review work; they do not define module or function
+boundaries.
+
+## Cohesion rule
+
+A file owns one cohesive authority, resource lifecycle, protocol layer,
+algorithm, fixture family, or model. A function owns one task.
+
+When a task has meaningful subtasks, its top-level function should read as an
+ordered outline of named helper calls. Validation, reservation, externally
+visible mutation, rollback, and result publication are separate subtasks when
+they have distinct invariants or failure boundaries.
+
+Atomicity is semantic, not numeric. A function is atomic only when further
+extraction would split one invariant, algorithm, or commit boundary without
+revealing a separately understandable task. Therefore:
+
+- a mixed 30-line function still requires decomposition;
+- a cohesive function over 120 lines may remain only with an explicit
+  algorithmic or invariant-based rationale;
+- helper extraction must improve the visible task hierarchy rather than
+  manufacture wrappers around individual expressions.
+
+Tests follow the same rule. One scenario may remain one public test, but its
+fixture construction, setup, action, failure injection, assertions, and
+cleanup should be visible as named phases instead of one long script.
+
+## Classification
+
+The 118 signal files fall into 18 correction units plus eight cohesive
+exceptions. Each correction unit is a separate reviewed design and
+implementation pair. Its design must define exact file ownership and function
+phases before source movement begins.
+
+### Immediate next-touch corrections
+
+These units are on the current Step 14 path. Their implementation must precede
+new behavior in the same signaled sources.
+
+| Unit | Signal files | Required outcome | Task pair |
+| --- | ---: | --- | --- |
+| VFS tests | 8 | Separate shared fixtures, core descriptor/namespace behavior, spawn transactions, service codec cases, replayable model logic, and target scenarios before adding exit-cleanup coverage. | `vfs-test-decomposition-design` / `vfs-test-decomposition-implementation` |
+| Kernel address spaces | 7 | Separate ordinary root/mapping ownership, complete validation, VM scratch, freeze/teardown, activation, execution validation, and their target scenarios. | `kernel-address-space-decomposition-design` / `kernel-address-space-decomposition-implementation` |
+| Frame ownership | 4 | Separate allocator-ledger validation, bootstrap handoff, VM claim/freeze/release transitions, and model/target scenarios. | `frame-ownership-decomposition-design` / `frame-ownership-decomposition-implementation` |
+| Kernel VM handoff | 7 | Separate ABI decoding, static handoff, dynamic load/scratch/freeze/commit/exit state, syscall adaptation, and tests. | `kernel-vm-handoff-decomposition-design` / `kernel-vm-handoff-decomposition-implementation` |
+| Kernel PM control | 4 | Separate reservation, execution preparation, activation, exit detach/release, syscall adaptation, and tests. | `kernel-pm-control-decomposition-design` / `kernel-pm-control-decomposition-implementation` |
+| VM service | 7 | Separate complete-state validation, frame selection, image/stack planning, load transaction, exit release, service adaptation, fixtures, and tests. | `vm-service-decomposition-design` / `vm-service-decomposition-implementation` |
+| PM service | 7 | Separate codec, table validation, spawn/rollback, exit/wait, service adaptation, spawn ABI, fixtures, and tests. | `pm-service-decomposition-design` / `pm-service-decomposition-implementation` |
+
+The VFS exit-cleanup implementation depends on the VFS test correction. The
+later PM/VFS/VM coordinator depends on the six PM/VM/kernel correction
+implementations above. This prevents new lifecycle behavior from being added
+to the currently mixed sources.
+
+### Before the next change to each subsystem
+
+These units do not block unrelated Step 14 work. They become mandatory before
+the next behavior-bearing change to their own subsystem.
+
+| Unit | Signal files | Required outcome | Task pair |
+| --- | ---: | --- | --- |
+| RAMFS service | 7 | Separate state validation, codec, node ownership, namespace, regular I/O, directory operations, fixtures, model, and tests. | `ramfs-source-decomposition-design` / `ramfs-source-decomposition-implementation` |
+| Kernel IPC | 11 | Separate queue primitives, matching, notifications, replies, deadlock checks, endpoint close, public operations, syscall adaptation, models, and target scenarios. | `kernel-ipc-decomposition-design` / `kernel-ipc-decomposition-implementation` |
+| Kernel endpoints | 4 | Separate identity/profile handling, object-state validation, publication/source-only/close transitions, authorization, models, and target scenarios. | `kernel-endpoint-decomposition-design` / `kernel-endpoint-decomposition-implementation` |
+| Kernel scheduler | 6 | Separate ready queues, IPC scheduler transactions, complete validation, return selection, accounting, target adaptation, models, and tests. | `kernel-scheduler-decomposition-design` / `kernel-scheduler-decomposition-implementation` |
+| Kernel objects | 3 | Separate process, thread, hart, execution-context, complete-validation, model, and target-test responsibilities while preserving distinct identities. | `kernel-object-decomposition-design` / `kernel-object-decomposition-implementation` |
+| Kernel bootstrap | 10 | Separate manifest validation, image/service preparation, diagnostics, runtime control, syscall handling, boot orchestration, fixtures, and tests. | `kernel-bootstrap-decomposition-design` / `kernel-bootstrap-decomposition-implementation` |
+| Trap and syscall routing | 6 | Replace the monolithic trap dispatcher with named user/supervisor interrupt, syscall, fault, return, and bounded test-hook phases. | `trap-syscall-decomposition-design` / `trap-syscall-decomposition-implementation` |
+| Grant data plane | 7 | Preserve the cohesive grant registry while splitting non-atomic range planning, copying, syscall, model, and target-test tasks. | `grant-data-plane-decomposition-design` / `grant-data-plane-decomposition-implementation` |
+| TTY | 8 | Preserve cohesive portable TTY state ownership while splitting service validation, submit/cancel/collect, console handoff, fixture, and test tasks. | `tty-function-decomposition-design` / `tty-function-decomposition-implementation` |
+
+### Tooling correction
+
+| Unit | Signal files | Required outcome | Task pair |
+| --- | ---: | --- | --- |
+| QEMU runner tooling | 2 | Separate outcome parsing, command construction, serial driving, CLI construction, and host tests without changing the command interface or accepted markers. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
+| ELF checker tooling | 2 | Separate ELF parsing, structural validation, policy validation, CLI construction, and host tests without changing the command interface. | `elf-tooling-decomposition-design` / `elf-tooling-decomposition-implementation` |
+
+The independent validation-plan deduplication task is not part of this source
+decomposition. The
+[validation planner](../../tools/validation_plan.py) remains a cohesive
+exception below; its execution policy is governed by ADR-0032.
+
+## Complete signal ownership
+
+Every signal file belongs to exactly one unit or exception.
+
+### VFS tests
+
+`tests/host/vfs_model_test.c`, `tests/host/vfs_spawn_test.c`,
+`tests/host/vfs_test.c`, `tests/host/vfs_service_test.c`,
+`tests/host/vfs_test_fixture.c`, `tests/qemu/vfs_service_probe.c`,
+`kernel/vfs_service_test.c`, and
+`tools/generate_vfs_service_fixture.py`.
+
+### Kernel address spaces
+
+`kernel/user_address_space.c`, `kernel/address_space.c`,
+`kernel/user_address_space_core.c`, `kernel/user_execution.c`,
+`kernel/user_address_space_test.c`, `kernel/user_execution_test.c`, and
+`tests/host/user_address_space_core_test.c`.
+
+### Frame ownership
+
+`kernel/frame_ownership.c`, `kernel/frame_ownership_test.c`,
+`tests/host/frame_ownership_test.c`, and
+`tests/host/frame_allocator_test.c`.
+
+### Kernel VM handoff
+
+`kernel/vm_handoff_core.c`, `kernel/vm_handoff_syscall.c`,
+`kernel/vm_snapshot.c`, `kernel/address_space_handoff_test.c`,
+`tests/host/vm_handoff_syscall_test.c`, `tests/host/vm_handoff_test.c`, and
+`tests/host/vm_bootstrap_test.c`.
+
+### Kernel PM control
+
+`kernel/pm_control_core.c`, `kernel/pm_control_syscall.c`,
+`tests/host/pm_control_test.c`, and
+`tests/host/pm_control_execution_test.c`.
+
+### VM service
+
+`servers/vm/vm_core.c`, `servers/vm/vm_image.c`,
+`lib/vm/vm_boot_validate.c`, `kernel/vm_scratch_preemption_test.c`,
+`tests/host/vm_core_test.c`, `tests/qemu/vm_server.c`, and
+`tools/generate_vm_scratch_preemption_fixture.py`.
+
+### PM service
+
+`servers/pm/pm_core.c`, `servers/pm/pm_service.c`,
+`lib/spawn/spawn_request.c`, `tests/host/pm_test.c`,
+`tests/host/spawn_abi_test.c`, `kernel/pm_service_test.c`, and
+`tools/generate_pm_service_fixture.py`.
+
+### RAMFS service
+
+`servers/ramfs/ramfs_core.c`, `tests/host/ramfs_model_test.c`,
+`tests/host/ramfs_test.c`, `tests/host/ramfs_seed_test.c`,
+`tests/qemu/ramfs_service_vfs.c`, `kernel/ramfs_service_test.c`, and
+`tools/generate_ramfs_service_fixture.py`.
+
+### Kernel IPC
+
+`kernel/ipc.c`, `kernel/ipc_syscall.c`, `kernel/ipc_test.c`,
+`kernel/ipc_syscall_test.c`, `kernel/ipc_ecall_test.c`,
+`tests/host/ipc_model_test.c`, `tests/host/ipc_notify_test.c`,
+`tests/host/ipc_reply_test.c`, `tests/host/ipc_close_test.c`,
+`tests/host/ipc_call_test.c`, and `tests/host/ipc_operation_test.c`.
+
+### Kernel endpoints
+
+`kernel/endpoint.c`, `kernel/endpoint_test.c`,
+`tests/host/endpoint_test.c`, and `tests/host/endpoint_model_test.c`.
+
+### Kernel scheduler
+
+`kernel/scheduler_core.c`, `kernel/scheduler.c`, `kernel/scheduler_test.c`,
+`kernel/scheduler_invalid_test.c`, `tests/host/scheduler_model_test.c`, and
+`tests/host/scheduler_test.c`.
+
+### Kernel objects
+
+`kernel/kernel_objects.c`, `kernel/object_model_test.c`, and
+`tests/host/kernel_objects_test.c`.
+
+### Kernel bootstrap
+
+`kernel/bootstrap_runtime.c`, `kernel/bootstrap_manifest.c`,
+`kernel/bootstrap_syscall.c`, `kernel/bootstrap_image.c`, `kernel/main.c`,
+`tests/host/bootstrap_manifest_test.c`, `tests/host/bootstrap_control_test.c`,
+`tests/host/fdt_test.c`, `tests/qemu/bootstrap_launcher.c`, and
+`tools/generate_bootstrap_fixture.py`.
+
+### Trap and syscall routing
+
+`kernel/trap.c`, `kernel/syscall.c`, `kernel/user_runtime_test.c`,
+`tests/qemu/user_runtime_service.c`, `tests/host/runtime_test.c`, and
+`tools/generate_user_runtime_fixture.py`.
+
+### Grant data plane
+
+`kernel/grant_copy.c`, `kernel/grant_syscall.c`, `kernel/grant_test.c`,
+`kernel/grant_syscall_test.c`, `tests/host/grant_test.c`,
+`tests/host/grant_copy_test.c`, and
+`tests/host/grant_syscall_core_test.c`.
+
+### TTY
+
+`kernel/tty_handoff_runtime.c`, `kernel/uart_console_test.c`,
+`servers/tty/tty_service_core.c`, `tests/host/tty_model_test.c`,
+`tests/host/tty_handoff_test.c`, `tests/host/tty_control_syscall_test.c`,
+`tests/host/tty_control_test.c`, and
+`tools/generate_tty_service_fixture.py`.
+
+### QEMU runner tooling
+
+`tools/run_qemu_smoke.py` and `tests/host/test_run_qemu_smoke.py`.
+
+### ELF checker tooling
+
+`tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.
+
+## Cohesive exceptions
+
+The following files trigger a numeric review signal but currently retain one
+cohesive responsibility and contain no function over 120 lines:
+
+| File | Rationale |
+| --- | --- |
+| `servers/vfs/vfs_service_core.c` | One byte-exact VFS service codec and dispatch layer; ADR-0051 already records this exception. |
+| `servers/vfs/vfs_state.c` | One complete VFS state-validation responsibility. |
+| `kernel/bootstrap_control_core.c` | One portable bootstrap-control state machine. |
+| `kernel/grant.c` | One generation-safe grant-registry lifecycle; copy and syscall responsibilities already live elsewhere. |
+| `kernel/bootstrap_memory.c` | One bootstrap memory and typed-ownership runtime adapter. |
+| `servers/tty/tty_core.c` | One portable TTY state machine. |
+| `tools/validation_plan.py` | One fail-closed change-aware planning tool with short task-level functions. |
+| `tests/host/test_validation_plan.py` | One focused validation-plan test module whose individual cases remain short. |
+
+All 118 in-scope tracked implementation/test source files that trigger at
+least one numeric review signal appear exactly once above, either in a
+correction unit or as a cohesive exception.
+
+An exception is not permanent immunity. A future change that introduces a
+second responsibility, obscures the task hierarchy, or creates a non-atomic
+function requires a new review and may activate a decomposition task.
+
+## Sequencing rule
+
+Only one correction pair is active at a time. Each design:
+
+1. confirms the current responsibility and function-task boundaries;
+2. records exact non-goals and behavior-preservation invariants;
+3. names the target files and private dependency direction;
+4. lists every non-atomic function and its required subtask outline;
+5. defines structural and existing semantic validation;
+6. receives independent design review before implementation starts.
+
+Each implementation then moves or extracts the minimum reviewed boundary,
+keeps every permanent commit green, receives one independent implementation
+review, and is squash-merged as one task outcome.
