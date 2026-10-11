@@ -28,6 +28,9 @@
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
 #endif
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+#include "kernel/vm_scratch_preemption_test.h"
+#endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tty_service_test.h"
 #endif
@@ -712,6 +715,42 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 frame
             );
         }
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+        if (
+            !user_timer
+            && !user_external
+            && cause_code != MICROS_EXCEPTION_USER_ECALL
+        ) {
+            enum micros_vm_scratch_preemption_test_trap_result
+                result =
+                    micros_vm_scratch_preemption_test_handle_trap(
+                        hart,
+                        frame
+                    );
+
+            if (
+                result
+                    == MICROS_VM_SCRATCH_PREEMPTION_TEST_TRAP_USER_RETURN
+            ) {
+                if (
+                    micros_scheduler_select_user_return(hart, frame)
+                        != MICROS_SCHEDULER_OK
+                ) {
+                    MICROS_TRAP_PANIC(
+                        hart->hardware_id,
+                        "vm-scratch-preemption-return",
+                        frame
+                    );
+                }
+                return;
+            }
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "vm-scratch-preemption-trap",
+                frame
+            );
+        }
+#endif
 #ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
         if (
             !user_timer
@@ -772,6 +811,20 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
             return;
         }
         if (user_timer) {
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+            if (
+                !micros_vm_scratch_preemption_test_before_user_timer(
+                    hart,
+                    frame
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "vm-scratch-preemption-timer-entry",
+                    frame
+                );
+            }
+#endif
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
             if (
@@ -1173,6 +1226,21 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                     frame
                 );
             }
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+            if (
+                !micros_vm_scratch_preemption_test_after_syscall_return(
+                    hart,
+                    frame,
+                    syscall_return
+                )
+            ) {
+                MICROS_TRAP_PANIC(
+                    hart->hardware_id,
+                    "vm-scratch-preemption-syscall-return",
+                    frame
+                );
+            }
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
             if (
                 !micros_ipc_syscall_test_after_return(
@@ -1315,6 +1383,21 @@ void micros_trap_dispatch(struct micros_trap_frame *frame)
                 frame
             );
         }
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+        if (
+            user_timer
+            && !micros_vm_scratch_preemption_test_after_user_timer(
+                hart,
+                frame
+            )
+        ) {
+            MICROS_TRAP_PANIC(
+                hart->hardware_id,
+                "vm-scratch-preemption-timer-return",
+                frame
+            );
+        }
+#endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
         if (
             user_timer

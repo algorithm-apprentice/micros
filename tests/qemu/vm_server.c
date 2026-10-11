@@ -6,11 +6,24 @@
 
 #include "lib/runtime/raw_syscall.h"
 #include "micros/bootstrap_control.h"
+#include "micros/sv39.h"
 #include "micros/tty.h"
+#include "micros/user_address_space.h"
+#include "micros/vm.h"
 #include "micros/vm_bootstrap.h"
 #include "servers/vm/vm_core.h"
 #include "tests/qemu/vm_handoff_protocol.h"
-#if defined(MICROS_VFS_SERVICE_TEST)
+#if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
+#include "tests/qemu/vm_scratch_preemption_protocol.h"
+#define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
+    MICROS_VM_SCRATCH_PREEMPTION_LAUNCHER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_VM_SERVICE_ID \
+    MICROS_VM_SCRATCH_PREEMPTION_VM_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_PROBE_SERVICE_ID \
+    MICROS_VM_SCRATCH_PREEMPTION_DRIVER_SERVICE_ID
+#define MICROS_VM_HANDOFF_TEST_SERVICE_COUNT \
+    MICROS_VM_SCRATCH_PREEMPTION_SERVICE_COUNT
+#elif defined(MICROS_VFS_SERVICE_TEST)
 #include "tests/qemu/vfs_service_protocol.h"
 #define MICROS_VM_HANDOFF_TEST_LAUNCHER_SERVICE_ID \
     MICROS_VFS_TEST_LAUNCHER_SERVICE_ID
@@ -65,12 +78,22 @@ struct micros_vm_boot_info micros_vm_boot_info = {0};
 static volatile uint64_t vm_data = UINT64_C(0x564d44415441564d);
 static struct micros_vm_state vm_state;
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST) \
+    && !defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
 static uint8_t grant_buffer[MICROS_VM_HANDOFF_TEST_DATA_SIZE];
 #endif
 
 void micros_vm_trigger_self_fault(void);
 static int vm_server_find_service(uint32_t service_id);
+
+#ifdef MICROS_VM_SCRATCH_PREEMPTION_TEST
+static struct micros_vm_load_begin_result scratch_begin_result;
+
+void micros_vm_scratch_preemption_vm_hook(uint64_t magic);
+_Noreturn void micros_vm_scratch_preemption_stale_load(
+    uint64_t virtual_address
+);
+#endif
 
 #ifdef MICROS_VM_TTY_HANDOFF_TEST
 struct vm_tty_mapping_descriptor {
@@ -125,6 +148,156 @@ static uint32_t vm_server_read_u32_le(const uint8_t *bytes)
         | (uint32_t)bytes[3] << 24
     );
 }
+
+#ifdef MICROS_VM_SCRATCH_PREEMPTION_TEST
+static uint64_t vm_server_read_u64_le(const uint8_t *bytes)
+{
+    uint64_t value = 0;
+    size_t index;
+
+    for (index = 0; index < 8; ++index) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
+}
+
+static bool vm_server_find_free_frame(uint64_t *physical_address)
+{
+    uint32_t range_index;
+
+    if (physical_address == NULL) {
+        return false;
+    }
+    for (
+        range_index = 0;
+        range_index
+            < micros_vm_boot_info.header.managed_range_count;
+        ++range_index
+    ) {
+        const struct micros_vm_managed_range *range =
+            &micros_vm_boot_info.managed_ranges[range_index];
+        uint64_t offset;
+
+        for (offset = 0; offset < range->frame_count; ++offset) {
+            uint64_t frame_index = range->frame_index + offset;
+
+            if (
+                frame_index
+                    >= micros_vm_boot_info.header.managed_frame_count
+            ) {
+                return false;
+            }
+            if (
+                micros_vm_boot_info.frame_states[frame_index]
+                    == MICROS_VM_FRAME_FREE
+            ) {
+                *physical_address =
+                    range->base + offset * MICROS_SV39_PAGE_SIZE;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static _Noreturn void vm_server_run_scratch_preemption(void)
+{
+    struct micros_ipc_message request;
+    volatile uint64_t *scratch =
+        (volatile uint64_t *)(uintptr_t)
+            MICROS_VM_SCRATCH_VIRTUAL_ADDRESS;
+    uint64_t transaction;
+    uint64_t physical_address = 0;
+    int driver_index = vm_server_find_service(
+        MICROS_VM_SCRATCH_PREEMPTION_DRIVER_SERVICE_ID
+    );
+
+    vm_server_clear_bytes(&request, sizeof(request));
+    vm_server_clear_bytes(
+        &scratch_begin_result,
+        sizeof(scratch_begin_result)
+    );
+    if (
+        driver_index < 0
+        || micros_runtime_receive(
+            MICROS_ENDPOINT_ANY,
+            &request
+        ) != MICROS_SYSCALL_ABI_OK
+        || request.source
+            != micros_bootstrap_service_config.services[driver_index]
+                .endpoint
+        || request.type != MICROS_VM_SCRATCH_PREEMPTION_START
+        || request.reply_token == 0
+        || vm_server_read_u32_le(&request.payload[0])
+            != MICROS_VM_SCRATCH_PREEMPTION_VERSION
+        || !vm_server_bytes_are_zero(
+            &request.payload[16],
+            sizeof(request.payload) - 16
+        )
+        || (
+            transaction =
+                vm_server_read_u64_le(&request.payload[8])
+        ) == 0
+        || !vm_server_find_free_frame(&physical_address)
+        || micros_runtime_raw_syscall(
+            MICROS_VM_LOAD_BEGIN,
+            transaction,
+            (uintptr_t)&scratch_begin_result,
+            MICROS_VM_LOAD_BEGIN_RESULT_SIZE,
+            0,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_VM_HANDOFF
+        ) != MICROS_SYSCALL_ABI_OK
+        || scratch_begin_result.version
+            != MICROS_VM_LOAD_BEGIN_RESULT_VERSION
+        || scratch_begin_result.size
+            != MICROS_VM_LOAD_BEGIN_RESULT_SIZE
+        || scratch_begin_result.load_token == 0
+        || scratch_begin_result.process_slot
+            != MICROS_VM_SCRATCH_PREEMPTION_RESERVED_PROCESS_SLOT
+        || scratch_begin_result.process_generation != 1
+        || scratch_begin_result.reserved0 != 0
+        || scratch_begin_result.reserved1 != 0
+        || micros_runtime_raw_syscall(
+            MICROS_VM_SCRATCH_MAP,
+            scratch_begin_result.load_token,
+            MICROS_USER_VIRTUAL_BASE,
+            physical_address,
+            MICROS_SV39_PERMISSION_USER
+                | MICROS_SV39_PERMISSION_READ
+                | MICROS_SV39_PERMISSION_EXECUTE,
+            MICROS_VM_SCRATCH_VIRTUAL_ADDRESS,
+            0,
+            MICROS_SYSCALL_ABI_VM_HANDOFF
+        ) != MICROS_SYSCALL_ABI_OK
+    ) {
+        __builtin_trap();
+    }
+    *scratch = MICROS_VM_SCRATCH_PREEMPTION_SENTINEL;
+    micros_vm_scratch_preemption_vm_hook(
+        MICROS_VM_SCRATCH_PREEMPTION_VM_HOOK_MAGIC
+    );
+    if (
+        *scratch != MICROS_VM_SCRATCH_PREEMPTION_SENTINEL
+        || micros_runtime_raw_syscall(
+            MICROS_VM_SCRATCH_COMMIT,
+            scratch_begin_result.load_token,
+            MICROS_USER_VIRTUAL_BASE,
+            physical_address,
+            MICROS_VM_SCRATCH_VIRTUAL_ADDRESS,
+            0,
+            0,
+            MICROS_SYSCALL_ABI_VM_HANDOFF
+        ) != MICROS_SYSCALL_ABI_OK
+    ) {
+        __builtin_trap();
+    }
+    micros_vm_scratch_preemption_stale_load(
+        MICROS_VM_SCRATCH_VIRTUAL_ADDRESS
+    );
+}
+#endif
 
 #ifdef MICROS_VM_TTY_HANDOFF_TEST
 static bool vm_server_notification_is_canonical(
@@ -200,7 +373,8 @@ static bool vm_server_map_tty_uart(void)
 #endif
 
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST) \
+    && !defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
 static uint64_t vm_server_read_u64_le(const uint8_t *bytes)
 {
     uint64_t value = 0;
@@ -365,7 +539,8 @@ static bool vm_server_complete_handoff(void)
 }
 
 #if !defined(MICROS_PM_SERVICE_TEST) \
-    && !defined(MICROS_VM_TTY_HANDOFF_TEST)
+    && !defined(MICROS_VM_TTY_HANDOFF_TEST) \
+    && !defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
 static bool vm_server_serve_probe(void)
 {
     struct micros_ipc_message request;
@@ -481,6 +656,8 @@ void micros_service_main(void)
     if (!vm_server_map_tty_uart()) {
         __builtin_trap();
     }
+#elif defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
+    vm_server_run_scratch_preemption();
 #elif !defined(MICROS_PM_SERVICE_TEST)
     if (!vm_server_serve_probe()) {
         __builtin_trap();

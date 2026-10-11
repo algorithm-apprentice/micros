@@ -779,6 +779,9 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-address-space-handoff": (
                 "kernel/address_space_handoff_test.c"
             ),
+            "test-qemu-vm-scratch-preemption": (
+                "kernel/vm_scratch_preemption_test.c"
+            ),
             "test-qemu-user-execution": "kernel/user_execution_test.c",
             "test-qemu-scheduler": "kernel/scheduler_test.c",
             "test-qemu-scheduler-invalid-outgoing": (

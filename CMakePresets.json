@@ -198,6 +198,15 @@
       }
     },
     {
+      "name": "riscv64-vm-scratch-preemption-test",
+      "displayName": "RISC-V 64 VM scratch preemption test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-vm-scratch-preemption-test",
+      "cacheVariables": {
+        "MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-test",
       "displayName": "RISC-V 64 TTY service integration test",
       "inherits": "riscv64-debug",
@@ -554,6 +563,13 @@
       "configurePreset": "riscv64-pm-service-test",
       "targets": [
         "test-qemu-pm-service"
+      ]
+    },
+    {
+      "name": "test-qemu-vm-scratch-preemption",
+      "configurePreset": "riscv64-vm-scratch-preemption-test",
+      "targets": [
+        "test-qemu-vm-scratch-preemption"
       ]
     },
     {
@@ -1066,6 +1082,20 @@
         {
           "type": "build",
           "name": "test-qemu-pm-service"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-vm-scratch-preemption",
+      "displayName": "Build and run VM scratch preemption",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-vm-scratch-preemption-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-vm-scratch-preemption"
         }
       ]
     },
