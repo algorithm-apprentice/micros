@@ -188,12 +188,17 @@ struct micros_vfs_spawn_transaction {
     uint32_t request_size;
     uint32_t executable_size;
     uint16_t executable_vnode;
-    uint16_t reserved1;
+    uint16_t child_process_reference;
     micros_grant_t executable_grant;
     micros_grant_t request_grant;
     uint64_t pm_spawn_token;
     uint64_t image_token;
     uint64_t semantic_pid;
+    uint64_t descriptor_token;
+    uint16_t child_root_vnode;
+    uint16_t child_working_directory_vnode;
+    uint16_t child_descriptors[MICROS_VFS_DESCRIPTOR_CAPACITY];
+    uint32_t reserved1;
 };
 
 struct micros_vfs_state {
@@ -207,6 +212,7 @@ struct micros_vfs_state {
     uint32_t reserved;
     uint64_t next_tty_request_id;
     uint64_t last_image_token;
+    uint64_t last_descriptor_token;
     enum micros_vfs_page_owner client_page_owner;
     enum micros_vfs_page_owner backend_page_owner;
     struct micros_vfs_pending_operation pending;
