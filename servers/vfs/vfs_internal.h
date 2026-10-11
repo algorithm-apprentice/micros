@@ -131,6 +131,19 @@ static inline void vfs_prepare_result(
     action->result = result;
 }
 
+static inline void vfs_prepare_control_result(
+    const struct micros_vfs_control_request *request,
+    enum micros_vfs_control_result result,
+    struct micros_vfs_control_result_action *action
+)
+{
+    vfs_zero_bytes(action, sizeof(*action));
+    action->active = true;
+    action->reply_token = request->reply_token;
+    action->command = request->command;
+    action->result = result;
+}
+
 size_t vfs_descriptor_user_count(
     const struct micros_vfs_state *state,
     size_t open_file_slot
@@ -325,6 +338,45 @@ enum micros_vfs_core_error vfs_console_cleanup_pending_operation(
     micros_endpoint_t endpoint,
     const struct micros_vfs_io *io,
     bool *debt
+);
+
+enum micros_vfs_core_error vfs_spawn_prepare_image(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+);
+
+enum micros_vfs_core_error vfs_spawn_release_image(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+);
+
+enum micros_vfs_core_error vfs_spawn_prepare_descriptors(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    struct micros_vfs_control_result_action *action
+);
+
+enum micros_vfs_core_error vfs_spawn_abort_descriptors(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_control_result_action *action
+);
+
+enum micros_vfs_core_error vfs_spawn_commit_hidden(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    struct micros_vfs_control_result_action *action
+);
+
+enum micros_vfs_core_error vfs_spawn_revert_hidden(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_control_request *request,
+    struct micros_vfs_control_result_action *action
 );
 
 #endif
