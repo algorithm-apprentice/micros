@@ -603,9 +603,6 @@ enum micros_vfs_core_error vfs_spawn_prepare_image(
     action->request_grant = request_grant;
     action->request_size = request->request_size;
     action->executable_size = lookup.file_size;
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -844,9 +841,6 @@ enum micros_vfs_core_error vfs_spawn_prepare_descriptors(
         action
     );
     action->descriptor_token = state->spawn.descriptor_token;
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -959,9 +953,6 @@ enum micros_vfs_core_error vfs_spawn_abort_descriptors(
         MICROS_VFS_CONTROL_RESULT_OK,
         action
     );
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -1047,9 +1038,6 @@ enum micros_vfs_core_error vfs_spawn_commit_hidden(
         MICROS_VFS_CONTROL_RESULT_OK,
         action
     );
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -1093,9 +1081,6 @@ enum micros_vfs_core_error vfs_spawn_revert_hidden(
         MICROS_VFS_CONTROL_RESULT_OK,
         action
     );
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -1171,8 +1156,5 @@ enum micros_vfs_core_error vfs_spawn_release_image(
         MICROS_VFS_CONTROL_RESULT_OK,
         action
     );
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }

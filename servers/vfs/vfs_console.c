@@ -530,30 +530,13 @@ static uint64_t expected_tty_event(
     return 0;
 }
 
-enum micros_vfs_core_error micros_vfs_handle_tty_notification(
+enum micros_vfs_core_error vfs_console_handle_notification(
     struct micros_vfs_state *state,
     uint64_t events,
     const struct micros_vfs_io *io,
     struct micros_vfs_result_action *action
 )
 {
-    if (
-        state == NULL
-        || io == NULL
-        || action == NULL
-        || events == 0
-        || (
-            events
-                & ~(
-                    MICROS_TTY_EVENT_COMPLETION
-                    | MICROS_TTY_EVENT_WRITABLE
-                )
-        ) != 0
-        || micros_vfs_state_validate(state)
-            != MICROS_VFS_CORE_OK
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
     if (events != expected_tty_event(state->pending.state)) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
@@ -622,12 +605,6 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
     }
-    if (
-        micros_vfs_state_validate(state)
-            != MICROS_VFS_CORE_OK
-    ) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     return MICROS_VFS_CORE_OK;
 }
 
@@ -694,30 +671,13 @@ static enum micros_vfs_core_error submit_test_drain(
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error micros_vfs_begin_test_drain(
+enum micros_vfs_core_error vfs_console_begin_test_drain(
     struct micros_vfs_state *state,
-    micros_endpoint_t endpoint,
     uint64_t reply_token,
     const struct micros_vfs_io *io,
     struct micros_vfs_result_action *action
 )
 {
-    size_t process_slot;
-
-    if (
-        state == NULL
-        || io == NULL
-        || action == NULL
-        || reply_token == 0
-        || !vfs_endpoint_is_canonical(endpoint)
-        || micros_vfs_state_validate(state)
-            != MICROS_VFS_CORE_OK
-        || !vfs_find_process(state, endpoint, &process_slot)
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
-    (void)process_slot;
-    vfs_zero_bytes(action, sizeof(*action));
     if (state->pending.state != MICROS_VFS_PENDING_NONE) {
         prepare_test_drain_action(
             reply_token,
@@ -742,8 +702,6 @@ enum micros_vfs_core_error micros_vfs_begin_test_drain(
             io,
             action
         ) != MICROS_VFS_CORE_OK
-        || micros_vfs_state_validate(state)
-            != MICROS_VFS_CORE_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }

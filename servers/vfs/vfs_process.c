@@ -1,6 +1,6 @@
 #include "servers/vfs/vfs_internal.h"
 
-enum micros_vfs_core_error micros_vfs_attach_console(
+enum micros_vfs_core_error vfs_process_attach_console(
     struct micros_vfs_state *state,
     micros_endpoint_t endpoint,
     uint16_t root_vnode,
@@ -12,21 +12,6 @@ enum micros_vfs_core_error micros_vfs_attach_console(
     struct micros_vfs_process_record *process;
     struct micros_vfs_vnode *root;
 
-    if (
-        state == NULL
-        || result == NULL
-        || !vfs_endpoint_is_canonical(endpoint)
-        || endpoint == state->self_endpoint
-        || endpoint == state->vm_endpoint
-        || endpoint == state->pm_endpoint
-        || endpoint == state->ramfs_endpoint
-        || endpoint == state->tty_endpoint
-        || root_vnode >= MICROS_VFS_VNODE_CAPACITY
-        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
-        || state->phase != MICROS_VFS_PHASE_MOUNTED
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
     if (vfs_find_process(state, endpoint, &process_slot)) {
         *result = MICROS_VFS_TRUSTED_EXISTS;
         return MICROS_VFS_CORE_OK;
@@ -79,14 +64,11 @@ enum micros_vfs_core_error micros_vfs_attach_console(
         state->open_files[open_file_slots[1]];
     root = &state->vnodes[root_vnode];
     root->local_reference_count += 2;
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     *result = MICROS_VFS_TRUSTED_OK;
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error micros_vfs_share_descriptor(
+enum micros_vfs_core_error vfs_process_share_descriptor(
     struct micros_vfs_state *state,
     micros_endpoint_t source_endpoint,
     uint32_t source_descriptor,
@@ -100,18 +82,6 @@ enum micros_vfs_core_error micros_vfs_share_descriptor(
     uint16_t reference;
     struct micros_vfs_open_file *open_file;
 
-    if (
-        state == NULL
-        || result == NULL
-        || !vfs_endpoint_is_canonical(source_endpoint)
-        || !vfs_endpoint_is_canonical(destination_endpoint)
-        || source_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
-        || destination_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
-        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
-        || state->phase != MICROS_VFS_PHASE_MOUNTED
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
     if (
         !vfs_find_process(
             state,
@@ -160,14 +130,11 @@ enum micros_vfs_core_error micros_vfs_share_descriptor(
     state->processes[destination_process_slot]
         .descriptors[destination_descriptor] = reference;
     ++open_file->reference_count;
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     *result = MICROS_VFS_TRUSTED_OK;
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error micros_vfs_detach(
+enum micros_vfs_core_error vfs_process_detach(
     struct micros_vfs_state *state,
     micros_endpoint_t endpoint,
     const struct micros_vfs_io *io,
@@ -181,17 +148,6 @@ enum micros_vfs_core_error micros_vfs_detach(
     size_t working_directory_vnode;
     bool debt;
 
-    if (
-        state == NULL
-        || io == NULL
-        || io->ramfs_call == NULL
-        || result == NULL
-        || !vfs_endpoint_is_canonical(endpoint)
-        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
-        || state->phase != MICROS_VFS_PHASE_MOUNTED
-    ) {
-        return MICROS_VFS_CORE_ERROR_ARGUMENT;
-    }
     if (!vfs_find_process(state, endpoint, &process_slot)) {
         *result = MICROS_VFS_TRUSTED_NOT_FOUND;
         return MICROS_VFS_CORE_OK;
@@ -275,9 +231,6 @@ enum micros_vfs_core_error micros_vfs_detach(
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     vfs_zero_bytes(process, sizeof(*process));
-    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
-    }
     *result = debt
         ? MICROS_VFS_TRUSTED_PENDING
         : MICROS_VFS_TRUSTED_OK;

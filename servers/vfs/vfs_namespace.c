@@ -1,5 +1,43 @@
 #include "servers/vfs/vfs_internal.h"
 
+enum micros_vfs_core_error vfs_namespace_mount(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_io *io
+)
+{
+    struct micros_vfs_ramfs_request request = {
+        .operation = MICROS_VFS_RAMFS_MOUNT,
+    };
+    struct micros_vfs_ramfs_response response = {0};
+    struct micros_vfs_vnode *root;
+
+    if (
+        io->ramfs_call(
+            io->context,
+            &request,
+            &response
+        ) != MICROS_VFS_BACKEND_OK
+        || response.result != MICROS_RAMFS_RESULT_OK
+        || response.node != MICROS_VFS_RAMFS_ROOT_NODE
+        || !vfs_mode_is_directory(response.mode)
+        || !vfs_mode_is_canonical(response.mode)
+        || response.file_size != 0
+        || response.position != 0
+        || response.count != 0
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    root = &state->vnodes[0];
+    root->state = MICROS_VFS_VNODE_ACTIVE;
+    root->mount_root = true;
+    root->node = response.node;
+    root->mode = response.mode;
+    root->local_reference_count = 1;
+    root->backend_reference_count = 1;
+    state->phase = MICROS_VFS_PHASE_MOUNTED;
+    return MICROS_VFS_CORE_OK;
+}
+
 bool vfs_namespace_response_node_is_valid(
     const struct micros_vfs_ramfs_response *response
 )

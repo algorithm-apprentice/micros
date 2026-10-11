@@ -11,224 +11,12 @@ static bool request_type_is_known(uint32_t type)
     );
 }
 
-static enum micros_vfs_core_error handle_transfer(
-    struct micros_vfs_state *state,
-    size_t process_slot,
-    const struct micros_vfs_request *request,
-    const struct micros_vfs_io *io,
-    struct micros_vfs_result_action *action
-)
-{
-    struct micros_vfs_open_file *open_file;
-    struct micros_vfs_vnode *vnode;
-    enum micros_vfs_result result;
-    size_t open_file_slot;
-    uint32_t required_access =
-        request->type == MICROS_VFS_MESSAGE_WRITE
-            ? MICROS_VFS_ACCESS_WRITE
-            : MICROS_VFS_ACCESS_READ;
-
-    if (
-        request->path_length != 0
-        || request->open_flags != 0
-        || request->mode != 0
-    ) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (request->count > MICROS_VFS_TRANSFER_MAX) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_RANGE,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        request->count == 0
-        && (
-            request->grant != 0
-            || request->grant_offset != 0
-        )
-    ) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        request->type == MICROS_VFS_MESSAGE_GETDENTS
-        && request->count != 0
-        && (
-            request->count < MICROS_VFS_DIRECTORY_RECORD_SIZE
-            || (
-                request->count
-                    % MICROS_VFS_DIRECTORY_RECORD_SIZE
-            ) != 0
-        )
-    ) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_RANGE,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    result = vfs_resolve_descriptor(
-        state,
-        process_slot,
-        request->descriptor,
-        &open_file_slot,
-        &open_file
-    );
-    if (result != MICROS_VFS_RESULT_OK) {
-        vfs_prepare_result(request, result, action);
-        return MICROS_VFS_CORE_OK;
-    }
-    (void)open_file_slot;
-    if ((open_file->access & required_access) == 0) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_ACCESS,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (request->type == MICROS_VFS_MESSAGE_GETDENTS) {
-        if (
-            open_file->kind != MICROS_VFS_OBJECT_RAMFS
-            || !vfs_mode_is_directory(
-                state->vnodes[open_file->vnode - 1].mode
-            )
-        ) {
-            vfs_prepare_result(
-                request,
-                MICROS_VFS_RESULT_NOT_DIRECTORY,
-                action
-            );
-            return MICROS_VFS_CORE_OK;
-        }
-    } else if (
-        open_file->kind == MICROS_VFS_OBJECT_RAMFS
-    ) {
-        vnode = &state->vnodes[open_file->vnode - 1];
-        if (vfs_mode_is_directory(vnode->mode)) {
-            vfs_prepare_result(
-                request,
-                MICROS_VFS_RESULT_IS_DIRECTORY,
-                action
-            );
-            return MICROS_VFS_CORE_OK;
-        }
-    }
-    if (state->pending.state != MICROS_VFS_PENDING_NONE) {
-        vfs_prepare_result(request, MICROS_VFS_RESULT_BUSY, action);
-        return MICROS_VFS_CORE_OK;
-    }
-    if (request->count == 0) {
-        vfs_prepare_result(request, MICROS_VFS_RESULT_OK, action);
-        action->position = open_file->position;
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        request->type == MICROS_VFS_MESSAGE_READ
-        && open_file->kind == MICROS_VFS_OBJECT_CONSOLE
-    ) {
-        if (
-            vfs_console_handle_read(
-                state,
-                process_slot,
-                open_file_slot,
-                request,
-                io,
-                &result
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        if (result != MICROS_VFS_RESULT_OK) {
-            vfs_prepare_result(request, result, action);
-        }
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        request->type == MICROS_VFS_MESSAGE_WRITE
-        && open_file->kind == MICROS_VFS_OBJECT_CONSOLE
-    ) {
-        if (
-            vfs_console_handle_write(
-                state,
-                process_slot,
-                open_file_slot,
-                request,
-                io,
-                &result
-            ) != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        if (result != MICROS_VFS_RESULT_OK) {
-            vfs_prepare_result(request, result, action);
-        }
-        return MICROS_VFS_CORE_OK;
-    }
-    if (
-        request->type == MICROS_VFS_MESSAGE_READ
-        && open_file->kind == MICROS_VFS_OBJECT_RAMFS
-    ) {
-        return vfs_io_handle_regular_read(
-            state,
-            open_file,
-            request,
-            io,
-            action
-        );
-    }
-    if (
-        request->type == MICROS_VFS_MESSAGE_WRITE
-        && open_file->kind == MICROS_VFS_OBJECT_RAMFS
-    ) {
-        return vfs_io_handle_regular_write(
-            state,
-            open_file,
-            request,
-            io,
-            action
-        );
-    }
-    if (request->type == MICROS_VFS_MESSAGE_GETDENTS) {
-        return vfs_io_handle_getdents(
-            state,
-            open_file,
-            request,
-            io,
-            action
-        );
-    }
-    vfs_prepare_result(
-        request,
-        MICROS_VFS_RESULT_STATE,
-        action
-    );
-    return MICROS_VFS_CORE_OK;
-}
-
 enum micros_vfs_core_error micros_vfs_mount(
     struct micros_vfs_state *state,
     const struct micros_vfs_io *io
 )
 {
-    struct micros_vfs_ramfs_request request = {
-        .operation = MICROS_VFS_RAMFS_MOUNT,
-    };
-    struct micros_vfs_ramfs_response response = {0};
-    struct micros_vfs_vnode *root;
+    enum micros_vfs_core_error error;
 
     if (
         state == NULL
@@ -239,35 +27,220 @@ enum micros_vfs_core_error micros_vfs_mount(
     ) {
         return MICROS_VFS_CORE_ERROR_ARGUMENT;
     }
-    if (
-        io->ramfs_call(
-            io->context,
-            &request,
-            &response
-        ) != MICROS_VFS_BACKEND_OK
-        || response.result != MICROS_RAMFS_RESULT_OK
-        || response.node != MICROS_VFS_RAMFS_ROOT_NODE
-        || !vfs_mode_is_directory(response.mode)
-        || !vfs_mode_is_canonical(response.mode)
-        || response.file_size != 0
-        || response.position != 0
-        || response.count != 0
-    ) {
-        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    error = vfs_namespace_mount(state, io);
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
     }
-    root = &state->vnodes[0];
-    root->state = MICROS_VFS_VNODE_ACTIVE;
-    root->mount_root = true;
-    root->node = response.node;
-    root->mode = response.mode;
-    root->local_reference_count = 1;
-    root->backend_reference_count = 1;
-    state->phase = MICROS_VFS_PHASE_MOUNTED;
     if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     return MICROS_VFS_CORE_OK;
 }
+
+enum micros_vfs_core_error micros_vfs_attach_console(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    uint16_t root_vnode,
+    enum micros_vfs_trusted_result *result
+)
+{
+    enum micros_vfs_core_error error;
+    enum micros_vfs_trusted_result transition_result;
+
+    if (
+        state == NULL
+        || result == NULL
+        || !vfs_endpoint_is_canonical(endpoint)
+        || endpoint == state->self_endpoint
+        || endpoint == state->vm_endpoint
+        || endpoint == state->pm_endpoint
+        || endpoint == state->ramfs_endpoint
+        || endpoint == state->tty_endpoint
+        || root_vnode >= MICROS_VFS_VNODE_CAPACITY
+        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
+        || state->phase != MICROS_VFS_PHASE_MOUNTED
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    error = vfs_process_attach_console(
+        state,
+        endpoint,
+        root_vnode,
+        &transition_result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    *result = transition_result;
+    return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error micros_vfs_share_descriptor(
+    struct micros_vfs_state *state,
+    micros_endpoint_t source_endpoint,
+    uint32_t source_descriptor,
+    micros_endpoint_t destination_endpoint,
+    uint32_t destination_descriptor,
+    enum micros_vfs_trusted_result *result
+)
+{
+    enum micros_vfs_core_error error;
+    enum micros_vfs_trusted_result transition_result;
+
+    if (
+        state == NULL
+        || result == NULL
+        || !vfs_endpoint_is_canonical(source_endpoint)
+        || !vfs_endpoint_is_canonical(destination_endpoint)
+        || source_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
+        || destination_descriptor >= MICROS_VFS_DESCRIPTOR_CAPACITY
+        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
+        || state->phase != MICROS_VFS_PHASE_MOUNTED
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    error = vfs_process_share_descriptor(
+        state,
+        source_endpoint,
+        source_descriptor,
+        destination_endpoint,
+        destination_descriptor,
+        &transition_result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    *result = transition_result;
+    return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error micros_vfs_detach(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_trusted_result *result
+)
+{
+    enum micros_vfs_core_error error;
+    enum micros_vfs_trusted_result transition_result;
+
+    if (
+        state == NULL
+        || io == NULL
+        || io->ramfs_call == NULL
+        || result == NULL
+        || !vfs_endpoint_is_canonical(endpoint)
+        || micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK
+        || state->phase != MICROS_VFS_PHASE_MOUNTED
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    error = vfs_process_detach(
+        state,
+        endpoint,
+        io,
+        &transition_result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    if (micros_vfs_state_validate(state) != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    *result = transition_result;
+    return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error micros_vfs_handle_tty_notification(
+    struct micros_vfs_state *state,
+    uint64_t events,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
+    enum micros_vfs_core_error error;
+
+    if (
+        state == NULL
+        || io == NULL
+        || action == NULL
+        || events == 0
+        || (
+            events
+                & ~(
+                    MICROS_TTY_EVENT_COMPLETION
+                    | MICROS_TTY_EVENT_WRITABLE
+                )
+        ) != 0
+        || micros_vfs_state_validate(state)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    error = vfs_console_handle_notification(
+        state,
+        events,
+        io,
+        action
+    );
+    if (
+        error == MICROS_VFS_CORE_OK
+        && micros_vfs_state_validate(state)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return error;
+}
+
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+enum micros_vfs_core_error micros_vfs_begin_test_drain(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    uint64_t reply_token,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
+    enum micros_vfs_core_error error;
+    size_t process_slot;
+
+    if (
+        state == NULL
+        || io == NULL
+        || action == NULL
+        || reply_token == 0
+        || !vfs_endpoint_is_canonical(endpoint)
+        || micros_vfs_state_validate(state)
+            != MICROS_VFS_CORE_OK
+        || !vfs_find_process(state, endpoint, &process_slot)
+    ) {
+        return MICROS_VFS_CORE_ERROR_ARGUMENT;
+    }
+    (void)process_slot;
+    vfs_zero_bytes(action, sizeof(*action));
+    error = vfs_console_begin_test_drain(
+        state,
+        reply_token,
+        io,
+        action
+    );
+    if (
+        error == MICROS_VFS_CORE_OK
+        && micros_vfs_state_validate(state)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return error;
+}
+#endif
 
 enum micros_vfs_core_error micros_vfs_handle_control(
     struct micros_vfs_state *state,
@@ -276,6 +249,8 @@ enum micros_vfs_core_error micros_vfs_handle_control(
     struct micros_vfs_control_result_action *action
 )
 {
+    enum micros_vfs_core_error error;
+
     if (
         state == NULL
         || request == NULL
@@ -292,66 +267,72 @@ enum micros_vfs_core_error micros_vfs_handle_control(
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
     if (request->command == MICROS_VFS_CONTROL_PREPARE_IMAGE) {
-        return vfs_spawn_prepare_image(
+        error = vfs_spawn_prepare_image(
             state,
             request,
             io,
             action
         );
-    }
-    if (request->command == MICROS_VFS_CONTROL_RELEASE_IMAGE) {
-        return vfs_spawn_release_image(
+    } else if (
+        request->command == MICROS_VFS_CONTROL_RELEASE_IMAGE
+    ) {
+        error = vfs_spawn_release_image(
             state,
             request,
             io,
             action
         );
-    }
-    if (
+    } else if (
         request->command
             == MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS
     ) {
-        return vfs_spawn_prepare_descriptors(
+        error = vfs_spawn_prepare_descriptors(
             state,
             request,
             action
         );
-    }
-    if (
+    } else if (
         request->command
             == MICROS_VFS_CONTROL_ABORT_DESCRIPTORS
     ) {
-        return vfs_spawn_abort_descriptors(
+        error = vfs_spawn_abort_descriptors(
             state,
             request,
             io,
             action
         );
-    }
-    if (
+    } else if (
         request->command == MICROS_VFS_CONTROL_COMMIT_HIDDEN
     ) {
-        return vfs_spawn_commit_hidden(
+        error = vfs_spawn_commit_hidden(
             state,
             request,
             action
         );
-    }
-    if (
+    } else if (
         request->command == MICROS_VFS_CONTROL_REVERT_HIDDEN
     ) {
-        return vfs_spawn_revert_hidden(
+        error = vfs_spawn_revert_hidden(
             state,
             request,
             action
         );
+    } else {
+        vfs_prepare_control_result(
+            request,
+            MICROS_VFS_CONTROL_RESULT_STATE,
+            action
+        );
+        error = MICROS_VFS_CORE_OK;
     }
-    vfs_prepare_control_result(
-        request,
-        MICROS_VFS_CONTROL_RESULT_STATE,
-        action
-    );
-    return MICROS_VFS_CORE_OK;
+    if (
+        error == MICROS_VFS_CORE_OK
+        && micros_vfs_state_validate(state)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    return error;
 }
 
 enum micros_vfs_core_error micros_vfs_handle_request(
@@ -445,7 +426,7 @@ enum micros_vfs_core_error micros_vfs_handle_request(
     case MICROS_VFS_MESSAGE_READ:
     case MICROS_VFS_MESSAGE_WRITE:
     case MICROS_VFS_MESSAGE_GETDENTS:
-        error = handle_transfer(
+        error = vfs_io_handle_transfer(
             state,
             process_slot,
             request,

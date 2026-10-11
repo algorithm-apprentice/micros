@@ -590,3 +590,211 @@ enum micros_vfs_core_error vfs_io_handle_getdents(
     action->position = response.position;
     return MICROS_VFS_CORE_OK;
 }
+
+enum micros_vfs_core_error vfs_io_handle_transfer(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
+    struct micros_vfs_open_file *open_file;
+    struct micros_vfs_vnode *vnode;
+    enum micros_vfs_result result;
+    size_t open_file_slot;
+    uint32_t required_access =
+        request->type == MICROS_VFS_MESSAGE_WRITE
+            ? MICROS_VFS_ACCESS_WRITE
+            : MICROS_VFS_ACCESS_READ;
+
+    if (
+        request->path_length != 0
+        || request->open_flags != 0
+        || request->mode != 0
+    ) {
+        vfs_prepare_result(
+            request,
+            MICROS_VFS_RESULT_MALFORMED,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (request->count > MICROS_VFS_TRANSFER_MAX) {
+        vfs_prepare_result(
+            request,
+            MICROS_VFS_RESULT_RANGE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->count == 0
+        && (
+            request->grant != 0
+            || request->grant_offset != 0
+        )
+    ) {
+        vfs_prepare_result(
+            request,
+            MICROS_VFS_RESULT_MALFORMED,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->type == MICROS_VFS_MESSAGE_GETDENTS
+        && request->count != 0
+        && (
+            request->count < MICROS_VFS_DIRECTORY_RECORD_SIZE
+            || (
+                request->count
+                    % MICROS_VFS_DIRECTORY_RECORD_SIZE
+            ) != 0
+        )
+    ) {
+        vfs_prepare_result(
+            request,
+            MICROS_VFS_RESULT_RANGE,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    result = vfs_resolve_descriptor(
+        state,
+        process_slot,
+        request->descriptor,
+        &open_file_slot,
+        &open_file
+    );
+    if (result != MICROS_VFS_RESULT_OK) {
+        vfs_prepare_result(request, result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    (void)open_file_slot;
+    if ((open_file->access & required_access) == 0) {
+        vfs_prepare_result(
+            request,
+            MICROS_VFS_RESULT_ACCESS,
+            action
+        );
+        return MICROS_VFS_CORE_OK;
+    }
+    if (request->type == MICROS_VFS_MESSAGE_GETDENTS) {
+        if (
+            open_file->kind != MICROS_VFS_OBJECT_RAMFS
+            || !vfs_mode_is_directory(
+                state->vnodes[open_file->vnode - 1].mode
+            )
+        ) {
+            vfs_prepare_result(
+                request,
+                MICROS_VFS_RESULT_NOT_DIRECTORY,
+                action
+            );
+            return MICROS_VFS_CORE_OK;
+        }
+    } else if (
+        open_file->kind == MICROS_VFS_OBJECT_RAMFS
+    ) {
+        vnode = &state->vnodes[open_file->vnode - 1];
+        if (vfs_mode_is_directory(vnode->mode)) {
+            vfs_prepare_result(
+                request,
+                MICROS_VFS_RESULT_IS_DIRECTORY,
+                action
+            );
+            return MICROS_VFS_CORE_OK;
+        }
+    }
+    if (state->pending.state != MICROS_VFS_PENDING_NONE) {
+        vfs_prepare_result(request, MICROS_VFS_RESULT_BUSY, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    if (request->count == 0) {
+        vfs_prepare_result(request, MICROS_VFS_RESULT_OK, action);
+        action->position = open_file->position;
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->type == MICROS_VFS_MESSAGE_READ
+        && open_file->kind == MICROS_VFS_OBJECT_CONSOLE
+    ) {
+        if (
+            vfs_console_handle_read(
+                state,
+                process_slot,
+                open_file_slot,
+                request,
+                io,
+                &result
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        if (result != MICROS_VFS_RESULT_OK) {
+            vfs_prepare_result(request, result, action);
+        }
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->type == MICROS_VFS_MESSAGE_WRITE
+        && open_file->kind == MICROS_VFS_OBJECT_CONSOLE
+    ) {
+        if (
+            vfs_console_handle_write(
+                state,
+                process_slot,
+                open_file_slot,
+                request,
+                io,
+                &result
+            ) != MICROS_VFS_CORE_OK
+        ) {
+            return MICROS_VFS_CORE_ERROR_INVARIANT;
+        }
+        if (result != MICROS_VFS_RESULT_OK) {
+            vfs_prepare_result(request, result, action);
+        }
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->type == MICROS_VFS_MESSAGE_READ
+        && open_file->kind == MICROS_VFS_OBJECT_RAMFS
+    ) {
+        return vfs_io_handle_regular_read(
+            state,
+            open_file,
+            request,
+            io,
+            action
+        );
+    }
+    if (
+        request->type == MICROS_VFS_MESSAGE_WRITE
+        && open_file->kind == MICROS_VFS_OBJECT_RAMFS
+    ) {
+        return vfs_io_handle_regular_write(
+            state,
+            open_file,
+            request,
+            io,
+            action
+        );
+    }
+    if (request->type == MICROS_VFS_MESSAGE_GETDENTS) {
+        return vfs_io_handle_getdents(
+            state,
+            open_file,
+            request,
+            io,
+            action
+        );
+    }
+    vfs_prepare_result(
+        request,
+        MICROS_VFS_RESULT_STATE,
+        action
+    );
+    return MICROS_VFS_CORE_OK;
+}

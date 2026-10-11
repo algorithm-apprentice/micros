@@ -283,6 +283,11 @@ enum micros_vfs_core_error vfs_namespace_handle_chdir(
     struct micros_vfs_result_action *action
 );
 
+enum micros_vfs_core_error vfs_namespace_mount(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_io *io
+);
+
 enum micros_vfs_core_error vfs_io_handle_close(
     struct micros_vfs_state *state,
     size_t process_slot,
@@ -315,6 +320,14 @@ enum micros_vfs_core_error vfs_io_handle_getdents(
     struct micros_vfs_result_action *action
 );
 
+enum micros_vfs_core_error vfs_io_handle_transfer(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
 enum micros_vfs_core_error vfs_console_handle_read(
     struct micros_vfs_state *state,
     size_t process_slot,
@@ -338,6 +351,45 @@ enum micros_vfs_core_error vfs_console_cleanup_pending_operation(
     micros_endpoint_t endpoint,
     const struct micros_vfs_io *io,
     bool *debt
+);
+
+enum micros_vfs_core_error vfs_console_handle_notification(
+    struct micros_vfs_state *state,
+    uint64_t events,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+enum micros_vfs_core_error vfs_console_begin_test_drain(
+    struct micros_vfs_state *state,
+    uint64_t reply_token,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+);
+#endif
+
+enum micros_vfs_core_error vfs_process_attach_console(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    uint16_t root_vnode,
+    enum micros_vfs_trusted_result *result
+);
+
+enum micros_vfs_core_error vfs_process_share_descriptor(
+    struct micros_vfs_state *state,
+    micros_endpoint_t source_endpoint,
+    uint32_t source_descriptor,
+    micros_endpoint_t destination_endpoint,
+    uint32_t destination_descriptor,
+    enum micros_vfs_trusted_result *result
+);
+
+enum micros_vfs_core_error vfs_process_detach(
+    struct micros_vfs_state *state,
+    micros_endpoint_t endpoint,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_trusted_result *result
 );
 
 enum micros_vfs_core_error vfs_spawn_prepare_image(
