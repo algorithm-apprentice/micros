@@ -523,27 +523,12 @@ static enum micros_vfs_core_error create_regular_file(
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error vfs_namespace_handle_open(
-    struct micros_vfs_state *state,
-    size_t process_slot,
+static bool open_request_is_malformed(
     const struct micros_vfs_request *request,
-    const struct micros_vfs_io *io,
-    struct micros_vfs_result_action *action
+    uint32_t access
 )
 {
-    struct micros_vfs_process_record *process =
-        &state->processes[process_slot];
-    struct micros_vfs_ramfs_response response = {0};
-    enum micros_vfs_result result;
-    size_t descriptor;
-    size_t open_file_slot;
-    size_t vnode_scratch;
-    size_t vnode_slot;
-    uint32_t access =
-        request->open_flags & MICROS_VFS_ACCESS_DEFINED_MASK;
-    bool created = false;
-
-    if (
+    return (
         request->descriptor != 0
         || request->count != 0
         || request->path_length < 2
@@ -579,16 +564,30 @@ enum micros_vfs_core_error vfs_namespace_handle_open(
             ) == 0
             && request->mode != 0
         )
-    ) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
+    );
+}
+
+static enum micros_vfs_core_error prepare_open_request(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    uint32_t access,
+    size_t *descriptor,
+    size_t *open_file_slot,
+    size_t *vnode_scratch,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
+    if (open_request_is_malformed(request, access)) {
+        *result = MICROS_VFS_RESULT_MALFORMED;
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     if (state->pending.state != MICROS_VFS_PENDING_NONE) {
-        vfs_prepare_result(request, MICROS_VFS_RESULT_BUSY, action);
+        *result = MICROS_VFS_RESULT_BUSY;
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     if (
@@ -596,104 +595,97 @@ enum micros_vfs_core_error vfs_namespace_handle_open(
             state,
             request,
             io,
-            &result
+            result
         ) != MICROS_VFS_CORE_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    if (result != MICROS_VFS_RESULT_OK) {
-        vfs_prepare_result(request, result, action);
+    if (*result != MICROS_VFS_RESULT_OK) {
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     if (
-        !vfs_find_free_descriptor(process, &descriptor)
-        || !vfs_find_free_open_files(state, 1, &open_file_slot)
-        || !vfs_find_free_vnode(state, &vnode_scratch)
+        !vfs_find_free_descriptor(process, descriptor)
+        || !vfs_find_free_open_files(state, 1, open_file_slot)
+        || !vfs_find_free_vnode(state, vnode_scratch)
     ) {
         state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_NO_SPACE,
-            action
-        );
+        *result = MICROS_VFS_RESULT_NO_SPACE;
+        vfs_prepare_result(request, *result, action);
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error create_missing_open_target(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_ramfs_response *response,
+    enum micros_vfs_result *result,
+    bool *created,
+    struct micros_vfs_result_action *action
+)
+{
+    if (*result == MICROS_VFS_RESULT_OK) {
+        state->client_page_owner = MICROS_VFS_PAGE_FREE;
         return MICROS_VFS_CORE_OK;
     }
     if (
-        lookup_path(
+        *result != MICROS_VFS_RESULT_NOT_FOUND
+        || (
+            request->open_flags & MICROS_VFS_OPEN_CREATE
+        ) == 0
+    ) {
+        state->client_page_owner = MICROS_VFS_PAGE_FREE;
+        vfs_prepare_result(request, *result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        request->path_length > 1
+        && state->client_page[request->path_length - 2] == '/'
+    ) {
+        state->client_page_owner = MICROS_VFS_PAGE_FREE;
+        *result = MICROS_VFS_RESULT_NOT_DIRECTORY;
+        vfs_prepare_result(request, *result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    if (vfs_free_vnode_count(state) < 2) {
+        state->client_page_owner = MICROS_VFS_PAGE_FREE;
+        *result = MICROS_VFS_RESULT_NO_SPACE;
+        vfs_prepare_result(request, *result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    if (
+        create_regular_file(
             state,
-            request,
             process,
+            request,
             io,
-            &response,
-            &result
+            response,
+            result
         ) != MICROS_VFS_CORE_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-    if (result != MICROS_VFS_RESULT_OK) {
-        if (
-            result == MICROS_VFS_RESULT_NOT_FOUND
-            && (
-                request->open_flags & MICROS_VFS_OPEN_CREATE
-            ) != 0
-        ) {
-            if (
-                request->path_length > 1
-                && state->client_page[
-                    request->path_length - 2
-                ] == '/'
-            ) {
-                state->client_page_owner =
-                    MICROS_VFS_PAGE_FREE;
-                vfs_prepare_result(
-                    request,
-                    MICROS_VFS_RESULT_NOT_DIRECTORY,
-                    action
-                );
-                return MICROS_VFS_CORE_OK;
-            }
-            if (vfs_free_vnode_count(state) < 2) {
-                state->client_page_owner =
-                    MICROS_VFS_PAGE_FREE;
-                vfs_prepare_result(
-                    request,
-                    MICROS_VFS_RESULT_NO_SPACE,
-                    action
-                );
-                return MICROS_VFS_CORE_OK;
-            }
-            if (
-                create_regular_file(
-                    state,
-                    process,
-                    request,
-                    io,
-                    &response,
-                    &result
-                ) != MICROS_VFS_CORE_OK
-            ) {
-                return MICROS_VFS_CORE_ERROR_INVARIANT;
-            }
-            state->client_page_owner =
-                MICROS_VFS_PAGE_FREE;
-            if (result != MICROS_VFS_RESULT_OK) {
-                vfs_prepare_result(request, result, action);
-                return MICROS_VFS_CORE_OK;
-            }
-            created = true;
-        } else {
-            state->client_page_owner =
-                MICROS_VFS_PAGE_FREE;
-            vfs_prepare_result(request, result, action);
-            return MICROS_VFS_CORE_OK;
-        }
-    } else {
-        state->client_page_owner = MICROS_VFS_PAGE_FREE;
-    }
-    if (result != MICROS_VFS_RESULT_OK) {
-        vfs_prepare_result(request, result, action);
+    state->client_page_owner = MICROS_VFS_PAGE_FREE;
+    if (*result != MICROS_VFS_RESULT_OK) {
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
+    *created = true;
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error validate_open_target(
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    const struct micros_vfs_ramfs_response *response,
+    bool created,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
     if (
         (
             request->open_flags
@@ -707,61 +699,55 @@ enum micros_vfs_core_error vfs_namespace_handle_open(
         )
         && !created
     ) {
-        if (
-            vfs_putnode(io, response.node, 1)
-                != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_EXISTS,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (vfs_mode_is_directory(response.mode)) {
+        *result = MICROS_VFS_RESULT_EXISTS;
+    } else if (vfs_mode_is_directory(response->mode)) {
         if (
             (request->open_flags & MICROS_VFS_OPEN_WRITE) != 0
             || (
                 request->open_flags & MICROS_VFS_OPEN_CREATE
             ) != 0
         ) {
-            if (
-                vfs_putnode(io, response.node, 1)
-                    != MICROS_VFS_CORE_OK
-            ) {
-                return MICROS_VFS_CORE_ERROR_INVARIANT;
-            }
-            vfs_prepare_result(
-                request,
-                MICROS_VFS_RESULT_IS_DIRECTORY,
-                action
-            );
-            return MICROS_VFS_CORE_OK;
+            *result = MICROS_VFS_RESULT_IS_DIRECTORY;
         }
     } else if (
         (
             request->open_flags & MICROS_VFS_OPEN_DIRECTORY
         ) != 0
     ) {
-        if (
-            vfs_putnode(io, response.node, 1)
-                != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_NOT_DIRECTORY,
-            action
-        );
+        *result = MICROS_VFS_RESULT_NOT_DIRECTORY;
+    }
+    if (*result == MICROS_VFS_RESULT_OK) {
         return MICROS_VFS_CORE_OK;
     }
     if (
+        vfs_putnode(io, response->node, 1)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    vfs_prepare_result(request, *result, action);
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error publish_open_target(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    const struct micros_vfs_ramfs_response *response,
+    size_t descriptor,
+    size_t open_file_slot,
+    size_t vnode_scratch,
+    uint32_t access,
+    struct micros_vfs_result_action *action
+)
+{
+    size_t vnode_slot;
+
+    if (
         vfs_namespace_integrate_vnode(
             state,
-            &response,
+            response,
             vnode_scratch,
             io,
             &vnode_slot
@@ -782,11 +768,11 @@ enum micros_vfs_core_error vfs_namespace_handle_open(
         (uint16_t)(open_file_slot + 1);
     vfs_prepare_result(request, MICROS_VFS_RESULT_OK, action);
     action->descriptor = (uint32_t)descriptor;
-    action->mode = response.mode;
+    action->mode = response->mode;
     return MICROS_VFS_CORE_OK;
 }
 
-enum micros_vfs_core_error vfs_namespace_handle_mkdir(
+enum micros_vfs_core_error vfs_namespace_handle_open(
     struct micros_vfs_state *state,
     size_t process_slot,
     const struct micros_vfs_request *request,
@@ -797,56 +783,33 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
     struct micros_vfs_process_record *process =
         &state->processes[process_slot];
     struct micros_vfs_ramfs_response response = {0};
-    struct micros_vfs_ramfs_response parent_response = {0};
-    struct micros_vfs_request parent_request = *request;
-    uint8_t name[MICROS_VFS_NAME_MAX + 1] = {0};
-    size_t name_length;
-    size_t parent_length;
-    size_t vnode_scratch;
     enum micros_vfs_result result;
     enum micros_vfs_core_error error;
+    size_t descriptor;
+    size_t open_file_slot;
+    size_t vnode_scratch;
+    uint32_t access =
+        request->open_flags & MICROS_VFS_ACCESS_DEFINED_MASK;
+    bool created = false;
 
-    if (
-        request->descriptor != 0
-        || request->count != 0
-        || request->open_flags != 0
-        || request->path_length < 2
-        || request->path_length > MICROS_VFS_PATH_MAX
-        || (
-            request->mode & ~MICROS_RAMFS_MODE_PERMISSIONS
-        ) != 0
-    ) {
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    if (state->pending.state != MICROS_VFS_PENDING_NONE) {
-        vfs_prepare_result(request, MICROS_VFS_RESULT_BUSY, action);
-        return MICROS_VFS_CORE_OK;
-    }
-    error = vfs_copy_application_path(state, request, io, &result);
+    error = prepare_open_request(
+        state,
+        process,
+        request,
+        io,
+        access,
+        &descriptor,
+        &open_file_slot,
+        &vnode_scratch,
+        &result,
+        action
+    );
     if (
         error != MICROS_VFS_CORE_OK
         || result != MICROS_VFS_RESULT_OK
     ) {
-        if (error == MICROS_VFS_CORE_OK) {
-            vfs_prepare_result(request, result, action);
-        }
         return error;
     }
-    if (!vfs_find_free_vnode(state, &vnode_scratch)) {
-        state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_NO_SPACE,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
-    }
-    (void)vnode_scratch;
     error = lookup_path(
         state,
         request,
@@ -856,9 +819,131 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
         &result
     );
     if (error != MICROS_VFS_CORE_OK) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
+    }
+    error = create_missing_open_target(
+        state,
+        process,
+        request,
+        io,
+        &response,
+        &result,
+        &created,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_RESULT_OK
+    ) {
         return error;
     }
-    if (result == MICROS_VFS_RESULT_OK) {
+    error = validate_open_target(
+        request,
+        io,
+        &response,
+        created,
+        &result,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_RESULT_OK
+    ) {
+        return error;
+    }
+    return publish_open_target(
+        state,
+        process,
+        request,
+        io,
+        &response,
+        descriptor,
+        open_file_slot,
+        vnode_scratch,
+        access,
+        action
+    );
+}
+
+static bool mkdir_request_is_malformed(
+    const struct micros_vfs_request *request
+)
+{
+    return (
+        request->descriptor != 0
+        || request->count != 0
+        || request->open_flags != 0
+        || request->path_length < 2
+        || request->path_length > MICROS_VFS_PATH_MAX
+        || (
+            request->mode & ~MICROS_RAMFS_MODE_PERMISSIONS
+        ) != 0
+    );
+}
+
+static enum micros_vfs_core_error prepare_mkdir_request(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
+    size_t vnode_scratch;
+    enum micros_vfs_core_error error;
+
+    if (mkdir_request_is_malformed(request)) {
+        *result = MICROS_VFS_RESULT_MALFORMED;
+        vfs_prepare_result(request, *result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    if (state->pending.state != MICROS_VFS_PENDING_NONE) {
+        *result = MICROS_VFS_RESULT_BUSY;
+        vfs_prepare_result(request, *result, action);
+        return MICROS_VFS_CORE_OK;
+    }
+    error = vfs_copy_application_path(state, request, io, result);
+    if (
+        error != MICROS_VFS_CORE_OK
+        || *result != MICROS_VFS_RESULT_OK
+    ) {
+        if (error == MICROS_VFS_CORE_OK) {
+            vfs_prepare_result(request, *result, action);
+        }
+        return error;
+    }
+    if (!vfs_find_free_vnode(state, &vnode_scratch)) {
+        state->client_page_owner = MICROS_VFS_PAGE_FREE;
+        *result = MICROS_VFS_RESULT_NO_SPACE;
+        vfs_prepare_result(request, *result, action);
+    }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error require_missing_mkdir_target(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
+    struct micros_vfs_ramfs_response response = {0};
+    enum micros_vfs_core_error error;
+
+    error = lookup_path(
+        state,
+        request,
+        process,
+        io,
+        &response,
+        result
+    );
+    if (error != MICROS_VFS_CORE_OK) {
+        return error;
+    }
+    if (*result == MICROS_VFS_RESULT_OK) {
         state->client_page_owner = MICROS_VFS_PAGE_FREE;
         if (
             vfs_putnode(io, response.node, 1)
@@ -866,34 +951,46 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
         ) {
             return MICROS_VFS_CORE_ERROR_INVARIANT;
         }
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_EXISTS,
-            action
-        );
+        *result = MICROS_VFS_RESULT_EXISTS;
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
-    if (result != MICROS_VFS_RESULT_NOT_FOUND) {
+    if (*result != MICROS_VFS_RESULT_NOT_FOUND) {
         state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        vfs_prepare_result(request, result, action);
-        return MICROS_VFS_CORE_OK;
+        vfs_prepare_result(request, *result, action);
     }
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error lookup_mkdir_parent(
+    struct micros_vfs_state *state,
+    struct micros_vfs_process_record *process,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    uint8_t *name,
+    size_t *name_length,
+    struct micros_vfs_ramfs_response *parent_response,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
+    struct micros_vfs_request parent_request = *request;
+    size_t parent_length;
+    enum micros_vfs_core_error error;
+
     if (
         !extract_final_component(
             state,
             request->path_length,
             true,
             name,
-            &name_length,
+            name_length,
             &parent_length
         )
     ) {
         state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
+        *result = MICROS_VFS_RESULT_MALFORMED;
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     parent_request.path_length = (uint32_t)parent_length;
@@ -902,63 +999,67 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
         &parent_request,
         process,
         io,
-        &parent_response,
-        &result
+        parent_response,
+        result
     );
     if (
         error != MICROS_VFS_CORE_OK
-        || result != MICROS_VFS_RESULT_OK
+        || *result != MICROS_VFS_RESULT_OK
     ) {
         state->client_page_owner = MICROS_VFS_PAGE_FREE;
         if (error == MICROS_VFS_CORE_OK) {
-            vfs_prepare_result(request, result, action);
+            vfs_prepare_result(request, *result, action);
         }
         return error;
     }
-    if (!vfs_mode_is_directory(parent_response.mode)) {
-        state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        if (
-            vfs_putnode(io, parent_response.node, 1)
-                != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_NOT_DIRECTORY,
-            action
-        );
+    if (
+        vfs_mode_is_directory(parent_response->mode)
+        && create_name_is_valid(name, *name_length)
+    ) {
         return MICROS_VFS_CORE_OK;
     }
-    if (!create_name_is_valid(name, name_length)) {
-        state->client_page_owner = MICROS_VFS_PAGE_FREE;
-        if (
-            vfs_putnode(io, parent_response.node, 1)
-                != MICROS_VFS_CORE_OK
-        ) {
-            return MICROS_VFS_CORE_ERROR_INVARIANT;
-        }
-        vfs_prepare_result(
-            request,
-            MICROS_VFS_RESULT_MALFORMED,
-            action
-        );
-        return MICROS_VFS_CORE_OK;
+    state->client_page_owner = MICROS_VFS_PAGE_FREE;
+    if (
+        vfs_putnode(io, parent_response->node, 1)
+            != MICROS_VFS_CORE_OK
+    ) {
+        return MICROS_VFS_CORE_ERROR_INVARIANT;
     }
+    *result = vfs_mode_is_directory(parent_response->mode)
+        ? MICROS_VFS_RESULT_MALFORMED
+        : MICROS_VFS_RESULT_NOT_DIRECTORY;
+    vfs_prepare_result(request, *result, action);
+    return MICROS_VFS_CORE_OK;
+}
+
+static enum micros_vfs_core_error create_mkdir_target(
+    struct micros_vfs_state *state,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    const uint8_t *name,
+    size_t name_length,
+    const struct micros_vfs_ramfs_response *parent_response,
+    enum micros_vfs_result *result,
+    struct micros_vfs_result_action *action
+)
+{
+    struct micros_vfs_ramfs_response response = {0};
+    enum micros_vfs_core_error error;
+
     error = call_create(
         state,
         MICROS_VFS_RAMFS_MKDIR,
-        parent_response.node,
+        parent_response->node,
         name,
         name_length,
         MICROS_RAMFS_MODE_DIRECTORY | request->mode,
         io,
         &response,
-        &result
+        result
     );
     state->client_page_owner = MICROS_VFS_PAGE_FREE;
     if (
-        vfs_putnode(io, parent_response.node, 1)
+        vfs_putnode(io, parent_response->node, 1)
             != MICROS_VFS_CORE_OK
     ) {
         return MICROS_VFS_CORE_ERROR_INVARIANT;
@@ -966,8 +1067,8 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
     if (error != MICROS_VFS_CORE_OK) {
         return error;
     }
-    if (result != MICROS_VFS_RESULT_OK) {
-        vfs_prepare_result(request, result, action);
+    if (*result != MICROS_VFS_RESULT_OK) {
+        vfs_prepare_result(request, *result, action);
         return MICROS_VFS_CORE_OK;
     }
     if (
@@ -981,6 +1082,78 @@ enum micros_vfs_core_error vfs_namespace_handle_mkdir(
     }
     vfs_prepare_result(request, MICROS_VFS_RESULT_OK, action);
     return MICROS_VFS_CORE_OK;
+}
+
+enum micros_vfs_core_error vfs_namespace_handle_mkdir(
+    struct micros_vfs_state *state,
+    size_t process_slot,
+    const struct micros_vfs_request *request,
+    const struct micros_vfs_io *io,
+    struct micros_vfs_result_action *action
+)
+{
+    struct micros_vfs_process_record *process =
+        &state->processes[process_slot];
+    struct micros_vfs_ramfs_response parent_response = {0};
+    uint8_t name[MICROS_VFS_NAME_MAX + 1] = {0};
+    size_t name_length;
+    enum micros_vfs_result result;
+    enum micros_vfs_core_error error;
+
+    error = prepare_mkdir_request(
+        state,
+        request,
+        io,
+        &result,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_RESULT_OK
+    ) {
+        return error;
+    }
+    error = require_missing_mkdir_target(
+        state,
+        process,
+        request,
+        io,
+        &result,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_RESULT_NOT_FOUND
+    ) {
+        return error;
+    }
+    error = lookup_mkdir_parent(
+        state,
+        process,
+        request,
+        io,
+        name,
+        &name_length,
+        &parent_response,
+        &result,
+        action
+    );
+    if (
+        error != MICROS_VFS_CORE_OK
+        || result != MICROS_VFS_RESULT_OK
+    ) {
+        return error;
+    }
+    return create_mkdir_target(
+        state,
+        request,
+        io,
+        name,
+        name_length,
+        &parent_response,
+        &result,
+        action
+    );
 }
 
 enum micros_vfs_core_error vfs_namespace_handle_chdir(
