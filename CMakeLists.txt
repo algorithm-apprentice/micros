@@ -93,6 +93,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+    "Build the VM scratch preemption and stale-translation image"
+    OFF
+)
+option(
     MICROS_BUILD_TTY_SERVICE_TEST
     "Build the real TTY service integration image"
     OFF
@@ -202,6 +207,7 @@ set(
     MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     MICROS_BUILD_VM_HANDOFF_TEST
     MICROS_BUILD_PM_SERVICE_TEST
+    MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
     MICROS_BUILD_TTY_SERVICE_TEST
     MICROS_BUILD_TTY_SERVICE_IMAGE
     MICROS_BUILD_RAMFS_SERVICE_IMAGE
@@ -1735,6 +1741,7 @@ if(
     OR MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST
     OR MICROS_BUILD_VM_HANDOFF_TEST
     OR MICROS_BUILD_PM_SERVICE_TEST
+    OR MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
     OR MICROS_BUILD_TTY_SERVICE_TEST
     OR MICROS_BUILD_TTY_SERVICE_IMAGE
     OR MICROS_BUILD_RAMFS_SERVICE_IMAGE
@@ -1949,6 +1956,7 @@ if(
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
         OR MICROS_BUILD_PM_SERVICE_TEST
+        OR MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
         OR MICROS_BUILD_TTY_SERVICE_TEST
         OR MICROS_BUILD_RAMFS_SERVICE_TEST
         OR MICROS_BUILD_VFS_SERVICE_TEST
@@ -1966,6 +1974,13 @@ if(
             tests/qemu/vm_self_fault.S
             tests/qemu/vm_server.c
         )
+        if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
+            target_sources(
+                micros_vm_server
+                PRIVATE
+                    tests/qemu/vm_scratch_preemption_vm.S
+            )
+        endif()
         add_custom_command(
             TARGET micros_vm_server
             POST_BUILD
@@ -1982,7 +1997,13 @@ if(
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             VERBATIM
         )
-        if(MICROS_BUILD_VFS_SERVICE_TEST)
+        if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_VM_SCRATCH_PREEMPTION_TEST=1
+            )
+        elseif(MICROS_BUILD_VFS_SERVICE_TEST)
             target_compile_definitions(
                 micros_vm_server
                 PRIVATE
@@ -2025,7 +2046,62 @@ if(
                     MICROS_VM_SELF_FAULT_SEALED=1
             )
         endif()
-        if(MICROS_BUILD_PM_SERVICE_TEST)
+        if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                servers/pm/pm_core.c
+                servers/pm/pm_service.c
+                tests/qemu/vm_scratch_preemption_peer.S
+            )
+            target_compile_definitions(
+                micros_pm_service
+                PRIVATE
+                    MICROS_VM_SCRATCH_PREEMPTION_TEST=1
+            )
+            micros_add_bootstrap_user(
+                micros_vm_scratch_preemption_driver
+                micros-vm-scratch-preemption-driver
+                tests/qemu/vm_scratch_preemption_driver.c
+            )
+            set(
+                MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/vm_scratch_preemption_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT
+                    "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}"
+                    -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_scratch_preemption_fixture.py"
+                    --launcher-elf
+                    "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf
+                    "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf
+                    "$<TARGET_FILE:micros_pm_service>"
+                    --driver-elf
+                    "$<TARGET_FILE:micros_vm_scratch_preemption_driver>"
+                    --output
+                    "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_vm_scratch_preemption_driver
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_scratch_preemption_fixture.py"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        elseif(MICROS_BUILD_PM_SERVICE_TEST)
             micros_add_bootstrap_user(
                 micros_pm_service
                 micros-pm-service
@@ -2532,6 +2608,27 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
     )
 endif()
 
+if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_vm_scratch_preemption_driver
+    )
+    target_compile_definitions(
+        micros
+        PRIVATE
+            MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST=1
+    )
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
+            kernel/vm_scratch_preemption_test.c
+    )
+endif()
+
 if(MICROS_BUILD_TTY_SERVICE_TEST)
     add_dependencies(
         micros
@@ -3007,6 +3104,40 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout
+            45
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
+    add_custom_target(
+        test-qemu-vm-scratch-preemption
+        COMMAND
+            "${MICROS_PYTHON}"
+            -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu
+            "${MICROS_QEMU}"
+            --kernel
+            "$<TARGET_FILE:micros>"
+            --marker
+            "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker
+            "MICROS_FDT_READY"
+            --marker
+            "MICROS_TRAP_READY"
+            --marker
+            "MICROS_VM_SCRATCH_PREEMPTION_TEST_PASS map=real timer=preempted roots=distinct inactive-validation=accepted reactivation=fenced sentinel=preserved commit=real stale-translation=faulted pte=absent ownership=transferable scratch=clear"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

@@ -28,6 +28,9 @@
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"
 #endif
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+#include "kernel/vm_scratch_preemption_test.h"
+#endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tty_service_test.h"
 #endif
@@ -480,6 +483,14 @@ void kernel_main(uintptr_t hart_id, uintptr_t fdt_address)
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
     micros_pm_service_test_launch();
     MICROS_PANIC(hart_id, "pm-service-test-returned");
+#endif
+
+#ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
+    micros_vm_scratch_preemption_test_launch();
+    MICROS_PANIC(
+        hart_id,
+        "vm-scratch-preemption-test-returned"
+    );
 #endif
 
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST

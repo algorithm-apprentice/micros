@@ -294,6 +294,7 @@ QEMU targets are `test-qemu-smoke`,
 `test-qemu-bootstrap-launcher`,
 `test-qemu-vm-handoff`,
 `test-qemu-pm-service`,
+`test-qemu-vm-scratch-preemption`,
 `test-qemu-tty`,
 `test-qemu-ramfs`,
 `test-qemu-vfs`,
@@ -338,6 +339,7 @@ cmake --workflow --preset test-qemu-user-runtime
 cmake --workflow --preset test-qemu-bootstrap-launcher
 cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
+cmake --workflow --preset test-qemu-vm-scratch-preemption
 cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-ramfs
 cmake --workflow --preset test-qemu-vfs
@@ -1053,6 +1055,30 @@ advanced and stale. Only the exact marker is accepted:
 ```text
 MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received reserve=aborted resources=clean generation=advanced transaction=advanced
 ```
+
+The first ELF-spawn Step 14 QEMU component is implemented:
+
+```text
+test-qemu-vm-scratch-preemption
+```
+
+It starts the production launcher, VM, and PM service plus one test-only
+orchestration driver. PM performs a real operation-13 reservation and replies
+to the driver, preserving PM's launcher-only call authority; the driver then
+calls VM with the opaque transaction. VM performs real `LOAD_BEGIN` and
+`SCRATCH_MAP` operation-12 calls, writes the scratch sentinel, and reaches the
+labeled test hook. The hook releases PM as the measured peer, reduces VM's
+remaining quantum to one tick, and resumes VM in a labeled user-mode spin so
+only the ordinary timer can cause the measured preemption. The scheduler must
+switch to PM's distinct root, where the production complete-root validator
+accepts VM's inactive scratch exception. PM then blocks through ordinary
+`RECEIVE`; the scheduler reactivates VM through the normal ASID-zero full-fence
+path. VM rereads the sentinel, performs the real `SCRATCH_COMMIT`, and executes
+the labeled stale load. Only an exact load-page fault at the removed scratch
+address passes, together with an absent scratch PTE, `SCRATCH_CLEAR`, and the
+frame retained as the transaction's unmapped `VM_TRANSFERABLE` entry. The
+final `test-qemu-elf-spawn` workflow remains reserved for this component plus
+the later complete spawn integration scenario.
 
 The TTY Step 11 workflow is implemented:
 

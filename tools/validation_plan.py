@@ -34,6 +34,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-vm-scratch-preemption",
     "test-qemu-tty",
     "test-qemu-ramfs",
     "test-qemu-vfs",
@@ -124,6 +125,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff",
     "test-qemu-pm-service",
+    "test-qemu-vm-scratch-preemption",
     "test-qemu-tty",
     "test-qemu-ramfs",
     "test-qemu-vfs",
@@ -599,6 +601,24 @@ GATE_INPUTS["test-qemu-pm-service"] = GATE_INPUTS[
     "tests/qemu/pm_service_protocol.h",
     "tests/qemu/pm_service_report.S",
     "tools/generate_pm_service_fixture.py",
+)
+GATE_INPUTS["test-qemu-vm-scratch-preemption"] = GATE_INPUTS[
+    "test-qemu-pm-service"
+] + (
+    "arch/riscv64/mmu.S",
+    "kernel/scheduler.c",
+    "kernel/timer.c",
+    "kernel/trap.c",
+    "kernel/user_address_space.c",
+    "kernel/vm_scratch_preemption_test.c",
+    "kernel/vm_scratch_preemption_test.h",
+    "kernel/vm_scratch_preemption_test_fixture.h",
+    "tests/host/test_generate_vm_scratch_preemption_fixture.py",
+    "tests/qemu/vm_scratch_preemption_peer.S",
+    "tests/qemu/vm_scratch_preemption_driver.c",
+    "tests/qemu/vm_scratch_preemption_protocol.h",
+    "tests/qemu/vm_scratch_preemption_vm.S",
+    "tools/generate_vm_scratch_preemption_fixture.py",
 )
 GATE_INPUTS["test-qemu-tty"] = GATE_INPUTS[
     "test-qemu-pm-service"
