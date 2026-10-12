@@ -420,6 +420,8 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "tests/host/vm_handoff_syscall_test_runtime_backend.c",
         "tests/host/vm_handoff_syscall_test_boot_backend.c",
         "tests/host/vm_handoff_syscall_test_load_backend.c",
+        "kernel/address_space_handoff_test_syscall.c",
+        "kernel/address_space_handoff_test_trap.c",
     }
 )
 
@@ -503,6 +505,18 @@ LONG_FUNCTION_MIGRATION = tuple(
         (
             "tests/host/vm_handoff_syscall_test.c",
             "reset_fixture",
+        ),
+        (
+            "kernel/address_space_handoff_test.c",
+            "arm_handoff_syscall",
+        ),
+        (
+            "kernel/address_space_handoff_test.c",
+            "transition_handoff_syscall",
+        ),
+        (
+            "kernel/address_space_handoff_test.c",
+            "micros_address_space_handoff_runtime_run_self_test",
         ),
     }
 )

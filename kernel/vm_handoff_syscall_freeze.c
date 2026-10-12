@@ -79,10 +79,14 @@ static enum reservation_check_result prepare_freeze_resources(
 )
 {
     struct micros_process_handle reserved_process;
-    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
     enum reservation_check_result reservation;
     size_t index;
 
+    micros_vm_handoff_syscall_clear_bytes(
+        data_frames,
+        sizeof(data_frames)
+    );
     reservation = micros_vm_handoff_syscall_check_reservation(
         pm,
         context->objects,

@@ -20,9 +20,13 @@ static void prepare_frozen_abort_release(
     struct abort_command_plans *plans
 )
 {
-    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
     size_t index;
 
+    micros_vm_handoff_syscall_clear_bytes(
+        data_frames,
+        sizeof(data_frames)
+    );
     if (micros_user_address_space_prepare_vm_teardown(
         process,
         plans->action.root_physical_address,
@@ -65,10 +69,14 @@ static void prepare_loading_abort_release(
     struct abort_command_plans *plans
 )
 {
-    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
+    uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
     size_t data_frame_count = plans->action.entry_count;
     size_t index;
 
+    micros_vm_handoff_syscall_clear_bytes(
+        data_frames,
+        sizeof(data_frames)
+    );
     for (index = 0; index < plans->action.entry_count; ++index) {
         data_frames[index] =
             plans->action.entries[index].physical_address;
