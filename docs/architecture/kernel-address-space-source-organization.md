@@ -252,6 +252,12 @@ restores the saved interrupt state only after the full operation boundary.
 No new module-global copy of process state, root state, table state,
 frame-owner state, execution state, or test context is permitted.
 
+The existing test-only allocation-failure sequence remains one guarded
+runtime mechanism because root creation and bootstrap page allocation both
+consume it. `user_address_space_mutation.c` owns the public test control,
+while `user_address_space_runtime.c` owns the shared allocation wrapper and
+counter used by both lifecycle and mutation.
+
 ### Private headers
 
 The three production-private headers contain:

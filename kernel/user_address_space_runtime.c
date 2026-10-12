@@ -14,6 +14,11 @@ static uint64_t reachable_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
 static uint64_t release_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
 static bool scratch_busy;
 
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+static size_t test_fail_after_allocations = SIZE_MAX;
+static size_t test_successful_allocations;
+#endif
+
 _Static_assert(sizeof(reachable_bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
                "reachability bitmap must cover every managed frame");
 _Static_assert(sizeof(release_bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
@@ -26,6 +31,16 @@ static void clear_scratch_bitmap(uint64_t *bitmap, size_t word_count) {
         bitmap[index] = 0;
     }
 }
+
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+void micros_user_address_space_test_set_allocation_limit(
+    size_t successful_allocations
+)
+{
+    test_fail_after_allocations = successful_allocations;
+    test_successful_allocations = 0;
+}
+#endif
 
 uintptr_t micros_user_address_space_runtime_lock(void) {
     return riscv_irq_save();
@@ -74,6 +89,32 @@ micros_user_address_space_map_ownership_error(enum micros_frame_ownership_error 
     default:
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
     }
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_allocate_owned_frame(
+    struct micros_frame_owner owner,
+    uint64_t *physical_address
+)
+{
+    enum micros_frame_ownership_error error;
+
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    if (test_successful_allocations >= test_fail_after_allocations) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ALLOCATION;
+    }
+#endif
+    error = micros_frame_ownership_runtime_allocate(
+        owner,
+        physical_address
+    );
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return micros_user_address_space_map_ownership_error(error);
+    }
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+    ++test_successful_allocations;
+#endif
+    return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 enum micros_user_address_space_error micros_user_address_space_runtime_require_bootstrap(

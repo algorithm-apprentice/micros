@@ -324,36 +324,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
 SYMBOL_OWNER_MIGRATION = (
     (
         "kernel/user_address_space.c",
-        "kernel/user_address_space_mutation.c",
-        "micros_user_address_space_allocate_page",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_mutation.c",
-        "micros_user_address_space_release_page",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_mutation.c",
-        "micros_user_address_space_test_fail_after_allocations",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_mapping.c",
-        "micros_user_address_space_lookup",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_mapping.c",
-        "micros_user_address_space_translate",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_mapping.c",
-        "micros_user_address_space_inventory",
-    ),
-    (
-        "kernel/user_address_space.c",
         "kernel/user_address_space_handoff.c",
         "micros_user_address_space_prepare_wired_handoff",
     ),
@@ -371,11 +341,6 @@ SYMBOL_OWNER_MIGRATION = (
         "kernel/user_address_space.c",
         "kernel/user_address_space_activation.c",
         "micros_user_address_space_activate_kernel",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_validation.c",
-        "micros_user_address_space_validate",
     ),
     (
         "kernel/user_execution.c",
@@ -501,16 +466,6 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 
 LONG_FUNCTION_MIGRATION = (
-    ("kernel/user_address_space.c", "validate_locked"),
-    ("kernel/user_address_space.c", "visit_user_mappings_locked"),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_allocate_page",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_release_page",
-    ),
     (
         "kernel/user_address_space.c",
         "micros_user_address_space_prepare_tty_uart_mapping",

@@ -16,6 +16,8 @@ enum {
     MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX = 1,
 };
 
+struct micros_tty_device_authority;
+
 struct micros_user_address_space_page_table {
     uint64_t entries[MICROS_SV39_TABLE_ENTRY_COUNT];
 };
@@ -148,6 +150,18 @@ _Noreturn void micros_user_address_space_panic_invariant(
     const char *reason
 );
 
+enum micros_user_address_space_error
+micros_user_address_space_allocate_owned_frame(
+    struct micros_frame_owner owner,
+    uint64_t *physical_address
+);
+
+#ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
+void micros_user_address_space_test_set_allocation_limit(
+    size_t successful_allocations
+);
+#endif
+
 struct micros_user_address_space_page_table *
 micros_user_address_space_table_at(
     uint64_t physical_address
@@ -208,6 +222,91 @@ bool micros_user_address_space_bitmap_add(
     uint64_t *bitmap,
     size_t word_count,
     uint64_t frame_index
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_load_tty_device_authority(
+    bool *active,
+    struct micros_tty_device_authority *authority
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_load_vm_scratch_authority(
+    bool *active,
+    struct micros_user_address_space_vm_scratch_authority
+        *authority
+);
+
+bool micros_user_address_space_leaf_matches_vm_scratch_authority(
+    bool authority_active,
+    const struct micros_user_address_space_vm_scratch_authority
+        *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_classify_tty_device_leaf(
+    bool authority_active,
+    const struct micros_tty_device_authority *authority,
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf,
+    bool *is_device
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_reject_exceptional_leaf(
+    struct micros_process_handle process,
+    uint64_t root_physical_address,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_validate_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    const struct micros_process **resolved_process
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_validate_all_process_roots_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_kernel_objects *objects,
+    const struct micros_user_address_space_scratch_lease *lease
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_visit_mappings_locked(
+    struct micros_process_handle process_handle,
+    const struct micros_process *process,
+    micros_user_mapping_visitor visitor,
+    void *context,
+    size_t *mapping_count
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_lookup_leaf_locked(
+    const struct micros_process *process,
+    uint64_t virtual_address,
+    struct micros_sv39_decoded_pte *leaf_entry,
+    uint64_t **leaf_pte,
+    uint64_t *middle_physical_address,
+    uint64_t *leaf_physical_address
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_locate_leaf_slot_locked(
+    const struct micros_process *process,
+    uint64_t virtual_address,
+    struct micros_sv39_decoded_pte *leaf_entry,
+    uint64_t **leaf_pte,
+    uint64_t *leaf_table_physical_address
 );
 
 enum micros_user_address_space_error
