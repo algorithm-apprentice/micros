@@ -1,4 +1,4 @@
-#include "servers/pm/pm_core.h"
+#include "tests/host/pm_test_internal.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -8,172 +8,9 @@
 bool micros_pm_control_test_run(void);
 bool micros_pm_control_execution_test_run(void);
 
-#define EXPECT_TRUE(expression) \
-    do { \
-        if (!(expression)) { \
-            fprintf( \
-                stderr, \
-                "%s:%d: expected %s\n", \
-                __FILE__, \
-                __LINE__, \
-                #expression \
-            ); \
-            return false; \
-        } \
-    } while (false)
-
-static bool spawn_running_child(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle parent,
-    micros_endpoint_t endpoint,
-    struct micros_pm_process_handle *child,
-    uint64_t *pid
-);
-
-static bool complete_exit(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle child,
-    uint64_t transaction,
-    int32_t exit_code,
-    struct micros_pm_wait_outcomes *outcomes
-);
-
-static void write_u32_le(uint8_t *bytes, uint32_t value)
-{
-    bytes[0] = (uint8_t)value;
-    bytes[1] = (uint8_t)(value >> 8);
-    bytes[2] = (uint8_t)(value >> 16);
-    bytes[3] = (uint8_t)(value >> 24);
-}
-
-static void write_u64_le(uint8_t *bytes, uint64_t value)
-{
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        bytes[index] = (uint8_t)(value >> (index * 8));
-    }
-}
-
-static uint32_t read_u32_le(const uint8_t *bytes)
-{
-    return (
-        (uint32_t)bytes[0]
-        | (uint32_t)bytes[1] << 8
-        | (uint32_t)bytes[2] << 16
-        | (uint32_t)bytes[3] << 24
-    );
-}
-
-static uint64_t read_u64_le(const uint8_t *bytes)
-{
-    uint64_t value = 0;
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        value |= (uint64_t)bytes[index] << (index * 8);
-    }
-    return value;
-}
-
-static bool pm_handles_equal(
-    struct micros_pm_process_handle left,
-    struct micros_pm_process_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.reserved == right.reserved
-        && left.generation == right.generation
-    );
-}
-
-static bool pm_handle_is_none(struct micros_pm_process_handle handle)
-{
-    return (
-        handle.slot == 0
-        && handle.reserved == 0
-        && handle.generation == 0
-    );
-}
-
-static bool bytes_are_zero(const void *storage, size_t size)
-{
-    const unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static struct micros_ipc_message exit_request(int32_t exit_code)
-{
-    struct micros_ipc_message message;
-
-    memset(&message, 0, sizeof(message));
-    message.source = UINT32_C(0x00001001);
-    message.type = MICROS_PM_MESSAGE_EXIT;
-    message.reply_token = 7;
-    write_u32_le(&message.payload[0], MICROS_PM_PROTOCOL_VERSION);
-    write_u32_le(&message.payload[8], (uint32_t)exit_code);
-    return message;
-}
-
-static struct micros_ipc_message wait_request(
-    uint32_t flags,
-    uint64_t child_pid
-)
-{
-    struct micros_ipc_message message;
-
-    memset(&message, 0, sizeof(message));
-    message.source = UINT32_C(0x00001001);
-    message.type = MICROS_PM_MESSAGE_WAIT;
-    message.reply_token = 9;
-    write_u32_le(&message.payload[0], MICROS_PM_PROTOCOL_VERSION);
-    write_u32_le(&message.payload[4], flags);
-    write_u64_le(&message.payload[8], child_pid);
-    return message;
-}
-
-static struct micros_ipc_message spawn_request(
-    uint32_t grant,
-    uint32_t request_size
-)
-{
-    struct micros_ipc_message message;
-
-    memset(&message, 0, sizeof(message));
-    message.source = UINT32_C(0x00001001);
-    message.type = MICROS_PM_MESSAGE_SPAWN;
-    message.reply_token = 11;
-    write_u32_le(&message.payload[0], MICROS_PM_PROTOCOL_VERSION);
-    write_u32_le(&message.payload[8], grant);
-    write_u32_le(&message.payload[12], request_size);
-    return message;
-}
-
-static struct micros_ipc_message sealed_event(void)
-{
-    struct micros_ipc_message message;
-
-    memset(&message, 0, sizeof(message));
-    message.source = MICROS_ENDPOINT_NONE;
-    message.type = MICROS_IPC_TYPE_KERNEL_NOTIFICATION;
-    write_u64_le(
-        &message.payload[0],
-        MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED
-    );
-    return message;
-}
-
 static bool test_protocol_contract(void)
 {
-    struct micros_ipc_message message = exit_request(-19);
+    struct micros_ipc_message message = pm_test_exit_request(-19);
     struct micros_pm_request request;
     struct micros_pm_request sentinel;
     struct micros_ipc_message result;
@@ -195,7 +32,7 @@ static bool test_protocol_contract(void)
         && request.exit_code == -19
         && request.child_pid == 0
     );
-    message = wait_request(MICROS_PM_WAIT_NOHANG, UINT64_C(45));
+    message = pm_test_wait_request(MICROS_PM_WAIT_NOHANG, UINT64_C(45));
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_OK
@@ -204,7 +41,7 @@ static bool test_protocol_contract(void)
         && request.child_pid == UINT64_C(45)
         && request.exit_code == 0
     );
-    message = spawn_request(UINT32_C(0x1234), 256);
+    message = pm_test_spawn_request(UINT32_C(0x1234), 256);
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_OK
@@ -215,13 +52,13 @@ static bool test_protocol_contract(void)
         && request.child_pid == 0
         && request.exit_code == 0
     );
-    message = spawn_request(UINT32_MAX, 256);
+    message = pm_test_spawn_request(UINT32_MAX, 256);
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_OK
         && request.grant == UINT32_MAX
     );
-    message = spawn_request(1, 4096);
+    message = pm_test_spawn_request(1, 4096);
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_OK
@@ -236,37 +73,37 @@ static bool test_protocol_contract(void)
             == MICROS_PM_PROTOCOL_BAD_TYPE
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
-    message = wait_request(0, 0);
-    write_u32_le(&message.payload[0], 2);
+    message = pm_test_wait_request(0, 0);
+    pm_test_write_u32_le(&message.payload[0], 2);
     request = sentinel;
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_BAD_VERSION
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
-    message = wait_request(UINT32_C(0x2), 0);
+    message = pm_test_wait_request(UINT32_C(0x2), 0);
     request = sentinel;
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_MALFORMED
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
-    message = spawn_request(1, 255);
+    message = pm_test_spawn_request(1, 255);
     request = sentinel;
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_MALFORMED
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
-    message = spawn_request(1, 4097);
+    message = pm_test_spawn_request(1, 4097);
     request = sentinel;
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
             == MICROS_PM_PROTOCOL_MALFORMED
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
-    message = spawn_request(1, 256);
-    write_u32_le(&message.payload[4], 1);
+    message = pm_test_spawn_request(1, 256);
+    pm_test_write_u32_le(&message.payload[4], 1);
     request = sentinel;
     EXPECT_TRUE(
         micros_pm_decode_request(&message, &request)
@@ -274,8 +111,8 @@ static bool test_protocol_contract(void)
         && memcmp(&request, &sentinel, sizeof(request)) == 0
     );
     for (index = 0; index < 32; ++index) {
-        message = spawn_request(1, 256);
-        write_u32_le(
+        message = pm_test_spawn_request(1, 256);
+        pm_test_write_u32_le(
             &message.payload[4],
             UINT32_C(1) << index
         );
@@ -287,7 +124,7 @@ static bool test_protocol_contract(void)
         );
     }
     for (index = 16; index < sizeof(message.payload); ++index) {
-        message = spawn_request(1, 256);
+        message = pm_test_spawn_request(1, 256);
         message.payload[index] = 1;
         request = sentinel;
         EXPECT_TRUE(
@@ -296,7 +133,7 @@ static bool test_protocol_contract(void)
             && memcmp(&request, &sentinel, sizeof(request)) == 0
         );
     }
-    message = wait_request(0, 0);
+    message = pm_test_wait_request(0, 0);
     message.reply_token = 0;
     request = sentinel;
     EXPECT_TRUE(
@@ -319,18 +156,18 @@ static bool test_protocol_contract(void)
         && result.source == 0
         && result.type == MICROS_PM_MESSAGE_RESULT
         && result.reply_token == 0
-        && read_u32_le(&result.payload[0])
+        && pm_test_read_u32_le(&result.payload[0])
             == MICROS_PM_PROTOCOL_VERSION
-        && read_u32_le(&result.payload[4])
+        && pm_test_read_u32_le(&result.payload[4])
             == MICROS_PM_MESSAGE_WAIT
-        && (int32_t)read_u32_le(&result.payload[8])
+        && (int32_t)pm_test_read_u32_le(&result.payload[8])
             == MICROS_PM_RESULT_OK
-        && read_u32_le(&result.payload[12]) == 0
-        && read_u64_le(&result.payload[16])
+        && pm_test_read_u32_le(&result.payload[12]) == 0
+        && pm_test_read_u64_le(&result.payload[16])
             == UINT64_C(0x0102030405060708)
-        && read_u32_le(&result.payload[24])
+        && pm_test_read_u32_le(&result.payload[24])
             == MICROS_PM_EXIT_NORMAL
-        && (int32_t)read_u32_le(&result.payload[28]) == -23
+        && (int32_t)pm_test_read_u32_le(&result.payload[28]) == -23
     );
     result = result_sentinel;
     EXPECT_TRUE(
@@ -355,9 +192,9 @@ static bool test_protocol_contract(void)
             &result
         ) == MICROS_PM_MODEL_OK
         && result.type == MICROS_PM_MESSAGE_RESULT
-        && read_u32_le(&result.payload[4])
+        && pm_test_read_u32_le(&result.payload[4])
             == MICROS_PM_MESSAGE_RESULT
-        && (int32_t)read_u32_le(&result.payload[8])
+        && (int32_t)pm_test_read_u32_le(&result.payload[8])
             == MICROS_PM_RESULT_BAD_TYPE
     );
     result = result_sentinel;
@@ -370,15 +207,15 @@ static bool test_protocol_contract(void)
             0,
             &result
         ) == MICROS_PM_MODEL_OK
-        && read_u32_le(&result.payload[4])
+        && pm_test_read_u32_le(&result.payload[4])
             == MICROS_PM_MESSAGE_SPAWN
-        && (int32_t)read_u32_le(&result.payload[8])
+        && (int32_t)pm_test_read_u32_le(&result.payload[8])
             == MICROS_PM_RESULT_OK
-        && read_u64_le(&result.payload[16])
+        && pm_test_read_u64_le(&result.payload[16])
             == UINT64_C(0x0102030405060708)
-        && read_u32_le(&result.payload[24])
+        && pm_test_read_u32_le(&result.payload[24])
             == MICROS_PM_EXIT_NONE
-        && read_u32_le(&result.payload[28]) == 0
+        && pm_test_read_u32_le(&result.payload[28]) == 0
     );
     result = result_sentinel;
     EXPECT_TRUE(
@@ -402,9 +239,9 @@ static bool test_protocol_contract(void)
             0,
             &result
         ) == MICROS_PM_MODEL_OK
-        && (int32_t)read_u32_le(&result.payload[8])
+        && (int32_t)pm_test_read_u32_le(&result.payload[8])
             == MICROS_PM_RESULT_DESCRIPTOR
-        && bytes_are_zero(&result.payload[12], 36)
+        && pm_test_bytes_are_zero(&result.payload[12], 36)
     );
     result = result_sentinel;
     EXPECT_TRUE(
@@ -418,380 +255,6 @@ static bool test_protocol_contract(void)
         ) == MICROS_PM_MODEL_ERROR_ARGUMENT
         && memcmp(&result, &result_sentinel, sizeof(result)) == 0
     );
-    return true;
-}
-
-static bool complete_spawn(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle child,
-    micros_endpoint_t endpoint,
-    uint64_t expected_reply_token
-)
-{
-    uint64_t reply_token = UINT64_MAX;
-
-    return (
-        micros_pm_spawn_reserve_kernel(table, child, 11)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_prepare_image(table, child, 12)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_freeze_mappings(table, child, 13, 14)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_prepare_descriptors(table, child, 15)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_prepare_execution(
-            table,
-            child,
-            16,
-            endpoint
-        ) == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_commit_hidden(table, child, 17)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_spawn_activate(
-            table,
-            child,
-            endpoint,
-            &reply_token
-        )
-            == MICROS_PM_MODEL_OK
-        && reply_token == expected_reply_token
-    );
-}
-
-static bool initialize_running_init(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle *init
-)
-{
-    struct micros_ipc_message event = sealed_event();
-    uint64_t pid = 0;
-
-    memset(table, 0, sizeof(*table));
-    return (
-        micros_pm_table_initialize(table) == MICROS_PM_MODEL_OK
-        && micros_pm_enable_runtime(table, &event)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_begin_init(table, init, &pid)
-            == MICROS_PM_MODEL_OK
-        && pid == 1
-        && complete_spawn(
-            table,
-            *init,
-            UINT32_C(0x00001000),
-            0
-        )
-        && micros_pm_table_validate(table) == MICROS_PM_MODEL_OK
-    );
-}
-
-static bool test_runtime_gate_and_spawn(void)
-{
-    struct micros_pm_table table;
-    struct micros_pm_process_handle init;
-    struct micros_pm_process_handle child;
-    const struct micros_pm_process_record *record;
-    struct micros_ipc_message event = sealed_event();
-    uint64_t pid = 0;
-
-    memset(&table, 0, sizeof(table));
-    EXPECT_TRUE(
-        micros_pm_table_initialize(&table) == MICROS_PM_MODEL_OK
-        && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
-        && micros_pm_begin_init(&table, &init, &pid)
-            == MICROS_PM_MODEL_ERROR_STATE
-    );
-    event.source = UINT32_C(1);
-    EXPECT_TRUE(
-        micros_pm_enable_runtime(&table, &event)
-            == MICROS_PM_MODEL_ERROR_ARGUMENT
-        && !table.runtime_enabled
-    );
-    event = sealed_event();
-    EXPECT_TRUE(
-        micros_pm_enable_runtime(&table, &event)
-            == MICROS_PM_MODEL_OK
-        && table.runtime_enabled
-        && micros_pm_enable_runtime(&table, &event)
-            == MICROS_PM_MODEL_ERROR_STATE
-    );
-    EXPECT_TRUE(
-        micros_pm_begin_init(&table, &init, &pid)
-            == MICROS_PM_MODEL_OK
-        && pid == 1
-        && micros_pm_process_resolve(&table, init, &record)
-            == MICROS_PM_MODEL_OK
-        && record->state == MICROS_PM_PROCESS_SPAWNING
-        && record->spawn_stage
-            == MICROS_PM_SPAWN_PM_RECORD_RESERVED
-        && record->endpoint == MICROS_ENDPOINT_NONE
-        && table.reaper.generation == 0
-    );
-    EXPECT_TRUE(
-        complete_spawn(&table, init, UINT32_C(0x00001000), 0)
-        && micros_pm_process_resolve(&table, init, &record)
-            == MICROS_PM_MODEL_OK
-        && record->state == MICROS_PM_PROCESS_RUNNING
-        && record->reaper
-        && record->endpoint == UINT32_C(0x00001000)
-        && table.reaper.slot == init.slot
-        && table.reaper.generation == init.generation
-    );
-    EXPECT_TRUE(
-        micros_pm_begin_spawn(&table, init, 101, &child, &pid)
-            == MICROS_PM_MODEL_OK
-        && pid == 2
-        && micros_pm_process_resolve(&table, child, &record)
-            == MICROS_PM_MODEL_OK
-        && record->spawn.parent_reply_token == 101
-        && micros_pm_spawn_prepare_image(&table, child, 1)
-            == MICROS_PM_MODEL_ERROR_STATE
-        && complete_spawn(
-            &table,
-            child,
-            UINT32_C(0x00002001),
-            101
-        )
-        && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
-    );
-    return true;
-}
-
-static uint32_t expected_resources(enum micros_pm_spawn_stage stage)
-{
-    uint32_t resources = 0;
-
-    if (stage >= MICROS_PM_SPAWN_KERNEL_PROCESS_RESERVED) {
-        resources |= MICROS_PM_RESOURCE_KERNEL_PROCESS;
-    }
-    if (stage >= MICROS_PM_SPAWN_VFS_IMAGE_PREPARED) {
-        resources |= MICROS_PM_RESOURCE_VFS_IMAGE;
-    }
-    if (stage >= MICROS_PM_SPAWN_VM_MAPPINGS_FROZEN) {
-        resources |= MICROS_PM_RESOURCE_VM_MAPPINGS;
-    }
-    if (stage >= MICROS_PM_SPAWN_VFS_DESCRIPTORS_PREPARED) {
-        resources |= MICROS_PM_RESOURCE_VFS_DESCRIPTORS;
-    }
-    if (stage >= MICROS_PM_SPAWN_KERNEL_EXECUTION_PREPARED) {
-        resources |= MICROS_PM_RESOURCE_KERNEL_EXECUTION;
-    }
-    if (stage >= MICROS_PM_SPAWN_PM_VFS_COMMITTED) {
-        resources |= MICROS_PM_RESOURCE_PM_VFS_COMMIT;
-    }
-    return resources;
-}
-
-static bool advance_to_stage(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle child,
-    enum micros_pm_spawn_stage stage
-)
-{
-    if (
-        stage >= MICROS_PM_SPAWN_KERNEL_PROCESS_RESERVED
-        && micros_pm_spawn_reserve_kernel(table, child, 21)
-            != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    if (
-        stage >= MICROS_PM_SPAWN_VFS_IMAGE_PREPARED
-        && micros_pm_spawn_prepare_image(table, child, 22)
-            != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    if (
-        stage >= MICROS_PM_SPAWN_VM_MAPPINGS_FROZEN
-        && micros_pm_spawn_freeze_mappings(table, child, 23, 24)
-            != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    if (
-        stage >= MICROS_PM_SPAWN_VFS_DESCRIPTORS_PREPARED
-        && micros_pm_spawn_prepare_descriptors(table, child, 25)
-            != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    if (
-        stage >= MICROS_PM_SPAWN_KERNEL_EXECUTION_PREPARED
-        && micros_pm_spawn_prepare_execution(
-            table,
-            child,
-            26,
-            UINT32_C(0x00003001)
-        ) != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    return (
-        stage < MICROS_PM_SPAWN_PM_VFS_COMMITTED
-        || micros_pm_spawn_commit_hidden(table, child, 27)
-            == MICROS_PM_MODEL_OK
-    );
-}
-
-static enum micros_pm_spawn_rollback_resource
-rollback_resource_for_stage(enum micros_pm_spawn_stage stage)
-{
-    switch (stage) {
-    case MICROS_PM_SPAWN_PM_VFS_COMMITTED:
-        return MICROS_PM_ROLLBACK_PM_VFS_COMMIT;
-    case MICROS_PM_SPAWN_KERNEL_EXECUTION_PREPARED:
-        return MICROS_PM_ROLLBACK_KERNEL_EXECUTION;
-    case MICROS_PM_SPAWN_VFS_DESCRIPTORS_PREPARED:
-        return MICROS_PM_ROLLBACK_VFS_DESCRIPTORS;
-    case MICROS_PM_SPAWN_VM_MAPPINGS_FROZEN:
-        return MICROS_PM_ROLLBACK_VM_MAPPINGS;
-    case MICROS_PM_SPAWN_VFS_IMAGE_PREPARED:
-        return MICROS_PM_ROLLBACK_VFS_IMAGE;
-    case MICROS_PM_SPAWN_KERNEL_PROCESS_RESERVED:
-        return MICROS_PM_ROLLBACK_KERNEL_PROCESS;
-    case MICROS_PM_SPAWN_PM_RECORD_RESERVED:
-    case MICROS_PM_SPAWN_NONE:
-    default:
-        return MICROS_PM_ROLLBACK_NONE;
-    }
-}
-
-static uint32_t rollback_resource_bit(
-    enum micros_pm_spawn_rollback_resource resource
-)
-{
-    switch (resource) {
-    case MICROS_PM_ROLLBACK_PM_VFS_COMMIT:
-        return MICROS_PM_RESOURCE_PM_VFS_COMMIT;
-    case MICROS_PM_ROLLBACK_KERNEL_EXECUTION:
-        return MICROS_PM_RESOURCE_KERNEL_EXECUTION;
-    case MICROS_PM_ROLLBACK_VFS_DESCRIPTORS:
-        return MICROS_PM_RESOURCE_VFS_DESCRIPTORS;
-    case MICROS_PM_ROLLBACK_VM_MAPPINGS:
-        return MICROS_PM_RESOURCE_VM_MAPPINGS;
-    case MICROS_PM_ROLLBACK_VFS_IMAGE:
-        return MICROS_PM_RESOURCE_VFS_IMAGE;
-    case MICROS_PM_ROLLBACK_KERNEL_PROCESS:
-        return MICROS_PM_RESOURCE_KERNEL_PROCESS;
-    case MICROS_PM_ROLLBACK_NONE:
-    default:
-        return 0;
-    }
-}
-
-static bool rollback_spawn(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle child,
-    enum micros_pm_spawn_stage stage,
-    uint64_t parent_reply_token,
-    bool parent_lost,
-    uint32_t *released_resources
-)
-{
-    struct micros_pm_spawn_rollback_action action;
-    enum micros_pm_spawn_stage current_stage = stage;
-    uint32_t released = 0;
-
-    if (
-        micros_pm_spawn_rollback_begin(
-            table,
-            child,
-            stage,
-            parent_reply_token,
-            parent_lost,
-            &action
-        ) != MICROS_PM_MODEL_OK
-    ) {
-        return false;
-    }
-    while (!action.complete) {
-        if (
-            action.expected_stage != current_stage
-            || action.resource
-                != rollback_resource_for_stage(current_stage)
-        ) {
-            return false;
-        }
-        released |= rollback_resource_bit(action.resource);
-        if (
-            micros_pm_spawn_rollback_ack(
-                table,
-                child,
-                action.expected_stage,
-                action.resource,
-                action.token,
-                action.secondary_token,
-                action.endpoint,
-                &action
-            ) != MICROS_PM_MODEL_OK
-        ) {
-            return false;
-        }
-        current_stage = (
-            enum micros_pm_spawn_stage
-        )((unsigned int)current_stage - 1U);
-    }
-    if (
-        action.resource != MICROS_PM_ROLLBACK_NONE
-        || action.parent_lost != parent_lost
-        || action.reply_token
-            != (parent_lost ? 0 : parent_reply_token)
-    ) {
-        return false;
-    }
-    *released_resources = released;
-    return true;
-}
-
-static bool test_reverse_rollback_and_identity(void)
-{
-    enum micros_pm_spawn_stage stage;
-
-    for (
-        stage = MICROS_PM_SPAWN_PM_RECORD_RESERVED;
-        stage <= MICROS_PM_SPAWN_PM_VFS_COMMITTED;
-        ++stage
-    ) {
-        struct micros_pm_table table;
-        struct micros_pm_process_handle init;
-        struct micros_pm_process_handle child;
-        struct micros_pm_process_handle next;
-        const struct micros_pm_process_record *record;
-        uint32_t released = UINT32_MAX;
-        uint64_t pid;
-
-        EXPECT_TRUE(initialize_running_init(&table, &init));
-        EXPECT_TRUE(
-            micros_pm_begin_spawn(&table, init, 100, &child, &pid)
-                == MICROS_PM_MODEL_OK
-            && pid == 2
-            && advance_to_stage(&table, child, stage)
-            && rollback_spawn(
-                &table,
-                child,
-                stage,
-                100,
-                false,
-                &released
-            )
-            && released == expected_resources(stage)
-            && micros_pm_process_resolve(&table, child, &record)
-                == MICROS_PM_MODEL_ERROR_STALE
-            && micros_pm_begin_spawn(
-                &table,
-                init,
-                101,
-                &next,
-                &pid
-            )
-                == MICROS_PM_MODEL_OK
-            && pid == 3
-            && next.slot == child.slot
-            && next.generation == child.generation + 1
-            && micros_pm_table_validate(&table)
-                == MICROS_PM_MODEL_OK
-        );
-    }
     return true;
 }
 
@@ -811,7 +274,7 @@ static bool test_rollback_acknowledgment_identity(void)
     uint64_t pid;
 
     EXPECT_TRUE(
-        initialize_running_init(&table, &init)
+        pm_test_initialize_running_init(&table, &init)
         && micros_pm_begin_spawn(
             &table,
             init,
@@ -819,7 +282,7 @@ static bool test_rollback_acknowledgment_identity(void)
             &child,
             &pid
         ) == MICROS_PM_MODEL_OK
-        && advance_to_stage(
+        && pm_test_advance_to_stage(
             &table,
             child,
             MICROS_PM_SPAWN_PM_VFS_COMMITTED
@@ -887,9 +350,9 @@ static bool test_rollback_acknowledgment_identity(void)
         EXPECT_TRUE(
             action.expected_stage == current_stage
             && action.resource
-                == rollback_resource_for_stage(current_stage)
+                == pm_test_rollback_resource_for_stage(current_stage)
         );
-        released |= rollback_resource_bit(action.resource);
+        released |= pm_test_rollback_resource_bit(action.resource);
         EXPECT_TRUE(
             micros_pm_spawn_rollback_ack(
                 &table,
@@ -915,105 +378,11 @@ static bool test_rollback_acknowledgment_identity(void)
     }
     EXPECT_TRUE(
         released
-            == expected_resources(MICROS_PM_SPAWN_PM_VFS_COMMITTED)
+            == pm_test_expected_resources(MICROS_PM_SPAWN_PM_VFS_COMMITTED)
         && action.reply_token == 300
         && !action.parent_lost
         && micros_pm_process_resolve(&table, child, &record)
             == MICROS_PM_MODEL_ERROR_STALE
-        && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
-    );
-    return true;
-}
-
-static bool test_generation_and_pid_exhaustion(void)
-{
-    struct micros_pm_table table;
-    struct micros_pm_process_handle init;
-    struct micros_pm_process_handle child;
-    const struct micros_pm_process_record *record;
-    uint32_t released;
-    uint64_t pid;
-
-    EXPECT_TRUE(initialize_running_init(&table, &init));
-    table.last_pid = UINT64_MAX - 1;
-    EXPECT_TRUE(
-        micros_pm_begin_spawn(&table, init, 200, &child, &pid)
-            == MICROS_PM_MODEL_OK
-        && pid == UINT64_MAX
-        && table.pid_exhausted
-        && rollback_spawn(
-            &table,
-            child,
-            MICROS_PM_SPAWN_PM_RECORD_RESERVED,
-            200,
-            false,
-            &released
-        )
-        && micros_pm_begin_spawn(
-            &table,
-            init,
-            201,
-            &child,
-            &pid
-        )
-            == MICROS_PM_MODEL_ERROR_CAPACITY
-    );
-
-    EXPECT_TRUE(initialize_running_init(&table, &init));
-    table.records[1].generation = UINT32_MAX - 1;
-    EXPECT_TRUE(
-        micros_pm_begin_spawn(&table, init, 202, &child, &pid)
-            == MICROS_PM_MODEL_OK
-        && child.slot == 1
-        && child.generation == UINT32_MAX
-        && rollback_spawn(
-            &table,
-            child,
-            MICROS_PM_SPAWN_PM_RECORD_RESERVED,
-            202,
-            false,
-            &released
-        )
-        && table.records[1].state
-            == MICROS_PM_PROCESS_QUARANTINED
-        && micros_pm_process_resolve(&table, child, &record)
-            == MICROS_PM_MODEL_ERROR_STALE
-        && micros_pm_table_validate(&table)
-            == MICROS_PM_MODEL_OK
-    );
-    return true;
-}
-
-static bool test_failed_init_is_terminal(void)
-{
-    struct micros_pm_table table;
-    struct micros_pm_process_handle init;
-    struct micros_ipc_message event = sealed_event();
-    uint32_t released = UINT32_MAX;
-    uint64_t pid = 0;
-
-    memset(&table, 0, sizeof(table));
-    EXPECT_TRUE(
-        micros_pm_table_initialize(&table) == MICROS_PM_MODEL_OK
-        && micros_pm_enable_runtime(&table, &event)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_begin_init(&table, &init, &pid)
-            == MICROS_PM_MODEL_OK
-        && pid == 1
-        && rollback_spawn(
-            &table,
-            init,
-            MICROS_PM_SPAWN_PM_RECORD_RESERVED,
-            0,
-            false,
-            &released
-        )
-        && released == 0
-        && table.init_attempted
-        && table.last_pid == 1
-        && table.reaper.generation == 0
-        && micros_pm_begin_init(&table, &init, &pid)
-            == MICROS_PM_MODEL_ERROR_STATE
         && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
     );
     return true;
@@ -1038,7 +407,7 @@ static bool test_endpoint_lookup_and_failure_preservation(void)
     uint64_t found_pid_sentinel = UINT64_C(0xa5a5a5a5a5a5a5a5);
 
     EXPECT_TRUE(
-        initialize_running_init(&table, &init)
+        pm_test_initialize_running_init(&table, &init)
         && micros_pm_find_running_by_endpoint(
             &table,
             UINT32_C(0x00001000),
@@ -1157,95 +526,6 @@ static bool test_endpoint_lookup_and_failure_preservation(void)
     return true;
 }
 
-static bool test_orphaned_lifecycle_is_invalid(void)
-{
-    struct micros_pm_table table;
-    struct micros_pm_process_handle init;
-    struct micros_pm_process_handle child;
-    struct micros_pm_wait_outcomes outcomes;
-    uint64_t pid;
-
-    EXPECT_TRUE(
-        initialize_running_init(&table, &init)
-        && spawn_running_child(
-            &table,
-            init,
-            UINT32_C(0x00002001),
-            &child,
-            &pid
-        )
-        && complete_exit(&table, child, 901, 9, &outcomes)
-        && outcomes.count == 0
-    );
-    memset(
-        &table.records[child.slot].parent,
-        0,
-        sizeof(table.records[child.slot].parent)
-    );
-    EXPECT_TRUE(
-        micros_pm_table_validate(&table)
-            == MICROS_PM_MODEL_ERROR_INVARIANT
-    );
-    return true;
-}
-
-static bool spawn_running_child(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle parent,
-    micros_endpoint_t endpoint,
-    struct micros_pm_process_handle *child,
-    uint64_t *pid
-)
-{
-    uint64_t reply_token = UINT64_C(0x400000) + endpoint;
-
-    return (
-        micros_pm_begin_spawn(
-            table,
-            parent,
-            reply_token,
-            child,
-            pid
-        )
-            == MICROS_PM_MODEL_OK
-        && complete_spawn(table, *child, endpoint, reply_token)
-    );
-}
-
-static bool complete_exit(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle child,
-    uint64_t transaction,
-    int32_t exit_code,
-    struct micros_pm_wait_outcomes *outcomes
-)
-{
-    struct micros_pm_exit_effects effects;
-
-    return (
-        micros_pm_exit_begin(
-            table,
-            child,
-            transaction,
-            MICROS_PM_EXIT_NORMAL,
-            exit_code,
-            &effects
-        ) == MICROS_PM_MODEL_OK
-        && !effects.aborted_spawn
-        && effects.reparented_count == 0
-        && micros_pm_exit_detach(table, child, transaction)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_exit_release_vm(table, child, transaction)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_exit_release_process(
-            table,
-            child,
-            transaction,
-            outcomes
-        ) == MICROS_PM_MODEL_OK
-    );
-}
-
 static bool test_exit_wait_and_reply_restore(void)
 {
     struct micros_pm_table table;
@@ -1258,8 +538,8 @@ static bool test_exit_wait_and_reply_restore(void)
     uint64_t pid;
 
     EXPECT_TRUE(
-        initialize_running_init(&table, &init)
-        && spawn_running_child(
+        pm_test_initialize_running_init(&table, &init)
+        && pm_test_spawn_running_child(
             &table,
             init,
             UINT32_C(0x00002001),
@@ -1349,8 +629,8 @@ static bool test_exit_wait_and_reply_restore(void)
         && outcomes.entries[0].child_pid == 2
         && outcomes.entries[0].exit_kind == MICROS_PM_EXIT_NORMAL
         && outcomes.entries[0].exit_code == -17
-        && pm_handles_equal(outcomes.entries[0].parent, init)
-        && bytes_are_zero(
+        && pm_test_handles_equal(outcomes.entries[0].parent, init)
+        && pm_test_bytes_are_zero(
             &outcomes.entries[1],
             sizeof(outcomes.entries[1])
         )
@@ -1384,112 +664,6 @@ static bool test_exit_wait_and_reply_restore(void)
     return true;
 }
 
-static bool test_wait_selection(void)
-{
-    struct micros_pm_table table;
-    struct micros_pm_process_handle init;
-    struct micros_pm_process_handle first;
-    struct micros_pm_process_handle second;
-    struct micros_pm_process_handle third;
-    struct micros_pm_wait_outcome outcome;
-    struct micros_pm_wait_outcomes outcomes;
-    uint64_t first_pid;
-    uint64_t second_pid;
-    uint64_t third_pid;
-
-    EXPECT_TRUE(
-        initialize_running_init(&table, &init)
-        && spawn_running_child(
-            &table,
-            init,
-            UINT32_C(0x00002001),
-            &first,
-            &first_pid
-        )
-        && spawn_running_child(
-            &table,
-            init,
-            UINT32_C(0x00002002),
-            &second,
-            &second_pid
-        )
-        && spawn_running_child(
-            &table,
-            init,
-            UINT32_C(0x00002003),
-            &third,
-            &third_pid
-        )
-        && micros_pm_wait_begin(
-            &table,
-            init,
-            0,
-            MICROS_PM_WAIT_NOHANG,
-            50,
-            &outcome
-        ) == MICROS_PM_MODEL_OK
-        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
-        && outcome.result == MICROS_PM_RESULT_OK
-        && outcome.child_pid == 0
-        && !table.records[init.slot].wait.active
-        && micros_pm_wait_begin(
-            &table,
-            init,
-            UINT64_C(999),
-            0,
-            51,
-            &outcome
-        ) == MICROS_PM_MODEL_OK
-        && outcome.result == MICROS_PM_RESULT_NO_CHILD
-    );
-    EXPECT_TRUE(
-        complete_exit(&table, second, 601, 22, &outcomes)
-        && outcomes.count == 0
-        && bytes_are_zero(&outcomes, sizeof(outcomes))
-        && complete_exit(&table, first, 602, 11, &outcomes)
-        && outcomes.count == 0
-        && bytes_are_zero(&outcomes, sizeof(outcomes))
-        && first_pid < second_pid
-        && second_pid < third_pid
-        && micros_pm_wait_begin(
-            &table,
-            init,
-            0,
-            0,
-            52,
-            &outcome
-        ) == MICROS_PM_MODEL_OK
-        && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
-        && outcome.child_pid == first_pid
-        && outcome.exit_code == 11
-        && micros_pm_wait_reply_complete(&table, init, 52, true)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_wait_begin(
-            &table,
-            init,
-            0,
-            0,
-            53,
-            &outcome
-        ) == MICROS_PM_MODEL_OK
-        && outcome.child_pid == second_pid
-        && outcome.exit_code == 22
-        && micros_pm_wait_reply_complete(&table, init, 53, true)
-            == MICROS_PM_MODEL_OK
-        && micros_pm_wait_begin(
-            &table,
-            init,
-            second_pid,
-            0,
-            54,
-            &outcome
-        ) == MICROS_PM_MODEL_OK
-        && outcome.result == MICROS_PM_RESULT_NO_CHILD
-        && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
-    );
-    return true;
-}
-
 static bool test_parent_exit_reparents_and_aborts(void)
 {
     struct micros_pm_table table;
@@ -1511,22 +685,22 @@ static bool test_parent_exit_reparents_and_aborts(void)
     uint64_t hidden_pid;
 
     EXPECT_TRUE(
-        initialize_running_init(&table, &init)
-        && spawn_running_child(
+        pm_test_initialize_running_init(&table, &init)
+        && pm_test_spawn_running_child(
             &table,
             init,
             UINT32_C(0x00002001),
             &parent,
             &parent_pid
         )
-        && spawn_running_child(
+        && pm_test_spawn_running_child(
             &table,
             parent,
             UINT32_C(0x00003001),
             &zombie,
             &zombie_pid
         )
-        && spawn_running_child(
+        && pm_test_spawn_running_child(
             &table,
             parent,
             UINT32_C(0x00003002),
@@ -1542,7 +716,7 @@ static bool test_parent_exit_reparents_and_aborts(void)
             &outcome
         ) == MICROS_PM_MODEL_OK
         && outcome.action == MICROS_PM_WAIT_ACTION_BLOCKED
-        && complete_exit(&table, zombie, 701, 33, &outcomes)
+        && pm_test_complete_exit(&table, zombie, 701, 33, &outcomes)
         && outcomes.count == 1
         && outcomes.entries[0].child_pid == zombie_pid
         && micros_pm_begin_spawn(
@@ -1580,7 +754,7 @@ static bool test_parent_exit_reparents_and_aborts(void)
         ) == MICROS_PM_MODEL_ERROR_BUSY
         && memcmp(&effects, &effects_sentinel, sizeof(effects)) == 0
         && memcmp(&table, &snapshot, sizeof(table)) == 0
-        && rollback_spawn(
+        && pm_test_rollback_spawn(
             &table,
             hidden,
             MICROS_PM_SPAWN_VFS_IMAGE_PREPARED,
@@ -1649,9 +823,9 @@ static bool test_parent_exit_reparents_and_aborts(void)
         && outcomes.entries[0].exit_kind
             == MICROS_PM_EXIT_NORMAL
         && outcomes.entries[0].exit_code == 44
-        && pm_handles_equal(outcomes.entries[0].parent, init)
-        && pm_handles_equal(outcomes.entries[0].child, parent)
-        && bytes_are_zero(
+        && pm_test_handles_equal(outcomes.entries[0].parent, init)
+        && pm_test_handles_equal(outcomes.entries[0].child, parent)
+        && pm_test_bytes_are_zero(
             &outcomes.entries[1],
             sizeof(outcomes.entries[1])
         )
@@ -1697,29 +871,29 @@ static bool test_nested_parent_exit_stages_independent_waits(void)
     uint64_t child_pid;
 
     EXPECT_TRUE(
-        initialize_running_init(&table, &init)
-        && spawn_running_child(
+        pm_test_initialize_running_init(&table, &init)
+        && pm_test_spawn_running_child(
             &table,
             init,
             UINT32_C(0x00002001),
             &grandparent,
             &grandparent_pid
         )
-        && spawn_running_child(
+        && pm_test_spawn_running_child(
             &table,
             grandparent,
             UINT32_C(0x00003001),
             &parent,
             &parent_pid
         )
-        && spawn_running_child(
+        && pm_test_spawn_running_child(
             &table,
             parent,
             UINT32_C(0x00004001),
             &child,
             &child_pid
         )
-        && complete_exit(&table, child, 801, 33, &outcomes)
+        && pm_test_complete_exit(&table, child, 801, 33, &outcomes)
         && outcomes.count == 0
         && micros_pm_wait_begin(
             &table,
@@ -1755,7 +929,7 @@ static bool test_nested_parent_exit_stages_independent_waits(void)
         && !table.records[grandparent.slot].wait.result_ready
         && micros_pm_process_resolve(&table, child, &record)
             == MICROS_PM_MODEL_OK
-        && pm_handles_equal(record->parent, init)
+        && pm_test_handles_equal(record->parent, init)
         && !record->reap_pending
         && micros_pm_exit_detach(&table, parent, 802)
             == MICROS_PM_MODEL_OK
@@ -1774,18 +948,18 @@ static bool test_nested_parent_exit_stages_independent_waits(void)
         && outcomes.entries[0].reply_token == 81
         && outcomes.entries[0].child_pid == child_pid
         && outcomes.entries[0].exit_code == 33
-        && pm_handles_equal(outcomes.entries[0].parent, init)
-        && pm_handles_equal(outcomes.entries[0].child, child)
+        && pm_test_handles_equal(outcomes.entries[0].parent, init)
+        && pm_test_handles_equal(outcomes.entries[0].child, child)
         && outcomes.entries[1].action
             == MICROS_PM_WAIT_ACTION_REPLY
         && outcomes.entries[1].reply_token == 82
         && outcomes.entries[1].child_pid == parent_pid
         && outcomes.entries[1].exit_code == 44
-        && pm_handles_equal(
+        && pm_test_handles_equal(
             outcomes.entries[1].parent,
             grandparent
         )
-        && pm_handles_equal(outcomes.entries[1].child, parent)
+        && pm_test_handles_equal(outcomes.entries[1].child, parent)
         && micros_pm_wait_reply_complete(&table, init, 81, false)
             == MICROS_PM_MODEL_OK
         && table.records[init.slot].wait.active
@@ -1810,7 +984,7 @@ static bool test_nested_parent_exit_stages_independent_waits(void)
         && outcome.action == MICROS_PM_WAIT_ACTION_REPLY
         && outcome.reply_token == 81
         && outcome.child_pid == child_pid
-        && pm_handles_equal(outcome.parent, init)
+        && pm_test_handles_equal(outcome.parent, init)
         && micros_pm_wait_reply_complete(&table, init, 81, true)
             == MICROS_PM_MODEL_OK
         && micros_pm_process_resolve(&table, child, &record)
@@ -1993,7 +1167,7 @@ static bool pm_model_compare(
     if (
         table->last_pid != reference->last_pid
         || !table->runtime_enabled
-        || !pm_handles_equal(table->reaper, init)
+        || !pm_test_handles_equal(table->reaper, init)
         || init_record->state != MICROS_PM_PROCESS_RUNNING
         || !init_record->reaper
         || init_record->pid != 1
@@ -2009,7 +1183,7 @@ static bool pm_model_compare(
         return false;
     }
     if (reference->wait.pending_slot == PM_MODEL_NO_SLOT) {
-        if (!pm_handle_is_none(init_record->wait.pending_child)) {
+        if (!pm_test_handle_is_none(init_record->wait.pending_child)) {
             return false;
         }
     } else {
@@ -2138,7 +1312,7 @@ static bool test_replayable_transition_model(void)
     memset(operation_trace, 0, sizeof(operation_trace));
     reference.wait.pending_slot = PM_MODEL_NO_SLOT;
     step = 0;
-    PM_MODEL_EXPECT(initialize_running_init(&table, &init));
+    PM_MODEL_EXPECT(pm_test_initialize_running_init(&table, &init));
     reference.last_pid = 1;
     reference.generations[init.slot] = init.generation;
     reference.records[init.slot].present = true;
@@ -2327,7 +1501,7 @@ static bool test_replayable_transition_model(void)
 
                 operation_trace[step] |= (uint32_t)slot << 16;
                 PM_MODEL_EXPECT(
-                    rollback_spawn(
+                    pm_test_rollback_spawn(
                         &table,
                         record->handle,
                         record->spawn_stage,
@@ -2336,7 +1510,7 @@ static bool test_replayable_transition_model(void)
                         &released
                     )
                     && released
-                        == expected_resources(record->spawn_stage)
+                        == pm_test_expected_resources(record->spawn_stage)
                 );
                 memset(record, 0, sizeof(*record));
             }
@@ -2446,7 +1620,7 @@ static bool test_replayable_transition_model(void)
                                 == reference.wait.reply_token
                             && outcomes.entries[0].child_pid
                                 == reference.records[zombie_slot].pid
-                            && pm_handles_equal(
+                            && pm_test_handles_equal(
                                 outcomes.entries[0].parent,
                                 init
                             )
