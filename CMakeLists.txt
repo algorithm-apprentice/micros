@@ -2209,6 +2209,16 @@ if(
                 -Wl,-z,common-page-size=4096
                 "-Wl,-Map,${CMAKE_BINARY_DIR}/bootstrap/${output_name}.map"
         )
+        set(user_elf_budget "")
+        if("${target}" STREQUAL "micros_pm_service")
+            set(
+                user_elf_budget
+                --resident-page-limit
+                32
+                --stack-page-count
+                1
+            )
+        endif()
         add_custom_command(
             TARGET "${target}"
             POST_BUILD
@@ -2218,6 +2228,7 @@ if(
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
                 --elf
                 "$<TARGET_FILE:${target}>"
+                ${user_elf_budget}
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             VERBATIM
         )

@@ -200,7 +200,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 LONG_FUNCTION_MIGRATION = tuple(
     migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
     if migration[1] in {
-        "run_self_test", "micros_pm_service_test_handle_trap", "render_fixture",
+        "micros_pm_service_test_handle_trap", "render_fixture",
     }
 )
 
@@ -262,6 +262,21 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(7, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
 
+    def test_common_pm_post_link_check_enforces_exact_budget_once(self) -> None:
+        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        start = cmake.index("function(micros_add_bootstrap_user ")
+        helper = cmake[start:cmake.index("endfunction()", start)]
+        self.assertIn('if("${target}" STREQUAL "micros_pm_service")', helper)
+        self.assertRegex(
+            helper,
+            r"set\(\s+user_elf_budget\s+--resident-page-limit\s+32\s+"
+            r"--stack-page-count\s+1\s*\)",
+        )
+        self.assertEqual(1, helper.count("add_custom_command("))
+        post_link = cmake_command(helper, "add_custom_command", "TARGET")
+        self.assertEqual(1, post_link.count('"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"'))
+        self.assertEqual(1, post_link.count("${user_elf_budget}"))
+
     def test_public_and_case_owners_follow_exact_migration(self) -> None:
         self.assertEqual(44, len(INITIAL_SYMBOL_OWNER_MIGRATION))
         migration = set(SYMBOL_OWNER_MIGRATION)
@@ -289,9 +304,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
 
     def test_current_static_state_has_exact_owners(self) -> None:
         expected = {
-            "process_table": ["servers/pm/pm_service.c"],
-            "pm_service_data": ["servers/pm/pm_service.c"],
-            "initial_table": ["servers/pm/pm_service.c"],
+            "process_table": [],
+            "pm_service_data": [],
+            "initial_table": [],
             "request_bytes": [],
             "elf_bytes": [],
             "path_storage": [],
@@ -319,11 +334,18 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         for path in all_sources():
             text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
             contexts.extend(
-                path for _ in re.finditer(
-                    r"\bstatic\s+struct\s+spawn_abi_test_context\b", text,
+                (path, match.group(1)) for match in re.finditer(
+                    r"\bstatic\s+struct\s+(spawn_abi_test_context|pm_service_context)\b",
+                    text,
                 )
             )
-        self.assertEqual(["tests/host/spawn_abi_test_fixture.c"], contexts)
+        self.assertEqual(
+            [
+                ("servers/pm/pm_service_fixture.c", "pm_service_context"),
+                ("tests/host/spawn_abi_test_fixture.c", "spawn_abi_test_context"),
+            ],
+            contexts,
+        )
 
     def test_new_paths_inherit_exact_original_classification(self) -> None:
         baselines = {
