@@ -89,5 +89,6 @@ bool test_wait_selection(void);
 bool test_exit_wait_and_reply_restore(void);
 bool test_nested_parent_exit_stages_independent_waits(void);
 bool test_parent_exit_reparents_and_aborts(void);
+bool test_replayable_transition_model(void);
 
 #endif

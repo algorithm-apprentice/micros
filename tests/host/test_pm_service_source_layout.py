@@ -184,6 +184,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "test_exit_wait_and_reply_restore",
         "test_nested_parent_exit_stages_independent_waits",
         "test_parent_exit_reparents_and_aborts",
+        "test_replayable_transition_model",
         "test_runtime_gate_and_spawn", "test_reverse_rollback_and_identity",
         "test_generation_and_pid_exhaustion", "test_failed_init_is_terminal",
         "test_orphaned_lifecycle_is_invalid", "test_wait_selection",
@@ -217,6 +218,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         "test_exit_wait_and_reply_restore",
         "test_nested_parent_exit_stages_independent_waits",
         "test_parent_exit_reparents_and_aborts",
+        "test_replayable_transition_model",
     }
 )
 
