@@ -1,0 +1,6 @@
+#ifndef MICROS_KERNEL_VM_SCRATCH_PREEMPTION_TEST_INTERNAL_H
+#define MICROS_KERNEL_VM_SCRATCH_PREEMPTION_TEST_INTERNAL_H
+
+#include "kernel/vm_scratch_preemption_test.h"
+
+#endif
