@@ -309,12 +309,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/pm_control_syscall.c",
-        "micros_pm_control_handle_captured_user_ecall",
-    ),
-)
+LONG_FUNCTION_MIGRATION = ()
 
 PM_CONTROL_CASE_ORDER = (
     "test_contract_and_decode",
