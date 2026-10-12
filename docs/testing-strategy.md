@@ -124,6 +124,22 @@ markers, and timeouts. Before review, the author runs one authoritative
 pull-request plan; reviewers inspect rather than routinely rerun that
 evidence.
 
+The PM service decomposition defined by ADR-0058 preserves `pm_test` /
+`pm-lifecycle`, `spawn_abi_test` / `spawn-abi`, the real PM service and its
+32-page budget, PM-service and scratch-preemption QEMU scenarios, and the
+downstream TTY/RAMFS/VFS consumers. Its implementation begins with a structural
+Red gate, an exact 44-function owner migration, and an exact 16-function
+long migration. PM case/model tables stay local; existing service globals and
+all seven spawn-ABI mutable static buffers gain explicit ownership. Existing
+case order, 4,096-step model seed/draws/trace/comparison, request and stack
+results, kernel report, generator bytes for identical inputs, markers, and
+timeouts are preserved. Narrow extraction evidence precedes one authoritative
+final PR plan; reviewers do not routinely rerun it. Every PM service variant
+must receive the existing common post-link checker with the Accepted
+32-resident-page/one-stack-page options, without a duplicate checker run.
+The retained kernel PM-control source-layout gate follows the moved report
+owner without weakening marker or timeout evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |
