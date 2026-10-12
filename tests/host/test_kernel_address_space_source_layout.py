@@ -323,26 +323,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
 
 SYMBOL_OWNER_MIGRATION = (
     (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_handoff.c",
-        "micros_user_address_space_prepare_wired_handoff",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_handoff.c",
-        "micros_user_address_space_complete_wired_handoff",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_activation.c",
-        "micros_user_address_space_activate",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "kernel/user_address_space_activation.c",
-        "micros_user_address_space_activate_kernel",
-    ),
-    (
         "kernel/user_execution.c",
         "kernel/user_execution_validation.c",
         "micros_user_execution_validate_return",
@@ -466,26 +446,6 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 
 LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_prepare_tty_uart_mapping",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_prepare_vm_scratch_mapping",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_prepare_vm_scratch_removal",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_prepare_vm_freeze",
-    ),
-    (
-        "kernel/user_address_space.c",
-        "micros_user_address_space_prepare_vm_teardown",
-    ),
     (
         "kernel/user_execution.c",
         "micros_user_execution_preflight_post_handoff",

@@ -942,3 +942,95 @@ done:
     micros_user_address_space_runtime_unlock(saved_status);
     return error;
 }
+
+bool micros_user_address_space_vm_table_plan_matches_memory(
+    const struct micros_user_address_space_vm_table_plan *plan,
+    const struct micros_kernel_address_space_report *kernel_report
+)
+{
+    const struct micros_user_address_space_page_table *kernel_root;
+    const struct micros_user_address_space_page_table *root;
+    const struct micros_user_address_space_page_table *middle;
+    const struct micros_user_address_space_page_table *image;
+    const struct micros_user_address_space_page_table *stack;
+    size_t index;
+
+    if (
+        plan == NULL
+        || kernel_report == NULL
+        || plan->entry_count
+            > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+    ) {
+        return false;
+    }
+    kernel_root = table_at(kernel_report->root_physical_address);
+    root = table_at(
+        plan->table_frames[
+            MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT
+        ]
+    );
+    middle = table_at(
+        plan->table_frames[
+            MICROS_USER_ADDRESS_SPACE_VM_TABLE_LEVEL_ONE
+        ]
+    );
+    image = table_at(
+        plan->table_frames[
+            MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE
+        ]
+    );
+    stack = table_at(
+        plan->table_frames[
+            MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK
+        ]
+    );
+    for (index = 0; index < MICROS_SV39_TABLE_ENTRY_COUNT; ++index) {
+        uint64_t expected_root = index == plan->root_index
+            ? plan->root_pte
+            : kernel_root->entries[index];
+        uint64_t expected_middle = 0;
+        uint64_t expected_image = 0;
+        uint64_t expected_stack = 0;
+        size_t leaf_index;
+
+        if (index == plan->image_middle_index) {
+            expected_middle = plan->image_middle_pte;
+        } else if (index == plan->stack_middle_index) {
+            expected_middle = plan->stack_middle_pte;
+        }
+        for (
+            leaf_index = 0;
+            leaf_index < plan->entry_count;
+            ++leaf_index
+        ) {
+            const struct micros_user_address_space_vm_leaf_plan
+                *leaf = &plan->leaves[leaf_index];
+
+            if (leaf->leaf_index != index) {
+                continue;
+            }
+            if (
+                leaf->table_role
+                    == MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE
+            ) {
+                expected_image = leaf->pte;
+            } else if (
+                leaf->table_role
+                    == MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK
+            ) {
+                expected_stack = leaf->pte;
+            } else {
+                return false;
+            }
+        }
+        if (
+            root->entries[index] != expected_root
+            || middle->entries[index] != expected_middle
+            || image->entries[index] != expected_image
+            || stack->entries[index] != expected_stack
+        ) {
+            return false;
+        }
+    }
+    return true;
+}

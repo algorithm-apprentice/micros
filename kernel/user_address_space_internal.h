@@ -281,6 +281,11 @@ micros_user_address_space_validate_all_process_roots_locked(
     const struct micros_user_address_space_scratch_lease *lease
 );
 
+bool micros_user_address_space_vm_table_plan_matches_memory(
+    const struct micros_user_address_space_vm_table_plan *plan,
+    const struct micros_kernel_address_space_report *kernel_report
+);
+
 enum micros_user_address_space_error
 micros_user_address_space_visit_mappings_locked(
     struct micros_process_handle process_handle,
