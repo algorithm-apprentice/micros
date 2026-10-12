@@ -241,14 +241,18 @@ exit-cleanup coverage is added. That correction and the exit-cleanup slice
 are merged. The ADR-0053 design and implementation are also merged, applying
 the exact
 [kernel address-space source-organization contract](architecture/kernel-address-space-source-organization.md).
-ADR-0054 defines the current correction: apply the exact
+ADR-0054 defined the frame-ownership correction: apply the exact
 [frame-ownership source-organization contract](architecture/frame-ownership-source-organization.md).
-That design and implementation are merged. ADR-0055 defines the current
+That design and implementation are merged. ADR-0055 defined the following
 correction: apply the exact
 [kernel VM-handoff source-organization contract](architecture/kernel-vm-handoff-source-organization.md)
 before later PM and VM coordination extends operation 12 and its lifecycle
-evidence. Kernel PM control, VM service, and PM service corrections remain
-sequential successors before the cross-service coordinator.
+evidence. That design and implementation are merged. ADR-0056 defines the
+current correction: apply the exact
+[kernel PM-control source-organization contract](architecture/kernel-pm-control-source-organization.md)
+before the cross-service coordinator extends operation 13 and its lifecycle
+evidence. VM service and PM service corrections remain sequential successors
+before that coordinator.
 
 ## v0.1 completion goal
 

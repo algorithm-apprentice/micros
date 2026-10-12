@@ -97,6 +97,19 @@ retained target scenario order, assembly hooks, markers, and timeouts. Before
 review, the author runs the authoritative pull-request plan once; the reviewer
 inspects rather than routinely reruns that evidence.
 
+The kernel PM-control decomposition defined by ADR-0056 preserves `pm_test`,
+`pm-lifecycle`, `test-qemu-pm-service`,
+`test-qemu-vm-scratch-preemption`, and the downstream TTY, RAMFS, and VFS
+workflows that compile the same production PM-control sources. It begins with
+one fail-closed source-layout test, an exact 32-function owner migration map,
+and an exact 15-function migration allowlist. Extraction preserves
+operation-13 decode and authority precedence, retained output translation,
+prepare/`fence.i`/publication order, activation, exit detach and release,
+native case order, the sole target state owner, one mutable context per native
+family, the PM-service marker, and its timeout. Before review, the author runs
+one authoritative pull-request plan, and reviewers inspect rather than
+routinely rerun that evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

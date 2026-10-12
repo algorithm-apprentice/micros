@@ -317,9 +317,11 @@ to this sequence without changing the runtime dependency graph:
   [ADR-0053](../adr/0053-kernel-address-space-source-decomposition.md) and
   defined by the
   [kernel address-space source-organization contract](kernel-address-space-source-organization.md),
-  followed by the frame-ownership, kernel VM-handoff, kernel PM-control,
-  VM-service, and PM-service corrections, must merge before the cross-service
-  coordinator composes the remaining spawn and exit transaction.
+  followed by the frame-ownership and kernel VM-handoff corrections, the
+  [kernel PM-control source-organization contract](kernel-pm-control-source-organization.md),
+  and the VM-service and PM-service corrections, must merge before the
+  cross-service coordinator composes the remaining spawn and exit
+  transaction.
 
 The exact correction units and paired task IDs are recorded in
 [the repository source-module audit](source-module-audit.md). They remain

@@ -253,3 +253,12 @@ adapter, native-test, and retained target-scenario boundaries are defined in
 The design keeps portable state below privileged adapters, preserves exact
 transaction and failure ordering, and retains one mutable context owner per
 evidence family.
+
+The following correction is the kernel PM-control family. Its exact operation-
+13 ABI, complete validation, reservation, execution preparation, activation,
+exit, privileged adapter, and native-evidence boundaries are defined in
+[Kernel PM-Control Source Organization](kernel-pm-control-source-organization.md).
+The design keeps validation below lifecycle transitions, portable state below
+privileged adapters, activation separate from rollbackable preparation, and
+one authoritative mutable owner for target state and each native fixture
+family.
