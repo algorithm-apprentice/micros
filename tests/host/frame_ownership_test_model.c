@@ -268,7 +268,10 @@ static bool compare_model(
             ) != 0;
 
         if (
-            !frame_ownership_test_owners_equal(model_owners[index], context->ownership.owners[index])
+                !frame_ownership_test_owners_equal(
+                    model_owners[index],
+                    context->ownership.owners[index]
+                )
             || model_targets[index] != context->ownership.handoff_targets[index]
             || allocated == model_owner_is_free(model_owners[index])
             || (
