@@ -501,10 +501,6 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 
 LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/address_space.c",
-        "tree_and_table_ownership_are_valid",
-    ),
     ("kernel/user_address_space.c", "validate_locked"),
     ("kernel/user_address_space.c", "visit_user_mappings_locked"),
     (
@@ -570,7 +566,7 @@ LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-SCRATCH_OWNER = "kernel/user_address_space.c"
+SCRATCH_OWNER = "kernel/user_address_space_runtime.c"
 ACCEPTED_SCRATCH_OWNERS = (
     "kernel/user_address_space.c",
     "kernel/user_address_space_runtime.c",
