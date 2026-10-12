@@ -1,4 +1,4 @@
-#include "micros/frame_ownership.h"
+#include "frame_ownership_internal.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -6,7 +6,7 @@
 
 #define MICROS_FRAME_OWNERSHIP_MAGIC UINT64_C(0x4d4943524f53464f)
 
-static void clear_bytes(void *storage, size_t size)
+void micros_frame_ownership_clear_bytes(void *storage, size_t size)
 {
     unsigned char *bytes = storage;
     size_t index;
@@ -16,7 +16,7 @@ static void clear_bytes(void *storage, size_t size)
     }
 }
 
-static void copy_bytes(void *destination, const void *source, size_t size)
+void micros_frame_ownership_copy_bytes(void *destination, const void *source, size_t size)
 {
     unsigned char *output = destination;
     const unsigned char *input = source;
@@ -40,7 +40,7 @@ static bool bytes_are_zero(const void *storage, size_t size)
     return true;
 }
 
-static bool owner_is_equal(
+bool micros_frame_owner_is_equal(
     struct micros_frame_owner left,
     struct micros_frame_owner right
 )
@@ -53,7 +53,7 @@ static bool owner_is_equal(
     );
 }
 
-static bool process_handle_is_valid(
+bool micros_frame_process_handle_is_valid(
     struct micros_process_handle process
 )
 {
@@ -64,7 +64,7 @@ static bool process_handle_is_valid(
     );
 }
 
-static bool owner_kind_is_process_bound(uint8_t kind)
+bool micros_frame_owner_kind_is_process_bound(uint8_t kind)
 {
     return (
         kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
@@ -73,7 +73,7 @@ static bool owner_kind_is_process_bound(uint8_t kind)
     );
 }
 
-static bool owner_is_valid(struct micros_frame_owner owner)
+bool micros_frame_owner_is_valid(struct micros_frame_owner owner)
 {
     if (
         owner.kind >= MICROS_FRAME_OWNER_KIND_COUNT
@@ -81,8 +81,8 @@ static bool owner_is_valid(struct micros_frame_owner owner)
     ) {
         return false;
     }
-    if (owner_kind_is_process_bound(owner.kind)) {
-        return process_handle_is_valid(
+    if (micros_frame_owner_kind_is_process_bound(owner.kind)) {
+        return micros_frame_process_handle_is_valid(
             (struct micros_process_handle){
                 owner.slot,
                 owner.generation,
@@ -90,20 +90,6 @@ static bool owner_is_valid(struct micros_frame_owner owner)
         );
     }
     return owner.slot == 0 && owner.generation == 0;
-}
-
-static bool owner_is_allocatable(struct micros_frame_owner owner)
-{
-    if (!owner_is_valid(owner)) {
-        return false;
-    }
-    return (
-        owner.kind == MICROS_FRAME_OWNER_KERNEL_RETAINED
-        || owner.kind == MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE
-        || owner.kind == MICROS_FRAME_OWNER_KERNEL_TEMPORARY
-        || owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
-        || owner.kind == MICROS_FRAME_OWNER_PROCESS_USER
-    );
 }
 
 static bool range_snapshot_is_zero(
@@ -223,7 +209,7 @@ static bool allocator_is_pristine(
     return true;
 }
 
-static enum micros_frame_ownership_error require_initialized(
+enum micros_frame_ownership_error micros_frame_ownership_require_initialized(
     const struct micros_frame_ownership *ownership
 )
 {
@@ -246,7 +232,7 @@ static enum micros_frame_ownership_error require_initialized(
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
-static bool geometry_matches(
+bool micros_frame_ownership_geometry_matches(
     const struct micros_frame_ownership *ownership
 )
 {
@@ -325,7 +311,7 @@ static bool geometry_matches(
     return true;
 }
 
-static enum micros_frame_ownership_error physical_address_to_index(
+enum micros_frame_ownership_error micros_frame_ownership_physical_address_to_index(
     const struct micros_frame_ownership *ownership,
     uint64_t physical_address,
     uint64_t *frame_index
@@ -359,7 +345,7 @@ static enum micros_frame_ownership_error physical_address_to_index(
     return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
 }
 
-static bool allocator_bit_is_set(
+bool micros_frame_ownership_allocator_bit_is_set(
     const struct micros_frame_allocator *allocator,
     uint64_t frame_index
 )
@@ -370,7 +356,7 @@ static bool allocator_bit_is_set(
     return (allocator->allocated_bitmap[word_index] & bit) != 0;
 }
 
-static bool handoff_target_is_valid(
+bool micros_frame_ownership_handoff_target_is_valid(
     struct micros_frame_owner owner,
     uint8_t target
 )
@@ -389,25 +375,6 @@ static bool handoff_target_is_valid(
         && target == MICROS_FRAME_HANDOFF_VM_TRANSFERABLE
     );
 }
-
-static struct micros_frame_owner resulting_owner(
-    struct micros_frame_owner owner,
-    uint8_t target
-)
-{
-    if (target == MICROS_FRAME_HANDOFF_VM_WIRED) {
-        owner.kind = MICROS_FRAME_OWNER_VM_WIRED;
-    } else if (target == MICROS_FRAME_HANDOFF_VM_TRANSFERABLE) {
-        owner = (struct micros_frame_owner){
-            0,
-            0,
-            MICROS_FRAME_OWNER_VM_TRANSFERABLE,
-            0,
-        };
-    }
-    return owner;
-}
-
 enum micros_frame_ownership_error micros_frame_owner_make_kernel(
     enum micros_frame_owner_kind kind,
     struct micros_frame_owner *owner
@@ -453,7 +420,7 @@ enum micros_frame_ownership_error micros_frame_owner_make_process(
             && kind != MICROS_FRAME_OWNER_PROCESS_USER
             && kind != MICROS_FRAME_OWNER_VM_WIRED
         )
-        || !process_handle_is_valid(process)
+        || !micros_frame_process_handle_is_valid(process)
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
@@ -507,144 +474,45 @@ enum micros_frame_ownership_error micros_frame_ownership_initialize(
         MICROS_FRAME_OWNERSHIP_MAGIC;
     return MICROS_FRAME_OWNERSHIP_OK;
 }
+void micros_frame_ownership_allocator_mark_allocated(
+    struct micros_frame_allocator *allocator,
+    uint64_t frame_index
+)
+{
+    size_t word_index = (size_t)(frame_index / 64);
+    uint64_t bit = UINT64_C(1) << (frame_index % 64);
 
-enum micros_frame_ownership_error micros_frame_ownership_allocate(
-    struct micros_frame_ownership *ownership,
+    allocator->allocated_bitmap[word_index] |= bit;
+}
+
+void micros_frame_ownership_allocator_mark_free(
+    struct micros_frame_allocator *allocator,
+    uint64_t frame_index
+)
+{
+    size_t word_index = (size_t)(frame_index / 64);
+    uint64_t bit = UINT64_C(1) << (frame_index % 64);
+
+    allocator->allocated_bitmap[word_index] &= ~bit;
+}
+
+static struct micros_frame_owner resulting_owner(
     struct micros_frame_owner owner,
-    uint64_t *physical_address
+    uint8_t target
 )
 {
-    uint64_t allocated_address;
-    uint64_t frame_index;
-    enum micros_frame_allocator_error allocator_error;
-    enum micros_frame_ownership_error error;
-
-    if (physical_address == NULL) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    if (target == MICROS_FRAME_HANDOFF_VM_WIRED) {
+        owner.kind = MICROS_FRAME_OWNER_VM_WIRED;
+    } else if (target == MICROS_FRAME_HANDOFF_VM_TRANSFERABLE) {
+        owner = (struct micros_frame_owner){
+            0,
+            0,
+            MICROS_FRAME_OWNER_VM_TRANSFERABLE,
+            0,
+        };
     }
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
-    }
-    if (!owner_is_allocatable(owner)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
-    }
-    if (!geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-
-    allocator_error = micros_frame_allocator_allocate(
-        ownership->allocator,
-        &allocated_address
-    );
-    if (allocator_error == MICROS_FRAME_ALLOCATOR_ERROR_EXHAUSTED) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_EXHAUSTED;
-    }
-    if (allocator_error != MICROS_FRAME_ALLOCATOR_OK) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    error = physical_address_to_index(
-        ownership,
-        allocated_address,
-        &frame_index
-    );
-    if (
-        error != MICROS_FRAME_OWNERSHIP_OK
-        || frame_index >= ownership->managed_frame_count
-        || ownership->owners[frame_index].kind
-            != MICROS_FRAME_OWNER_FREE
-        || !owner_is_valid(ownership->owners[frame_index])
-        || ownership->handoff_targets[frame_index]
-            != MICROS_FRAME_HANDOFF_NONE
-        || ownership->owned_frame_count
-            >= ownership->managed_frame_count
-        || ownership->owner_counts[owner.kind]
-            >= ownership->managed_frame_count
-    ) {
-        (void)micros_frame_allocator_release(
-            ownership->allocator,
-            allocated_address
-        );
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-
-    ownership->owners[frame_index] = owner;
-    ownership->handoff_targets[frame_index] =
-        MICROS_FRAME_HANDOFF_NONE;
-    ++ownership->owned_frame_count;
-    ++ownership->owner_counts[owner.kind];
-    *physical_address = allocated_address;
-    return MICROS_FRAME_OWNERSHIP_OK;
+    return owner;
 }
-
-enum micros_frame_ownership_error micros_frame_ownership_release(
-    struct micros_frame_ownership *ownership,
-    struct micros_frame_owner expected_owner,
-    uint64_t physical_address
-)
-{
-    struct micros_frame_owner stored_owner;
-    uint64_t frame_index;
-    enum micros_frame_allocator_error allocator_error;
-    enum micros_frame_ownership_error error;
-
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
-    }
-    if (!owner_is_valid(expected_owner)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
-    }
-    if (!geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    error = physical_address_to_index(
-        ownership,
-        physical_address,
-        &frame_index
-    );
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    stored_owner = ownership->owners[frame_index];
-    if (stored_owner.kind == MICROS_FRAME_OWNER_FREE) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
-    }
-    if (!owner_is_valid(stored_owner)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    if (!owner_is_equal(stored_owner, expected_owner)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-    }
-    if (
-        ownership->owned_frame_count == 0
-        || ownership->owner_counts[stored_owner.kind] == 0
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-
-    allocator_error = micros_frame_allocator_release(
-        ownership->allocator,
-        physical_address
-    );
-    if (allocator_error != MICROS_FRAME_ALLOCATOR_OK) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    ownership->owners[frame_index] =
-        (struct micros_frame_owner){0, 0, 0, 0};
-    ownership->handoff_targets[frame_index] =
-        MICROS_FRAME_HANDOFF_NONE;
-    --ownership->owned_frame_count;
-    --ownership->owner_counts[stored_owner.kind];
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
 enum micros_frame_ownership_error
 micros_frame_ownership_prepare_handoff(
     struct micros_frame_ownership *ownership,
@@ -657,20 +525,20 @@ micros_frame_ownership_prepare_handoff(
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
-    error = require_initialized(ownership);
+    error = micros_frame_ownership_require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
     if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
         return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
     }
-    if (!owner_is_valid(expected_owner)) {
+    if (!micros_frame_owner_is_valid(expected_owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
-    if (!geometry_matches(ownership)) {
+    if (!micros_frame_ownership_geometry_matches(ownership)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    error = physical_address_to_index(
+    error = micros_frame_ownership_physical_address_to_index(
         ownership,
         physical_address,
         &frame_index
@@ -682,15 +550,15 @@ micros_frame_ownership_prepare_handoff(
     if (stored_owner.kind == MICROS_FRAME_OWNER_FREE) {
         return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
     }
-    if (!owner_is_valid(stored_owner)) {
+    if (!micros_frame_owner_is_valid(stored_owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    if (!owner_is_equal(stored_owner, expected_owner)) {
+    if (!micros_frame_owner_is_equal(stored_owner, expected_owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
     }
     if (
         target >= MICROS_FRAME_HANDOFF_TARGET_COUNT
-        || !handoff_target_is_valid(stored_owner, (uint8_t)target)
+        || !micros_frame_ownership_handoff_target_is_valid(stored_owner, (uint8_t)target)
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
     }
@@ -710,7 +578,7 @@ micros_frame_ownership_prepare_wired_process_user_set(
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
-    error = require_initialized(ownership);
+    error = micros_frame_ownership_require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
@@ -798,217 +666,6 @@ micros_frame_ownership_prepare_wired_process_user_set(
     }
     return MICROS_FRAME_OWNERSHIP_OK;
 }
-
-enum micros_frame_ownership_error micros_frame_ownership_lookup(
-    const struct micros_frame_ownership *ownership,
-    uint64_t physical_address,
-    struct micros_frame_owner *owner
-)
-{
-    struct micros_frame_owner observed;
-    uint64_t frame_index;
-    enum micros_frame_ownership_error error;
-
-    if (owner == NULL) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
-    }
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (!geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    error = physical_address_to_index(
-        ownership,
-        physical_address,
-        &frame_index
-    );
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    observed = ownership->owners[frame_index];
-    if (!owner_is_valid(observed)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    *owner = observed;
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
-enum micros_frame_ownership_error
-micros_frame_ownership_count_process(
-    const struct micros_frame_ownership *ownership,
-    struct micros_process_handle process,
-    uint64_t *count
-)
-{
-    uint64_t observed_count = 0;
-    uint64_t frame_index;
-    enum micros_frame_ownership_error error;
-
-    if (count == NULL) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
-    }
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (!process_handle_is_valid(process)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
-    }
-    if (!geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    for (
-        frame_index = 0;
-        frame_index < ownership->managed_frame_count;
-        ++frame_index
-    ) {
-        struct micros_frame_owner owner =
-            ownership->owners[frame_index];
-
-        if (!owner_is_valid(owner)) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-        if (
-            owner_kind_is_process_bound(owner.kind)
-            && owner.slot == process.slot
-            && owner.generation == process.generation
-        ) {
-            ++observed_count;
-        }
-    }
-    *count = observed_count;
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
-enum micros_frame_ownership_error
-micros_frame_ownership_release_process_set(
-    struct micros_frame_ownership *ownership,
-    struct micros_process_handle process,
-    const uint64_t *release_bitmap,
-    size_t release_word_count
-)
-{
-    uint64_t release_counts[MICROS_FRAME_OWNER_KIND_COUNT];
-    uint64_t release_count = 0;
-    uint64_t frame_index;
-    enum micros_frame_ownership_error error;
-
-    clear_bytes(release_counts, sizeof(release_counts));
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
-    }
-    if (
-        release_bitmap == NULL
-        || release_word_count
-            != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
-    }
-    if (!process_handle_is_valid(process)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
-    }
-    error = micros_frame_ownership_validate(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-
-    for (
-        frame_index = 0;
-        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
-        ++frame_index
-    ) {
-        size_t word_index = (size_t)(frame_index / 64);
-        uint64_t bit = UINT64_C(1) << (frame_index % 64);
-        struct micros_frame_owner owner;
-
-        if ((release_bitmap[word_index] & bit) == 0) {
-            continue;
-        }
-        if (frame_index >= ownership->managed_frame_count) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
-        }
-        owner = ownership->owners[frame_index];
-        if (owner.kind == MICROS_FRAME_OWNER_FREE) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
-        }
-        if (
-            (
-                owner.kind
-                    != MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
-                && owner.kind != MICROS_FRAME_OWNER_PROCESS_USER
-            )
-            || owner.slot != process.slot
-            || owner.generation != process.generation
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-        }
-        if (
-            release_count == ownership->managed_frame_count
-            || release_counts[owner.kind]
-                == ownership->managed_frame_count
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-        ++release_count;
-        ++release_counts[owner.kind];
-    }
-    if (
-        release_count > ownership->owned_frame_count
-        || release_count
-            > ownership->managed_frame_count
-                - ownership->allocator->free_frame_count
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    for (
-        frame_index = 0;
-        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
-        ++frame_index
-    ) {
-        if (
-            release_counts[frame_index]
-                > ownership->owner_counts[frame_index]
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-    }
-
-    for (
-        frame_index = 0;
-        frame_index < ownership->managed_frame_count;
-        ++frame_index
-    ) {
-        size_t word_index = (size_t)(frame_index / 64);
-        uint64_t bit = UINT64_C(1) << (frame_index % 64);
-
-        if ((release_bitmap[word_index] & bit) == 0) {
-            continue;
-        }
-        ownership->allocator->allocated_bitmap[word_index] &= ~bit;
-        ownership->owners[frame_index] =
-            (struct micros_frame_owner){0, 0, 0, 0};
-        ownership->handoff_targets[frame_index] =
-            MICROS_FRAME_HANDOFF_NONE;
-    }
-    ownership->allocator->free_frame_count += release_count;
-    ownership->owned_frame_count -= release_count;
-    for (
-        frame_index = 0;
-        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
-        ++frame_index
-    ) {
-        ownership->owner_counts[frame_index] -=
-            release_counts[frame_index];
-    }
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
 enum micros_frame_ownership_error
 micros_frame_ownership_complete_handoff(
     struct micros_frame_ownership *ownership
@@ -1019,8 +676,8 @@ micros_frame_ownership_complete_handoff(
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
-    clear_bytes(resulting_counts, sizeof(resulting_counts));
-    error = require_initialized(ownership);
+    micros_frame_ownership_clear_bytes(resulting_counts, sizeof(resulting_counts));
+    error = micros_frame_ownership_require_initialized(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
@@ -1052,7 +709,7 @@ micros_frame_ownership_complete_handoff(
             return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
         }
         result = resulting_owner(owner, target);
-        if (!owner_is_valid(result)) {
+        if (!micros_frame_owner_is_valid(result)) {
             return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
         }
         if (result.kind != MICROS_FRAME_OWNER_FREE) {
@@ -1096,183 +753,6 @@ micros_frame_ownership_complete_handoff(
     ownership->phase = MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF;
     return MICROS_FRAME_OWNERSHIP_OK;
 }
-
-enum micros_frame_ownership_error micros_frame_ownership_validate(
-    const struct micros_frame_ownership *ownership
-)
-{
-    uint64_t observed_counts[MICROS_FRAME_OWNER_KIND_COUNT];
-    uint64_t observed_owned_count = 0;
-    uint64_t observed_allocated_count = 0;
-    uint64_t frame_index;
-    enum micros_frame_ownership_error error;
-
-    clear_bytes(observed_counts, sizeof(observed_counts));
-    error = require_initialized(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (
-        (
-            ownership->phase
-                != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-            && ownership->phase
-                != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
-        )
-        || !geometry_matches(ownership)
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-
-    for (
-        frame_index = 0;
-        frame_index < ownership->managed_frame_count;
-        ++frame_index
-    ) {
-        struct micros_frame_owner owner =
-            ownership->owners[frame_index];
-        uint8_t target = ownership->handoff_targets[frame_index];
-        bool allocated = allocator_bit_is_set(
-            ownership->allocator,
-            frame_index
-        );
-
-        if (
-            !owner_is_valid(owner)
-            || allocated
-                == (owner.kind == MICROS_FRAME_OWNER_FREE)
-            || !handoff_target_is_valid(owner, target)
-            || (
-                owner.kind == MICROS_FRAME_OWNER_FREE
-                && target != MICROS_FRAME_HANDOFF_NONE
-            )
-            || (
-                ownership->phase
-                    == MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
-                && (
-                    target != MICROS_FRAME_HANDOFF_NONE
-                    || owner.kind
-                        == MICROS_FRAME_OWNER_KERNEL_TEMPORARY
-                    || owner.kind
-                        == MICROS_FRAME_OWNER_PROCESS_USER
-                )
-            )
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-        if (allocated) {
-            ++observed_allocated_count;
-        }
-        if (owner.kind != MICROS_FRAME_OWNER_FREE) {
-            ++observed_owned_count;
-            ++observed_counts[owner.kind];
-        }
-    }
-
-    for (
-        frame_index = ownership->managed_frame_count;
-        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
-        ++frame_index
-    ) {
-        if (
-            !owner_is_equal(
-                ownership->owners[frame_index],
-                (struct micros_frame_owner){0, 0, 0, 0}
-            )
-            || ownership->handoff_targets[frame_index]
-                != MICROS_FRAME_HANDOFF_NONE
-            || allocator_bit_is_set(
-                ownership->allocator,
-                frame_index
-            )
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-    }
-
-    if (
-        ownership->owner_counts[MICROS_FRAME_OWNER_FREE] != 0
-        || observed_owned_count != ownership->owned_frame_count
-        || observed_allocated_count != observed_owned_count
-        || ownership->allocator->managed_frame_count
-            - ownership->allocator->free_frame_count
-            != observed_owned_count
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-    }
-    for (
-        frame_index = 0;
-        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
-        ++frame_index
-    ) {
-        if (
-            ownership->owner_counts[frame_index]
-                != observed_counts[frame_index]
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-    }
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
-static enum micros_frame_ownership_error
-vm_transition_preflight(
-    const struct micros_frame_ownership *ownership
-)
-{
-    enum micros_frame_ownership_error error =
-        require_initialized(ownership);
-
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    if (
-        ownership->phase
-            != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
-    }
-    return micros_frame_ownership_validate(ownership);
-}
-
-static bool frame_index_is_duplicate(
-    const uint64_t *frame_indices,
-    size_t frame_index_count,
-    uint64_t frame_index
-)
-{
-    size_t index;
-
-    for (index = 0; index < frame_index_count; ++index) {
-        if (frame_indices[index] == frame_index) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void allocator_mark_allocated(
-    struct micros_frame_allocator *allocator,
-    uint64_t frame_index
-)
-{
-    size_t word_index = (size_t)(frame_index / 64);
-    uint64_t bit = UINT64_C(1) << (frame_index % 64);
-
-    allocator->allocated_bitmap[word_index] |= bit;
-}
-
-static void allocator_mark_free(
-    struct micros_frame_allocator *allocator,
-    uint64_t frame_index
-)
-{
-    size_t word_index = (size_t)(frame_index / 64);
-    uint64_t bit = UINT64_C(1) << (frame_index % 64);
-
-    allocator->allocated_bitmap[word_index] &= ~bit;
-}
-
 enum micros_frame_ownership_error
 micros_frame_ownership_vm_claim_preflight(
     const struct micros_frame_ownership *ownership,
@@ -1287,11 +767,11 @@ micros_frame_ownership_vm_claim_preflight(
     if (plan == NULL) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
-    error = vm_transition_preflight(ownership);
+    error = micros_frame_ownership_vm_transition_preflight(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    error = physical_address_to_index(
+    error = micros_frame_ownership_physical_address_to_index(
         ownership,
         physical_address,
         &frame_index
@@ -1316,7 +796,7 @@ micros_frame_ownership_vm_claim_preflight(
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
     candidate.frame_index = frame_index;
-    copy_bytes(plan, &candidate, sizeof(candidate));
+    micros_frame_ownership_copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1332,7 +812,7 @@ void micros_frame_ownership_vm_claim_commit_prevalidated(
         0,
     };
 
-    allocator_mark_allocated(
+    micros_frame_ownership_allocator_mark_allocated(
         ownership->allocator,
         plan->frame_index
     );
@@ -1369,8 +849,8 @@ micros_frame_ownership_vm_release_transferable_preflight(
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
-    clear_bytes(&candidate, sizeof(candidate));
-    error = vm_transition_preflight(ownership);
+    micros_frame_ownership_clear_bytes(&candidate, sizeof(candidate));
+    error = micros_frame_ownership_vm_transition_preflight(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
@@ -1378,7 +858,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
         uint64_t frame_index;
         struct micros_frame_owner owner;
 
-        error = physical_address_to_index(
+        error = micros_frame_ownership_physical_address_to_index(
             ownership,
             physical_addresses[index],
             &frame_index
@@ -1386,7 +866,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
         if (error != MICROS_FRAME_OWNERSHIP_OK) {
             return error;
         }
-        if (frame_index_is_duplicate(
+        if (micros_frame_ownership_frame_index_is_duplicate(
             candidate.frame_indices,
             index,
             frame_index
@@ -1398,7 +878,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
             return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
         }
         if (
-            !owner_is_equal(
+            !micros_frame_owner_is_equal(
                 owner,
                 (struct micros_frame_owner){
                     0,
@@ -1425,7 +905,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
     candidate.frame_count = (uint32_t)physical_address_count;
-    copy_bytes(plan, &candidate, sizeof(candidate));
+    micros_frame_ownership_copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1439,7 +919,7 @@ void micros_frame_ownership_vm_release_transferable_commit_prevalidated(
     for (index = 0; index < plan->frame_count; ++index) {
         uint64_t frame_index = plan->frame_indices[index];
 
-        allocator_mark_free(ownership->allocator, frame_index);
+        micros_frame_ownership_allocator_mark_free(ownership->allocator, frame_index);
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};
         ownership->handoff_targets[frame_index] =
@@ -1451,144 +931,6 @@ void micros_frame_ownership_vm_release_transferable_commit_prevalidated(
         MICROS_FRAME_OWNER_VM_TRANSFERABLE
     ] -= plan->frame_count;
 }
-
-static enum micros_frame_ownership_error
-vm_process_set_preflight(
-    const struct micros_frame_ownership *ownership,
-    struct micros_process_handle process,
-    const uint64_t *data_physical_addresses,
-    size_t data_physical_address_count,
-    const uint64_t
-        table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
-    enum micros_frame_owner_kind data_owner_kind,
-    enum micros_frame_owner_kind table_owner_kind,
-    uint64_t
-        data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX],
-    uint64_t
-        table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT]
-)
-{
-    struct micros_frame_owner expected_data_owner;
-    struct micros_frame_owner expected_table_owner;
-    enum micros_frame_ownership_error error;
-    size_t index;
-
-    if (
-        data_physical_addresses == NULL
-        || table_physical_addresses == NULL
-        || data_physical_address_count == 0
-        || data_physical_address_count
-            > MICROS_APPLICATION_RESIDENT_PAGE_MAX
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
-    }
-    if (!process_handle_is_valid(process)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
-    }
-    error = vm_transition_preflight(ownership);
-    if (error != MICROS_FRAME_OWNERSHIP_OK) {
-        return error;
-    }
-    expected_data_owner =
-        data_owner_kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE
-        ? (struct micros_frame_owner){
-            0,
-            0,
-            MICROS_FRAME_OWNER_VM_TRANSFERABLE,
-            0,
-        }
-        : (struct micros_frame_owner){
-            process.generation,
-            process.slot,
-            (uint8_t)data_owner_kind,
-            0,
-        };
-    expected_table_owner =
-        table_owner_kind == MICROS_FRAME_OWNER_FREE
-        ? (struct micros_frame_owner){0, 0, 0, 0}
-        : (struct micros_frame_owner){
-            process.generation,
-            process.slot,
-            (uint8_t)table_owner_kind,
-            0,
-        };
-
-    for (index = 0; index < data_physical_address_count; ++index) {
-        uint64_t frame_index;
-        struct micros_frame_owner owner;
-
-        error = physical_address_to_index(
-            ownership,
-            data_physical_addresses[index],
-            &frame_index
-        );
-        if (error != MICROS_FRAME_OWNERSHIP_OK) {
-            return error;
-        }
-        if (frame_index_is_duplicate(
-            data_frame_indices,
-            index,
-            frame_index
-        )) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
-        }
-        owner = ownership->owners[frame_index];
-        if (owner.kind == MICROS_FRAME_OWNER_FREE) {
-            return data_owner_kind
-                    == MICROS_FRAME_OWNER_VM_TRANSFERABLE
-                ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
-                : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-        }
-        if (!owner_is_equal(owner, expected_data_owner)) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-        }
-        data_frame_indices[index] = frame_index;
-    }
-    for (
-        index = 0;
-        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
-        ++index
-    ) {
-        uint64_t frame_index;
-        struct micros_frame_owner owner;
-
-        error = physical_address_to_index(
-            ownership,
-            table_physical_addresses[index],
-            &frame_index
-        );
-        if (error != MICROS_FRAME_OWNERSHIP_OK) {
-            return error;
-        }
-        if (
-            frame_index_is_duplicate(
-                data_frame_indices,
-                data_physical_address_count,
-                frame_index
-            )
-            || frame_index_is_duplicate(
-                table_frame_indices,
-                index,
-                frame_index
-            )
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
-        }
-        owner = ownership->owners[frame_index];
-        if (
-            table_owner_kind != MICROS_FRAME_OWNER_FREE
-            && owner.kind == MICROS_FRAME_OWNER_FREE
-        ) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
-        }
-        if (!owner_is_equal(owner, expected_table_owner)) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-        }
-        table_frame_indices[index] = frame_index;
-    }
-    return MICROS_FRAME_OWNERSHIP_OK;
-}
-
 enum micros_frame_ownership_error
 micros_frame_ownership_vm_freeze_preflight(
     const struct micros_frame_ownership *ownership,
@@ -1606,8 +948,8 @@ micros_frame_ownership_vm_freeze_preflight(
     if (plan == NULL) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
-    clear_bytes(&candidate, sizeof(candidate));
-    error = vm_process_set_preflight(
+    micros_frame_ownership_clear_bytes(&candidate, sizeof(candidate));
+    error = micros_frame_ownership_vm_process_set_preflight(
         ownership,
         process,
         data_physical_addresses,
@@ -1647,7 +989,7 @@ micros_frame_ownership_vm_freeze_preflight(
     candidate.process = process;
     candidate.data_frame_count =
         (uint32_t)data_physical_address_count;
-    copy_bytes(plan, &candidate, sizeof(candidate));
+    micros_frame_ownership_copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1680,7 +1022,7 @@ void micros_frame_ownership_vm_freeze_commit_prevalidated(
     ) {
         uint64_t frame_index = plan->table_frame_indices[index];
 
-        allocator_mark_allocated(ownership->allocator, frame_index);
+        micros_frame_ownership_allocator_mark_allocated(ownership->allocator, frame_index);
         ownership->owners[frame_index] = table;
         ownership->handoff_targets[frame_index] =
             MICROS_FRAME_HANDOFF_NONE;
@@ -1717,8 +1059,8 @@ micros_frame_ownership_vm_release_process_preflight(
     if (plan == NULL) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
-    clear_bytes(&candidate, sizeof(candidate));
-    error = vm_process_set_preflight(
+    micros_frame_ownership_clear_bytes(&candidate, sizeof(candidate));
+    error = micros_frame_ownership_vm_process_set_preflight(
         ownership,
         process,
         data_physical_addresses,
@@ -1753,7 +1095,7 @@ micros_frame_ownership_vm_release_process_preflight(
     candidate.process = process;
     candidate.data_frame_count =
         (uint32_t)data_physical_address_count;
-    copy_bytes(plan, &candidate, sizeof(candidate));
+    micros_frame_ownership_copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -1769,7 +1111,7 @@ void micros_frame_ownership_vm_release_process_commit_prevalidated(
     for (index = 0; index < plan->data_frame_count; ++index) {
         uint64_t frame_index = plan->data_frame_indices[index];
 
-        allocator_mark_free(ownership->allocator, frame_index);
+        micros_frame_ownership_allocator_mark_free(ownership->allocator, frame_index);
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};
         ownership->handoff_targets[frame_index] =
@@ -1782,7 +1124,7 @@ void micros_frame_ownership_vm_release_process_commit_prevalidated(
     ) {
         uint64_t frame_index = plan->table_frame_indices[index];
 
-        allocator_mark_free(ownership->allocator, frame_index);
+        micros_frame_ownership_allocator_mark_free(ownership->allocator, frame_index);
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};
         ownership->handoff_targets[frame_index] =
