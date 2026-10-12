@@ -295,15 +295,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if (
-        migration[0] != "kernel/frame_ownership.c"
-        and migration[0] != "tests/host/frame_ownership_test.c"
-        and not migration[0].startswith("tests/host/frame_allocator_")
-    )
-)
+LONG_FUNCTION_MIGRATION = ()
 
 STRUCTURAL_TEST_PATH = "tests/host/test_frame_ownership_source_layout.py"
 
