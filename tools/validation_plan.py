@@ -285,12 +285,57 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/vm_bootstrap_test_internal.h",
         ),
     ),
+    (
+        "kernel/pm_control_core.c",
+        (
+            "kernel/pm_control_abi.c",
+            "kernel/pm_control_validation.c",
+            "kernel/pm_control_reservation.c",
+            "kernel/pm_control_execution.c",
+            "kernel/pm_control_activation.c",
+            "kernel/pm_control_exit.c",
+            "kernel/pm_control_internal.h",
+        ),
+    ),
+    (
+        "kernel/pm_control_syscall.c",
+        (
+            "kernel/pm_control_syscall_runtime.c",
+            "kernel/pm_control_syscall_reservation.c",
+            "kernel/pm_control_syscall_execution.c",
+            "kernel/pm_control_syscall_activation.c",
+            "kernel/pm_control_syscall_exit.c",
+            "kernel/pm_control_syscall_internal.h",
+        ),
+    ),
+    (
+        "tests/host/pm_control_test.c",
+        (
+            "tests/host/pm_control_test_fixture.c",
+            "tests/host/pm_control_abi_test.c",
+            "tests/host/pm_control_syscall_test.c",
+            "tests/host/pm_control_reservation_test.c",
+            "tests/host/pm_control_runtime_test.c",
+            "tests/host/pm_control_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/pm_control_execution_test.c",
+        (
+            "tests/host/pm_control_execution_test_fixture.c",
+            "tests/host/pm_control_execution_prepare_test.c",
+            "tests/host/pm_control_execution_token_test.c",
+            "tests/host/pm_control_execution_exit_test.c",
+            "tests/host/pm_control_execution_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_kernel_address_space_source_layout.py",
     "tests/host/test_frame_ownership_source_layout.py",
     "tests/host/test_kernel_vm_handoff_source_layout.py",
+    "tests/host/test_kernel_pm_control_source_layout.py",
 )
 
 
