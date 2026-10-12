@@ -551,6 +551,57 @@ set(
     tests/host/pm_control_execution_exit_test.c
 )
 
+set(
+    MICROS_VM_BOOT_VALIDATION_SOURCES
+    lib/vm/vm_boot_validate.c
+)
+
+set(
+    MICROS_VM_IMAGE_SOURCES
+    servers/vm/vm_image.c
+    servers/vm/vm_stack.c
+    servers/vm/vm_elf.c
+)
+
+set(
+    MICROS_VM_CORE_SOURCES
+    servers/vm/vm_core.c
+    servers/vm/vm_validation.c
+    servers/vm/vm_frames.c
+    servers/vm/vm_load.c
+    servers/vm/vm_exit.c
+)
+
+set(
+    MICROS_VM_CORE_HOST_TEST_SOURCES
+    tests/host/vm_core_test.c
+    tests/host/vm_core_test_fixture.c
+    tests/host/vm_core_boot_test.c
+    tests/host/vm_core_load_test.c
+    tests/host/vm_core_abort_test.c
+    tests/host/vm_core_validation_test.c
+)
+
+set(
+    MICROS_VM_SERVICE_QEMU_SOURCES
+    tests/qemu/vm_server.c
+    tests/qemu/vm_server_fixture.c
+    tests/qemu/vm_server_handoff.c
+    tests/qemu/vm_server_probe.c
+    tests/qemu/vm_server_tty.c
+    tests/qemu/vm_server_scratch.c
+    tests/qemu/vm_server_pm.c
+)
+
+set(
+    MICROS_VM_SCRATCH_PREEMPTION_QEMU_TEST_SOURCES
+    kernel/vm_scratch_preemption_test.c
+    kernel/vm_scratch_preemption_test_fixture.c
+    kernel/vm_scratch_preemption_test_runtime.c
+    kernel/vm_scratch_preemption_test_report.c
+    kernel/vm_scratch_preemption_test_trap.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -668,7 +719,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
-        lib/vm/vm_boot_validate.c
+        ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES}
         ${MICROS_VM_BOOTSTRAP_HOST_TEST_SOURCES}
     )
@@ -690,7 +741,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         spawn_abi_test
         lib/spawn/spawn_request.c
-        servers/vm/vm_image.c
+        ${MICROS_VM_IMAGE_SOURCES}
         tests/host/spawn_abi_test.c
     )
     add_executable(
@@ -698,11 +749,11 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
-        lib/vm/vm_boot_validate.c
+        ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         lib/spawn/spawn_request.c
-        servers/vm/vm_core.c
-        servers/vm/vm_image.c
-        tests/host/vm_core_test.c
+        ${MICROS_VM_IMAGE_SOURCES}
+        ${MICROS_VM_CORE_SOURCES}
+        ${MICROS_VM_CORE_HOST_TEST_SOURCES}
     )
     add_executable(
         ramfs_seed_test
@@ -2259,11 +2310,11 @@ if(
             micros_vm_server
             micros-vm-server
             lib/spawn/spawn_request.c
-            lib/vm/vm_boot_validate.c
-            servers/vm/vm_core.c
-            servers/vm/vm_image.c
+            ${MICROS_VM_BOOT_VALIDATION_SOURCES}
+            ${MICROS_VM_IMAGE_SOURCES}
+            ${MICROS_VM_CORE_SOURCES}
             tests/qemu/vm_self_fault.S
-            tests/qemu/vm_server.c
+            ${MICROS_VM_SERVICE_QEMU_SOURCES}
         )
         if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
             target_sources(
@@ -2766,7 +2817,7 @@ add_executable(
     kernel/vm_handoff_runtime.c
     ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
     ${MICROS_VM_SNAPSHOT_SOURCES}
-    lib/vm/vm_boot_validate.c
+    ${MICROS_VM_BOOT_VALIDATION_SOURCES}
 )
 
 if(MICROS_BUILD_UART_CONSOLE_TEST)
@@ -2918,7 +2969,7 @@ if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
         micros
         PRIVATE
             "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
-            kernel/vm_scratch_preemption_test.c
+            ${MICROS_VM_SCRATCH_PREEMPTION_QEMU_TEST_SOURCES}
     )
 endif()
 

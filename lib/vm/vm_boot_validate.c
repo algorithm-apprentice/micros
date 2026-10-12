@@ -359,119 +359,120 @@ enum micros_vm_boot_error micros_vm_boot_digest(
     return MICROS_VM_BOOT_OK;
 }
 
-enum micros_vm_boot_error micros_vm_boot_validate(
-    const struct micros_vm_boot_info *info,
-    struct micros_vm_boot_summary *summary
+struct vm_boot_validation_counts {
+    uint64_t free;
+    uint64_t kernel;
+    uint64_t self;
+    uint64_t service;
+    uint64_t transferable;
+    uint64_t wired_mappings;
+};
+
+static bool vm_boot_header_is_valid(
+    const struct micros_vm_boot_info *info
 )
 {
-    struct micros_vm_boot_summary candidate;
-    uint64_t free_count = 0;
-    uint64_t kernel_count = 0;
-    uint64_t self_count = 0;
-    uint64_t service_count = 0;
-    uint64_t transferable_count = 0;
-    uint64_t digest;
-    uint64_t wired_mapping_count = 0;
-    uint32_t expected_mapping_index = 0;
-    bool found_self = false;
-    size_t index;
-
-    if (
-        info == NULL
-        || summary == NULL
-        || (uintptr_t)info % MICROS_VM_BOOT_INFO_ALIGNMENT != 0
-    ) {
-        return MICROS_VM_BOOT_ERROR_ARGUMENT;
-    }
-    if (
-        info->header.version != MICROS_VM_BOOT_INFO_VERSION
-        || info->header.header_size != MICROS_VM_BOOT_HEADER_SIZE
-        || info->header.total_size != MICROS_VM_BOOT_INFO_SIZE
-        || info->header.physical_range_size
-            != MICROS_VM_PHYSICAL_RANGE_SIZE
-        || info->header.managed_range_size
-            != MICROS_VM_MANAGED_RANGE_SIZE
-        || info->header.address_space_entry_size
-            != MICROS_VM_ADDRESS_SPACE_SIZE
-        || info->header.mapping_entry_size != MICROS_VM_MAPPING_SIZE
-        || info->header.memory_range_capacity
-            != MICROS_VM_MAX_MEMORY_RANGES
-        || info->header.reserved_range_capacity
-            != MICROS_VM_MAX_RESERVED_RANGES
-        || info->header.managed_range_capacity
-            != MICROS_VM_MAX_MANAGED_RANGES
-        || info->header.address_space_capacity
-            != MICROS_VM_MAX_STATIC_ADDRESS_SPACES
-        || info->header.mapping_capacity
-            != MICROS_VM_MAX_STATIC_MAPPINGS
-        || info->header.frame_state_capacity
-            != MICROS_VM_MAX_MANAGED_FRAMES
-        || info->header.frame_state_size != 1
-        || info->header.service_id == 0
-        || info->header.service_id > VM_SERVICE_ID_MAX
-        || !vm_boot_endpoint_is_valid(info->header.self_endpoint)
-        || info->header.ownership_phase
-            != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-        || info->header.flags != MICROS_VM_BOOT_FLAG_NONE
-        || info->header.reserved0 != 0
-        || !vm_boot_bytes_are_zero(
+    return (
+        info->header.version == MICROS_VM_BOOT_INFO_VERSION
+        && info->header.header_size == MICROS_VM_BOOT_HEADER_SIZE
+        && info->header.total_size == MICROS_VM_BOOT_INFO_SIZE
+        && info->header.physical_range_size
+            == MICROS_VM_PHYSICAL_RANGE_SIZE
+        && info->header.managed_range_size
+            == MICROS_VM_MANAGED_RANGE_SIZE
+        && info->header.address_space_entry_size
+            == MICROS_VM_ADDRESS_SPACE_SIZE
+        && info->header.mapping_entry_size == MICROS_VM_MAPPING_SIZE
+        && info->header.memory_range_capacity
+            == MICROS_VM_MAX_MEMORY_RANGES
+        && info->header.reserved_range_capacity
+            == MICROS_VM_MAX_RESERVED_RANGES
+        && info->header.managed_range_capacity
+            == MICROS_VM_MAX_MANAGED_RANGES
+        && info->header.address_space_capacity
+            == MICROS_VM_MAX_STATIC_ADDRESS_SPACES
+        && info->header.mapping_capacity
+            == MICROS_VM_MAX_STATIC_MAPPINGS
+        && info->header.frame_state_capacity
+            == MICROS_VM_MAX_MANAGED_FRAMES
+        && info->header.frame_state_size == 1
+        && info->header.service_id != 0
+        && info->header.service_id <= VM_SERVICE_ID_MAX
+        && vm_boot_endpoint_is_valid(info->header.self_endpoint)
+        && info->header.ownership_phase
+            == MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        && info->header.flags == MICROS_VM_BOOT_FLAG_NONE
+        && info->header.reserved0 == 0
+        && vm_boot_bytes_are_zero(
             info->header.reserved,
             sizeof(info->header.reserved)
         )
-        || info->header.memory_range_count == 0
-        || info->header.memory_range_count
-            > MICROS_VM_MAX_MEMORY_RANGES
-        || info->header.reserved_range_count
-            > MICROS_VM_MAX_RESERVED_RANGES
-        || info->header.managed_range_count == 0
-        || info->header.managed_range_count
-            > MICROS_VM_MAX_MANAGED_RANGES
-        || info->header.address_space_count == 0
-        || info->header.address_space_count
-            > MICROS_VM_MAX_STATIC_ADDRESS_SPACES
-        || info->header.mapping_count == 0
-        || info->header.mapping_count
-            > MICROS_VM_MAX_STATIC_MAPPINGS
-        || info->header.managed_frame_count == 0
-        || info->header.managed_frame_count
-            > MICROS_VM_MAX_MANAGED_FRAMES
-    ) {
-        return MICROS_VM_BOOT_ERROR_SHAPE;
-    }
-    if (
-        !vm_boot_physical_ranges_are_canonical(
+        && info->header.memory_range_count != 0
+        && info->header.memory_range_count
+            <= MICROS_VM_MAX_MEMORY_RANGES
+        && info->header.reserved_range_count
+            <= MICROS_VM_MAX_RESERVED_RANGES
+        && info->header.managed_range_count != 0
+        && info->header.managed_range_count
+            <= MICROS_VM_MAX_MANAGED_RANGES
+        && info->header.address_space_count != 0
+        && info->header.address_space_count
+            <= MICROS_VM_MAX_STATIC_ADDRESS_SPACES
+        && info->header.mapping_count != 0
+        && info->header.mapping_count
+            <= MICROS_VM_MAX_STATIC_MAPPINGS
+        && info->header.managed_frame_count != 0
+        && info->header.managed_frame_count
+            <= MICROS_VM_MAX_MANAGED_FRAMES
+    );
+}
+
+static bool vm_boot_ranges_are_valid(
+    const struct micros_vm_boot_info *info
+)
+{
+    return (
+        vm_boot_physical_ranges_are_canonical(
             info->memory_ranges,
             info->header.memory_range_count
         )
-        || !vm_boot_physical_ranges_are_canonical(
+        && vm_boot_physical_ranges_are_canonical(
             info->reserved_ranges,
             info->header.reserved_range_count
         )
-        || !vm_boot_managed_ranges_match_physical_database(info)
-        || !vm_boot_bytes_are_zero(
+        && vm_boot_managed_ranges_match_physical_database(info)
+        && vm_boot_bytes_are_zero(
             &info->memory_ranges[info->header.memory_range_count],
             (
                 MICROS_VM_MAX_MEMORY_RANGES
                 - info->header.memory_range_count
             ) * sizeof(info->memory_ranges[0])
         )
-        || !vm_boot_bytes_are_zero(
+        && vm_boot_bytes_are_zero(
             &info->reserved_ranges[info->header.reserved_range_count],
             (
                 MICROS_VM_MAX_RESERVED_RANGES
                 - info->header.reserved_range_count
             ) * sizeof(info->reserved_ranges[0])
         )
-        || !vm_boot_bytes_are_zero(
+        && vm_boot_bytes_are_zero(
             &info->managed_ranges[info->header.managed_range_count],
             (
                 MICROS_VM_MAX_MANAGED_RANGES
                 - info->header.managed_range_count
             ) * sizeof(info->managed_ranges[0])
         )
-    ) {
-        return MICROS_VM_BOOT_ERROR_RANGE;
-    }
+    );
+}
+
+static enum micros_vm_boot_error vm_boot_validate_address_spaces(
+    const struct micros_vm_boot_info *info
+)
+{
+    uint32_t expected_mapping_index = 0;
+    bool found_self = false;
+    size_t index;
+
     for (
         index = 0;
         index < info->header.address_space_count;
@@ -539,7 +540,7 @@ enum micros_vm_boot_error micros_vm_boot_validate(
         }
         expected_mapping_index = mapping_end;
     }
-    if (
+    return (
         !found_self
         || expected_mapping_index != info->header.mapping_count
         || !vm_boot_bytes_are_zero(
@@ -549,9 +550,16 @@ enum micros_vm_boot_error micros_vm_boot_validate(
                 - info->header.address_space_count
             ) * sizeof(info->address_spaces[0])
         )
-    ) {
-        return MICROS_VM_BOOT_ERROR_IDENTITY;
-    }
+    ) ? MICROS_VM_BOOT_ERROR_IDENTITY : MICROS_VM_BOOT_OK;
+}
+
+static enum micros_vm_boot_error vm_boot_validate_mappings(
+    const struct micros_vm_boot_info *info,
+    struct vm_boot_validation_counts *counts
+)
+{
+    size_t index;
+
     for (index = 0; index < info->header.mapping_count; ++index) {
         const struct micros_vm_mapping *mapping = &info->mappings[index];
         const struct micros_vm_address_space *space = NULL;
@@ -622,7 +630,7 @@ enum micros_vm_boot_error micros_vm_boot_validate(
                 return MICROS_VM_BOOT_ERROR_MAPPING;
             }
         }
-        ++wired_mapping_count;
+        ++counts->wired_mappings;
     }
     if (
         !vm_boot_bytes_are_zero(
@@ -635,6 +643,16 @@ enum micros_vm_boot_error micros_vm_boot_validate(
     ) {
         return MICROS_VM_BOOT_ERROR_MAPPING;
     }
+    return MICROS_VM_BOOT_OK;
+}
+
+static enum micros_vm_boot_error vm_boot_validate_frame_counts(
+    const struct micros_vm_boot_info *info,
+    struct vm_boot_validation_counts *counts
+)
+{
+    size_t index;
+
     for (
         index = 0;
         index < info->header.managed_frame_count;
@@ -642,19 +660,19 @@ enum micros_vm_boot_error micros_vm_boot_validate(
     ) {
         switch (info->frame_states[index]) {
         case MICROS_VM_FRAME_FREE:
-            ++free_count;
+            ++counts->free;
             break;
         case MICROS_VM_FRAME_KERNEL:
-            ++kernel_count;
+            ++counts->kernel;
             break;
         case MICROS_VM_FRAME_SELF_WIRED:
-            ++self_count;
+            ++counts->self;
             break;
         case MICROS_VM_FRAME_SERVICE_WIRED:
-            ++service_count;
+            ++counts->service;
             break;
         case MICROS_VM_FRAME_TRANSFERABLE:
-            ++transferable_count;
+            ++counts->transferable;
             break;
         default:
             return MICROS_VM_BOOT_ERROR_MAPPING;
@@ -666,27 +684,33 @@ enum micros_vm_boot_error micros_vm_boot_validate(
             MICROS_VM_MAX_MANAGED_FRAMES
                 - info->header.managed_frame_count
         )
-        || free_count != info->header.free_frame_count
-        || kernel_count != info->header.kernel_frame_count
-        || self_count != info->header.vm_self_wired_frame_count
-        || service_count != info->header.service_wired_frame_count
-        || transferable_count
+        || counts->free != info->header.free_frame_count
+        || counts->kernel != info->header.kernel_frame_count
+        || counts->self != info->header.vm_self_wired_frame_count
+        || counts->service != info->header.service_wired_frame_count
+        || counts->transferable
             != info->header.transferable_frame_count
-        || self_count == 0
-        || transferable_count != 0
-        || wired_mapping_count != self_count + service_count
-        || free_count + kernel_count + self_count
-                + service_count + transferable_count
+        || counts->self == 0
+        || counts->transferable != 0
+        || counts->wired_mappings
+            != counts->self + counts->service
+        || counts->free + counts->kernel + counts->self
+                + counts->service + counts->transferable
             != info->header.managed_frame_count
     ) {
         return MICROS_VM_BOOT_ERROR_COUNT;
     }
-    if (
-        micros_vm_boot_digest(info, &digest) != MICROS_VM_BOOT_OK
-        || digest != info->header.digest
-    ) {
-        return MICROS_VM_BOOT_ERROR_DIGEST;
-    }
+    return MICROS_VM_BOOT_OK;
+}
+
+static void vm_boot_publish_summary(
+    const struct micros_vm_boot_info *info,
+    uint64_t digest,
+    struct micros_vm_boot_summary *summary
+)
+{
+    struct micros_vm_boot_summary candidate;
+
     candidate.version = info->header.version;
     candidate.managed_range_count =
         info->header.managed_range_count;
@@ -700,5 +724,48 @@ enum micros_vm_boot_error micros_vm_boot_validate(
         info->header.vm_self_wired_frame_count;
     candidate.digest = digest;
     vm_boot_copy_bytes(summary, &candidate, sizeof(*summary));
+}
+
+enum micros_vm_boot_error micros_vm_boot_validate(
+    const struct micros_vm_boot_info *info,
+    struct micros_vm_boot_summary *summary
+)
+{
+    struct vm_boot_validation_counts counts = {0};
+    enum micros_vm_boot_error error;
+    uint64_t digest;
+
+    if (
+        info == NULL
+        || summary == NULL
+        || (uintptr_t)info % MICROS_VM_BOOT_INFO_ALIGNMENT != 0
+    ) {
+        return MICROS_VM_BOOT_ERROR_ARGUMENT;
+    }
+    if (!vm_boot_header_is_valid(info)) {
+        return MICROS_VM_BOOT_ERROR_SHAPE;
+    }
+    if (!vm_boot_ranges_are_valid(info)) {
+        return MICROS_VM_BOOT_ERROR_RANGE;
+    }
+    error = vm_boot_validate_address_spaces(info);
+    if (error != MICROS_VM_BOOT_OK) {
+        return error;
+    }
+    error = vm_boot_validate_mappings(info, &counts);
+    if (error != MICROS_VM_BOOT_OK) {
+        return error;
+    }
+    error = vm_boot_validate_frame_counts(info, &counts);
+    if (error != MICROS_VM_BOOT_OK) {
+        return error;
+    }
+    if (
+        micros_vm_boot_digest(info, &digest) != MICROS_VM_BOOT_OK
+        || digest != info->header.digest
+    ) {
+        return MICROS_VM_BOOT_ERROR_DIGEST;
+    }
+    vm_boot_publish_summary(info, digest, summary);
     return MICROS_VM_BOOT_OK;
 }

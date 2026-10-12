@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_generate_bootstrap_fixture import bootstrap_image
@@ -44,6 +45,10 @@ class VmScratchPreemptionFixtureGeneratorTest(unittest.TestCase):
             bootstrap_image(),
         )
 
+        self.assertEqual(
+            "83130e7d37432e986fda755e2c2e8861e35f45f46f5eaa3834cbcba9434e15c4",
+            hashlib.sha256(output.encode("utf-8")).hexdigest(),
+        )
         self.assertIn(
             "micros_vm_scratch_preemption_test_images",
             output,

@@ -329,6 +329,57 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/pm_control_execution_test_internal.h",
         ),
     ),
+    (
+        "servers/vm/vm_core.c",
+        (
+            "servers/vm/vm_validation.c",
+            "servers/vm/vm_frames.c",
+            "servers/vm/vm_load.c",
+            "servers/vm/vm_exit.c",
+            "servers/vm/vm_internal.h",
+        ),
+    ),
+    (
+        "servers/vm/vm_image.c",
+        (
+            "servers/vm/vm_stack.c",
+            "servers/vm/vm_elf.c",
+            "servers/vm/vm_image_internal.h",
+        ),
+    ),
+    (
+        "tests/host/vm_core_test.c",
+        (
+            "tests/host/vm_core_test_fixture.c",
+            "tests/host/vm_core_boot_test.c",
+            "tests/host/vm_core_load_test.c",
+            "tests/host/vm_core_abort_test.c",
+            "tests/host/vm_core_validation_test.c",
+            "tests/host/vm_core_test_internal.h",
+        ),
+    ),
+    (
+        "tests/qemu/vm_server.c",
+        (
+            "tests/qemu/vm_server_fixture.c",
+            "tests/qemu/vm_server_handoff.c",
+            "tests/qemu/vm_server_probe.c",
+            "tests/qemu/vm_server_tty.c",
+            "tests/qemu/vm_server_scratch.c",
+            "tests/qemu/vm_server_pm.c",
+            "tests/qemu/vm_server_internal.h",
+        ),
+    ),
+    (
+        "kernel/vm_scratch_preemption_test.c",
+        (
+            "kernel/vm_scratch_preemption_test_fixture.c",
+            "kernel/vm_scratch_preemption_test_runtime.c",
+            "kernel/vm_scratch_preemption_test_report.c",
+            "kernel/vm_scratch_preemption_test_trap.c",
+            "kernel/vm_scratch_preemption_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
@@ -336,6 +387,7 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_frame_ownership_source_layout.py",
     "tests/host/test_kernel_vm_handoff_source_layout.py",
     "tests/host/test_kernel_pm_control_source_layout.py",
+    "tests/host/test_vm_service_source_layout.py",
 )
 
 

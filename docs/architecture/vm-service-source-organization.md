@@ -470,6 +470,13 @@ Family inventory and state/context assertions are unconditional. Dependency
 checks use identifier references across each owner's complete local include
 closure, with stable declaration-only headers treated explicitly.
 
+The implemented gate retains the initial migration inventories for review
+history, but both active migration collections are empty. It also checks
+file-scope object declarations, including initialized and inline-aggregate
+definitions, so a differently named global cannot bypass context ownership.
+The existing generator test compares its complete synthetic fixture against
+the pre-extraction SHA-256 output baseline.
+
 ## Implementation sequence
 
 The implementation proceeds as small green commits:
