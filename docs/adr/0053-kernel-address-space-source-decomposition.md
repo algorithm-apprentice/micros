@@ -117,9 +117,9 @@ The final production layout is:
 | `kernel/user_execution_trap.c` | Trap capture, stored-context mutation, and return-frame installation |
 | `kernel/user_execution_internal.h` | Private execution-family declarations |
 
-`kernel/address_space_test.c` and its assembly fixture remain outside this
-correction. The existing kernel-MMU test already has a bounded source owner
-and is not one of the audited signal files.
+`kernel/mmu_test.c` and its assembly fixture remain outside this correction.
+The existing kernel-MMU test already has a bounded source owner and is not
+one of the audited signal files.
 
 ### Public function ownership
 

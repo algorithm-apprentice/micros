@@ -199,7 +199,7 @@ Stable target-test symbol ownership is:
 
 | Owner | Test symbols |
 | --- | --- |
-| `kernel/address_space_test.c` | Existing kernel-MMU self-test and trap-hook symbols; unchanged and outside this correction |
+| `kernel/mmu_test.c` | Existing kernel-MMU self-test and trap-hook symbols; unchanged and outside this correction |
 | `kernel/user_address_space_test.c` | `micros_user_address_space_runtime_run_self_test`, `micros_user_address_space_handle_test_trap` |
 | `kernel/user_execution_test.c` | `micros_user_execution_runtime_run_self_test`, `micros_user_execution_test_enter_production` |
 | `kernel/user_execution_test_trap.c` | `micros_user_execution_test_pre_capture`, `micros_user_execution_handle_test_trap` |
@@ -251,6 +251,12 @@ restores the saved interrupt state only after the full operation boundary.
 
 No new module-global copy of process state, root state, table state,
 frame-owner state, execution state, or test context is permitted.
+
+The existing test-only allocation-failure sequence remains one guarded
+runtime mechanism because root creation and bootstrap page allocation both
+consume it. `user_address_space_mutation.c` owns the public test control,
+while `user_address_space_runtime.c` owns the shared allocation wrapper and
+counter used by both lifecycle and mutation.
 
 ### Private headers
 
