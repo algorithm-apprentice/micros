@@ -75,6 +75,16 @@ existing evidence; before review, the author runs the authoritative
 pull-request plan once, and the reviewer inspects rather than routinely
 reruns that evidence.
 
+The frame-ownership decomposition defined by ADR-0054 preserves
+`frame_allocator_test`, `frame-allocator`, `frame_ownership_test`,
+`frame-ownership`, and `test-qemu-frame-ownership`. It begins with one
+source-layout test, an exact 17-symbol owner migration map, and an exact
+15-function migration allowlist. Native extraction retains the allocator and
+ledger model seeds, step counts, random-draw order, and test-case order.
+Target extraction retains the exact runtime scenario and pass record. Before
+review, the author runs the authoritative pull-request plan once; the
+reviewer inspects that evidence without routinely rerunning it.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

@@ -237,3 +237,11 @@ The design retains one bounded validation/release scratch owner, preserves
 the existing public headers and evidence identities, and places wired
 handoff above both validation families to keep the concrete module graph
 acyclic.
+
+The following correction is the frame-ownership family. Its exact
+allocator-ledger validation, bootstrap mutation, one-way handoff, VM claim,
+freeze, release, native-model, and target-scenario boundaries are defined in
+[Frame-Ownership Source Organization](frame-ownership-source-organization.md).
+The design keeps complete validation below every mutation owner, preserves
+the public ledger contract and evidence identities, and retains one explicit
+mutable context owner per split test family.

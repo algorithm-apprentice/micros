@@ -238,10 +238,14 @@ repository-wide rewrite. ADR-0052 defines the first correction: preserve the
 existing VFS test executions while separating fixture, core, spawn, service,
 model, target, kernel-hook, and fixture-generation source ownership before
 exit-cleanup coverage is added. That correction and the exit-cleanup slice
-are merged. ADR-0053 proposes the next correction: apply the exact
-[kernel address-space source-organization contract](architecture/kernel-address-space-source-organization.md)
-before the cross-service coordinator extends the current address-space or
-execution owners.
+are merged. The ADR-0053 design and implementation are also merged, applying
+the exact
+[kernel address-space source-organization contract](architecture/kernel-address-space-source-organization.md).
+ADR-0054 defines the current correction: apply the exact
+[frame-ownership source-organization contract](architecture/frame-ownership-source-organization.md)
+before later VM and PM coordination adds transitions around the typed ledger.
+Kernel VM handoff, kernel PM control, VM service, and PM service corrections
+remain sequential successors before the cross-service coordinator.
 
 ## v0.1 completion goal
 
