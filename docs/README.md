@@ -21,6 +21,9 @@ This directory contains the design baseline for `micros`.
 - [VM service source organization](architecture/vm-service-source-organization.md)
   defines exact boot/image planning, portable state, frame, load/exit,
   service-adapter, host/QEMU evidence, and fixture-generator ownership.
+- [PM service source organization](architecture/pm-service-source-organization.md)
+  defines exact lifecycle, codec, validation, request/layout, service,
+  native/model, kernel-report, and generator ownership.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -92,6 +95,9 @@ This directory contains the design baseline for `micros`.
   traces service dispatch, physical allocation, regions/page tables,
   executable planning, exit release, faults, and required `micros`
   adaptations.
+- [MINIX PM service source-organization baseline](research/minix-pm-service-source-organization.md)
+  traces semantic identity, dispatch, lifecycle/wait completion, argument
+  capture, and the current source-only correction.
 
 ## Planning and verification
 
