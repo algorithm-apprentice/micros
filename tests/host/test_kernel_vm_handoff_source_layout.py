@@ -416,6 +416,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "kernel/vm_handoff_freeze.c",
         "kernel/vm_handoff_commit.c",
         "kernel/vm_handoff_release.c",
+        "kernel/vm_snapshot_validation.c",
     }
 )
 
@@ -471,6 +472,15 @@ LONG_FUNCTION_MIGRATION = tuple(
             "tests/host/vm_handoff_test.c",
             "test_decodes_load_commands",
         ),
+        ("kernel/vm_snapshot.c", "micros_vm_snapshot_prepare"),
+        (
+            "tests/host/vm_bootstrap_test.c",
+            "initialize_build_fixture",
+        ),
+        (
+            "tests/host/vm_bootstrap_test.c",
+            "test_build_failure_clears_candidate",
+        ),
     }
 )
 STRUCTURAL_TEST_PATH = "tests/host/test_kernel_vm_handoff_source_layout.py"
@@ -490,13 +500,13 @@ VM_HANDOFF_CASE_ORDER = (
 )
 
 VM_BOOTSTRAP_CASE_ORDER = (
-    "test_abi_contract",
-    "test_valid_snapshot",
-    "test_finalize_is_failure_atomic",
-    "test_rejections",
-    "test_misaligned_storage",
-    "test_builds_from_authoritative_state",
-    "test_build_failure_clears_candidate",
+    "vm_bootstrap_test_test_abi_contract",
+    "vm_bootstrap_test_test_valid_snapshot",
+    "vm_bootstrap_test_test_finalize_is_failure_atomic",
+    "vm_bootstrap_test_test_rejections",
+    "vm_bootstrap_test_test_misaligned_storage",
+    "vm_bootstrap_test_test_builds_from_authoritative_state",
+    "vm_bootstrap_test_test_build_failure_clears_candidate",
     "micros_vm_handoff_test_run",
 )
 
