@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_generate_bootstrap_fixture import bootstrap_image
@@ -29,6 +30,10 @@ class PmServiceFixtureGeneratorTest(unittest.TestCase):
             bootstrap_image(),
         )
 
+        self.assertEqual(
+            "0792855c7e977b78c07e47b08da10e849e753cbd833f2ebeb46ba2725fda8585",
+            hashlib.sha256(output.encode("utf-8")).hexdigest(),
+        )
         self.assertIn("micros_pm_service_test_images", output)
         self.assertIn("MICROS_BOOTSTRAP_ROLE_PM", output)
         self.assertIn('                .service_name = "pm",', output)

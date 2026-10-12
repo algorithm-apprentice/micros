@@ -957,7 +957,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             REPOSITORY_ROOT / "tests/host/pm_test.c"
         ).read_text(encoding="utf-8")
         qemu_entry = (
-            REPOSITORY_ROOT / "kernel/pm_service_test.c"
+            REPOSITORY_ROOT / "kernel/pm_service_test_report.c"
         ).read_text(encoding="utf-8")
         marker = (
             "MICROS_PM_SERVICE_TEST_PASS "

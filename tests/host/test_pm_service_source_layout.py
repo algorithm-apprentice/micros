@@ -174,10 +174,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in FINAL_OWNER_GROUPS.items()
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[2] == "micros_pm_service_test_handle_trap"
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("servers/pm/pm_core.c", "micros_pm_table_validate"),
@@ -197,12 +194,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ("kernel/pm_service_test.c", "micros_pm_service_test_handle_trap"),
     (GENERATOR_PATH, "render_fixture"),
 )
-LONG_FUNCTION_MIGRATION = tuple(
-    migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration[1] in {
-        "micros_pm_service_test_handle_trap", "render_fixture",
-    }
-)
+LONG_FUNCTION_MIGRATION = ()
 
 
 def all_sources() -> tuple[str, ...]:
