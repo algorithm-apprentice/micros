@@ -323,31 +323,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
 
 SYMBOL_OWNER_MIGRATION = (
     (
-        "kernel/user_execution.c",
-        "kernel/user_execution_validation.c",
-        "micros_user_execution_validate_return",
-    ),
-    (
-        "kernel/user_execution.c",
-        "kernel/user_execution_validation.c",
-        "micros_user_execution_validate_context",
-    ),
-    (
-        "kernel/user_execution.c",
-        "kernel/user_execution_trap.c",
-        "micros_user_execution_capture_trap",
-    ),
-    (
-        "kernel/user_execution.c",
-        "kernel/user_execution_trap.c",
-        "micros_user_execution_store_context",
-    ),
-    (
-        "kernel/user_execution.c",
-        "kernel/user_execution_trap.c",
-        "micros_user_execution_install_return_frame",
-    ),
-    (
         "kernel/user_execution_test.c",
         "kernel/user_execution_test_trap.c",
         "micros_user_execution_test_pre_capture",
@@ -446,11 +421,6 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 
 LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/user_execution.c",
-        "micros_user_execution_preflight_post_handoff",
-    ),
-    ("kernel/user_execution.c", "micros_user_execution_prepare"),
     (
         "kernel/user_address_space_test.c",
         "post_handoff_operations_are_revoked",

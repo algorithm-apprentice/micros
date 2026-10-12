@@ -5,36 +5,12 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
-#include "arch/riscv64/mmu.h"
-#include "arch/riscv64/trap_context.h"
 #include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/user_execution_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/sv39.h"
-#include "micros/user_address_space.h"
-
-#define USER_SSTATUS_UBE (UINT64_C(1) << 6)
-#define USER_SSTATUS_VS (UINT64_C(3) << 9)
-#define USER_SSTATUS_FS (UINT64_C(3) << 13)
-#define USER_SSTATUS_XS (UINT64_C(3) << 15)
-#define USER_SSTATUS_MXR (UINT64_C(1) << 19)
-#define USER_SSTATUS_UXL_MASK (UINT64_C(3) << 32)
-#define USER_SSTATUS_UXL_64 (UINT64_C(2) << 32)
-#define USER_SSTATUS_SD (UINT64_C(1) << 63)
-
-#define USER_SSTATUS_CONTROL_MASK \
-    ( \
-        MICROS_RISCV_SSTATUS_SIE \
-        | MICROS_RISCV_SSTATUS_SPIE \
-        | MICROS_RISCV_SSTATUS_SPP \
-        | USER_SSTATUS_UBE \
-        | USER_SSTATUS_VS \
-        | USER_SSTATUS_FS \
-        | USER_SSTATUS_XS \
-        | MICROS_RISCV_SSTATUS_SUM \
-        | USER_SSTATUS_MXR \
-    )
 
 extern const unsigned char __thread_kernel_stacks_start[];
 extern const unsigned char __thread_kernel_stacks_end[];
@@ -42,22 +18,6 @@ extern const unsigned char __thread_kernel_stacks_end[];
 _Noreturn void micros_riscv_enter_user(
     const struct micros_user_context *context
 );
-
-static void copy_context(
-    struct micros_user_context *destination,
-    const struct micros_user_context *source
-)
-{
-    unsigned char *destination_bytes =
-        (unsigned char *)destination;
-    const unsigned char *source_bytes =
-        (const unsigned char *)source;
-    size_t index;
-
-    for (index = 0; index < sizeof(*destination); ++index) {
-        destination_bytes[index] = source_bytes[index];
-    }
-}
 
 static void copy_bytes(void *destination, const void *source, size_t size)
 {
@@ -80,40 +40,6 @@ static void clear_bytes(void *storage, size_t size)
     }
 }
 
-static bool bytes_equal(
-    const void *left_storage,
-    const void *right_storage,
-    size_t size
-)
-{
-    const unsigned char *left = left_storage;
-    const unsigned char *right = right_storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (left[index] != right[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static uint64_t read_sstatus(void)
-{
-    uint64_t status;
-
-    __asm__ volatile("csrr %0, sstatus" : "=r"(status));
-    return status;
-}
-
-static uint64_t read_satp(void)
-{
-    uint64_t satp;
-
-    __asm__ volatile("csrr %0, satp" : "=r"(satp));
-    return satp;
-}
-
 static _Noreturn void panic_invariant(const char *reason)
 {
     struct micros_hart *hart =
@@ -121,28 +47,6 @@ static _Noreturn void panic_invariant(const char *reason)
     uintptr_t hart_id = hart == NULL ? 0 : hart->hardware_id;
 
     MICROS_PANIC(hart_id, reason);
-}
-
-static enum micros_user_execution_error map_object_error(
-    enum micros_kernel_object_error error
-)
-{
-    switch (error) {
-    case MICROS_KERNEL_OBJECT_OK:
-        return MICROS_USER_EXECUTION_OK;
-    case MICROS_KERNEL_OBJECT_ERROR_ARGUMENT:
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    case MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED:
-        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
-    case MICROS_KERNEL_OBJECT_ERROR_STALE:
-        return MICROS_USER_EXECUTION_ERROR_STALE;
-    case MICROS_KERNEL_OBJECT_ERROR_STACK:
-        return MICROS_USER_EXECUTION_ERROR_STACK;
-    case MICROS_KERNEL_OBJECT_ERROR_STATE:
-        return MICROS_USER_EXECUTION_ERROR_STATE;
-    default:
-        return MICROS_USER_EXECUTION_ERROR_INVARIANT;
-    }
 }
 
 static bool derive_stack_bounds(
@@ -193,121 +97,89 @@ static void clear_stack(uintptr_t stack_bottom)
     }
 }
 
-static uint64_t derive_user_status(uint64_t live_status)
-{
-    return (
-        live_status
-        & ~(USER_SSTATUS_CONTROL_MASK | USER_SSTATUS_SD)
-    ) | MICROS_RISCV_SSTATUS_SPIE;
-}
-
-static bool status_is_valid_user_return(
-    uint64_t status,
-    uint64_t preserved_status
+static enum micros_user_execution_error
+validate_post_handoff_thread(
+    struct micros_kernel_objects *objects,
+    struct micros_process_handle process_handle,
+    struct micros_thread_handle thread_handle
 )
 {
-    uint64_t expected = derive_user_status(preserved_status);
+    const struct micros_process *process;
+    uint32_t next_generation;
+    enum micros_kernel_object_error object_error;
+    enum micros_user_execution_error error;
 
-    return (
-        (expected & USER_SSTATUS_UXL_MASK)
-            == USER_SSTATUS_UXL_64
-        && status == expected
+    object_error = micros_process_resolve(
+        objects,
+        process_handle,
+        &process
     );
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return micros_user_execution_map_object_error(object_error);
+    }
+    if (
+        process->live_thread_count != 0
+        || thread_handle.slot >= MICROS_THREAD_CAPACITY
+        || objects->threads[thread_handle.slot].slot_state
+            != MICROS_KERNEL_OBJECT_SLOT_FREE
+    ) {
+        return MICROS_USER_EXECUTION_ERROR_STATE;
+    }
+    object_error = micros_thread_next_generation(
+        objects->threads[thread_handle.slot].generation,
+        &next_generation
+    );
+    if (
+        object_error == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
+    ) {
+        return MICROS_USER_EXECUTION_ERROR_STATE;
+    }
+    error = micros_user_execution_map_object_error(object_error);
+    if (error != MICROS_USER_EXECUTION_OK) {
+        return error;
+    }
+    return next_generation == thread_handle.generation
+        ? MICROS_USER_EXECUTION_OK
+        : MICROS_USER_EXECUTION_ERROR_STALE;
 }
 
-static enum micros_user_execution_error validate_user_mappings(
-    struct micros_process_handle process,
-    const struct micros_user_context *context
-)
-{
-    uint64_t physical_address;
-    uint32_t permissions;
-    uint64_t pc_page;
-    uint64_t stack_page;
-
-    if (
-        context == NULL
-        || context->sepc % 2 != 0
-        || context->sp == 0
-        || context->sp % 16 != 0
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_CONTEXT;
-    }
-    pc_page = context->sepc
-        & ~((uint64_t)MICROS_SV39_PAGE_SIZE - 1);
-    if (
-        micros_user_address_space_lookup(
-            process,
-            pc_page,
-            &physical_address,
-            &permissions
-        ) != MICROS_USER_ADDRESS_SPACE_OK
-        || (permissions & MICROS_SV39_PERMISSION_EXECUTE) == 0
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_MAPPING;
-    }
-    stack_page = (context->sp - 1)
-        & ~((uint64_t)MICROS_SV39_PAGE_SIZE - 1);
-    if (
-        micros_user_address_space_lookup(
-            process,
-            stack_page,
-            &physical_address,
-            &permissions
-        ) != MICROS_USER_ADDRESS_SPACE_OK
-        || (
-            permissions
-            & (
-                MICROS_SV39_PERMISSION_READ
-                | MICROS_SV39_PERMISSION_WRITE
-            )
-        )
-            != (
-                MICROS_SV39_PERMISSION_READ
-                | MICROS_SV39_PERMISSION_WRITE
-            )
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_MAPPING;
-    }
-    return MICROS_USER_EXECUTION_OK;
-}
-
-static enum micros_user_execution_error resolve_thread_and_process(
+static enum micros_user_execution_error
+prepare_post_handoff_binding(
+    const struct micros_kernel_objects *objects,
     struct micros_thread_handle thread_handle,
-    struct micros_kernel_objects **objects,
-    const struct micros_thread **thread,
-    const struct micros_process **process
+    const struct micros_user_context *context,
+    struct micros_user_execution_binding *candidate
 )
 {
-    struct micros_kernel_objects *registry =
-        micros_kernel_object_runtime_authoritative_registry();
-    const struct micros_thread *resolved_thread;
-    const struct micros_process *resolved_process;
-    enum micros_kernel_object_error error;
+    const struct micros_hart *hart;
+    struct micros_hart_handle hart_handle;
 
-    if (registry == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
+    clear_bytes(candidate, sizeof(*candidate));
+    candidate->thread = thread_handle;
+    hart_handle = micros_kernel_object_runtime_boot_hart_handle();
+    if (
+        micros_hart_resolve(objects, hart_handle, &hart)
+            != MICROS_KERNEL_OBJECT_OK
+        || hart_handle.slot != 0
+        || hart->hardware_id != 0
+        || !derive_stack_bounds(
+            thread_handle,
+            &candidate->kernel_stack_bottom,
+            &candidate->kernel_stack_top
+        )
+    ) {
+        return MICROS_USER_EXECUTION_ERROR_STACK;
     }
-    error = micros_thread_resolve(
-        registry,
-        thread_handle,
-        &resolved_thread
+    candidate->hart = hart_handle;
+    copy_bytes(
+        &candidate->context,
+        context,
+        sizeof(candidate->context)
     );
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return map_object_error(error);
-    }
-    error = micros_process_resolve(
-        registry,
-        resolved_thread->owner,
-        &resolved_process
-    );
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return map_object_error(error);
-    }
-    *objects = registry;
-    *thread = resolved_thread;
-    *process = resolved_process;
-    return MICROS_USER_EXECUTION_OK;
+    return micros_kernel_objects_validate(objects)
+            == MICROS_KERNEL_OBJECT_OK
+        ? MICROS_USER_EXECUTION_OK
+        : MICROS_USER_EXECUTION_ERROR_INVARIANT;
 }
 
 enum micros_user_execution_error
@@ -322,13 +194,7 @@ micros_user_execution_preflight_post_handoff(
     struct micros_kernel_objects *objects =
         micros_kernel_object_runtime_authoritative_registry();
     struct micros_user_execution_binding candidate;
-    struct micros_user_context canonical;
-    const struct micros_process *process;
-    const struct micros_hart *hart;
-    struct micros_hart_handle hart_handle;
-    uint32_t next_generation;
-    uint64_t live_status;
-    enum micros_kernel_object_error object_error;
+    struct micros_user_context prepared;
     enum micros_user_execution_error error;
     uintptr_t saved_status;
 
@@ -356,109 +222,32 @@ micros_user_execution_preflight_post_handoff(
         error = MICROS_USER_EXECUTION_ERROR_PHASE;
         goto done;
     }
-    object_error = micros_process_resolve(
+    error = validate_post_handoff_thread(
         objects,
         process_handle,
-        &process
-    );
-    if (object_error != MICROS_KERNEL_OBJECT_OK) {
-        error = map_object_error(object_error);
-        goto done;
-    }
-    if (
-        process->live_thread_count != 0
-        || thread_handle.slot >= MICROS_THREAD_CAPACITY
-        || objects->threads[thread_handle.slot].slot_state
-            != MICROS_KERNEL_OBJECT_SLOT_FREE
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_STATE;
-        goto done;
-    }
-    object_error = micros_thread_next_generation(
-        objects->threads[thread_handle.slot].generation,
-        &next_generation
-    );
-    if (
-        object_error != MICROS_KERNEL_OBJECT_OK
-        || next_generation != thread_handle.generation
-    ) {
-        error = object_error
-                == MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED
-            ? MICROS_USER_EXECUTION_ERROR_STATE
-            : map_object_error(object_error);
-        if (
-            object_error == MICROS_KERNEL_OBJECT_OK
-            && next_generation != thread_handle.generation
-        ) {
-            error = MICROS_USER_EXECUTION_ERROR_STALE;
-        }
-        goto done;
-    }
-    clear_bytes(&canonical, sizeof(canonical));
-    canonical.sp = initial_context->sp;
-    canonical.sepc = initial_context->sepc;
-    if (
-        initial_context->sstatus != 0
-        || !bytes_equal(
-            initial_context,
-            &canonical,
-            sizeof(canonical)
-        )
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
-        goto done;
-    }
-    if (
-        micros_user_address_space_validate(process_handle)
-            != MICROS_USER_ADDRESS_SPACE_OK
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_MAPPING;
-        goto done;
-    }
-    error = validate_user_mappings(
-        process_handle,
-        initial_context
+        thread_handle
     );
     if (error != MICROS_USER_EXECUTION_OK) {
         goto done;
     }
-    live_status = read_sstatus();
-    if (
-        (live_status & USER_SSTATUS_UXL_MASK)
-            != USER_SSTATUS_UXL_64
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
+    error = micros_user_execution_prepare_post_handoff_context(
+        process_handle,
+        initial_context,
+        &prepared
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
         goto done;
     }
-    clear_bytes(&candidate, sizeof(candidate));
-    candidate.thread = thread_handle;
-    hart_handle = micros_kernel_object_runtime_boot_hart_handle();
-    if (
-        micros_hart_resolve(objects, hart_handle, &hart)
-            != MICROS_KERNEL_OBJECT_OK
-        || hart_handle.slot != 0
-        || hart->hardware_id != 0
-        || !derive_stack_bounds(
-            thread_handle,
-            &candidate.kernel_stack_bottom,
-            &candidate.kernel_stack_top
-        )
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_STACK;
-        goto done;
-    }
-    candidate.hart = hart_handle;
-    copy_context(&candidate.context, &canonical);
-    candidate.context.sstatus = derive_user_status(live_status);
-    if (
-        micros_kernel_objects_validate(objects)
-            != MICROS_KERNEL_OBJECT_OK
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_INVARIANT;
+    error = prepare_post_handoff_binding(
+        objects,
+        thread_handle,
+        &prepared,
+        &candidate
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
         goto done;
     }
     copy_bytes(binding, &candidate, sizeof(candidate));
-    error = MICROS_USER_EXECUTION_OK;
 
 done:
     riscv_irq_restore(saved_status);
@@ -472,110 +261,88 @@ void micros_user_execution_commit_post_handoff_prevalidated(
     clear_stack(binding->kernel_stack_bottom);
 }
 
-enum micros_user_execution_error micros_user_execution_prepare(
+static enum micros_user_execution_error require_bootstrap_thread(
     struct micros_thread_handle thread_handle,
-    const struct micros_user_context *initial_context
+    struct micros_kernel_objects **objects,
+    const struct micros_thread **thread
 )
 {
     const struct micros_frame_ownership *ledger;
-    struct micros_kernel_objects *objects;
-    const struct micros_thread *thread;
     const struct micros_process *process;
-    struct micros_user_context prepared;
-    uintptr_t stack_bottom;
-    uintptr_t stack_top;
-    uint64_t live_status;
     enum micros_user_execution_error error;
-    enum micros_kernel_object_error object_error;
-    uintptr_t saved_status;
 
-    if (initial_context == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    }
-    saved_status = riscv_irq_save();
-    error = resolve_thread_and_process(
+    error = micros_user_execution_resolve_thread_and_process(
         thread_handle,
-        &objects,
-        &thread,
+        objects,
+        thread,
         &process
     );
     if (error != MICROS_USER_EXECUTION_OK) {
-        goto done;
+        return error;
     }
     ledger = micros_frame_ownership_runtime_ledger();
     if (ledger == NULL) {
-        error = MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
-        goto done;
+        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
     }
     if (
         ledger->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
     ) {
-        error = MICROS_USER_EXECUTION_ERROR_PHASE;
-        goto done;
+        return MICROS_USER_EXECUTION_ERROR_PHASE;
     }
     if (
-        thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
-        || thread->scheduler_assigned
-        || thread->context_attached
+        (*thread)->runtime_flags != MICROS_THREAD_RTS_INACTIVE
+        || (*thread)->scheduler_assigned
+        || (*thread)->context_attached
     ) {
-        error = MICROS_USER_EXECUTION_ERROR_STATE;
-        goto done;
+        return MICROS_USER_EXECUTION_ERROR_STATE;
     }
-    if (initial_context->sstatus != 0) {
-        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
-        goto done;
-    }
-    if (
-        micros_user_address_space_validate(thread->owner)
-            != MICROS_USER_ADDRESS_SPACE_OK
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_MAPPING;
-        goto done;
-    }
-    error = validate_user_mappings(
-        thread->owner,
-        initial_context
-    );
-    if (error != MICROS_USER_EXECUTION_OK) {
-        goto done;
-    }
-    live_status = read_sstatus();
-    if (
-        (live_status & USER_SSTATUS_UXL_MASK)
-            != USER_SSTATUS_UXL_64
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
-        goto done;
-    }
+    (void)process;
+    return MICROS_USER_EXECUTION_OK;
+}
+
+static enum micros_user_execution_error prepare_kernel_stack(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    uintptr_t *stack_bottom,
+    uintptr_t *stack_top
+)
+{
     if (
         !derive_stack_bounds(
             thread_handle,
-            &stack_bottom,
-            &stack_top
+            stack_bottom,
+            stack_top
         )
     ) {
-        error = MICROS_USER_EXECUTION_ERROR_STACK;
-        goto done;
+        return MICROS_USER_EXECUTION_ERROR_STACK;
     }
-    if (
-        micros_kernel_objects_validate(objects)
-            != MICROS_KERNEL_OBJECT_OK
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_INVARIANT;
-        goto done;
-    }
-    copy_context(&prepared, initial_context);
-    prepared.sstatus = derive_user_status(live_status);
+    return micros_kernel_objects_validate(objects)
+            == MICROS_KERNEL_OBJECT_OK
+        ? MICROS_USER_EXECUTION_OK
+        : MICROS_USER_EXECUTION_ERROR_INVARIANT;
+}
+
+static enum micros_user_execution_error commit_execution_context(
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle thread_handle,
+    uintptr_t stack_bottom,
+    uintptr_t stack_top,
+    const struct micros_user_context *prepared
+)
+{
+    enum micros_user_execution_error error;
+
     clear_stack(stack_bottom);
-    object_error = micros_thread_attach_execution_context(
-        objects,
-        thread_handle,
-        stack_bottom,
-        stack_top,
-        &prepared
+    error = micros_user_execution_map_object_error(
+        micros_thread_attach_execution_context(
+            objects,
+            thread_handle,
+            stack_bottom,
+            stack_top,
+            prepared
+        )
     );
-    error = map_object_error(object_error);
     if (
         error == MICROS_USER_EXECUTION_OK
         && micros_kernel_objects_validate(objects)
@@ -589,11 +356,62 @@ enum micros_user_execution_error micros_user_execution_prepare(
         ) {
             panic_invariant("user-context-prepare-rollback");
         }
-        error = MICROS_USER_EXECUTION_ERROR_INVARIANT;
+        return MICROS_USER_EXECUTION_ERROR_INVARIANT;
     }
+    return error;
+}
+
+enum micros_user_execution_error micros_user_execution_prepare(
+    struct micros_thread_handle thread_handle,
+    const struct micros_user_context *initial_context
+)
+{
+    struct micros_kernel_objects *objects;
+    const struct micros_thread *thread;
+    struct micros_user_context prepared;
+    uintptr_t stack_bottom;
+    uintptr_t stack_top;
+    enum micros_user_execution_error error;
+    uintptr_t saved_status;
+
+    if (initial_context == NULL) {
+        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
+    }
+    saved_status = riscv_irq_save();
+    error = require_bootstrap_thread(
+        thread_handle,
+        &objects,
+        &thread
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
+        goto done;
+    }
+    error = micros_user_execution_prepare_bootstrap_context(
+        thread->owner,
+        initial_context,
+        &prepared
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
+        goto done;
+    }
+    error = prepare_kernel_stack(
+        objects,
+        thread_handle,
+        &stack_bottom,
+        &stack_top
+    );
+    if (error != MICROS_USER_EXECUTION_OK) {
+        goto done;
+    }
+    error = commit_execution_context(
+        objects,
+        thread_handle,
+        stack_bottom,
+        stack_top,
+        &prepared
+    );
 
 done:
-    (void)process;
     riscv_irq_restore(saved_status);
     return error;
 }
@@ -625,7 +443,7 @@ enum micros_user_execution_error micros_user_execution_inspect(
         &stack_top
     );
     riscv_irq_restore(saved_status);
-    return map_object_error(error);
+    return micros_user_execution_map_object_error(error);
 }
 
 enum micros_user_execution_error micros_user_execution_detach(
@@ -650,239 +468,7 @@ enum micros_user_execution_error micros_user_execution_detach(
         error = MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
     riscv_irq_restore(saved_status);
-    return map_object_error(error);
-}
-
-enum micros_user_execution_error
-micros_user_execution_capture_trap(
-    struct micros_hart *hart,
-    const struct micros_trap_frame *frame
-)
-{
-    struct micros_kernel_objects *objects =
-        micros_kernel_object_runtime_authoritative_registry();
-    struct micros_hart_handle hart_handle =
-        micros_kernel_object_runtime_boot_hart_handle();
-    struct micros_thread_handle thread_handle;
-    const struct micros_thread *thread;
-    const struct micros_process *process;
-    struct micros_user_context context;
-    uintptr_t frame_address = (uintptr_t)frame;
-    enum micros_kernel_object_error object_error;
-
-    if (hart == NULL || frame == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    }
-    if (objects == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
-    }
-    if ((frame->sstatus & MICROS_RISCV_SSTATUS_SPP) != 0) {
-        return MICROS_USER_EXECUTION_ERROR_CONTEXT;
-    }
-    if (
-        hart != &objects->harts[hart_handle.slot]
-        || micros_hart_current_thread(
-            objects,
-            hart_handle,
-            &thread_handle
-        ) != MICROS_KERNEL_OBJECT_OK
-        || micros_thread_resolve(
-            objects,
-            thread_handle,
-            &thread
-        ) != MICROS_KERNEL_OBJECT_OK
-        || !thread->context_attached
-        || hart->trap.primary_stack_bottom
-            != thread->kernel_stack_bottom
-        || hart->trap.primary_stack_top
-            != thread->kernel_stack_top
-        || frame_address < thread->kernel_stack_bottom
-        || frame_address >= thread->kernel_stack_top
-        || sizeof(*frame) > thread->kernel_stack_top - frame_address
-        || micros_process_resolve(
-            objects,
-            thread->owner,
-            &process
-        ) != MICROS_KERNEL_OBJECT_OK
-        || read_satp()
-            != (
-                MICROS_RISCV_SATP_MODE_SV39
-                | (process->address_space_root >> 12)
-            )
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_INVARIANT;
-    }
-    copy_context(
-        &context,
-        (const struct micros_user_context *)frame
-    );
-    object_error = micros_thread_capture_execution_context(
-        objects,
-        thread_handle,
-        &context
-    );
-    return map_object_error(object_error);
-}
-
-enum micros_user_execution_error
-micros_user_execution_validate_return(
-    struct micros_hart *hart,
-    const struct micros_trap_frame *frame
-)
-{
-    struct micros_kernel_objects *objects =
-        micros_kernel_object_runtime_authoritative_registry();
-    struct micros_hart_handle hart_handle =
-        micros_kernel_object_runtime_boot_hart_handle();
-    struct micros_thread_handle thread_handle;
-    const struct micros_thread *thread;
-    const struct micros_process *process;
-    uintptr_t frame_address = (uintptr_t)frame;
-    enum micros_user_execution_error error;
-
-    if (hart == NULL || frame == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    }
-    if (
-        objects == NULL
-        || hart != &objects->harts[hart_handle.slot]
-        || micros_hart_current_thread(
-            objects,
-            hart_handle,
-            &thread_handle
-        ) != MICROS_KERNEL_OBJECT_OK
-        || micros_thread_resolve(
-            objects,
-            thread_handle,
-            &thread
-        ) != MICROS_KERNEL_OBJECT_OK
-        || !thread->context_attached
-        || frame->hart_context != (uintptr_t)hart
-        || frame_address < thread->kernel_stack_bottom
-        || frame_address >= thread->kernel_stack_top
-        || sizeof(*frame) > thread->kernel_stack_top - frame_address
-        || micros_process_resolve(
-            objects,
-            thread->owner,
-            &process
-        ) != MICROS_KERNEL_OBJECT_OK
-        || read_satp()
-            != (
-                MICROS_RISCV_SATP_MODE_SV39
-                | (process->address_space_root >> 12)
-            )
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_INVARIANT;
-    }
-    if (
-        !status_is_valid_user_return(
-            frame->sstatus,
-            thread->user_context.sstatus
-        )
-    ) {
-        return MICROS_USER_EXECUTION_ERROR_CONTEXT;
-    }
-    {
-        struct micros_user_context candidate;
-
-        copy_context(
-            &candidate,
-            (const struct micros_user_context *)frame
-        );
-        error = validate_user_mappings(
-            thread->owner,
-            &candidate
-        );
-    }
-    return error;
-}
-
-enum micros_user_execution_error
-micros_user_execution_validate_context(
-    struct micros_thread_handle thread_handle,
-    const struct micros_user_context *context
-)
-{
-    struct micros_kernel_objects *objects;
-    const struct micros_thread *thread;
-    const struct micros_process *process;
-    enum micros_user_execution_error error;
-    uintptr_t saved_status;
-
-    if (context == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    }
-    saved_status = riscv_irq_save();
-    error = resolve_thread_and_process(
-        thread_handle,
-        &objects,
-        &thread,
-        &process
-    );
-    if (
-        error == MICROS_USER_EXECUTION_OK
-        && (
-            !thread->context_attached
-            || !status_is_valid_user_return(
-                context->sstatus,
-                thread->user_context.sstatus
-            )
-        )
-    ) {
-        error = MICROS_USER_EXECUTION_ERROR_CONTEXT;
-    }
-    if (error == MICROS_USER_EXECUTION_OK) {
-        error = validate_user_mappings(thread->owner, context);
-    }
-    (void)objects;
-    (void)process;
-    riscv_irq_restore(saved_status);
-    return error;
-}
-
-enum micros_user_execution_error
-micros_user_execution_store_context(
-    struct micros_thread_handle thread,
-    const struct micros_user_context *context
-)
-{
-    struct micros_kernel_objects *objects =
-        micros_kernel_object_runtime_authoritative_registry();
-    enum micros_kernel_object_error error;
-    uintptr_t saved_status;
-
-    if (context == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_ARGUMENT;
-    }
-    if (objects == NULL) {
-        return MICROS_USER_EXECUTION_ERROR_NOT_INITIALIZED;
-    }
-    saved_status = riscv_irq_save();
-    error = micros_thread_capture_execution_context(
-        objects,
-        thread,
-        context
-    );
-    riscv_irq_restore(saved_status);
-    return map_object_error(error);
-}
-
-void micros_user_execution_install_return_frame(
-    struct micros_trap_frame *frame,
-    const struct micros_user_context *context,
-    struct micros_hart *hart
-)
-{
-    if (frame == NULL || context == NULL || hart == NULL) {
-        panic_invariant("user-context-install-argument");
-    }
-    copy_context(
-        (struct micros_user_context *)frame,
-        context
-    );
-    frame->scause = 0;
-    frame->stval = 0;
-    frame->hart_context = (uintptr_t)hart;
+    return micros_user_execution_map_object_error(error);
 }
 
 #if defined(MICROS_BUILD_USER_EXECUTION_TEST) \
