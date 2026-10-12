@@ -400,6 +400,43 @@ set(
     kernel/user_execution_test_lifecycle.c
 )
 
+set(
+    MICROS_FRAME_OWNERSHIP_SOURCES
+    kernel/frame_ownership.c
+    kernel/frame_ownership_validation.c
+    kernel/frame_ownership_bootstrap.c
+    kernel/frame_ownership_handoff.c
+    kernel/frame_ownership_vm_claim.c
+    kernel/frame_ownership_vm_freeze.c
+    kernel/frame_ownership_vm_release.c
+)
+
+set(
+    MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES
+    tests/host/frame_allocator_test.c
+    tests/host/frame_allocator_test_cases.c
+    tests/host/frame_allocator_model_test.c
+)
+
+set(
+    MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES
+    tests/host/frame_ownership_test.c
+    tests/host/frame_ownership_test_fixture.c
+    tests/host/frame_ownership_test_bootstrap.c
+    tests/host/frame_ownership_test_validation.c
+    tests/host/frame_ownership_test_handoff.c
+    tests/host/frame_ownership_test_model.c
+    tests/host/frame_ownership_test_vm.c
+)
+
+set(
+    MICROS_FRAME_OWNERSHIP_QEMU_TEST_SOURCES
+    kernel/frame_ownership_test.c
+    kernel/frame_ownership_test_fixture.c
+    kernel/frame_ownership_test_lifecycle.c
+    kernel/frame_ownership_test_handoff.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -411,7 +448,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         frame_allocator_test
         kernel/frame_allocator.c
-        tests/host/frame_allocator_test.c
+        ${MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES}
     )
     add_executable(
         sv39_test
@@ -427,10 +464,10 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         frame_ownership_test
         kernel/frame_allocator.c
-        kernel/frame_ownership.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/kernel_objects.c
         kernel/scheduler_core.c
-        tests/host/frame_ownership_test.c
+        ${MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES}
     )
     add_executable(
         scheduler_test
@@ -514,7 +551,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         vm_bootstrap_test
         kernel/frame_allocator.c
-        kernel/frame_ownership.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         kernel/vm_handoff_core.c
         lib/vm/vm_boot_validate.c
@@ -524,7 +561,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         pm_test
         kernel/frame_allocator.c
-        kernel/frame_ownership.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/endpoint.c
         kernel/ipc.c
         kernel/kernel_objects.c
@@ -547,7 +584,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         vm_core_test
         kernel/frame_allocator.c
-        kernel/frame_ownership.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         lib/vm/vm_boot_validate.c
         lib/spawn/spawn_request.c
@@ -2573,7 +2610,7 @@ add_executable(
     kernel/endpoint.c
     kernel/fdt.c
     kernel/frame_allocator.c
-    kernel/frame_ownership.c
+    ${MICROS_FRAME_OWNERSHIP_SOURCES}
     kernel/grant.c
     kernel/grant_abi.c
     kernel/grant_copy.c
@@ -4115,7 +4152,7 @@ if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/frame_ownership_test.c
+            ${MICROS_FRAME_OWNERSHIP_QEMU_TEST_SOURCES}
     )
 endif()
 
