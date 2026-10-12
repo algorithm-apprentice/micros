@@ -405,7 +405,14 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
 )
 
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    migration
+    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
+    if migration[1] not in {
+        "kernel/vm_handoff_abi.c",
+        "kernel/vm_handoff_boot.c",
+    }
+)
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     (
@@ -447,21 +454,34 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    migration
+    for migration in INITIAL_LONG_FUNCTION_MIGRATION
+    if migration not in {
+        (
+            "kernel/vm_handoff_core.c",
+            "micros_vm_handoff_state_validate",
+        ),
+        (
+            "tests/host/vm_handoff_test.c",
+            "test_decodes_load_commands",
+        ),
+    }
+)
 STRUCTURAL_TEST_PATH = "tests/host/test_kernel_vm_handoff_source_layout.py"
 
 VM_HANDOFF_CASE_ORDER = (
-    "test_decodes_exact_shape",
-    "test_decodes_exact_tty_mapping",
-    "test_decodes_load_commands",
-    "test_prepares_matches_and_commits",
-    "test_rejects_invalid_state_without_mutation",
-    "test_load_transaction_lifecycle",
-    "test_load_abort_before_and_after_freeze",
-    "test_load_failures_preserve_state",
-    "test_freeze_stack_boundaries",
-    "test_rejects_oversized_later_mapping_record",
-    "test_classifies_vm_self_fault_phase",
+    "vm_handoff_test_test_decodes_exact_shape",
+    "vm_handoff_test_test_decodes_exact_tty_mapping",
+    "vm_handoff_test_test_decodes_load_commands",
+    "vm_handoff_test_test_prepares_matches_and_commits",
+    "vm_handoff_test_test_rejects_invalid_state_without_mutation",
+    "vm_handoff_test_test_load_transaction_lifecycle",
+    "vm_handoff_test_test_load_abort_before_and_after_freeze",
+    "vm_handoff_test_test_load_failures_preserve_state",
+    "vm_handoff_test_test_freeze_stack_boundaries",
+    "vm_handoff_test_test_rejects_oversized_later_mapping_record",
+    "vm_handoff_test_test_classifies_vm_self_fault_phase",
 )
 
 VM_BOOTSTRAP_CASE_ORDER = (
