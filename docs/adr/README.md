@@ -71,3 +71,4 @@ to make the project appear more consistent than it was.
 | [0053](0053-kernel-address-space-source-decomposition.md) | Kernel address-space source decomposition | Accepted |
 | [0054](0054-frame-ownership-source-decomposition.md) | Frame-ownership source decomposition | Accepted |
 | [0055](0055-kernel-vm-handoff-source-decomposition.md) | Kernel VM-handoff source decomposition | Accepted |
+| [0056](0056-kernel-pm-control-source-decomposition.md) | Kernel PM-control source decomposition | Accepted |

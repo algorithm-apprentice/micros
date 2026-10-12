@@ -15,6 +15,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel address-space source organization](architecture/kernel-address-space-source-organization.md)
   defines exact kernel-root, user-root, VM-transaction, user-execution, and
   native/QEMU evidence ownership for the next audit correction.
+- [Kernel PM-control source organization](architecture/kernel-pm-control-source-organization.md)
+  defines exact operation-13 ABI, validation, reservation, execution,
+  activation, exit, syscall-adapter, and native-evidence ownership.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -78,6 +81,10 @@ This directory contains the design baseline for `micros`.
 - [MINIX kernel address-space source-organization baseline](research/minix-kernel-address-space-source-organization.md)
   traces privileged root binding, page-table mechanism, region policy,
   lifecycle orchestration, and the required `micros` adaptations.
+- [MINIX kernel PM-control source-organization baseline](research/minix-kernel-pm-control-source-organization.md)
+  traces common kernel-call dispatch, process reservation, execution
+  installation, stop/detach/release ordering, and the required `micros`
+  adaptations.
 
 ## Planning and verification
 
