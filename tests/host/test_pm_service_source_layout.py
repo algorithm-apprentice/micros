@@ -179,6 +179,11 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if not migration[1].startswith("servers/pm/")
     and migration[2] not in {
         "test_protocol_contract",
+        "test_rollback_acknowledgment_identity",
+        "test_endpoint_lookup_and_failure_preservation",
+        "test_exit_wait_and_reply_restore",
+        "test_nested_parent_exit_stages_independent_waits",
+        "test_parent_exit_reparents_and_aborts",
         "test_runtime_gate_and_spawn", "test_reverse_rollback_and_identity",
         "test_generation_and_pid_exhaustion", "test_failed_init_is_terminal",
         "test_orphaned_lifecycle_is_invalid", "test_wait_selection",
@@ -205,7 +210,14 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 LONG_FUNCTION_MIGRATION = tuple(
     migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration[1] not in {"micros_pm_table_validate", "test_protocol_contract"}
+    if migration[1] not in {
+        "micros_pm_table_validate", "test_protocol_contract",
+        "test_rollback_acknowledgment_identity",
+        "test_endpoint_lookup_and_failure_preservation",
+        "test_exit_wait_and_reply_restore",
+        "test_nested_parent_exit_stages_independent_waits",
+        "test_parent_exit_reparents_and_aborts",
+    }
 )
 
 

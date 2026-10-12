@@ -217,3 +217,150 @@ bool test_failed_init_is_terminal(void)
     );
     return true;
 }
+
+struct rollback_identity_case {
+    struct micros_pm_table table;
+    struct micros_pm_table snapshot;
+    struct micros_pm_process_handle init;
+    struct micros_pm_process_handle child;
+    struct micros_pm_process_handle next_child;
+    const struct micros_pm_process_record *record;
+    struct micros_pm_spawn_rollback_action action;
+    struct micros_pm_spawn_rollback_action output;
+    struct micros_pm_spawn_rollback_action output_sentinel;
+    uint64_t pid;
+};
+
+static bool check_rejected_rollback_identity(struct rollback_identity_case *context)
+{
+    EXPECT_TRUE(
+        pm_test_initialize_running_init(&context->table, &context->init)
+        && micros_pm_begin_spawn(
+            &context->table,
+            context->init,
+            300,
+            &context->child,
+            &context->pid
+        ) == MICROS_PM_MODEL_OK
+        && pm_test_advance_to_stage(
+            &context->table,
+            context->child,
+            MICROS_PM_SPAWN_PM_VFS_COMMITTED
+        )
+    );
+
+    context->snapshot = context->table;
+    memset(&context->output_sentinel, 0xa5, sizeof(context->output_sentinel));
+    context->output = context->output_sentinel;
+    EXPECT_TRUE(
+        micros_pm_spawn_rollback_begin(
+            &context->table,
+            context->child,
+            MICROS_PM_SPAWN_PM_VFS_COMMITTED,
+            301,
+            false,
+            &context->output
+        ) == MICROS_PM_MODEL_ERROR_STALE
+        && memcmp(&context->output, &context->output_sentinel, sizeof(context->output)) == 0
+        && memcmp(&context->table, &context->snapshot, sizeof(context->table)) == 0
+        && micros_pm_spawn_rollback_begin(
+            &context->table,
+            context->child,
+            MICROS_PM_SPAWN_PM_VFS_COMMITTED,
+            300,
+            false,
+            &context->action
+        ) == MICROS_PM_MODEL_OK
+        && context->action.resource == MICROS_PM_ROLLBACK_PM_VFS_COMMIT
+        && context->action.expected_stage
+            == MICROS_PM_SPAWN_PM_VFS_COMMITTED
+        && context->action.token == 27
+        && !context->action.complete
+    );
+
+    context->snapshot = context->table;
+    context->output = context->output_sentinel;
+    EXPECT_TRUE(
+        micros_pm_spawn_rollback_ack(
+            &context->table,
+            context->child,
+            context->action.expected_stage,
+            context->action.resource,
+            context->action.token + 1,
+            context->action.secondary_token,
+            context->action.endpoint,
+            &context->output
+        ) == MICROS_PM_MODEL_ERROR_STALE
+        && memcmp(&context->output, &context->output_sentinel, sizeof(context->output)) == 0
+        && memcmp(&context->table, &context->snapshot, sizeof(context->table)) == 0
+        && micros_pm_process_resolve(&context->table, context->child, &context->record)
+            == MICROS_PM_MODEL_OK
+        && context->record->spawn.rollback_active
+        && micros_pm_begin_spawn(
+            &context->table,
+            context->init,
+            302,
+            &context->next_child,
+            &context->pid
+        ) == MICROS_PM_MODEL_ERROR_STATE
+    );
+
+    return true;
+}
+
+static bool complete_rollback_identity(struct rollback_identity_case *context)
+{
+    enum micros_pm_spawn_stage current_stage = MICROS_PM_SPAWN_PM_VFS_COMMITTED;
+    uint32_t released = 0;
+
+    while (!context->action.complete) {
+        EXPECT_TRUE(
+            context->action.expected_stage == current_stage
+            && context->action.resource
+                == pm_test_rollback_resource_for_stage(current_stage)
+        );
+        released |= pm_test_rollback_resource_bit(context->action.resource);
+        EXPECT_TRUE(
+            micros_pm_spawn_rollback_ack(
+                &context->table,
+                context->child,
+                context->action.expected_stage,
+                context->action.resource,
+                context->action.token,
+                context->action.secondary_token,
+                context->action.endpoint,
+                &context->action
+            ) == MICROS_PM_MODEL_OK
+        );
+        current_stage = (
+            enum micros_pm_spawn_stage
+        )((unsigned int)current_stage - 1U);
+        if (!context->action.complete) {
+            EXPECT_TRUE(
+                micros_pm_process_resolve(&context->table, context->child, &context->record)
+                    == MICROS_PM_MODEL_OK
+                && context->record->spawn.rollback_active
+            );
+        }
+    }
+    EXPECT_TRUE(
+        released
+            == pm_test_expected_resources(MICROS_PM_SPAWN_PM_VFS_COMMITTED)
+        && context->action.reply_token == 300
+        && !context->action.parent_lost
+        && micros_pm_process_resolve(&context->table, context->child, &context->record)
+            == MICROS_PM_MODEL_ERROR_STALE
+        && micros_pm_table_validate(&context->table) == MICROS_PM_MODEL_OK
+    );
+    return true;
+}
+
+bool test_rollback_acknowledgment_identity(void)
+{
+    struct rollback_identity_case context;
+
+    return (
+        check_rejected_rollback_identity(&context)
+        && complete_rollback_identity(&context)
+    );
+}

@@ -80,9 +80,14 @@ bool pm_test_complete_exit(
 bool test_runtime_gate_and_spawn(void);
 bool test_protocol_contract(void);
 bool test_reverse_rollback_and_identity(void);
+bool test_rollback_acknowledgment_identity(void);
 bool test_generation_and_pid_exhaustion(void);
 bool test_failed_init_is_terminal(void);
 bool test_orphaned_lifecycle_is_invalid(void);
+bool test_endpoint_lookup_and_failure_preservation(void);
 bool test_wait_selection(void);
+bool test_exit_wait_and_reply_restore(void);
+bool test_nested_parent_exit_stages_independent_waits(void);
+bool test_parent_exit_reparents_and_aborts(void);
 
 #endif
