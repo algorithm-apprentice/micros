@@ -1,0 +1,6 @@
+#ifndef MICROS_KERNEL_ADDRESS_SPACE_HANDOFF_TEST_INTERNAL_H
+#define MICROS_KERNEL_ADDRESS_SPACE_HANDOFF_TEST_INTERNAL_H
+
+#include "kernel/address_space_handoff_test.h"
+
+#endif
