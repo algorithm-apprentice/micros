@@ -259,24 +259,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
 )
 
-SYMBOL_OWNER_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[1] not in {
-        "kernel/pm_control_abi.c",
-        "kernel/pm_control_activation.c",
-        "kernel/pm_control_execution.c",
-        "kernel/pm_control_validation.c",
-        "kernel/pm_control_reservation.c",
-        "tests/host/pm_control_abi_test.c",
-        "tests/host/pm_control_execution_exit_test.c",
-        "tests/host/pm_control_execution_prepare_test.c",
-        "tests/host/pm_control_execution_token_test.c",
-        "tests/host/pm_control_syscall_test.c",
-        "tests/host/pm_control_reservation_test.c",
-        "tests/host/pm_control_runtime_test.c",
-    }
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     (
@@ -326,60 +309,11 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration not in {
-        (
-            "kernel/pm_control_core.c",
-            "micros_pm_control_state_validate_objects",
-        ),
-        ("kernel/pm_control_core.c", "micros_pm_control_decode"),
-        (
-            "tests/host/pm_control_test.c",
-            "test_contract_and_decode",
-        ),
-        (
-            "tests/host/pm_control_test.c",
-            "test_syscall_authority",
-        ),
-        (
-            "tests/host/pm_control_test.c",
-            "test_syscall_authority_resolution",
-        ),
-        (
-            "tests/host/pm_control_test.c",
-            "test_syscall_phase_and_retained_output",
-        ),
-        (
-            "tests/host/pm_control_test.c",
-            "test_reserve_abort_lifecycle",
-        ),
-        (
-            "tests/host/pm_control_test.c",
-            "test_runtime_accepts_exact_frozen_vm_reservation",
-        ),
-        (
-            "kernel/pm_control_core.c",
-            "micros_pm_control_prepare_preflight",
-        ),
-        (
-            "tests/host/pm_control_execution_test.c",
-            "freeze_child",
-        ),
-        (
-            "tests/host/pm_control_execution_test.c",
-            "initialize_fixture",
-        ),
-        (
-            "tests/host/pm_control_execution_test.c",
-            "test_prepare_abort_activate",
-        ),
-        (
-            "tests/host/pm_control_execution_test.c",
-            "test_exit_begin_detach_release",
-        ),
-    }
+LONG_FUNCTION_MIGRATION = (
+    (
+        "kernel/pm_control_syscall.c",
+        "micros_pm_control_handle_captured_user_ecall",
+    ),
 )
 
 PM_CONTROL_CASE_ORDER = (
