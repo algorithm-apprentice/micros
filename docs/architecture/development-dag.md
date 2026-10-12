@@ -319,9 +319,9 @@ to this sequence without changing the runtime dependency graph:
   [kernel address-space source-organization contract](kernel-address-space-source-organization.md),
   followed by the frame-ownership and kernel VM-handoff corrections, the
   [kernel PM-control source-organization contract](kernel-pm-control-source-organization.md),
-  and the VM-service and PM-service corrections, must merge before the
-  cross-service coordinator composes the remaining spawn and exit
-  transaction.
+  the [VM service source-organization contract](vm-service-source-organization.md),
+  and the PM-service correction, must merge before the cross-service
+  coordinator composes the remaining spawn and exit transaction.
 
 The exact correction units and paired task IDs are recorded in
 [the repository source-module audit](source-module-audit.md). They remain

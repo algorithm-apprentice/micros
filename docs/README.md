@@ -18,6 +18,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel PM-control source organization](architecture/kernel-pm-control-source-organization.md)
   defines exact operation-13 ABI, validation, reservation, execution,
   activation, exit, syscall-adapter, and native-evidence ownership.
+- [VM service source organization](architecture/vm-service-source-organization.md)
+  defines exact boot/image planning, portable state, frame, load/exit,
+  service-adapter, host/QEMU evidence, and fixture-generator ownership.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -84,6 +87,10 @@ This directory contains the design baseline for `micros`.
 - [MINIX kernel PM-control source-organization baseline](research/minix-kernel-pm-control-source-organization.md)
   traces common kernel-call dispatch, process reservation, execution
   installation, stop/detach/release ordering, and the required `micros`
+  adaptations.
+- [MINIX VM service source-organization baseline](research/minix-vm-service-source-organization.md)
+  traces service dispatch, physical allocation, regions/page tables,
+  executable planning, exit release, faults, and required `micros`
   adaptations.
 
 ## Planning and verification
