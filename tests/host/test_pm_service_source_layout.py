@@ -174,7 +174,10 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in FINAL_OWNER_GROUPS.items()
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
+    if migration[2] not in {"micros_pm_decode_request", "micros_pm_build_result"}
+)
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("servers/pm/pm_core.c", "micros_pm_table_validate"),

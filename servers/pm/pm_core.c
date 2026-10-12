@@ -1,149 +1,8 @@
-#include "servers/pm/pm_core.h"
+#include "servers/pm/pm_internal.h"
 
 #include <stddef.h>
 
-#include "micros/spawn.h"
-
 #define MICROS_PM_INITIALIZATION_MAGIC UINT64_C(0x4d4943524f53504d)
-
-static void zero_bytes(void *value, size_t size)
-{
-    uint8_t *bytes = value;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static bool bytes_are_zero(const uint8_t *bytes, size_t size)
-{
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static uint32_t read_u32_le(const uint8_t *bytes)
-{
-    return (
-        (uint32_t)bytes[0]
-        | (uint32_t)bytes[1] << 8
-        | (uint32_t)bytes[2] << 16
-        | (uint32_t)bytes[3] << 24
-    );
-}
-
-static uint64_t read_u64_le(const uint8_t *bytes)
-{
-    uint64_t value = 0;
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        value |= (uint64_t)bytes[index] << (index * 8);
-    }
-    return value;
-}
-
-static void write_u32_le(uint8_t *bytes, uint32_t value)
-{
-    bytes[0] = (uint8_t)value;
-    bytes[1] = (uint8_t)(value >> 8);
-    bytes[2] = (uint8_t)(value >> 16);
-    bytes[3] = (uint8_t)(value >> 24);
-}
-
-static void write_u64_le(uint8_t *bytes, uint64_t value)
-{
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        bytes[index] = (uint8_t)(value >> (index * 8));
-    }
-}
-
-static bool handle_is_none(struct micros_pm_process_handle handle)
-{
-    return (
-        handle.slot == 0
-        && handle.reserved == 0
-        && handle.generation == 0
-    );
-}
-
-static bool handles_equal(
-    struct micros_pm_process_handle left,
-    struct micros_pm_process_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.reserved == right.reserved
-        && left.generation == right.generation
-    );
-}
-
-static bool endpoint_is_concrete(micros_endpoint_t endpoint)
-{
-    uint32_t slot_mask =
-        (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) - 1;
-    uint32_t slot = endpoint & slot_mask;
-    uint32_t generation = endpoint >> MICROS_ENDPOINT_SLOT_BITS;
-
-    return (
-        endpoint != MICROS_ENDPOINT_NONE
-        && endpoint != MICROS_ENDPOINT_ANY
-        && slot < MICROS_PROCESS_CAPACITY
-        && generation != 0
-        && generation <= MICROS_ENDPOINT_GENERATION_MAX
-    );
-}
-
-static bool endpoint_is_published_elsewhere(
-    const struct micros_pm_table *table,
-    micros_endpoint_t endpoint,
-    uint16_t excluded_slot
-)
-{
-    uint16_t index;
-
-    for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
-        if (
-            index != excluded_slot
-            && table->records[index].endpoint == endpoint
-            && (
-                table->records[index].state
-                    == MICROS_PM_PROCESS_RUNNING
-                || table->records[index].state
-                    == MICROS_PM_PROCESS_EXITING
-            )
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool result_is_defined(enum micros_pm_result result)
-{
-    return (
-        result >= MICROS_PM_RESULT_DESCRIPTOR
-        && result <= MICROS_PM_RESULT_OK
-    );
-}
-
-static bool exit_kind_is_defined(enum micros_pm_exit_kind kind)
-{
-    return (
-        kind == MICROS_PM_EXIT_NONE
-        || kind == MICROS_PM_EXIT_NORMAL
-        || kind == MICROS_PM_EXIT_FAULT
-    );
-}
 
 static bool spawn_resources_are_valid(
     enum micros_pm_spawn_stage stage,
@@ -188,92 +47,10 @@ static bool spawn_resources_are_valid(
         && (committed == (resources->pm_vfs_commit_token != 0))
         && (
             execution
-                ? endpoint_is_concrete(resources->prepared_endpoint)
+                ? pm_common_endpoint_is_concrete(resources->prepared_endpoint)
                 : resources->prepared_endpoint == MICROS_ENDPOINT_NONE
         )
     );
-}
-
-static void clear_record(
-    struct micros_pm_process_record *record,
-    enum micros_pm_process_state state
-)
-{
-    uint32_t generation = record->generation;
-
-    zero_bytes(record, sizeof(*record));
-    record->state = state;
-    record->generation = generation;
-    record->endpoint = MICROS_ENDPOINT_NONE;
-    record->spawn.prepared_endpoint = MICROS_ENDPOINT_NONE;
-}
-
-static struct micros_pm_process_handle record_handle(
-    uint16_t slot,
-    const struct micros_pm_process_record *record
-)
-{
-    struct micros_pm_process_handle handle;
-
-    zero_bytes(&handle, sizeof(handle));
-    handle.slot = slot;
-    handle.generation = record->generation;
-    return handle;
-}
-
-static enum micros_pm_model_error resolve_record(
-    const struct micros_pm_table *table,
-    struct micros_pm_process_handle handle,
-    const struct micros_pm_process_record **record
-)
-{
-    const struct micros_pm_process_record *candidate;
-
-    if (
-        table == NULL
-        || record == NULL
-        || handle.reserved != 0
-        || handle.generation == 0
-        || handle.slot >= MICROS_PM_PROCESS_CAPACITY
-    ) {
-        return MICROS_PM_MODEL_ERROR_ARGUMENT;
-    }
-
-    candidate = &table->records[handle.slot];
-    if (
-        candidate->state == MICROS_PM_PROCESS_FREE
-        || candidate->state == MICROS_PM_PROCESS_QUARANTINED
-        || candidate->generation != handle.generation
-    ) {
-        return MICROS_PM_MODEL_ERROR_STALE;
-    }
-
-    *record = candidate;
-    return MICROS_PM_MODEL_OK;
-}
-
-static enum micros_pm_model_error resolve_spawning_record(
-    struct micros_pm_table *table,
-    struct micros_pm_process_handle handle,
-    enum micros_pm_spawn_stage expected_stage,
-    struct micros_pm_process_record **record
-)
-{
-    const struct micros_pm_process_record *resolved;
-    enum micros_pm_model_error error;
-
-    error = resolve_record(table, handle, &resolved);
-    if (error != MICROS_PM_MODEL_OK) {
-        return error;
-    }
-    if (
-        resolved->state != MICROS_PM_PROCESS_SPAWNING
-        || resolved->spawn_stage != expected_stage
-    ) {
-        return MICROS_PM_MODEL_ERROR_STATE;
-    }
-    *record = &table->records[handle.slot];
-    return MICROS_PM_MODEL_OK;
 }
 
 static enum micros_pm_model_error resolve_forward_spawning_record(
@@ -285,7 +62,7 @@ static enum micros_pm_model_error resolve_forward_spawning_record(
 {
     enum micros_pm_model_error error;
 
-    error = resolve_spawning_record(
+    error = pm_common_resolve_spawning_record(
         table,
         handle,
         expected_stage,
@@ -364,7 +141,7 @@ static void populate_rollback_action(
     struct micros_pm_spawn_rollback_action *action
 )
 {
-    zero_bytes(action, sizeof(*action));
+    pm_common_zero_bytes(action, sizeof(*action));
     action->resource = rollback_resource_for_stage(
         record->spawn_stage
     );
@@ -405,7 +182,7 @@ static void populate_completed_rollback(
     struct micros_pm_spawn_rollback_action *action
 )
 {
-    zero_bytes(action, sizeof(*action));
+    pm_common_zero_bytes(action, sizeof(*action));
     action->complete = true;
     action->parent_lost = parent_lost;
     action->reply_token = (
@@ -458,44 +235,19 @@ static bool wait_is_clear(const struct micros_pm_wait_state *wait)
         && wait->flags == 0
         && wait->selector == 0
         && wait->reply_token == 0
-        && handle_is_none(wait->pending_child)
+        && pm_common_handle_is_none(wait->pending_child)
     );
-}
-
-static void clear_wait(struct micros_pm_wait_state *wait)
-{
-    zero_bytes(wait, sizeof(*wait));
 }
 
 static void clear_wait_outcome(struct micros_pm_wait_outcome *outcome)
 {
-    zero_bytes(outcome, sizeof(*outcome));
+    pm_common_zero_bytes(outcome, sizeof(*outcome));
     outcome->result = MICROS_PM_RESULT_OK;
 }
 
 static void clear_wait_outcomes(struct micros_pm_wait_outcomes *outcomes)
 {
-    zero_bytes(outcomes, sizeof(*outcomes));
-}
-
-static bool wait_matches_pid(
-    const struct micros_pm_wait_state *wait,
-    uint64_t pid
-)
-{
-    return wait->selector == 0 || wait->selector == pid;
-}
-
-static bool record_is_child_of(
-    const struct micros_pm_process_record *record,
-    struct micros_pm_process_handle parent
-)
-{
-    return (
-        record->state != MICROS_PM_PROCESS_FREE
-        && record->state != MICROS_PM_PROCESS_QUARANTINED
-        && handles_equal(record->parent, parent)
-    );
+    pm_common_zero_bytes(outcomes, sizeof(*outcomes));
 }
 
 static bool find_lowest_matching_zombie(
@@ -517,7 +269,7 @@ static bool find_lowest_matching_zombie(
         if (
             record->state == MICROS_PM_PROCESS_ZOMBIE
             && !record->reap_pending
-            && record_is_child_of(record, parent)
+            && pm_common_record_is_child_of(record, parent)
             && (selector == 0 || selector == record->pid)
             && (!found || record->pid < lowest_pid)
         ) {
@@ -530,28 +282,6 @@ static bool find_lowest_matching_zombie(
         *slot = selected_slot;
     }
     return found;
-}
-
-static bool has_matching_child(
-    const struct micros_pm_table *table,
-    struct micros_pm_process_handle parent,
-    uint64_t selector
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
-        const struct micros_pm_process_record *record
-            = &table->records[index];
-
-        if (
-            record_is_child_of(record, parent)
-            && (selector == 0 || selector == record->pid)
-        ) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static void populate_wait_outcome(
@@ -598,7 +328,7 @@ static bool stage_wait_result(
     }
 
     child = &table->records[child_slot];
-    child_handle = record_handle(child_slot, child);
+    child_handle = pm_common_record_handle(child_slot, child);
     child->reap_pending = true;
     parent->wait.result_ready = true;
     parent->wait.pending_child = child_handle;
@@ -610,15 +340,6 @@ static bool stage_wait_result(
         outcome
     );
     return true;
-}
-
-static void release_record(struct micros_pm_process_record *record)
-{
-    if (record->generation == UINT32_MAX) {
-        clear_record(record, MICROS_PM_PROCESS_QUARANTINED);
-    } else {
-        clear_record(record, MICROS_PM_PROCESS_FREE);
-    }
 }
 
 static enum micros_pm_model_error allocate_record(
@@ -645,7 +366,7 @@ static enum micros_pm_model_error allocate_record(
     new_pid = table->last_pid + 1;
     record = &table->records[slot];
     ++record->generation;
-    clear_record(record, MICROS_PM_PROCESS_SPAWNING);
+    pm_common_clear_record(record, MICROS_PM_PROCESS_SPAWNING);
     record->pid = new_pid;
     record->parent = parent;
     record->init_candidate = init_candidate;
@@ -656,148 +377,9 @@ static enum micros_pm_model_error allocate_record(
     if (new_pid == UINT64_MAX) {
         table->pid_exhausted = true;
     }
-    new_handle = record_handle(slot, record);
+    new_handle = pm_common_record_handle(slot, record);
     *child = new_handle;
     *pid = new_pid;
-    return MICROS_PM_MODEL_OK;
-}
-
-enum micros_pm_protocol_status micros_pm_decode_request(
-    const struct micros_ipc_message *message,
-    struct micros_pm_request *request
-)
-{
-    struct micros_pm_request decoded;
-    uint32_t version;
-    uint32_t flags;
-
-    if (message == NULL || request == NULL) {
-        return MICROS_PM_PROTOCOL_INVARIANT;
-    }
-    if (
-        message->type != MICROS_PM_MESSAGE_EXIT
-        && message->type != MICROS_PM_MESSAGE_WAIT
-        && message->type != MICROS_PM_MESSAGE_SPAWN
-    ) {
-        return MICROS_PM_PROTOCOL_BAD_TYPE;
-    }
-
-    version = read_u32_le(&message->payload[0]);
-    if (version != MICROS_PM_PROTOCOL_VERSION) {
-        return MICROS_PM_PROTOCOL_BAD_VERSION;
-    }
-    flags = read_u32_le(&message->payload[4]);
-    if (message->type == MICROS_PM_MESSAGE_EXIT) {
-        if (
-            flags != 0
-            || !bytes_are_zero(&message->payload[12], 36)
-        ) {
-            return MICROS_PM_PROTOCOL_MALFORMED;
-        }
-    } else if (message->type == MICROS_PM_MESSAGE_WAIT) {
-        if (
-            (flags & ~MICROS_PM_WAIT_NOHANG) != 0
-            || !bytes_are_zero(&message->payload[16], 32)
-        ) {
-            return MICROS_PM_PROTOCOL_MALFORMED;
-        }
-    } else {
-        uint32_t request_size = read_u32_le(&message->payload[12]);
-
-        if (
-            flags != 0
-            || request_size < MICROS_SPAWN_REQUEST_SIZE_MIN
-            || request_size > MICROS_SPAWN_REQUEST_SIZE_MAX
-            || !bytes_are_zero(&message->payload[16], 32)
-        ) {
-            return MICROS_PM_PROTOCOL_MALFORMED;
-        }
-    }
-    if (message->reply_token == 0) {
-        return MICROS_PM_PROTOCOL_INVARIANT;
-    }
-
-    zero_bytes(&decoded, sizeof(decoded));
-    decoded.type = message->type;
-    decoded.flags = flags;
-    decoded.source = message->source;
-    decoded.reply_token = message->reply_token;
-    if (message->type == MICROS_PM_MESSAGE_EXIT) {
-        decoded.exit_code = (int32_t)read_u32_le(
-            &message->payload[8]
-        );
-    } else if (message->type == MICROS_PM_MESSAGE_WAIT) {
-        decoded.child_pid = read_u64_le(&message->payload[8]);
-    } else {
-        decoded.grant = read_u32_le(&message->payload[8]);
-        decoded.request_size = read_u32_le(&message->payload[12]);
-    }
-    *request = decoded;
-    return MICROS_PM_PROTOCOL_OK;
-}
-
-enum micros_pm_model_error micros_pm_build_result(
-    uint32_t request_type,
-    enum micros_pm_result result,
-    uint64_t child_pid,
-    enum micros_pm_exit_kind exit_kind,
-    int32_t exit_code,
-    struct micros_ipc_message *message
-)
-{
-    struct micros_ipc_message built;
-
-    if (
-        message == NULL
-        || (request_type & MICROS_IPC_TYPE_KERNEL_MASK) != 0
-        || !result_is_defined(result)
-        || !exit_kind_is_defined(exit_kind)
-    ) {
-        return MICROS_PM_MODEL_ERROR_ARGUMENT;
-    }
-    if (result == MICROS_PM_RESULT_OK) {
-        if (request_type == MICROS_PM_MESSAGE_WAIT) {
-            if (
-                (
-                    child_pid == 0
-                    && (
-                        exit_kind != MICROS_PM_EXIT_NONE
-                        || exit_code != 0
-                    )
-                )
-                || (
-                    child_pid != 0
-                    && exit_kind != MICROS_PM_EXIT_NORMAL
-                    && exit_kind != MICROS_PM_EXIT_FAULT
-                )
-            ) {
-                return MICROS_PM_MODEL_ERROR_ARGUMENT;
-            }
-        } else if (
-            request_type != MICROS_PM_MESSAGE_SPAWN
-            || child_pid == 0
-            || exit_kind != MICROS_PM_EXIT_NONE
-            || exit_code != 0
-        ) {
-            return MICROS_PM_MODEL_ERROR_ARGUMENT;
-        }
-    } else if (
-        child_pid != 0
-        || exit_kind != MICROS_PM_EXIT_NONE
-        || exit_code != 0
-    ) {
-        return MICROS_PM_MODEL_ERROR_ARGUMENT;
-    }
-
-    zero_bytes(&built, sizeof(built));
-    built.type = MICROS_PM_MESSAGE_RESULT;
-    write_u32_le(&built.payload[0], MICROS_PM_PROTOCOL_VERSION);
-    write_u32_le(&built.payload[4], request_type);
-    write_u32_le(&built.payload[8], (uint32_t)(int32_t)result);
-    write_u64_le(&built.payload[16], child_pid);
-    write_u32_le(&built.payload[24], (uint32_t)exit_kind);
-    write_u32_le(&built.payload[28], (uint32_t)exit_code);
-    *message = built;
     return MICROS_PM_MODEL_OK;
 }
 
@@ -811,7 +393,7 @@ enum micros_pm_model_error micros_pm_table_initialize(
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
 
-    zero_bytes(table, sizeof(*table));
+    pm_common_zero_bytes(table, sizeof(*table));
     table->initialization_magic = MICROS_PM_INITIALIZATION_MAGIC;
     for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
         table->records[index].endpoint = MICROS_ENDPOINT_NONE;
@@ -836,7 +418,7 @@ enum micros_pm_model_error micros_pm_table_validate(
         table == NULL
         || table->initialization_magic
             != MICROS_PM_INITIALIZATION_MAGIC
-        || !bytes_are_zero(table->reserved0, sizeof(table->reserved0))
+        || !pm_common_bytes_are_zero(table->reserved0, sizeof(table->reserved0))
         || table->reaper.reserved != 0
         || table->pid_exhausted != (table->last_pid == UINT64_MAX)
         || (!table->init_attempted && table->last_pid != 0)
@@ -855,7 +437,7 @@ enum micros_pm_model_error micros_pm_table_validate(
             || record->reserved1 != 0
             || record->wait.reserved != 0
             || record->wait.pending_child.reserved != 0
-            || !bytes_are_zero(
+            || !pm_common_bytes_are_zero(
                 record->reserved2,
                 sizeof(record->reserved2)
             )
@@ -868,7 +450,7 @@ enum micros_pm_model_error micros_pm_table_validate(
         ) {
             if (
                 record->pid != 0
-                || !handle_is_none(record->parent)
+                || !pm_common_handle_is_none(record->parent)
                 || record->init_candidate
                 || record->reaper
                 || record->endpoint != MICROS_ENDPOINT_NONE
@@ -912,8 +494,8 @@ enum micros_pm_model_error micros_pm_table_validate(
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
             }
             if (
-                endpoint_is_concrete(record->endpoint)
-                && endpoint_is_concrete(other_record->endpoint)
+                pm_common_endpoint_is_concrete(record->endpoint)
+                && pm_common_endpoint_is_concrete(other_record->endpoint)
                 && other_record->endpoint == record->endpoint
             ) {
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
@@ -935,7 +517,7 @@ enum micros_pm_model_error micros_pm_table_validate(
                 || (
                     record->spawn_stage
                         >= MICROS_PM_SPAWN_KERNEL_EXECUTION_PREPARED
-                    && endpoint_is_published_elsewhere(
+                    && pm_common_endpoint_is_published_elsewhere(
                         table,
                         record->spawn.prepared_endpoint,
                         (uint16_t)index
@@ -945,14 +527,14 @@ enum micros_pm_model_error micros_pm_table_validate(
                     record->init_candidate
                     && (
                         record->pid != 1
-                        || !handle_is_none(record->parent)
+                        || !pm_common_handle_is_none(record->parent)
                         || record->spawn.parent_reply_token != 0
                     )
                 )
                 || (
                     !record->init_candidate
                     && (
-                        handle_is_none(record->parent)
+                        pm_common_handle_is_none(record->parent)
                         || record->spawn.parent_reply_token == 0
                     )
                 )
@@ -970,7 +552,7 @@ enum micros_pm_model_error micros_pm_table_validate(
         } else if (record->state == MICROS_PM_PROCESS_RUNNING) {
             if (
                 record->init_candidate
-                || !endpoint_is_concrete(record->endpoint)
+                || !pm_common_endpoint_is_concrete(record->endpoint)
                 || !spawn_is_clear(record)
                 || !exit_is_clear(record)
                 || record->reap_pending
@@ -978,12 +560,12 @@ enum micros_pm_model_error micros_pm_table_validate(
                     record->reaper
                     && (
                         record->pid != 1
-                        || !handle_is_none(record->parent)
+                        || !pm_common_handle_is_none(record->parent)
                     )
                 )
                 || (
                     !record->reaper
-                    && handle_is_none(record->parent)
+                    && pm_common_handle_is_none(record->parent)
                 )
             ) {
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
@@ -1002,7 +584,7 @@ enum micros_pm_model_error micros_pm_table_validate(
                     return MICROS_PM_MODEL_ERROR_INVARIANT;
                 }
                 if (record->wait.result_ready) {
-                    error = resolve_record(
+                    error = pm_common_resolve_record(
                         table,
                         record->wait.pending_child,
                         &pending
@@ -1012,14 +594,14 @@ enum micros_pm_model_error micros_pm_table_validate(
                         || pending->state
                             != MICROS_PM_PROCESS_ZOMBIE
                         || !pending->reap_pending
-                        || !handles_equal(
+                        || !pm_common_handles_equal(
                             pending->parent,
-                            record_handle(
+                            pm_common_record_handle(
                                 (uint16_t)index,
                                 record
                             )
                         )
-                        || !wait_matches_pid(
+                        || !pm_common_wait_matches_pid(
                             &record->wait,
                             pending->pid
                         )
@@ -1027,10 +609,10 @@ enum micros_pm_model_error micros_pm_table_validate(
                         return MICROS_PM_MODEL_ERROR_INVARIANT;
                     }
                 } else if (
-                    !handle_is_none(record->wait.pending_child)
-                    || !has_matching_child(
+                    !pm_common_handle_is_none(record->wait.pending_child)
+                    || !pm_common_has_matching_child(
                         table,
-                        record_handle((uint16_t)index, record),
+                        pm_common_record_handle((uint16_t)index, record),
                         record->wait.selector
                     )
                 ) {
@@ -1042,9 +624,9 @@ enum micros_pm_model_error micros_pm_table_validate(
             if (record->reaper) {
                 ++reaper_count;
                 if (
-                    !handles_equal(
+                    !pm_common_handles_equal(
                         table->reaper,
-                        record_handle((uint16_t)index, record)
+                        pm_common_record_handle((uint16_t)index, record)
                     )
                 ) {
                     return MICROS_PM_MODEL_ERROR_INVARIANT;
@@ -1056,7 +638,7 @@ enum micros_pm_model_error micros_pm_table_validate(
             if (
                 record->init_candidate
                 || record->reaper
-                || handle_is_none(record->parent)
+                || pm_common_handle_is_none(record->parent)
                 || !spawn_is_clear(record)
                 || !wait_is_clear(&record->wait)
                 || record->reap_pending
@@ -1068,7 +650,7 @@ enum micros_pm_model_error micros_pm_table_validate(
                 || (
                     record->exit_stage
                         == MICROS_PM_EXIT_STAGE_STOPPED
-                    && !endpoint_is_concrete(record->endpoint)
+                    && !pm_common_endpoint_is_concrete(record->endpoint)
                 )
                 || (
                     record->exit_stage
@@ -1091,7 +673,7 @@ enum micros_pm_model_error micros_pm_table_validate(
             if (
                 record->init_candidate
                 || record->reaper
-                || handle_is_none(record->parent)
+                || pm_common_handle_is_none(record->parent)
                 || record->endpoint != MICROS_ENDPOINT_NONE
                 || !spawn_is_clear(record)
                 || record->exit_stage != MICROS_PM_EXIT_STAGE_NONE
@@ -1110,19 +692,19 @@ enum micros_pm_model_error micros_pm_table_validate(
             return MICROS_PM_MODEL_ERROR_INVARIANT;
         }
 
-        if (!handle_is_none(record->parent)) {
+        if (!pm_common_handle_is_none(record->parent)) {
             const struct micros_pm_process_record *parent;
             enum micros_pm_model_error error;
 
             if (
-                handles_equal(
+                pm_common_handles_equal(
                     record->parent,
-                    record_handle((uint16_t)index, record)
+                    pm_common_record_handle((uint16_t)index, record)
                 )
             ) {
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
             }
-            error = resolve_record(table, record->parent, &parent);
+            error = pm_common_resolve_record(table, record->parent, &parent);
             if (
                 error != MICROS_PM_MODEL_OK
                 || parent->state != MICROS_PM_PROCESS_RUNNING
@@ -1137,14 +719,14 @@ enum micros_pm_model_error micros_pm_table_validate(
             if (record->state != MICROS_PM_PROCESS_ZOMBIE) {
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
             }
-            error = resolve_record(table, record->parent, &parent);
+            error = pm_common_resolve_record(table, record->parent, &parent);
             if (
                 error != MICROS_PM_MODEL_OK
                 || !parent->wait.active
                 || !parent->wait.result_ready
-                || !handles_equal(
+                || !pm_common_handles_equal(
                     parent->wait.pending_child,
-                    record_handle((uint16_t)index, record)
+                    pm_common_record_handle((uint16_t)index, record)
                 )
             ) {
                 return MICROS_PM_MODEL_ERROR_INVARIANT;
@@ -1159,11 +741,11 @@ enum micros_pm_model_error micros_pm_table_validate(
         || (reaper_count == 0 && non_init_count != 0)
         || (
             reaper_count == 0
-            && !handle_is_none(table->reaper)
+            && !pm_common_handle_is_none(table->reaper)
         )
         || (
             reaper_count == 1
-            && handle_is_none(table->reaper)
+            && pm_common_handle_is_none(table->reaper)
         )
     ) {
         return MICROS_PM_MODEL_ERROR_INVARIANT;
@@ -1192,9 +774,9 @@ enum micros_pm_model_error micros_pm_enable_runtime(
         message->source != MICROS_ENDPOINT_NONE
         || message->type != MICROS_IPC_TYPE_KERNEL_NOTIFICATION
         || message->reply_token != 0
-        || read_u64_le(&message->payload[0])
+        || pm_common_read_u64_le(&message->payload[0])
             != MICROS_KERNEL_EVENT_BOOTSTRAP_SEALED
-        || !bytes_are_zero(&message->payload[8], 40)
+        || !pm_common_bytes_are_zero(&message->payload[8], 40)
     ) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
@@ -1223,13 +805,13 @@ enum micros_pm_model_error micros_pm_begin_init(
         !table->runtime_enabled
         || table->init_attempted
         || table_has_spawning_record(table)
-        || !handle_is_none(table->reaper)
+        || !pm_common_handle_is_none(table->reaper)
         || table->last_pid != 0
     ) {
         return MICROS_PM_MODEL_ERROR_STATE;
     }
 
-    zero_bytes(&parent, sizeof(parent));
+    pm_common_zero_bytes(&parent, sizeof(parent));
     error = allocate_record(table, parent, true, 0, child, pid);
     if (error == MICROS_PM_MODEL_OK) {
         table->init_attempted = true;
@@ -1262,12 +844,12 @@ enum micros_pm_model_error micros_pm_begin_spawn(
     }
     if (
         !table->runtime_enabled
-        || handle_is_none(table->reaper)
+        || pm_common_handle_is_none(table->reaper)
         || table_has_spawning_record(table)
     ) {
         return MICROS_PM_MODEL_ERROR_STATE;
     }
-    error = resolve_record(table, parent, &parent_record);
+    error = pm_common_resolve_record(table, parent, &parent_record);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -1428,7 +1010,7 @@ enum micros_pm_model_error micros_pm_spawn_prepare_execution(
     if (
         table == NULL
         || prepared_token == 0
-        || !endpoint_is_concrete(endpoint)
+        || !pm_common_endpoint_is_concrete(endpoint)
     ) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
@@ -1445,7 +1027,7 @@ enum micros_pm_model_error micros_pm_spawn_prepare_execution(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    if (endpoint_is_published_elsewhere(table, endpoint, child.slot)) {
+    if (pm_common_endpoint_is_published_elsewhere(table, endpoint, child.slot)) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
 
@@ -1502,7 +1084,7 @@ enum micros_pm_model_error micros_pm_spawn_activate(
     if (
         table == NULL
         || reply_token == NULL
-        || !endpoint_is_concrete(endpoint)
+        || !pm_common_endpoint_is_concrete(endpoint)
     ) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
@@ -1522,7 +1104,7 @@ enum micros_pm_model_error micros_pm_spawn_activate(
     if (record->spawn.prepared_endpoint != endpoint) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
-    if (endpoint_is_published_elsewhere(table, endpoint, child.slot)) {
+    if (pm_common_endpoint_is_published_elsewhere(table, endpoint, child.slot)) {
         return MICROS_PM_MODEL_ERROR_STATE;
     }
 
@@ -1532,7 +1114,7 @@ enum micros_pm_model_error micros_pm_spawn_activate(
     record->init_candidate = false;
     record->endpoint = endpoint;
     record->spawn_stage = MICROS_PM_SPAWN_NONE;
-    zero_bytes(&record->spawn, sizeof(record->spawn));
+    pm_common_zero_bytes(&record->spawn, sizeof(record->spawn));
     record->spawn.prepared_endpoint = MICROS_ENDPOINT_NONE;
     if (init_candidate) {
         record->reaper = true;
@@ -1567,7 +1149,7 @@ enum micros_pm_model_error micros_pm_spawn_rollback_begin(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_spawning_record(
+    error = pm_common_resolve_spawning_record(
         table,
         child,
         expected_stage,
@@ -1589,7 +1171,7 @@ enum micros_pm_model_error micros_pm_spawn_rollback_begin(
             parent_lost,
             &committed
         );
-        release_record(record);
+        pm_common_release_record(record);
     } else {
         record->spawn.rollback_active = true;
         record->spawn.rollback_parent_lost = parent_lost;
@@ -1631,7 +1213,7 @@ enum micros_pm_model_error micros_pm_spawn_rollback_ack(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_spawning_record(
+    error = pm_common_resolve_spawning_record(
         table,
         child,
         expected_stage,
@@ -1699,7 +1281,7 @@ enum micros_pm_model_error micros_pm_spawn_rollback_ack(
             parent_lost,
             &committed
         );
-        release_record(record);
+        pm_common_release_record(record);
     } else {
         populate_rollback_action(record, &committed);
     }
@@ -1722,7 +1304,7 @@ enum micros_pm_model_error micros_pm_process_resolve(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    return resolve_record(table, handle, record);
+    return pm_common_resolve_record(table, handle, record);
 }
 
 enum micros_pm_model_error micros_pm_exit_begin(
@@ -1756,7 +1338,7 @@ enum micros_pm_model_error micros_pm_exit_begin(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, process, &resolved);
+    error = pm_common_resolve_record(table, process, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -1773,20 +1355,20 @@ enum micros_pm_model_error micros_pm_exit_begin(
 
         if (
             child->state == MICROS_PM_PROCESS_SPAWNING
-            && handles_equal(child->parent, process)
+            && pm_common_handles_equal(child->parent, process)
         ) {
             return MICROS_PM_MODEL_ERROR_BUSY;
         }
     }
 
-    zero_bytes(&committed, sizeof(committed));
+    pm_common_zero_bytes(&committed, sizeof(committed));
     record = &table->records[process.slot];
     if (record->wait.result_ready) {
         table->records[
             record->wait.pending_child.slot
         ].reap_pending = false;
     }
-    clear_wait(&record->wait);
+    pm_common_clear_wait(&record->wait);
 
     reaper = table->reaper;
     for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
@@ -1794,7 +1376,7 @@ enum micros_pm_model_error micros_pm_exit_begin(
             = &table->records[index];
 
         if (
-            handles_equal(child->parent, process)
+            pm_common_handles_equal(child->parent, process)
             && (
                 child->state == MICROS_PM_PROCESS_RUNNING
                 || child->state == MICROS_PM_PROCESS_EXITING
@@ -1832,7 +1414,7 @@ enum micros_pm_model_error micros_pm_exit_detach(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, process, &resolved);
+    error = pm_common_resolve_record(table, process, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -1869,7 +1451,7 @@ enum micros_pm_model_error micros_pm_exit_release_vm(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, process, &resolved);
+    error = pm_common_resolve_record(table, process, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -1910,7 +1492,7 @@ enum micros_pm_model_error micros_pm_exit_release_process(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, process, &resolved);
+    error = pm_common_resolve_record(table, process, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -1941,7 +1523,7 @@ enum micros_pm_model_error micros_pm_exit_release_process(
         ++committed.count;
     }
     if (
-        !handles_equal(parent, table->reaper)
+        !pm_common_handles_equal(parent, table->reaper)
         && stage_wait_result(
             table,
             parent,
@@ -1983,7 +1565,7 @@ enum micros_pm_model_error micros_pm_wait_begin(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, parent, &resolved);
+    error = pm_common_resolve_record(table, parent, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -2011,7 +1593,7 @@ enum micros_pm_model_error micros_pm_wait_begin(
         )
     ) {
         child_record = &table->records[child_slot];
-        child_handle = record_handle(child_slot, child_record);
+        child_handle = pm_common_record_handle(child_slot, child_record);
         parent_record->wait.active = true;
         parent_record->wait.result_ready = true;
         parent_record->wait.flags = flags;
@@ -2026,7 +1608,7 @@ enum micros_pm_model_error micros_pm_wait_begin(
             child_handle,
             &committed
         );
-    } else if (!has_matching_child(table, parent, selector)) {
+    } else if (!pm_common_has_matching_child(table, parent, selector)) {
         committed.action = MICROS_PM_WAIT_ACTION_REPLY;
         committed.result = MICROS_PM_RESULT_NO_CHILD;
     } else if ((flags & MICROS_PM_WAIT_NOHANG) != 0) {
@@ -2060,7 +1642,7 @@ enum micros_pm_model_error micros_pm_wait_resume(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, parent, &resolved);
+    error = pm_common_resolve_record(table, parent, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -2101,7 +1683,7 @@ enum micros_pm_model_error micros_pm_wait_reply_complete(
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
-    error = resolve_record(table, parent, &resolved);
+    error = pm_common_resolve_record(table, parent, &resolved);
     if (error != MICROS_PM_MODEL_OK) {
         return error;
     }
@@ -2123,15 +1705,15 @@ enum micros_pm_model_error micros_pm_wait_reply_complete(
     if (!accepted) {
         child_record->reap_pending = false;
         parent_record->wait.result_ready = false;
-        zero_bytes(
+        pm_common_zero_bytes(
             &parent_record->wait.pending_child,
             sizeof(parent_record->wait.pending_child)
         );
         return MICROS_PM_MODEL_OK;
     }
 
-    clear_wait(&parent_record->wait);
-    release_record(child_record);
+    pm_common_clear_wait(&parent_record->wait);
+    pm_common_release_record(child_record);
     return MICROS_PM_MODEL_OK;
 }
 
@@ -2151,7 +1733,7 @@ enum micros_pm_model_error micros_pm_find_running_by_endpoint(
         table == NULL
         || process == NULL
         || pid == NULL
-        || !endpoint_is_concrete(endpoint)
+        || !pm_common_endpoint_is_concrete(endpoint)
     ) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
     }
@@ -2168,7 +1750,7 @@ enum micros_pm_model_error micros_pm_find_running_by_endpoint(
             record->state == MICROS_PM_PROCESS_RUNNING
             && record->endpoint == endpoint
         ) {
-            found = record_handle(index, record);
+            found = pm_common_record_handle(index, record);
             found_pid = record->pid;
             *process = found;
             *pid = found_pid;
