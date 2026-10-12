@@ -88,6 +88,14 @@ PRIVATE_HEADERS = (
     "kernel/address_space_handoff_test_internal.h",
 )
 
+UNAFFECTED_FAMILY_PATHS = (
+    "kernel/vm_handoff_runtime.c",
+    "kernel/vm_handoff_runtime.h",
+    "kernel/vm_handoff_test.c",
+    "kernel/vm_handoff_test.h",
+    "kernel/vm_handoff_test_fixture.h",
+)
+
 TEST_PRIVATE_HEADERS = (
     "tests/host/vm_handoff_test_internal.h",
     "tests/host/vm_bootstrap_test_internal.h",
@@ -587,6 +595,90 @@ def symbol_scan_sources() -> tuple[str, ...]:
     return all_source_set_paths()
 
 
+def accepted_family_paths() -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            (
+                *all_source_set_paths(),
+                *PRIVATE_HEADERS,
+                *STABLE_HEADER_HASHES,
+                *UNAFFECTED_FAMILY_PATHS,
+            )
+        )
+    )
+
+
+def discovered_family_paths() -> tuple[str, ...]:
+    patterns = (
+        "kernel/vm_handoff*.c",
+        "kernel/vm_handoff*.h",
+        "kernel/vm_snapshot*.c",
+        "kernel/vm_snapshot*.h",
+        "kernel/address_space_handoff_test*.c",
+        "kernel/address_space_handoff_test*.h",
+        "tests/host/vm_handoff*.c",
+        "tests/host/vm_handoff*.h",
+        "tests/host/vm_bootstrap*.c",
+        "tests/host/vm_bootstrap*.h",
+    )
+    return tuple(
+        sorted(
+            {
+                str(path.relative_to(REPOSITORY_ROOT))
+                for pattern in patterns
+                for path in REPOSITORY_ROOT.glob(pattern)
+            }
+        )
+    )
+
+
+def resolve_local_include(
+    source: Path,
+    include: str,
+) -> Path | None:
+    candidates = (
+        source.parent / include,
+        REPOSITORY_ROOT / include,
+        REPOSITORY_ROOT / "include" / include,
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def compiled_source_header_closure() -> tuple[str, ...]:
+    pending = [
+        (REPOSITORY_ROOT / relative).resolve()
+        for relative in accepted_family_paths()
+        if (REPOSITORY_ROOT / relative).suffix in {".c", ".h"}
+    ]
+    observed = set()
+    include_pattern = re.compile(
+        r'(?m)^\s*#\s*include\s*"([^"]+)"'
+    )
+
+    while pending:
+        path = pending.pop()
+        if path in observed:
+            continue
+        observed.add(path)
+        for include in include_pattern.findall(
+            path.read_text(encoding="utf-8")
+        ):
+            resolved = resolve_local_include(path, include)
+            if (
+                resolved is not None
+                and resolved.suffix == ".h"
+                and REPOSITORY_ROOT in resolved.parents
+            ):
+                pending.append(resolved)
+
+    return tuple(
+        sorted(str(path.relative_to(REPOSITORY_ROOT)) for path in observed)
+    )
+
+
 class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
     def test_expected_sources_and_private_headers_exist(self) -> None:
         missing = [
@@ -595,6 +687,12 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
             if not (REPOSITORY_ROOT / path).is_file()
         ]
         self.assertEqual([], missing)
+
+    def test_family_path_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            tuple(sorted(accepted_family_paths())),
+            discovered_family_paths(),
+        )
 
     def test_stable_headers_are_byte_exact(self) -> None:
         observed = {
@@ -621,6 +719,34 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(expected, listed)
         for source in all_source_set_paths():
             self.assertEqual(1, cmake.count(source), source)
+        self.assertEqual(1, cmake.count("kernel/vm_handoff_runtime.c"))
+        self.assertEqual(1, cmake.count("kernel/vm_handoff_test.c"))
+
+    def test_consumers_do_not_list_split_sources_directly(self) -> None:
+        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        blocks = (
+            cmake_command(cmake, "add_executable", "vm_bootstrap_test"),
+            cmake_command(cmake, "add_executable", "pm_test"),
+            cmake_command(
+                cmake,
+                "add_executable",
+                "vm_handoff_syscall_test",
+            ),
+            cmake_command(cmake, "add_executable", "micros"),
+            "\n".join(
+                cmake_if_blocks(
+                    cmake,
+                    "MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST",
+                )
+            ),
+        )
+        direct = []
+
+        for block in blocks:
+            for relative in all_source_set_paths():
+                if relative in block:
+                    direct.append(relative)
+        self.assertEqual([], direct)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
         cmake = CMAKE_PATH.read_text(encoding="utf-8")
@@ -743,42 +869,38 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                 )
 
     def test_mutable_context_and_snapshot_owners_are_unique(self) -> None:
-        contexts = (
-            (
-                "vm_bootstrap_test_context",
-                "tests/host/vm_bootstrap_test_fixture.c",
-                SOURCE_SETS["MICROS_VM_BOOTSTRAP_HOST_TEST_SOURCES"],
-            ),
-            (
-                "vm_handoff_syscall_test_context",
-                "tests/host/vm_handoff_syscall_test_fixture.c",
-                SOURCE_SETS[
-                    "MICROS_VM_HANDOFF_SYSCALL_HOST_TEST_SOURCES"
-                ],
-            ),
-            (
-                "micros_address_space_handoff_test_context",
-                "kernel/address_space_handoff_test_fixture.c",
-                SOURCE_SETS[
-                    "MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES"
-                ],
-            ),
+        context_definitions = []
+        generic_context = re.compile(
+            r"(?m)^\s*static\s+struct\s+"
+            r"([A-Za-z_][A-Za-z0-9_]*test_context)\b"
         )
-        for context, owner, sources in contexts:
-            pattern = re.compile(
-                rf"(?m)^static\s+struct\s+{context}\s+"
-                r"[A-Za-z_][A-Za-z0-9_]*\s*;"
-            )
-            observed = []
-            for relative in sources:
-                path = REPOSITORY_ROOT / relative
-                if (
-                    path.is_file()
-                    and pattern.search(path.read_text(encoding="utf-8"))
-                ):
-                    observed.append(relative)
-            if observed:
-                self.assertEqual([owner], observed)
+        for relative in compiled_source_header_closure():
+            path = REPOSITORY_ROOT / relative
+            if not path.is_file():
+                continue
+            for context_type in generic_context.findall(
+                path.read_text(encoding="utf-8")
+            ):
+                context_definitions.append((relative, context_type))
+        self.assertEqual(
+            sorted(
+                (
+                    (
+                        "kernel/address_space_handoff_test_fixture.c",
+                        "micros_address_space_handoff_test_context",
+                    ),
+                    (
+                        "tests/host/vm_bootstrap_test_fixture.c",
+                        "vm_bootstrap_test_context",
+                    ),
+                    (
+                        "tests/host/vm_handoff_syscall_test_fixture.c",
+                        "vm_handoff_syscall_test_context",
+                    ),
+                )
+            ),
+            sorted(context_definitions),
+        )
 
         snapshot_pattern = re.compile(
             r"(?ms)^_Alignas\(MICROS_VM_BOOT_INFO_ALIGNMENT\)\s*"
@@ -936,7 +1058,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         self.assertEqual(13, len(INITIAL_LONG_FUNCTION_MIGRATION))
         self.assertEqual(len(migration), len(LONG_FUNCTION_MIGRATION))
         self.assertTrue(migration <= initial)
-        for relative in all_source_set_paths():
+        for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             if not path.is_file():
                 continue
