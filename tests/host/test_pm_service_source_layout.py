@@ -312,11 +312,11 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "process_table": ["servers/pm/pm_service.c"],
             "pm_service_data": ["servers/pm/pm_service.c"],
             "initial_table": ["servers/pm/pm_service.c"],
-            "request_bytes": ["tests/host/spawn_abi_test.c"],
-            "elf_bytes": ["tests/host/spawn_abi_test.c"],
-            "path_storage": ["tests/host/spawn_abi_test.c"],
-            "argument_storage": ["tests/host/spawn_abi_test.c"] * 2,
-            "environment_storage": ["tests/host/spawn_abi_test.c"] * 2,
+            "request_bytes": [],
+            "elf_bytes": [],
+            "path_storage": [],
+            "argument_storage": [],
+            "environment_storage": [],
         }
         for name, owners in expected.items():
             observed = []
@@ -335,6 +335,15 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             self.assertNotRegex(
                 text, r"\bstatic\s+(?:volatile\s+)?struct\s+micros_pm_table\b",
             )
+        contexts = []
+        for path in all_sources():
+            text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+            contexts.extend(
+                path for _ in re.finditer(
+                    r"\bstatic\s+struct\s+spawn_abi_test_context\b", text,
+                )
+            )
+        self.assertEqual(["tests/host/spawn_abi_test_fixture.c"], contexts)
 
     def test_new_paths_inherit_exact_original_classification(self) -> None:
         baselines = {
