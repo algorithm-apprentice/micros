@@ -233,14 +233,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
     ),
 )
 
-SYMBOL_OWNER_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[1] not in {
-        "kernel/frame_ownership_validation.c",
-        "kernel/frame_ownership_bootstrap.c",
-    }
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     (
