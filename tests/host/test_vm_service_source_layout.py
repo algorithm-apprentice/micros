@@ -242,7 +242,6 @@ LONG_FUNCTION_MIGRATION = tuple(
     for migration in INITIAL_LONG_FUNCTION_MIGRATION
     if migration[0] in {
         "kernel/vm_scratch_preemption_test.c",
-        "tests/qemu/vm_server.c",
         GENERATOR_PATH,
     }
 )
@@ -569,7 +568,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             "executable": [],
             "request": [],
             "scratch_page": [],
-            "vm_state": ["tests/qemu/vm_server.c"],
+            "vm_state": [],
             "test_phase": [
                 "kernel/vm_scratch_preemption_test.c",
             ],
@@ -593,6 +592,25 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                 static_definition_paths(sources, name),
                 name,
             )
+        contexts = []
+        pattern = re.compile(
+            r"\bstatic\s+struct\s+(vm_core_test_context|vm_server_context)\b"
+        )
+        for relative in compiled_source_header_closure():
+            text = c_lexical_text(
+                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            )
+            contexts.extend(
+                (relative, match.group(1))
+                for match in pattern.finditer(text)
+            )
+        self.assertEqual(
+            [
+                ("tests/host/vm_core_test_fixture.c", "vm_core_test_context"),
+                ("tests/qemu/vm_server_fixture.c", "vm_server_context"),
+            ],
+            contexts,
+        )
 
     def test_evidence_identities_and_orders_remain_stable(self) -> None:
         cmake = CMAKE_PATH.read_text(encoding="utf-8")
