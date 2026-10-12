@@ -7,6 +7,7 @@ import unittest
 
 from tools import validation_plan
 from tests.host.test_frame_ownership_source_layout import (
+    c_lexical_text,
     c_function_definitions,
     cmake_command,
     static_definition_paths,
@@ -215,6 +216,115 @@ FINAL_SYMBOL_OWNERS = {
     **TEST_FINAL_OWNERS,
 }
 
+PORTABLE_TRANSITION_OWNERS = (
+    "kernel/pm_control_reservation.c",
+    "kernel/pm_control_execution.c",
+    "kernel/pm_control_activation.c",
+    "kernel/pm_control_exit.c",
+)
+
+PORTABLE_TRANSITION_SYMBOLS = {
+    owner: tuple(
+        symbol
+        for symbol, final_owner in PORTABLE_FINAL_OWNERS.items()
+        if final_owner == owner
+    )
+    for owner in PORTABLE_TRANSITION_OWNERS
+}
+
+SYSCALL_ADAPTER_ENTRY_OWNERS = {
+    "micros_pm_control_syscall_handle_reservation":
+        "kernel/pm_control_syscall_reservation.c",
+    "micros_pm_control_syscall_handle_execution":
+        "kernel/pm_control_syscall_execution.c",
+    "micros_pm_control_syscall_handle_activation":
+        "kernel/pm_control_syscall_activation.c",
+    "micros_pm_control_syscall_handle_exit":
+        "kernel/pm_control_syscall_exit.c",
+}
+
+SYSCALL_PORTABLE_OWNER = {
+    "kernel/pm_control_syscall_reservation.c":
+        "kernel/pm_control_reservation.c",
+    "kernel/pm_control_syscall_execution.c":
+        "kernel/pm_control_execution.c",
+    "kernel/pm_control_syscall_activation.c":
+        "kernel/pm_control_activation.c",
+    "kernel/pm_control_syscall_exit.c":
+        "kernel/pm_control_exit.c",
+}
+
+EXPECTED_PM_INCLUDES = {
+    "kernel/pm_control_internal.h": (
+        "kernel/pm_control_core.h",
+    ),
+    "kernel/pm_control_syscall_internal.h": (
+        "kernel/pm_control_runtime.h",
+        "kernel/pm_control_syscall.h",
+        "kernel/pm_control_syscall_core.h",
+    ),
+    "tests/host/pm_control_test_internal.h": (
+        "kernel/pm_control_core.h",
+        "kernel/pm_control_syscall_core.h",
+    ),
+    "tests/host/pm_control_execution_test_internal.h": (
+        "kernel/pm_control_core.h",
+    ),
+    "kernel/pm_control_core.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_abi.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_validation.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_reservation.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_execution.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_activation.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_exit.c": (
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_runtime_core.c": (
+        "kernel/pm_control_runtime_core.h",
+    ),
+    "kernel/pm_control_syscall_core.c": (
+        "kernel/pm_control_syscall_core.h",
+    ),
+    "kernel/pm_control_runtime.c": (
+        "kernel/pm_control_runtime.h",
+        "kernel/pm_control_runtime_core.h",
+    ),
+    "kernel/pm_control_syscall.c": (
+        "kernel/pm_control_syscall.h",
+        "kernel/pm_control_runtime.h",
+        "kernel/pm_control_syscall_internal.h",
+    ),
+    "kernel/pm_control_syscall_runtime.c": (
+        "kernel/pm_control_syscall_internal.h",
+    ),
+    "kernel/pm_control_syscall_reservation.c": (
+        "kernel/pm_control_syscall_internal.h",
+        "kernel/pm_control_runtime_core.h",
+    ),
+    "kernel/pm_control_syscall_execution.c": (
+        "kernel/pm_control_syscall_internal.h",
+        "kernel/pm_control_internal.h",
+    ),
+    "kernel/pm_control_syscall_activation.c": (
+        "kernel/pm_control_syscall_internal.h",
+    ),
+    "kernel/pm_control_syscall_exit.c": (
+        "kernel/pm_control_syscall_internal.h",
+    ),
+}
+
 CURRENT_SYMBOL_OWNERS = {
     **{
         symbol: "kernel/pm_control_core.c"
@@ -413,7 +523,6 @@ def compiled_source_header_closure() -> tuple[str, ...]:
             resolved = resolve_local_include(path, include)
             if (
                 resolved is not None
-                and resolved.suffix == ".h"
                 and REPOSITORY_ROOT in resolved.parents
             ):
                 pending.append(resolved)
@@ -421,6 +530,120 @@ def compiled_source_header_closure() -> tuple[str, ...]:
     return tuple(
         sorted(str(path.relative_to(REPOSITORY_ROOT)) for path in observed)
     )
+
+
+def local_include_closure(relative: str) -> tuple[str, ...]:
+    pending = [(REPOSITORY_ROOT / relative).resolve()]
+    observed = set()
+    include_pattern = re.compile(
+        r'(?m)^\s*#\s*include\s*"([^"]+)"'
+    )
+
+    while pending:
+        path = pending.pop()
+        if path in observed:
+            continue
+        observed.add(path)
+        for include in include_pattern.findall(
+            path.read_text(encoding="utf-8")
+        ):
+            resolved = resolve_local_include(path, include)
+            if (
+                resolved is not None
+                and REPOSITORY_ROOT in resolved.parents
+            ):
+                pending.append(resolved)
+
+    return tuple(
+        sorted(str(path.relative_to(REPOSITORY_ROOT)) for path in observed)
+    )
+
+
+def macro_definition_text(text: str) -> str:
+    lines = text.splitlines()
+    definitions = []
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        if re.match(r"^\s*#\s*define\b", line):
+            selected = [line]
+            while selected[-1].rstrip().endswith("\\"):
+                index += 1
+                if index >= len(lines):
+                    break
+                selected.append(lines[index])
+            definitions.extend(selected)
+        index += 1
+    return "\n".join(definitions)
+
+
+def owner_dependency_text(relative: str) -> str:
+    declaration_only = {
+        "kernel/pm_control_core.h",
+        "kernel/pm_control_syscall_internal.h",
+    }
+    selected = []
+
+    for dependency in local_include_closure(relative):
+        text = (REPOSITORY_ROOT / dependency).read_text(
+            encoding="utf-8"
+        )
+        if dependency in declaration_only and dependency != relative:
+            selected.append(c_lexical_text(macro_definition_text(text)))
+        else:
+            selected.append(c_lexical_text(text))
+    return "\n".join(selected)
+
+
+def private_header_object_definitions(text: str) -> tuple[str, ...]:
+    lexical = c_lexical_text(text)
+    lexical = re.sub(r"(?m)^\s*#.*$", "", lexical)
+    definitions = []
+    depth = 0
+    segment_start = 0
+
+    for index, selected in enumerate(lexical):
+        if selected == "{":
+            depth += 1
+        elif selected == "}":
+            depth -= 1
+            if depth < 0:
+                raise AssertionError("unexpected closing brace")
+        elif selected == ";" and depth == 0:
+            declaration = lexical[segment_start:index + 1].strip()
+            segment_start = index + 1
+            if (
+                not declaration
+                or declaration.startswith("typedef ")
+                or declaration.startswith("_Static_assert")
+                or (
+                    declaration.startswith("extern ")
+                    and "=" not in declaration
+                    and "{" not in declaration
+                )
+                or re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_\s*]*"
+                    r"\b[A-Za-z_][A-Za-z0-9_]*\s*"
+                    r"\([^;]*\)\s*;",
+                    declaration,
+                    re.DOTALL,
+                )
+                or re.match(
+                    r"^(?:struct|union|enum)\b[^{;]*\{",
+                    declaration,
+                    re.DOTALL,
+                )
+                or re.fullmatch(
+                    r"(?:struct|union|enum)\s+"
+                    r"[A-Za-z_][A-Za-z0-9_]*\s*;",
+                    declaration,
+                )
+            ):
+                continue
+            definitions.append(declaration)
+
+    return tuple(definitions)
 
 
 class KernelPmControlSourceLayoutTest(unittest.TestCase):
@@ -498,18 +721,31 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
                         self.assertNotIn(relative, block)
 
     def test_private_headers_contain_declarations_only(self) -> None:
-        definitions = {}
+        function_definitions = {}
+        object_definitions = {}
+        static_declarations = {}
 
         for relative in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative
             if not path.is_file():
                 continue
-            selected = c_function_definitions(
-                path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
+            selected = c_function_definitions(text)
+            objects = private_header_object_definitions(text)
+            static = re.findall(
+                r"(?m)^\s*(?:_Alignas\([^\n]+\)\s*)?"
+                r"static\b[^\n;]*(?:;|\{)",
+                c_lexical_text(text),
             )
             if selected:
-                definitions[relative] = selected
-        self.assertEqual({}, definitions)
+                function_definitions[relative] = selected
+            if objects:
+                object_definitions[relative] = objects
+            if static:
+                static_declarations[relative] = tuple(static)
+        self.assertEqual({}, function_definitions)
+        self.assertEqual({}, object_definitions)
+        self.assertEqual({}, static_declarations)
 
     def test_sources_do_not_include_c_or_test_private_headers(self) -> None:
         c_include = re.compile(
@@ -531,6 +767,81 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
                         private_violations.append((relative, private))
         self.assertEqual([], c_violations)
         self.assertEqual([], private_violations)
+
+    def test_private_dependency_direction_is_exact(self) -> None:
+        include_pattern = re.compile(
+            r'(?m)^\s*#\s*include\s*"([^"]*pm_control[^"]*)"'
+        )
+        transition_symbols = {
+            symbol
+            for symbols in PORTABLE_TRANSITION_SYMBOLS.values()
+            for symbol in symbols
+        }
+        adapter_symbols = set(SYSCALL_ADAPTER_ENTRY_OWNERS)
+
+        for relative, expected in EXPECTED_PM_INCLUDES.items():
+            text = (REPOSITORY_ROOT / relative).read_text(
+                encoding="utf-8"
+            )
+            with self.subTest(source=relative, dependency="include"):
+                self.assertEqual(
+                    expected,
+                    tuple(include_pattern.findall(text)),
+                )
+
+        for relative in SOURCE_SETS["MICROS_PM_CONTROL_CORE_SOURCES"]:
+            text = owner_dependency_text(relative)
+            allowed = set(
+                PORTABLE_TRANSITION_SYMBOLS.get(relative, ())
+            )
+            observed = {
+                symbol
+                for symbol in transition_symbols
+                if re.search(rf"\b{re.escape(symbol)}\b", text)
+            }
+            with self.subTest(source=relative, dependency="portable"):
+                self.assertEqual(allowed, observed)
+
+        for relative in SOURCE_SETS["MICROS_PM_CONTROL_TARGET_SOURCES"]:
+            text = owner_dependency_text(relative)
+            allowed_portable_owner = SYSCALL_PORTABLE_OWNER.get(
+                relative
+            )
+            allowed_portable = set(
+                PORTABLE_TRANSITION_SYMBOLS.get(
+                    allowed_portable_owner,
+                    (),
+                )
+            )
+            observed_portable = {
+                symbol
+                for symbol in transition_symbols
+                if re.search(rf"\b{re.escape(symbol)}\b", text)
+            }
+            allowed_adapters = (
+                adapter_symbols
+                if relative == "kernel/pm_control_syscall.c"
+                else {
+                    symbol
+                    for symbol, owner
+                    in SYSCALL_ADAPTER_ENTRY_OWNERS.items()
+                    if owner == relative
+                }
+            )
+            observed_adapters = {
+                symbol
+                for symbol in adapter_symbols
+                if re.search(rf"\b{re.escape(symbol)}\b", text)
+            }
+            with self.subTest(source=relative, dependency="adapter"):
+                self.assertEqual(
+                    allowed_portable,
+                    observed_portable,
+                )
+                self.assertEqual(
+                    allowed_adapters,
+                    observed_adapters,
+                )
 
     def test_symbol_owners_follow_exact_migration_map(self) -> None:
         initial = set(INITIAL_SYMBOL_OWNER_MIGRATION)
@@ -564,10 +875,39 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
     def test_mutable_state_owners_are_exact(self) -> None:
         sources = all_source_set_paths()
 
+        state_definitions = []
+        static_state = re.compile(
+            r"(?m)^\s*(?:_Alignas\([^\n]+\)\s*)?"
+            r"static\s+struct\s+micros_pm_control_state\b"
+        )
+        nonstatic_global_state = re.compile(
+            r"(?m)^(?:_Alignas\([^\n]+\)\s*)?"
+            r"struct\s+micros_pm_control_state\s+"
+            r"[A-Za-z_][A-Za-z0-9_]*\b"
+        )
+        state_alias = re.compile(
+            r"\btypedef\s+struct\s+micros_pm_control_state\b"
+        )
+        aliases = []
+        nonstatic_globals = []
+
+        for relative in compiled_source_header_closure():
+            path = REPOSITORY_ROOT / relative
+            lexical = c_lexical_text(
+                path.read_text(encoding="utf-8")
+            )
+            for _ in static_state.finditer(lexical):
+                state_definitions.append(relative)
+            for _ in nonstatic_global_state.finditer(lexical):
+                nonstatic_globals.append(relative)
+            for _ in state_alias.finditer(lexical):
+                aliases.append(relative)
         self.assertEqual(
             ["kernel/pm_control_runtime.c"],
-            static_definition_paths(sources, "control_state"),
+            state_definitions,
         )
+        self.assertEqual([], nonstatic_globals)
+        self.assertEqual([], aliases)
         for name in (
             "runtime_allocator",
             "runtime_ownership",
