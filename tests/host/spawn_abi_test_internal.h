@@ -79,4 +79,13 @@ size_t spawn_abi_test_build_valid_elf(
     uint64_t data_pages
 );
 
+bool test_spawn_request_contract(struct spawn_abi_test_context *context);
+bool test_spawn_request_boundaries(struct spawn_abi_test_context *context);
+bool test_application_stack_boundaries(struct spawn_abi_test_context *context);
+bool test_elf_plan(struct spawn_abi_test_context *context);
+bool test_spawn_request_rejections(struct spawn_abi_test_context *context);
+bool test_application_stack(struct spawn_abi_test_context *context);
+bool test_elf_header_rejections(struct spawn_abi_test_context *context);
+bool test_elf_segment_rejections(struct spawn_abi_test_context *context);
+
 #endif

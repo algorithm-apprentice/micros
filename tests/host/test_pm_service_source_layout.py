@@ -176,20 +176,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if not migration[1].startswith("servers/pm/")
-    and migration[2] != "micros_spawn_stack_layout_plan"
-    and migration[2] not in {
-        "test_protocol_contract",
-        "test_rollback_acknowledgment_identity",
-        "test_endpoint_lookup_and_failure_preservation",
-        "test_exit_wait_and_reply_restore",
-        "test_nested_parent_exit_stages_independent_waits",
-        "test_parent_exit_reparents_and_aborts",
-        "test_replayable_transition_model",
-        "test_runtime_gate_and_spawn", "test_reverse_rollback_and_identity",
-        "test_generation_and_pid_exhaustion", "test_failed_init_is_terminal",
-        "test_orphaned_lifecycle_is_invalid", "test_wait_selection",
-    }
+    if migration[2] == "micros_pm_service_test_handle_trap"
 )
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
@@ -212,15 +199,8 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 LONG_FUNCTION_MIGRATION = tuple(
     migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration[1] not in {
-        "micros_spawn_request_decode",
-        "micros_pm_table_validate", "test_protocol_contract",
-        "test_rollback_acknowledgment_identity",
-        "test_endpoint_lookup_and_failure_preservation",
-        "test_exit_wait_and_reply_restore",
-        "test_nested_parent_exit_stages_independent_waits",
-        "test_parent_exit_reparents_and_aborts",
-        "test_replayable_transition_model",
+    if migration[1] in {
+        "run_self_test", "micros_pm_service_test_handle_trap", "render_fixture",
     }
 )
 
