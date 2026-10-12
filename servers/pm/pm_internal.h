@@ -55,5 +55,10 @@ bool pm_common_has_matching_child(
     struct micros_pm_process_handle parent,
     uint64_t selector
 );
+bool pm_wait_stage_result(
+    struct micros_pm_table *table,
+    struct micros_pm_process_handle parent,
+    struct micros_pm_wait_outcome *outcome
+);
 
 #endif

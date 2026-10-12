@@ -176,9 +176,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[2] not in {
-        "micros_pm_decode_request", "micros_pm_build_result", "micros_pm_table_validate",
-    }
+    if not migration[1].startswith("servers/pm/")
 )
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
