@@ -340,6 +340,66 @@ set(
     tests/qemu/vfs_service_probe_console.c
 )
 
+set(
+    MICROS_KERNEL_ADDRESS_SPACE_SOURCES
+    kernel/address_space.c
+    kernel/address_space_validation.c
+)
+
+set(
+    MICROS_USER_ADDRESS_SPACE_CORE_SOURCES
+    kernel/user_address_space_core.c
+    kernel/user_address_space_vm_plan.c
+)
+
+set(
+    MICROS_USER_ADDRESS_SPACE_SOURCES
+    kernel/user_address_space.c
+    kernel/user_address_space_runtime.c
+    kernel/user_address_space_table.c
+    kernel/user_address_space_validation.c
+    kernel/user_address_space_mapping.c
+    kernel/user_address_space_mutation.c
+    kernel/user_address_space_handoff.c
+    kernel/user_address_space_tty.c
+    kernel/user_address_space_vm_scratch.c
+    kernel/user_address_space_vm_freeze.c
+    kernel/user_address_space_vm_teardown.c
+    kernel/user_address_space_activation.c
+)
+
+set(
+    MICROS_USER_EXECUTION_SOURCES
+    kernel/user_execution.c
+    kernel/user_execution_validation.c
+    kernel/user_execution_trap.c
+)
+
+set(
+    MICROS_USER_ADDRESS_SPACE_HOST_TEST_SOURCES
+    tests/host/user_address_space_core_test.c
+    tests/host/user_address_space_owner_test.c
+    tests/host/user_address_space_vm_plan_test.c
+)
+
+set(
+    MICROS_USER_ADDRESS_SPACE_QEMU_TEST_SOURCES
+    kernel/user_address_space_test.c
+    kernel/user_address_space_test_fixture.c
+    kernel/user_address_space_test_lifecycle.c
+    kernel/user_address_space_test_mapping.c
+    kernel/user_address_space_test_validation.c
+)
+
+set(
+    MICROS_USER_EXECUTION_QEMU_TEST_SOURCES
+    kernel/user_execution_test.c
+    kernel/user_execution_test_fixture.c
+    kernel/user_execution_test_prepare.c
+    kernel/user_execution_test_trap.c
+    kernel/user_execution_test_lifecycle.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -390,7 +450,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant_copy_core.c
         kernel/grant_syscall_core.c
         kernel/sv39.c
-        kernel/user_address_space_core.c
+        ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
         kernel/ipc_abi.c
         kernel/ipc.c
         tests/host/ipc_abi_test.c
@@ -401,7 +461,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
         tests/host/grant_syscall_core_test.c
-        tests/host/user_address_space_core_test.c
+        ${MICROS_USER_ADDRESS_SPACE_HOST_TEST_SOURCES}
         tests/host/ipc_notify_test.c
         tests/host/ipc_operation_test.c
         tests/host/ipc_queue_test.c
@@ -2502,7 +2562,7 @@ add_executable(
     arch/riscv64/trap.S
     arch/riscv64/uart.c
     arch/riscv64/user_entry.S
-    kernel/address_space.c
+    ${MICROS_KERNEL_ADDRESS_SPACE_SOURCES}
     kernel/bootstrap_control.c
     kernel/bootstrap_control_core.c
     kernel/bootstrap_image.c
@@ -2552,9 +2612,9 @@ add_executable(
     kernel/tty_handoff_runtime.c
     kernel/tty_interrupt.c
     kernel/uart_console_core.c
-    kernel/user_address_space.c
-    kernel/user_address_space_core.c
-    kernel/user_execution.c
+    ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
+    ${MICROS_USER_ADDRESS_SPACE_SOURCES}
+    ${MICROS_USER_EXECUTION_SOURCES}
     kernel/vm_bootstrap.c
     kernel/vm_handoff_core.c
     kernel/vm_handoff_runtime.c
@@ -4069,7 +4129,7 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
         micros
         PRIVATE
             arch/riscv64/user_address_space_test.S
-            kernel/user_address_space_test.c
+            ${MICROS_USER_ADDRESS_SPACE_QEMU_TEST_SOURCES}
     )
 endif()
 
@@ -4097,7 +4157,7 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
         micros
         PRIVATE
             arch/riscv64/user_execution_test.S
-            kernel/user_execution_test.c
+            ${MICROS_USER_EXECUTION_QEMU_TEST_SOURCES}
     )
 endif()
 

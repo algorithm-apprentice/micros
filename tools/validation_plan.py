@@ -101,6 +101,92 @@ PLANNER_INPUTS = (
     "docs/adr/0032-fail-closed-change-aware-validation.md",
 )
 
+PATH_CLASSIFICATION_EQUIVALENTS = (
+    (
+        "kernel/address_space.c",
+        (
+            "kernel/address_space_validation.c",
+            "kernel/address_space_internal.h",
+        ),
+    ),
+    (
+        "kernel/user_address_space.c",
+        (
+            "kernel/user_address_space_runtime.c",
+            "kernel/user_address_space_table.c",
+            "kernel/user_address_space_validation.c",
+            "kernel/user_address_space_mapping.c",
+            "kernel/user_address_space_mutation.c",
+            "kernel/user_address_space_handoff.c",
+            "kernel/user_address_space_tty.c",
+            "kernel/user_address_space_vm_scratch.c",
+            "kernel/user_address_space_vm_freeze.c",
+            "kernel/user_address_space_vm_teardown.c",
+            "kernel/user_address_space_activation.c",
+            "kernel/user_address_space_internal.h",
+        ),
+    ),
+    (
+        "kernel/user_address_space_core.c",
+        ("kernel/user_address_space_vm_plan.c",),
+    ),
+    (
+        "kernel/user_execution.c",
+        (
+            "kernel/user_execution_validation.c",
+            "kernel/user_execution_trap.c",
+            "kernel/user_execution_internal.h",
+        ),
+    ),
+    (
+        "kernel/user_address_space_test.c",
+        (
+            "kernel/user_address_space_test_fixture.c",
+            "kernel/user_address_space_test_lifecycle.c",
+            "kernel/user_address_space_test_mapping.c",
+            "kernel/user_address_space_test_validation.c",
+            "kernel/user_address_space_test_internal.h",
+        ),
+    ),
+    (
+        "kernel/user_execution_test.c",
+        (
+            "kernel/user_execution_test_fixture.c",
+            "kernel/user_execution_test_prepare.c",
+            "kernel/user_execution_test_trap.c",
+            "kernel/user_execution_test_lifecycle.c",
+            "kernel/user_execution_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/user_address_space_core_test.c",
+        (
+            "tests/host/user_address_space_owner_test.c",
+            "tests/host/user_address_space_vm_plan_test.c",
+            "tests/host/user_address_space_core_test_suites.h",
+        ),
+    ),
+)
+
+HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_kernel_address_space_source_layout.py",
+)
+
+
+def with_path_classification_equivalents(inputs):
+    expanded = list(inputs)
+    selected = set(inputs)
+
+    for baseline, equivalents in PATH_CLASSIFICATION_EQUIVALENTS:
+        if baseline not in selected:
+            continue
+        for equivalent in equivalents:
+            if equivalent not in expanded:
+                expanded.append(equivalent)
+
+    return tuple(expanded)
+
+
 BOOTSTRAP_CROSS_GATE_INPUTS = (
     "kernel/bootstrap_control.c",
     "kernel/bootstrap_control_core.c",
@@ -840,6 +926,18 @@ SLOW_MODEL_CTESTS = {
     "test-vfs-model": ("vfs-model", "vfs_model_test"),
 }
 
+SHARED_QEMU_PATHS = with_path_classification_equivalents(
+    SHARED_QEMU_PATHS
+)
+GATE_INPUTS = {
+    name: with_path_classification_equivalents(inputs)
+    for name, inputs in GATE_INPUTS.items()
+}
+SLOW_MODEL_INPUTS = {
+    name: with_path_classification_equivalents(inputs)
+    for name, inputs in SLOW_MODEL_INPUTS.items()
+}
+
 
 def workflow(name):
     return ("cmake", "--workflow", "--preset", name)
@@ -943,6 +1041,7 @@ def requires_full_tier(paths):
             or bool(affected_slow_models([path]))
             or bool(affected_image_workflows([path]))
             or path_matches(path, PLANNER_INPUTS)
+            or path_matches(path, HOST_UNIT_ONLY_INPUTS)
         )
         if not known:
             return True

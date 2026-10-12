@@ -139,6 +139,85 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_address_space_split_paths_inherit_exact_gate_ownership(
+        self,
+    ):
+        for (
+            baseline,
+            equivalents,
+        ) in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS:
+            baseline_workflows = validation_plan.affected_workflows(
+                [baseline]
+            )
+            baseline_models = validation_plan.affected_slow_models(
+                [baseline]
+            )
+            baseline_images = validation_plan.affected_image_workflows(
+                [baseline]
+            )
+            baseline_full = validation_plan.requires_full_tier(
+                [baseline]
+            )
+
+            for equivalent in equivalents:
+                with self.subTest(
+                    baseline=baseline,
+                    equivalent=equivalent,
+                ):
+                    self.assertEqual(
+                        baseline_workflows,
+                        validation_plan.affected_workflows(
+                            [equivalent]
+                        ),
+                    )
+                    self.assertEqual(
+                        baseline_models,
+                        validation_plan.affected_slow_models(
+                            [equivalent]
+                        ),
+                    )
+                    self.assertEqual(
+                        baseline_images,
+                        validation_plan.affected_image_workflows(
+                            [equivalent]
+                        ),
+                    )
+                    self.assertEqual(
+                        baseline_full,
+                        validation_plan.requires_full_tier(
+                            [equivalent]
+                        ),
+                    )
+                    for tier in ("fast", "pr"):
+                        self.assertEqual(
+                            validation_plan.plan(
+                                [baseline],
+                                tier,
+                                "main",
+                            ),
+                            validation_plan.plan(
+                                [equivalent],
+                                tier,
+                                "main",
+                            ),
+                        )
+
+    def test_address_space_layout_test_is_host_unit_only(self):
+        path = "tests/host/test_kernel_address_space_source_layout.py"
+
+        self.assertIn(path, validation_plan.HOST_UNIT_ONLY_INPUTS)
+        self.assertEqual(
+            [],
+            validation_plan.affected_workflows([path]),
+        )
+        self.assertEqual(
+            [
+                validation_plan.UNIT_FAST,
+                *validation_plan.diff_commands("main"),
+            ],
+            validation_plan.plan([path], "fast", "main"),
+        )
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",

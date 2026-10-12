@@ -1,0 +1,8 @@
+#ifndef MICROS_KERNEL_USER_ADDRESS_SPACE_TEST_INTERNAL_H
+#define MICROS_KERNEL_USER_ADDRESS_SPACE_TEST_INTERNAL_H
+
+#include "micros/user_address_space.h"
+
+struct micros_user_address_space_test_context;
+
+#endif

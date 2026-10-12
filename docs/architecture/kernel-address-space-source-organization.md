@@ -199,7 +199,7 @@ Stable target-test symbol ownership is:
 
 | Owner | Test symbols |
 | --- | --- |
-| `kernel/address_space_test.c` | Existing kernel-MMU self-test and trap-hook symbols; unchanged and outside this correction |
+| `kernel/mmu_test.c` | Existing kernel-MMU self-test and trap-hook symbols; unchanged and outside this correction |
 | `kernel/user_address_space_test.c` | `micros_user_address_space_runtime_run_self_test`, `micros_user_address_space_handle_test_trap` |
 | `kernel/user_execution_test.c` | `micros_user_execution_runtime_run_self_test`, `micros_user_execution_test_enter_production` |
 | `kernel/user_execution_test_trap.c` | `micros_user_execution_test_pre_capture`, `micros_user_execution_handle_test_trap` |
