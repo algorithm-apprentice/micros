@@ -264,9 +264,14 @@ SYMBOL_OWNER_MIGRATION = tuple(
     for migration in INITIAL_SYMBOL_OWNER_MIGRATION
     if migration[1] not in {
         "kernel/pm_control_abi.c",
+        "kernel/pm_control_activation.c",
+        "kernel/pm_control_execution.c",
         "kernel/pm_control_validation.c",
         "kernel/pm_control_reservation.c",
         "tests/host/pm_control_abi_test.c",
+        "tests/host/pm_control_execution_exit_test.c",
+        "tests/host/pm_control_execution_prepare_test.c",
+        "tests/host/pm_control_execution_token_test.c",
         "tests/host/pm_control_syscall_test.c",
         "tests/host/pm_control_reservation_test.c",
         "tests/host/pm_control_runtime_test.c",
@@ -353,6 +358,26 @@ LONG_FUNCTION_MIGRATION = tuple(
         (
             "tests/host/pm_control_test.c",
             "test_runtime_accepts_exact_frozen_vm_reservation",
+        ),
+        (
+            "kernel/pm_control_core.c",
+            "micros_pm_control_prepare_preflight",
+        ),
+        (
+            "tests/host/pm_control_execution_test.c",
+            "freeze_child",
+        ),
+        (
+            "tests/host/pm_control_execution_test.c",
+            "initialize_fixture",
+        ),
+        (
+            "tests/host/pm_control_execution_test.c",
+            "test_prepare_abort_activate",
+        ),
+        (
+            "tests/host/pm_control_execution_test.c",
+            "test_exit_begin_detach_release",
         ),
     }
 )
@@ -621,10 +646,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         ):
             self.assertEqual([], static_definition_paths(sources, name))
         for name in ("fixture", "fixture_snapshot"):
-            self.assertEqual(
-                ["tests/host/pm_control_execution_test.c"],
-                static_definition_paths(sources, name),
-            )
+            self.assertEqual([], static_definition_paths(sources, name))
 
         context_definitions = []
         context_pattern = re.compile(
@@ -638,13 +660,20 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             ):
                 context_definitions.append((relative, context_type))
         self.assertEqual(
-            [
+            sorted(
                 (
-                    "tests/host/pm_control_test_fixture.c",
-                    "pm_control_test_context",
+                    (
+                        "tests/host/pm_control_test_fixture.c",
+                        "pm_control_test_context",
+                    ),
+                    (
+                        "tests/host/"
+                        "pm_control_execution_test_fixture.c",
+                        "pm_control_execution_test_context",
+                    ),
                 )
-            ],
-            context_definitions,
+            ),
+            sorted(context_definitions),
         )
 
     def test_evidence_identities_and_case_order_remain_stable(self) -> None:
