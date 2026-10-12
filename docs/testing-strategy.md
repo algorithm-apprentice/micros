@@ -65,6 +65,16 @@ verifies that it includes complete native validation, the standalone VFS
 image, and the QEMU VFS gate. A workflow already selected by that plan is not
 run separately. The reviewer does not routinely rerun those suites.
 
+The kernel address-space decomposition proposed by ADR-0053 preserves
+`endpoint_test`, `endpoint-profile`, `test-qemu-user-address-space`,
+`test-qemu-address-space-handoff`, and `test-qemu-user-execution` while
+splitting kernel-root, user-root, VM-transaction, execution, fixture, and
+scenario owners. It begins with one source-layout test and an exact
+23-function migration allowlist. Each extraction runs only its narrow
+existing evidence; before review, the author runs the authoritative
+pull-request plan once, and the reviewer inspects rather than routinely
+reruns that evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

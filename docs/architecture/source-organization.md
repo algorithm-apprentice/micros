@@ -228,3 +228,12 @@ boundaries are defined in
 [VFS Test Source Organization](vfs-test-source-organization.md). The design
 preserves the current test executables and workflows; it does not equate a
 source-file split with an additional test job.
+
+The next audit correction is the kernel address-space and execution-family
+design. Its exact kernel-root, user-root, VM-transaction, execution,
+private-contract, native-test, and QEMU-test boundaries are defined in
+[Kernel Address-Space Source Organization](kernel-address-space-source-organization.md).
+The design retains one bounded validation/release scratch owner, preserves
+the existing public headers and evidence identities, and places wired
+handoff above both validation families to keep the concrete module graph
+acyclic.

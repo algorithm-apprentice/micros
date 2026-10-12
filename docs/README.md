@@ -12,6 +12,9 @@ This directory contains the design baseline for `micros`.
   classifies every in-scope tracked implementation/test source review signal
   at the audited base and records dependency-ordered correction units and
   cohesive exceptions.
+- [Kernel address-space source organization](architecture/kernel-address-space-source-organization.md)
+  defines exact kernel-root, user-root, VM-transaction, user-execution, and
+  native/QEMU evidence ownership for the next audit correction.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -72,6 +75,9 @@ This directory contains the design baseline for `micros`.
   traces the shared harness, behavior-oriented test programs, helper
   executables, and required `micros` evidence extensions before the VFS test
   sources are decomposed.
+- [MINIX kernel address-space source-organization baseline](research/minix-kernel-address-space-source-organization.md)
+  traces privileged root binding, page-table mechanism, region policy,
+  lifecycle orchestration, and the required `micros` adaptations.
 
 ## Planning and verification
 

@@ -68,3 +68,4 @@ to make the project appear more consistent than it was.
 | [0050](0050-post-handoff-elf-spawn.md) | Post-handoff ELF spawn and normal exit | Accepted |
 | [0051](0051-responsibility-based-source-modules.md) | Responsibility-based source modules | Accepted |
 | [0052](0052-vfs-test-source-decomposition.md) | VFS test source decomposition | Accepted |
+| [0053](0053-kernel-address-space-source-decomposition.md) | Kernel address-space source decomposition | Accepted |
