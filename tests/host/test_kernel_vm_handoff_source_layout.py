@@ -417,6 +417,9 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "kernel/vm_handoff_commit.c",
         "kernel/vm_handoff_release.c",
         "kernel/vm_snapshot_validation.c",
+        "tests/host/vm_handoff_syscall_test_runtime_backend.c",
+        "tests/host/vm_handoff_syscall_test_boot_backend.c",
+        "tests/host/vm_handoff_syscall_test_load_backend.c",
     }
 )
 
@@ -481,6 +484,26 @@ LONG_FUNCTION_MIGRATION = tuple(
             "tests/host/vm_bootstrap_test.c",
             "test_build_failure_clears_candidate",
         ),
+        (
+            "kernel/vm_handoff_syscall.c",
+            "handle_tty_mapping_command",
+        ),
+        (
+            "kernel/vm_handoff_syscall.c",
+            "handle_load_freeze_command",
+        ),
+        (
+            "kernel/vm_handoff_syscall.c",
+            "handle_load_abort_command",
+        ),
+        (
+            "kernel/vm_handoff_syscall.c",
+            "micros_vm_handoff_handle_captured_user_ecall",
+        ),
+        (
+            "tests/host/vm_handoff_syscall_test.c",
+            "reset_fixture",
+        ),
     }
 )
 STRUCTURAL_TEST_PATH = "tests/host/test_kernel_vm_handoff_source_layout.py"
@@ -511,20 +534,20 @@ VM_BOOTSTRAP_CASE_ORDER = (
 )
 
 VM_SYSCALL_CASE_ORDER = (
-    "test_load_begin_dispatches_post_handoff_command",
-    "test_load_begin_failures_preserve_state_and_output",
-    "test_post_handoff_phase_and_authority_are_enforced",
-    "test_load_freeze_failure_preserves_state_and_output",
-    "test_post_handoff_invariants_are_fatal",
-    "test_load_lifecycle_commit_and_exit_release",
-    "test_load_abort_before_freeze_removes_scratch",
-    "test_load_abort_before_freeze_without_scratch",
-    "test_load_abort_after_freeze_tears_down_child",
-    "test_successful_mapping",
-    "test_unauthorized_mapping_is_atomic",
-    "test_wrong_phase_is_atomic",
-    "test_notification_preflight_is_atomic",
-    "test_uncleared_console_event_is_rejected",
+    "vm_handoff_syscall_test_load_begin_dispatches",
+    "vm_handoff_syscall_test_load_begin_failures",
+    "vm_handoff_syscall_test_phase_and_authority",
+    "vm_handoff_syscall_test_freeze_failure",
+    "vm_handoff_syscall_test_invariants_are_fatal",
+    "vm_handoff_syscall_test_lifecycle_commit_and_exit",
+    "vm_handoff_syscall_test_abort_loading_scratch",
+    "vm_handoff_syscall_test_abort_loading_clear",
+    "vm_handoff_syscall_test_abort_frozen",
+    "vm_handoff_syscall_test_successful_mapping",
+    "vm_handoff_syscall_test_unauthorized_mapping",
+    "vm_handoff_syscall_test_wrong_phase",
+    "vm_handoff_syscall_test_notification_atomicity",
+    "vm_handoff_syscall_test_uncleared_console_event",
 )
 
 
