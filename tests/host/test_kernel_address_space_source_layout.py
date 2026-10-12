@@ -422,18 +422,6 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 
 LONG_FUNCTION_MIGRATION = (
     (
-        "kernel/user_address_space_test.c",
-        "post_handoff_operations_are_revoked",
-    ),
-    (
-        "kernel/user_address_space_test.c",
-        "stale_operations_are_rejected",
-    ),
-    (
-        "kernel/user_address_space_test.c",
-        "micros_user_address_space_runtime_run_self_test",
-    ),
-    (
         "kernel/user_execution_test.c",
         "micros_user_execution_test_pre_capture",
     ),
