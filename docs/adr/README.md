@@ -70,3 +70,4 @@ to make the project appear more consistent than it was.
 | [0052](0052-vfs-test-source-decomposition.md) | VFS test source decomposition | Accepted |
 | [0053](0053-kernel-address-space-source-decomposition.md) | Kernel address-space source decomposition | Accepted |
 | [0054](0054-frame-ownership-source-decomposition.md) | Frame-ownership source decomposition | Accepted |
+| [0055](0055-kernel-vm-handoff-source-decomposition.md) | Kernel VM-handoff source decomposition | Accepted |

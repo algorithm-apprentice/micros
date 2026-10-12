@@ -85,6 +85,18 @@ Target extraction retains the exact runtime scenario and pass record. Before
 review, the author runs the authoritative pull-request plan once; the
 reviewer inspects that evidence without routinely rerunning it.
 
+The kernel VM-handoff decomposition defined by ADR-0055 preserves
+`vm_bootstrap_test`, `vm-bootstrap`, `vm_handoff_syscall_test`,
+`vm-handoff-syscall`, `test-qemu-vm-handoff`,
+`test-qemu-address-space-handoff`, `test-qemu-vm-scratch-preemption`, and the
+existing VM role/fault panic workflows. It begins with one source-layout test,
+an exact 92-symbol owner migration map, and an exact 13-function migration
+allowlist. Extraction preserves command decode, fixed-object input-copy and
+output-publication timing, preflight/commit ordering, native case order,
+retained target scenario order, assembly hooks, markers, and timeouts. Before
+review, the author runs the authoritative pull-request plan once; the reviewer
+inspects rather than routinely reruns that evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

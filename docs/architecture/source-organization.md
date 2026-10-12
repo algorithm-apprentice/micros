@@ -245,3 +245,11 @@ freeze, release, native-model, and target-scenario boundaries are defined in
 The design keeps complete validation below every mutation owner, preserves
 the public ledger contract and evidence identities, and retains one explicit
 mutable context owner per split test family.
+
+The next correction is the kernel VM-handoff family. Its exact register ABI,
+portable boot/load/scratch/freeze/commit/release state, snapshot, privileged
+adapter, native-test, and retained target-scenario boundaries are defined in
+[Kernel VM-Handoff Source Organization](kernel-vm-handoff-source-organization.md).
+The design keeps portable state below privileged adapters, preserves exact
+transaction and failure ordering, and retains one mutable context owner per
+evidence family.
