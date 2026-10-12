@@ -5,6 +5,8 @@
 
 #include "servers/pm/pm_core.h"
 
+#define MICROS_PM_INITIALIZATION_MAGIC UINT64_C(0x4d4943524f53504d)
+
 void pm_common_zero_bytes(void *value, size_t size);
 bool pm_common_bytes_are_zero(const uint8_t *bytes, size_t size);
 uint64_t pm_common_read_u64_le(const uint8_t *bytes);

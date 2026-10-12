@@ -176,7 +176,9 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[2] not in {"micros_pm_decode_request", "micros_pm_build_result"}
+    if migration[2] not in {
+        "micros_pm_decode_request", "micros_pm_build_result", "micros_pm_table_validate",
+    }
 )
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
@@ -197,7 +199,10 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ("kernel/pm_service_test.c", "micros_pm_service_test_handle_trap"),
     (GENERATOR_PATH, "render_fixture"),
 )
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
+    if migration[1] != "micros_pm_table_validate"
+)
 
 
 def all_sources() -> tuple[str, ...]:
