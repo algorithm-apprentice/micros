@@ -317,7 +317,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
 
 FILE_SCOPE_OBJECT_OWNERS = {
     "tests/host/vm_core_test_fixture.c": (
-        r"static\s+struct\s+vm_core_test_context\s+test_context\b",
+        r"static\s+struct\s+vm_core_test_context\s+test_context\s*(?:=|;)",
     ),
     "tests/qemu/vm_server_fixture.c": (
         r"volatile\s+struct\s+micros_bootstrap_service_config\s+"
@@ -325,10 +325,11 @@ FILE_SCOPE_OBJECT_OWNERS = {
         r"_Alignas\(MICROS_VM_BOOT_INFO_ALIGNMENT\)\s+"
         r"__attribute__\(\(section\(\s*\),\s*used\)\)\s+"
         r"struct\s+micros_vm_boot_info\s+micros_vm_boot_info\b",
-        r"static\s+struct\s+vm_server_context\s+service_context\b",
+        r"static\s+struct\s+vm_server_context\s+service_context\s*(?:=|;)",
     ),
     "kernel/vm_scratch_preemption_test_fixture.c": (
-        r"static\s+struct\s+vm_scratch_preemption_test_context\s+test_context\b",
+        r"static\s+struct\s+vm_scratch_preemption_test_context\s+"
+        r"test_context\s*(?:=|;)",
         r"static\s+const\s+struct\s+micros_bootstrap_expected_service\s+"
         r"expected_services\b",
         r"static\s+const\s+struct\s+micros_privilege_profile\s+profiles\b",
@@ -549,6 +550,21 @@ def c_declaration_text(text: str) -> str:
     return "".join(output)
 
 
+def require_single_object_declaration(declaration: str) -> None:
+    depth = 0
+    for char in declaration:
+        if char in "({[":
+            depth += 1
+        elif char in ")}]":
+            depth -= 1
+            if depth < 0:
+                raise AssertionError("unbalanced object declaration")
+        elif char == "," and depth == 0:
+            raise AssertionError("multiple objects in one file-scope declaration")
+    if depth != 0:
+        raise AssertionError("unbalanced object declaration")
+
+
 def file_scope_objects(text: str) -> tuple[str, ...]:
     lexical = c_declaration_text(text)
     objects = []
@@ -602,6 +618,7 @@ def file_scope_objects(text: str) -> tuple[str, ...]:
                 )
             ):
                 continue
+            require_single_object_declaration(declaration)
             objects.append(declaration)
     if depth != 0 or lexical[start:].strip():
         raise AssertionError("unterminated file-scope declaration")
@@ -922,6 +939,20 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                         (root / "nested.h").read_text(encoding="utf-8")
                     )),
                 )
+
+    def test_file_scope_scan_rejects_multiple_objects_in_one_declaration(self) -> None:
+        for declaration in (
+            "static struct vm_server_context service_context, hidden;",
+            "static struct vm_server_context service_context = {0}, hidden = {0};",
+            "static struct vm_server_context service_context[2], hidden[2];",
+        ):
+            with self.subTest(declaration=declaration):
+                with self.assertRaisesRegex(AssertionError, "multiple objects"):
+                    file_scope_objects(declaration)
+        scalar_pattern = FILE_SCOPE_OBJECT_OWNERS["tests/qemu/vm_server_fixture.c"][-1]
+        self.assertIsNone(re.match(
+            scalar_pattern, "static struct vm_server_context service_context[2];",
+        ))
 
     def test_current_mutable_state_owners_are_exact(self) -> None:
         sources = all_source_set_paths()
