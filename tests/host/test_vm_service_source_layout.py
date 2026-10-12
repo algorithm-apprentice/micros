@@ -214,7 +214,11 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
 )
 
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    migration
+    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
+    if migration[2] not in {*IMAGE_FINAL_OWNERS, *TEST_FINAL_OWNERS}
+)
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("servers/vm/vm_core.c", "vm_core_validate_state"),
@@ -233,7 +237,16 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     (GENERATOR_PATH, "render_fixture"),
 )
 
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    migration
+    for migration in INITIAL_LONG_FUNCTION_MIGRATION
+    if migration not in {
+        ("servers/vm/vm_image.c", "micros_vm_elf_plan"),
+        ("lib/vm/vm_boot_validate.c", "micros_vm_boot_validate"),
+        ("tests/host/vm_core_test.c", "initialize_boot_info"),
+        ("tests/host/vm_core_test.c", "test_load_lifecycle"),
+    }
+)
 
 VM_CORE_CASE_ORDER = (
     "test_record_abi",
@@ -551,11 +564,12 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
     def test_current_mutable_state_owners_are_exact(self) -> None:
         sources = all_source_set_paths()
         expected = {
-            "boot_info": ["tests/host/vm_core_test.c"],
-            "state": ["tests/host/vm_core_test.c"],
-            "executable": ["tests/host/vm_core_test.c"],
-            "request": ["tests/host/vm_core_test.c"],
-            "scratch_page": ["tests/host/vm_core_test.c"],
+            "test_context": ["tests/host/vm_core_test_fixture.c"],
+            "boot_info": [],
+            "state": [],
+            "executable": [],
+            "request": [],
+            "scratch_page": [],
             "vm_state": ["tests/qemu/vm_server.c"],
             "test_phase": [
                 "kernel/vm_scratch_preemption_test.c",
