@@ -78,6 +78,7 @@ bool pm_test_complete_exit(
 );
 
 bool test_runtime_gate_and_spawn(void);
+bool test_protocol_contract(void);
 bool test_reverse_rollback_and_identity(void);
 bool test_generation_and_pid_exhaustion(void);
 bool test_failed_init_is_terminal(void);
