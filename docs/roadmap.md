@@ -242,10 +242,13 @@ are merged. The ADR-0053 design and implementation are also merged, applying
 the exact
 [kernel address-space source-organization contract](architecture/kernel-address-space-source-organization.md).
 ADR-0054 defines the current correction: apply the exact
-[frame-ownership source-organization contract](architecture/frame-ownership-source-organization.md)
-before later VM and PM coordination adds transitions around the typed ledger.
-Kernel VM handoff, kernel PM control, VM service, and PM service corrections
-remain sequential successors before the cross-service coordinator.
+[frame-ownership source-organization contract](architecture/frame-ownership-source-organization.md).
+That design and implementation are merged. ADR-0055 defines the current
+correction: apply the exact
+[kernel VM-handoff source-organization contract](architecture/kernel-vm-handoff-source-organization.md)
+before later PM and VM coordination extends operation 12 and its lifecycle
+evidence. Kernel PM control, VM service, and PM service corrections remain
+sequential successors before the cross-service coordinator.
 
 ## v0.1 completion goal
 
