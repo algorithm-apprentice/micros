@@ -307,6 +307,7 @@ LONG_FUNCTION_MIGRATION = tuple(
     for migration in INITIAL_LONG_FUNCTION_MIGRATION
     if (
         migration[0] != "kernel/frame_ownership.c"
+        and migration[0] != "tests/host/frame_ownership_test.c"
         and not migration[0].startswith("tests/host/frame_allocator_")
     )
 )
@@ -844,6 +845,8 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
             for path in (
                 *SOURCE_SETS["MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES"],
                 *SOURCE_SETS["MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES"],
+                "tests/host/frame_allocator_test_internal.h",
+                "tests/host/frame_ownership_test_internal.h",
             )
             if (REPOSITORY_ROOT / path).is_file()
         )
