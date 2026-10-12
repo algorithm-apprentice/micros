@@ -247,12 +247,15 @@ That design and implementation are merged. ADR-0055 defined the following
 correction: apply the exact
 [kernel VM-handoff source-organization contract](architecture/kernel-vm-handoff-source-organization.md)
 before later PM and VM coordination extends operation 12 and its lifecycle
-evidence. That design and implementation are merged. ADR-0056 defines the
-current correction: apply the exact
+evidence. That design and implementation are merged. ADR-0056 defined the
+following correction: apply the exact
 [kernel PM-control source-organization contract](architecture/kernel-pm-control-source-organization.md)
 before the cross-service coordinator extends operation 13 and its lifecycle
-evidence. VM service and PM service corrections remain sequential successors
-before that coordinator.
+evidence. That design and implementation are merged. ADR-0057 defines the
+current correction: apply the exact
+[VM service source-organization contract](architecture/vm-service-source-organization.md)
+before the coordinator extends VM loading and release behavior. The PM
+service correction remains the sequential successor before that coordinator.
 
 ## v0.1 completion goal
 

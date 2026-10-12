@@ -110,6 +110,20 @@ family, the PM-service marker, and its timeout. Before review, the author runs
 one authoritative pull-request plan, and reviewers inspect rather than
 routinely rerun that evidence.
 
+The VM service decomposition defined by ADR-0057 preserves `vm_bootstrap_test`,
+`vm-bootstrap`, `spawn_abi_test`, `spawn-abi`, `vm_core_test`, `vm-core`, the
+real `micros_vm_server` ELF, `test-qemu-vm-handoff`,
+`test-qemu-pm-service`, `test-qemu-vm-scratch-preemption`, the retained TTY,
+RAMFS, and VFS integrations, and both VM self-fault workflows. It begins with
+one fail-closed source-layout test, an exact 23-function owner migration map,
+and an exact 11-function C/Python migration allowlist. Extraction preserves
+boot-object import, deterministic frame selection, ELF/stack planning,
+scratch/freeze/abort/commit/exit ordering, native case order, service phase
+order, generated fixture bytes and symbols, scratch trap/report stages,
+markers, and timeouts. Before review, the author runs one authoritative
+pull-request plan; reviewers inspect rather than routinely rerun that
+evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

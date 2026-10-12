@@ -262,3 +262,12 @@ The design keeps validation below lifecycle transitions, portable state below
 privileged adapters, activation separate from rollbackable preparation, and
 one authoritative mutable owner for target state and each native fixture
 family.
+
+The next correction is the VM service family. Its exact boot validation,
+binary planning, portable state validation, frame selection, load/exit,
+service-adapter, host-evidence, scratch-preemption, and fixture-generator
+boundaries are defined in
+[VM Service Source Organization](vm-service-source-organization.md). The
+design keeps validation below lifecycle mutation, frame selection separate
+from ELF/stack policy, one mutable context per evidence family, and common
+service startup separate from scenario-specific protocols.
