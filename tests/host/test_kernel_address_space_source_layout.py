@@ -321,18 +321,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
     ),
 )
 
-SYMBOL_OWNER_MIGRATION = (
-    (
-        "kernel/user_execution_test.c",
-        "kernel/user_execution_test_trap.c",
-        "micros_user_execution_test_pre_capture",
-    ),
-    (
-        "kernel/user_execution_test.c",
-        "kernel/user_execution_test_trap.c",
-        "micros_user_execution_handle_test_trap",
-    ),
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     (
@@ -420,24 +409,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/user_execution_test.c",
-        "micros_user_execution_test_pre_capture",
-    ),
-    (
-        "kernel/user_execution_test.c",
-        "micros_user_execution_handle_test_trap",
-    ),
-    (
-        "kernel/user_execution_test.c",
-        "micros_user_execution_test_finish",
-    ),
-    (
-        "kernel/user_execution_test.c",
-        "micros_user_execution_runtime_run_self_test",
-    ),
-)
+LONG_FUNCTION_MIGRATION = ()
 
 SCRATCH_OWNER = "kernel/user_address_space_runtime.c"
 ACCEPTED_SCRATCH_OWNERS = (
