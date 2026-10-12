@@ -4,7 +4,9 @@ import ast
 import hashlib
 from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from tools import validation_plan
 from tests.host.test_frame_ownership_source_layout import (
@@ -14,6 +16,7 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_if_blocks,
     static_definition_paths,
 )
+from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -90,6 +93,13 @@ STABLE_HEADER_HASHES = {
     "kernel/vm_scratch_preemption_test_fixture.h":
         "d30f8be9e3a36721f7182f31f700f82fac9ffb945526381df446dc554b9bc02f",
 }
+
+DECLARATION_ONLY_HEADERS = (
+    *PRIVATE_HEADERS,
+    *STABLE_HEADER_HASHES,
+    "include/micros/runtime.h",
+    "include/micros/vm.h",
+)
 
 VM_SERVICE_PATH_CLASSIFICATION_EQUIVALENTS = (
     (
@@ -179,6 +189,155 @@ TEST_FINAL_OWNERS = {
         "tests/host/vm_core_validation_test.c",
 }
 
+PRIVATE_FUNCTION_OWNERS = {
+    "servers/vm/vm_core.c": (
+        "vm_core_zero_bytes", "vm_core_copy_bytes", "vm_core_bytes_are_zero",
+        "vm_core_bytes_equal", "vm_core_ranges_overlap",
+        "vm_core_endpoint_is_canonical", "vm_core_process_is_canonical",
+        "vm_core_user_permissions_are_canonical", "vm_core_stack_plan_equal",
+        "vm_core_initial_frame_is_free", "vm_core_load_page_digest",
+    ),
+    "servers/vm/vm_frames.c": (
+        "vm_core_physical_to_frame_index", "vm_core_frame_index_to_physical",
+        "vm_core_record_is_zero", "vm_core_record_contains_physical",
+        "vm_core_physical_is_in_record_other_than", "vm_core_select_lowest_frames",
+        "vm_core_selected_frames_match",
+    ),
+    "servers/vm/vm_validation.c": ("vm_core_validate_state",),
+    "servers/vm/vm_image.c": (
+        "vm_image_read_u16_le", "vm_image_read_u32_le", "vm_image_read_u64_le",
+        "vm_image_write_u64_le", "vm_image_zero_bytes", "vm_image_copy_bytes",
+        "vm_image_bytes_are_zero", "vm_image_add_u64", "vm_image_ranges_overlap",
+        "vm_image_address_ranges_overlap",
+    ),
+}
+
+TARGET_FUNCTION_OWNERS = {
+    "tests/qemu/vm_server.c": ("micros_service_main",),
+    "tests/qemu/vm_server_fixture.c": (
+        "vm_server_context_get", "vm_server_clear_bytes",
+        "vm_server_bytes_are_zero", "vm_server_write_u32_le",
+        "vm_server_read_u32_le", "vm_server_read_u64_le",
+        "vm_server_find_service", "vm_server_validate_configuration",
+    ),
+    "tests/qemu/vm_server_handoff.c": (
+        "vm_server_send_ready", "vm_server_complete_handoff",
+    ),
+    "tests/qemu/vm_server_probe.c": ("vm_server_serve_probe",),
+    "tests/qemu/vm_server_tty.c": (
+        "vm_server_notification_is_canonical", "vm_server_map_tty_uart",
+    ),
+    "tests/qemu/vm_server_scratch.c": (
+        "vm_server_find_free_frame", "vm_server_run_scratch_preemption",
+    ),
+    "tests/qemu/vm_server_pm.c": (
+        "pm_test_write_u64_le", "pm_test_collect_free_frames",
+        "pm_test_digest_byte", "pm_test_digest_u32", "pm_test_digest_u64",
+        "pm_test_page_plan_digest", "pm_test_write_child_page",
+        "pm_test_initialize_pages", "pm_test_build_freeze_plan",
+        "pm_test_load_child", "pm_test_commit_child", "pm_test_release_child",
+        "pm_test_serve_request",
+    ),
+    "kernel/vm_scratch_preemption_test.c": (
+        "micros_vm_scratch_preemption_test_launch",
+        "micros_vm_scratch_preemption_test_before_user_timer",
+        "micros_vm_scratch_preemption_test_after_user_timer",
+        "micros_vm_scratch_preemption_test_after_syscall_return",
+    ),
+    "kernel/vm_scratch_preemption_test_fixture.c": (
+        "vm_scratch_test_context_get",
+    ),
+    "kernel/vm_scratch_preemption_test_runtime.c": (
+        "vm_scratch_test_failure", "vm_scratch_test_read_satp",
+        "vm_scratch_test_expected_satp", "vm_scratch_test_current_is",
+        "vm_scratch_test_runtime_is_valid",
+    ),
+    "kernel/vm_scratch_preemption_test_report.c": (
+        "acquire_report_authority", "report_authority_is_complete",
+        "report_fault_context_is_valid", "report_load_record_is_valid",
+        "report_removed_mapping_is_valid", "vm_scratch_test_report_success",
+    ),
+    "kernel/vm_scratch_preemption_test_trap.c": (
+        "peer_hold_trap_matches", "vm_hook_trap_matches", "peer_run_trap_matches",
+        "hold_peer", "arm_vm_preemption",
+        "micros_vm_scratch_preemption_test_handle_trap",
+    ),
+}
+
+PERMITTED_OWNER_DEPENDENCIES = {
+    "lib/vm/vm_boot_validate.c": (),
+    "servers/vm/vm_image.c": (),
+    "servers/vm/vm_stack.c": ("servers/vm/vm_image.c",),
+    "servers/vm/vm_elf.c": ("servers/vm/vm_image.c",),
+    "servers/vm/vm_core.c": ("lib/vm/vm_boot_validate.c",),
+    "servers/vm/vm_frames.c": ("servers/vm/vm_core.c",),
+    "servers/vm/vm_validation.c": (
+        "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
+        "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
+    ),
+    "servers/vm/vm_load.c": (
+        "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
+        "servers/vm/vm_validation.c",
+        "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
+    ),
+    "servers/vm/vm_exit.c": (
+        "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
+        "servers/vm/vm_validation.c",
+    ),
+    "tests/qemu/vm_server.c": (
+        "tests/qemu/vm_server_fixture.c", "tests/qemu/vm_server_handoff.c",
+        "tests/qemu/vm_server_probe.c", "tests/qemu/vm_server_tty.c",
+        "tests/qemu/vm_server_scratch.c", "tests/qemu/vm_server_pm.c",
+        "lib/vm/vm_boot_validate.c", "servers/vm/vm_image.c",
+        "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
+        "servers/vm/vm_validation.c", "servers/vm/vm_load.c",
+        "servers/vm/vm_exit.c", "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
+    ),
+    "tests/qemu/vm_server_fixture.c": (),
+    "tests/qemu/vm_server_handoff.c": ("tests/qemu/vm_server_fixture.c",),
+    "tests/qemu/vm_server_probe.c": ("tests/qemu/vm_server_fixture.c",),
+    "tests/qemu/vm_server_tty.c": ("tests/qemu/vm_server_fixture.c",),
+    "tests/qemu/vm_server_scratch.c": ("tests/qemu/vm_server_fixture.c",),
+    "tests/qemu/vm_server_pm.c": ("tests/qemu/vm_server_fixture.c",),
+    "kernel/vm_scratch_preemption_test.c": (
+        "kernel/vm_scratch_preemption_test_fixture.c",
+        "kernel/vm_scratch_preemption_test_runtime.c",
+    ),
+    "kernel/vm_scratch_preemption_test_fixture.c": (),
+    "kernel/vm_scratch_preemption_test_runtime.c": (),
+    "kernel/vm_scratch_preemption_test_report.c": (
+        "kernel/vm_scratch_preemption_test_runtime.c",
+    ),
+    "kernel/vm_scratch_preemption_test_trap.c": (
+        "kernel/vm_scratch_preemption_test_fixture.c",
+        "kernel/vm_scratch_preemption_test_runtime.c",
+        "kernel/vm_scratch_preemption_test_report.c",
+    ),
+}
+
+FILE_SCOPE_OBJECT_OWNERS = {
+    "tests/host/vm_core_test_fixture.c": (
+        r"static\s+struct\s+vm_core_test_context\s+test_context\b",
+    ),
+    "tests/qemu/vm_server_fixture.c": (
+        r"volatile\s+struct\s+micros_bootstrap_service_config\s+"
+        r"micros_bootstrap_service_config\b",
+        r"_Alignas\(MICROS_VM_BOOT_INFO_ALIGNMENT\)\s+"
+        r"__attribute__\(\(section\(\s*\),\s*used\)\)\s+"
+        r"struct\s+micros_vm_boot_info\s+micros_vm_boot_info\b",
+        r"static\s+struct\s+vm_server_context\s+service_context\b",
+    ),
+    "kernel/vm_scratch_preemption_test_fixture.c": (
+        r"static\s+struct\s+vm_scratch_preemption_test_context\s+test_context\b",
+        r"static\s+const\s+struct\s+micros_bootstrap_expected_service\s+"
+        r"expected_services\b",
+        r"static\s+const\s+struct\s+micros_privilege_profile\s+profiles\b",
+        r"static\s+const\s+struct\s+micros_bootstrap_scheduler_policy\s+policies\b",
+        r"const\s+struct\s+micros_bootstrap_runtime_config\s+"
+        r"vm_scratch_test_runtime_config\b",
+    ),
+}
+
 FINAL_SYMBOL_OWNERS = {
     **CORE_FINAL_OWNERS,
     **IMAGE_FINAL_OWNERS,
@@ -214,11 +373,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
 )
 
-SYMBOL_OWNER_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[2] == "micros_vm_scratch_preemption_test_handle_trap"
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("servers/vm/vm_core.c", "vm_core_validate_state"),
@@ -237,14 +392,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     (GENERATOR_PATH, "render_fixture"),
 )
 
-LONG_FUNCTION_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration[0] in {
-        "kernel/vm_scratch_preemption_test.c",
-        GENERATOR_PATH,
-    }
-)
+LONG_FUNCTION_MIGRATION = ()
 
 VM_CORE_CASE_ORDER = (
     "test_record_abi",
@@ -338,12 +486,17 @@ def resolve_local_include(source: Path, include: str) -> Path | None:
 
 
 def compiled_source_header_closure() -> tuple[str, ...]:
-    pending = [
-        (REPOSITORY_ROOT / relative).resolve()
+    observed = {
+        dependency
         for relative in accepted_family_paths()
-        if (REPOSITORY_ROOT / relative).suffix in {".c", ".h"}
-        and (REPOSITORY_ROOT / relative).is_file()
-    ]
+        if Path(relative).suffix in {".c", ".h"}
+        for dependency in local_include_closure(relative)
+    }
+    return tuple(sorted(observed))
+
+
+def local_include_closure(relative: str) -> tuple[str, ...]:
+    pending = [(REPOSITORY_ROOT / relative).resolve()]
     observed = set()
     include_pattern = re.compile(
         r'(?m)^\s*#\s*include\s*"([^"]+)"'
@@ -367,6 +520,92 @@ def compiled_source_header_closure() -> tuple[str, ...]:
     return tuple(
         sorted(str(path.relative_to(REPOSITORY_ROOT)) for path in observed)
     )
+
+
+def owner_dependency_text(relative: str) -> str:
+    selected = []
+    for dependency in local_include_closure(relative):
+        text = (REPOSITORY_ROOT / dependency).read_text(encoding="utf-8")
+        if dependency in DECLARATION_ONLY_HEADERS and dependency != relative:
+            text = macro_definition_text(text)
+        lexical = c_lexical_text(text)
+        selected.append(re.sub(
+            r"\b(?:struct|union|enum)\s+[A-Za-z_][A-Za-z0-9_]*",
+            "", lexical,
+        ))
+    return "\n".join(selected)
+
+
+def c_declaration_text(text: str) -> str:
+    lines = c_lexical_text(text).splitlines(keepends=True)
+    output = []
+    continuation = False
+    for line in lines:
+        if continuation or line.lstrip().startswith("#"):
+            output.append("".join("\n" if char == "\n" else " " for char in line))
+            continuation = line.rstrip().endswith("\\")
+        else:
+            output.append(line)
+    return "".join(output)
+
+
+def file_scope_objects(text: str) -> tuple[str, ...]:
+    lexical = c_declaration_text(text)
+    objects = []
+    depth = 0
+    start = 0
+    function_body = False
+    for index, char in enumerate(lexical):
+        if char == "{":
+            if depth == 0:
+                prefix = lexical[start:index].strip()
+                function_body = prefix.endswith(")") and "=" not in prefix
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth < 0:
+                raise AssertionError("unexpected closing brace")
+            if depth == 0 and function_body:
+                start = index + 1
+                function_body = False
+        elif char == ";" and depth == 0:
+            declaration = lexical[start:index + 1].strip()
+            start = index + 1
+            if (
+                not declaration
+                or declaration.startswith("typedef ")
+                or declaration.startswith("_Static_assert")
+                or (
+                    declaration.startswith("extern ")
+                    and "=" not in declaration and "{" not in declaration
+                )
+                or re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_\s*]*"
+                    r"\b[A-Za-z_][A-Za-z0-9_]*\s*\([^;]*\)\s*;",
+                    declaration, re.DOTALL,
+                )
+                or (
+                    "{" in declaration
+                    and re.fullmatch(
+                        r"(?:struct|union|enum)(?:\s+[A-Za-z_][A-Za-z0-9_]*)?",
+                        declaration.split("{", 1)[0].strip(),
+                    )
+                    and declaration.rsplit("}", 1)[-1].strip() == ";"
+                )
+                or re.fullmatch(
+                    r"(?:struct|union|enum)\s+[A-Za-z_][A-Za-z0-9_]*\s*;",
+                    declaration,
+                )
+                or re.fullmatch(
+                    r"MICROS_(?:TRAP|HART_TRAP|USER_CONTEXT)_ASSERT_OFFSET"
+                    r"\([^;]*\)\s*;", declaration, re.DOTALL,
+                )
+            ):
+                continue
+            objects.append(declaration)
+    if depth != 0 or lexical[start:].strip():
+        raise AssertionError("unterminated file-scope declaration")
+    return tuple(objects)
 
 
 def python_function_definitions(text: str) -> dict[str, int]:
@@ -491,9 +730,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
 
     def test_private_headers_are_declarations_only(self) -> None:
         definitions = {}
+        objects = {}
         static = {}
 
-        for relative in PRIVATE_HEADERS:
+        for relative in DECLARATION_ONLY_HEADERS:
             path = REPOSITORY_ROOT / relative
             if not path.is_file():
                 continue
@@ -501,6 +741,9 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             selected = c_function_definitions(text)
             if selected:
                 definitions[relative] = selected
+            object_definitions = file_scope_objects(text)
+            if object_definitions:
+                objects[relative] = object_definitions
             static_matches = re.findall(
                 r"(?m)^\s*(?:_Alignas\([^\n]+\)\s*)?"
                 r"static\b[^\n;]*(?:;|\{)",
@@ -509,6 +752,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             if static_matches:
                 static[relative] = tuple(static_matches)
         self.assertEqual({}, definitions)
+        self.assertEqual({}, objects)
         self.assertEqual({}, static)
 
     def test_sources_do_not_include_source_or_test_private_headers(self) -> None:
@@ -518,17 +762,17 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         source_violations = []
         private_violations = []
 
-        for relative in (*all_source_set_paths(), *PRIVATE_HEADERS):
+        for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             if not path.is_file():
                 continue
             text = path.read_text(encoding="utf-8")
             if source_include.search(text):
                 source_violations.append(relative)
-            if relative in production_sources():
-                for private in TEST_PRIVATE_HEADERS:
-                    if Path(private).name in text:
-                        private_violations.append((relative, private))
+        for relative in production_sources():
+            for dependency in local_include_closure(relative):
+                if dependency in TEST_PRIVATE_HEADERS:
+                    private_violations.append((relative, dependency))
         self.assertEqual([], source_violations)
         self.assertEqual([], private_violations)
 
@@ -541,6 +785,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(23, len(INITIAL_SYMBOL_OWNER_MIGRATION))
         self.assertEqual(len(migration), len(SYMBOL_OWNER_MIGRATION))
         self.assertTrue(migration <= initial)
+        self.assertEqual((), SYMBOL_OWNER_MIGRATION)
         for current, final, symbol in migration:
             self.assertEqual(FINAL_SYMBOL_OWNERS[symbol], final)
             expected_current[symbol] = current
@@ -559,31 +804,139 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     definitions.get(symbol, []),
                 )
 
+    def test_private_and_target_helper_owners_are_exact(self) -> None:
+        definitions = {}
+        for relative in compiled_source_header_closure():
+            for name in c_function_definitions(
+                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            ):
+                definitions.setdefault(name, []).append(relative)
+        for relative, names in {
+            **PRIVATE_FUNCTION_OWNERS, **TARGET_FUNCTION_OWNERS,
+        }.items():
+            for name in names:
+                with self.subTest(symbol=name):
+                    self.assertEqual([relative], definitions.get(name, []))
+        for relative, expected in TARGET_FUNCTION_OWNERS.items():
+            with self.subTest(owner=relative):
+                self.assertEqual(
+                    expected,
+                    tuple(c_function_definitions(
+                        (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                    )),
+                )
+
+    def test_dependency_direction_is_exact_across_local_includes(self) -> None:
+        symbol_owners = {}
+        for relative in PERMITTED_OWNER_DEPENDENCIES:
+            for name in c_function_definitions(
+                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            ):
+                symbol_owners.setdefault(name, set()).add(relative)
+        for relative, dependencies in PERMITTED_OWNER_DEPENDENCIES.items():
+            text = owner_dependency_text(relative)
+            allowed = {relative, *dependencies}
+            violations = {
+                name: sorted(owners - allowed)
+                for name, owners in symbol_owners.items()
+                if owners - allowed
+                and re.search(rf"\b{re.escape(name)}\b", text)
+            }
+            with self.subTest(owner=relative):
+                self.assertEqual({}, violations)
+
+    def test_file_scope_state_and_abi_objects_have_one_owner(self) -> None:
+        observed = {}
+        for relative in compiled_source_header_closure():
+            objects = file_scope_objects(
+                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            )
+            if objects:
+                observed[relative] = objects
+        self.assertEqual(set(FILE_SCOPE_OBJECT_OWNERS), set(observed))
+        for relative, patterns in FILE_SCOPE_OBJECT_OWNERS.items():
+            objects = observed[relative]
+            with self.subTest(owner=relative):
+                self.assertEqual(len(patterns), len(objects))
+                for pattern in patterns:
+                    self.assertEqual(
+                        1, sum(bool(re.match(pattern, item)) for item in objects),
+                        pattern,
+                    )
+
+    def test_file_scope_scan_rejects_hidden_header_definitions(self) -> None:
+        interface = (
+            "#define FLAGS \\\n"
+            "    (FIRST | SECOND)\n"
+            "struct context { int member; };\n"
+            "typedef struct context context_t;\n"
+            "extern struct context external;\n"
+            "void helper(struct context *context);\n"
+        )
+        self.assertEqual((), file_scope_objects(interface))
+        for definition in (
+            "int hidden;",
+            "extern int hidden = 1;",
+            "struct context hidden = {0};",
+            "struct inline_context { int member; } hidden;",
+            "context_t hidden;",
+            "int (*hidden)(void);",
+        ):
+            with self.subTest(definition=definition):
+                self.assertEqual(
+                    1, len(file_scope_objects(interface + definition)),
+                )
+        self.assertEqual(
+            (),
+            file_scope_objects(
+                "static int helper(void) { static int local; return local; }\n"
+            ),
+        )
+
+    def test_recursive_include_scan_keeps_hidden_dependency_references(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "owner.c").write_text(
+                '#include "forward.h"\nvoid owner(void) {}\n',
+                encoding="utf-8",
+            )
+            (root / "forward.h").write_text(
+                '#include "nested.h"\n', encoding="utf-8",
+            )
+            (root / "nested.h").write_text(
+                "static inline void hidden(void) {\n"
+                "    micros_vm_load_aborted(0);\n}\n"
+                "static struct vm_server_context duplicate = {0};\n",
+                encoding="utf-8",
+            )
+            with patch(f"{__name__}.REPOSITORY_ROOT", root):
+                self.assertEqual(
+                    ("forward.h", "nested.h", "owner.c"),
+                    local_include_closure("owner.c"),
+                )
+                self.assertIn(
+                    "micros_vm_load_aborted", owner_dependency_text("owner.c"),
+                )
+                self.assertEqual(
+                    1, len(file_scope_objects(
+                        (root / "nested.h").read_text(encoding="utf-8")
+                    )),
+                )
+
     def test_current_mutable_state_owners_are_exact(self) -> None:
         sources = all_source_set_paths()
         expected = {
-            "test_context": ["tests/host/vm_core_test_fixture.c"],
             "boot_info": [],
             "state": [],
             "executable": [],
             "request": [],
             "scratch_page": [],
             "vm_state": [],
-            "test_phase": [
-                "kernel/vm_scratch_preemption_test.c",
-            ],
-            "timer_observed": [
-                "kernel/vm_scratch_preemption_test.c",
-            ],
-            "scratch_physical_address": [
-                "kernel/vm_scratch_preemption_test.c",
-            ],
-            "scratch_load_token": [
-                "kernel/vm_scratch_preemption_test.c",
-            ],
-            "scratch_process": [
-                "kernel/vm_scratch_preemption_test.c",
-            ],
+            "test_phase": [],
+            "timer_observed": [],
+            "scratch_physical_address": [],
+            "scratch_load_token": [],
+            "scratch_process": [],
         }
 
         for name, owners in expected.items():
@@ -594,7 +947,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             )
         contexts = []
         pattern = re.compile(
-            r"\bstatic\s+struct\s+(vm_core_test_context|vm_server_context)\b"
+            r"\bstatic\s+(?:(?:const|volatile)\s+)*struct\s+"
+            r"(vm_core_test_context|vm_server_context|"
+            r"vm_scratch_preemption_test_context|micros_vm_state|"
+            r"micros_vm_boot_info)\b"
         )
         for relative in compiled_source_header_closure():
             text = c_lexical_text(
@@ -606,6 +962,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             )
         self.assertEqual(
             [
+                (
+                    "kernel/vm_scratch_preemption_test_fixture.c",
+                    "vm_scratch_preemption_test_context",
+                ),
                 ("tests/host/vm_core_test_fixture.c", "vm_core_test_context"),
                 ("tests/qemu/vm_server_fixture.c", "vm_server_context"),
             ],
@@ -729,6 +1089,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(11, len(INITIAL_LONG_FUNCTION_MIGRATION))
         self.assertEqual(len(migration), len(LONG_FUNCTION_MIGRATION))
         self.assertTrue(migration <= initial)
+        self.assertEqual((), LONG_FUNCTION_MIGRATION)
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             for name, line_count in c_function_definitions(

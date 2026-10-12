@@ -43,7 +43,7 @@ def _render_address(name, symbol):
     )
 
 
-def render_fixture(launcher_image, vm_image, pm_image, driver_image):
+def _validated_descriptors(launcher_image, vm_image, pm_image, driver_image):
     launcher = generate_bootstrap_fixture._validated_descriptor(
         launcher_image,
         "launcher",
@@ -73,17 +73,21 @@ def render_fixture(launcher_image, vm_image, pm_image, driver_image):
         )
     _require_symbols(vm, VM_SYMBOLS, "VM")
     _require_symbols(pm, PEER_SYMBOLS, "PM peer")
+    return launcher, vm, pm, driver
 
+
+def _resident_limits(launcher, vm, pm, driver):
     launcher_limit = launcher["page_count"] + 2
     vm_limit = vm["page_count"] + 1
     pm_limit = pm["page_count"] + 1
     driver_limit = driver["page_count"] + 1
-    total_limit = launcher_limit + vm_limit + pm_limit + driver_limit
-    output = [
-        '#include "kernel/vm_scratch_preemption_test_fixture.h"',
-        "",
-    ]
-    for descriptor in (launcher, vm, pm, driver):
+    return launcher_limit, vm_limit, pm_limit, driver_limit
+
+
+def _render_images(descriptors):
+    launcher, vm, pm, driver = descriptors
+    output = []
+    for descriptor in descriptors:
         output.extend(
             generate_bootstrap_fixture._render_segment_bytes(descriptor)
         )
@@ -99,92 +103,98 @@ def render_fixture(launcher_image, vm_image, pm_image, driver_image):
     output.extend(generate_bootstrap_fixture._render_image(vm, 102))
     output.extend(generate_bootstrap_fixture._render_image(pm, 103))
     output.extend(generate_bootstrap_fixture._render_image(driver, 104))
-    output.extend(
-        (
-            "};",
-            "",
-            "const struct micros_bootstrap_manifest",
-            "    micros_vm_scratch_preemption_test_manifest = {",
-            "        .header = {",
-            "            .magic = MICROS_BOOTSTRAP_MANIFEST_MAGIC,",
-            "            .version = MICROS_BOOTSTRAP_MANIFEST_VERSION,",
-            "            .header_size = MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE,",
-            "            .entry_size = MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE,",
-            "            .entry_capacity = MICROS_BOOTSTRAP_SERVICE_CAPACITY,",
-            "            .entry_count = "
-            "MICROS_VM_SCRATCH_PREEMPTION_SERVICE_COUNT,",
-            f"            .total_user_page_limit = {total_limit},",
-            "            .manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE,",
-            "        },",
-            "        .entries = {",
-            "            {",
-            "                .service_id = "
-            "MICROS_VM_SCRATCH_PREEMPTION_DRIVER_SERVICE_ID,",
-            "                .image_id = 104,",
-            "                .process_slot = 3,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = "
-            "MICROS_VM_SCRATCH_PREEMPTION_DRIVER_PROFILE_ID,",
-            '                .service_name = "vm-scratch-driver",',
-            '                .profile_name = "VM_SCRATCH_DRIVER",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_VM_SCRATCH_PREEMPTION_PM_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
-            f"                .user_page_limit = {driver_limit},",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_VM_SCRATCH_PREEMPTION_LAUNCHER_SERVICE_ID,",
-            "                .image_id = 101,",
-            "                .process_slot = 0,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = "
-            "MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,",
-            '                .service_name = "bootstrap-launcher",',
-            '                .profile_name = "BOOTSTRAP_LAUNCHER",',
-            f"                .user_page_limit = {launcher_limit},",
-            "                .role_flags = "
-            "MICROS_BOOTSTRAP_ROLE_CONTROLLER,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_VM_SCRATCH_PREEMPTION_PM_SERVICE_ID,",
-            "                .image_id = 103,",
-            "                .process_slot = 2,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_PM,",
-            '                .service_name = "pm",',
-            '                .profile_name = "PM",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_VM_SCRATCH_PREEMPTION_VM_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
-            f"                .user_page_limit = {pm_limit},",
-            "                .role_flags = MICROS_BOOTSTRAP_ROLE_PM,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_VM_SCRATCH_PREEMPTION_VM_SERVICE_ID,",
-            "                .image_id = 102,",
-            "                .process_slot = 1,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_VM,",
-            '                .service_name = "vm",',
-            '                .profile_name = "VM",',
-            "                .prerequisites = UINT64_C(1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
-            f"                .user_page_limit = {vm_limit},",
-            "                .role_flags = MICROS_BOOTSTRAP_ROLE_VM,",
-            "            },",
-            "        },",
-            "    };",
-            "",
-        )
-    )
+    output.extend(("};", ""))
+    return output
+
+
+def _render_manifest(limits):
+    launcher_limit, vm_limit, pm_limit, driver_limit = limits
+    total_limit = launcher_limit + vm_limit + pm_limit + driver_limit
+    return [
+        "const struct micros_bootstrap_manifest",
+        "    micros_vm_scratch_preemption_test_manifest = {",
+        "        .header = {",
+        "            .magic = MICROS_BOOTSTRAP_MANIFEST_MAGIC,",
+        "            .version = MICROS_BOOTSTRAP_MANIFEST_VERSION,",
+        "            .header_size = MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE,",
+        "            .entry_size = MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE,",
+        "            .entry_capacity = MICROS_BOOTSTRAP_SERVICE_CAPACITY,",
+        "            .entry_count = "
+        "MICROS_VM_SCRATCH_PREEMPTION_SERVICE_COUNT,",
+        f"            .total_user_page_limit = {total_limit},",
+        "            .manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE,",
+        "        },",
+        "        .entries = {",
+        "            {",
+        "                .service_id = "
+        "MICROS_VM_SCRATCH_PREEMPTION_DRIVER_SERVICE_ID,",
+        "                .image_id = 104,",
+        "                .process_slot = 3,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = "
+        "MICROS_VM_SCRATCH_PREEMPTION_DRIVER_PROFILE_ID,",
+        '                .service_name = "vm-scratch-driver",',
+        '                .profile_name = "VM_SCRATCH_DRIVER",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_VM_SCRATCH_PREEMPTION_PM_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
+        f"                .user_page_limit = {driver_limit},",
+        "            },",
+        "            {",
+        "                .service_id = "
+        "MICROS_VM_SCRATCH_PREEMPTION_LAUNCHER_SERVICE_ID,",
+        "                .image_id = 101,",
+        "                .process_slot = 0,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = "
+        "MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,",
+        '                .service_name = "bootstrap-launcher",',
+        '                .profile_name = "BOOTSTRAP_LAUNCHER",',
+        f"                .user_page_limit = {launcher_limit},",
+        "                .role_flags = "
+        "MICROS_BOOTSTRAP_ROLE_CONTROLLER,",
+        "            },",
+        "            {",
+        "                .service_id = "
+        "MICROS_VM_SCRATCH_PREEMPTION_PM_SERVICE_ID,",
+        "                .image_id = 103,",
+        "                .process_slot = 2,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_PM,",
+        '                .service_name = "pm",',
+        '                .profile_name = "PM",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_VM_SCRATCH_PREEMPTION_VM_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
+        f"                .user_page_limit = {pm_limit},",
+        "                .role_flags = MICROS_BOOTSTRAP_ROLE_PM,",
+        "            },",
+        "            {",
+        "                .service_id = "
+        "MICROS_VM_SCRATCH_PREEMPTION_VM_SERVICE_ID,",
+        "                .image_id = 102,",
+        "                .process_slot = 1,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_VM,",
+        '                .service_name = "vm",',
+        '                .profile_name = "VM",',
+        "                .prerequisites = UINT64_C(1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_VM_SCRATCH_PREEMPTION_READY_TIMEOUT,",
+        f"                .user_page_limit = {vm_limit},",
+        "                .role_flags = MICROS_BOOTSTRAP_ROLE_VM,",
+        "            },",
+        "        },",
+        "    };",
+        "",
+    ]
+
+
+def _render_addresses(vm, pm):
     addresses = (
         (
             "micros_vm_scratch_preemption_peer_hold_trap_address",
@@ -223,9 +233,25 @@ def render_fixture(launcher_image, vm_image, pm_image, driver_image):
             vm["symbols"][VM_SYMBOLS[4]],
         ),
     )
+    output = []
     for name, symbol in addresses:
         output.extend(_render_address(name, symbol).rstrip().splitlines())
         output.append("")
+    return output
+
+
+def render_fixture(launcher_image, vm_image, pm_image, driver_image):
+    descriptors = _validated_descriptors(
+        launcher_image, vm_image, pm_image, driver_image
+    )
+    limits = _resident_limits(*descriptors)
+    output = [
+        '#include "kernel/vm_scratch_preemption_test_fixture.h"',
+        "",
+    ]
+    output.extend(_render_images(descriptors))
+    output.extend(_render_manifest(limits))
+    output.extend(_render_addresses(descriptors[1], descriptors[2]))
     return "\n".join(output)
 
 
