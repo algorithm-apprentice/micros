@@ -166,10 +166,52 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/user_address_space_core_test_suites.h",
         ),
     ),
+    (
+        "kernel/frame_ownership.c",
+        (
+            "kernel/frame_ownership_validation.c",
+            "kernel/frame_ownership_bootstrap.c",
+            "kernel/frame_ownership_handoff.c",
+            "kernel/frame_ownership_vm_claim.c",
+            "kernel/frame_ownership_vm_freeze.c",
+            "kernel/frame_ownership_vm_release.c",
+            "kernel/frame_ownership_internal.h",
+        ),
+    ),
+    (
+        "kernel/frame_ownership_test.c",
+        (
+            "kernel/frame_ownership_test_fixture.c",
+            "kernel/frame_ownership_test_lifecycle.c",
+            "kernel/frame_ownership_test_handoff.c",
+            "kernel/frame_ownership_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/frame_ownership_test.c",
+        (
+            "tests/host/frame_ownership_test_fixture.c",
+            "tests/host/frame_ownership_test_bootstrap.c",
+            "tests/host/frame_ownership_test_validation.c",
+            "tests/host/frame_ownership_test_handoff.c",
+            "tests/host/frame_ownership_test_model.c",
+            "tests/host/frame_ownership_test_vm.c",
+            "tests/host/frame_ownership_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/frame_allocator_test.c",
+        (
+            "tests/host/frame_allocator_test_cases.c",
+            "tests/host/frame_allocator_model_test.c",
+            "tests/host/frame_allocator_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_kernel_address_space_source_layout.py",
+    "tests/host/test_frame_ownership_source_layout.py",
 )
 
 

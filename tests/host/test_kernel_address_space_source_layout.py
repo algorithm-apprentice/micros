@@ -1033,9 +1033,19 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
     def test_validation_plan_inherits_exact_path_classification(
         self,
     ) -> None:
+        baselines = {
+            baseline
+            for baseline, _ in PATH_CLASSIFICATION_EQUIVALENTS
+        }
+        observed = tuple(
+            item
+            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            if item[0] in baselines
+        )
+
         self.assertEqual(
             PATH_CLASSIFICATION_EQUIVALENTS,
-            validation_plan.PATH_CLASSIFICATION_EQUIVALENTS,
+            observed,
         )
 
         for baseline, equivalents in PATH_CLASSIFICATION_EQUIVALENTS:
