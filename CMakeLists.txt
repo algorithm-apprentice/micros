@@ -437,6 +437,77 @@ set(
     kernel/frame_ownership_test_handoff.c
 )
 
+set(
+    MICROS_VM_HANDOFF_CORE_SOURCES
+    kernel/vm_handoff_core.c
+    kernel/vm_handoff_abi.c
+    kernel/vm_handoff_boot.c
+    kernel/vm_handoff_load.c
+    kernel/vm_handoff_scratch.c
+    kernel/vm_handoff_freeze.c
+    kernel/vm_handoff_commit.c
+    kernel/vm_handoff_release.c
+)
+
+set(
+    MICROS_VM_HANDOFF_SYSCALL_SOURCES
+    kernel/vm_handoff_syscall.c
+    kernel/vm_handoff_syscall_runtime.c
+    kernel/vm_handoff_syscall_memory.c
+    kernel/vm_handoff_syscall_boot.c
+    kernel/vm_handoff_syscall_load.c
+    kernel/vm_handoff_syscall_scratch.c
+    kernel/vm_handoff_syscall_freeze.c
+    kernel/vm_handoff_syscall_release.c
+)
+
+set(
+    MICROS_VM_SNAPSHOT_SOURCES
+    kernel/vm_snapshot.c
+    kernel/vm_snapshot_validation.c
+)
+
+set(
+    MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES
+    tests/host/vm_handoff_test.c
+    tests/host/vm_handoff_test_fixture.c
+    tests/host/vm_handoff_abi_test.c
+    tests/host/vm_handoff_boot_test.c
+    tests/host/vm_handoff_load_test.c
+)
+
+set(
+    MICROS_VM_BOOTSTRAP_HOST_TEST_SOURCES
+    tests/host/vm_bootstrap_test.c
+    tests/host/vm_bootstrap_test_fixture.c
+    tests/host/vm_bootstrap_abi_test.c
+    tests/host/vm_bootstrap_build_test.c
+)
+
+set(
+    MICROS_VM_HANDOFF_SYSCALL_HOST_TEST_SOURCES
+    tests/host/vm_handoff_syscall_test.c
+    tests/host/vm_handoff_syscall_test_fixture.c
+    tests/host/vm_handoff_syscall_test_boot.c
+    tests/host/vm_handoff_syscall_test_load.c
+    tests/host/vm_handoff_syscall_test_runtime_backend.c
+    tests/host/vm_handoff_syscall_test_boot_backend.c
+    tests/host/vm_handoff_syscall_test_load_backend.c
+)
+
+set(
+    MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES
+    kernel/address_space_handoff_test.c
+    kernel/address_space_handoff_test_fixture.c
+    kernel/address_space_handoff_test_setup.c
+    kernel/address_space_handoff_test_snapshot.c
+    kernel/address_space_handoff_test_handoff.c
+    kernel/address_space_handoff_test_runtime.c
+    kernel/address_space_handoff_test_syscall.c
+    kernel/address_space_handoff_test_tty.c
+    kernel/address_space_handoff_test_trap.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -553,10 +624,10 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
-        kernel/vm_handoff_core.c
+        ${MICROS_VM_HANDOFF_CORE_SOURCES}
         lib/vm/vm_boot_validate.c
-        tests/host/vm_bootstrap_test.c
-        tests/host/vm_handoff_test.c
+        ${MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES}
+        ${MICROS_VM_BOOTSTRAP_HOST_TEST_SOURCES}
     )
     add_executable(
         pm_test
@@ -569,7 +640,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/pm_control_runtime_core.c
         kernel/pm_control_syscall_core.c
         kernel/scheduler_core.c
-        kernel/vm_handoff_core.c
+        ${MICROS_VM_HANDOFF_CORE_SOURCES}
         servers/pm/pm_core.c
         tests/host/pm_control_test.c
         tests/host/pm_control_execution_test.c
@@ -676,9 +747,9 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         vm_handoff_syscall_test
         kernel/tty_handoff_core.c
-        kernel/vm_handoff_core.c
-        kernel/vm_handoff_syscall.c
-        tests/host/vm_handoff_syscall_test.c
+        ${MICROS_VM_HANDOFF_CORE_SOURCES}
+        ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
+        ${MICROS_VM_HANDOFF_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_interrupt_test
@@ -2653,10 +2724,10 @@ add_executable(
     ${MICROS_USER_ADDRESS_SPACE_SOURCES}
     ${MICROS_USER_EXECUTION_SOURCES}
     kernel/vm_bootstrap.c
-    kernel/vm_handoff_core.c
+    ${MICROS_VM_HANDOFF_CORE_SOURCES}
     kernel/vm_handoff_runtime.c
-    kernel/vm_handoff_syscall.c
-    kernel/vm_snapshot.c
+    ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
+    ${MICROS_VM_SNAPSHOT_SOURCES}
     lib/vm/vm_boot_validate.c
 )
 
@@ -4180,7 +4251,7 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
         micros
         PRIVATE
             arch/riscv64/address_space_handoff_test.S
-            kernel/address_space_handoff_test.c
+            ${MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES}
     )
 endif()
 

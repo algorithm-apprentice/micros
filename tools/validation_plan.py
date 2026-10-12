@@ -207,11 +207,90 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/frame_allocator_test_internal.h",
         ),
     ),
+    (
+        "kernel/vm_handoff_core.c",
+        (
+            "kernel/vm_handoff_abi.c",
+            "kernel/vm_handoff_boot.c",
+            "kernel/vm_handoff_load.c",
+            "kernel/vm_handoff_scratch.c",
+            "kernel/vm_handoff_freeze.c",
+            "kernel/vm_handoff_commit.c",
+            "kernel/vm_handoff_release.c",
+            "kernel/vm_handoff_internal.h",
+        ),
+    ),
+    (
+        "kernel/vm_handoff_syscall.c",
+        (
+            "kernel/vm_handoff_syscall_runtime.c",
+            "kernel/vm_handoff_syscall_memory.c",
+            "kernel/vm_handoff_syscall_boot.c",
+            "kernel/vm_handoff_syscall_load.c",
+            "kernel/vm_handoff_syscall_scratch.c",
+            "kernel/vm_handoff_syscall_freeze.c",
+            "kernel/vm_handoff_syscall_release.c",
+            "kernel/vm_handoff_syscall_internal.h",
+        ),
+    ),
+    (
+        "kernel/vm_snapshot.c",
+        (
+            "kernel/vm_snapshot_validation.c",
+            "kernel/vm_snapshot_internal.h",
+        ),
+    ),
+    (
+        "kernel/address_space_handoff_test.c",
+        (
+            "kernel/address_space_handoff_test_fixture.c",
+            "kernel/address_space_handoff_test_setup.c",
+            "kernel/address_space_handoff_test_snapshot.c",
+            "kernel/address_space_handoff_test_handoff.c",
+            "kernel/address_space_handoff_test_runtime.c",
+            "kernel/address_space_handoff_test_syscall.c",
+            "kernel/address_space_handoff_test_tty.c",
+            "kernel/address_space_handoff_test_trap.c",
+            "kernel/address_space_handoff_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/vm_handoff_syscall_test.c",
+        (
+            "tests/host/vm_handoff_syscall_test_fixture.c",
+            "tests/host/vm_handoff_syscall_test_boot.c",
+            "tests/host/vm_handoff_syscall_test_load.c",
+            "tests/host/vm_handoff_syscall_test_runtime_backend.c",
+            "tests/host/vm_handoff_syscall_test_boot_backend.c",
+            "tests/host/vm_handoff_syscall_test_load_backend.c",
+            "tests/host/vm_handoff_syscall_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/vm_handoff_test.c",
+        (
+            "tests/host/vm_handoff_test_fixture.c",
+            "tests/host/vm_handoff_abi_test.c",
+            "tests/host/vm_handoff_boot_test.c",
+            "tests/host/vm_handoff_load_test.c",
+            "tests/host/vm_handoff_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/vm_bootstrap_test.c",
+        (
+            "tests/host/vm_bootstrap_test_fixture.c",
+            "tests/host/vm_bootstrap_abi_test.c",
+            "tests/host/vm_bootstrap_build_test.c",
+            "tests/host/vm_bootstrap_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_kernel_address_space_source_layout.py",
     "tests/host/test_frame_ownership_source_layout.py",
+    "tests/host/test_kernel_vm_handoff_source_layout.py",
 )
 
 
