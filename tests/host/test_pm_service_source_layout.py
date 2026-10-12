@@ -177,6 +177,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = tuple(
     migration for migration in INITIAL_SYMBOL_OWNER_MIGRATION
     if not migration[1].startswith("servers/pm/")
+    and migration[2] != "micros_spawn_stack_layout_plan"
     and migration[2] not in {
         "test_protocol_contract",
         "test_rollback_acknowledgment_identity",
@@ -212,6 +213,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 LONG_FUNCTION_MIGRATION = tuple(
     migration for migration in INITIAL_LONG_FUNCTION_MIGRATION
     if migration[1] not in {
+        "micros_spawn_request_decode",
         "micros_pm_table_validate", "test_protocol_contract",
         "test_rollback_acknowledgment_identity",
         "test_endpoint_lookup_and_failure_preservation",
