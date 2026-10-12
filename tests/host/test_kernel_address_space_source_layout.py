@@ -321,7 +321,98 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
     ),
 )
 
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = (
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mutation.c",
+        "micros_user_address_space_allocate_page",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mutation.c",
+        "micros_user_address_space_release_page",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mutation.c",
+        "micros_user_address_space_test_fail_after_allocations",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mapping.c",
+        "micros_user_address_space_lookup",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mapping.c",
+        "micros_user_address_space_translate",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_mapping.c",
+        "micros_user_address_space_inventory",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_handoff.c",
+        "micros_user_address_space_prepare_wired_handoff",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_handoff.c",
+        "micros_user_address_space_complete_wired_handoff",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_activation.c",
+        "micros_user_address_space_activate",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_activation.c",
+        "micros_user_address_space_activate_kernel",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "kernel/user_address_space_validation.c",
+        "micros_user_address_space_validate",
+    ),
+    (
+        "kernel/user_execution.c",
+        "kernel/user_execution_validation.c",
+        "micros_user_execution_validate_return",
+    ),
+    (
+        "kernel/user_execution.c",
+        "kernel/user_execution_validation.c",
+        "micros_user_execution_validate_context",
+    ),
+    (
+        "kernel/user_execution.c",
+        "kernel/user_execution_trap.c",
+        "micros_user_execution_capture_trap",
+    ),
+    (
+        "kernel/user_execution.c",
+        "kernel/user_execution_trap.c",
+        "micros_user_execution_store_context",
+    ),
+    (
+        "kernel/user_execution.c",
+        "kernel/user_execution_trap.c",
+        "micros_user_execution_install_return_frame",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "kernel/user_execution_test_trap.c",
+        "micros_user_execution_test_pre_capture",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "kernel/user_execution_test_trap.c",
+        "micros_user_execution_handle_test_trap",
+    ),
+)
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     (
@@ -409,7 +500,75 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ),
 )
 
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = (
+    (
+        "kernel/address_space.c",
+        "tree_and_table_ownership_are_valid",
+    ),
+    ("kernel/user_address_space.c", "validate_locked"),
+    ("kernel/user_address_space.c", "visit_user_mappings_locked"),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_allocate_page",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_release_page",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_prepare_tty_uart_mapping",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_prepare_vm_scratch_mapping",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_prepare_vm_scratch_removal",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_prepare_vm_freeze",
+    ),
+    (
+        "kernel/user_address_space.c",
+        "micros_user_address_space_prepare_vm_teardown",
+    ),
+    (
+        "kernel/user_execution.c",
+        "micros_user_execution_preflight_post_handoff",
+    ),
+    ("kernel/user_execution.c", "micros_user_execution_prepare"),
+    (
+        "kernel/user_address_space_test.c",
+        "post_handoff_operations_are_revoked",
+    ),
+    (
+        "kernel/user_address_space_test.c",
+        "stale_operations_are_rejected",
+    ),
+    (
+        "kernel/user_address_space_test.c",
+        "micros_user_address_space_runtime_run_self_test",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "micros_user_execution_test_pre_capture",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "micros_user_execution_handle_test_trap",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "micros_user_execution_test_finish",
+    ),
+    (
+        "kernel/user_execution_test.c",
+        "micros_user_execution_runtime_run_self_test",
+    ),
+)
 
 SCRATCH_OWNER = "kernel/user_address_space.c"
 ACCEPTED_SCRATCH_OWNERS = (
