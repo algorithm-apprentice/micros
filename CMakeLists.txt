@@ -552,6 +552,63 @@ set(
 )
 
 set(
+    MICROS_PM_CORE_SOURCES
+    servers/pm/pm_common.c
+    servers/pm/pm_core.c
+    servers/pm/pm_protocol.c
+    servers/pm/pm_validation.c
+    servers/pm/pm_spawn.c
+    servers/pm/pm_rollback.c
+    servers/pm/pm_exit.c
+    servers/pm/pm_wait.c
+)
+
+set(
+    MICROS_SPAWN_REQUEST_SOURCES
+    lib/spawn/spawn_request.c
+    lib/spawn/spawn_stack_layout.c
+)
+
+set(
+    MICROS_PM_SERVICE_SOURCES
+    servers/pm/pm_service.c
+    servers/pm/pm_service_fixture.c
+    servers/pm/pm_service_bootstrap.c
+    servers/pm/pm_service_requests.c
+    servers/pm/pm_service_self_test.c
+    servers/pm/pm_service_scratch.c
+)
+
+set(
+    MICROS_PM_CORE_HOST_TEST_SOURCES
+    tests/host/pm_test.c
+    tests/host/pm_test_fixture.c
+    tests/host/pm_protocol_test.c
+    tests/host/pm_spawn_test.c
+    tests/host/pm_validation_test.c
+    tests/host/pm_exit_wait_test.c
+    tests/host/pm_model_test.c
+    tests/host/pm_model_reference.c
+    tests/host/pm_model_operations.c
+)
+
+set(
+    MICROS_SPAWN_ABI_HOST_TEST_SOURCES
+    tests/host/spawn_abi_test.c
+    tests/host/spawn_abi_test_fixture.c
+    tests/host/spawn_request_test.c
+    tests/host/application_stack_test.c
+    tests/host/vm_elf_test.c
+)
+
+set(
+    MICROS_PM_SERVICE_QEMU_TEST_SOURCES
+    kernel/pm_service_test.c
+    kernel/pm_service_test_fixture.c
+    kernel/pm_service_test_report.c
+)
+
+set(
     MICROS_VM_BOOT_VALIDATION_SOURCES
     lib/vm/vm_boot_validate.c
 )
@@ -733,16 +790,16 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_PM_CONTROL_CORE_SOURCES}
         kernel/scheduler_core.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
-        servers/pm/pm_core.c
+        ${MICROS_PM_CORE_SOURCES}
         ${MICROS_PM_CONTROL_HOST_TEST_SOURCES}
         ${MICROS_PM_CONTROL_EXECUTION_HOST_TEST_SOURCES}
-        tests/host/pm_test.c
+        ${MICROS_PM_CORE_HOST_TEST_SOURCES}
     )
     add_executable(
         spawn_abi_test
-        lib/spawn/spawn_request.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
-        tests/host/spawn_abi_test.c
+        ${MICROS_SPAWN_ABI_HOST_TEST_SOURCES}
     )
     add_executable(
         vm_core_test
@@ -750,7 +807,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
-        lib/spawn/spawn_request.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
         ${MICROS_VM_CORE_HOST_TEST_SOURCES}
@@ -777,7 +834,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(ramfs_model_test ramfs_seed_image)
     add_executable(
         vfs_test
-        lib/spawn/spawn_request.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VFS_PORTABLE_SOURCES}
         ${MICROS_VFS_TEST_FIXTURE_SOURCES}
         ${MICROS_VFS_CORE_TEST_SOURCES}
@@ -785,14 +842,14 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vfs_model_test
-        lib/spawn/spawn_request.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VFS_PORTABLE_SOURCES}
         ${MICROS_VFS_TEST_FIXTURE_SOURCES}
         ${MICROS_VFS_MODEL_TEST_SOURCES}
     )
     add_executable(
         vfs_service_test
-        lib/spawn/spawn_request.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VFS_PORTABLE_SOURCES}
         servers/vfs/vfs_service_core.c
         ${MICROS_VFS_TEST_FIXTURE_SOURCES}
@@ -2259,7 +2316,7 @@ if(
         micros_add_bootstrap_user(
             micros_vfs_service
             micros-vfs-service
-            lib/spawn/spawn_request.c
+            ${MICROS_SPAWN_REQUEST_SOURCES}
             ${MICROS_VFS_PORTABLE_SOURCES}
             servers/vfs/vfs_service_core.c
             servers/vfs/vfs_service.c
@@ -2309,7 +2366,7 @@ if(
         micros_add_bootstrap_user(
             micros_vm_server
             micros-vm-server
-            lib/spawn/spawn_request.c
+            ${MICROS_SPAWN_REQUEST_SOURCES}
             ${MICROS_VM_BOOT_VALIDATION_SOURCES}
             ${MICROS_VM_IMAGE_SOURCES}
             ${MICROS_VM_CORE_SOURCES}
@@ -2398,8 +2455,8 @@ if(
                 micros_pm_service
                 micros-pm-service
                 servers/pm/pm_control.c
-                servers/pm/pm_core.c
-                servers/pm/pm_service.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
                 tests/qemu/vm_scratch_preemption_peer.S
             )
             target_compile_definitions(
@@ -2453,8 +2510,8 @@ if(
                 micros_pm_service
                 micros-pm-service
                 servers/pm/pm_control.c
-                servers/pm/pm_core.c
-                servers/pm/pm_service.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
                 tests/qemu/pm_service_report.S
             )
             target_compile_definitions(
@@ -2507,8 +2564,8 @@ if(
                 micros_pm_service
                 micros-pm-service
                 servers/pm/pm_control.c
-                servers/pm/pm_core.c
-                servers/pm/pm_service.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_tty_service_vfs
@@ -2559,8 +2616,8 @@ if(
                 micros_pm_service
                 micros-pm-service
                 servers/pm/pm_control.c
-                servers/pm/pm_core.c
-                servers/pm/pm_service.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_vfs_service_probe
@@ -2617,8 +2674,8 @@ if(
                 micros_pm_service
                 micros-pm-service
                 servers/pm/pm_control.c
-                servers/pm/pm_core.c
-                servers/pm/pm_service.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_ramfs_service_vfs
@@ -2948,7 +3005,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
-            kernel/pm_service_test.c
+            ${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}
     )
 endif()
 

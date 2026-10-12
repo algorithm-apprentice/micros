@@ -380,6 +380,67 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "kernel/vm_scratch_preemption_test_internal.h",
         ),
     ),
+    (
+        "servers/pm/pm_core.c",
+        (
+            "servers/pm/pm_common.c",
+            "servers/pm/pm_protocol.c",
+            "servers/pm/pm_validation.c",
+            "servers/pm/pm_spawn.c",
+            "servers/pm/pm_rollback.c",
+            "servers/pm/pm_exit.c",
+            "servers/pm/pm_wait.c",
+            "servers/pm/pm_internal.h",
+        ),
+    ),
+    (
+        "servers/pm/pm_service.c",
+        (
+            "servers/pm/pm_service_fixture.c",
+            "servers/pm/pm_service_bootstrap.c",
+            "servers/pm/pm_service_requests.c",
+            "servers/pm/pm_service_self_test.c",
+            "servers/pm/pm_service_scratch.c",
+            "servers/pm/pm_service_internal.h",
+        ),
+    ),
+    (
+        "lib/spawn/spawn_request.c",
+        ("lib/spawn/spawn_stack_layout.c",),
+    ),
+    (
+        "tests/host/pm_test.c",
+        (
+            "tests/host/pm_test_fixture.c",
+            "tests/host/pm_protocol_test.c",
+            "tests/host/pm_spawn_test.c",
+            "tests/host/pm_validation_test.c",
+            "tests/host/pm_exit_wait_test.c",
+            "tests/host/pm_model_test.c",
+            "tests/host/pm_model_reference.c",
+            "tests/host/pm_model_operations.c",
+            "tests/host/pm_test_internal.h",
+            "tests/host/pm_model_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/spawn_abi_test.c",
+        (
+            "tests/host/spawn_abi_test_fixture.c",
+            "tests/host/spawn_request_test.c",
+            "tests/host/application_stack_test.c",
+            "tests/host/vm_elf_test.c",
+            "tests/host/spawn_abi_test_internal.h",
+        ),
+    ),
+    (
+        "kernel/pm_service_test.c",
+        (
+            "kernel/pm_service_test_fixture.c",
+            "kernel/pm_service_test_report.c",
+            "kernel/pm_service_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
@@ -388,6 +449,7 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_kernel_vm_handoff_source_layout.py",
     "tests/host/test_kernel_pm_control_source_layout.py",
     "tests/host/test_vm_service_source_layout.py",
+    "tests/host/test_pm_service_source_layout.py",
 )
 
 
