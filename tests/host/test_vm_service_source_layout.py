@@ -217,11 +217,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = tuple(
     migration
     for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[2] not in {
-        *IMAGE_FINAL_OWNERS,
-        *TEST_FINAL_OWNERS,
-        "micros_vm_state_validate",
-    }
+    if migration[2] == "micros_vm_scratch_preemption_test_handle_trap"
 )
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
@@ -244,12 +240,10 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 LONG_FUNCTION_MIGRATION = tuple(
     migration
     for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration not in {
-        ("servers/vm/vm_core.c", "vm_core_validate_state"),
-        ("servers/vm/vm_image.c", "micros_vm_elf_plan"),
-        ("lib/vm/vm_boot_validate.c", "micros_vm_boot_validate"),
-        ("tests/host/vm_core_test.c", "initialize_boot_info"),
-        ("tests/host/vm_core_test.c", "test_load_lifecycle"),
+    if migration[0] in {
+        "kernel/vm_scratch_preemption_test.c",
+        "tests/qemu/vm_server.c",
+        GENERATOR_PATH,
     }
 )
 
