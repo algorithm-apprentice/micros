@@ -411,6 +411,11 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if migration[1] not in {
         "kernel/vm_handoff_abi.c",
         "kernel/vm_handoff_boot.c",
+        "kernel/vm_handoff_load.c",
+        "kernel/vm_handoff_scratch.c",
+        "kernel/vm_handoff_freeze.c",
+        "kernel/vm_handoff_commit.c",
+        "kernel/vm_handoff_release.c",
     }
 )
 

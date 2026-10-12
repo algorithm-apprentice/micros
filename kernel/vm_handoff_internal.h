@@ -76,6 +76,10 @@ bool micros_vm_handoff_loading_record_can_append(
     const struct micros_vm_kernel_mapping_entry *entry
 );
 
+bool micros_vm_handoff_record_entries_are_frozen_shape(
+    const struct micros_vm_kernel_mapping_record *record
+);
+
 bool micros_vm_handoff_frozen_record_is_valid(
     const struct micros_vm_kernel_mapping_record *record
 );
