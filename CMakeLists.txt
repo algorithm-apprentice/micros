@@ -508,6 +508,49 @@ set(
     kernel/address_space_handoff_test_trap.c
 )
 
+set(
+    MICROS_PM_CONTROL_CORE_SOURCES
+    kernel/pm_control_core.c
+    kernel/pm_control_abi.c
+    kernel/pm_control_validation.c
+    kernel/pm_control_reservation.c
+    kernel/pm_control_execution.c
+    kernel/pm_control_activation.c
+    kernel/pm_control_exit.c
+    kernel/pm_control_runtime_core.c
+    kernel/pm_control_syscall_core.c
+)
+
+set(
+    MICROS_PM_CONTROL_TARGET_SOURCES
+    kernel/pm_control_runtime.c
+    kernel/pm_control_syscall.c
+    kernel/pm_control_syscall_runtime.c
+    kernel/pm_control_syscall_reservation.c
+    kernel/pm_control_syscall_execution.c
+    kernel/pm_control_syscall_activation.c
+    kernel/pm_control_syscall_exit.c
+)
+
+set(
+    MICROS_PM_CONTROL_HOST_TEST_SOURCES
+    tests/host/pm_control_test.c
+    tests/host/pm_control_test_fixture.c
+    tests/host/pm_control_abi_test.c
+    tests/host/pm_control_syscall_test.c
+    tests/host/pm_control_reservation_test.c
+    tests/host/pm_control_runtime_test.c
+)
+
+set(
+    MICROS_PM_CONTROL_EXECUTION_HOST_TEST_SOURCES
+    tests/host/pm_control_execution_test.c
+    tests/host/pm_control_execution_test_fixture.c
+    tests/host/pm_control_execution_prepare_test.c
+    tests/host/pm_control_execution_token_test.c
+    tests/host/pm_control_execution_exit_test.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -636,14 +679,12 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/endpoint.c
         kernel/ipc.c
         kernel/kernel_objects.c
-        kernel/pm_control_core.c
-        kernel/pm_control_runtime_core.c
-        kernel/pm_control_syscall_core.c
+        ${MICROS_PM_CONTROL_CORE_SOURCES}
         kernel/scheduler_core.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         servers/pm/pm_core.c
-        tests/host/pm_control_test.c
-        tests/host/pm_control_execution_test.c
+        ${MICROS_PM_CONTROL_HOST_TEST_SOURCES}
+        ${MICROS_PM_CONTROL_EXECUTION_HOST_TEST_SOURCES}
         tests/host/pm_test.c
     )
     add_executable(
@@ -2703,11 +2744,8 @@ add_executable(
     kernel/panic.c
     kernel/plic.c
     kernel/plic_core.c
-    kernel/pm_control_core.c
-    kernel/pm_control_runtime.c
-    kernel/pm_control_runtime_core.c
-    kernel/pm_control_syscall.c
-    kernel/pm_control_syscall_core.c
+    ${MICROS_PM_CONTROL_CORE_SOURCES}
+    ${MICROS_PM_CONTROL_TARGET_SOURCES}
     kernel/sv39.c
     kernel/timer.c
     kernel/trap.c
