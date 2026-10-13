@@ -33,6 +33,15 @@ uint64_t pm_common_read_u64_le(const uint8_t *bytes)
     return value;
 }
 
+void pm_common_write_u64_le(uint8_t *bytes, uint64_t value)
+{
+    size_t index;
+
+    for (index = 0; index < 8; ++index) {
+        bytes[index] = (uint8_t)(value >> (index * 8));
+    }
+}
+
 bool pm_common_handle_is_none(struct micros_pm_process_handle handle)
 {
     return (

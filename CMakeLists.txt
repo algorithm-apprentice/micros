@@ -678,6 +678,7 @@ set(
 set(
     MICROS_PM_COORDINATOR_SOURCES
     servers/pm/pm_coordinator.c
+    servers/pm/pm_coordinator_protocol.c
 )
 
 set(
@@ -713,6 +714,7 @@ set(
     MICROS_PM_COORDINATOR_HOST_TEST_SOURCES
     tests/host/pm_coordinator_test.c
     tests/host/pm_coordinator_configuration_test.c
+    tests/host/pm_coordinator_protocol_test.c
 )
 
 set(

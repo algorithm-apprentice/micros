@@ -20,15 +20,6 @@ static void write_u32_le(uint8_t *bytes, uint32_t value)
     bytes[3] = (uint8_t)(value >> 24);
 }
 
-static void write_u64_le(uint8_t *bytes, uint64_t value)
-{
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        bytes[index] = (uint8_t)(value >> (index * 8));
-    }
-}
-
 static bool result_is_defined(enum micros_pm_result result)
 {
     return (
@@ -178,7 +169,7 @@ enum micros_pm_model_error micros_pm_build_result(
     write_u32_le(&built.payload[0], MICROS_PM_PROTOCOL_VERSION);
     write_u32_le(&built.payload[4], request_type);
     write_u32_le(&built.payload[8], (uint32_t)(int32_t)result);
-    write_u64_le(&built.payload[16], child_pid);
+    pm_common_write_u64_le(&built.payload[16], child_pid);
     write_u32_le(&built.payload[24], (uint32_t)exit_kind);
     write_u32_le(&built.payload[28], (uint32_t)exit_code);
     *message = built;

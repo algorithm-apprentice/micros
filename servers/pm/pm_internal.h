@@ -30,6 +30,7 @@ struct pm_exit_begin_plan {
 void pm_common_zero_bytes(void *value, size_t size);
 bool pm_common_bytes_are_zero(const uint8_t *bytes, size_t size);
 uint64_t pm_common_read_u64_le(const uint8_t *bytes);
+void pm_common_write_u64_le(uint8_t *bytes, uint64_t value);
 bool pm_common_handle_is_none(struct micros_pm_process_handle handle);
 bool pm_common_handles_equal(
     struct micros_pm_process_handle left,

@@ -494,8 +494,12 @@ The Accepted coordinator extension adds the current
 header and native-suite header are declarations-only. `pm_coordinator_test`
 expands both new sets and the existing PM core once, increasing the core's
 consumer count from six to seven without changing the five service branches.
-These configuration cases add one fast `pm-coordinator` CTest to both native
-aggregates. New coordinator paths inherit their PM core/native baselines;
+Configuration and VFS/VM codec cases share one fast `pm-coordinator` CTest
+in both native aggregates. The codec borrows common endpoint and byte
+primitives without lifecycle transitions; the 64-bit writer is shared with
+the unchanged application-result codec rather than duplicated. The new
+shared VM IPC header is separate from the stable kernel-operation header.
+New coordinator paths inherit their PM core/native baselines;
 unknown ownership still escalates fail-closed. The remaining transaction and
 model owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
 

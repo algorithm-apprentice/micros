@@ -10,6 +10,9 @@ int main(void)
         {"coordinator embedded bindings", test_coordinator_embedded_bindings},
         {"coordinator binding failures", test_coordinator_binding_failures},
         {"coordinator table failures", test_coordinator_table_failures},
+        {"coordinator VFS control contract", test_coordinator_vfs_control_contract},
+        {"coordinator VM control contract", test_coordinator_vm_control_contract},
+        {"coordinator control rejections", test_coordinator_control_rejections},
     };
     size_t index;
 

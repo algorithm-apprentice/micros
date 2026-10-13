@@ -40,6 +40,7 @@ SOURCE_SETS = {
     ),
     "MICROS_PM_COORDINATOR_SOURCES": (
         "servers/pm/pm_coordinator.c",
+        "servers/pm/pm_coordinator_protocol.c",
     ),
     "MICROS_SPAWN_REQUEST_SOURCES": (
         "lib/spawn/spawn_request.c",
@@ -67,6 +68,7 @@ SOURCE_SETS = {
     "MICROS_PM_COORDINATOR_HOST_TEST_SOURCES": (
         "tests/host/pm_coordinator_test.c",
         "tests/host/pm_coordinator_configuration_test.c",
+        "tests/host/pm_coordinator_protocol_test.c",
     ),
     "MICROS_SPAWN_ABI_HOST_TEST_SOURCES": (
         "tests/host/spawn_abi_test.c",
@@ -93,6 +95,8 @@ PRIVATE_HEADERS = (
     "tests/host/pm_coordinator_test_internal.h",
 )
 
+SHARED_PROTOCOL_HEADERS = ("include/micros/vm_service.h",)
+
 STABLE_HEADER_HASHES = {
     "include/micros/pm.h":
         "03d4c85565fa859046fcc48140331affc8da4ca453e7f6972d448287b037240c",
@@ -115,11 +119,16 @@ STABLE_HEADER_HASHES = {
 WRAPPER_PATH = "servers/pm/pm_control.c"
 WRAPPER_HASH = "3ab44cebd8f6c8783edc6ebeb7f46594e0303768150f2a28d654f3bceef1c7a6"
 DECLARATION_ONLY_HEADERS = (
-    *PRIVATE_HEADERS, *STABLE_HEADER_HASHES, "include/micros/runtime.h",
+    *PRIVATE_HEADERS, *SHARED_PROTOCOL_HEADERS, *STABLE_HEADER_HASHES,
+    "include/micros/runtime.h",
 )
 
 RETAINED_OWNER_GROUPS = {
     "servers/pm/pm_coordinator.c": ("micros_pm_coordinator_initialize",),
+    "servers/pm/pm_coordinator_protocol.c": (
+        "micros_pm_coordinator_build_vfs_control", "micros_pm_coordinator_build_vm_control",
+        "micros_pm_coordinator_decode_vfs_result", "micros_pm_coordinator_decode_vm_result",
+    ),
     "servers/pm/pm_core.c": (
         "micros_pm_table_initialize", "micros_pm_enable_runtime",
         "micros_pm_process_resolve", "micros_pm_find_running_by_endpoint",
@@ -131,9 +140,15 @@ RETAINED_OWNER_GROUPS = {
 
 HELPER_OWNER_GROUPS = {
     "servers/pm/pm_coordinator.c": ("coordinator_bindings_are_valid",),
+    "servers/pm/pm_coordinator_protocol.c": (
+        "endpoint_word_is_valid", "grant_pair_is_valid", "vfs_command_is_defined",
+        "vm_command_is_defined", "vfs_arguments_are_valid", "vm_arguments_are_valid",
+        "build_control_message", "outputs_are_zero", "decode_control_envelope",
+        "vfs_success_output_is_valid", "vm_success_output_is_valid",
+    ),
     "servers/pm/pm_common.c": tuple(
         "pm_common_" + name for name in (
-            "zero_bytes", "bytes_are_zero", "read_u64_le", "handle_is_none",
+            "zero_bytes", "bytes_are_zero", "read_u64_le", "write_u64_le", "handle_is_none",
             "handles_equal", "endpoint_is_concrete", "endpoint_is_published_elsewhere",
             "clear_record", "record_handle", "resolve_record", "resolve_spawning_record",
             "release_record", "clear_wait", "wait_matches_pid", "record_is_child_of",
@@ -141,7 +156,7 @@ HELPER_OWNER_GROUPS = {
         )
     ),
     "servers/pm/pm_protocol.c": (
-        "read_u32_le", "write_u32_le", "write_u64_le",
+        "read_u32_le", "write_u32_le",
         "result_is_defined", "exit_kind_is_defined",
     ),
     "servers/pm/pm_validation.c": (
@@ -226,6 +241,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "servers/pm/pm_protocol.c": (COMMON_OWNER,),
     VALIDATION_OWNER: (COMMON_OWNER,),
     "servers/pm/pm_coordinator.c": (COMMON_OWNER, VALIDATION_OWNER),
+    "servers/pm/pm_coordinator_protocol.c": (COMMON_OWNER,),
     "servers/pm/pm_spawn.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_rollback.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_wait.c": (COMMON_OWNER, VALIDATION_OWNER),
@@ -407,7 +423,7 @@ def all_sources() -> tuple[str, ...]:
 
 def accepted_family_paths() -> set[str]:
     return {
-        *all_sources(), *PRIVATE_HEADERS, *STABLE_HEADER_HASHES,
+        *all_sources(), *PRIVATE_HEADERS, *SHARED_PROTOCOL_HEADERS, *STABLE_HEADER_HASHES,
         WRAPPER_PATH, GENERATOR_PATH,
     }
 
@@ -425,7 +441,7 @@ def discovered_family_paths() -> set[str]:
         for path in REPOSITORY_ROOT.glob(pattern)
         if not path.name.startswith("pm_control_")
     } | {"include/micros/pm.h", "include/micros/spawn.h",
-         "tests/qemu/pm_service_protocol.h", GENERATOR_PATH}
+         *SHARED_PROTOCOL_HEADERS, "tests/qemu/pm_service_protocol.h", GENERATOR_PATH}
 
 
 def compiled_source_header_closure() -> tuple[str, ...]:
@@ -675,10 +691,15 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 *HELPER_OWNER_GROUPS["tests/host/spawn_abi_test_fixture.c"], *SPAWN_CASE_ORDER,
             ),
             "kernel/pm_service_test_internal.h": (),
-            "servers/pm/pm_coordinator.h": ("micros_pm_coordinator_initialize",),
+            "servers/pm/pm_coordinator.h": (
+                "micros_pm_coordinator_initialize",
+                *RETAINED_OWNER_GROUPS["servers/pm/pm_coordinator_protocol.c"],
+            ),
             "tests/host/pm_coordinator_test_internal.h": (
                 "test_coordinator_initialization", "test_coordinator_embedded_bindings",
                 "test_coordinator_binding_failures", "test_coordinator_table_failures",
+                "test_coordinator_vfs_control_contract", "test_coordinator_vm_control_contract",
+                "test_coordinator_control_rejections",
             ),
         }
         for private_header, expected in expected_declarations.items():
@@ -908,6 +929,15 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                         path,
                     )
         self.assertEqual(expected, inherited)
+        for header in SHARED_PROTOCOL_HEADERS:
+            self.assertTrue(validation_plan.path_matches(
+                header, validation_plan.SHARED_QEMU_PATHS
+            ))
+            self.assertTrue(validation_plan.requires_full_tier([header]))
+            self.assertEqual(
+                list(validation_plan.QEMU_WORKFLOWS),
+                validation_plan.affected_workflows([header]),
+            )
         self.assertIn(
             "tests/host/test_pm_service_source_layout.py",
             validation_plan.HOST_UNIT_ONLY_INPUTS,

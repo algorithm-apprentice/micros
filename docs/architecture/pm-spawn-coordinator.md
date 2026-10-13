@@ -71,11 +71,24 @@ rejected without changing either object.
 Binding input is captured before owned storage is cleared, including when
 the caller supplied the coordinator's own binding member.
 
-The constructor and four deterministic configuration cases are implemented
-as the initial `MICROS_PM_COORDINATOR_SOURCES` and
-`MICROS_PM_COORDINATOR_HOST_TEST_SOURCES` sets. The fast `pm-coordinator`
-CTest is included by both native aggregates. Forward transactions, peer
-adapters, and the separate mixed lifecycle model remain in progress.
+The constructor, four deterministic configuration cases, and byte-exact
+VFS/VM control codecs are implemented in `MICROS_PM_COORDINATOR_SOURCES`
+and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`. The fast `pm-coordinator`
+CTest is included by both native aggregates. Forward transactions, runtime
+peer adapters, and the separate mixed lifecycle model remain in progress.
+
+VFS control identity remains in its existing shared header. The separate
+`include/micros/vm_service.h` defines only the already Accepted user-service
+IPC types, commands, and results; the kernel operation-12 header is unchanged.
+Request builders check every command's scalar and reserved words. Reply
+decoders require exact peer generation, type, echoed version/command,
+zero-upper-half signed results, and command-specific output shape before
+publishing any output. Grant/size pairs and VM entry/stack diagnostics are
+data, never cross-process pointer authority. This shared header inherits the
+existing complete-matrix public-header validation policy.
+The trusted-init `PREPARE_IMAGE` parent word is literal zero, not the distinct
+internal `MICROS_ENDPOINT_NONE` sentinel; ordinary spawn carries its concrete
+parent endpoint.
 
 ## Active mapping identity
 
