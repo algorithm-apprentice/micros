@@ -286,6 +286,9 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "micros_ipc_receiver_enqueue",
         "micros_ipc_sender_commit_delivery",
         "micros_ipc_receiver_commit_delivery",
+        "micros_ipc_reply",
+        "micros_ipc_reply_expected_caller",
+        "micros_ipc_reply_receive",
         "micros_ipc_notify",
         "micros_ipc_inject_kernel_notification",
         "micros_ipc_prepare_kernel_notification",
@@ -344,6 +347,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         "sender_enqueue",
         "micros_ipc_receiver_commit_delivery",
         "sender_commit_delivery",
+        "micros_ipc_reply_receive",
     }
 )
 
