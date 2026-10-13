@@ -255,11 +255,13 @@ evidence. That design and implementation are merged. ADR-0057 defined the
 following correction: apply the exact
 [VM service source-organization contract](architecture/vm-service-source-organization.md)
 before the coordinator extends VM loading and release behavior. That design
-and implementation are merged. ADR-0058 defines the current correction:
+and implementation are merged. ADR-0058 defines the PM correction:
 apply the exact
 [PM service source-organization contract](architecture/pm-service-source-organization.md)
-before the PM/VFS/VM coordinator. Its implementation remains blocked until
-the design is reviewed, Accepted, and merged.
+before the PM/VFS/VM coordinator. Its reviewed design is Accepted and merged.
+The implementation now separates the specified lifecycle, adapter, native
+evidence, kernel report, and generator owners, with empty migrations and
+fail-closed structural enforcement. It does not add the later coordinator.
 
 ## v0.1 completion goal
 

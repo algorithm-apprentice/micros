@@ -185,7 +185,10 @@ void spawn_abi_test_fill_environment_string(uint8_t *bytes, uint16_t size)
 }
 
 bool spawn_abi_test_build_occupancy_request(
-    struct spawn_abi_test_context *context,bool overflow, size_t *request_size)
+    struct spawn_abi_test_context *context,
+    bool overflow,
+    size_t *request_size
+)
 {
     static const uint16_t argument_sizes[8] = {
         256, 256, 256, 256, 256, 256, 1, 1,
