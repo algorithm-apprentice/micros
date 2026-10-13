@@ -276,32 +276,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in FINAL_OWNER_GROUPS.items()
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[1] not in {
-        "kernel/ipc_common.c",
-        "kernel/ipc_completion.c",
-        "kernel/ipc_notifications.c",
-        "kernel/ipc_rendezvous.c",
-        "kernel/ipc_close.c",
-        "kernel/ipc_reply.c",
-        "tests/host/ipc_send_operation_test.c",
-        "tests/host/ipc_receive_operation_test.c",
-        "tests/host/ipc_call_delivery_test.c",
-        "tests/host/ipc_call_validation_test.c",
-        "tests/host/ipc_reply_authority_test.c",
-        "tests/host/ipc_reply_validation_test.c",
-        "tests/host/ipc_reply_receive_test.c",
-        "tests/host/ipc_notify_delivery_test.c",
-        "tests/host/ipc_kernel_notify_test.c",
-        "tests/host/ipc_notify_validation_test.c",
-        "tests/host/ipc_notify_model_test.c",
-        "tests/host/ipc_close_cancellation_test.c",
-        "tests/host/ipc_close_validation_test.c",
-        "tests/host/ipc_close_model_test.c",
-        "kernel/ipc_ecall_test_report.c",
-    }
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("kernel/ipc.c", "micros_ipc_notify"),
@@ -347,40 +322,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ("tests/host/ipc_call_test.c", "test_call_rejections_are_atomic"),
     ("tests/host/ipc_operation_test.c", "test_receive_specific_and_any_fifo"),
 )
-LONG_FUNCTION_MIGRATION = tuple(
-    entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
-    if entry[0] != "tests/host/ipc_model_test.c" and entry[1] not in {
-        "micros_ipc_notify",
-        "sender_enqueue",
-        "micros_ipc_receiver_commit_delivery",
-        "sender_commit_delivery",
-        "micros_ipc_reply_receive",
-        "micros_ipc_handle_captured_user_ecall",
-        "test_receive_specific_and_any_fifo",
-        "test_queued_calls_bind_exact_threads_and_deliver_fifo",
-        "test_call_rejections_are_atomic",
-        "setup_reply_fixture",
-        "test_reply_requires_request_return",
-        "test_reply_routes_exact_tokens_without_send_target",
-        "test_reply_rejections_are_atomic",
-        "test_reply_receive_blocks_and_later_receives",
-        "test_reply_receive_selects_specific_sender_atomically",
-        "setup_notify_fixture",
-        "test_kernel_notify_prepare_commit_is_retained",
-        "test_kernel_notify_validation_and_close_rules",
-        "test_receive_prefers_lowest_notification_before_sender",
-        "test_reply_receive_prefers_pending_notification",
-        "test_notification_validators_and_close_preflight",
-        "test_seeded_notify_model",
-        "test_close_cancels_complete_transaction",
-        "test_successful_staged_deliveries_block_close_atomically",
-        "test_close_failures_are_atomic",
-        "test_seeded_close_scenarios",
-        "micros_ipc_runtime_run_self_test",
-        "micros_ipc_ecall_core_test_finish",
-        "micros_ipc_ecall_core_runtime_run_self_test",
-    }
-)
+LONG_FUNCTION_MIGRATION = ()
 
 FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_operation_test_fixture.c": "3bbffce409df296cc5ccbc908c8034b84d730d32db201c73f6fdfe128ba065fc",
@@ -393,7 +335,7 @@ FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_model_test_fixture.c": "e833e18b6805722b07da8602feecdf1fbb9bfbd743a123d22da7719df4f6617a",
     "kernel/ipc_test_fixture.c": "2b411170546bf55f679f74f6511fd8a246d60908bcd4ad49725993bf48785fb3",
     "kernel/ipc_ecall_test_fixture.c": "ba1f713e71c720adef6be2bab0ff295d2f662c7c3e19d742285cc43a4817338f",
-    "kernel/ipc_syscall_test.c": "edd0f929402275dc494bc18e5d3f585825529f43b45fec956e3394118f654523",
+    "kernel/ipc_syscall_test_fixture.c": "d9c0441b0feae0c995a2c314fea1ad95a2ebcca2484771aac49db8eb1e63505d",
 }
 
 
