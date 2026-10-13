@@ -32,33 +32,6 @@ static bool spawn_request_bytes_are_zero(const uint8_t *bytes, size_t size)
     return true;
 }
 
-static bool spawn_request_add_size(
-    size_t left,
-    size_t right,
-    size_t *result
-)
-{
-    if (right > SIZE_MAX - left) {
-        return false;
-    }
-    *result = left + right;
-    return true;
-}
-
-static bool spawn_request_align_size_16(
-    size_t value,
-    size_t *result
-)
-{
-    size_t added;
-
-    if (!spawn_request_add_size(value, 15, &added)) {
-        return false;
-    }
-    *result = added & ~(size_t)15;
-    return true;
-}
-
 static bool spawn_request_string_bytes_are_canonical(
     const uint8_t *bytes,
     uint16_t size,
@@ -130,20 +103,12 @@ static bool spawn_request_decode_string_reference(
     return true;
 }
 
-enum micros_spawn_request_error micros_spawn_request_decode(
+static bool spawn_request_decode_header(
     const uint8_t *bytes,
     size_t byte_count,
-    struct micros_spawn_request *request
+    struct micros_spawn_request *decoded
 )
 {
-    struct micros_spawn_request decoded = {0};
-    bool destinations[MICROS_SPAWN_DESCRIPTOR_CAPACITY] = {false};
-    size_t cursor = MICROS_SPAWN_REQUEST_HEADER_SIZE;
-    size_t index;
-
-    if (bytes == NULL || request == NULL) {
-        return MICROS_SPAWN_REQUEST_ERROR_ARGUMENT;
-    }
     if (
         byte_count < MICROS_SPAWN_REQUEST_SIZE_MIN
         || byte_count > MICROS_SPAWN_REQUEST_SIZE_MAX
@@ -159,41 +124,53 @@ enum micros_spawn_request_error micros_spawn_request_decode(
                 - MICROS_SPAWN_HEADER_RESERVED_OFFSET
         )
     ) {
-        return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+        return false;
     }
 
-    decoded.total_size = (uint32_t)byte_count;
-    decoded.argument_count = spawn_request_read_u16_le(
+    decoded->total_size = (uint32_t)byte_count;
+    decoded->argument_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_ARGUMENT_COUNT_OFFSET]
     );
-    decoded.environment_count = spawn_request_read_u16_le(
+    decoded->environment_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_ENVIRONMENT_COUNT_OFFSET]
     );
-    decoded.descriptor_action_count = spawn_request_read_u16_le(
+    decoded->descriptor_action_count = spawn_request_read_u16_le(
         &bytes[MICROS_SPAWN_DESCRIPTOR_ACTION_COUNT_OFFSET]
     );
+    return (
+        decoded->argument_count != 0
+        && decoded->argument_count <= MICROS_SPAWN_ARGUMENT_CAPACITY
+        && decoded->environment_count <= MICROS_SPAWN_ENVIRONMENT_CAPACITY
+        && decoded->descriptor_action_count
+            <= MICROS_SPAWN_DESCRIPTOR_ACTION_CAPACITY
+    );
+}
+
+static bool spawn_request_decode_strings(
+    const uint8_t *bytes,
+    size_t byte_count,
+    struct micros_spawn_request *decoded
+)
+{
+    size_t cursor = MICROS_SPAWN_REQUEST_HEADER_SIZE;
+    size_t index;
+
     if (
-        decoded.argument_count == 0
-        || decoded.argument_count > MICROS_SPAWN_ARGUMENT_CAPACITY
-        || decoded.environment_count
-            > MICROS_SPAWN_ENVIRONMENT_CAPACITY
-        || decoded.descriptor_action_count
-            > MICROS_SPAWN_DESCRIPTOR_ACTION_CAPACITY
-        || !spawn_request_decode_string_reference(
+        !spawn_request_decode_string_reference(
             bytes,
             byte_count,
             MICROS_SPAWN_PATH_REFERENCE_OFFSET,
             cursor,
             true,
             false,
-            &decoded.path,
+            &decoded->path,
             &cursor
         )
     ) {
-        return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+        return false;
     }
 
-    for (index = 0; index < decoded.argument_count; ++index) {
+    for (index = 0; index < decoded->argument_count; ++index) {
         if (!spawn_request_decode_string_reference(
             bytes,
             byte_count,
@@ -202,14 +179,14 @@ enum micros_spawn_request_error micros_spawn_request_decode(
             cursor,
             index == 0,
             false,
-            &decoded.arguments[index],
+            &decoded->arguments[index],
             &cursor
         )) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
     }
     for (
-        index = decoded.argument_count;
+        index = decoded->argument_count;
         index < MICROS_SPAWN_ARGUMENT_CAPACITY;
         ++index
     ) {
@@ -218,11 +195,11 @@ enum micros_spawn_request_error micros_spawn_request_decode(
                 + index * MICROS_SPAWN_STRING_REFERENCE_SIZE],
             MICROS_SPAWN_STRING_REFERENCE_SIZE
         )) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
     }
 
-    for (index = 0; index < decoded.environment_count; ++index) {
+    for (index = 0; index < decoded->environment_count; ++index) {
         if (!spawn_request_decode_string_reference(
             bytes,
             byte_count,
@@ -231,14 +208,14 @@ enum micros_spawn_request_error micros_spawn_request_decode(
             cursor,
             false,
             true,
-            &decoded.environment[index],
+            &decoded->environment[index],
             &cursor
         )) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
     }
     for (
-        index = decoded.environment_count;
+        index = decoded->environment_count;
         index < MICROS_SPAWN_ENVIRONMENT_CAPACITY;
         ++index
     ) {
@@ -247,16 +224,23 @@ enum micros_spawn_request_error micros_spawn_request_decode(
                 + index * MICROS_SPAWN_STRING_REFERENCE_SIZE],
             MICROS_SPAWN_STRING_REFERENCE_SIZE
         )) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
     }
-    if (cursor != byte_count) {
-        return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
-    }
+    return cursor == byte_count;
+}
 
-    for (index = 0; index < decoded.descriptor_action_count; ++index) {
+static bool spawn_request_decode_descriptors(
+    const uint8_t *bytes,
+    struct micros_spawn_request *decoded
+)
+{
+    bool destinations[MICROS_SPAWN_DESCRIPTOR_CAPACITY] = {false};
+    size_t index;
+
+    for (index = 0; index < decoded->descriptor_action_count; ++index) {
         struct micros_spawn_descriptor_action *action =
-            &decoded.descriptor_actions[index];
+            &decoded->descriptor_actions[index];
         size_t offset = MICROS_SPAWN_DESCRIPTOR_ACTIONS_OFFSET
             + index * MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE;
 
@@ -269,12 +253,12 @@ enum micros_spawn_request_error micros_spawn_request_decode(
             || action->operation != MICROS_SPAWN_DESCRIPTOR_DUPLICATE
             || destinations[action->destination]
         ) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
         destinations[action->destination] = true;
     }
     for (
-        index = decoded.descriptor_action_count;
+        index = decoded->descriptor_action_count;
         index < MICROS_SPAWN_DESCRIPTOR_ACTION_CAPACITY;
         ++index
     ) {
@@ -283,128 +267,31 @@ enum micros_spawn_request_error micros_spawn_request_decode(
                 + index * MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE],
             MICROS_SPAWN_DESCRIPTOR_ACTION_SIZE
         )) {
-            return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
+            return false;
         }
+    }
+    return true;
+}
+
+enum micros_spawn_request_error micros_spawn_request_decode(
+    const uint8_t *bytes,
+    size_t byte_count,
+    struct micros_spawn_request *request
+)
+{
+    struct micros_spawn_request decoded = {0};
+
+    if (bytes == NULL || request == NULL) {
+        return MICROS_SPAWN_REQUEST_ERROR_ARGUMENT;
+    }
+    if (
+        !spawn_request_decode_header(bytes, byte_count, &decoded)
+        || !spawn_request_decode_strings(bytes, byte_count, &decoded)
+        || !spawn_request_decode_descriptors(bytes, &decoded)
+    ) {
+        return MICROS_SPAWN_REQUEST_ERROR_MALFORMED;
     }
 
     *request = decoded;
     return MICROS_SPAWN_REQUEST_OK;
-}
-
-enum micros_spawn_stack_layout_error
-micros_spawn_stack_layout_plan(
-    const struct micros_spawn_request *request,
-    struct micros_spawn_stack_layout *layout
-)
-{
-    enum {
-        APPLICATION_AUXILIARY_BYTES =
-            MICROS_APPLICATION_AUXV_COUNT
-                * 2
-                * sizeof(uint64_t),
-    };
-    struct micros_spawn_stack_layout candidate = {0};
-    size_t relative_offset = sizeof(uint64_t);
-    size_t strings_size = 0;
-    size_t occupied_size;
-    size_t index;
-
-    if (
-        request == NULL
-        || layout == NULL
-        || request->argument_count == 0
-        || request->argument_count
-            > MICROS_SPAWN_ARGUMENT_CAPACITY
-        || request->environment_count
-            > MICROS_SPAWN_ENVIRONMENT_CAPACITY
-    ) {
-        return MICROS_SPAWN_STACK_LAYOUT_ERROR_ARGUMENT;
-    }
-    if (
-        !spawn_request_add_size(
-            relative_offset,
-            ((size_t)request->argument_count + 1)
-                * sizeof(uint64_t),
-            &relative_offset
-        )
-    ) {
-        return MICROS_SPAWN_STACK_LAYOUT_ERROR_TOO_BIG;
-    }
-    candidate.environment_offset = (uint32_t)relative_offset;
-    if (
-        !spawn_request_add_size(
-            relative_offset,
-            ((size_t)request->environment_count + 1)
-                * sizeof(uint64_t),
-            &relative_offset
-        )
-        || !spawn_request_align_size_16(
-            relative_offset,
-            &relative_offset
-        )
-    ) {
-        return MICROS_SPAWN_STACK_LAYOUT_ERROR_TOO_BIG;
-    }
-    candidate.auxiliary_offset = (uint32_t)relative_offset;
-    if (
-        !spawn_request_add_size(
-            relative_offset,
-            APPLICATION_AUXILIARY_BYTES,
-            &relative_offset
-        )
-    ) {
-        return MICROS_SPAWN_STACK_LAYOUT_ERROR_TOO_BIG;
-    }
-    candidate.strings_offset = (uint32_t)relative_offset;
-    for (index = 0; index < request->argument_count; ++index) {
-        if (
-            request->arguments[index].size == 0
-            || request->arguments[index].size
-                > MICROS_SPAWN_STRING_SIZE_MAX
-            || !spawn_request_add_size(
-                strings_size,
-                request->arguments[index].size,
-                &strings_size
-            )
-        ) {
-            return MICROS_SPAWN_STACK_LAYOUT_ERROR_ARGUMENT;
-        }
-    }
-    for (
-        index = 0;
-        index < request->environment_count;
-        ++index
-    ) {
-        if (
-            request->environment[index].size == 0
-            || request->environment[index].size
-                > MICROS_SPAWN_STRING_SIZE_MAX
-            || !spawn_request_add_size(
-                strings_size,
-                request->environment[index].size,
-                &strings_size
-            )
-        ) {
-            return MICROS_SPAWN_STACK_LAYOUT_ERROR_ARGUMENT;
-        }
-    }
-    if (
-        !spawn_request_add_size(
-            relative_offset,
-            strings_size,
-            &relative_offset
-        )
-        || !spawn_request_align_size_16(
-            relative_offset,
-            &occupied_size
-        )
-        || occupied_size > MICROS_APPLICATION_STACK_OCCUPIED_MAX
-        || occupied_size > MICROS_APPLICATION_STACK_PAGE_SIZE
-    ) {
-        return MICROS_SPAWN_STACK_LAYOUT_ERROR_TOO_BIG;
-    }
-    candidate.frame_size = (uint32_t)relative_offset;
-    candidate.occupied_size = (uint32_t)occupied_size;
-    *layout = candidate;
-    return MICROS_SPAWN_STACK_LAYOUT_OK;
 }
