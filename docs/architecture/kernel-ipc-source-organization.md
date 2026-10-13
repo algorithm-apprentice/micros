@@ -80,6 +80,11 @@ its individual tasks stay below the function review signal. This is a
 function-count review disposition, not an exception for an unchanged long
 algorithm.
 
+The action-selection dependency gate admits only common/fixture helpers and
+the read-only reference authority owner. Its regression rejects reference
+scheduler and IPC-state mutator calls, so action construction cannot acquire
+transition authority through another reference owner.
+
 The focused structural command is:
 
 ```bash

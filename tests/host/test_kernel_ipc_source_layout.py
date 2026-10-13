@@ -582,7 +582,9 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "tests/host/ipc_model_test_step.c": (
         MODEL_REFERENCE, "tests/host/ipc_model_test_production.c", "tests/host/ipc_model_test_trace.c",
     ),
-    "tests/host/ipc_model_test_actions.c": (MODEL_COMMON, MODEL_FIXTURE, *MODEL_PRIMITIVES, *MODEL_OPERATIONS),
+    "tests/host/ipc_model_test_actions.c": (
+        MODEL_COMMON, MODEL_FIXTURE, "tests/host/ipc_model_reference_authority.c",
+    ),
     "tests/host/ipc_model_test_prelude.c": (MODEL_COMMON, "tests/host/ipc_model_test_actions.c", "tests/host/ipc_model_test_step.c"),
     "tests/host/ipc_model_test.c": (
         MODEL_COMMON, MODEL_FIXTURE, "tests/host/ipc_model_test_prelude.c",
@@ -799,6 +801,24 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                 (REPOSITORY_ROOT / path).read_text(),
                 r'(?m)^\s*#\s*include\s*[<"][^">]+\.(?:c|py)[">]', path,
             )
+
+    def test_action_selection_rejects_reference_mutators(self) -> None:
+        actions_path = "tests/host/ipc_model_test_actions.c"
+        actions_dependency = owner_dependency_text(actions_path)
+        for call in (
+            "ipc_model_hold_thread(0, 0);",
+            "ipc_model_drain_thread(0, 0);",
+            "ipc_model_stage_delivery(0, 0, 0);",
+            "ipc_model_ipc_append(0, 0, 0, 0);",
+        ):
+            with self.subTest(call=call):
+                def dependency_with_mutator(path: str) -> str:
+                    return f"{actions_dependency}\n{call}\n" if path == actions_path else ""
+
+                with patch(f"{__name__}.owner_dependency_text",
+                           side_effect=dependency_with_mutator):
+                    with self.assertRaisesRegex(AssertionError, call.split("(")[0]):
+                        self.test_recursive_owner_direction_and_private_imports_are_bounded()
 
     def test_reference_decisions_and_action_selection_do_not_execute_production(self) -> None:
         for path in (*MODEL_PRIMITIVES, *MODEL_OPERATIONS):
