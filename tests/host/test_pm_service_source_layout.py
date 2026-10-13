@@ -38,6 +38,9 @@ SOURCE_SETS = {
         "servers/pm/pm_exit.c",
         "servers/pm/pm_wait.c",
     ),
+    "MICROS_PM_COORDINATOR_SOURCES": (
+        "servers/pm/pm_coordinator.c",
+    ),
     "MICROS_SPAWN_REQUEST_SOURCES": (
         "lib/spawn/spawn_request.c",
         "lib/spawn/spawn_stack_layout.c",
@@ -61,6 +64,10 @@ SOURCE_SETS = {
         "tests/host/pm_model_reference.c",
         "tests/host/pm_model_operations.c",
     ),
+    "MICROS_PM_COORDINATOR_HOST_TEST_SOURCES": (
+        "tests/host/pm_coordinator_test.c",
+        "tests/host/pm_coordinator_configuration_test.c",
+    ),
     "MICROS_SPAWN_ABI_HOST_TEST_SOURCES": (
         "tests/host/spawn_abi_test.c",
         "tests/host/spawn_abi_test_fixture.c",
@@ -82,6 +89,8 @@ PRIVATE_HEADERS = (
     "tests/host/pm_model_test_internal.h",
     "tests/host/spawn_abi_test_internal.h",
     "kernel/pm_service_test_internal.h",
+    "servers/pm/pm_coordinator.h",
+    "tests/host/pm_coordinator_test_internal.h",
 )
 
 STABLE_HEADER_HASHES = {
@@ -110,6 +119,7 @@ DECLARATION_ONLY_HEADERS = (
 )
 
 RETAINED_OWNER_GROUPS = {
+    "servers/pm/pm_coordinator.c": ("micros_pm_coordinator_initialize",),
     "servers/pm/pm_core.c": (
         "micros_pm_table_initialize", "micros_pm_enable_runtime",
         "micros_pm_process_resolve", "micros_pm_find_running_by_endpoint",
@@ -120,6 +130,7 @@ RETAINED_OWNER_GROUPS = {
 }
 
 HELPER_OWNER_GROUPS = {
+    "servers/pm/pm_coordinator.c": ("coordinator_bindings_are_valid",),
     "servers/pm/pm_common.c": tuple(
         "pm_common_" + name for name in (
             "zero_bytes", "bytes_are_zero", "read_u64_le", "handle_is_none",
@@ -214,6 +225,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "servers/pm/pm_core.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_protocol.c": (COMMON_OWNER,),
     VALIDATION_OWNER: (COMMON_OWNER,),
+    "servers/pm/pm_coordinator.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_spawn.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_rollback.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_wait.c": (COMMON_OWNER, VALIDATION_OWNER),
@@ -545,6 +557,10 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                     self.assertEqual(1, cmake.count(source), source)
         for target, required in {
             "pm_test": ("MICROS_PM_CORE_SOURCES", "MICROS_PM_CORE_HOST_TEST_SOURCES"),
+            "pm_coordinator_test": (
+                "MICROS_PM_CORE_SOURCES", "MICROS_PM_COORDINATOR_SOURCES",
+                "MICROS_PM_COORDINATOR_HOST_TEST_SOURCES",
+            ),
             "spawn_abi_test": (
                 "MICROS_SPAWN_REQUEST_SOURCES", "MICROS_SPAWN_ABI_HOST_TEST_SOURCES",
             ),
@@ -559,7 +575,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             for source in all_sources():
                 self.assertNotIn(source, block)
         self.assertEqual(5, cmake.count("${MICROS_PM_SERVICE_SOURCES}"))
-        self.assertEqual(6, cmake.count("${MICROS_PM_CORE_SOURCES}"))
+        self.assertEqual(7, cmake.count("${MICROS_PM_CORE_SOURCES}"))
+        self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
+        self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
         self.assertEqual(7, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
         for target in ("micros_vm_server", "micros_vfs_service"):
@@ -657,6 +675,11 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 *HELPER_OWNER_GROUPS["tests/host/spawn_abi_test_fixture.c"], *SPAWN_CASE_ORDER,
             ),
             "kernel/pm_service_test_internal.h": (),
+            "servers/pm/pm_coordinator.h": ("micros_pm_coordinator_initialize",),
+            "tests/host/pm_coordinator_test_internal.h": (
+                "test_coordinator_initialization", "test_coordinator_embedded_bindings",
+                "test_coordinator_binding_failures", "test_coordinator_table_failures",
+            ),
         }
         for private_header, expected in expected_declarations.items():
             text = c_declaration_text((REPOSITORY_ROOT / private_header).read_text())
@@ -714,14 +737,20 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                     r'(?m)^\s*#\s*include\s*[<"][^">]+\.(?:c|py)[">]',
                     dependency,
                 )
-            if path not in SOURCE_SETS["MICROS_PM_CORE_SOURCES"]:
+            if path not in (
+                *SOURCE_SETS["MICROS_PM_CORE_SOURCES"],
+                *SOURCE_SETS["MICROS_PM_COORDINATOR_SOURCES"],
+            ):
                 self.assertNotIn("servers/pm/pm_internal.h", closure, path)
                 text = owner_dependency_text(path)
                 for name in private_functions:
                     self.assertNotRegex(text, rf"\b{re.escape(name)}\b", (path, name))
             if not path.startswith("tests/host/"):
                 self.assertFalse(
-                    set(closure) & set(PRIVATE_HEADERS[2:5]), (path, closure),
+                    set(closure) & {
+                        header for header in PRIVATE_HEADERS
+                        if header.startswith("tests/host/")
+                    }, (path, closure),
                 )
         for path, dependencies in PERMITTED_OWNER_DEPENDENCIES.items():
             text = owner_dependency_text(path)
@@ -897,6 +926,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 tuple(re.findall(r"\b((?:test_|micros_pm_control_)[A-Za-z0-9_]+)\s*\(", main)),
             )
         self.assertEqual(1, cmake.count("NAME pm-lifecycle"))
+        self.assertEqual(1, cmake.count("NAME pm-coordinator"))
         self.assertEqual(1, cmake.count("NAME spawn-abi"))
         self.assertIn(
             'printf("spawn ABI tests passed\\n");',

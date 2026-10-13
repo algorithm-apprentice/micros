@@ -488,6 +488,17 @@ still expanded as before. `pm_control.c`, the two existing PM assembly paths,
 probe, generated fixture, and resident limits stay with their current
 consumers. No raw split-source listing is left beside its new source set.
 
+The Accepted coordinator extension adds the current
+`MICROS_PM_COORDINATOR_SOURCES` constructor owner and
+`MICROS_PM_COORDINATOR_HOST_TEST_SOURCES` configuration suite. Its supported
+header and native-suite header are declarations-only. `pm_coordinator_test`
+expands both new sets and the existing PM core once, increasing the core's
+consumer count from six to seven without changing the five service branches.
+These configuration cases add one fast `pm-coordinator` CTest to both native
+aggregates. New coordinator paths inherit their PM core/native baselines;
+unknown ownership still escalates fail-closed. The remaining transaction and
+model owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
+
 ## Validation and structural gate
 
 New paths inherit their exact monolithic classification: portable PM from

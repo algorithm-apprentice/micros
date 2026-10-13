@@ -391,6 +391,8 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/pm/pm_exit.c",
             "servers/pm/pm_wait.c",
             "servers/pm/pm_internal.h",
+            "servers/pm/pm_coordinator.c",
+            "servers/pm/pm_coordinator.h",
         ),
     ),
     (
@@ -421,6 +423,9 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/pm_model_operations.c",
             "tests/host/pm_test_internal.h",
             "tests/host/pm_model_test_internal.h",
+            "tests/host/pm_coordinator_test.c",
+            "tests/host/pm_coordinator_configuration_test.c",
+            "tests/host/pm_coordinator_test_internal.h",
         ),
     ),
     (

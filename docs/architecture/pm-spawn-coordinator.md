@@ -62,6 +62,21 @@ prevalidated commit plans. Service adapters do not include `pm_internal.h`.
 Reference decisions use neither production-private transitions nor production
 coordinator helpers.
 
+Configuration initialization borrows one valid PM table before its first
+dynamic PID is consumed. It requires three distinct concrete endpoint
+generations and zero reserved binding fields, initializes the resident request
+page and PM spawn counter, and publishes readiness last. It is one-shot;
+reinitialization or reconstruction around an already used lifecycle table is
+rejected without changing either object.
+Binding input is captured before owned storage is cleared, including when
+the caller supplied the coordinator's own binding member.
+
+The constructor and four deterministic configuration cases are implemented
+as the initial `MICROS_PM_COORDINATOR_SOURCES` and
+`MICROS_PM_COORDINATOR_HOST_TEST_SOURCES` sets. The fast `pm-coordinator`
+CTest is included by both native aggregates. Forward transactions, peer
+adapters, and the separate mixed lifecycle model remain in progress.
+
 ## Active mapping identity
 
 ADR-0050 requires the running PM record to retain the kernel load token and
@@ -186,4 +201,11 @@ The first lifecycle slice uses the existing configured native graph:
 cmake --build build/host-debug --target pm_test --parallel
 ctest --test-dir build/host-debug --output-on-failure -R '^pm-lifecycle$'
 python3 -m unittest tests.host.test_pm_service_source_layout
+```
+
+Coordinator configuration and later deterministic transaction cases use:
+
+```bash
+cmake --build build/host-debug --target pm_coordinator_test --parallel
+ctest --test-dir build/host-debug --output-on-failure -R '^pm-coordinator$'
 ```

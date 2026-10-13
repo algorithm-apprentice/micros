@@ -676,6 +676,11 @@ set(
 )
 
 set(
+    MICROS_PM_COORDINATOR_SOURCES
+    servers/pm/pm_coordinator.c
+)
+
+set(
     MICROS_SPAWN_REQUEST_SOURCES
     lib/spawn/spawn_request.c
     lib/spawn/spawn_stack_layout.c
@@ -702,6 +707,12 @@ set(
     tests/host/pm_model_test.c
     tests/host/pm_model_reference.c
     tests/host/pm_model_operations.c
+)
+
+set(
+    MICROS_PM_COORDINATOR_HOST_TEST_SOURCES
+    tests/host/pm_coordinator_test.c
+    tests/host/pm_coordinator_configuration_test.c
 )
 
 set(
@@ -907,6 +918,44 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_PM_CONTROL_EXECUTION_HOST_TEST_SOURCES}
         ${MICROS_PM_CORE_HOST_TEST_SOURCES}
     )
+    add_executable(
+        pm_coordinator_test
+        ${MICROS_PM_CORE_SOURCES}
+        ${MICROS_PM_COORDINATOR_SOURCES}
+        ${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}
+    )
+    target_include_directories(
+        pm_coordinator_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(pm_coordinator_test PRIVATE c_std_17)
+    target_compile_options(
+        pm_coordinator_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    if(
+        MICROS_ENABLE_SANITIZERS
+        AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU"
+    )
+        target_compile_options(
+            pm_coordinator_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            pm_coordinator_test
+            PRIVATE -fsanitize=address,undefined
+        )
+    endif()
     add_executable(
         spawn_abi_test
         ${MICROS_SPAWN_REQUEST_SOURCES}
@@ -1927,6 +1976,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(NAME pm-coordinator COMMAND pm_coordinator_test)
     add_test(NAME spawn-abi COMMAND spawn_abi_test)
     add_test(NAME vm-core COMMAND vm_core_test)
     add_test(
@@ -1994,6 +2044,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            pm_coordinator_test
             spawn_abi_test
             vm_core_test
             ramfs_seed_test
@@ -2100,6 +2151,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            pm_coordinator_test
             spawn_abi_test
             vm_core_test
             ramfs_seed_test
