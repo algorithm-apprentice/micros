@@ -40,6 +40,7 @@ The intended responsibility owners are:
 | Owner | Task |
 | --- | --- |
 | `servers/pm/pm_coordinator.c` | Configuration, public request preflight, trusted-init entry, and dispatch |
+| `servers/pm/pm_coordinator_requests.c` | Application spawn preflight, parent grant snapshot, lifecycle reservation, and returning result |
 | `servers/pm/pm_coordinator_protocol.c` | Exact VFS/VM request words, reply validation, and result mapping |
 | `servers/pm/pm_coordinator_spawn.c` | Forward spawn phases and sole activation boundary |
 | `servers/pm/pm_coordinator_rollback.c` | Reverse collaborator release and exact PM acknowledgments |
@@ -71,12 +72,12 @@ rejected without changing either object.
 Binding input is captured before owned storage is cleared, including when
 the caller supplied the coordinator's own binding member.
 
-The constructor, byte-exact VFS/VM codecs, and the trusted-init forward
-transaction with every completed-stage rollback are implemented in
+The constructor, byte-exact VFS/VM codecs, trusted init, ordinary application
+spawn, and every completed-stage rollback are implemented in
 `MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
 The fast `pm-coordinator` CTest is included by both native aggregates.
-Ordinary application spawn, exit/wait coordination, runtime peer adapters,
-and the separate mixed lifecycle model remain in progress.
+Exit/wait coordination, runtime peer adapters, and the separate mixed
+lifecycle model remain in progress.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -106,6 +107,23 @@ cross-check. Kernel activation immediately composes the prevalidated local
 commit before VM commit or VFS release. Expected prepublication failure
 unwinds exact resource acknowledgments and remains terminal for PID 1;
 postpublication failure is an explicit invariant outcome, never failed spawn.
+
+Application spawn captures the kernel-written parent source and reply token,
+copies only the declared parent-to-PM read grant, and performs canonical and
+stack validation before PID or transaction consumption. Expected parent-grant
+errors map to `GRANT`; unknown transport results are fatal. Capacity preflight
+reuses the lifecycle owner's free-slot query before the global reservation
+check. Returning errors echo the exact original request type and zero every
+child/status field.
+
+The explicit PM-owned parent-loss input matches the pending reply token.
+Every successful preactivation phase records its owned resource before
+checking that input; a just-created request grant is revoked before unwind.
+Rollback suppresses the reply and clears pending coordinator state. Once
+activation succeeds, cancellation cannot unwind the running child: mandatory
+VM/VFS commits still finish before reply suppression. The input denotes reply
+loss, not proof that the semantic parent exited; only the existing exit
+transition reparents children.
 
 ## Active mapping identity
 

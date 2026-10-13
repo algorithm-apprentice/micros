@@ -682,6 +682,7 @@ set(
     servers/pm/pm_coordinator_peers.c
     servers/pm/pm_coordinator_spawn.c
     servers/pm/pm_coordinator_rollback.c
+    servers/pm/pm_coordinator_requests.c
 )
 
 set(
@@ -720,6 +721,7 @@ set(
     tests/host/pm_coordinator_protocol_test.c
     tests/host/pm_coordinator_spawn_fixture.c
     tests/host/pm_coordinator_spawn_test.c
+    tests/host/pm_coordinator_request_test.c
 )
 
 set(

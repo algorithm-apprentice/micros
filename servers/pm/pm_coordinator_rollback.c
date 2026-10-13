@@ -67,7 +67,8 @@ enum micros_pm_coordinator_error pm_coordinator_rollback_spawn(
     struct micros_pm_spawn_rollback_action action;
 
     if (micros_pm_spawn_rollback_begin(
-        spawn->coordinator->table, spawn->child, spawn->record->spawn_stage, 0, false, &action
+        spawn->coordinator->table, spawn->child, spawn->record->spawn_stage,
+        spawn->parent_reply_token, !spawn->init && spawn->coordinator->parent_lost, &action
     ) != MICROS_PM_MODEL_OK) {
         return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
     }

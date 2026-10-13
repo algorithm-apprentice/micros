@@ -29,5 +29,11 @@ bool test_coordinator_directed_init(void);
 bool test_coordinator_init_failure_rollback(void);
 bool test_coordinator_init_postpublication_failures(void);
 bool test_coordinator_init_preflight_preserves_pid(void);
+bool test_coordinator_public_spawn(void);
+bool test_coordinator_public_failure_results(void);
+bool test_coordinator_public_preflight_results(void);
+bool test_coordinator_parent_loss_rollback(void);
+bool test_coordinator_public_capacity_and_unknown_grant(void);
+bool test_coordinator_parent_loss_after_publication(void);
 
 #endif

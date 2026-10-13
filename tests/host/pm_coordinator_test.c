@@ -17,6 +17,12 @@ int main(void)
         {"coordinator init failure rollback", test_coordinator_init_failure_rollback},
         {"coordinator init postpublication failures", test_coordinator_init_postpublication_failures},
         {"coordinator init preflight preserves PID", test_coordinator_init_preflight_preserves_pid},
+        {"coordinator public spawn", test_coordinator_public_spawn},
+        {"coordinator public failure results", test_coordinator_public_failure_results},
+        {"coordinator public preflight results", test_coordinator_public_preflight_results},
+        {"coordinator parent loss rollback", test_coordinator_parent_loss_rollback},
+        {"coordinator public capacity and unknown grant", test_coordinator_public_capacity_and_unknown_grant},
+        {"coordinator parent loss after publication", test_coordinator_parent_loss_after_publication},
     };
     size_t index;
 

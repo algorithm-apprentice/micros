@@ -44,6 +44,7 @@ SOURCE_SETS = {
         "servers/pm/pm_coordinator_peers.c",
         "servers/pm/pm_coordinator_spawn.c",
         "servers/pm/pm_coordinator_rollback.c",
+        "servers/pm/pm_coordinator_requests.c",
     ),
     "MICROS_SPAWN_REQUEST_SOURCES": (
         "lib/spawn/spawn_request.c",
@@ -74,6 +75,7 @@ SOURCE_SETS = {
         "tests/host/pm_coordinator_protocol_test.c",
         "tests/host/pm_coordinator_spawn_fixture.c",
         "tests/host/pm_coordinator_spawn_test.c",
+        "tests/host/pm_coordinator_request_test.c",
     ),
     "MICROS_SPAWN_ABI_HOST_TEST_SOURCES": (
         "tests/host/spawn_abi_test.c",
@@ -133,11 +135,16 @@ DECLARATION_ONLY_HEADERS = (
 RETAINED_OWNER_GROUPS = {
     "servers/pm/pm_coordinator.c": (
         "micros_pm_coordinator_initialize", "micros_pm_coordinator_spawn_init",
+        "micros_pm_coordinator_parent_lost", "pm_coordinator_spawn_backend_is_complete",
+        "pm_coordinator_validate_instance", "pm_coordinator_prepare_snapshot",
     ),
+    "servers/pm/pm_coordinator_requests.c": ("micros_pm_coordinator_spawn_request",),
     "servers/pm/pm_coordinator_peers.c": (
         "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call", "pm_coordinator_vm_call",
     ),
-    "servers/pm/pm_coordinator_spawn.c": ("pm_coordinator_run_spawn",),
+    "servers/pm/pm_coordinator_spawn.c": (
+        "pm_coordinator_complete_phase", "pm_coordinator_run_spawn",
+    ),
     "servers/pm/pm_coordinator_rollback.c": ("pm_coordinator_rollback_spawn",),
     "servers/pm/pm_coordinator_protocol.c": (
         "micros_pm_coordinator_build_vfs_control", "micros_pm_coordinator_build_vm_control",
@@ -154,7 +161,11 @@ RETAINED_OWNER_GROUPS = {
 
 HELPER_OWNER_GROUPS = {
     "servers/pm/pm_coordinator.c": (
-        "coordinator_bindings_are_valid", "spawn_backend_is_complete", "prepare_init_snapshot",
+        "coordinator_bindings_are_valid",
+    ),
+    "servers/pm/pm_coordinator_requests.c": (
+        "build_spawn_response", "decode_spawn_request", "parent_grant_failure_is_expected",
+        "copy_parent_request", "finish_public_spawn", "reserve_public_child",
     ),
     "servers/pm/pm_coordinator_spawn.c": (
         "reserve_kernel_process", "prepare_vfs_image", "freeze_vm_mappings",
@@ -188,6 +199,7 @@ HELPER_OWNER_GROUPS = {
     "servers/pm/pm_spawn.c": (
         "resolve_forward_spawning_record", "table_has_spawning_record",
         "find_free_slot", "allocate_record",
+        "pm_spawn_capacity_is_available",
         "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
     ),
     "servers/pm/pm_rollback.c": (
@@ -276,6 +288,11 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "servers/pm/pm_coordinator_rollback.c": (
         "servers/pm/pm_rollback.c", "servers/pm/pm_coordinator_peers.c",
     ),
+    "servers/pm/pm_coordinator_requests.c": (
+        COMMON_OWNER, VALIDATION_OWNER, "servers/pm/pm_core.c", "servers/pm/pm_protocol.c",
+        "servers/pm/pm_spawn.c", "servers/pm/pm_coordinator.c",
+        "servers/pm/pm_coordinator_spawn.c", "servers/pm/pm_coordinator_rollback.c",
+    ),
     "servers/pm/pm_spawn.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_rollback.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_wait.c": (COMMON_OWNER, VALIDATION_OWNER),
@@ -330,6 +347,7 @@ STATIC_LOCAL_DECLARATIONS = {
         ".activate = spawn_fixture_activate,"
         ".grant_create = spawn_fixture_grant_create,"
         ".grant_revoke = spawn_fixture_grant_revoke,"
+        ".grant_copy_from = spawn_fixture_copy_parent,"
         ".call = spawn_fixture_call, };",
     ),
     "tests/host/spawn_abi_test_fixture.c": (
@@ -717,6 +735,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "servers/pm/pm_internal.h": (
                 *HELPER_OWNER_GROUPS[COMMON_OWNER], "pm_wait_stage_result",
                 "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
+                "pm_spawn_capacity_is_available",
                 "pm_exit_prepare_begin", "pm_exit_commit_begin",
             ),
             "servers/pm/pm_service_internal.h": (
@@ -739,6 +758,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "kernel/pm_service_test_internal.h": (),
             "servers/pm/pm_coordinator.h": (
                 "micros_pm_coordinator_initialize", "micros_pm_coordinator_spawn_init",
+                "micros_pm_coordinator_spawn_request", "micros_pm_coordinator_parent_lost",
                 *RETAINED_OWNER_GROUPS["servers/pm/pm_coordinator_protocol.c"],
             ),
             "tests/host/pm_coordinator_test_internal.h": (
@@ -749,15 +769,23 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 "test_coordinator_directed_init", "test_coordinator_init_failure_rollback",
                 "test_coordinator_init_postpublication_failures",
                 "test_coordinator_init_preflight_preserves_pid",
+                "test_coordinator_public_spawn", "test_coordinator_public_failure_results",
+                "test_coordinator_public_preflight_results", "test_coordinator_parent_loss_rollback",
+                "test_coordinator_public_capacity_and_unknown_grant",
+                "test_coordinator_parent_loss_after_publication",
             ),
             "servers/pm/pm_coordinator_internal.h": (
                 "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call",
                 "pm_coordinator_vm_call", "pm_coordinator_run_spawn",
                 "pm_coordinator_rollback_spawn",
+                "pm_coordinator_spawn_backend_is_complete", "pm_coordinator_validate_instance",
+                "pm_coordinator_prepare_snapshot", "pm_coordinator_complete_phase",
             ),
             "tests/host/pm_coordinator_spawn_fixture.h": (
                 "coordinator_spawn_fixture_initialize", "coordinator_spawn_fixture_backend",
                 "coordinator_spawn_fixture_resources_are_empty",
+                "coordinator_spawn_fixture_initialize_parent", "coordinator_spawn_fixture_request",
+                "coordinator_spawn_fixture_result_code", "coordinator_spawn_fixture_result_pid",
             ),
         }
         for private_header, expected in expected_declarations.items():
@@ -806,6 +834,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         private_functions = {
             *HELPER_OWNER_GROUPS[COMMON_OWNER], "pm_wait_stage_result",
             "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
+            "pm_spawn_capacity_is_available",
             "pm_exit_prepare_begin", "pm_exit_commit_begin",
         }
         for path in all_sources():

@@ -47,7 +47,7 @@ enum micros_pm_coordinator_error micros_pm_coordinator_initialize(
     return MICROS_PM_COORDINATOR_OK;
 }
 
-static bool spawn_backend_is_complete(const struct micros_pm_coordinator_backend *backend)
+bool pm_coordinator_spawn_backend_is_complete(const struct micros_pm_coordinator_backend *backend)
 {
     return backend != NULL && backend->reserve != NULL && backend->abort_reserved != NULL
         && backend->prepare_execution != NULL && backend->abort_prepared != NULL
@@ -55,22 +55,47 @@ static bool spawn_backend_is_complete(const struct micros_pm_coordinator_backend
         && backend->grant_revoke != NULL && backend->call != NULL;
 }
 
-static enum micros_pm_coordinator_error prepare_init_snapshot(
+enum micros_pm_coordinator_error pm_coordinator_validate_instance(
+    const struct micros_pm_coordinator *coordinator
+)
+{
+    return (
+        coordinator != NULL
+        && coordinator->initialization_magic == MICROS_PM_COORDINATOR_INITIALIZATION_MAGIC
+        && coordinator->table != NULL
+        && coordinator_bindings_are_valid(&coordinator->bindings)
+        && pm_common_bytes_are_zero(coordinator->reserved, sizeof(coordinator->reserved))
+        && coordinator->spawn_pending == (coordinator->pending_parent_reply != 0)
+        && (!coordinator->parent_lost || coordinator->spawn_pending)
+        && micros_pm_table_validate(coordinator->table) == MICROS_PM_MODEL_OK
+    ) ? MICROS_PM_COORDINATOR_OK : MICROS_PM_COORDINATOR_ERROR_INVARIANT;
+}
+
+enum pm_coordinator_step pm_coordinator_prepare_snapshot(
     struct micros_pm_coordinator *coordinator, const uint8_t *bytes, size_t size,
-    struct micros_spawn_stack_layout *layout
+    bool init, struct micros_spawn_stack_layout *layout, enum micros_pm_result *rejection
 )
 {
     struct micros_spawn_request request;
+    enum micros_spawn_stack_layout_error error;
     size_t index;
 
     if (
         bytes == NULL || size < MICROS_SPAWN_REQUEST_SIZE_MIN
         || size > MICROS_SPAWN_REQUEST_SIZE_MAX
         || micros_spawn_request_decode(bytes, size, &request) != MICROS_SPAWN_REQUEST_OK
-        || request.descriptor_action_count != 0 || bytes[request.path.offset] != '/'
-        || micros_spawn_stack_layout_plan(&request, layout) != MICROS_SPAWN_STACK_LAYOUT_OK
+        || (init && (request.descriptor_action_count != 0 || bytes[request.path.offset] != '/'))
     ) {
-        return MICROS_PM_COORDINATOR_ERROR_ARGUMENT;
+        *rejection = MICROS_PM_RESULT_MALFORMED;
+        return PM_COORDINATOR_REJECTED;
+    }
+    error = micros_spawn_stack_layout_plan(&request, layout);
+    if (error == MICROS_SPAWN_STACK_LAYOUT_ERROR_TOO_BIG) {
+        *rejection = MICROS_PM_RESULT_TOO_BIG;
+        return PM_COORDINATOR_REJECTED;
+    }
+    if (error != MICROS_SPAWN_STACK_LAYOUT_OK) {
+        return PM_COORDINATOR_CORRUPT;
     }
     if (bytes != coordinator->request_bytes) {
         for (index = 0; index < size; ++index) {
@@ -78,7 +103,7 @@ static enum micros_pm_coordinator_error prepare_init_snapshot(
         }
     }
     pm_common_zero_bytes(&coordinator->request_bytes[size], sizeof(coordinator->request_bytes) - size);
-    return MICROS_PM_COORDINATOR_OK;
+    return PM_COORDINATOR_ADVANCED;
 }
 
 enum micros_pm_coordinator_error micros_pm_coordinator_spawn_init(
@@ -97,23 +122,21 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_init(
     enum micros_pm_coordinator_error error;
     enum pm_coordinator_step step;
 
-    if (coordinator == NULL || child == NULL || !spawn_backend_is_complete(backend)) {
+    if (coordinator == NULL || child == NULL || !pm_coordinator_spawn_backend_is_complete(backend)) {
         return MICROS_PM_COORDINATOR_ERROR_ARGUMENT;
     }
-    if (
-        coordinator->initialization_magic != MICROS_PM_COORDINATOR_INITIALIZATION_MAGIC
-        || coordinator->table == NULL
-        || !coordinator_bindings_are_valid(&coordinator->bindings)
-        || micros_pm_table_validate(coordinator->table) != MICROS_PM_MODEL_OK
-    ) {
+    if (pm_coordinator_validate_instance(coordinator) != MICROS_PM_COORDINATOR_OK) {
         return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
     }
     if (!coordinator->table->runtime_enabled || coordinator->table->init_attempted) {
         return MICROS_PM_COORDINATOR_ERROR_STATE;
     }
-    error = prepare_init_snapshot(coordinator, request_bytes, request_size, &layout);
-    if (error != MICROS_PM_COORDINATOR_OK) {
-        return error;
+    step = pm_coordinator_prepare_snapshot(
+        coordinator, request_bytes, request_size, true, &layout, &spawn.rejection
+    );
+    if (step != PM_COORDINATOR_ADVANCED) {
+        return step == PM_COORDINATOR_REJECTED
+            ? MICROS_PM_COORDINATOR_ERROR_ARGUMENT : MICROS_PM_COORDINATOR_ERROR_INVARIANT;
     }
     if (coordinator->last_spawn_token == UINT64_MAX) {
         return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
@@ -122,6 +145,8 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_init(
     spawn.coordinator = coordinator;
     spawn.backend = backend;
     spawn.context = backend_context;
+    spawn.init = true;
+    spawn.parent_endpoint = MICROS_ENDPOINT_NONE;
     spawn.request_size = request_size;
     spawn.expected_stack = MICROS_APPLICATION_STACK_TOP - layout.occupied_size;
     model_error = micros_pm_begin_init(coordinator->table, &spawn.child, &spawn.pid);
@@ -148,5 +173,24 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_init(
     activated.pid = spawn.pid;
     activated.endpoint = spawn.record->endpoint;
     *child = activated;
+    return MICROS_PM_COORDINATOR_OK;
+}
+
+enum micros_pm_coordinator_error micros_pm_coordinator_parent_lost(
+    struct micros_pm_coordinator *coordinator,
+    uint64_t reply_token
+)
+{
+    if (coordinator == NULL || reply_token == 0) {
+        return MICROS_PM_COORDINATOR_ERROR_ARGUMENT;
+    }
+    if (pm_coordinator_validate_instance(coordinator) != MICROS_PM_COORDINATOR_OK) {
+        return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
+    }
+    if (!coordinator->spawn_pending || coordinator->parent_lost
+        || coordinator->pending_parent_reply != reply_token) {
+        return MICROS_PM_COORDINATOR_ERROR_STATE;
+    }
+    coordinator->parent_lost = true;
     return MICROS_PM_COORDINATOR_OK;
 }

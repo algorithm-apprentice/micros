@@ -60,6 +60,14 @@ static bool find_free_slot(
     return false;
 }
 
+bool pm_spawn_capacity_is_available(const struct micros_pm_table *table)
+{
+    uint16_t slot;
+
+    return !table->pid_exhausted && table->last_pid != UINT64_MAX
+        && find_free_slot(table, &slot);
+}
+
 static enum micros_pm_model_error allocate_record(
     struct micros_pm_table *table,
     struct micros_pm_process_handle parent,

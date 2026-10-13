@@ -1,6 +1,12 @@
 #include "servers/pm/pm_coordinator_internal.h"
 #include "servers/pm/pm_internal.h"
 
+enum pm_coordinator_step pm_coordinator_complete_phase(const struct pm_coordinator_spawn *spawn)
+{
+    return !spawn->init && spawn->coordinator->parent_lost
+        ? PM_COORDINATOR_PARENT_GONE : PM_COORDINATOR_ADVANCED;
+}
+
 static enum pm_coordinator_step reserve_kernel_process(struct pm_coordinator_spawn *spawn)
 {
     struct micros_pm_reservation_result result;
@@ -22,7 +28,7 @@ static enum pm_coordinator_step reserve_kernel_process(struct pm_coordinator_spa
     ) {
         return PM_COORDINATOR_CORRUPT;
     }
-    return PM_COORDINATOR_ADVANCED;
+    return pm_coordinator_complete_phase(spawn);
 }
 
 static enum pm_coordinator_step prepare_vfs_image(struct pm_coordinator_spawn *spawn)
@@ -46,11 +52,15 @@ static enum pm_coordinator_step prepare_vfs_image(struct pm_coordinator_spawn *s
     if (status != MICROS_SYSCALL_ABI_OK || grant == 0) {
         return PM_COORDINATOR_CORRUPT;
     }
+    if (!spawn->init && spawn->coordinator->parent_lost) {
+        return spawn->backend->grant_revoke(spawn->context, grant) == MICROS_SYSCALL_ABI_OK
+            ? PM_COORDINATOR_PARENT_GONE : PM_COORDINATOR_CORRUPT;
+    }
     arguments[0] = spawn->spawn_token;
     arguments[1] = spawn->pid;
-    arguments[2] = 0;
+    arguments[2] = spawn->init ? 0 : spawn->parent_endpoint;
     arguments[3] = (uint64_t)spawn->request_size << 32 | grant;
-    arguments[4] = 1;
+    arguments[4] = (uint64_t)spawn->init;
     if (micros_pm_coordinator_build_vfs_control(
         MICROS_VFS_CONTROL_PREPARE_IMAGE, arguments, &message
     ) != MICROS_PM_COORDINATOR_PROTOCOL_OK) {
@@ -86,7 +96,7 @@ static enum pm_coordinator_step prepare_vfs_image(struct pm_coordinator_spawn *s
     }
     spawn->executable_grant = result.output[1];
     spawn->request_grant = result.output[2];
-    return PM_COORDINATOR_ADVANCED;
+    return pm_coordinator_complete_phase(spawn);
 }
 
 static enum pm_coordinator_step freeze_vm_mappings(struct pm_coordinator_spawn *spawn)
@@ -111,7 +121,7 @@ static enum pm_coordinator_step freeze_vm_mappings(struct pm_coordinator_spawn *
     ) {
         return PM_COORDINATOR_CORRUPT;
     }
-    return PM_COORDINATOR_ADVANCED;
+    return pm_coordinator_complete_phase(spawn);
 }
 
 static enum pm_coordinator_step prepare_vfs_descriptors(struct pm_coordinator_spawn *spawn)
@@ -129,7 +139,7 @@ static enum pm_coordinator_step prepare_vfs_descriptors(struct pm_coordinator_sp
     }
     return micros_pm_spawn_prepare_descriptors(
         spawn->coordinator->table, spawn->child, result.output[0]
-    ) == MICROS_PM_MODEL_OK ? PM_COORDINATOR_ADVANCED : PM_COORDINATOR_CORRUPT;
+    ) == MICROS_PM_MODEL_OK ? pm_coordinator_complete_phase(spawn) : PM_COORDINATOR_CORRUPT;
 }
 
 static enum pm_coordinator_step prepare_kernel_execution(struct pm_coordinator_spawn *spawn)
@@ -160,7 +170,7 @@ static enum pm_coordinator_step prepare_kernel_execution(struct pm_coordinator_s
     ) {
         return PM_COORDINATOR_CORRUPT;
     }
-    return PM_COORDINATOR_ADVANCED;
+    return pm_coordinator_complete_phase(spawn);
 }
 
 static enum pm_coordinator_step commit_hidden_records(struct pm_coordinator_spawn *spawn)
@@ -180,7 +190,7 @@ static enum pm_coordinator_step commit_hidden_records(struct pm_coordinator_spaw
     }
     return micros_pm_spawn_commit_hidden(
         spawn->coordinator->table, spawn->child, spawn->spawn_token
-    ) == MICROS_PM_MODEL_OK ? PM_COORDINATOR_ADVANCED : PM_COORDINATOR_CORRUPT;
+    ) == MICROS_PM_MODEL_OK ? pm_coordinator_complete_phase(spawn) : PM_COORDINATOR_CORRUPT;
 }
 
 static enum pm_coordinator_step activate_and_commit_peers(struct pm_coordinator_spawn *spawn)
@@ -197,6 +207,9 @@ static enum pm_coordinator_step activate_and_commit_peers(struct pm_coordinator_
     uint64_t reply_token;
     micros_runtime_result_t status;
 
+    if (pm_coordinator_complete_phase(spawn) != PM_COORDINATOR_ADVANCED) {
+        return PM_COORDINATOR_PARENT_GONE;
+    }
     if (pm_spawn_prepare_activation(
         spawn->coordinator->table, spawn->child, resources->prepared_endpoint, &plan
     ) != MICROS_PM_MODEL_OK) {
@@ -214,7 +227,7 @@ static enum pm_coordinator_step activate_and_commit_peers(struct pm_coordinator_
         return PM_COORDINATOR_CORRUPT;
     }
     pm_spawn_commit_activation(&plan, &reply_token);
-    if (reply_token != 0
+    if (reply_token != spawn->parent_reply_token
         || pm_coordinator_vm_call(spawn, MICROS_VM_CONTROL_COMMIT_LOAD, vm_arguments, &result)
             != PM_COORDINATOR_ADVANCED
         || pm_coordinator_vfs_call(spawn, MICROS_VFS_CONTROL_RELEASE_IMAGE, vfs_arguments, &result)

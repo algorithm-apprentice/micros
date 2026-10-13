@@ -29,7 +29,15 @@ struct coordinator_spawn_fixture {
     size_t request_size;
     uint32_t trace[64];
     size_t trace_count;
+    size_t child_slot;
+    uint64_t expected_pid;
+    uint64_t expected_spawn_token;
+    uint64_t parent_reply;
     uint32_t fail_step;
+    uint32_t cancel_step;
+    bool init_mode;
+    bool parent_grant_error;
+    micros_runtime_result_t parent_grant_status;
     bool violation;
     bool kernel_reserved;
     bool grant_live;
@@ -44,6 +52,12 @@ struct coordinator_spawn_fixture {
 };
 
 bool coordinator_spawn_fixture_initialize(struct coordinator_spawn_fixture *fixture);
+bool coordinator_spawn_fixture_initialize_parent(struct coordinator_spawn_fixture *fixture);
+struct micros_ipc_message coordinator_spawn_fixture_request(
+    const struct coordinator_spawn_fixture *fixture
+);
+int32_t coordinator_spawn_fixture_result_code(const struct micros_ipc_message *message);
+uint64_t coordinator_spawn_fixture_result_pid(const struct micros_ipc_message *message);
 const struct micros_pm_coordinator_backend *coordinator_spawn_fixture_backend(void);
 bool coordinator_spawn_fixture_resources_are_empty(const struct coordinator_spawn_fixture *fixture);
 

@@ -24,6 +24,10 @@ struct micros_pm_coordinator {
     struct micros_pm_table *table;
     struct micros_pm_coordinator_bindings bindings;
     uint64_t last_spawn_token;
+    uint64_t pending_parent_reply;
+    bool spawn_pending;
+    bool parent_lost;
+    uint8_t reserved[6];
     uint8_t request_bytes[MICROS_SPAWN_REQUEST_SIZE_MAX];
 };
 
@@ -87,6 +91,18 @@ struct micros_pm_coordinator_child {
     uint32_t reserved;
 };
 
+enum micros_pm_coordinator_response_kind {
+    MICROS_PM_COORDINATOR_RESPONSE_REPLY = 0,
+    MICROS_PM_COORDINATOR_RESPONSE_PARENT_LOST,
+};
+
+struct micros_pm_coordinator_response {
+    enum micros_pm_coordinator_response_kind kind;
+    uint32_t reserved;
+    uint64_t reply_token;
+    struct micros_ipc_message message;
+};
+
 enum micros_pm_coordinator_error micros_pm_coordinator_initialize(
     struct micros_pm_coordinator *coordinator,
     struct micros_pm_table *table,
@@ -127,6 +143,18 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_init(
     const uint8_t *request_bytes,
     size_t request_size,
     struct micros_pm_coordinator_child *child
+);
+
+enum micros_pm_coordinator_error micros_pm_coordinator_spawn_request(
+    struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend,
+    void *backend_context,
+    const struct micros_ipc_message *message,
+    struct micros_pm_coordinator_response *response
+);
+enum micros_pm_coordinator_error micros_pm_coordinator_parent_lost(
+    struct micros_pm_coordinator *coordinator,
+    uint64_t reply_token
 );
 
 #endif

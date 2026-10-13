@@ -87,6 +87,7 @@ enum micros_pm_model_error pm_spawn_prepare_activation(
     micros_endpoint_t endpoint,
     struct pm_spawn_activation_plan *plan
 );
+bool pm_spawn_capacity_is_available(const struct micros_pm_table *table);
 void pm_spawn_commit_activation(
     const struct pm_spawn_activation_plan *plan,
     uint64_t *reply_token

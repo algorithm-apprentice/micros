@@ -39,12 +39,20 @@ static bool spawn_fixture_step(struct coordinator_spawn_fixture *fixture, uint32
     if (!valid) {
         fixture->violation = true;
     }
+    if (valid && !fixture->init_mode && fixture->cancel_step == step) {
+        if (micros_pm_coordinator_parent_lost(&fixture->coordinator, fixture->parent_reply)
+            != MICROS_PM_COORDINATOR_OK) {
+            fixture->violation = true;
+            return false;
+        }
+    }
     return valid;
 }
 
-static micros_endpoint_t spawn_fixture_endpoint(void)
+static micros_endpoint_t spawn_fixture_endpoint(const struct coordinator_spawn_fixture *fixture)
 {
-    return (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) | UINT32_C(6);
+    return (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS)
+        | (fixture->init_mode ? UINT32_C(6) : UINT32_C(7));
 }
 
 static micros_runtime_result_t spawn_fixture_reserve(void *context, struct micros_pm_reservation_result *result)
@@ -52,7 +60,7 @@ static micros_runtime_result_t spawn_fixture_reserve(void *context, struct micro
     struct coordinator_spawn_fixture *fixture = context;
 
     if (!spawn_fixture_step(fixture, COORDINATOR_MOCK_RESERVE,
-        !fixture->kernel_reserved && fixture->table.records[0].spawn_stage
+        !fixture->kernel_reserved && fixture->table.records[fixture->child_slot].spawn_stage
             == MICROS_PM_SPAWN_PM_RECORD_RESERVED)) {
         return MICROS_SYSCALL_ABI_STATE;
     }
@@ -90,7 +98,8 @@ static micros_runtime_result_t spawn_fixture_prepare(
     if (!spawn_fixture_step(fixture, COORDINATOR_MOCK_PREPARE_EXECUTION,
         transaction == 101 && load_token == 201 && mapping_generation == 301
             && fixture->descriptors_live && fixture->mappings_frozen
-            && fixture->table.records[0].spawn_stage == MICROS_PM_SPAWN_VFS_DESCRIPTORS_PREPARED)) {
+            && fixture->table.records[fixture->child_slot].spawn_stage
+                == MICROS_PM_SPAWN_VFS_DESCRIPTORS_PREPARED)) {
         return MICROS_SYSCALL_ABI_STATE;
     }
     if (fixture->fail_step == COORDINATOR_MOCK_PREPARE_EXECUTION) {
@@ -100,7 +109,7 @@ static micros_runtime_result_t spawn_fixture_prepare(
     result->version = MICROS_PM_PREPARED_VERSION;
     result->size = MICROS_PM_PREPARED_SIZE;
     result->prepared_token = 401;
-    result->endpoint = spawn_fixture_endpoint();
+    result->endpoint = spawn_fixture_endpoint(fixture);
     fixture->execution_live = true;
     return MICROS_SYSCALL_ABI_OK;
 }
@@ -132,8 +141,9 @@ static micros_runtime_result_t spawn_fixture_activate(
     if (!spawn_fixture_step(fixture, COORDINATOR_MOCK_ACTIVATE,
         transaction == 101 && load_token == 201 && mapping_generation == 301
             && prepared_token == 401 && fixture->hidden_live
-            && fixture->table.records[0].state == MICROS_PM_PROCESS_SPAWNING
-            && fixture->table.records[0].spawn_stage == MICROS_PM_SPAWN_PM_VFS_COMMITTED)) {
+            && fixture->table.records[fixture->child_slot].state == MICROS_PM_PROCESS_SPAWNING
+            && fixture->table.records[fixture->child_slot].spawn_stage
+                == MICROS_PM_SPAWN_PM_VFS_COMMITTED)) {
         return MICROS_SYSCALL_ABI_STATE;
     }
     if (fixture->fail_step == COORDINATOR_MOCK_ACTIVATE) {
@@ -203,28 +213,29 @@ static micros_runtime_result_t spawn_fixture_vfs_call(
     for (index = 0; index < 5; ++index) {
         words[index] = spawn_fixture_read_word(&message->payload[(index + 1) * 8]);
     }
-    valid = words[0] == 1;
+    valid = words[0] == fixture->expected_spawn_token;
     switch (command) {
     case MICROS_VFS_CONTROL_PREPARE_IMAGE:
         step = COORDINATOR_MOCK_PREPARE_IMAGE;
-        valid = valid && fixture->grant_live && words[1] == 1 && words[2] == 0
+        valid = valid && fixture->grant_live && words[1] == fixture->expected_pid
+            && words[2] == (fixture->init_mode ? 0 : fixture->table.records[0].endpoint)
             && words[3] == ((uint64_t)fixture->request_size << 32 | UINT64_C(0x100))
-            && words[4] == 1;
+            && words[4] == (uint64_t)fixture->init_mode;
         break;
     case MICROS_VFS_CONTROL_PREPARE_DESCRIPTORS:
         step = COORDINATOR_MOCK_PREPARE_DESCRIPTORS;
         valid = valid && fixture->mappings_frozen && words[1] == 501
-            && words[2] == 1 && words[3] == 0 && words[4] == 0;
+            && words[2] == fixture->expected_pid && words[3] == 0 && words[4] == 0;
         break;
     case MICROS_VFS_CONTROL_COMMIT_HIDDEN:
         step = COORDINATOR_MOCK_COMMIT_HIDDEN;
         valid = valid && fixture->execution_live && words[1] == 501 && words[2] == 601
-            && words[3] == spawn_fixture_endpoint() && words[4] == 0;
+            && words[3] == spawn_fixture_endpoint(fixture) && words[4] == 0;
         break;
     case MICROS_VFS_CONTROL_REVERT_HIDDEN:
         step = COORDINATOR_MOCK_REVERT_HIDDEN;
         valid = valid && fixture->hidden_live && !fixture->published && words[1] == 501
-            && words[2] == 601 && words[3] == spawn_fixture_endpoint() && words[4] == 0;
+            && words[2] == 601 && words[3] == spawn_fixture_endpoint(fixture) && words[4] == 0;
         break;
     case MICROS_VFS_CONTROL_ABORT_DESCRIPTORS:
         step = COORDINATOR_MOCK_ABORT_DESCRIPTORS;
@@ -295,20 +306,22 @@ static micros_runtime_result_t spawn_fixture_vm_call(
     if (command == MICROS_VM_CONTROL_LOAD) {
         step = COORDINATOR_MOCK_LOAD;
         valid = fixture->image_live && !fixture->grant_live && words[0] == 101
-            && words[1] == 1 && words[2] == (UINT64_C(4096) << 32 | UINT64_C(0x301))
+            && words[1] == fixture->expected_pid
+            && words[2] == (UINT64_C(4096) << 32 | UINT64_C(0x301))
             && words[3] == ((uint64_t)fixture->request_size << 32 | UINT64_C(0x300))
             && words[4] == 0;
     } else if (command == MICROS_VM_CONTROL_ABORT_LOAD) {
         step = COORDINATOR_MOCK_ABORT_LOAD;
         valid = fixture->mappings_frozen && !fixture->execution_live && !fixture->published
-            && words[0] == 201 && words[1] == 301 && words[2] == 1
+            && words[0] == 201 && words[1] == 301 && words[2] == fixture->expected_pid
             && words[3] == 0 && words[4] == 0;
     } else if (command == MICROS_VM_CONTROL_COMMIT_LOAD) {
         step = COORDINATOR_MOCK_COMMIT_LOAD;
-        valid = fixture->published && fixture->table.records[0].state == MICROS_PM_PROCESS_RUNNING
-            && fixture->table.records[0].load_token == 201
-            && fixture->table.records[0].mapping_generation == 301
-            && words[0] == 201 && words[1] == 301 && words[2] == 1
+        valid = fixture->published
+            && fixture->table.records[fixture->child_slot].state == MICROS_PM_PROCESS_RUNNING
+            && fixture->table.records[fixture->child_slot].load_token == 201
+            && fixture->table.records[fixture->child_slot].mapping_generation == 301
+            && words[0] == 201 && words[1] == 301 && words[2] == fixture->expected_pid
             && words[3] == 0 && words[4] == 0;
     } else {
         fixture->violation = true;
@@ -357,6 +370,32 @@ static micros_runtime_result_t spawn_fixture_call(
     return MICROS_SYSCALL_ABI_STATE;
 }
 
+static micros_runtime_result_t spawn_fixture_copy_parent(
+    void *context, micros_endpoint_t grantor, micros_grant_t grant,
+    size_t offset, uintptr_t local_address, size_t length
+)
+{
+    struct coordinator_spawn_fixture *fixture = context;
+
+    if (
+        fixture->init_mode || grantor != fixture->table.records[0].endpoint
+        || grant != UINT32_C(0x700) || offset != 0
+        || local_address != (uintptr_t)fixture->coordinator.request_bytes
+        || length != fixture->request_size
+    ) {
+        fixture->violation = true;
+        return MICROS_SYSCALL_ABI_STATE;
+    }
+    if (fixture->parent_grant_error) {
+        return MICROS_SYSCALL_ABI_UNAUTHORIZED;
+    }
+    if (fixture->parent_grant_status != MICROS_SYSCALL_ABI_OK) {
+        return fixture->parent_grant_status;
+    }
+    memcpy((void *)local_address, fixture->request, length);
+    return MICROS_SYSCALL_ABI_OK;
+}
+
 const struct micros_pm_coordinator_backend *coordinator_spawn_fixture_backend(void)
 {
     static const struct micros_pm_coordinator_backend backend = {
@@ -367,6 +406,7 @@ const struct micros_pm_coordinator_backend *coordinator_spawn_fixture_backend(vo
         .activate = spawn_fixture_activate,
         .grant_create = spawn_fixture_grant_create,
         .grant_revoke = spawn_fixture_grant_revoke,
+        .grant_copy_from = spawn_fixture_copy_parent,
         .call = spawn_fixture_call,
     };
 
@@ -384,6 +424,9 @@ bool coordinator_spawn_fixture_initialize(struct coordinator_spawn_fixture *fixt
     struct micros_ipc_message event;
 
     memset(fixture, 0, sizeof(*fixture));
+    fixture->init_mode = true;
+    fixture->expected_pid = 1;
+    fixture->expected_spawn_token = 1;
     memset(&event, 0, sizeof(event));
     event.source = MICROS_ENDPOINT_NONE;
     event.type = MICROS_IPC_TYPE_KERNEL_NOTIFICATION;
@@ -406,6 +449,67 @@ bool coordinator_spawn_fixture_initialize(struct coordinator_spawn_fixture *fixt
     return true;
 }
 
+bool coordinator_spawn_fixture_initialize_parent(struct coordinator_spawn_fixture *fixture)
+{
+    struct micros_pm_process_handle parent;
+    uint64_t pid;
+    uint64_t reply_token;
+    micros_endpoint_t endpoint = (UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) | UINT32_C(6);
+
+    COORDINATOR_EXPECT(coordinator_spawn_fixture_initialize(fixture));
+    COORDINATOR_EXPECT(
+        micros_pm_begin_init(&fixture->table, &parent, &pid) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_reserve_kernel(&fixture->table, parent, 1001) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_prepare_image(&fixture->table, parent, 5001) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_freeze_mappings(&fixture->table, parent, 2001, 3001) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_prepare_descriptors(&fixture->table, parent, 6001) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_prepare_execution(&fixture->table, parent, 4001, endpoint)
+            == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_commit_hidden(&fixture->table, parent, 1) == MICROS_PM_MODEL_OK
+        && micros_pm_spawn_activate(&fixture->table, parent, endpoint, &reply_token)
+            == MICROS_PM_MODEL_OK
+        && pid == 1 && reply_token == 0
+    );
+    fixture->coordinator.last_spawn_token = 1;
+    fixture->init_mode = false;
+    fixture->child_slot = 1;
+    fixture->expected_pid = 2;
+    fixture->expected_spawn_token = 2;
+    fixture->parent_reply = 777;
+    return true;
+}
+
+struct micros_ipc_message coordinator_spawn_fixture_request(
+    const struct coordinator_spawn_fixture *fixture
+)
+{
+    struct micros_ipc_message message;
+
+    memset(&message, 0, sizeof(message));
+    message.type = MICROS_PM_MESSAGE_SPAWN;
+    message.source = fixture->table.records[0].endpoint;
+    message.reply_token = fixture->parent_reply;
+    spawn_fixture_write_u32(&message.payload[0], MICROS_PM_PROTOCOL_VERSION);
+    spawn_fixture_write_u32(&message.payload[8], UINT32_C(0x700));
+    spawn_fixture_write_u32(&message.payload[12], (uint32_t)fixture->request_size);
+    return message;
+}
+
+int32_t coordinator_spawn_fixture_result_code(const struct micros_ipc_message *message)
+{
+    uint64_t word = spawn_fixture_read_word(&message->payload[8]) & UINT32_MAX;
+    int64_t result = (int64_t)word;
+
+    if (result > INT32_MAX) {
+        result -= INT64_C(1) << 32;
+    }
+    return (int32_t)result;
+}
+
+uint64_t coordinator_spawn_fixture_result_pid(const struct micros_ipc_message *message)
+{
+    return spawn_fixture_read_word(&message->payload[16]);
+}
 bool coordinator_spawn_fixture_resources_are_empty(const struct coordinator_spawn_fixture *fixture)
 {
     return (
