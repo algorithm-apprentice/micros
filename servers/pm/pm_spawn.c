@@ -429,6 +429,8 @@ enum micros_pm_model_error micros_pm_spawn_activate(
     record->state = MICROS_PM_PROCESS_RUNNING;
     record->init_candidate = false;
     record->endpoint = endpoint;
+    record->load_token = record->spawn.vm_load_token;
+    record->mapping_generation = record->spawn.mapping_generation;
     record->spawn_stage = MICROS_PM_SPAWN_NONE;
     pm_common_zero_bytes(&record->spawn, sizeof(record->spawn));
     record->spawn.prepared_endpoint = MICROS_ENDPOINT_NONE;

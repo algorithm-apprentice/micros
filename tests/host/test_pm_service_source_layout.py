@@ -92,7 +92,7 @@ STABLE_HEADER_HASHES = {
     "lib/spawn/spawn_request.h":
         "98d4cd7beec17b7d7ef00070e31b41c6a4cdf10a856dea1e1b545bd69c8966cf",
     "servers/pm/pm_core.h":
-        "96d660e2dcd7d7cc62030dea77d08bd373d03e34d1e571b501abb77af5254696",
+        "1aa15efd1ada1f595968898e4a0c5c04a9ec102dca8ff8f4687b7c2e94c454a9",
     "servers/pm/pm_control.h":
         "8ea7047976c776e75d5e4bd46e36fb5de2232b4f025e337673cde3d0820fb6ef",
     "kernel/pm_service_test.h":
@@ -135,6 +135,7 @@ HELPER_OWNER_GROUPS = {
     ),
     "servers/pm/pm_validation.c": (
         "spawn_resources_are_valid", "spawn_is_clear", "exit_is_clear", "wait_is_clear",
+        "validation_mapping_identity_is_valid",
     ),
     "servers/pm/pm_spawn.c": (
         "resolve_forward_spawning_record", "table_has_spawning_record",
@@ -180,7 +181,9 @@ HELPER_OWNER_GROUPS = {
             "has_child", "set_wait_result", "compare",
         )
     ),
-    "tests/host/pm_model_operations.c": ("pm_model_run_operation",),
+    "tests/host/pm_model_operations.c": (
+        "activate_selected_spawn", "pm_model_run_operation",
+    ),
     "tests/host/spawn_abi_test_fixture.c": tuple(
         "spawn_abi_test_" + name for name in (
             "context_get", "write_u16_le", "write_u32_le", "write_u64_le",

@@ -61,6 +61,8 @@ bool test_replayable_transition_model(void)
     context->reference.records[context->init.slot].handle = context->init;
     context->reference.records[context->init.slot].pid = 1;
     context->reference.records[context->init.slot].endpoint = UINT32_C(0x00001000);
+    context->reference.records[context->init.slot].load_token = 13;
+    context->reference.records[context->init.slot].mapping_generation = 14;
 
     for (context->step = 0; context->step < PM_MODEL_STEP_COUNT;
          ++context->step) {

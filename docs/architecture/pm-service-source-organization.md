@@ -66,7 +66,8 @@ The authoritative final PR plan remains the gate described below.
 
 ## Preserved contracts
 
-The following headers remain byte-for-byte stable:
+The completed ADR-0058 source-only correction preserved these headers
+byte-for-byte:
 
 ```text
 include/micros/pm.h
@@ -79,9 +80,18 @@ kernel/pm_service_test_fixture.h
 tests/qemu/pm_service_protocol.h
 ```
 
-No public declaration, structure, capacity, result, phase, token, protocol,
-ELF policy, stack layout, privilege, scheduling policy, or syscall changes.
+That correction changed no public declaration, structure, capacity, result,
+phase, token, protocol, ELF policy, stack layout, privilege, scheduling policy,
+or syscall.
 `servers/pm/pm_control.c` remains an unchanged, cohesive syscall wrapper.
+
+The later Accepted ADR-0050
+[coordinator extension](pm-spawn-coordinator.md) adds `load_token` and
+`mapping_generation` to the portable PM process record so activation retains
+the identity needed by exit. Its header hash is updated for that specific
+behavior extension; the seven other headers and all user/syscall wire layouts
+remain unchanged. Complete validation and the independent PM model now check
+the active pair through activation, detach, and VM-release acknowledgment.
 
 ADR-0050's existing PM budget must be enforced for every service variant.
 At the reviewed base the common user-ELF check had no PM-specific resident

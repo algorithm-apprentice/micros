@@ -24,6 +24,9 @@ This directory contains the design baseline for `micros`.
 - [PM service source organization](architecture/pm-service-source-organization.md)
   defines exact lifecycle, codec, validation, request/layout, service,
   native/model, kernel-report, and generator ownership.
+- [PM spawn and exit coordinator](architecture/pm-spawn-coordinator.md)
+  maps the Accepted post-handoff transaction to lifecycle, peer-adapter,
+  commit, rollback, and native-model implementation owners.
 - [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.

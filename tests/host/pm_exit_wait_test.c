@@ -179,6 +179,8 @@ static bool release_exit_into_wait_result(struct exit_wait_case *context)
         && context->record->exit_transaction == 501
         && context->record->exit_kind == MICROS_PM_EXIT_NORMAL
         && context->record->exit_code == -17
+        && context->record->load_token == 13
+        && context->record->mapping_generation == 14
         && micros_pm_exit_detach(&context->table, context->child, 500)
             == MICROS_PM_MODEL_ERROR_STALE
         && micros_pm_exit_detach(&context->table, context->child, 501)
@@ -188,6 +190,8 @@ static bool release_exit_into_wait_result(struct exit_wait_case *context)
         && context->record->exit_stage
             == MICROS_PM_EXIT_STAGE_VM_RELEASE_PENDING
         && context->record->endpoint == MICROS_ENDPOINT_NONE
+        && context->record->load_token == 13
+        && context->record->mapping_generation == 14
         && micros_pm_exit_release_process(
             &context->table,
             context->child,
@@ -201,6 +205,8 @@ static bool release_exit_into_wait_result(struct exit_wait_case *context)
         ) == 0
         && micros_pm_exit_release_vm(&context->table, context->child, 501)
             == MICROS_PM_MODEL_OK
+        && context->record->load_token == 0
+        && context->record->mapping_generation == 0
         && micros_pm_exit_release_process(
             &context->table,
             context->child,

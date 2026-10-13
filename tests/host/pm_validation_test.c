@@ -20,6 +20,16 @@ bool test_orphaned_lifecycle_is_invalid(void)
         && pm_test_complete_exit(&table, child, 901, 9, &outcomes)
         && outcomes.count == 0
     );
+    table.records[child.slot].load_token = 13;
+    EXPECT_TRUE(
+        micros_pm_table_validate(&table) == MICROS_PM_MODEL_ERROR_INVARIANT
+    );
+    table.records[child.slot].load_token = 0;
+    table.records[child.slot].mapping_generation = 14;
+    EXPECT_TRUE(
+        micros_pm_table_validate(&table) == MICROS_PM_MODEL_ERROR_INVARIANT
+    );
+    table.records[child.slot].mapping_generation = 0;
     memset(
         &table.records[child.slot].parent,
         0,

@@ -165,6 +165,8 @@ enum micros_pm_model_error micros_pm_exit_release_vm(
     }
 
     record = &table->records[process.slot];
+    record->load_token = 0;
+    record->mapping_generation = 0;
     record->exit_stage
         = MICROS_PM_EXIT_STAGE_KERNEL_PROCESS_EMPTY;
     return MICROS_PM_MODEL_OK;
