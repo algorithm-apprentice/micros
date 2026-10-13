@@ -295,6 +295,14 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "test_authorized_receive_blocks",
         "test_receive_specific_and_any_fifo",
         "test_receive_rejections_are_atomic",
+        "test_call_delivers_to_waiting_receiver",
+        "test_call_preserves_independent_receiver_flags",
+        "test_queued_calls_bind_exact_threads_and_deliver_fifo",
+        "test_low_level_enqueue_rejects_reply_tokens",
+        "test_token_exhaustion_is_preflighted",
+        "test_call_rejections_are_atomic",
+        "test_staged_call_token_binding_is_validated",
+        "test_allocator_validator_rejects_unissued_token",
         "micros_ipc_notify",
         "micros_ipc_inject_kernel_notification",
         "micros_ipc_prepare_kernel_notification",
@@ -356,12 +364,14 @@ LONG_FUNCTION_MIGRATION = tuple(
         "micros_ipc_reply_receive",
         "micros_ipc_handle_captured_user_ecall",
         "test_receive_specific_and_any_fifo",
+        "test_queued_calls_bind_exact_threads_and_deliver_fifo",
+        "test_call_rejections_are_atomic",
     }
 )
 
 FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_operation_test_fixture.c": "3bbffce409df296cc5ccbc908c8034b84d730d32db201c73f6fdfe128ba065fc",
-    "tests/host/ipc_call_test.c": "1930fcc91c4e9af060fd743ed214b2ac20b1e08dda54bde6c38cfaa21a95a30e",
+    "tests/host/ipc_call_test_fixture.c": "3c4205f69f3a21baaeb3e7fada651741446007de252d5d1f5d932e11f2ccbe87",
     "tests/host/ipc_reply_test.c": "3dfadd845ed505feb914a031ece89584318a5d34580468272bea7aef7fa81ae5",
     "tests/host/ipc_notify_test.c": "1238cd625791ec0e01b96de630dfa5d453068d1a1a9eaa36d1d90fac35baa054",
     "tests/host/ipc_close_test.c": "01c87398aed0e69b094997423c40683cb178fd4682f8a958214797f52e69086b",
