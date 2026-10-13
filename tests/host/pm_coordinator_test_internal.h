@@ -25,5 +25,9 @@ bool test_coordinator_table_failures(void);
 bool test_coordinator_vfs_control_contract(void);
 bool test_coordinator_vm_control_contract(void);
 bool test_coordinator_control_rejections(void);
+bool test_coordinator_directed_init(void);
+bool test_coordinator_init_failure_rollback(void);
+bool test_coordinator_init_postpublication_failures(void);
+bool test_coordinator_init_preflight_preserves_pid(void);
 
 #endif

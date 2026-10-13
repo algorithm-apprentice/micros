@@ -502,6 +502,12 @@ shared VM IPC header is separate from the stable kernel-operation header.
 New coordinator paths inherit their PM core/native baselines;
 unknown ownership still escalates fail-closed. The remaining transaction and
 model owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
+Trusted init now composes explicit forward, peer-result, and reverse owners.
+The coordinator native target also expands the existing spawn-request set
+once, increasing that set's consumer count to eight. Its automatic transition
+fixture adds no mutable static state; one exact immutable backend-port table
+is the sole new static-local declaration. Callback members are distinguished
+from top-level function declarations by the private-interface gate.
 
 ## Validation and structural gate
 

@@ -679,6 +679,9 @@ set(
     MICROS_PM_COORDINATOR_SOURCES
     servers/pm/pm_coordinator.c
     servers/pm/pm_coordinator_protocol.c
+    servers/pm/pm_coordinator_peers.c
+    servers/pm/pm_coordinator_spawn.c
+    servers/pm/pm_coordinator_rollback.c
 )
 
 set(
@@ -715,6 +718,8 @@ set(
     tests/host/pm_coordinator_test.c
     tests/host/pm_coordinator_configuration_test.c
     tests/host/pm_coordinator_protocol_test.c
+    tests/host/pm_coordinator_spawn_fixture.c
+    tests/host/pm_coordinator_spawn_test.c
 )
 
 set(
@@ -924,6 +929,7 @@ if(MICROS_BUILD_HOST_TESTS)
         pm_coordinator_test
         ${MICROS_PM_CORE_SOURCES}
         ${MICROS_PM_COORDINATOR_SOURCES}
+        ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}
     )
     target_include_directories(

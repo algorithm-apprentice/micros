@@ -13,6 +13,10 @@ int main(void)
         {"coordinator VFS control contract", test_coordinator_vfs_control_contract},
         {"coordinator VM control contract", test_coordinator_vm_control_contract},
         {"coordinator control rejections", test_coordinator_control_rejections},
+        {"coordinator directed init", test_coordinator_directed_init},
+        {"coordinator init failure rollback", test_coordinator_init_failure_rollback},
+        {"coordinator init postpublication failures", test_coordinator_init_postpublication_failures},
+        {"coordinator init preflight preserves PID", test_coordinator_init_preflight_preserves_pid},
     };
     size_t index;
 

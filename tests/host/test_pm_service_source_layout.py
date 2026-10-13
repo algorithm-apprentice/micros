@@ -41,6 +41,9 @@ SOURCE_SETS = {
     "MICROS_PM_COORDINATOR_SOURCES": (
         "servers/pm/pm_coordinator.c",
         "servers/pm/pm_coordinator_protocol.c",
+        "servers/pm/pm_coordinator_peers.c",
+        "servers/pm/pm_coordinator_spawn.c",
+        "servers/pm/pm_coordinator_rollback.c",
     ),
     "MICROS_SPAWN_REQUEST_SOURCES": (
         "lib/spawn/spawn_request.c",
@@ -69,6 +72,8 @@ SOURCE_SETS = {
         "tests/host/pm_coordinator_test.c",
         "tests/host/pm_coordinator_configuration_test.c",
         "tests/host/pm_coordinator_protocol_test.c",
+        "tests/host/pm_coordinator_spawn_fixture.c",
+        "tests/host/pm_coordinator_spawn_test.c",
     ),
     "MICROS_SPAWN_ABI_HOST_TEST_SOURCES": (
         "tests/host/spawn_abi_test.c",
@@ -93,6 +98,8 @@ PRIVATE_HEADERS = (
     "kernel/pm_service_test_internal.h",
     "servers/pm/pm_coordinator.h",
     "tests/host/pm_coordinator_test_internal.h",
+    "servers/pm/pm_coordinator_internal.h",
+    "tests/host/pm_coordinator_spawn_fixture.h",
 )
 
 SHARED_PROTOCOL_HEADERS = ("include/micros/vm_service.h",)
@@ -124,7 +131,14 @@ DECLARATION_ONLY_HEADERS = (
 )
 
 RETAINED_OWNER_GROUPS = {
-    "servers/pm/pm_coordinator.c": ("micros_pm_coordinator_initialize",),
+    "servers/pm/pm_coordinator.c": (
+        "micros_pm_coordinator_initialize", "micros_pm_coordinator_spawn_init",
+    ),
+    "servers/pm/pm_coordinator_peers.c": (
+        "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call", "pm_coordinator_vm_call",
+    ),
+    "servers/pm/pm_coordinator_spawn.c": ("pm_coordinator_run_spawn",),
+    "servers/pm/pm_coordinator_rollback.c": ("pm_coordinator_rollback_spawn",),
     "servers/pm/pm_coordinator_protocol.c": (
         "micros_pm_coordinator_build_vfs_control", "micros_pm_coordinator_build_vm_control",
         "micros_pm_coordinator_decode_vfs_result", "micros_pm_coordinator_decode_vm_result",
@@ -139,7 +153,15 @@ RETAINED_OWNER_GROUPS = {
 }
 
 HELPER_OWNER_GROUPS = {
-    "servers/pm/pm_coordinator.c": ("coordinator_bindings_are_valid",),
+    "servers/pm/pm_coordinator.c": (
+        "coordinator_bindings_are_valid", "spawn_backend_is_complete", "prepare_init_snapshot",
+    ),
+    "servers/pm/pm_coordinator_spawn.c": (
+        "reserve_kernel_process", "prepare_vfs_image", "freeze_vm_mappings",
+        "prepare_vfs_descriptors", "prepare_kernel_execution", "commit_hidden_records",
+        "activate_and_commit_peers",
+    ),
+    "servers/pm/pm_coordinator_rollback.c": ("release_spawn_resource",),
     "servers/pm/pm_coordinator_protocol.c": (
         "endpoint_word_is_valid", "grant_pair_is_valid", "vfs_command_is_defined",
         "vm_command_is_defined", "vfs_arguments_are_valid", "vm_arguments_are_valid",
@@ -240,8 +262,20 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "servers/pm/pm_core.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_protocol.c": (COMMON_OWNER,),
     VALIDATION_OWNER: (COMMON_OWNER,),
-    "servers/pm/pm_coordinator.c": (COMMON_OWNER, VALIDATION_OWNER),
+    "servers/pm/pm_coordinator.c": (
+        COMMON_OWNER, VALIDATION_OWNER, "servers/pm/pm_core.c", "servers/pm/pm_spawn.c",
+        "lib/spawn/spawn_request.c", "lib/spawn/spawn_stack_layout.c",
+        "servers/pm/pm_coordinator_spawn.c", "servers/pm/pm_coordinator_rollback.c",
+    ),
     "servers/pm/pm_coordinator_protocol.c": (COMMON_OWNER,),
+    "servers/pm/pm_coordinator_peers.c": ("servers/pm/pm_coordinator_protocol.c",),
+    "servers/pm/pm_coordinator_spawn.c": (
+        COMMON_OWNER, "servers/pm/pm_spawn.c", "servers/pm/pm_coordinator_protocol.c",
+        "servers/pm/pm_coordinator_peers.c",
+    ),
+    "servers/pm/pm_coordinator_rollback.c": (
+        "servers/pm/pm_rollback.c", "servers/pm/pm_coordinator_peers.c",
+    ),
     "servers/pm/pm_spawn.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_rollback.c": (COMMON_OWNER, VALIDATION_OWNER),
     "servers/pm/pm_wait.c": (COMMON_OWNER, VALIDATION_OWNER),
@@ -287,6 +321,17 @@ FILE_SCOPE_OBJECT_PATTERNS = {
 }
 
 STATIC_LOCAL_DECLARATIONS = {
+    "tests/host/pm_coordinator_spawn_fixture.c": (
+        "static const struct micros_pm_coordinator_backend backend = {"
+        ".reserve = spawn_fixture_reserve,"
+        ".abort_reserved = spawn_fixture_abort_reserved,"
+        ".prepare_execution = spawn_fixture_prepare,"
+        ".abort_prepared = spawn_fixture_abort_prepared,"
+        ".activate = spawn_fixture_activate,"
+        ".grant_create = spawn_fixture_grant_create,"
+        ".grant_revoke = spawn_fixture_grant_revoke,"
+        ".call = spawn_fixture_call, };",
+    ),
     "tests/host/spawn_abi_test_fixture.c": (
         "static const uint16_t argument_sizes[8] = {"
         "256, 256, 256, 256, 256, 256, 1, 1, };",
@@ -576,6 +621,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "pm_coordinator_test": (
                 "MICROS_PM_CORE_SOURCES", "MICROS_PM_COORDINATOR_SOURCES",
                 "MICROS_PM_COORDINATOR_HOST_TEST_SOURCES",
+                "MICROS_SPAWN_REQUEST_SOURCES",
             ),
             "spawn_abi_test": (
                 "MICROS_SPAWN_REQUEST_SOURCES", "MICROS_SPAWN_ABI_HOST_TEST_SOURCES",
@@ -594,7 +640,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(7, cmake.count("${MICROS_PM_CORE_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
-        self.assertEqual(7, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(8, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
         for target in ("micros_vm_server", "micros_vfs_service"):
             block = cmake_command(cmake, "micros_add_bootstrap_user", target)
@@ -692,7 +738,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             ),
             "kernel/pm_service_test_internal.h": (),
             "servers/pm/pm_coordinator.h": (
-                "micros_pm_coordinator_initialize",
+                "micros_pm_coordinator_initialize", "micros_pm_coordinator_spawn_init",
                 *RETAINED_OWNER_GROUPS["servers/pm/pm_coordinator_protocol.c"],
             ),
             "tests/host/pm_coordinator_test_internal.h": (
@@ -700,11 +746,23 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 "test_coordinator_binding_failures", "test_coordinator_table_failures",
                 "test_coordinator_vfs_control_contract", "test_coordinator_vm_control_contract",
                 "test_coordinator_control_rejections",
+                "test_coordinator_directed_init", "test_coordinator_init_failure_rollback",
+                "test_coordinator_init_postpublication_failures",
+                "test_coordinator_init_preflight_preserves_pid",
+            ),
+            "servers/pm/pm_coordinator_internal.h": (
+                "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call",
+                "pm_coordinator_vm_call", "pm_coordinator_run_spawn",
+                "pm_coordinator_rollback_spawn",
+            ),
+            "tests/host/pm_coordinator_spawn_fixture.h": (
+                "coordinator_spawn_fixture_initialize", "coordinator_spawn_fixture_backend",
+                "coordinator_spawn_fixture_resources_are_empty",
             ),
         }
         for private_header, expected in expected_declarations.items():
             text = c_declaration_text((REPOSITORY_ROOT / private_header).read_text())
-            declarations = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", text)
+            declarations = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\((?!\s*\*)", text)
             self.assertEqual(len(expected), len(declarations), private_header)
             self.assertEqual(set(expected), set(declarations), private_header)
             for name in declarations:

@@ -71,11 +71,12 @@ rejected without changing either object.
 Binding input is captured before owned storage is cleared, including when
 the caller supplied the coordinator's own binding member.
 
-The constructor, four deterministic configuration cases, and byte-exact
-VFS/VM control codecs are implemented in `MICROS_PM_COORDINATOR_SOURCES`
-and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`. The fast `pm-coordinator`
-CTest is included by both native aggregates. Forward transactions, runtime
-peer adapters, and the separate mixed lifecycle model remain in progress.
+The constructor, byte-exact VFS/VM codecs, and the trusted-init forward
+transaction with every completed-stage rollback are implemented in
+`MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
+The fast `pm-coordinator` CTest is included by both native aggregates.
+Ordinary application spawn, exit/wait coordination, runtime peer adapters,
+and the separate mixed lifecycle model remain in progress.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -89,6 +90,22 @@ existing complete-matrix public-header validation policy.
 The trusted-init `PREPARE_IMAGE` parent word is literal zero, not the distinct
 internal `MICROS_ENDPOINT_NONE` sentinel; ordinary spawn carries its concrete
 parent endpoint.
+
+The typed backend is borrowed for one operation. Init requires only the
+kernel reservation/preparation/activation, grant creation/revocation, and IPC
+ports it can reach, including every reverse release. It does not gain exit or
+reply authority through a missing callback. The native transition fixture
+validates each collaborator's exact token, stage, word, and resource shape.
+It checks the complete success trace, all eight prepublication rejection
+points, and mandatory post-activation failure without rollback.
+
+Init copies the validated absolute-path request before PID consumption,
+issues a separate monotonic PM spawn token, revokes its VFS request grant
+after every returning image call, and retains the exact VM diagnostic stack
+cross-check. Kernel activation immediately composes the prevalidated local
+commit before VM commit or VFS release. Expected prepublication failure
+unwinds exact resource acknowledgments and remains terminal for PID 1;
+postpublication failure is an explicit invariant outcome, never failed spawn.
 
 ## Active mapping identity
 
