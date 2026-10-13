@@ -282,6 +282,10 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "micros_ipc_thread_has_staged_kernel_notification",
         "micros_ipc_stage_no_message_completion",
         "micros_ipc_endpoint_close",
+        "micros_ipc_sender_enqueue",
+        "micros_ipc_receiver_enqueue",
+        "micros_ipc_sender_commit_delivery",
+        "micros_ipc_receiver_commit_delivery",
         "micros_ipc_notify",
         "micros_ipc_inject_kernel_notification",
         "micros_ipc_prepare_kernel_notification",
@@ -335,7 +339,12 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 LONG_FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
-    if entry[1] != "micros_ipc_notify"
+    if entry[1] not in {
+        "micros_ipc_notify",
+        "sender_enqueue",
+        "micros_ipc_receiver_commit_delivery",
+        "sender_commit_delivery",
+    }
 )
 
 FILE_SCOPE_STORAGE_HASHES = {

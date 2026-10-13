@@ -152,4 +152,25 @@ enum micros_ipc_error ipc_preflight_deadlock(
     struct micros_thread_handle cleared_dependency
 );
 
+enum micros_ipc_error ipc_sender_enqueue(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender_handle,
+    micros_endpoint_t destination_endpoint,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer,
+    bool allocates_reply_token
+);
+enum micros_ipc_error ipc_sender_commit_delivery(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle sender_handle,
+    micros_endpoint_t destination_endpoint,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer,
+    struct micros_thread_handle *matched_receiver
+);
+
 #endif
