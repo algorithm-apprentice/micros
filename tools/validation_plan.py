@@ -413,6 +413,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/pm/pm_service_self_test.c",
             "servers/pm/pm_service_scratch.c",
             "servers/pm/pm_service_internal.h",
+            "servers/pm/pm_service_backend.c",
         ),
     ),
     (
@@ -441,6 +442,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/pm_coordinator_request_test.c",
             "tests/host/pm_coordinator_exit_fixture.c",
             "tests/host/pm_coordinator_exit_wait_test.c",
+            "tests/host/pm_coordinator_backend_test.c",
             "tests/host/pm_coordinator_test_internal.h",
         ),
     ),

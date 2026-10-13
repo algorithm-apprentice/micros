@@ -39,5 +39,6 @@ bool test_coordinator_exit_and_blocked_wait(void);
 bool test_coordinator_exit_failure_boundaries(void);
 bool test_coordinator_immediate_wait_reply_restore(void);
 bool test_coordinator_nested_independent_wait_replies(void);
+bool test_coordinator_real_runtime_backend(void);
 
 #endif

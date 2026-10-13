@@ -689,6 +689,11 @@ set(
 )
 
 set(
+    MICROS_PM_RUNTIME_BACKEND_SOURCES
+    servers/pm/pm_service_backend.c
+)
+
+set(
     MICROS_SPAWN_REQUEST_SOURCES
     lib/spawn/spawn_request.c
     lib/spawn/spawn_stack_layout.c
@@ -727,6 +732,7 @@ set(
     tests/host/pm_coordinator_request_test.c
     tests/host/pm_coordinator_exit_fixture.c
     tests/host/pm_coordinator_exit_wait_test.c
+    tests/host/pm_coordinator_backend_test.c
 )
 
 set(
@@ -937,6 +943,9 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_PM_CORE_SOURCES}
         ${MICROS_PM_COORDINATOR_SOURCES}
         ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+        servers/pm/pm_control.c
+        lib/runtime/runtime.c
         ${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}
     )
     target_include_directories(
@@ -2647,6 +2656,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
                 tests/qemu/vm_scratch_preemption_peer.S
             )
             target_compile_definitions(
@@ -2702,6 +2714,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
                 tests/qemu/pm_service_report.S
             )
             target_compile_definitions(
@@ -2756,6 +2771,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_tty_service_vfs
@@ -2808,6 +2826,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_vfs_service_probe
@@ -2866,6 +2887,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_ramfs_service_vfs

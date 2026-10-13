@@ -78,7 +78,8 @@ The constructor, byte-exact VFS/VM codecs, trusted init, ordinary application
 spawn, every completed-stage rollback, and exit/wait coordination are implemented in
 `MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
 The fast `pm-coordinator` CTest is included by both native aggregates.
-Runtime peer adapters and the separate mixed lifecycle model remain in progress.
+The real PM runtime adapter is wired; the general VM control adapter and the
+separate mixed lifecycle model remain in progress.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -222,6 +223,19 @@ when no local post-reply commit remains.
 Historical dependency-closed QEMU prefixes retain their existing readiness,
 synthetic lifecycle, scratch, console, and failure behavior. They do not gain
 an application or infer a missing VFS authority.
+
+PM resolves its mode explicitly before readiness. A configured service-6 VFS
+binding initializes the borrowed coordinator; shorter historical prefixes
+remain `STATIC_ONLY` and reject every unmanaged call. A running application
+in that mode is corruption, not a fallback to the old `STATE` result.
+The real backend invokes the unchanged typed PM-control wrappers and runtime
+grant/IPC functions. A native raw-register capture proves every argument and
+return mapping for all thirteen ports.
+
+The receive loop uses atomic `reply_receive` only for a returned ordinary
+reply. Accepted exit, blocked wait, completed selected-zombie wait reply,
+and suppressed parent reply all use plain receive. Thus a status is neither
+replied twice nor consumed before local wait acceptance is recorded.
 
 The coordinator derives VM and VFS endpoints only from the checked immutable
 service configuration. A valid dynamic transaction requires the complete

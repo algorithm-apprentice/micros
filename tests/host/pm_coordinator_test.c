@@ -27,6 +27,7 @@ int main(void)
         {"coordinator exit failure boundaries", test_coordinator_exit_failure_boundaries},
         {"coordinator immediate wait reply restore", test_coordinator_immediate_wait_reply_restore},
         {"coordinator nested independent wait replies", test_coordinator_nested_independent_wait_replies},
+        {"coordinator real runtime backend", test_coordinator_real_runtime_backend},
     };
     size_t index;
 

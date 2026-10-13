@@ -136,10 +136,17 @@ Preserve the exact current behavior:
 - at most two ordered wait outcomes, independently accepted or restored; and
 - no record release before successful wait-reply acceptance.
 
-The current target service still rejects ordinary successful application
-operations. Its isolated self-test exercises the existing synthetic kernel
-lifecycle, not production PM/VFS/VM coordination or PID 1. This decomposition
-does not implement that later coordinator.
+At completion of the source-only correction, the target service still rejected
+ordinary successful application operations. Its isolated self-test exercised
+the existing synthetic kernel lifecycle, not production PM/VFS/VM coordination
+or PID 1. That correction did not implement the later coordinator.
+
+The Accepted coordinator extension now wires the real runtime ports and
+application dispatch into the same service owners. Full configured peer
+bindings initialize coordinator mode before readiness; shorter preserved
+fixtures remain explicitly static-only. Reply-required outcomes retain atomic
+reply/receive, while accepted exit, blocked wait, already completed wait
+replies, and parent-loss suppression return to plain receive.
 
 ## Portable PM owners
 
@@ -504,9 +511,12 @@ unknown ownership still escalates fail-closed. The remaining transaction and
 model owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
 Trusted init now composes explicit forward, peer-result, and reverse owners.
 The coordinator native target also expands the existing spawn-request set
-once, increasing that set's consumer count to eight. Its automatic transition
-fixture adds no mutable static state; one exact immutable backend-port table
-is the sole new static-local declaration. Callback members are distinguished
+once. Each of the five real PM service branches now expands coordinator,
+runtime-backend, and spawn-request sets once, giving six coordinator/backend
+consumers and thirteen spawn-request consumers while retaining the exact PM
+budget helper. Automatic transition fixtures add no mutable static state.
+One scoped native raw-register capture and two exact immutable backend-port
+tables have explicit approved owners. Callback members are distinguished
 from top-level function declarations by the private-interface gate.
 
 ## Validation and structural gate

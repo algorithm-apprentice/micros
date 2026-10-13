@@ -49,6 +49,9 @@ SOURCE_SETS = {
         "servers/pm/pm_coordinator_exit.c",
         "servers/pm/pm_coordinator_wait.c",
     ),
+    "MICROS_PM_RUNTIME_BACKEND_SOURCES": (
+        "servers/pm/pm_service_backend.c",
+    ),
     "MICROS_SPAWN_REQUEST_SOURCES": (
         "lib/spawn/spawn_request.c",
         "lib/spawn/spawn_stack_layout.c",
@@ -81,6 +84,7 @@ SOURCE_SETS = {
         "tests/host/pm_coordinator_request_test.c",
         "tests/host/pm_coordinator_exit_fixture.c",
         "tests/host/pm_coordinator_exit_wait_test.c",
+        "tests/host/pm_coordinator_backend_test.c",
     ),
     "MICROS_SPAWN_ABI_HOST_TEST_SOURCES": (
         "tests/host/spawn_abi_test.c",
@@ -152,6 +156,7 @@ RETAINED_OWNER_GROUPS = {
     "servers/pm/pm_coordinator_wait.c": (
         "micros_pm_coordinator_wait_request", "pm_coordinator_complete_wait_outcomes",
     ),
+    "servers/pm/pm_service_backend.c": ("pm_service_backend_get",),
     "servers/pm/pm_coordinator_peers.c": (
         "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call", "pm_coordinator_vm_call",
         "pm_coordinator_vfs_exchange", "pm_coordinator_vm_exchange",
@@ -239,9 +244,19 @@ HELPER_OWNER_GROUPS = {
         "pm_service_bytes_are_zero", "pm_service_write_u32_le", "pm_service_write_u64_le",
         "pm_service_read_u64_le", "pm_service_read_u32_le",
         "pm_service_validate_configuration",
+        "pm_service_configure_coordinator",
     ),
     "servers/pm/pm_service_bootstrap.c": ("pm_service_send_ready",),
-    "servers/pm/pm_service_requests.c": ("protocol_result", "pm_service_serve_request"),
+    "servers/pm/pm_service_requests.c": (
+        "protocol_result", "serve_coordinator_request", "pm_service_serve_request",
+    ),
+    "servers/pm/pm_service_backend.c": (
+        "service_backend_reserve", "service_backend_abort_reserved", "service_backend_prepare",
+        "service_backend_abort_prepared", "service_backend_activate", "service_backend_exit_begin",
+        "service_backend_exit_detach", "service_backend_release", "service_backend_grant_create",
+        "service_backend_grant_revoke", "service_backend_grant_copy", "service_backend_call",
+        "service_backend_reply",
+    ),
     "servers/pm/pm_service_self_test.c": (
         "pm_service_vm_load", "pm_service_vm_commit", "pm_service_vm_exit_release",
         "pm_service_run_self_test",
@@ -338,17 +353,32 @@ PERMITTED_OWNER_DEPENDENCIES = {
         *SOURCE_SETS["MICROS_PM_CORE_SOURCES"],
         *SOURCE_SETS["MICROS_PM_SERVICE_SOURCES"],
     ),
-    SERVICE_FIXTURE_OWNER: (),
+    SERVICE_FIXTURE_OWNER: ("servers/pm/pm_coordinator.c",),
     **{
         path: (SERVICE_FIXTURE_OWNER, *SOURCE_SETS["MICROS_PM_CORE_SOURCES"])
         for path in SOURCE_SETS["MICROS_PM_SERVICE_SOURCES"][2:]
     },
+    "servers/pm/pm_service_requests.c": (
+        SERVICE_FIXTURE_OWNER, *SOURCE_SETS["MICROS_PM_CORE_SOURCES"],
+        *SOURCE_SETS["MICROS_PM_COORDINATOR_SOURCES"], "servers/pm/pm_service_backend.c",
+    ),
+    "servers/pm/pm_service_backend.c": (WRAPPER_PATH,),
+    "servers/pm/pm_service_self_test.c": (
+        SERVICE_FIXTURE_OWNER, *SOURCE_SETS["MICROS_PM_CORE_SOURCES"], WRAPPER_PATH,
+    ),
+    "servers/pm/pm_service_scratch.c": (
+        SERVICE_FIXTURE_OWNER, *SOURCE_SETS["MICROS_PM_CORE_SOURCES"], WRAPPER_PATH,
+    ),
+    WRAPPER_PATH: (),
     "kernel/pm_service_test.c": ("kernel/pm_service_test_fixture.c",),
     "kernel/pm_service_test_fixture.c": (),
     "kernel/pm_service_test_report.c": (),
 }
 
 FILE_SCOPE_OBJECT_PATTERNS = {
+    "tests/host/pm_coordinator_backend_test.c": (
+        r"static\s+struct\s+coordinator_backend_capture\s+backend_capture\s*;",
+    ),
     "servers/pm/pm_service_fixture.c": (
         r"volatile\s+struct\s+micros_bootstrap_service_config\s+"
         r"micros_bootstrap_service_config\s*;",
@@ -371,6 +401,22 @@ FILE_SCOPE_OBJECT_PATTERNS = {
 }
 
 STATIC_LOCAL_DECLARATIONS = {
+    "servers/pm/pm_service_backend.c": (
+        "static const struct micros_pm_coordinator_backend backend = {"
+        ".reserve = service_backend_reserve,"
+        ".abort_reserved = service_backend_abort_reserved,"
+        ".prepare_execution = service_backend_prepare,"
+        ".abort_prepared = service_backend_abort_prepared,"
+        ".activate = service_backend_activate,"
+        ".exit_begin = service_backend_exit_begin,"
+        ".exit_detach = service_backend_exit_detach,"
+        ".release_exited_process = service_backend_release,"
+        ".grant_create = service_backend_grant_create,"
+        ".grant_revoke = service_backend_grant_revoke,"
+        ".grant_copy_from = service_backend_grant_copy,"
+        ".call = service_backend_call,"
+        ".reply = service_backend_reply, };",
+    ),
     "tests/host/pm_coordinator_spawn_fixture.c": (
         "static const struct micros_pm_coordinator_backend backend = {"
         ".reserve = spawn_fixture_reserve,"
@@ -677,6 +723,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 "MICROS_PM_CORE_SOURCES", "MICROS_PM_COORDINATOR_SOURCES",
                 "MICROS_PM_COORDINATOR_HOST_TEST_SOURCES",
                 "MICROS_SPAWN_REQUEST_SOURCES",
+                "MICROS_PM_RUNTIME_BACKEND_SOURCES",
             ),
             "spawn_abi_test": (
                 "MICROS_SPAWN_REQUEST_SOURCES", "MICROS_SPAWN_ABI_HOST_TEST_SOURCES",
@@ -693,9 +740,10 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 self.assertNotIn(source, block)
         self.assertEqual(5, cmake.count("${MICROS_PM_SERVICE_SOURCES}"))
         self.assertEqual(7, cmake.count("${MICROS_PM_CORE_SOURCES}"))
-        self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
+        self.assertEqual(6, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
-        self.assertEqual(8, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(6, cmake.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
+        self.assertEqual(13, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
         for target in ("micros_vm_server", "micros_vfs_service"):
             block = cmake_command(cmake, "micros_add_bootstrap_user", target)
@@ -706,7 +754,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, block.count("${MICROS_PM_CORE_SOURCES}"))
             self.assertEqual(1, block.count("${MICROS_PM_SERVICE_SOURCES}"))
             self.assertEqual(1, block.count(WRAPPER_PATH))
-            self.assertNotIn("${MICROS_SPAWN_REQUEST_SOURCES}", block)
+            self.assertEqual(1, block.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+            self.assertEqual(1, block.count("${MICROS_PM_COORDINATOR_SOURCES}"))
+            self.assertEqual(1, block.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
         branches = re.findall(
             r"\b(?:if|elseif)\(\s*(MICROS_BUILD_[A-Z_]+)\s*\)\s*"
             r"micros_add_bootstrap_user\(\s*micros_pm_service\b", cmake,
@@ -778,6 +828,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "servers/pm/pm_service_internal.h": (
                 *HELPER_OWNER_GROUPS[SERVICE_FIXTURE_OWNER],
                 "pm_service_send_ready", "pm_service_serve_request",
+                "pm_service_backend_get",
                 "pm_service_run_self_test", "pm_service_run_scratch_preemption_test",
                 "micros_pm_service_report", "micros_vm_scratch_preemption_peer_hold",
                 "micros_vm_scratch_preemption_peer_run",
@@ -814,6 +865,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 "test_coordinator_exit_and_blocked_wait", "test_coordinator_exit_failure_boundaries",
                 "test_coordinator_immediate_wait_reply_restore",
                 "test_coordinator_nested_independent_wait_replies",
+                "test_coordinator_real_runtime_backend",
             ),
             "servers/pm/pm_coordinator_internal.h": (
                 "pm_coordinator_classify_vfs_result", "pm_coordinator_vfs_call",
@@ -975,6 +1027,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 service, "pm_service_context",
                 "struct micros_pm_table process_table;"
                 "volatile uint64_t pm_service_data;"
+                "struct micros_pm_coordinator coordinator;"
+                "enum pm_service_coordinator_mode coordinator_mode;"
                 "struct micros_pm_table initial_table;",
             ),
             (
@@ -1140,7 +1194,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         ordered = (
             "pm_service_context_get", "context->pm_service_data",
             "pm_service_validate_configuration", "micros_pm_table_initialize",
-            "micros_pm_table_validate", "pm_service_copy_bytes", "pm_service_send_ready",
+            "micros_pm_table_validate", "pm_service_configure_coordinator",
+            "pm_service_copy_bytes", "pm_service_send_ready",
             "micros_runtime_receive", "MICROS_IPC_TYPE_KERNEL_NOTIFICATION",
             "micros_pm_enable_runtime", "pm_service_run_self_test",
             "pm_service_run_scratch_preemption_test", "pm_service_serve_request",
