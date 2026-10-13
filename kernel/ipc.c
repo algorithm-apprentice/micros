@@ -1,151 +1,9 @@
-#include "micros/ipc_core.h"
+#include "ipc_internal.h"
 
 #include <stddef.h>
 
 #include "endpoint_internal.h"
 #include "scheduler_core_internal.h"
-
-static void copy_bytes(void *destination, const void *source, size_t size)
-{
-    unsigned char *output = destination;
-    const unsigned char *input = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        output[index] = input[index];
-    }
-}
-
-static void clear_bytes(void *storage, size_t size)
-{
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static bool thread_handle_is_zero(
-    struct micros_thread_handle handle
-)
-{
-    return handle.slot == 0 && handle.generation == 0;
-}
-
-static bool thread_handles_equal(
-    struct micros_thread_handle left,
-    struct micros_thread_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.generation == right.generation
-    );
-}
-
-static bool process_handles_equal(
-    struct micros_process_handle left,
-    struct micros_process_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.generation == right.generation
-    );
-}
-
-static bool thread_is_current(
-    const struct micros_kernel_objects *objects,
-    struct micros_thread_handle thread
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
-        const struct micros_hart *hart = &objects->harts[index];
-
-        if (
-            hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread_handles_equal(hart->current_thread, thread)
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static enum micros_ipc_error endpoint_error_to_ipc(
-    enum micros_endpoint_error error
-)
-{
-    switch (error) {
-    case MICROS_ENDPOINT_OK:
-        return MICROS_IPC_OK;
-    case MICROS_ENDPOINT_ERROR_ARGUMENT:
-    case MICROS_ENDPOINT_ERROR_ENDPOINT:
-        return MICROS_IPC_ERROR_ARGUMENT;
-    case MICROS_ENDPOINT_ERROR_STALE:
-        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
-    case MICROS_ENDPOINT_ERROR_STATE:
-        return MICROS_IPC_ERROR_STATE;
-    case MICROS_ENDPOINT_ERROR_CLOSING:
-        return MICROS_IPC_ERROR_ENDPOINT_CLOSING;
-    case MICROS_ENDPOINT_ERROR_UNAUTHORIZED:
-        return MICROS_IPC_ERROR_UNAUTHORIZED;
-    case MICROS_ENDPOINT_ERROR_INVARIANT:
-        return MICROS_IPC_ERROR_INVARIANT;
-    default:
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-}
-
-static enum micros_ipc_error scheduler_error_to_ipc(
-    enum micros_kernel_object_error error
-)
-{
-    switch (error) {
-    case MICROS_KERNEL_OBJECT_OK:
-        return MICROS_IPC_OK;
-    case MICROS_KERNEL_OBJECT_ERROR_ARGUMENT:
-        return MICROS_IPC_ERROR_ARGUMENT;
-    case MICROS_KERNEL_OBJECT_ERROR_STALE:
-        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
-    case MICROS_KERNEL_OBJECT_ERROR_STATE:
-        return MICROS_IPC_ERROR_STATE;
-    case MICROS_KERNEL_OBJECT_ERROR_INVARIANT:
-        return MICROS_IPC_ERROR_INVARIANT;
-    default:
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-}
-
-static void canonicalize_message(
-    struct micros_ipc_message *destination,
-    const struct micros_ipc_message *source,
-    micros_endpoint_t source_endpoint,
-    uint64_t reply_token
-)
-{
-    size_t index;
-
-    destination->source = source_endpoint;
-    destination->type = source->type;
-    destination->reply_token = reply_token;
-    for (index = 0; index < sizeof(destination->payload); ++index) {
-        destination->payload[index] = source->payload[index];
-    }
-}
-
-static void clear_message(struct micros_ipc_message *message)
-{
-    unsigned char *bytes = (unsigned char *)message;
-    size_t index;
-
-    for (index = 0; index < sizeof(*message); ++index) {
-        bytes[index] = 0;
-    }
-}
 
 static void canonicalize_notification(
     struct micros_ipc_message *message,
@@ -155,28 +13,13 @@ static void canonicalize_notification(
 {
     size_t index;
 
-    clear_message(message);
+    ipc_clear_message(message);
     message->source = source;
     message->type = MICROS_IPC_TYPE_KERNEL_NOTIFICATION;
     for (index = 0; index < sizeof(event_mask); ++index) {
         message->payload[index] =
             (uint8_t)(event_mask >> (index * 8));
     }
-}
-
-bool micros_ipc_thread_has_staged_kernel_notification(
-    const struct micros_thread *thread
-)
-{
-    return (
-        thread != NULL
-        && thread->ipc_delivery_pending
-        && thread->ipc_staged_result == MICROS_IPC_OK
-        && thread->ipc_inbound_message.source
-            == MICROS_ENDPOINT_NONE
-        && thread->ipc_inbound_message.type
-            == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
-    );
 }
 
 struct pending_notification_plan {
@@ -217,7 +60,7 @@ static enum micros_ipc_error find_pending_notification(
             &resolved_source
         );
         if (endpoint_error != MICROS_ENDPOINT_OK) {
-            return endpoint_error_to_ipc(endpoint_error);
+            return ipc_endpoint_error_to_ipc(endpoint_error);
         }
         source_slot = resolved_source->owner.slot;
         if (
@@ -313,843 +156,6 @@ static void consume_pending_notification(
     }
 }
 
-static bool reply_token_is_available(
-    const struct micros_kernel_objects *objects,
-    uint64_t reply_token
-)
-{
-    size_t index;
-
-    if (reply_token == 0) {
-        return true;
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread->ipc_reply_token == reply_token
-        ) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static enum micros_ipc_error resolve_reply_waiter(
-    struct micros_kernel_objects *objects,
-    uint64_t reply_token,
-    micros_endpoint_t replying_endpoint,
-    struct micros_thread_handle *caller_handle,
-    struct micros_thread **caller
-)
-{
-    struct micros_thread *matched = NULL;
-    struct micros_thread_handle matched_handle = {0, 0};
-    size_t index;
-
-    if (reply_token == 0) {
-        return MICROS_IPC_ERROR_REPLY_TOKEN;
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        struct micros_thread *candidate = &objects->threads[index];
-
-        if (
-            candidate->slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || candidate->ipc_reply_token != reply_token
-        ) {
-            continue;
-        }
-        if (matched != NULL) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-        matched = candidate;
-        matched_handle.slot = (uint16_t)index;
-        matched_handle.generation = candidate->generation;
-    }
-    if (
-        matched == NULL
-        || matched->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
-        || !thread_handle_is_zero(matched->ipc_next)
-        || (
-            matched->runtime_flags
-            & MICROS_THREAD_RTS_IPC_MASK
-        ) != MICROS_THREAD_RTS_IPC_REPLY
-        || matched->ipc_reply_callee != replying_endpoint
-    ) {
-        return MICROS_IPC_ERROR_REPLY_TOKEN;
-    }
-    *caller_handle = matched_handle;
-    *caller = matched;
-    return MICROS_IPC_OK;
-}
-
-static bool reply_request_is_pending(
-    const struct micros_kernel_objects *objects,
-    uint64_t reply_token
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread->ipc_delivery_pending
-            && thread->ipc_staged_result == MICROS_IPC_OK
-            && thread->ipc_inbound_message.reply_token
-                == reply_token
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool thread_is_held_and_clear(
-    const struct micros_thread *thread
-)
-{
-    return (
-        thread->scheduler_assigned
-        && thread->runtime_flags == MICROS_THREAD_RTS_INACTIVE
-        && !thread->ready_linked
-        && micros_thread_ipc_state_is_clear(thread)
-    );
-}
-
-static enum micros_ipc_error resolve_held_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    struct micros_thread **thread
-)
-{
-    const struct micros_thread *resolved;
-    enum micros_kernel_object_error error;
-
-    error = micros_thread_resolve(objects, handle, &resolved);
-    if (error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
-        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
-    }
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    if (!thread_is_held_and_clear(resolved)) {
-        return MICROS_IPC_ERROR_STATE;
-    }
-    *thread = &objects->threads[handle.slot];
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error resolve_operation_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    micros_endpoint_t *source_endpoint
-)
-{
-    struct micros_thread *thread;
-    enum micros_ipc_error error;
-
-    error = resolve_held_thread(objects, handle, &thread);
-    if (error != MICROS_IPC_OK) {
-        return error;
-    }
-    if (thread_is_current(objects, handle)) {
-        return MICROS_IPC_ERROR_STATE;
-    }
-    *source_endpoint =
-        objects->processes[thread->owner.slot].primary_endpoint;
-    if (
-        *source_endpoint == MICROS_ENDPOINT_NONE
-        || *source_endpoint == MICROS_ENDPOINT_ANY
-    ) {
-        return MICROS_IPC_ERROR_STATE;
-    }
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error resolve_dependency_endpoint(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t endpoint,
-    struct micros_process_handle *owner
-)
-{
-    const struct micros_endpoint_record *record;
-    const struct micros_process *process;
-    struct micros_process_handle unpacked;
-
-    if (
-        endpoint == MICROS_ENDPOINT_NONE
-        || endpoint == MICROS_ENDPOINT_ANY
-        || micros_endpoint_unpack(endpoint, &unpacked)
-            != MICROS_ENDPOINT_OK
-        || unpacked.slot >= MICROS_PROCESS_CAPACITY
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    record = &registry->endpoints[unpacked.slot];
-    process = &objects->processes[unpacked.slot];
-    if (
-        (
-            record->state != MICROS_ENDPOINT_STATE_ACTIVE
-            && record->state
-                != MICROS_ENDPOINT_STATE_SOURCE_ONLY
-        )
-        || record->value != endpoint
-        || !process_handles_equal(record->owner, unpacked)
-        || process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || process->generation != unpacked.generation
-        || process->primary_endpoint != endpoint
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    *owner = unpacked;
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error resolve_sole_live_thread(
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle owner,
-    struct micros_thread_handle *thread_handle,
-    const struct micros_thread **thread
-)
-{
-    const struct micros_process *process;
-    const struct micros_thread *matched = NULL;
-    struct micros_thread_handle matched_handle = {0, 0};
-    size_t index;
-
-    if (
-        owner.slot >= MICROS_PROCESS_CAPACITY
-        || owner.generation == 0
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    process = &objects->processes[owner.slot];
-    if (
-        process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || process->generation != owner.generation
-        || process->live_thread_count != 1
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *candidate =
-            &objects->threads[index];
-
-        if (
-            candidate->slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || !process_handles_equal(candidate->owner, owner)
-        ) {
-            continue;
-        }
-        if (matched != NULL) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-        matched = candidate;
-        matched_handle.slot = (uint16_t)index;
-        matched_handle.generation = candidate->generation;
-    }
-    if (matched == NULL || matched_handle.generation == 0) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    *thread_handle = matched_handle;
-    *thread = matched;
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error blocked_dependency(
-    const struct micros_thread *thread,
-    struct micros_thread_handle thread_handle,
-    struct micros_thread_handle cleared_dependency,
-    bool *has_dependency,
-    micros_endpoint_t *endpoint
-)
-{
-    if (
-        !thread_handle_is_zero(cleared_dependency)
-        && thread_handles_equal(thread_handle, cleared_dependency)
-    ) {
-        *has_dependency = false;
-        return MICROS_IPC_OK;
-    }
-    if (
-        (
-            thread->runtime_flags
-            & MICROS_THREAD_RTS_IPC_SEND
-        ) != 0
-    ) {
-        *endpoint = thread->ipc_send_destination;
-    } else if (
-        (
-            thread->runtime_flags
-            & MICROS_THREAD_RTS_IPC_REPLY
-        ) != 0
-    ) {
-        *endpoint = thread->ipc_reply_callee;
-    } else if (
-        (
-            thread->runtime_flags
-            & MICROS_THREAD_RTS_IPC_RECEIVE
-        ) != 0
-    ) {
-        if (thread->ipc_receive_source == MICROS_ENDPOINT_ANY) {
-            *has_dependency = false;
-            return MICROS_IPC_OK;
-        }
-        *endpoint = thread->ipc_receive_source;
-    } else {
-        *has_dependency = false;
-        return MICROS_IPC_OK;
-    }
-    if (
-        *endpoint == MICROS_ENDPOINT_NONE
-        || *endpoint == MICROS_ENDPOINT_ANY
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    *has_dependency = true;
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error preflight_deadlock(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    struct micros_thread_handle candidate,
-    micros_endpoint_t dependency,
-    struct micros_thread_handle cleared_dependency
-)
-{
-    struct micros_thread_handle visited[MICROS_THREAD_CAPACITY];
-    const struct micros_thread *unused_candidate;
-    size_t visited_count = 0;
-    size_t steps;
-
-    if (
-        dependency == MICROS_ENDPOINT_ANY
-        || dependency == MICROS_ENDPOINT_NONE
-    ) {
-        return dependency == MICROS_ENDPOINT_ANY
-            ? MICROS_IPC_OK
-            : MICROS_IPC_ERROR_INVARIANT;
-    }
-    if (
-        micros_thread_resolve(objects, candidate, &unused_candidate)
-            != MICROS_KERNEL_OBJECT_OK
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    if (!thread_handle_is_zero(cleared_dependency)) {
-        const struct micros_thread *unused_cleared;
-
-        if (
-            micros_thread_resolve(
-                objects,
-                cleared_dependency,
-                &unused_cleared
-            ) != MICROS_KERNEL_OBJECT_OK
-        ) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-    }
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        struct micros_process_handle owner;
-        struct micros_thread_handle thread_handle;
-        const struct micros_thread *thread;
-        micros_endpoint_t next_dependency = MICROS_ENDPOINT_NONE;
-        enum micros_ipc_error error;
-        bool has_dependency;
-        size_t index;
-
-        error = resolve_dependency_endpoint(
-            registry,
-            objects,
-            dependency,
-            &owner
-        );
-        if (error != MICROS_IPC_OK) {
-            return error;
-        }
-        error = resolve_sole_live_thread(
-            objects,
-            owner,
-            &thread_handle,
-            &thread
-        );
-        if (error != MICROS_IPC_OK) {
-            return error;
-        }
-        if (thread_handles_equal(thread_handle, candidate)) {
-            return MICROS_IPC_ERROR_DEADLOCK;
-        }
-        for (index = 0; index < visited_count; ++index) {
-            if (thread_handles_equal(visited[index], thread_handle)) {
-                return MICROS_IPC_ERROR_INVARIANT;
-            }
-        }
-        visited[visited_count] = thread_handle;
-        ++visited_count;
-
-        error = blocked_dependency(
-            thread,
-            thread_handle,
-            cleared_dependency,
-            &has_dependency,
-            &next_dependency
-        );
-        if (error != MICROS_IPC_OK) {
-            return error;
-        }
-        if (!has_dependency) {
-            return MICROS_IPC_OK;
-        }
-        dependency = next_dependency;
-    }
-    return MICROS_IPC_ERROR_INVARIANT;
-}
-
-static void stage_delivery(
-    struct micros_thread *receiver,
-    uintptr_t receive_buffer,
-    const struct micros_ipc_message *message
-);
-
-struct reply_preflight {
-    struct micros_thread_handle caller_handle;
-    struct micros_thread *caller;
-    struct micros_ipc_message message;
-    micros_endpoint_t replying_endpoint;
-    uintptr_t reply_buffer;
-};
-
-static enum micros_ipc_error preflight_reply(
-    struct micros_endpoint_registry *registry,
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle replier_handle,
-    uint64_t reply_token,
-    micros_endpoint_t expected_caller_endpoint,
-    const struct micros_ipc_message *message,
-    uint32_t required_operation,
-    struct reply_preflight *plan
-)
-{
-    struct micros_thread_handle caller_handle = {0, 0};
-    struct micros_thread *caller;
-    struct micros_ipc_message snapshot;
-    micros_endpoint_t replying_endpoint;
-    enum micros_endpoint_error endpoint_error;
-    enum micros_ipc_error error;
-
-    if (
-        registry == NULL
-        || objects == NULL
-        || message == NULL
-        || plan == NULL
-        || (
-            required_operation
-                != MICROS_PRIVILEGE_OPERATION_REPLY
-            && required_operation
-                != MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
-        )
-        || (uintptr_t)message % _Alignof(struct micros_ipc_message)
-            != 0
-        || (
-            message->type
-            & MICROS_IPC_TYPE_KERNEL_MASK
-        ) != 0
-    ) {
-        return MICROS_IPC_ERROR_ARGUMENT;
-    }
-    endpoint_error =
-        micros_endpoint_registry_validate_objects(registry, objects);
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
-    }
-    error = resolve_operation_thread(
-        objects,
-        replier_handle,
-        &replying_endpoint
-    );
-    if (error != MICROS_IPC_OK) {
-        return error;
-    }
-    endpoint_error = micros_endpoint_authorize_operation(
-        registry,
-        objects,
-        replying_endpoint,
-        required_operation
-    );
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
-    }
-    error = resolve_reply_waiter(
-        objects,
-        reply_token,
-        replying_endpoint,
-        &caller_handle,
-        &caller
-    );
-    if (error != MICROS_IPC_OK) {
-        return error;
-    }
-    {
-        const struct micros_endpoint_record *caller_endpoint =
-            &registry->endpoints[caller->owner.slot];
-
-        if (
-            caller_endpoint->state
-                != MICROS_ENDPOINT_STATE_ACTIVE
-            || (
-                expected_caller_endpoint
-                    != MICROS_ENDPOINT_NONE
-                && caller_endpoint->value
-                    != expected_caller_endpoint
-            )
-            || caller_endpoint->owner.slot != caller->owner.slot
-            || caller_endpoint->owner.generation
-                != caller->owner.generation
-        ) {
-            return MICROS_IPC_ERROR_REPLY_TOKEN;
-        }
-    }
-    if (reply_request_is_pending(objects, reply_token)) {
-        return MICROS_IPC_ERROR_REPLY_TOKEN;
-    }
-    canonicalize_message(
-        &snapshot,
-        message,
-        replying_endpoint,
-        0
-    );
-
-    plan->caller_handle = caller_handle;
-    plan->caller = caller;
-    plan->message = snapshot;
-    plan->replying_endpoint = replying_endpoint;
-    plan->reply_buffer = caller->ipc_receive_buffer;
-    return MICROS_IPC_OK;
-}
-
-static void commit_reply_delivery(
-    const struct reply_preflight *plan
-)
-{
-    stage_delivery(
-        plan->caller,
-        plan->reply_buffer,
-        &plan->message
-    );
-    plan->caller->ipc_reply_token = 0;
-    plan->caller->ipc_reply_callee = 0;
-}
-
-static enum micros_ipc_error resolve_queue_tail(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle tail,
-    struct micros_thread **thread
-)
-{
-    const struct micros_thread *resolved;
-
-    if (thread_handle_is_zero(tail)) {
-        *thread = NULL;
-        return MICROS_IPC_OK;
-    }
-    if (
-        micros_thread_resolve(objects, tail, &resolved)
-            != MICROS_KERNEL_OBJECT_OK
-        || !thread_handle_is_zero(resolved->ipc_next)
-    ) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    *thread = &objects->threads[tail.slot];
-    return MICROS_IPC_OK;
-}
-
-static bool receiver_is_ready_for(
-    const struct micros_endpoint_record *destination,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
-)
-{
-    struct micros_thread_handle current = destination->receiver_head;
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *receiver;
-
-        if (thread_handle_is_zero(current)) {
-            return false;
-        }
-        receiver = &objects->threads[current.slot];
-        if (
-            receiver->ipc_receive_source == MICROS_ENDPOINT_ANY
-            || receiver->ipc_receive_source == source
-        ) {
-            return true;
-        }
-        current = receiver->ipc_next;
-    }
-    return false;
-}
-
-static bool sender_is_ready_for(
-    const struct micros_endpoint_record *receiver_endpoint,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
-)
-{
-    struct micros_thread_handle current =
-        receiver_endpoint->sender_head;
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *sender;
-
-        if (thread_handle_is_zero(current)) {
-            return false;
-        }
-        sender = &objects->threads[current.slot];
-        if (
-            source == MICROS_ENDPOINT_ANY
-            || sender->ipc_outbound_message.source == source
-        ) {
-            return true;
-        }
-        current = sender->ipc_next;
-    }
-    return false;
-}
-
-static void append_thread(
-    struct micros_thread_handle thread_handle,
-    struct micros_thread *previous_tail,
-    struct micros_thread_handle *head,
-    struct micros_thread_handle *tail
-)
-{
-    if (previous_tail == NULL) {
-        *head = thread_handle;
-    } else {
-        previous_tail->ipc_next = thread_handle;
-    }
-    *tail = thread_handle;
-}
-
-static bool find_matching_sender(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **sender
-)
-{
-    struct micros_thread_handle current = endpoint->sender_head;
-    struct micros_thread_handle prior = {0, 0};
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        struct micros_thread *candidate;
-
-        if (thread_handle_is_zero(current)) {
-            return false;
-        }
-        candidate = &objects->threads[current.slot];
-        if (
-            source == MICROS_ENDPOINT_ANY
-            || candidate->ipc_outbound_message.source == source
-        ) {
-            *previous = prior;
-            *matched = current;
-            *sender = candidate;
-            return true;
-        }
-        prior = current;
-        current = candidate->ipc_next;
-    }
-    return false;
-}
-
-static bool find_matching_receiver_const(
-    const struct micros_endpoint_record *endpoint,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    const struct micros_thread **receiver
-)
-{
-    struct micros_thread_handle current = endpoint->receiver_head;
-    struct micros_thread_handle prior = {0, 0};
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *candidate;
-
-        if (thread_handle_is_zero(current)) {
-            return false;
-        }
-        candidate = &objects->threads[current.slot];
-        if (
-            candidate->ipc_receive_source == MICROS_ENDPOINT_ANY
-            || candidate->ipc_receive_source == source
-        ) {
-            *previous = prior;
-            *matched = current;
-            *receiver = candidate;
-            return true;
-        }
-        prior = current;
-        current = candidate->ipc_next;
-    }
-    return false;
-}
-
-static bool find_matching_receiver(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **receiver
-)
-{
-    const struct micros_thread *resolved;
-
-    if (
-        !find_matching_receiver_const(
-            endpoint,
-            objects,
-            source,
-            previous,
-            matched,
-            &resolved
-        )
-    ) {
-        return false;
-    }
-    *receiver = &objects->threads[matched->slot];
-    return true;
-}
-
-static void unlink_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle previous,
-    struct micros_thread_handle matched,
-    struct micros_thread_handle *head,
-    struct micros_thread_handle *tail
-)
-{
-    struct micros_thread *thread = &objects->threads[matched.slot];
-
-    if (thread_handle_is_zero(previous)) {
-        *head = thread->ipc_next;
-    } else {
-        objects->threads[previous.slot].ipc_next =
-            thread->ipc_next;
-    }
-    if (thread_handles_equal(*tail, matched)) {
-        *tail = previous;
-    }
-}
-
-static void stage_no_message_completion(
-    struct micros_thread *thread,
-    enum micros_ipc_error result
-)
-{
-    thread->ipc_receive_buffer = 0;
-    thread->ipc_delivery_pending = true;
-    clear_message(&thread->ipc_inbound_message);
-    thread->ipc_staged_result = result;
-}
-
-static void clear_delivered_sender(struct micros_thread *sender)
-{
-    bool completes_send = sender->ipc_reply_token == 0;
-
-    sender->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
-    sender->ipc_next.slot = 0;
-    sender->ipc_next.generation = 0;
-    clear_message(&sender->ipc_outbound_message);
-    sender->ipc_send_destination = 0;
-    if (completes_send) {
-        stage_no_message_completion(sender, MICROS_IPC_OK);
-    }
-}
-
-static void stage_delivery(
-    struct micros_thread *receiver,
-    uintptr_t receive_buffer,
-    const struct micros_ipc_message *message
-)
-{
-    receiver->ipc_receive_buffer = receive_buffer;
-    receiver->ipc_delivery_pending = true;
-    receiver->ipc_inbound_message = *message;
-    receiver->ipc_staged_result = MICROS_IPC_OK;
-}
-
-enum micros_ipc_error micros_ipc_stage_no_message_completion(
-    struct micros_endpoint_registry *registry,
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle thread_handle,
-    enum micros_ipc_error result
-)
-{
-    const struct micros_thread *resolved;
-    struct micros_thread *thread;
-    const struct micros_endpoint_record *owner;
-    enum micros_endpoint_error endpoint_error;
-    enum micros_kernel_object_error object_error;
-
-    if (
-        registry == NULL
-        || objects == NULL
-        || (
-            result != MICROS_IPC_OK
-            && result != MICROS_IPC_ERROR_DEAD_ENDPOINT
-        )
-    ) {
-        return MICROS_IPC_ERROR_ARGUMENT;
-    }
-    endpoint_error =
-        micros_endpoint_registry_validate_objects(registry, objects);
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
-    }
-    object_error =
-        micros_thread_resolve(objects, thread_handle, &resolved);
-    if (object_error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
-        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
-    }
-    if (object_error != MICROS_KERNEL_OBJECT_OK) {
-        return MICROS_IPC_ERROR_INVARIANT;
-    }
-    owner = &registry->endpoints[resolved->owner.slot];
-    if (
-        !resolved->scheduler_assigned
-        || !micros_thread_ipc_state_is_clear(resolved)
-        || (
-            resolved->runtime_flags
-            & MICROS_THREAD_RTS_IPC_MASK
-        ) != 0
-        || owner->state != MICROS_ENDPOINT_STATE_ACTIVE
-        || !process_handles_equal(owner->owner, resolved->owner)
-    ) {
-        return MICROS_IPC_ERROR_STATE;
-    }
-    thread = &objects->threads[thread_handle.slot];
-    stage_no_message_completion(thread, result);
-    return MICROS_IPC_OK;
-}
-
 enum ipc_close_thread_action {
     IPC_CLOSE_THREAD_NONE = 0,
     IPC_CLOSE_THREAD_CLEAR,
@@ -1243,7 +249,7 @@ static enum micros_ipc_error preflight_close_threads(
         }
         handle.slot = (uint16_t)index;
         handle.generation = thread->generation;
-        owned = process_handles_equal(thread->owner, plan->owner);
+        owned = ipc_process_handles_equal(thread->owner, plan->owner);
         queued_sender =
             (
                 thread->ipc_queue_kind
@@ -1266,7 +272,7 @@ static enum micros_ipc_error preflight_close_threads(
 
         if (owned) {
             if (
-                thread_is_current(objects, handle)
+                ipc_thread_is_current(objects, handle)
                 || (
                     thread->ipc_delivery_pending
                     && thread->ipc_staged_result == MICROS_IPC_OK
@@ -1334,7 +340,7 @@ static enum micros_ipc_error preflight_close_queue(
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
         const struct micros_thread *thread;
 
-        if (thread_handle_is_zero(current)) {
+        if (ipc_thread_handle_is_zero(current)) {
             return MICROS_IPC_OK;
         }
         if (
@@ -1445,7 +451,7 @@ static enum micros_ipc_error preflight_endpoint_close(
         &record
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     plan_bytes = (unsigned char *)plan;
     for (index = 0; index < sizeof(*plan); ++index) {
@@ -1480,13 +486,13 @@ static void commit_close_queue(
         struct micros_thread *thread;
         struct micros_thread_handle next;
 
-        if (thread_handle_is_zero(current)) {
+        if (ipc_thread_handle_is_zero(current)) {
             break;
         }
         thread = &objects->threads[current.slot];
         next = thread->ipc_next;
         if (!plan->threads[current.slot].remove_from_queue) {
-            if (thread_handle_is_zero(retained_head)) {
+            if (ipc_thread_handle_is_zero(retained_head)) {
                 retained_head = current;
             } else {
                 objects->threads[
@@ -1497,7 +503,7 @@ static void commit_close_queue(
         }
         current = next;
     }
-    if (!thread_handle_is_zero(retained_tail)) {
+    if (!ipc_thread_handle_is_zero(retained_tail)) {
         objects->threads[retained_tail.slot].ipc_next =
             (struct micros_thread_handle){0, 0};
     }
@@ -1511,12 +517,12 @@ static void clear_thread_ipc_state_for_close(
 {
     thread->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
     thread->ipc_next = (struct micros_thread_handle){0, 0};
-    clear_message(&thread->ipc_outbound_message);
+    ipc_clear_message(&thread->ipc_outbound_message);
     thread->ipc_send_destination = 0;
     thread->ipc_receive_source = 0;
     thread->ipc_receive_buffer = 0;
     thread->ipc_delivery_pending = false;
-    clear_message(&thread->ipc_inbound_message);
+    ipc_clear_message(&thread->ipc_inbound_message);
     thread->ipc_staged_result = MICROS_IPC_OK;
     thread->ipc_reply_token = 0;
     thread->ipc_reply_callee = 0;
@@ -1626,7 +632,7 @@ enum micros_ipc_error micros_ipc_endpoint_close(
             plan.transition_count
         );
         if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-            return scheduler_error_to_ipc(scheduler_error);
+            return ipc_scheduler_error_to_ipc(scheduler_error);
         }
     }
     commit_endpoint_close(registry, objects, &plan);
@@ -1663,9 +669,9 @@ enum micros_ipc_error micros_ipc_send(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_operation_thread(
+    error = ipc_resolve_operation_thread(
         objects,
         sender_handle,
         &source_endpoint
@@ -1681,9 +687,9 @@ enum micros_ipc_error micros_ipc_send(
         destination_endpoint
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    canonicalize_message(
+    ipc_canonicalize_message(
         &snapshot,
         message,
         source_endpoint,
@@ -1700,7 +706,7 @@ enum micros_ipc_error micros_ipc_send(
     if (error != MICROS_IPC_ERROR_NOT_READY) {
         return error;
     }
-    error = preflight_deadlock(
+    error = ipc_preflight_deadlock(
         registry,
         objects,
         sender_handle,
@@ -1755,9 +761,9 @@ enum micros_ipc_error micros_ipc_notify(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_operation_thread(
+    error = ipc_resolve_operation_thread(
         objects,
         notifier_handle,
         &source_endpoint
@@ -1773,7 +779,7 @@ enum micros_ipc_error micros_ipc_notify(
         destination_endpoint
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     endpoint_error = micros_endpoint_resolve_active(
         registry,
@@ -1782,7 +788,7 @@ enum micros_ipc_error micros_ipc_notify(
         &resolved_destination
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
@@ -1793,7 +799,7 @@ enum micros_ipc_error micros_ipc_notify(
         source_endpoint,
         event_mask
     );
-    has_receiver = find_matching_receiver(
+    has_receiver = ipc_find_matching_receiver(
         destination,
         objects,
         source_endpoint,
@@ -1824,10 +830,10 @@ enum micros_ipc_error micros_ipc_notify(
             MICROS_THREAD_RTS_IPC_RECEIVE
         );
         if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-            return scheduler_error_to_ipc(scheduler_error);
+            return ipc_scheduler_error_to_ipc(scheduler_error);
         }
 
-        unlink_thread(
+        ipc_unlink_thread(
             objects,
             previous,
             receiver_handle,
@@ -1838,7 +844,7 @@ enum micros_ipc_error micros_ipc_notify(
         receiver->ipc_next.slot = 0;
         receiver->ipc_next.generation = 0;
         receiver->ipc_receive_source = 0;
-        stage_delivery(
+        ipc_stage_delivery(
             receiver,
             receiver->ipc_receive_buffer,
             &notification
@@ -1852,7 +858,7 @@ enum micros_ipc_error micros_ipc_notify(
         MICROS_THREAD_RTS_INACTIVE
     );
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-        return scheduler_error_to_ipc(scheduler_error);
+        return ipc_scheduler_error_to_ipc(scheduler_error);
     }
     destination->pending_events[source_slot] |= event_mask;
     destination->pending_notification_sources |=
@@ -1916,11 +922,11 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
     ) {
         return MICROS_IPC_ERROR_ARGUMENT;
     }
-    clear_bytes(&candidate, sizeof(candidate));
+    ipc_clear_bytes(&candidate, sizeof(candidate));
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     endpoint_error = micros_endpoint_resolve_active(
         registry,
@@ -1929,7 +935,7 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
         &resolved_destination
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
@@ -1941,7 +947,7 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
         MICROS_ENDPOINT_NONE,
         event_mask
     );
-    has_receiver = find_matching_receiver_const(
+    has_receiver = ipc_find_matching_receiver_const(
         destination,
         objects,
         MICROS_ENDPOINT_NONE,
@@ -1971,7 +977,7 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
             &candidate.wake
         );
         if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-            return scheduler_error_to_ipc(scheduler_error);
+            return ipc_scheduler_error_to_ipc(scheduler_error);
         }
         candidate.deliver_to_receiver = true;
         candidate.previous_receiver = previous;
@@ -1979,7 +985,7 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
         candidate.receive_buffer = receiver->ipc_receive_buffer;
     }
     candidate.active = true;
-    copy_bytes(plan, &candidate, sizeof(*plan));
+    ipc_copy_bytes(plan, &candidate, sizeof(*plan));
     return MICROS_IPC_OK;
 }
 
@@ -2000,7 +1006,7 @@ void micros_ipc_commit_kernel_notification_prevalidated(
             objects,
             &plan->wake
         );
-        unlink_thread(
+        ipc_unlink_thread(
             objects,
             plan->previous_receiver,
             plan->receiver,
@@ -2011,7 +1017,7 @@ void micros_ipc_commit_kernel_notification_prevalidated(
         receiver->ipc_next.slot = 0;
         receiver->ipc_next.generation = 0;
         receiver->ipc_receive_source = 0;
-        stage_delivery(
+        ipc_stage_delivery(
             receiver,
             plan->receive_buffer,
             &plan->notification
@@ -2019,7 +1025,7 @@ void micros_ipc_commit_kernel_notification_prevalidated(
     } else {
         destination->pending_kernel_events |= plan->event_mask;
     }
-    clear_bytes(plan, sizeof(*plan));
+    ipc_clear_bytes(plan, sizeof(*plan));
 }
 
 enum micros_ipc_error micros_ipc_receive(
@@ -2047,9 +1053,9 @@ enum micros_ipc_error micros_ipc_receive(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_operation_thread(
+    error = ipc_resolve_operation_thread(
         objects,
         receiver_handle,
         &receiver_endpoint
@@ -2064,7 +1070,7 @@ enum micros_ipc_error micros_ipc_receive(
         MICROS_PRIVILEGE_OPERATION_RECEIVE
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     error = micros_ipc_receiver_commit_delivery(
         registry,
@@ -2077,7 +1083,7 @@ enum micros_ipc_error micros_ipc_receive(
     if (error != MICROS_IPC_ERROR_NOT_READY) {
         return error;
     }
-    error = preflight_deadlock(
+    error = ipc_preflight_deadlock(
         registry,
         objects,
         receiver_handle,
@@ -2151,9 +1157,9 @@ static enum micros_ipc_error sender_enqueue(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_held_thread(objects, sender_handle, &sender);
+    error = ipc_resolve_held_thread(objects, sender_handle, &sender);
     if (error != MICROS_IPC_OK) {
         return error;
     }
@@ -2164,7 +1170,7 @@ static enum micros_ipc_error sender_enqueue(
         &resolved_destination
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     source = &registry->endpoints[sender->owner.slot];
     if (
@@ -2183,11 +1189,11 @@ static enum micros_ipc_error sender_enqueue(
     ) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
-    if (!reply_token_is_available(objects, reply_token)) {
+    if (!ipc_reply_token_is_available(objects, reply_token)) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
     if (
-        receiver_is_ready_for(
+        ipc_receiver_is_ready_for(
             resolved_destination,
             objects,
             source->value
@@ -2197,7 +1203,7 @@ static enum micros_ipc_error sender_enqueue(
     }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
-    error = resolve_queue_tail(
+    error = ipc_resolve_queue_tail(
         objects,
         destination->sender_tail,
         &previous_tail
@@ -2213,7 +1219,7 @@ static enum micros_ipc_error sender_enqueue(
     sender->ipc_queue_kind = MICROS_IPC_QUEUE_SENDER;
     sender->ipc_next.slot = 0;
     sender->ipc_next.generation = 0;
-    canonicalize_message(
+    ipc_canonicalize_message(
         &sender->ipc_outbound_message,
         message,
         source->value,
@@ -2224,7 +1230,7 @@ static enum micros_ipc_error sender_enqueue(
     sender->ipc_reply_token = reply_token;
     sender->ipc_reply_callee =
         reply_token == 0 ? 0 : destination_endpoint;
-    append_thread(
+    ipc_append_thread(
         sender_handle,
         previous_tail,
         &destination->sender_head,
@@ -2289,9 +1295,9 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_held_thread(objects, receiver_handle, &receiver);
+    error = ipc_resolve_held_thread(objects, receiver_handle, &receiver);
     if (error != MICROS_IPC_OK) {
         return error;
     }
@@ -2312,7 +1318,7 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
             &resolved_source
         );
         if (endpoint_error != MICROS_ENDPOINT_OK) {
-            return endpoint_error_to_ipc(endpoint_error);
+            return ipc_endpoint_error_to_ipc(endpoint_error);
         }
         (void)resolved_source;
     }
@@ -2330,14 +1336,14 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
             MICROS_THREAD_RTS_INACTIVE
         );
         if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-            return scheduler_error_to_ipc(scheduler_error);
+            return ipc_scheduler_error_to_ipc(scheduler_error);
         }
 
         consume_pending_notification(
             receiver_endpoint,
             &notification
         );
-        stage_delivery(
+        ipc_stage_delivery(
             receiver,
             receive_buffer,
             &notification.message
@@ -2350,7 +1356,7 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
         return error;
     }
     if (
-        !find_matching_sender(
+        !ipc_find_matching_sender(
             receiver_endpoint,
             objects,
             source_endpoint,
@@ -2370,18 +1376,18 @@ enum micros_ipc_error micros_ipc_receiver_commit_delivery(
         MICROS_THREAD_RTS_IPC_SEND
     );
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-        return scheduler_error_to_ipc(scheduler_error);
+        return ipc_scheduler_error_to_ipc(scheduler_error);
     }
 
-    unlink_thread(
+    ipc_unlink_thread(
         objects,
         previous,
         sender_handle,
         &receiver_endpoint->sender_head,
         &receiver_endpoint->sender_tail
     );
-    clear_delivered_sender(sender);
-    stage_delivery(receiver, receive_buffer, &staged_message);
+    ipc_clear_delivered_sender(sender);
+    ipc_stage_delivery(receiver, receive_buffer, &staged_message);
     *matched_sender = sender_handle;
     return MICROS_IPC_OK;
 }
@@ -2433,9 +1439,9 @@ static enum micros_ipc_error sender_commit_delivery(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_held_thread(objects, sender_handle, &sender);
+    error = ipc_resolve_held_thread(objects, sender_handle, &sender);
     if (error != MICROS_IPC_OK) {
         return error;
     }
@@ -2446,7 +1452,7 @@ static enum micros_ipc_error sender_commit_delivery(
         &resolved_destination
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     source = &registry->endpoints[sender->owner.slot];
     if (
@@ -2464,13 +1470,13 @@ static enum micros_ipc_error sender_commit_delivery(
     ) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
-    if (!reply_token_is_available(objects, reply_token)) {
+    if (!ipc_reply_token_is_available(objects, reply_token)) {
         return MICROS_IPC_ERROR_REPLY_TOKEN;
     }
     destination =
         &registry->endpoints[resolved_destination->owner.slot];
     if (
-        !find_matching_receiver(
+        !ipc_find_matching_receiver(
             destination,
             objects,
             source->value,
@@ -2490,7 +1496,7 @@ static enum micros_ipc_error sender_commit_delivery(
         return MICROS_IPC_ERROR_STATE;
     }
     receive_buffer = receiver->ipc_receive_buffer;
-    canonicalize_message(
+    ipc_canonicalize_message(
         &staged_message,
         message,
         source->value,
@@ -2511,10 +1517,10 @@ static enum micros_ipc_error sender_commit_delivery(
                 receiver_handle
             );
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-        return scheduler_error_to_ipc(scheduler_error);
+        return ipc_scheduler_error_to_ipc(scheduler_error);
     }
 
-    unlink_thread(
+    ipc_unlink_thread(
         objects,
         previous,
         receiver_handle,
@@ -2525,7 +1531,7 @@ static enum micros_ipc_error sender_commit_delivery(
     receiver->ipc_next.slot = 0;
     receiver->ipc_next.generation = 0;
     receiver->ipc_receive_source = 0;
-    stage_delivery(receiver, receive_buffer, &staged_message);
+    ipc_stage_delivery(receiver, receive_buffer, &staged_message);
     if (reply_token != 0) {
         sender->ipc_receive_buffer = reply_buffer;
         sender->ipc_reply_token = reply_token;
@@ -2590,9 +1596,9 @@ enum micros_ipc_error micros_ipc_call(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_operation_thread(
+    error = ipc_resolve_operation_thread(
         objects,
         caller_handle,
         &source_endpoint
@@ -2608,13 +1614,13 @@ enum micros_ipc_error micros_ipc_call(
         destination_endpoint
     );
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     if (registry->last_reply_token == UINT64_MAX) {
         return MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED;
     }
     reply_token = registry->last_reply_token + 1;
-    canonicalize_message(
+    ipc_canonicalize_message(
         &snapshot,
         request,
         source_endpoint,
@@ -2637,7 +1643,7 @@ enum micros_ipc_error micros_ipc_call(
     if (error != MICROS_IPC_ERROR_NOT_READY) {
         return error;
     }
-    error = preflight_deadlock(
+    error = ipc_preflight_deadlock(
         registry,
         objects,
         caller_handle,
@@ -2693,11 +1699,11 @@ enum micros_ipc_error micros_ipc_reply_expected_caller(
     const struct micros_ipc_message *message
 )
 {
-    struct reply_preflight plan;
+    struct ipc_reply_preflight plan;
     enum micros_kernel_object_error scheduler_error;
     enum micros_ipc_error error;
 
-    error = preflight_reply(
+    error = ipc_preflight_reply(
         registry,
         objects,
         replier_handle,
@@ -2718,10 +1724,10 @@ enum micros_ipc_error micros_ipc_reply_expected_caller(
         MICROS_THREAD_RTS_IPC_REPLY
     );
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-        return scheduler_error_to_ipc(scheduler_error);
+        return ipc_scheduler_error_to_ipc(scheduler_error);
     }
 
-    commit_reply_delivery(&plan);
+    ipc_commit_reply_delivery(&plan);
     return MICROS_IPC_OK;
 }
 
@@ -2735,7 +1741,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
     uintptr_t receive_buffer
 )
 {
-    struct reply_preflight reply_plan;
+    struct ipc_reply_preflight reply_plan;
     const struct micros_endpoint_record *resolved_source;
     struct micros_endpoint_record *receiver_endpoint;
     struct pending_notification_plan notification;
@@ -2761,7 +1767,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
     ) {
         return MICROS_IPC_ERROR_ARGUMENT;
     }
-    error = preflight_reply(
+    error = ipc_preflight_reply(
         registry,
         objects,
         replier_handle,
@@ -2782,7 +1788,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
             &resolved_source
         );
         if (endpoint_error != MICROS_ENDPOINT_OK) {
-            return endpoint_error_to_ipc(endpoint_error);
+            return ipc_endpoint_error_to_ipc(endpoint_error);
         }
         (void)resolved_source;
     }
@@ -2802,7 +1808,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
     }
     has_sender = false;
     if (!has_notification) {
-        has_sender = find_matching_sender(
+        has_sender = ipc_find_matching_sender(
             receiver_endpoint,
             objects,
             source_endpoint,
@@ -2829,7 +1835,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
                 sender_handle
             );
     } else {
-        error = resolve_queue_tail(
+        error = ipc_resolve_queue_tail(
             objects,
             receiver_endpoint->receiver_tail,
             &previous_tail
@@ -2837,7 +1843,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
         if (error != MICROS_IPC_OK) {
             return error;
         }
-        error = preflight_deadlock(
+        error = ipc_preflight_deadlock(
             registry,
             objects,
             replier_handle,
@@ -2855,30 +1861,30 @@ enum micros_ipc_error micros_ipc_reply_receive(
             );
     }
     if (scheduler_error != MICROS_KERNEL_OBJECT_OK) {
-        return scheduler_error_to_ipc(scheduler_error);
+        return ipc_scheduler_error_to_ipc(scheduler_error);
     }
 
-    commit_reply_delivery(&reply_plan);
+    ipc_commit_reply_delivery(&reply_plan);
     if (has_notification) {
         consume_pending_notification(
             receiver_endpoint,
             &notification
         );
-        stage_delivery(
+        ipc_stage_delivery(
             replier,
             receive_buffer,
             &notification.message
         );
     } else if (has_sender) {
-        unlink_thread(
+        ipc_unlink_thread(
             objects,
             previous,
             sender_handle,
             &receiver_endpoint->sender_head,
             &receiver_endpoint->sender_tail
         );
-        clear_delivered_sender(sender);
-        stage_delivery(
+        ipc_clear_delivered_sender(sender);
+        ipc_stage_delivery(
             replier,
             receive_buffer,
             &incoming_message
@@ -2889,7 +1895,7 @@ enum micros_ipc_error micros_ipc_reply_receive(
         replier->ipc_next.generation = 0;
         replier->ipc_receive_source = source_endpoint;
         replier->ipc_receive_buffer = receive_buffer;
-        append_thread(
+        ipc_append_thread(
             replier_handle,
             previous_tail,
             &receiver_endpoint->receiver_head,
@@ -2927,9 +1933,9 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
     endpoint_error =
         micros_endpoint_registry_validate_objects(registry, objects);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error_to_ipc(endpoint_error);
+        return ipc_endpoint_error_to_ipc(endpoint_error);
     }
-    error = resolve_held_thread(objects, receiver_handle, &receiver);
+    error = ipc_resolve_held_thread(objects, receiver_handle, &receiver);
     if (error != MICROS_IPC_OK) {
         return error;
     }
@@ -2950,7 +1956,7 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
             &resolved_source
         );
         if (endpoint_error != MICROS_ENDPOINT_OK) {
-            return endpoint_error_to_ipc(endpoint_error);
+            return ipc_endpoint_error_to_ipc(endpoint_error);
         }
         (void)resolved_source;
     }
@@ -2968,7 +1974,7 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
         return error;
     }
     if (
-        sender_is_ready_for(
+        ipc_sender_is_ready_for(
             receiver_endpoint,
             objects,
             source_endpoint
@@ -2976,7 +1982,7 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
     ) {
         return MICROS_IPC_ERROR_NOT_READY;
     }
-    error = resolve_queue_tail(
+    error = ipc_resolve_queue_tail(
         objects,
         receiver_endpoint->receiver_tail,
         &previous_tail
@@ -2991,7 +1997,7 @@ enum micros_ipc_error micros_ipc_receiver_enqueue(
     receiver->ipc_next.generation = 0;
     receiver->ipc_receive_source = source_endpoint;
     receiver->ipc_receive_buffer = receive_buffer;
-    append_thread(
+    ipc_append_thread(
         receiver_handle,
         previous_tail,
         &receiver_endpoint->receiver_head,

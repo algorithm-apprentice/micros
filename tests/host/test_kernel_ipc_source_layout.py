@@ -276,7 +276,13 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in FINAL_OWNER_GROUPS.items()
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
+    if entry[2] not in {
+        "micros_ipc_thread_has_staged_kernel_notification",
+        "micros_ipc_stage_no_message_completion",
+    }
+)
 
 INITIAL_LONG_FUNCTION_MIGRATION = (
     ("kernel/ipc.c", "micros_ipc_notify"),
