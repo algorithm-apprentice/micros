@@ -20,6 +20,12 @@ enum coordinator_mock_step {
     COORDINATOR_MOCK_ABORT_DESCRIPTORS,
     COORDINATOR_MOCK_ABORT_LOAD,
     COORDINATOR_MOCK_ABORT_RESERVED,
+    COORDINATOR_MOCK_EXIT_BEGIN,
+    COORDINATOR_MOCK_VFS_EXIT,
+    COORDINATOR_MOCK_EXIT_DETACH,
+    COORDINATOR_MOCK_VM_EXIT,
+    COORDINATOR_MOCK_RELEASE_PROCESS,
+    COORDINATOR_MOCK_WAIT_REPLY,
 };
 
 struct coordinator_spawn_fixture {
@@ -49,8 +55,40 @@ struct coordinator_spawn_fixture {
     bool published;
     bool vm_committed;
     bool vfs_process_live;
+    bool stopped;
+    bool exit_token_live;
+    uint64_t replies[4];
+    uint64_t reply_pids[4];
+    size_t reply_count;
+    uint64_t fail_reply;
+    micros_endpoint_t exit_endpoint;
+    uint64_t exit_load;
+    uint64_t exit_mapping;
 };
 
+void spawn_fixture_write_word(uint8_t *bytes, uint64_t value);
+uint64_t spawn_fixture_read_word(const uint8_t *bytes);
+bool spawn_fixture_step(struct coordinator_spawn_fixture *fixture, uint32_t step, bool valid);
+void spawn_fixture_result(
+    struct micros_ipc_message *message, micros_endpoint_t peer,
+    uint32_t type, uint32_t command, int32_t result
+);
+micros_runtime_result_t coordinator_exit_fixture_begin(
+    void *context, micros_endpoint_t endpoint, struct micros_pm_exit_begin_result *result
+);
+micros_runtime_result_t coordinator_exit_fixture_detach(
+    void *context, uint64_t transaction, micros_endpoint_t endpoint
+);
+micros_runtime_result_t coordinator_exit_fixture_release(void *context, uint64_t transaction);
+micros_runtime_result_t coordinator_exit_fixture_reply(
+    void *context, uint64_t token, const struct micros_ipc_message *message
+);
+micros_runtime_result_t coordinator_exit_fixture_vfs(
+    struct coordinator_spawn_fixture *fixture, struct micros_ipc_message *message
+);
+micros_runtime_result_t coordinator_exit_fixture_vm(
+    struct coordinator_spawn_fixture *fixture, struct micros_ipc_message *message
+);
 bool coordinator_spawn_fixture_initialize(struct coordinator_spawn_fixture *fixture);
 bool coordinator_spawn_fixture_initialize_parent(struct coordinator_spawn_fixture *fixture);
 struct micros_ipc_message coordinator_spawn_fixture_request(

@@ -23,6 +23,10 @@ int main(void)
         {"coordinator parent loss rollback", test_coordinator_parent_loss_rollback},
         {"coordinator public capacity and unknown grant", test_coordinator_public_capacity_and_unknown_grant},
         {"coordinator parent loss after publication", test_coordinator_parent_loss_after_publication},
+        {"coordinator exit and blocked wait", test_coordinator_exit_and_blocked_wait},
+        {"coordinator exit failure boundaries", test_coordinator_exit_failure_boundaries},
+        {"coordinator immediate wait reply restore", test_coordinator_immediate_wait_reply_restore},
+        {"coordinator nested independent wait replies", test_coordinator_nested_independent_wait_replies},
     };
     size_t index;
 

@@ -94,6 +94,9 @@ struct micros_pm_coordinator_child {
 enum micros_pm_coordinator_response_kind {
     MICROS_PM_COORDINATOR_RESPONSE_REPLY = 0,
     MICROS_PM_COORDINATOR_RESPONSE_PARENT_LOST,
+    MICROS_PM_COORDINATOR_RESPONSE_EXIT_ACCEPTED,
+    MICROS_PM_COORDINATOR_RESPONSE_WAIT_BLOCKED,
+    MICROS_PM_COORDINATOR_RESPONSE_WAIT_REPLY_COMPLETED,
 };
 
 struct micros_pm_coordinator_response {
@@ -155,6 +158,20 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_request(
 enum micros_pm_coordinator_error micros_pm_coordinator_parent_lost(
     struct micros_pm_coordinator *coordinator,
     uint64_t reply_token
+);
+enum micros_pm_coordinator_error micros_pm_coordinator_exit_request(
+    struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend,
+    void *backend_context,
+    const struct micros_ipc_message *message,
+    struct micros_pm_coordinator_response *response
+);
+enum micros_pm_coordinator_error micros_pm_coordinator_wait_request(
+    struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend,
+    void *backend_context,
+    const struct micros_ipc_message *message,
+    struct micros_pm_coordinator_response *response
 );
 
 #endif

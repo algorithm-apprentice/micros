@@ -46,8 +46,9 @@ enum pm_coordinator_step pm_coordinator_classify_vfs_result(
     return PM_COORDINATOR_REJECTED;
 }
 
-enum pm_coordinator_step pm_coordinator_vfs_call(
-    struct pm_coordinator_spawn *spawn, uint32_t command,
+enum micros_pm_coordinator_error pm_coordinator_vfs_exchange(
+    const struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend, void *context, uint32_t command,
     const uint64_t arguments[5], struct micros_pm_coordinator_control_result *result
 )
 {
@@ -56,19 +57,33 @@ enum pm_coordinator_step pm_coordinator_vfs_call(
     if (
         micros_pm_coordinator_build_vfs_control(command, arguments, &message)
             != MICROS_PM_COORDINATOR_PROTOCOL_OK
-        || spawn->backend->call(spawn->context, spawn->coordinator->bindings.vfs, &message)
+        || backend->call(context, coordinator->bindings.vfs, &message)
             != MICROS_SYSCALL_ABI_OK
         || micros_pm_coordinator_decode_vfs_result(
-            spawn->coordinator->bindings.vfs, command, &message, result
+            coordinator->bindings.vfs, command, &message, result
         ) != MICROS_PM_COORDINATOR_PROTOCOL_OK
     ) {
+        return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
+    }
+    return MICROS_PM_COORDINATOR_OK;
+}
+
+enum pm_coordinator_step pm_coordinator_vfs_call(
+    struct pm_coordinator_spawn *spawn, uint32_t command,
+    const uint64_t arguments[5], struct micros_pm_coordinator_control_result *result
+)
+{
+    if (pm_coordinator_vfs_exchange(
+        spawn->coordinator, spawn->backend, spawn->context, command, arguments, result
+    ) != MICROS_PM_COORDINATOR_OK) {
         return PM_COORDINATOR_CORRUPT;
     }
     return pm_coordinator_classify_vfs_result(spawn, command, result->result);
 }
 
-enum pm_coordinator_step pm_coordinator_vm_call(
-    struct pm_coordinator_spawn *spawn, uint32_t command,
+enum micros_pm_coordinator_error pm_coordinator_vm_exchange(
+    const struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend, void *context, uint32_t command,
     const uint64_t arguments[5], struct micros_pm_coordinator_control_result *result
 )
 {
@@ -77,12 +92,25 @@ enum pm_coordinator_step pm_coordinator_vm_call(
     if (
         micros_pm_coordinator_build_vm_control(command, arguments, &message)
             != MICROS_PM_COORDINATOR_PROTOCOL_OK
-        || spawn->backend->call(spawn->context, spawn->coordinator->bindings.vm, &message)
+        || backend->call(context, coordinator->bindings.vm, &message)
             != MICROS_SYSCALL_ABI_OK
         || micros_pm_coordinator_decode_vm_result(
-            spawn->coordinator->bindings.vm, command, &message, result
+            coordinator->bindings.vm, command, &message, result
         ) != MICROS_PM_COORDINATOR_PROTOCOL_OK
     ) {
+        return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
+    }
+    return MICROS_PM_COORDINATOR_OK;
+}
+
+enum pm_coordinator_step pm_coordinator_vm_call(
+    struct pm_coordinator_spawn *spawn, uint32_t command,
+    const uint64_t arguments[5], struct micros_pm_coordinator_control_result *result
+)
+{
+    if (pm_coordinator_vm_exchange(
+        spawn->coordinator, spawn->backend, spawn->context, command, arguments, result
+    ) != MICROS_PM_COORDINATOR_OK) {
         return PM_COORDINATOR_CORRUPT;
     }
     if (result->result == MICROS_VM_CONTROL_RESULT_OK) {

@@ -41,6 +41,8 @@ The intended responsibility owners are:
 | --- | --- |
 | `servers/pm/pm_coordinator.c` | Configuration, public request preflight, trusted-init entry, and dispatch |
 | `servers/pm/pm_coordinator_requests.c` | Application spawn preflight, parent grant snapshot, lifecycle reservation, and returning result |
+| `servers/pm/pm_coordinator_frontend.c` | Shared application envelope/caller preflight and canonical reply/no-reply shaping |
+| `servers/pm/pm_coordinator_peers.c` | Validated peer exchange and phase-specific forward result classification |
 | `servers/pm/pm_coordinator_protocol.c` | Exact VFS/VM request words, reply validation, and result mapping |
 | `servers/pm/pm_coordinator_spawn.c` | Forward spawn phases and sole activation boundary |
 | `servers/pm/pm_coordinator_rollback.c` | Reverse collaborator release and exact PM acknowledgments |
@@ -73,11 +75,10 @@ Binding input is captured before owned storage is cleared, including when
 the caller supplied the coordinator's own binding member.
 
 The constructor, byte-exact VFS/VM codecs, trusted init, ordinary application
-spawn, and every completed-stage rollback are implemented in
+spawn, every completed-stage rollback, and exit/wait coordination are implemented in
 `MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
 The fast `pm-coordinator` CTest is included by both native aggregates.
-Exit/wait coordination, runtime peer adapters, and the separate mixed
-lifecycle model remain in progress.
+Runtime peer adapters and the separate mixed lifecycle model remain in progress.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -201,6 +202,14 @@ set is scanned first; the original parent's set is scanned separately only
 when it differs. Every staged wait reply is accepted or restored independently,
 in order, before receiving another request. One failed reply must not consume
 another parent's status or prevent its attempted completion.
+
+The native cross-service cases prove stop/reparent, VFS cleanup, kernel
+detach, VM release, process release, and only then zombie/wait completion.
+They cover an atomic rejection before exit stop, every later fatal boundary,
+immediate-wait reply restoration, and `init -> C -> A -> B` with two blocked
+parents. Rejecting init's reply restores only adopted `B`; `C` still receives
+and consumes `A` independently. The spawn and exit mock portions have
+separate owners over one automatic transition fixture.
 
 An immediate wait with a staged zombie uses `reply` followed by the matching
 local completion; it cannot use `reply_receive` before recording acceptance.

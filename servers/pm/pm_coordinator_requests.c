@@ -6,44 +6,9 @@ static enum micros_pm_coordinator_error build_spawn_response(
     struct micros_pm_coordinator_response *response
 )
 {
-    struct micros_pm_coordinator_response built;
-
-    pm_common_zero_bytes(&built, sizeof(built));
-    built.kind = MICROS_PM_COORDINATOR_RESPONSE_REPLY;
-    built.reply_token = reply_token;
-    if (micros_pm_build_result(
-        request_type, result, pid, MICROS_PM_EXIT_NONE, 0, &built.message
-    ) != MICROS_PM_MODEL_OK) {
-        return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
-    }
-    *response = built;
-    return MICROS_PM_COORDINATOR_OK;
-}
-
-static enum micros_pm_result decode_spawn_request(
-    const struct micros_ipc_message *message, struct micros_pm_request *request,
-    bool *corrupt
-)
-{
-    enum micros_pm_protocol_status status = micros_pm_decode_request(message, request);
-
-    *corrupt = false;
-    switch (status) {
-    case MICROS_PM_PROTOCOL_BAD_TYPE:
-        return MICROS_PM_RESULT_BAD_TYPE;
-    case MICROS_PM_PROTOCOL_BAD_VERSION:
-        return MICROS_PM_RESULT_BAD_VERSION;
-    case MICROS_PM_PROTOCOL_MALFORMED:
-        return MICROS_PM_RESULT_MALFORMED;
-    case MICROS_PM_PROTOCOL_INVARIANT:
-        *corrupt = true;
-        return MICROS_PM_RESULT_STATE;
-    case MICROS_PM_PROTOCOL_OK:
-        return request->type == MICROS_PM_MESSAGE_SPAWN
-            ? MICROS_PM_RESULT_OK : MICROS_PM_RESULT_BAD_TYPE;
-    }
-    *corrupt = true;
-    return MICROS_PM_RESULT_STATE;
+    return pm_coordinator_reply_response(
+        request_type, reply_token, result, pid, MICROS_PM_EXIT_NONE, 0, response
+    );
 }
 
 static bool parent_grant_failure_is_expected(micros_runtime_result_t status)
@@ -182,38 +147,21 @@ enum micros_pm_coordinator_error micros_pm_coordinator_spawn_request(
     struct micros_spawn_stack_layout layout;
     struct pm_coordinator_spawn spawn;
     enum micros_pm_result result;
-    enum micros_pm_model_error model_error;
     enum pm_coordinator_step step;
-    uint64_t pid;
-    bool corrupt;
 
     if (coordinator == NULL || message == NULL || response == NULL
         || !pm_coordinator_spawn_backend_is_complete(backend)
         || backend->grant_copy_from == NULL) {
         return MICROS_PM_COORDINATOR_ERROR_ARGUMENT;
     }
-    result = decode_spawn_request(message, &request, &corrupt);
-    if (corrupt || pm_coordinator_validate_instance(coordinator) != MICROS_PM_COORDINATOR_OK) {
-        return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
-    }
-    if (result != MICROS_PM_RESULT_OK) {
-        return build_spawn_response(message->type, message->reply_token, result, 0, response);
-    }
-    model_error = micros_pm_find_running_by_endpoint(
-        coordinator->table, request.source, &parent, &pid
+    step = pm_coordinator_preflight_call(
+        coordinator, MICROS_PM_MESSAGE_SPAWN, message, &request, &parent, &result
     );
-    if (model_error == MICROS_PM_MODEL_ERROR_STALE) {
-        return build_spawn_response(
-            request.type, request.reply_token, MICROS_PM_RESULT_CALLER, 0, response
-        );
-    }
-    if (model_error != MICROS_PM_MODEL_OK) {
+    if (step == PM_COORDINATOR_CORRUPT) {
         return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
     }
-    if (!coordinator->table->runtime_enabled) {
-        return build_spawn_response(
-            request.type, request.reply_token, MICROS_PM_RESULT_STATE, 0, response
-        );
+    if (step == PM_COORDINATOR_REJECTED) {
+        return build_spawn_response(message->type, message->reply_token, result, 0, response);
     }
     if (coordinator->spawn_pending) {
         return MICROS_PM_COORDINATOR_ERROR_STATE;

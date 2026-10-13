@@ -9,7 +9,7 @@ static void spawn_fixture_write_u32(uint8_t *bytes, uint32_t value)
     }
 }
 
-static void spawn_fixture_write_word(uint8_t *bytes, uint64_t value)
+void spawn_fixture_write_word(uint8_t *bytes, uint64_t value)
 {
     size_t index;
 
@@ -18,7 +18,7 @@ static void spawn_fixture_write_word(uint8_t *bytes, uint64_t value)
     }
 }
 
-static uint64_t spawn_fixture_read_word(const uint8_t *bytes)
+uint64_t spawn_fixture_read_word(const uint8_t *bytes)
 {
     uint64_t value = 0;
     size_t index;
@@ -29,7 +29,7 @@ static uint64_t spawn_fixture_read_word(const uint8_t *bytes)
     return value;
 }
 
-static bool spawn_fixture_step(struct coordinator_spawn_fixture *fixture, uint32_t step, bool valid)
+bool spawn_fixture_step(struct coordinator_spawn_fixture *fixture, uint32_t step, bool valid)
 {
     if (fixture->trace_count >= sizeof(fixture->trace) / sizeof(fixture->trace[0])) {
         fixture->violation = true;
@@ -188,7 +188,7 @@ static micros_runtime_result_t spawn_fixture_grant_revoke(void *context, micros_
     return MICROS_SYSCALL_ABI_OK;
 }
 
-static void spawn_fixture_result(
+void spawn_fixture_result(
     struct micros_ipc_message *message, micros_endpoint_t peer,
     uint32_t type, uint32_t command, int32_t result
 )
@@ -210,6 +210,9 @@ static micros_runtime_result_t spawn_fixture_vfs_call(
     bool valid;
     size_t index;
 
+    if (command == MICROS_VFS_CONTROL_EXIT_PROCESS) {
+        return coordinator_exit_fixture_vfs(fixture, message);
+    }
     for (index = 0; index < 5; ++index) {
         words[index] = spawn_fixture_read_word(&message->payload[(index + 1) * 8]);
     }
@@ -300,6 +303,9 @@ static micros_runtime_result_t spawn_fixture_vm_call(
     bool valid;
     size_t index;
 
+    if (command == MICROS_VM_CONTROL_EXIT_RELEASE) {
+        return coordinator_exit_fixture_vm(fixture, message);
+    }
     for (index = 0; index < 5; ++index) {
         words[index] = spawn_fixture_read_word(&message->payload[(index + 1) * 8]);
     }
@@ -404,10 +410,14 @@ const struct micros_pm_coordinator_backend *coordinator_spawn_fixture_backend(vo
         .prepare_execution = spawn_fixture_prepare,
         .abort_prepared = spawn_fixture_abort_prepared,
         .activate = spawn_fixture_activate,
+        .exit_begin = coordinator_exit_fixture_begin,
+        .exit_detach = coordinator_exit_fixture_detach,
+        .release_exited_process = coordinator_exit_fixture_release,
         .grant_create = spawn_fixture_grant_create,
         .grant_revoke = spawn_fixture_grant_revoke,
         .grant_copy_from = spawn_fixture_copy_parent,
         .call = spawn_fixture_call,
+        .reply = coordinator_exit_fixture_reply,
     };
 
     return &backend;
@@ -517,5 +527,6 @@ bool coordinator_spawn_fixture_resources_are_empty(const struct coordinator_spaw
         && !fixture->mappings_frozen && !fixture->descriptors_live && !fixture->execution_live
         && !fixture->hidden_live && !fixture->published && !fixture->vm_committed
         && !fixture->vfs_process_live
+        && !fixture->exit_token_live
     );
 }

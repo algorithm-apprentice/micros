@@ -46,6 +46,37 @@ enum pm_coordinator_step pm_coordinator_prepare_snapshot(
 enum pm_coordinator_step pm_coordinator_complete_phase(
     const struct pm_coordinator_spawn *spawn
 );
+enum pm_coordinator_step pm_coordinator_preflight_call(
+    const struct micros_pm_coordinator *coordinator, uint32_t expected_type,
+    const struct micros_ipc_message *message, struct micros_pm_request *request,
+    struct micros_pm_process_handle *caller, enum micros_pm_result *rejection
+);
+enum micros_pm_coordinator_error pm_coordinator_reply_response(
+    uint32_t request_type, uint64_t token, enum micros_pm_result result, uint64_t pid,
+    enum micros_pm_exit_kind exit_kind, int32_t exit_code,
+    struct micros_pm_coordinator_response *response
+);
+void pm_coordinator_no_reply_response(
+    enum micros_pm_coordinator_response_kind kind,
+    struct micros_pm_coordinator_response *response
+);
+enum micros_pm_coordinator_error pm_coordinator_vfs_exchange(
+    const struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend, void *context,
+    uint32_t command, const uint64_t arguments[5],
+    struct micros_pm_coordinator_control_result *result
+);
+enum micros_pm_coordinator_error pm_coordinator_vm_exchange(
+    const struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend, void *context,
+    uint32_t command, const uint64_t arguments[5],
+    struct micros_pm_coordinator_control_result *result
+);
+enum micros_pm_coordinator_error pm_coordinator_complete_wait_outcomes(
+    struct micros_pm_coordinator *coordinator,
+    const struct micros_pm_coordinator_backend *backend, void *context,
+    const struct micros_pm_wait_outcomes *outcomes
+);
 
 enum pm_coordinator_step pm_coordinator_classify_vfs_result(
     struct pm_coordinator_spawn *spawn, uint32_t command, int32_t result
