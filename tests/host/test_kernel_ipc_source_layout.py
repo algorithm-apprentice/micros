@@ -348,7 +348,7 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
 )
 LONG_FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
-    if entry[1] not in {
+    if entry[0] != "tests/host/ipc_model_test.c" and entry[1] not in {
         "micros_ipc_notify",
         "sender_enqueue",
         "micros_ipc_receiver_commit_delivery",
@@ -386,7 +386,7 @@ FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_notify_model_test.c": "81f85e33023553fbd2c1b334f5b19342f95962e4ec3c9ddac9982aed6f4a019c",
     "tests/host/ipc_close_test_fixture.c": "38ebf808fef614fc64d51d3057065bee7906afa47d7df17c08e404c0adb1090f",
     "tests/host/ipc_close_model_test.c": "7b2491687b616a4100153002b72e99b1ea7b58b7ba95d4035f3828a713ce477f",
-    "tests/host/ipc_model_test.c": "963b5f6cbd53ce422c5f00bd8b877fb876265cab4a0bfda4d16d5da1878f169c",
+    "tests/host/ipc_model_test_fixture.c": "e833e18b6805722b07da8602feecdf1fbb9bfbd743a123d22da7719df4f6617a",
     "kernel/ipc_test.c": "b0ef5316ebac2b81c2ef1982af6c264bb833355211c27953405971b983c33f28",
     "kernel/ipc_ecall_test.c": "d8b668741da95028e58573d42953fb94c12c3efc32132c2f41054e50a81fdbff",
     "kernel/ipc_syscall_test.c": "edd0f929402275dc494bc18e5d3f585825529f43b45fec956e3394118f654523",
