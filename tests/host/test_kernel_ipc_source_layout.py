@@ -281,6 +281,10 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if entry[2] not in {
         "micros_ipc_thread_has_staged_kernel_notification",
         "micros_ipc_stage_no_message_completion",
+        "micros_ipc_notify",
+        "micros_ipc_inject_kernel_notification",
+        "micros_ipc_prepare_kernel_notification",
+        "micros_ipc_commit_kernel_notification_prevalidated",
     }
 )
 
@@ -328,7 +332,10 @@ INITIAL_LONG_FUNCTION_MIGRATION = (
     ("tests/host/ipc_call_test.c", "test_call_rejections_are_atomic"),
     ("tests/host/ipc_operation_test.c", "test_receive_specific_and_any_fifo"),
 )
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
+    if entry[1] != "micros_ipc_notify"
+)
 
 FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_operation_test.c": "f02364ea0be2c6ed8e566310728e29ffadaa836b7146cae772031cb33eb9d7aa",

@@ -101,6 +101,26 @@ void ipc_stage_delivery(
     const struct micros_ipc_message *message
 );
 
+struct ipc_pending_notification_plan {
+    bool kernel_origin;
+    size_t source_slot;
+    micros_endpoint_t source_endpoint;
+    uint64_t event_mask;
+    struct micros_ipc_message message;
+};
+
+enum micros_ipc_error ipc_find_pending_notification(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *destination,
+    micros_endpoint_t source_filter,
+    struct ipc_pending_notification_plan *plan
+);
+void ipc_consume_pending_notification(
+    struct micros_endpoint_record *destination,
+    const struct ipc_pending_notification_plan *plan
+);
+
 struct ipc_reply_preflight {
     struct micros_thread_handle caller_handle;
     struct micros_thread *caller;
