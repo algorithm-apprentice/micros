@@ -292,6 +292,10 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "tests/host/ipc_reply_authority_test.c",
         "tests/host/ipc_reply_validation_test.c",
         "tests/host/ipc_reply_receive_test.c",
+        "tests/host/ipc_notify_delivery_test.c",
+        "tests/host/ipc_kernel_notify_test.c",
+        "tests/host/ipc_notify_validation_test.c",
+        "tests/host/ipc_notify_model_test.c",
     }
 )
 
@@ -357,6 +361,13 @@ LONG_FUNCTION_MIGRATION = tuple(
         "test_reply_rejections_are_atomic",
         "test_reply_receive_blocks_and_later_receives",
         "test_reply_receive_selects_specific_sender_atomically",
+        "setup_notify_fixture",
+        "test_kernel_notify_prepare_commit_is_retained",
+        "test_kernel_notify_validation_and_close_rules",
+        "test_receive_prefers_lowest_notification_before_sender",
+        "test_reply_receive_prefers_pending_notification",
+        "test_notification_validators_and_close_preflight",
+        "test_seeded_notify_model",
     }
 )
 
@@ -364,7 +375,8 @@ FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_operation_test_fixture.c": "3bbffce409df296cc5ccbc908c8034b84d730d32db201c73f6fdfe128ba065fc",
     "tests/host/ipc_call_test_fixture.c": "3c4205f69f3a21baaeb3e7fada651741446007de252d5d1f5d932e11f2ccbe87",
     "tests/host/ipc_reply_test_fixture.c": "ac463d588ed52d441e693e6f98821b4fbaa84e1ff9a32cb5adbed247e8516ebe",
-    "tests/host/ipc_notify_test.c": "1238cd625791ec0e01b96de630dfa5d453068d1a1a9eaa36d1d90fac35baa054",
+    "tests/host/ipc_notify_test_fixture.c": "df17fd7674262222781d53f2d3e27a16e331243280131154eb7bfc0e57f78de3",
+    "tests/host/ipc_notify_model_test.c": "81f85e33023553fbd2c1b334f5b19342f95962e4ec3c9ddac9982aed6f4a019c",
     "tests/host/ipc_close_test.c": "01c87398aed0e69b094997423c40683cb178fd4682f8a958214797f52e69086b",
     "tests/host/ipc_model_test.c": "963b5f6cbd53ce422c5f00bd8b877fb876265cab4a0bfda4d16d5da1878f169c",
     "kernel/ipc_test.c": "b0ef5316ebac2b81c2ef1982af6c264bb833355211c27953405971b983c33f28",
