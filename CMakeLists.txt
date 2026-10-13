@@ -341,6 +341,118 @@ set(
 )
 
 set(
+    MICROS_IPC_CORE_SOURCES
+    kernel/ipc_common.c
+    kernel/ipc_queue.c
+    kernel/ipc_completion.c
+    kernel/ipc_tokens.c
+    kernel/ipc_notifications.c
+    kernel/ipc_deadlock.c
+    kernel/ipc_rendezvous.c
+    kernel/ipc_close.c
+    kernel/ipc_reply.c
+    kernel/ipc.c
+)
+
+set(
+    MICROS_IPC_SYSCALL_SOURCES
+    kernel/ipc_syscall_result.c
+    kernel/ipc_syscall_request.c
+    kernel/ipc_syscall.c
+)
+
+set(
+    MICROS_IPC_OPERATION_HOST_TEST_SOURCES
+    tests/host/ipc_operation_test.c
+    tests/host/ipc_operation_test_fixture.c
+    tests/host/ipc_send_operation_test.c
+    tests/host/ipc_receive_operation_test.c
+)
+
+set(
+    MICROS_IPC_CALL_HOST_TEST_SOURCES
+    tests/host/ipc_call_test.c
+    tests/host/ipc_call_test_fixture.c
+    tests/host/ipc_call_delivery_test.c
+    tests/host/ipc_call_validation_test.c
+)
+
+set(
+    MICROS_IPC_REPLY_HOST_TEST_SOURCES
+    tests/host/ipc_reply_test.c
+    tests/host/ipc_reply_test_fixture.c
+    tests/host/ipc_reply_authority_test.c
+    tests/host/ipc_reply_validation_test.c
+    tests/host/ipc_reply_receive_test.c
+)
+
+set(
+    MICROS_IPC_NOTIFY_HOST_TEST_SOURCES
+    tests/host/ipc_notify_test.c
+    tests/host/ipc_notify_test_fixture.c
+    tests/host/ipc_notify_delivery_test.c
+    tests/host/ipc_kernel_notify_test.c
+    tests/host/ipc_notify_validation_test.c
+    tests/host/ipc_notify_model_test.c
+)
+
+set(
+    MICROS_IPC_CLOSE_HOST_TEST_SOURCES
+    tests/host/ipc_close_test.c
+    tests/host/ipc_close_test_fixture.c
+    tests/host/ipc_close_cancellation_test.c
+    tests/host/ipc_close_validation_test.c
+    tests/host/ipc_close_model_test.c
+)
+
+set(
+    MICROS_IPC_MODEL_HOST_TEST_SOURCES
+    tests/host/ipc_model_test.c
+    tests/host/ipc_model_test_common.c
+    tests/host/ipc_model_test_fixture.c
+    tests/host/ipc_model_test_trace.c
+    tests/host/ipc_model_reference_authority.c
+    tests/host/ipc_model_reference_scheduler.c
+    tests/host/ipc_model_reference_ipc_state.c
+    tests/host/ipc_model_reference_rendezvous.c
+    tests/host/ipc_model_reference_notifications.c
+    tests/host/ipc_model_reference_lifecycle.c
+    tests/host/ipc_model_reference.c
+    tests/host/ipc_model_test_production.c
+    tests/host/ipc_model_test_step.c
+    tests/host/ipc_model_test_actions.c
+    tests/host/ipc_model_test_prelude.c
+)
+
+set(
+    MICROS_IPC_QEMU_TEST_SOURCES
+    kernel/ipc_test.c
+    kernel/ipc_test_fixture.c
+    kernel/ipc_test_setup.c
+    kernel/ipc_test_scenarios.c
+    kernel/ipc_test_report.c
+)
+
+set(
+    MICROS_IPC_ECALL_QEMU_TEST_SOURCES
+    kernel/ipc_ecall_test.c
+    kernel/ipc_ecall_test_fixture.c
+    kernel/ipc_ecall_test_setup.c
+    kernel/ipc_ecall_test_report.c
+)
+
+set(
+    MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES
+    kernel/ipc_syscall_test.c
+    kernel/ipc_syscall_test_fixture.c
+    kernel/ipc_syscall_test_setup.c
+    kernel/ipc_syscall_test_commands.c
+    kernel/ipc_syscall_test_scenarios.c
+    kernel/ipc_syscall_test_hooks.c
+    kernel/ipc_syscall_test_report.c
+)
+
+set(
     MICROS_KERNEL_ADDRESS_SPACE_SOURCES
     kernel/address_space.c
     kernel/address_space_validation.c
@@ -711,21 +823,21 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
         kernel/ipc_abi.c
-        kernel/ipc.c
+        ${MICROS_IPC_CORE_SOURCES}
         tests/host/ipc_abi_test.c
-        tests/host/ipc_call_test.c
-        tests/host/ipc_close_test.c
+        ${MICROS_IPC_CALL_HOST_TEST_SOURCES}
+        ${MICROS_IPC_CLOSE_HOST_TEST_SOURCES}
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
         tests/host/grant_syscall_core_test.c
         ${MICROS_USER_ADDRESS_SPACE_HOST_TEST_SOURCES}
-        tests/host/ipc_notify_test.c
-        tests/host/ipc_operation_test.c
+        ${MICROS_IPC_NOTIFY_HOST_TEST_SOURCES}
+        ${MICROS_IPC_OPERATION_HOST_TEST_SOURCES}
         tests/host/ipc_queue_test.c
         tests/host/ipc_queue_mutation_test.c
-        tests/host/ipc_reply_test.c
+        ${MICROS_IPC_REPLY_HOST_TEST_SOURCES}
         tests/host/ipc_state_test.c
         tests/host/endpoint_model_test.c
         tests/host/endpoint_test.c
@@ -737,14 +849,14 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/endpoint.c
         kernel/grant.c
         kernel/grant_copy_core.c
-        kernel/ipc.c
+        ${MICROS_IPC_CORE_SOURCES}
         tests/host/endpoint_model_test.c
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
-        tests/host/ipc_close_test.c
+        ${MICROS_IPC_CLOSE_HOST_TEST_SOURCES}
         tests/host/ipc_model_main.c
-        tests/host/ipc_model_test.c
-        tests/host/ipc_notify_test.c
+        ${MICROS_IPC_MODEL_HOST_TEST_SOURCES}
+        ${MICROS_IPC_NOTIFY_HOST_TEST_SOURCES}
     )
     add_executable(
         runtime_test
@@ -765,7 +877,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/bootstrap_image.c
         kernel/bootstrap_manifest.c
         kernel/endpoint.c
-        kernel/ipc.c
+        ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         kernel/scheduler_core.c
         tests/host/bootstrap_control_test.c
@@ -785,7 +897,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/endpoint.c
-        kernel/ipc.c
+        ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         ${MICROS_PM_CONTROL_CORE_SOURCES}
         kernel/scheduler_core.c
@@ -2850,10 +2962,10 @@ add_executable(
     kernel/grant_syscall.c
     kernel/grant_runtime.c
     kernel/ipc_abi.c
-    kernel/ipc.c
+    ${MICROS_IPC_CORE_SOURCES}
     kernel/ipc_buffer.c
     kernel/ipc_runtime.c
-    kernel/ipc_syscall.c
+    ${MICROS_IPC_SYSCALL_SOURCES}
     kernel/syscall.c
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
@@ -4312,7 +4424,7 @@ if(MICROS_BUILD_IPC_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/ipc_test.c
+            ${MICROS_IPC_QEMU_TEST_SOURCES}
     )
 endif()
 
@@ -4326,7 +4438,7 @@ if(MICROS_BUILD_IPC_ECALL_CORE_TEST)
         micros
         PRIVATE
             arch/riscv64/ipc_ecall_test.S
-            kernel/ipc_ecall_test.c
+            ${MICROS_IPC_ECALL_QEMU_TEST_SOURCES}
     )
 endif()
 
@@ -4340,7 +4452,7 @@ if(MICROS_BUILD_IPC_SYSCALL_TEST)
         micros
         PRIVATE
             arch/riscv64/ipc_syscall_test.S
-            kernel/ipc_syscall_test.c
+            ${MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES}
     )
 endif()
 

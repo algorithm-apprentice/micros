@@ -143,9 +143,10 @@ owner without weakening marker or timeout evidence.
 The kernel IPC decomposition defined by ADR-0059 preserves
 `endpoint-profile`, `ipc-model`, all existing fast/slow entry selection, and
 the trusted IPC, ecall-core, full syscall, and unchanged buffer-loss panic
-workflows with their exact eight-second timeouts. Its later implementation
-begins with one fail-closed structural Red gate, an exact 70-symbol owner
-migration, and an exact 42-function long migration. Nine contexts consolidate
+workflows with their exact eight-second timeouts. Its implementation
+began with one fail-closed structural Red gate, an exact 70-symbol owner
+migration, and an exact 42-function long migration; both are now empty.
+Nine contexts consolidate
 only existing mutable evidence storage; automatic snapshots/reference state
 and six assembly saved-register ABI objects retain their roles. The
 8,192-transition acceptance model keeps trace `65c2014aad08f70b`, while
