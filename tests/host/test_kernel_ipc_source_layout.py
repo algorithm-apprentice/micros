@@ -289,6 +289,12 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "micros_ipc_reply",
         "micros_ipc_reply_expected_caller",
         "micros_ipc_reply_receive",
+        "test_authorized_send_blocks_with_snapshot",
+        "test_authorized_send_matches_first_receiver",
+        "test_send_rejections_are_atomic",
+        "test_authorized_receive_blocks",
+        "test_receive_specific_and_any_fifo",
+        "test_receive_rejections_are_atomic",
         "micros_ipc_notify",
         "micros_ipc_inject_kernel_notification",
         "micros_ipc_prepare_kernel_notification",
@@ -349,11 +355,12 @@ LONG_FUNCTION_MIGRATION = tuple(
         "sender_commit_delivery",
         "micros_ipc_reply_receive",
         "micros_ipc_handle_captured_user_ecall",
+        "test_receive_specific_and_any_fifo",
     }
 )
 
 FILE_SCOPE_STORAGE_HASHES = {
-    "tests/host/ipc_operation_test.c": "f02364ea0be2c6ed8e566310728e29ffadaa836b7146cae772031cb33eb9d7aa",
+    "tests/host/ipc_operation_test_fixture.c": "3bbffce409df296cc5ccbc908c8034b84d730d32db201c73f6fdfe128ba065fc",
     "tests/host/ipc_call_test.c": "1930fcc91c4e9af060fd743ed214b2ac20b1e08dda54bde6c38cfaa21a95a30e",
     "tests/host/ipc_reply_test.c": "3dfadd845ed505feb914a031ece89584318a5d34580468272bea7aef7fa81ae5",
     "tests/host/ipc_notify_test.c": "1238cd625791ec0e01b96de630dfa5d453068d1a1a9eaa36d1d90fac35baa054",
