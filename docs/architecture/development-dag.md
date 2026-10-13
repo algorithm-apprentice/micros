@@ -329,6 +329,10 @@ to this sequence without changing the runtime dependency graph:
 The exact correction units and paired task IDs are recorded in
 [the repository source-module audit](source-module-audit.md). They remain
 sequential, behavior-preserving tasks rather than one broad Step 14 rewrite.
+The separately reviewed
+[kernel IPC correction](kernel-ipc-source-organization.md) applies the audit's
+before-next-touch rule to existing Step 6/7 mechanisms. It does not change
+this runtime graph or add an unrelated coordinator prerequisite.
 
 The Step 14 PID-1 program is an isolated integration fixture, not production
 init. It proves the production spawn, loader, application-runtime, exit, and

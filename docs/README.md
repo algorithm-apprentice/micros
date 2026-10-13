@@ -24,6 +24,9 @@ This directory contains the design baseline for `micros`.
 - [PM service source organization](architecture/pm-service-source-organization.md)
   defines exact lifecycle, codec, validation, request/layout, service,
   native/model, kernel-report, and generator ownership.
+- [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
+  defines exact queue, completion, token, event, cancellation, syscall,
+  native/reference-model, and target-script ownership.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -44,6 +47,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
   traces endpoint validation, privilege checks, send/receive queues,
   request/reply blocking, notifications, deadlock detection, and exit cleanup.
+- [MINIX kernel IPC source-organization baseline](research/minix-kernel-ipc-source-organization.md)
+  traces those responsibilities against the fixed local reference before the
+  behavior-preserving shared IPC correction.
 - [MINIX IRQ notification study](research/minix-irq-notification.md) traces
   interrupt ownership, kernel pseudo-source delivery, event coalescing,
   explicit driver acknowledgment, and endpoint cleanup.
