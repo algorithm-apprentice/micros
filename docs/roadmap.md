@@ -263,6 +263,15 @@ The implementation now separates the specified lifecycle, adapter, native
 evidence, kernel report, and generator owners, with empty migrations and
 fail-closed structural enforcement. It does not add the later coordinator.
 
+The next shared-mechanism audit correction is the kernel IPC design in
+Accepted
+[ADR-0059](adr/0059-kernel-ipc-source-decomposition.md) and its exact
+[source contract](architecture/kernel-ipc-source-organization.md).
+It is a behavior-preserving maintenance outcome over the already implemented
+Step 6/7 mechanisms, not a new runtime dependency node. Its design is
+independently reviewed and Accepted; implementation begins only after the
+design merge.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented

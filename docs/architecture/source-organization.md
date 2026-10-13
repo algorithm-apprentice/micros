@@ -271,3 +271,13 @@ boundaries are defined in
 design keeps validation below lifecycle mutation, frame selection separate
 from ELF/stack policy, one mutable context per evidence family, and common
 service startup separate from scenario-specific protocols.
+
+The shared IPC correction is defined by Accepted
+[ADR-0059](../adr/0059-kernel-ipc-source-decomposition.md) and
+[Kernel IPC Source Organization](kernel-ipc-source-organization.md).
+It separates queue, completion, token, notification, deadlock, rendezvous,
+close, syscall, reference-model, and target-script responsibilities while
+preserving existing authority and execution identities. Complete endpoint/
+object validation and the authoritative IPC runtime remain in their current
+owners. Implementation is blocked until that design is independently
+reviewed, Accepted, and merged.
