@@ -281,6 +281,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if entry[2] not in {
         "micros_ipc_thread_has_staged_kernel_notification",
         "micros_ipc_stage_no_message_completion",
+        "micros_ipc_endpoint_close",
         "micros_ipc_notify",
         "micros_ipc_inject_kernel_notification",
         "micros_ipc_prepare_kernel_notification",
