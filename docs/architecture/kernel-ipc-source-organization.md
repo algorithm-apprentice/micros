@@ -5,10 +5,12 @@ files identified by the source-module audit. It applies ADR-0051 to portable
 IPC, captured syscall adaptation, native cases/reference models, and three
 target evidence families.
 
-Implementation is blocked until
-[ADR-0059](../adr/0059-kernel-ipc-source-decomposition.md) is Accepted and
-its independently reviewed design is merged. The new files, private headers,
-source sets, and structural gate below are planned, not present at this base.
+The implementation follows Accepted
+[ADR-0059](../adr/0059-kernel-ipc-source-decomposition.md), whose independently
+reviewed design merged in
+[PR #116](https://github.com/algorithm-apprentice/micros/pull/116).
+The pre-extraction inventory below describes the reviewed base; the exact
+owners, source sets, private contracts, and structural gate are implemented.
 
 ## Base, goal, and readiness
 
@@ -49,6 +51,42 @@ kernel-directory tasks remain separate.
 These are review signals. Module/function boundaries follow authority,
 preflight/commit, independent reference decisions, fixture, and scenario
 responsibilities rather than line count.
+
+## Implemented preservation evidence
+
+Both migration collections are empty: all 70 public/case/hook owner moves
+and all 42 long-function semantic splits are complete. The structural gate
+checks the exact 105-file family, all eleven source sets and consumers,
+private types/members/declarations/macros, recursive dependencies, every
+file-scope/static-local storage owner, original cases/models, target script,
+capture frame, markers, timeouts, and validation inheritance.
+
+The existing acceptance-model execution retained seed `0x30accee5`, 8,192
+transitions, and trace `0x65c2014aad08f70b` after the complete extraction.
+All original production transition/validation call sites and all 93 checked
+forced-prelude actions were retained. Notification and close retain their
+original draw schedules, reference comparisons, and coverage. No additional
+behavioral execution was introduced.
+
+All three existing QEMU scenarios passed their narrow extraction gates.
+Supervisor register capture remains in each original non-returning entry
+frame, and setup-failure helpers remain in the setup owner so the facade
+does not acquire a reverse report dependency.
+
+`ipc_model_test_actions.c` has 32 functions after exposing the thirteen
+selection classes. It remains one cohesive action-construction/selection
+module: it performs no reference transition or production operation, and
+its individual tasks stay below the function review signal. This is a
+function-count review disposition, not an exception for an unchanged long
+algorithm.
+
+The focused structural command is:
+
+```bash
+python3 -m unittest tests.host.test_kernel_ipc_source_layout
+```
+
+The authoritative final PR plan remains the gate described below.
 
 ## Stable surfaces and non-goals
 

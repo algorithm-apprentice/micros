@@ -160,3 +160,17 @@ bool ipc_ecall_test_prepare_environment(
         && prepare_ecall_payload_and_context(fixture, state)
     );
 }
+
+_Noreturn void ipc_ecall_test_setup_failure(uintptr_t saved_status)
+{
+    riscv_irq_restore(saved_status);
+    uart_write("MICROS_TEST_FAILURE ipc-ecall-setup\n");
+    uart_flush();
+    (void)sbi_system_reset(
+        SBI_RESET_TYPE_SHUTDOWN,
+        SBI_RESET_REASON_SYSTEM_FAILURE
+    );
+    for (;;) {
+        __asm__ volatile("wfi");
+    }
+}

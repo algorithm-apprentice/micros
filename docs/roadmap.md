@@ -268,9 +268,11 @@ Accepted
 [ADR-0059](adr/0059-kernel-ipc-source-decomposition.md) and its exact
 [source contract](architecture/kernel-ipc-source-organization.md).
 It is a behavior-preserving maintenance outcome over the already implemented
-Step 6/7 mechanisms, not a new runtime dependency node. Its design is
-independently reviewed and Accepted; implementation begins only after the
-design merge.
+Step 6/7 mechanisms, not a new runtime dependency node. Its independently
+reviewed design is Accepted and merged. The implementation separates the
+specified portable, captured-syscall, native/reference-model, and target
+owners, with empty migrations and fail-closed structural enforcement. It
+adds no new IPC behavior or execution.
 
 ## v0.1 completion goal
 
