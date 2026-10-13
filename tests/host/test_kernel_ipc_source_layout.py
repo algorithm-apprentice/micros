@@ -296,6 +296,9 @@ SYMBOL_OWNER_MIGRATION = tuple(
         "tests/host/ipc_kernel_notify_test.c",
         "tests/host/ipc_notify_validation_test.c",
         "tests/host/ipc_notify_model_test.c",
+        "tests/host/ipc_close_cancellation_test.c",
+        "tests/host/ipc_close_validation_test.c",
+        "tests/host/ipc_close_model_test.c",
     }
 )
 
@@ -368,6 +371,10 @@ LONG_FUNCTION_MIGRATION = tuple(
         "test_reply_receive_prefers_pending_notification",
         "test_notification_validators_and_close_preflight",
         "test_seeded_notify_model",
+        "test_close_cancels_complete_transaction",
+        "test_successful_staged_deliveries_block_close_atomically",
+        "test_close_failures_are_atomic",
+        "test_seeded_close_scenarios",
     }
 )
 
@@ -377,7 +384,8 @@ FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_reply_test_fixture.c": "ac463d588ed52d441e693e6f98821b4fbaa84e1ff9a32cb5adbed247e8516ebe",
     "tests/host/ipc_notify_test_fixture.c": "df17fd7674262222781d53f2d3e27a16e331243280131154eb7bfc0e57f78de3",
     "tests/host/ipc_notify_model_test.c": "81f85e33023553fbd2c1b334f5b19342f95962e4ec3c9ddac9982aed6f4a019c",
-    "tests/host/ipc_close_test.c": "01c87398aed0e69b094997423c40683cb178fd4682f8a958214797f52e69086b",
+    "tests/host/ipc_close_test_fixture.c": "38ebf808fef614fc64d51d3057065bee7906afa47d7df17c08e404c0adb1090f",
+    "tests/host/ipc_close_model_test.c": "7b2491687b616a4100153002b72e99b1ea7b58b7ba95d4035f3828a713ce477f",
     "tests/host/ipc_model_test.c": "963b5f6cbd53ce422c5f00bd8b877fb876265cab4a0bfda4d16d5da1878f169c",
     "kernel/ipc_test.c": "b0ef5316ebac2b81c2ef1982af6c264bb833355211c27953405971b983c33f28",
     "kernel/ipc_ecall_test.c": "d8b668741da95028e58573d42953fb94c12c3efc32132c2f41054e50a81fdbff",
