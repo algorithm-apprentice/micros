@@ -375,6 +375,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         "test_successful_staged_deliveries_block_close_atomically",
         "test_close_failures_are_atomic",
         "test_seeded_close_scenarios",
+        "micros_ipc_runtime_run_self_test",
     }
 )
 
@@ -387,7 +388,7 @@ FILE_SCOPE_STORAGE_HASHES = {
     "tests/host/ipc_close_test_fixture.c": "38ebf808fef614fc64d51d3057065bee7906afa47d7df17c08e404c0adb1090f",
     "tests/host/ipc_close_model_test.c": "7b2491687b616a4100153002b72e99b1ea7b58b7ba95d4035f3828a713ce477f",
     "tests/host/ipc_model_test_fixture.c": "e833e18b6805722b07da8602feecdf1fbb9bfbd743a123d22da7719df4f6617a",
-    "kernel/ipc_test.c": "b0ef5316ebac2b81c2ef1982af6c264bb833355211c27953405971b983c33f28",
+    "kernel/ipc_test_fixture.c": "2b411170546bf55f679f74f6511fd8a246d60908bcd4ad49725993bf48785fb3",
     "kernel/ipc_ecall_test.c": "d8b668741da95028e58573d42953fb94c12c3efc32132c2f41054e50a81fdbff",
     "kernel/ipc_syscall_test.c": "edd0f929402275dc494bc18e5d3f585825529f43b45fec956e3394118f654523",
 }
