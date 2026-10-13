@@ -385,21 +385,20 @@ enum micros_pm_model_error micros_pm_spawn_commit_hidden(
     return MICROS_PM_MODEL_OK;
 }
 
-enum micros_pm_model_error micros_pm_spawn_activate(
+enum micros_pm_model_error pm_spawn_prepare_activation(
     struct micros_pm_table *table,
     struct micros_pm_process_handle child,
     micros_endpoint_t endpoint,
-    uint64_t *reply_token
+    struct pm_spawn_activation_plan *plan
 )
 {
     struct micros_pm_process_record *record;
-    bool init_candidate;
-    uint64_t parent_reply_token;
+    struct pm_spawn_activation_plan candidate;
     enum micros_pm_model_error error;
 
     if (
         table == NULL
-        || reply_token == NULL
+        || plan == NULL
         || !pm_common_endpoint_is_concrete(endpoint)
     ) {
         return MICROS_PM_MODEL_ERROR_ARGUMENT;
@@ -424,20 +423,58 @@ enum micros_pm_model_error micros_pm_spawn_activate(
         return MICROS_PM_MODEL_ERROR_STATE;
     }
 
-    init_candidate = record->init_candidate;
-    parent_reply_token = record->spawn.parent_reply_token;
+    pm_common_zero_bytes(&candidate, sizeof(candidate));
+    candidate.table = table;
+    candidate.record = record;
+    candidate.child = child;
+    candidate.endpoint = endpoint;
+    candidate.init_candidate = record->init_candidate;
+    candidate.parent_reply_token = record->spawn.parent_reply_token;
+    candidate.load_token = record->spawn.vm_load_token;
+    candidate.mapping_generation = record->spawn.mapping_generation;
+    *plan = candidate;
+    return MICROS_PM_MODEL_OK;
+}
+
+void pm_spawn_commit_activation(
+    const struct pm_spawn_activation_plan *plan,
+    uint64_t *reply_token
+)
+{
+    struct micros_pm_process_record *record = plan->record;
+
     record->state = MICROS_PM_PROCESS_RUNNING;
     record->init_candidate = false;
-    record->endpoint = endpoint;
-    record->load_token = record->spawn.vm_load_token;
-    record->mapping_generation = record->spawn.mapping_generation;
+    record->endpoint = plan->endpoint;
+    record->load_token = plan->load_token;
+    record->mapping_generation = plan->mapping_generation;
     record->spawn_stage = MICROS_PM_SPAWN_NONE;
     pm_common_zero_bytes(&record->spawn, sizeof(record->spawn));
     record->spawn.prepared_endpoint = MICROS_ENDPOINT_NONE;
-    if (init_candidate) {
+    if (plan->init_candidate) {
         record->reaper = true;
-        table->reaper = child;
+        plan->table->reaper = plan->child;
     }
-    *reply_token = parent_reply_token;
+    *reply_token = plan->parent_reply_token;
+}
+
+enum micros_pm_model_error micros_pm_spawn_activate(
+    struct micros_pm_table *table,
+    struct micros_pm_process_handle child,
+    micros_endpoint_t endpoint,
+    uint64_t *reply_token
+)
+{
+    struct pm_spawn_activation_plan plan;
+    enum micros_pm_model_error error;
+
+    if (reply_token == NULL) {
+        return MICROS_PM_MODEL_ERROR_ARGUMENT;
+    }
+    error = pm_spawn_prepare_activation(table, child, endpoint, &plan);
+    if (error != MICROS_PM_MODEL_OK) {
+        return error;
+    }
+    pm_spawn_commit_activation(&plan, reply_token);
     return MICROS_PM_MODEL_OK;
 }

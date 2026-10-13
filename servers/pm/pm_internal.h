@@ -7,6 +7,26 @@
 
 #define MICROS_PM_INITIALIZATION_MAGIC UINT64_C(0x4d4943524f53504d)
 
+struct pm_spawn_activation_plan {
+    struct micros_pm_table *table;
+    struct micros_pm_process_record *record;
+    struct micros_pm_process_handle child;
+    micros_endpoint_t endpoint;
+    bool init_candidate;
+    uint64_t parent_reply_token;
+    uint64_t load_token;
+    uint64_t mapping_generation;
+};
+
+struct pm_exit_begin_plan {
+    struct micros_pm_table *table;
+    struct micros_pm_process_record *record;
+    struct micros_pm_process_handle process;
+    struct micros_pm_process_handle reaper;
+    enum micros_pm_exit_kind exit_kind;
+    int32_t exit_code;
+};
+
 void pm_common_zero_bytes(void *value, size_t size);
 bool pm_common_bytes_are_zero(const uint8_t *bytes, size_t size);
 uint64_t pm_common_read_u64_le(const uint8_t *bytes);
@@ -59,6 +79,28 @@ bool pm_wait_stage_result(
     struct micros_pm_table *table,
     struct micros_pm_process_handle parent,
     struct micros_pm_wait_outcome *outcome
+);
+enum micros_pm_model_error pm_spawn_prepare_activation(
+    struct micros_pm_table *table,
+    struct micros_pm_process_handle child,
+    micros_endpoint_t endpoint,
+    struct pm_spawn_activation_plan *plan
+);
+void pm_spawn_commit_activation(
+    const struct pm_spawn_activation_plan *plan,
+    uint64_t *reply_token
+);
+enum micros_pm_model_error pm_exit_prepare_begin(
+    struct micros_pm_table *table,
+    struct micros_pm_process_handle process,
+    enum micros_pm_exit_kind exit_kind,
+    int32_t exit_code,
+    struct pm_exit_begin_plan *plan
+);
+void pm_exit_commit_begin(
+    const struct pm_exit_begin_plan *plan,
+    uint64_t transaction,
+    struct micros_pm_exit_effects *effects
 );
 
 #endif

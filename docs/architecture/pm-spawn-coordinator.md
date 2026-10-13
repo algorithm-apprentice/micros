@@ -99,6 +99,13 @@ order. Their private prepare/commit helpers also let the higher coordinator
 preflight before an irreversible kernel transition without duplicating
 record-mutation logic.
 
+`pm_spawn_prepare_activation` and `pm_exit_prepare_begin` publish private
+automatic plans only after complete preflight. Their corresponding
+`pm_spawn_commit_activation` and `pm_exit_commit_begin` functions return
+`void` and perform only bounded prevalidated stores. The public lifecycle
+operations compose those same helpers; service and reference code do not
+import them.
+
 The exact collaborator sequence, rollback rows, command words, error
 precedence, and post-activation obligations remain those in ADR-0050.
 Every peer reply is checked for exact endpoint generation, type, version,

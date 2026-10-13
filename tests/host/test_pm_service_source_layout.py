@@ -140,12 +140,15 @@ HELPER_OWNER_GROUPS = {
     "servers/pm/pm_spawn.c": (
         "resolve_forward_spawning_record", "table_has_spawning_record",
         "find_free_slot", "allocate_record",
+        "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
     ),
     "servers/pm/pm_rollback.c": (
         "rollback_resource_for_stage", "populate_rollback_action",
         "populate_completed_rollback",
     ),
-    "servers/pm/pm_exit.c": ("clear_wait_outcomes",),
+    "servers/pm/pm_exit.c": (
+        "clear_wait_outcomes", "pm_exit_prepare_begin", "pm_exit_commit_begin",
+    ),
     "servers/pm/pm_wait.c": (
         "clear_wait_outcome", "find_lowest_matching_zombie",
         "populate_wait_outcome", "pm_wait_stage_result",
@@ -633,6 +636,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         expected_declarations = {
             "servers/pm/pm_internal.h": (
                 *HELPER_OWNER_GROUPS[COMMON_OWNER], "pm_wait_stage_result",
+                "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
+                "pm_exit_prepare_begin", "pm_exit_commit_begin",
             ),
             "servers/pm/pm_service_internal.h": (
                 *HELPER_OWNER_GROUPS[SERVICE_FIXTURE_OWNER],
@@ -662,6 +667,26 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 if name in definitions:
                     self.assertEqual(1, len(definitions[name]), (private_header, name))
 
+    def test_irreversible_local_commits_do_not_revalidate_or_return_early(self) -> None:
+        for path, commit, public in (
+            ("servers/pm/pm_spawn.c", "pm_spawn_commit_activation", "micros_pm_spawn_activate"),
+            ("servers/pm/pm_exit.c", "pm_exit_commit_begin", "micros_pm_exit_begin"),
+        ):
+            with self.subTest(commit=commit):
+                text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+                begin = re.search(rf"\bvoid\s+{commit}\s*\(", text)
+                end = re.search(rf"\benum\s+micros_pm_model_error\s+{public}\s*\(", text)
+                self.assertIsNotNone(begin)
+                self.assertIsNotNone(end)
+                self.assertLess(begin.start(), end.start())
+                body = text[begin.start():end.start()]
+                self.assertNotRegex(
+                    body,
+                    r"\b(?:micros_pm_[A-Za-z0-9_]+|pm_common_resolve_[A-Za-z0-9_]+|"
+                    r"pm_spawn_prepare_activation|pm_exit_prepare_begin)\s*\(",
+                )
+                self.assertNotRegex(body, r"\breturn\b")
+
     def test_private_headers_are_declarations_only(self) -> None:
         for path in DECLARATION_ONLY_HEADERS:
             if not (REPOSITORY_ROOT / path).is_file():
@@ -678,6 +703,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 symbols.setdefault(name, set()).add(path)
         private_functions = {
             *HELPER_OWNER_GROUPS[COMMON_OWNER], "pm_wait_stage_result",
+            "pm_spawn_prepare_activation", "pm_spawn_commit_activation",
+            "pm_exit_prepare_begin", "pm_exit_commit_begin",
         }
         for path in all_sources():
             closure = vm_layout.local_include_closure(path)

@@ -92,6 +92,11 @@ the identity needed by exit. Its header hash is updated for that specific
 behavior extension; the seven other headers and all user/syscall wire layouts
 remain unchanged. Complete validation and the independent PM model now check
 the active pair through activation, detach, and VM-release acknowledgment.
+The same extension separates private activation and exit-begin preflight
+plans from their non-failing commit helpers. They stay with the existing
+spawn/exit owners; the public lifecycle APIs compose those helpers without
+changing their supported signatures. Structural ownership checks reject
+validation, lookup, or early return inside the irreversible local commit.
 
 ADR-0050's existing PM budget must be enforced for every service variant.
 At the reviewed base the common user-ELF check had no PM-specific resident
