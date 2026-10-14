@@ -239,6 +239,16 @@ endif()
 find_program(MICROS_PYTHON NAMES python3 REQUIRED)
 
 set(
+    MICROS_USER_ELF_CHECKER_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_format.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_parse.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_structure.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_instructions.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_policy.py"
+)
+
+set(
     MICROS_RAMFS_SEED_IMAGE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
 )
@@ -2518,7 +2528,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             SUFFIX ".elf"
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/user-runtime"
             LINK_DEPENDS
-                "${MICROS_USER_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                "${MICROS_USER_LINKER_SCRIPT};${MICROS_USER_ELF_CHECKER_SOURCES}"
     )
     target_include_directories(
         micros_user_runtime_service
@@ -2591,7 +2601,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             "${MICROS_USER_RUNTIME_FIXTURE_SOURCE}"
         DEPENDS
             micros_user_runtime_service
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+            ${MICROS_USER_ELF_CHECKER_SOURCES}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_user_runtime_fixture.py"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
@@ -2637,7 +2647,7 @@ if(
                 RUNTIME_OUTPUT_DIRECTORY
                     "${CMAKE_BINARY_DIR}/bootstrap"
                 LINK_DEPENDS
-                    "${MICROS_USER_LINKER_SCRIPT};${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    "${MICROS_USER_LINKER_SCRIPT};${MICROS_USER_ELF_CHECKER_SOURCES}"
         )
         target_include_directories(
             "${target}"
@@ -2979,7 +2989,7 @@ if(
                     micros_vm_server
                     micros_pm_service
                     micros_vm_scratch_preemption_driver
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_scratch_preemption_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3036,7 +3046,7 @@ if(
                     micros_vm_server
                     micros_pm_service
                     micros_pm_service_probe
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_pm_service_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3091,7 +3101,7 @@ if(
                     micros_pm_service
                     micros_tty_service
                     micros_tty_service_vfs
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3152,7 +3162,7 @@ if(
                     micros_ramfs_service
                     micros_vfs_service
                     micros_vfs_service_probe
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vfs_service_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3210,7 +3220,7 @@ if(
                     micros_tty_service
                     micros_ramfs_service
                     micros_ramfs_service_vfs
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_service_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3249,7 +3259,7 @@ if(
                     micros_bootstrap_launcher
                     micros_vm_server
                     micros_vm_handoff_probe
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                    ${MICROS_USER_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3293,7 +3303,7 @@ if(
             DEPENDS
                 micros_bootstrap_launcher
                 micros_bootstrap_probe
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
+                ${MICROS_USER_ELF_CHECKER_SOURCES}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             VERBATIM

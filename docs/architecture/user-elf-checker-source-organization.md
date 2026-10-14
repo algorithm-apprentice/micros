@@ -9,7 +9,9 @@ It implements the existing audit task pair
 `elf-tooling-decomposition-implementation`.
 Independent design review found one image-inheritance gap, which was
 corrected and independently re-reviewed with no substantive issue remaining.
-Implementation remains pending this separate Accepted design's merge.
+The design merged separately as #125 /
+`53dd53293c2c27b2405730032ceb22bf187ac49d`. Its dependent implementation
+is in progress; no owner or semantic migration is yet claimed complete.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.
