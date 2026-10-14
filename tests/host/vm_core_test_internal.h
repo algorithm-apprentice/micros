@@ -22,6 +22,9 @@ struct vm_core_test_context {
     uint8_t executable[MICROS_APPLICATION_EXECUTABLE_SIZE_MAX];
     uint8_t request[MICROS_SPAWN_REQUEST_SIZE_MAX];
     uint8_t scratch_page[MICROS_APPLICATION_STACK_PAGE_SIZE];
+    uint64_t backend_registers[8];
+    int64_t backend_result;
+    size_t backend_calls;
 };
 
 struct vm_core_test_context *vm_core_test_context_get(void);

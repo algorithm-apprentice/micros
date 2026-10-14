@@ -49,6 +49,21 @@ SOURCE_SETS = {
         "tests/host/vm_core_abort_test.c",
         "tests/host/vm_core_validation_test.c",
     ),
+    "MICROS_VM_SERVICE_CORE_SOURCES": (
+        "servers/vm/vm_service_core.c",
+        "servers/vm/vm_service_protocol.c",
+        "servers/vm/vm_service_load.c",
+        "servers/vm/vm_service_release.c",
+    ),
+    "MICROS_VM_SERVICE_BACKEND_SOURCES": (
+        "servers/vm/vm_service_backend.c",
+    ),
+    "MICROS_VM_SERVICE_HOST_TEST_SOURCES": (
+        "tests/host/vm_service_test_fixture.c",
+        "tests/host/vm_service_test.c",
+        "tests/host/vm_service_protocol_test.c",
+        "tests/host/vm_service_backend_test.c",
+    ),
     "MICROS_VM_SERVICE_QEMU_SOURCES": (
         "tests/qemu/vm_server.c",
         "tests/qemu/vm_server_fixture.c",
@@ -57,6 +72,7 @@ SOURCE_SETS = {
         "tests/qemu/vm_server_tty.c",
         "tests/qemu/vm_server_scratch.c",
         "tests/qemu/vm_server_pm.c",
+        "tests/qemu/vm_server_control.c",
     ),
     "MICROS_VM_SCRATCH_PREEMPTION_QEMU_TEST_SOURCES": (
         "kernel/vm_scratch_preemption_test.c",
@@ -70,13 +86,16 @@ SOURCE_SETS = {
 PRIVATE_HEADERS = (
     "servers/vm/vm_internal.h",
     "servers/vm/vm_image_internal.h",
+    "servers/vm/vm_service_internal.h",
     "tests/host/vm_core_test_internal.h",
+    "tests/host/vm_service_test_internal.h",
     "tests/qemu/vm_server_internal.h",
     "kernel/vm_scratch_preemption_test_internal.h",
 )
 
 TEST_PRIVATE_HEADERS = (
     "tests/host/vm_core_test_internal.h",
+    "tests/host/vm_service_test_internal.h",
     "tests/qemu/vm_server_internal.h",
     "kernel/vm_scratch_preemption_test_internal.h",
 )
@@ -99,6 +118,8 @@ DECLARATION_ONLY_HEADERS = (
     *STABLE_HEADER_HASHES,
     "include/micros/runtime.h",
     "include/micros/vm.h",
+    "include/micros/vm_service.h",
+    "servers/vm/vm_service_core.h",
 )
 
 VM_SERVICE_PATH_CLASSIFICATION_EQUIVALENTS = (
@@ -110,6 +131,13 @@ VM_SERVICE_PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/vm/vm_load.c",
             "servers/vm/vm_exit.c",
             "servers/vm/vm_internal.h",
+            "servers/vm/vm_service_core.h",
+            "servers/vm/vm_service_core.c",
+            "servers/vm/vm_service_protocol.c",
+            "servers/vm/vm_service_load.c",
+            "servers/vm/vm_service_release.c",
+            "servers/vm/vm_service_backend.c",
+            "servers/vm/vm_service_internal.h",
         ),
     ),
     (
@@ -129,6 +157,11 @@ VM_SERVICE_PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/vm_core_abort_test.c",
             "tests/host/vm_core_validation_test.c",
             "tests/host/vm_core_test_internal.h",
+            "tests/host/vm_service_test_fixture.c",
+            "tests/host/vm_service_test.c",
+            "tests/host/vm_service_protocol_test.c",
+            "tests/host/vm_service_backend_test.c",
+            "tests/host/vm_service_test_internal.h",
         ),
     ),
     (
@@ -140,6 +173,7 @@ VM_SERVICE_PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/qemu/vm_server_tty.c",
             "tests/qemu/vm_server_scratch.c",
             "tests/qemu/vm_server_pm.c",
+            "tests/qemu/vm_server_control.c",
             "tests/qemu/vm_server_internal.h",
         ),
     ),
@@ -213,6 +247,28 @@ PRIVATE_FUNCTION_OWNERS = {
 }
 
 TARGET_FUNCTION_OWNERS = {
+    "servers/vm/vm_service_core.c": (
+        "service_endpoint_is_concrete", "service_bindings_are_valid",
+        "micros_vm_service_initialize", "service_instance_is_valid",
+        "service_backend_is_complete", "micros_vm_service_handle_message",
+    ),
+    "servers/vm/vm_service_protocol.c": (
+        "vm_service_clear_bytes", "service_read_word", "service_write_word",
+        "service_request_shape_is_valid", "vm_service_decode_request", "vm_service_build_reply",
+    ),
+    "servers/vm/vm_service_load.c": (
+        "service_copy_inputs", "service_bind_load", "service_fill_pages",
+        "service_freeze_load", "service_prepare_result", "vm_service_load",
+    ),
+    "servers/vm/vm_service_release.c": (
+        "service_release_frozen", "vm_service_release",
+    ),
+    "servers/vm/vm_service_backend.c": (
+        "vm_backend_copy", "vm_backend_begin", "vm_backend_map",
+        "vm_backend_scratch", "vm_backend_scratch_commit", "vm_backend_freeze",
+        "vm_backend_abort", "vm_backend_commit", "vm_backend_exit",
+        "micros_vm_service_runtime_backend",
+    ),
     "tests/qemu/vm_server.c": ("micros_service_main",),
     "tests/qemu/vm_server_fixture.c": (
         "vm_server_context_get", "vm_server_clear_bytes",
@@ -237,6 +293,9 @@ TARGET_FUNCTION_OWNERS = {
         "pm_test_initialize_pages", "pm_test_build_freeze_plan",
         "pm_test_load_child", "pm_test_commit_child", "pm_test_release_child",
         "pm_test_serve_request",
+    ),
+    "tests/qemu/vm_server_control.c": (
+        "vm_server_configure_control", "vm_server_serve_control",
     ),
     "kernel/vm_scratch_preemption_test.c": (
         "micros_vm_scratch_preemption_test_launch",
@@ -284,6 +343,16 @@ PERMITTED_OWNER_DEPENDENCIES = {
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_validation.c",
     ),
+    "servers/vm/vm_service_core.c": (
+        "servers/vm/vm_service_protocol.c", "servers/vm/vm_service_load.c",
+        "servers/vm/vm_service_release.c", "servers/vm/vm_validation.c",
+    ),
+    "servers/vm/vm_service_protocol.c": (),
+    "servers/vm/vm_service_load.c": ("servers/vm/vm_load.c",),
+    "servers/vm/vm_service_release.c": (
+        "servers/vm/vm_load.c", "servers/vm/vm_exit.c",
+    ),
+    "servers/vm/vm_service_backend.c": (),
     "tests/qemu/vm_server.c": (
         "tests/qemu/vm_server_fixture.c", "tests/qemu/vm_server_handoff.c",
         "tests/qemu/vm_server_probe.c", "tests/qemu/vm_server_tty.c",
@@ -292,6 +361,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_validation.c", "servers/vm/vm_load.c",
         "servers/vm/vm_exit.c", "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
+        "tests/qemu/vm_server_control.c",
     ),
     "tests/qemu/vm_server_fixture.c": (),
     "tests/qemu/vm_server_handoff.c": ("tests/qemu/vm_server_fixture.c",),
@@ -299,6 +369,10 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "tests/qemu/vm_server_tty.c": ("tests/qemu/vm_server_fixture.c",),
     "tests/qemu/vm_server_scratch.c": ("tests/qemu/vm_server_fixture.c",),
     "tests/qemu/vm_server_pm.c": ("tests/qemu/vm_server_fixture.c",),
+    "tests/qemu/vm_server_control.c": (
+        "tests/qemu/vm_server_fixture.c", "servers/vm/vm_service_core.c",
+        "servers/vm/vm_service_backend.c",
+    ),
     "kernel/vm_scratch_preemption_test.c": (
         "kernel/vm_scratch_preemption_test_fixture.c",
         "kernel/vm_scratch_preemption_test_runtime.c",
@@ -404,6 +478,17 @@ VM_CORE_CASE_ORDER = (
     "test_staged_inputs_and_immutable_database",
 )
 
+VM_SERVICE_CASE_ORDER = (
+    "test_vm_service_configuration",
+    "test_vm_service_load_and_release",
+    "test_vm_service_abort_and_failure",
+    "test_vm_service_protocol_boundaries",
+    "test_vm_service_release_identity",
+    "test_vm_service_expected_load_rejection",
+    "test_vm_service_kernel_disagreement",
+    "test_vm_service_runtime_backend",
+)
+
 VM_SYMBOLS = (
     "micros_vm_scratch_preemption_vm_hook_trap",
     "micros_vm_scratch_preemption_vm_hook_spin",
@@ -435,6 +520,8 @@ def production_sources() -> tuple[str, ...]:
         *SOURCE_SETS["MICROS_VM_BOOT_VALIDATION_SOURCES"],
         *SOURCE_SETS["MICROS_VM_IMAGE_SOURCES"],
         *SOURCE_SETS["MICROS_VM_CORE_SOURCES"],
+        *SOURCE_SETS["MICROS_VM_SERVICE_CORE_SOURCES"],
+        *SOURCE_SETS["MICROS_VM_SERVICE_BACKEND_SOURCES"],
     )
 
 
@@ -445,6 +532,7 @@ def accepted_family_paths() -> tuple[str, ...]:
                 *all_source_set_paths(),
                 *PRIVATE_HEADERS,
                 *STABLE_HEADER_HASHES,
+                "servers/vm/vm_service_core.h",
                 GENERATOR_PATH,
             )
         )
@@ -461,6 +549,8 @@ def discovered_family_paths() -> tuple[str, ...]:
         "kernel/vm_scratch_preemption_test*.h",
         "tests/host/vm_core*.c",
         "tests/host/vm_core*.h",
+        "tests/host/vm_service*.c",
+        "tests/host/vm_service*.h",
         "tests/qemu/vm_server*.c",
         "tests/qemu/vm_server*.h",
     )
@@ -712,6 +802,9 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     "MICROS_VM_IMAGE_SOURCES",
                     "MICROS_VM_CORE_SOURCES",
                     "MICROS_VM_CORE_HOST_TEST_SOURCES",
+                    "MICROS_VM_SERVICE_CORE_SOURCES",
+                    "MICROS_VM_SERVICE_BACKEND_SOURCES",
+                    "MICROS_VM_SERVICE_HOST_TEST_SOURCES",
                 ),
             ),
             "vm-server": (
@@ -721,6 +814,8 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     "MICROS_VM_IMAGE_SOURCES",
                     "MICROS_VM_CORE_SOURCES",
                     "MICROS_VM_SERVICE_QEMU_SOURCES",
+                    "MICROS_VM_SERVICE_CORE_SOURCES",
+                    "MICROS_VM_SERVICE_BACKEND_SOURCES",
                 ),
             ),
             "micros": (
@@ -1050,6 +1145,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         main_body = host[host.index("int main"):]
         positions = [main_body.index(name) for name in VM_CORE_CASE_ORDER]
         self.assertEqual(sorted(positions), positions)
+        self.assertEqual(
+            (*VM_CORE_CASE_ORDER, *VM_SERVICE_CASE_ORDER),
+            tuple(re.findall(r"\b(test_[A-Za-z0-9_]+)\s*\(", main_body)),
+        )
 
         service_body = service[service.index("void micros_service_main"):]
         validate_position = service_body.index(
@@ -1076,6 +1175,26 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         )
         for symbol in (*VM_SYMBOLS, *PEER_SYMBOLS):
             self.assertEqual(1, generator.count(f'"{symbol}"'), symbol)
+
+    def test_ordinary_service_control_is_wired_before_readiness(self) -> None:
+        facade = (REPOSITORY_ROOT / "tests/qemu/vm_server.c").read_text(encoding="utf-8")
+        self.assertIn("vm_server_configure_control(context)", facade)
+        handoff = facade.index("vm_server_complete_handoff")
+        configure = facade.index("vm_server_configure_control")
+        ready = facade.index("vm_server_send_ready", handoff)
+        self.assertLess(handoff, configure)
+        self.assertLess(configure, ready)
+        self.assertIn("vm_server_serve_control(context, &message)", facade)
+        public = (REPOSITORY_ROOT / "servers/vm/vm_service_core.h").read_text(encoding="utf-8")
+        self.assertIn("struct micros_vm_state *state;", public)
+        self.assertNotIn("executable_bytes[", public)
+        self.assertNotIn("request_bytes[", public)
+        for path in (*SOURCE_SETS["MICROS_VM_SERVICE_CORE_SOURCES"],
+                     *SOURCE_SETS["MICROS_VM_SERVICE_BACKEND_SOURCES"]):
+            self.assertNotIn(
+                '#include "servers/vm/vm_internal.h"',
+                (REPOSITORY_ROOT / path).read_text(encoding="utf-8"),
+            )
 
     def test_validation_plan_inherits_path_classification(self) -> None:
         baselines = {

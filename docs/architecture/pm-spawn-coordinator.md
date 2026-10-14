@@ -51,14 +51,30 @@ The intended responsibility owners are:
 | `servers/pm/pm_coordinator.h` | Supported portable coordinator and transport contract |
 | `servers/pm/pm_coordinator_internal.h` | Narrow declarations-only coordinator helpers |
 | `servers/pm/pm_service_backend.c` | Real runtime grants, IPC, and existing PM-control wrappers |
-| `tests/qemu/vm_server_control.c` | Ordinary PM control dispatch and exact peer-message validation |
-| `tests/qemu/vm_server_load.c` | Grant snapshots and real scratch/freeze load execution |
-| `tests/qemu/vm_server_release.c` | Exact abort, post-activation commit, and exit-release acknowledgments |
+| `servers/vm/vm_service_core.c` | Borrowed VM state/bindings and ordinary PM control dispatch |
+| `servers/vm/vm_service_protocol.c` | Independent server-side command and result word validation |
+| `servers/vm/vm_service_load.c` | Grant snapshots and real scratch/freeze load execution |
+| `servers/vm/vm_service_release.c` | Exact abort, post-activation commit, and exit-release acknowledgments |
+| `servers/vm/vm_service_backend.c` | Existing operation-12 raw register layouts and checked runtime grant copy |
+| `servers/vm/vm_service_core.h` | Supported bounded service/backend contract |
+| `servers/vm/vm_service_internal.h` | Declarations-only service helper contract |
+| `tests/qemu/vm_server_control.c` | Checked static bindings, service dispatch, and token-bound runtime reply |
 
-The VM adapter paths follow the real service's existing historical source
-location. They invoke production `servers/vm` state and image owners, not a
-fixture-only loader. Existing synthetic PM and scratch scenarios remain
+The VM target adapter follows the real service's historical source location.
+Its ordinary service protocol and transition orchestration are production
+`servers/vm` owners that invoke the existing state and image APIs. They borrow
+one state object and its resident buffers, with no fixture-only loader or
+second executable copy. Existing synthetic PM and scratch scenarios remain
 separate compile-time adapters.
+
+The ordinary VM backend exposes only the existing grant-copy and bounded
+operation-12 transitions. Its scratch accessor returns the one Accepted
+scratch VA. Native raw-register capture checks every argument and result
+without emulating privilege or MMU behavior; the existing QEMU scratch
+component remains the hardware proof. Native service tests borrow the
+existing VM test context and independently check copied image bytes,
+complete zero fill, stack words and auxv authority, frozen diagnostics,
+expected pre-begin rejection, and every fatal backend/output boundary.
 
 Coordinator policy uses the supported lifecycle operations and narrow private
 prevalidated commit plans. Service adapters do not include `pm_internal.h`.
@@ -78,8 +94,8 @@ The constructor, byte-exact VFS/VM codecs, trusted init, ordinary application
 spawn, every completed-stage rollback, and exit/wait coordination are implemented in
 `MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
 The fast `pm-coordinator` CTest is included by both native aggregates.
-The real PM runtime adapter is wired; the general VM control adapter and the
-separate mixed lifecycle model remain in progress.
+The real PM runtime adapter and general VM control adapter are wired. The
+separate mixed lifecycle model remains in progress.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -243,6 +259,16 @@ peer bindings; missing required authority is fatal rather than a fallback.
 The fixed PM priority 8 and application priority 9 preserve the Accepted
 post-activation ordering.
 
+VM likewise configures its ordinary control adapter after handoff and before
+readiness. Only a complete service-6 VFS binding enables that adapter; shorter
+historical prefixes remain explicitly `STATIC_ONLY`. Requests bind the exact
+PM generation and the actual VFS grantor, and reuse the existing VM state and
+buffers. Image/request validation and complete frame selection precede
+`LOAD_BEGIN`; expected rejection leaves `IDLE` with zero transient state.
+Every successful kernel transition is mirrored before the reply. Malformed
+kernel outputs, trusted-copy failures, and post-validation kernel/local
+disagreement remain fatal, with no ordinary result or partial-success reply.
+
 The PM 32-page, VM 160-page, and VFS 80-page bounds remain enforced by the
 existing single post-link checks. Public wire headers, syscall numbers,
 profiles, page permissions, and service startup ABI do not change.
@@ -279,4 +305,13 @@ Coordinator configuration and later deterministic transaction cases use:
 ```bash
 cmake --build build/host-debug --target pm_coordinator_test --parallel
 ctest --test-dir build/host-debug --output-on-failure -R '^pm-coordinator$'
+```
+
+The VM service/codec, exact page and stack construction, bound release,
+failure boundaries, and real operation-12 backend use the existing VM suite:
+
+```bash
+cmake --build build/host-debug --target vm_core_test --parallel
+ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
+python3 -m unittest tests.host.test_vm_service_source_layout tests.host.test_pm_service_source_layout tests.host.test_validation_plan
 ```

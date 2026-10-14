@@ -783,6 +783,27 @@ set(
 )
 
 set(
+    MICROS_VM_SERVICE_CORE_SOURCES
+    servers/vm/vm_service_core.c
+    servers/vm/vm_service_protocol.c
+    servers/vm/vm_service_load.c
+    servers/vm/vm_service_release.c
+)
+
+set(
+    MICROS_VM_SERVICE_BACKEND_SOURCES
+    servers/vm/vm_service_backend.c
+)
+
+set(
+    MICROS_VM_SERVICE_HOST_TEST_SOURCES
+    tests/host/vm_service_test_fixture.c
+    tests/host/vm_service_test.c
+    tests/host/vm_service_protocol_test.c
+    tests/host/vm_service_backend_test.c
+)
+
+set(
     MICROS_VM_SERVICE_QEMU_SOURCES
     tests/qemu/vm_server.c
     tests/qemu/vm_server_fixture.c
@@ -791,6 +812,7 @@ set(
     tests/qemu/vm_server_tty.c
     tests/qemu/vm_server_scratch.c
     tests/qemu/vm_server_pm.c
+    tests/qemu/vm_server_control.c
 )
 
 set(
@@ -996,6 +1018,10 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
         ${MICROS_VM_CORE_HOST_TEST_SOURCES}
+        ${MICROS_VM_SERVICE_CORE_SOURCES}
+        ${MICROS_VM_SERVICE_BACKEND_SOURCES}
+        ${MICROS_VM_SERVICE_HOST_TEST_SOURCES}
+        lib/runtime/runtime.c
     )
     add_executable(
         ramfs_seed_test
@@ -2569,6 +2595,8 @@ if(
             ${MICROS_VM_BOOT_VALIDATION_SOURCES}
             ${MICROS_VM_IMAGE_SOURCES}
             ${MICROS_VM_CORE_SOURCES}
+            ${MICROS_VM_SERVICE_CORE_SOURCES}
+            ${MICROS_VM_SERVICE_BACKEND_SOURCES}
             tests/qemu/vm_self_fault.S
             ${MICROS_VM_SERVICE_QEMU_SOURCES}
         )

@@ -6,6 +6,14 @@ planning, load/exit lifecycle, native evidence, service adapter, scratch-
 preemption target scenario, and fixture generator. It applies ADR-0051 to the
 sixth correction identified by the repository source-module audit.
 
+The source-only correction below is merged. Its preserved interfaces and
+evidence remain the historical baseline. The later Accepted ADR-0050
+coordinator adds ordinary VM control, a production-owned service/backend
+layer, and native service evidence as mapped in
+[the coordinator implementation](pm-spawn-coordinator.md). Those new owners
+borrow the existing state and buffers; they do not change the boot/core/image
+ABI or replace the preserved synthetic and scratch adapters.
+
 Implementation must not begin until
 [ADR-0057](../adr/0057-vm-service-source-decomposition.md) is Accepted and its
 design pull request is merged.
