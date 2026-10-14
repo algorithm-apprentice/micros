@@ -143,7 +143,7 @@ SYMBOL_OWNER_MIGRATION = (
     "tests/host/user_elf_structure_cases.py",
     "tests/host/user_elf_policy_cases.py",
 )
-FUNCTION_MIGRATION = ("_validate_symbols", "build_elf")
+FUNCTION_MIGRATION = ("build_elf",)
 
 FROZEN_AST = {
     "ELF_CLASS_64": "a736a124de6b9502565aa1f30ea741dfd57af693da130c39b4de302a091f4438",
@@ -742,6 +742,71 @@ class UserElfSourceLayoutTest(unittest.TestCase):
         for source in ("layout.base = 1", "value = layout.unknown"):
             with self.assertRaisesRegex(AssertionError, "fixture layout field"):
                 LayoutFields().visit(ast.parse(source))
+
+    def test_symbol_phase_expansion_preserves_guard_transport_and_order(self):
+        source = """
+def _validate_symbol_boundaries(image, symbols, errors):
+    boundaries = {"start": image}
+    errors.append("boundaries")
+    return boundaries
+def _validate_symbol_load_ranges(loads, boundaries, errors):
+    errors.append("loads")
+def _validate_symbol_section_ranges(image, boundaries, errors):
+    errors.append("sections")
+def _validate_symbols(image, loads):
+    errors = []
+    symbols = {}
+    if image is None:
+        return errors, symbols
+    boundaries = _validate_symbol_boundaries(image, symbols, errors)
+    _validate_symbol_load_ranges(loads, boundaries, errors)
+    _validate_symbol_section_ranges(image, boundaries, errors)
+    return errors, symbols
+"""
+        original = """
+def _validate_symbols(image, loads):
+    errors = []
+    symbols = {}
+    if image is None:
+        return errors, symbols
+    boundaries = {"start": image}
+    errors.append("boundaries")
+    errors.append("loads")
+    errors.append("sections")
+    return errors, symbols
+"""
+        texts = {"sample": source}
+        node = one_definition(texts, "sample", "_validate_symbols")
+        result = expanded_symbols(texts, "sample", node)
+        self.assertEqual(
+            ast_key(ast.parse(original).body[0]), ast_key(result),
+        )
+        mutations = (
+            (
+                "\n    _validate_symbol_load_ranges(loads, boundaries, errors)\n",
+                "\n    _validate_symbol_load_ranges(loads, boundaries, errors.copy())\n",
+            ),
+            (
+                "\n    return boundaries\n",
+                "\n    if image:\n        return {}\n    return boundaries\n",
+            ),
+            (
+                "\n    return boundaries\n",
+                "\n    return dict(boundaries)\n",
+            ),
+            (
+                "\n    boundaries = _validate_symbol_boundaries(image, symbols, errors)\n",
+                "\n    boundaries = _validate_symbol_boundaries(image, errors, symbols)\n",
+            ),
+        )
+        for old, new in mutations:
+            with self.subTest(mutation=new):
+                self.assertEqual(1, source.count(old))
+                texts = {"sample": source.replace(old, new)}
+                with self.assertRaises(AssertionError):
+                    expanded_symbols(
+                        texts, "sample", one_definition(texts, "sample", "_validate_symbols"),
+                    )
 
     def test_duplicate_wrapper_type_and_policy_copies_fail(self):
         for extra in (

@@ -64,6 +64,13 @@ def _validate_symbols(image: ElfImage, loads):
         errors.append(f"undefined symbol {name}")
     if any(name not in symbols for name in REQUIRED_SYMBOLS):
         return errors, symbols
+    boundaries = _validate_symbol_boundaries(image, symbols, errors)
+    _validate_symbol_load_ranges(loads, boundaries, errors)
+    _validate_symbol_section_ranges(image, boundaries, errors)
+    return errors, symbols
+
+
+def _validate_symbol_boundaries(image: ElfImage, symbols, errors):
     if symbols["_start"].binding != SYMBOL_BIND_GLOBAL:
         errors.append("_start must be a global symbol")
     if (
@@ -111,6 +118,10 @@ def _validate_symbols(image: ElfImage, loads):
         errors.append("user text range is empty")
     if boundaries["__micros_user_image_end"] > MINIMUM_STACK_BOTTOM:
         errors.append("user image overlaps the minimum external stack")
+    return boundaries
+
+
+def _validate_symbol_load_ranges(loads, boundaries, errors):
     if len(loads) == 3:
         expected_ranges = (
             (
@@ -144,6 +155,9 @@ def _validate_symbols(image: ElfImage, loads):
             errors.append(
                 "writable PT_LOAD file range must end at BSS start"
             )
+
+
+def _validate_symbol_section_ranges(image: ElfImage, boundaries, errors):
     required_sections = {
         ".text": (
             boundaries["__micros_user_text_start"],
@@ -184,7 +198,6 @@ def _validate_symbols(image: ElfImage, loads):
         )
     ):
         errors.append(".bss does not match the exported BSS range")
-    return errors, symbols
 
 
 def _validate_instructions(image: ElfImage, symbols, loads):

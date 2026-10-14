@@ -13,7 +13,9 @@ The design merged separately as #125 /
 `53dd53293c2c27b2405730032ceb22bf187ac49d`. Its dependent implementation
 is in progress. All 24 moving production functions and 44 checker data/type
 declarations now have their specified owners with original bodies preserved.
-Host ownership and both semantic function migrations remain pending.
+Symbol validation now exposes its three checked phases with the original
+statement tree and diagnostic order preserved. Host ownership and the
+fixture-construction migration remain pending.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.
