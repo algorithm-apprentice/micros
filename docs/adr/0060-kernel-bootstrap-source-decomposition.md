@@ -1,6 +1,6 @@
 # ADR-0060: Kernel Bootstrap Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-14
 - Related:
   [ADR-0025](0025-minix-behavioral-baseline-before-optimization.md),

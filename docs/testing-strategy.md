@@ -157,7 +157,7 @@ timer/negative-state evidence. Narrow extraction gates precede one
 authoritative final PR plan; independent reviewers inspect rather than
 routinely rerun those commands.
 
-The kernel bootstrap correction proposed by ADR-0060 preserves
+The kernel bootstrap correction defined by Accepted ADR-0060 preserves
 `bootstrap_test` / `bootstrap-manifest`, `bootstrap_control_test` /
 `bootstrap-control`, `fdt_test` / `fdt-parser`, the existing launcher ELF,
 all component/prefix/fatal workflows, and the shared fixture generator.
