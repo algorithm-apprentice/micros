@@ -685,9 +685,60 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/fdt_test_internal.h",
         ),
     ),
+    (
+        "kernel/trap.c",
+        (
+            "kernel/trap_context.c",
+            "kernel/trap_user.c",
+            "kernel/trap_interrupt.c",
+            "kernel/trap_syscall.c",
+            "kernel/trap_fault.c",
+            "kernel/trap_test.c",
+            "kernel/trap_test_hooks.c",
+            "kernel/trap_internal.h",
+        ),
+    ),
+    (
+        "kernel/syscall.c",
+        (
+            "kernel/syscall_decode.c",
+            "kernel/syscall_context.c",
+            "kernel/syscall_internal.h",
+        ),
+    ),
+    (
+        "kernel/user_runtime_test.c",
+        (
+            "kernel/user_runtime_test_state.c",
+            "kernel/user_runtime_test_image.c",
+            "kernel/user_runtime_test_setup.c",
+            "kernel/user_runtime_test_trap.c",
+            "kernel/user_runtime_test_cleanup.c",
+            "kernel/user_runtime_test_report.c",
+            "kernel/user_runtime_test_internal.h",
+        ),
+    ),
+    (
+        "tests/qemu/user_runtime_service.c",
+        (
+            "tests/qemu/user_runtime_service_common.c",
+            "tests/qemu/user_runtime_client.c",
+            "tests/qemu/user_runtime_responders.c",
+            "tests/qemu/user_runtime_service_internal.h",
+        ),
+    ),
+    (
+        "tests/host/runtime_test.c",
+        (
+            "tests/host/runtime_test_fixture.c",
+            "tests/host/runtime_wrapper_test.c",
+            "tests/host/runtime_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_trap_syscall_source_layout.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",
