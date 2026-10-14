@@ -2,12 +2,14 @@
 
 ## Status and outcome
 
-This is the exact source contract for Proposed
+This is the exact source contract for Accepted
 [ADR-0063](../adr/0063-user-elf-checker-source-decomposition.md).
 It implements the existing audit task pair
 `elf-tooling-decomposition-design` /
 `elf-tooling-decomposition-implementation`.
-Implementation is pending independent design review, Acceptance, and merge.
+Independent design review found one image-inheritance gap, which was
+corrected and independently re-reviewed with no substantive issue remaining.
+Implementation remains pending this separate Accepted design's merge.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.

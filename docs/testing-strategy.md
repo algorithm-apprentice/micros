@@ -357,7 +357,7 @@ VFS pass marker.
 
 Before the host application checker reuses the existing image tooling,
 the separate [user ELF checker source correction](architecture/user-elf-checker-source-organization.md)
-must pass its design/implementation barriers. Proposed ADR-0063 preserves
+must pass its design/implementation barriers. Accepted ADR-0063 preserves
 the twelve original checker cases and fixture-generator output identities,
 adds focused facade/CLI/AST regressions, and carries exact dependency and
 validation ownership to every new private source. It introduces no new QEMU

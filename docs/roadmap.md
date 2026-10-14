@@ -316,15 +316,15 @@ identical validated/reviewed squash tree.
 This does not add application startup, dynamic PID-1 integration, or a new
 runtime dependency.
 
-The next selected tooling correction is Proposed
+The next selected tooling correction is Accepted
 [ADR-0063](adr/0063-user-elf-checker-source-decomposition.md) and its exact
 [user ELF checker source contract](architecture/user-elf-checker-source-organization.md).
 It separates parsing, structure, service policy, instructions, CLI, fixtures,
 and case discovery without changing accepted service images or diagnostics.
 The correction precedes application-checker reuse in `elf-spawn-app-runtime`;
 it is not a new runtime-DAG node or an application-runtime implementation.
-The paired implementation remains pending independent design Acceptance
-and merge.
+Independent design review is clean after correction of one image-inheritance
+gap. The paired implementation remains pending the separate design merge.
 
 ## v0.1 completion goal
 

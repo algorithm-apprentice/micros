@@ -1,6 +1,6 @@
 # ADR-0063: User ELF Checker Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-14
 - Refines: ADR-0025, ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0042,
   ADR-0050, and ADR-0051

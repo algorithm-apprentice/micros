@@ -332,9 +332,9 @@ sequential, behavior-preserving tasks rather than one broad Step 14 rewrite.
 The selected [ELF checker tooling correction](user-elf-checker-source-organization.md)
 also precedes the host application checker in item 8: existing parsing and
 structural validation acquire explicit owners before reuse, without
-duplicating service policy or changing this runtime graph. Its Proposed
-ADR-0063 must be reviewed, Accepted, and merged before that correction is
-implemented.
+duplicating service policy or changing this runtime graph. Accepted
+ADR-0063 has passed independent design review; implementation remains pending
+the separate design merge.
 The separately reviewed
 [kernel IPC correction](kernel-ipc-source-organization.md) applies the audit's
 before-next-touch rule to existing Step 6/7 mechanisms. It does not change
