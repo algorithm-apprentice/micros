@@ -20,8 +20,9 @@ case bodies. The fixture now has all seven encoding phases and one immutable
 thirteen-scalar layout. Both migration collections are literal empty tuples,
 and the largest resulting function is the 97-line fixture root. Original
 ASTs, eight byte witnesses, twelve case identities, and eight added CLI
-contracts pass. Final author validation and independent implementation
-review remain before merge.
+contracts pass. Implementation #126 records its current evidence; merge
+requires complete author validation and a clean independent implementation
+review.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.

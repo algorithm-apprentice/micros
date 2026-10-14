@@ -327,8 +327,9 @@ Independent design review is clean after correction of one image-inheritance
 gap, and the design merged separately as #125. Implementation now separates
 all specified owners and both semantic phase roots with literal-empty
 migrations, unchanged fixture/case identities, and added CLI contracts.
-Final author validation and independent implementation review remain before
-merge; application startup is not part of this source-only outcome.
+Implementation #126 records the evidence; its merge requires full author
+validation and a clean independent implementation review. Application
+startup is not part of this source-only outcome.
 
 ## v0.1 completion goal
 
