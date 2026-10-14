@@ -716,7 +716,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                     )),
                 )
                 for source in sources:
-                    self.assertEqual(1, cmake.count(source), source)
+                    expected = 2 if source == "tests/host/spawn_abi_test_fixture.c" else 1
+                    self.assertEqual(expected, cmake.count(source), source)
         for target, required in {
             "pm_test": ("MICROS_PM_CORE_SOURCES", "MICROS_PM_CORE_HOST_TEST_SOURCES"),
             "pm_coordinator_test": (
@@ -747,7 +748,11 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(7, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
         self.assertEqual(6, cmake.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
-        self.assertEqual(14, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(15, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        application = cmake_command(cmake, "add_executable", "application_runtime_test")
+        self.assertEqual(1, application.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(1, application.count("tests/host/spawn_abi_test_fixture.c"))
+        self.assertNotIn("${MICROS_SPAWN_ABI_HOST_TEST_SOURCES}", application)
         self.assertEqual(1, cmake.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
         for target in ("micros_vm_server", "micros_vfs_service"):
             block = cmake_command(cmake, "micros_add_bootstrap_user", target)

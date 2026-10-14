@@ -826,6 +826,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/application_runtime_test.c",
     "tests/host/test_user_elf_source_layout.py",
     "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",

@@ -1222,6 +1222,44 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_SPAWN_ABI_HOST_TEST_SOURCES}
     )
     add_executable(
+        application_runtime_test
+        lib/runtime/application_stack.c
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_VM_IMAGE_SOURCES}
+        tests/host/spawn_abi_test_fixture.c
+        tests/host/application_runtime_test.c
+    )
+    target_include_directories(
+        application_runtime_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(application_runtime_test PRIVATE c_std_17)
+    target_compile_options(
+        application_runtime_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(
+            application_runtime_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            application_runtime_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+    endif()
+    add_executable(
         vm_core_test
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
@@ -2270,6 +2308,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME endpoint-profile COMMAND endpoint_test)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
+    add_test(NAME application-runtime COMMAND application_runtime_test)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
@@ -2340,6 +2379,7 @@ if(MICROS_BUILD_HOST_TESTS)
             scheduler_test
             endpoint_test
             runtime_test
+            application_runtime_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
@@ -2461,6 +2501,7 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             ipc_model_test
             runtime_test
+            application_runtime_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test

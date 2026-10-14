@@ -797,6 +797,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                 spawn_abi,
                 ("MICROS_VM_IMAGE_SOURCES",),
             ),
+            "application-runtime": (
+                cmake_command(cmake, "add_executable", "application_runtime_test"),
+                ("MICROS_VM_IMAGE_SOURCES",),
+            ),
             "vm-core": (
                 vm_core,
                 (
