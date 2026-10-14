@@ -9,7 +9,20 @@ It implements the existing audit task pair
 `elf-tooling-decomposition-implementation`.
 Independent design review found one image-inheritance gap, which was
 corrected and independently re-reviewed with no substantive issue remaining.
-Implementation remains pending this separate Accepted design's merge.
+The design merged separately as #125 /
+`53dd53293c2c27b2405730032ceb22bf187ac49d`. Its dependent implementation
+is in progress. All 24 moving production functions and 44 checker data/type
+declarations now have their specified owners with original bodies preserved.
+Symbol validation now exposes its three checked phases with the original
+statement tree and diagnostic order preserved. All 41 original function
+moves are complete, including the unchanged host fixture and twelve inherited
+case bodies. The fixture now has all seven encoding phases and one immutable
+thirteen-scalar layout. Both migration collections are literal empty tuples,
+and the largest resulting function is the 97-line fixture root. Original
+ASTs, eight byte witnesses, twelve case identities, and eight added CLI
+contracts pass. Implementation #126 records its current evidence; merge
+requires complete author validation and a clean independent implementation
+review.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.

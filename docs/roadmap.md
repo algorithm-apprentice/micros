@@ -324,7 +324,12 @@ and case discovery without changing accepted service images or diagnostics.
 The correction precedes application-checker reuse in `elf-spawn-app-runtime`;
 it is not a new runtime-DAG node or an application-runtime implementation.
 Independent design review is clean after correction of one image-inheritance
-gap. The paired implementation remains pending the separate design merge.
+gap, and the design merged separately as #125. Implementation now separates
+all specified owners and both semantic phase roots with literal-empty
+migrations, unchanged fixture/case identities, and added CLI contracts.
+Implementation #126 records the evidence; its merge requires full author
+validation and a clean independent implementation review. Application
+startup is not part of this source-only outcome.
 
 ## v0.1 completion goal
 

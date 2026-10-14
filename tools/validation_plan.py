@@ -104,6 +104,26 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        "tools/check_user_elf.py",
+        (
+            "tools/user_elf_format.py",
+            "tools/user_elf_parse.py",
+            "tools/user_elf_structure.py",
+            "tools/user_elf_instructions.py",
+            "tools/user_elf_policy.py",
+        ),
+    ),
+    (
+        "tests/host/test_check_user_elf.py",
+        (
+            "tests/host/user_elf_test_fixture.py",
+            "tests/host/user_elf_parse_cases.py",
+            "tests/host/user_elf_structure_cases.py",
+            "tests/host/user_elf_policy_cases.py",
+            "tests/host/user_elf_cli_cases.py",
+        ),
+    ),
+    (
         "kernel/address_space.c",
         (
             "kernel/address_space_validation.c",
@@ -806,6 +826,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_user_elf_source_layout.py",
     "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
@@ -1608,6 +1629,10 @@ GATE_INPUTS = {
 SLOW_MODEL_INPUTS = {
     name: with_path_classification_equivalents(inputs)
     for name, inputs in SLOW_MODEL_INPUTS.items()
+}
+IMAGE_INPUTS = {
+    name: with_path_classification_equivalents(inputs)
+    for name, inputs in IMAGE_INPUTS.items()
 }
 
 
