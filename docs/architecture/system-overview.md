@@ -295,8 +295,11 @@ application endpoint source-only while retaining its exact reply-blocked call,
 then detaches IPC, grants, thread, context, and scheduler state before VM
 releases the root and frames and PM retires the empty process. An isolated QEMU
 fixture proves this complete kernel lifecycle with a synthetic dynamic child;
-the production PM/VFS coordinator, argv/env startup, and PID-1 integration
-remain later Step 14 slices.
+the production PM/VFS/VM coordinator now composes ordinary spawn, rollback,
+exit, and wait through checked service protocols. Its
+[implementation map](pm-spawn-coordinator.md) records the mixed native
+lifecycle proof and real runtime adapters. Application argv/env startup and
+PID-1 QEMU integration remain later Step 14 slices.
 
 The PM model contract is
 [ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md), and the

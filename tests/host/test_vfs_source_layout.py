@@ -251,7 +251,7 @@ inline bool split_inline_body(void)
         for source in PORTABLE_SOURCES:
             self.assertEqual(1, cmake.count(source), source)
 
-        for target in ("vfs_test", "vfs_model_test"):
+        for target in ("vfs_test", "vfs_model_test", "elf_spawn_model_test"):
             block = cmake_command(cmake, "add_executable", target)
             self.assertIn(f"${{{PORTABLE_SOURCE_SET}}}", block)
 

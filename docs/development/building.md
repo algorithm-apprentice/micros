@@ -293,11 +293,13 @@ Run the fast native development loop with:
 cmake --workflow --preset test-unit-fast
 ```
 
-Run the persistent IPC/endpoint and TTY models separately with:
+Run the persistent IPC/endpoint, TTY, and composed ELF lifecycle models
+separately with:
 
 ```bash
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
+cmake --workflow --preset test-elf-spawn-model
 ```
 
 The complete native milestone gate remains:
@@ -329,6 +331,15 @@ selection, bootstrap-identity mismatches, in-place input staging,
 scratch-page filling and commit-before-fill rejection, freeze, rollback before
 and after freeze, active-record reuse exclusion, exit release, and record/frame
 ownership agreement.
+The same CTest retains its original six-case prefix and adds the ordinary VM
+control codec, exact VFS grant snapshots, independent page/stack/auxv bytes,
+bound abort/commit/exit release, fatal kernel-output/transport boundaries,
+and real operation-12 raw-register capture.
+The slow `elf-spawn-model` composes production PM, VFS, and VM service paths
+for 8,192 seeded mixed operations plus deterministic prelude/drain. It compares
+independent lifecycle, frame, mapping, descriptor/reference, collaborator-order,
+and wait-result state after every operation. It is included by `test-unit`
+and excluded from `test-unit-fast`.
 It also links the production user-runtime wrappers against a raw-syscall
 capture stub, exercises the production-prefixed `memcpy` and `memset` bodies,
 and runs malformed standalone-ELF and fixture-generator regressions. It then

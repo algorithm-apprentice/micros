@@ -380,6 +380,13 @@
   ],
   "buildPresets": [
     {
+      "name": "test-elf-spawn-model",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-elf-spawn-model"
+      ]
+    },
+    {
       "name": "test-unit",
       "configurePreset": "host-debug",
       "targets": [
@@ -788,6 +795,20 @@
         {
           "type": "build",
           "name": "test-vfs-model"
+        }
+      ]
+    },
+    {
+      "name": "test-elf-spawn-model",
+      "displayName": "Build and run mixed ELF spawn lifecycle model",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-elf-spawn-model"
         }
       ]
     },

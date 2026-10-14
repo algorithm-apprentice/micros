@@ -16,9 +16,9 @@ The VFS exit-cleanup and six immediate PM/VM/kernel source corrections are
 merged. The application runtime and final dynamic PID-1 integration remain
 dependent tasks; production init and shell remain the later DAG node.
 
-The implementation is in progress. The owners and evidence below describe
-its intended completion boundary, not a claim that every listed source or
-test target already exists.
+The implementation supplies the coordinator, real runtime adapters, and
+native evidence mapped below. Application startup and the final dynamic
+PID-1 QEMU gate remain the separate dependency-ready follow-ups.
 
 ## Ownership
 
@@ -35,7 +35,7 @@ Per-transaction handles, plans, messages, and rollback actions stay automatic.
 VM copies into its existing resident input buffers; it does not allocate
 another executable snapshot.
 
-The intended responsibility owners are:
+The responsibility owners are:
 
 | Owner | Task |
 | --- | --- |
@@ -94,8 +94,8 @@ The constructor, byte-exact VFS/VM codecs, trusted init, ordinary application
 spawn, every completed-stage rollback, and exit/wait coordination are implemented in
 `MICROS_PM_COORDINATOR_SOURCES` and `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES`.
 The fast `pm-coordinator` CTest is included by both native aggregates.
-The real PM runtime adapter and general VM control adapter are wired. The
-separate mixed lifecycle model remains in progress.
+The real PM runtime adapter, general VM control adapter, and separate mixed
+lifecycle model are implemented.
 
 VFS control identity remains in its existing shared header. The separate
 `include/micros/vm_service.h` defines only the already Accepted user-service
@@ -273,6 +273,55 @@ The PM 32-page, VM 160-page, and VFS 80-page bounds remain enforced by the
 existing single post-link checks. Public wire headers, syscall numbers,
 profiles, page permissions, and service startup ABI do not change.
 
+## Mixed lifecycle evidence
+
+The mixed model composes the production PM coordinator,
+VFS service codec/core, and VM service codec/core through native typed
+transport. Only kernel mechanisms, grant access, and the already established
+RAMFS/TTY fixture are injected. A separate semantic reference chooses PM
+records/PIDs, parentage, waits, lowest free frames, and descriptor/reference
+ownership without invoking production transitions or coordinator helpers.
+
+The model runs 8,192 replayable mixed operations after a deterministic
+two-parent wait prelude, then drain every non-init child. It covers real
+image/request grant hops, valid spawn, stage failures, bad executable/path/
+descriptor inputs, pre/post-publication parent loss, invalid VM/VFS controls,
+exit, reparenting, immediate/deferred waits, generation reuse, and capacity.
+After every operation it compares complete PM record fields, active VM
+mapping records and frame states, VFS process/descriptor/reference ownership,
+idle transaction/grant state, collaborator order, and independent wait
+results. Expected kernel tokens are externally supplied fixture inputs, not
+values read back from production lifecycle state.
+
+The evidence owners are:
+
+| Owner | Responsibility |
+| --- | --- |
+| `tests/host/elf_spawn_model_test.c` | Seeded entry, deterministic prelude, replay trace, mixed operations, and final drain |
+| `tests/host/elf_spawn_model_context.c` | Sole model context, borrowed existing VM fixture, and initial bindings |
+| `tests/host/elf_spawn_model_kernel.c` | Injected kernel process/publication/exit ports |
+| `tests/host/elf_spawn_model_vm.c` | Injected kernel frame/scratch/freeze/release ports |
+| `tests/host/elf_spawn_model_transport.c` | Actual service dispatch, bounded grants, and captured wait replies |
+| `tests/host/elf_spawn_model_operations.c` | Public operation inputs and scenario execution |
+| `tests/host/elf_spawn_model_reference.c` | Independent semantic outcomes, reference transitions, and collaborator trace |
+| `tests/host/elf_spawn_model_compare.c` | Complete production/reference state and resource comparison |
+| `tests/host/elf_spawn_model_internal.h` | Declarations-only fixture and reference contract |
+| `tests/host/test_elf_spawn_model_layout.py` | Exact build/preset/ownership and oracle-boundary enforcement |
+
+`test-elf-spawn-model` is a slow native workflow included transitively by
+`test-unit` and excluded from `test-unit-fast`. No new target authority,
+production service, application image, QEMU workflow, or fault policy is
+introduced by this evidence slice.
+
+The model prints seed `8d13bca057e2469f` and a complete operation trace on
+failure. The current deterministic acceptance finishes 8,266 total operations
+(8,192 mixed plus prelude/drain), trace `e3bc5e9fc4ffb7b2`, with 245 VM
+capacity rejections and the required two-parent completion. It also mutates
+PM, VM, and VFS state in bounded oracle self-checks and requires every
+mutation to be detected before restoring the fixture.
+Registering the model preserves the VM family's previous full-tier
+classification; model ownership does not silently narrow existing gates.
+
 ## Test-first implementation sequence
 
 1. Retained mapping identity and prevalidated local commit phases, with PM
@@ -314,4 +363,10 @@ failure boundaries, and real operation-12 backend use the existing VM suite:
 cmake --build build/host-debug --target vm_core_test --parallel
 ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
 python3 -m unittest tests.host.test_vm_service_source_layout tests.host.test_pm_service_source_layout tests.host.test_validation_plan
+```
+
+The persistent composed lifecycle gate runs separately from the fast loop:
+
+```bash
+cmake --workflow --preset test-elf-spawn-model
 ```

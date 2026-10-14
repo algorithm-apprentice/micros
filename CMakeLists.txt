@@ -773,9 +773,13 @@ set(
 )
 
 set(
+    MICROS_VM_CORE_TEST_FIXTURE_SOURCES
+    tests/host/vm_core_test_fixture.c
+)
+
+set(
     MICROS_VM_CORE_HOST_TEST_SOURCES
     tests/host/vm_core_test.c
-    tests/host/vm_core_test_fixture.c
     tests/host/vm_core_boot_test.c
     tests/host/vm_core_load_test.c
     tests/host/vm_core_abort_test.c
@@ -801,6 +805,18 @@ set(
     tests/host/vm_service_test.c
     tests/host/vm_service_protocol_test.c
     tests/host/vm_service_backend_test.c
+)
+
+set(
+    MICROS_ELF_SPAWN_MODEL_SOURCES
+    tests/host/elf_spawn_model_test.c
+    tests/host/elf_spawn_model_context.c
+    tests/host/elf_spawn_model_kernel.c
+    tests/host/elf_spawn_model_vm.c
+    tests/host/elf_spawn_model_transport.c
+    tests/host/elf_spawn_model_operations.c
+    tests/host/elf_spawn_model_reference.c
+    tests/host/elf_spawn_model_compare.c
 )
 
 set(
@@ -1018,11 +1034,45 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
         ${MICROS_VM_CORE_HOST_TEST_SOURCES}
+        ${MICROS_VM_CORE_TEST_FIXTURE_SOURCES}
         ${MICROS_VM_SERVICE_CORE_SOURCES}
         ${MICROS_VM_SERVICE_BACKEND_SOURCES}
         ${MICROS_VM_SERVICE_HOST_TEST_SOURCES}
         lib/runtime/runtime.c
     )
+    add_executable(
+        elf_spawn_model_test
+        kernel/frame_allocator.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
+        kernel/vm_bootstrap.c
+        ${MICROS_VM_BOOT_VALIDATION_SOURCES}
+        ${MICROS_VM_IMAGE_SOURCES}
+        ${MICROS_VM_CORE_SOURCES}
+        ${MICROS_VM_SERVICE_CORE_SOURCES}
+        ${MICROS_VM_CORE_TEST_FIXTURE_SOURCES}
+        ${MICROS_PM_CORE_SOURCES}
+        ${MICROS_PM_COORDINATOR_SOURCES}
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_VFS_PORTABLE_SOURCES}
+        ${MICROS_VFS_TEST_FIXTURE_SOURCES}
+        servers/vfs/vfs_service_core.c
+        ${MICROS_ELF_SPAWN_MODEL_SOURCES}
+    )
+    target_include_directories(
+        elf_spawn_model_test
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(elf_spawn_model_test PRIVATE c_std_17)
+    target_compile_options(
+        elf_spawn_model_test
+        PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes
+    )
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(
+            elf_spawn_model_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined
+        )
+        target_link_options(elf_spawn_model_test PRIVATE -fsanitize=address,undefined)
+    endif()
     add_executable(
         ramfs_seed_test
         servers/ramfs/ramfs_seed.c
@@ -2029,6 +2079,8 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME pm-coordinator COMMAND pm_coordinator_test)
     add_test(NAME spawn-abi COMMAND spawn_abi_test)
     add_test(NAME vm-core COMMAND vm_core_test)
+    add_test(NAME elf-spawn-model COMMAND elf_spawn_model_test)
+    set_tests_properties(elf-spawn-model PROPERTIES LABELS slow)
     add_test(
         NAME ramfs-seed
         COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
@@ -2171,6 +2223,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
 
     add_custom_target(
+        test-elf-spawn-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            elf-spawn-model
+        DEPENDS elf_spawn_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
         test-unit
         COMMAND
             "${CMAKE_CTEST_COMMAND}"
@@ -2202,6 +2268,7 @@ if(MICROS_BUILD_HOST_TESTS)
             vm_bootstrap_test
             pm_test
             pm_coordinator_test
+            elf_spawn_model_test
             spawn_abi_test
             vm_core_test
             ramfs_seed_test

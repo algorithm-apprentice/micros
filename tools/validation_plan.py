@@ -14,6 +14,7 @@ IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
 TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 VFS_MODEL = ("cmake", "--workflow", "--preset", "test-vfs-model")
+ELF_SPAWN_MODEL = ("cmake", "--workflow", "--preset", "test-elf-spawn-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -603,6 +604,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",
     "tests/host/test_kernel_address_space_source_layout.py",
     "tests/host/test_frame_ownership_source_layout.py",
@@ -1357,6 +1359,29 @@ SLOW_MODEL_INPUTS = {
         "include/micros/vfs.h",
         "servers/vfs/",
     ) + VFS_SHARED_FIXTURE_INPUTS + VFS_MODEL_TEST_INPUTS,
+    "test-elf-spawn-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/",
+        "lib/spawn/",
+        "lib/vm/",
+        "servers/pm/",
+        "servers/vm/",
+        "servers/vfs/",
+        "kernel/frame_allocator.c",
+        "kernel/frame_ownership.c",
+        "kernel/vm_bootstrap.c",
+        "tests/host/vm_core_test.c",
+        "tests/host/elf_spawn_model_test.c",
+        "tests/host/elf_spawn_model_context.c",
+        "tests/host/elf_spawn_model_kernel.c",
+        "tests/host/elf_spawn_model_vm.c",
+        "tests/host/elf_spawn_model_transport.c",
+        "tests/host/elf_spawn_model_operations.c",
+        "tests/host/elf_spawn_model_reference.c",
+        "tests/host/elf_spawn_model_compare.c",
+        "tests/host/elf_spawn_model_internal.h",
+    ) + VFS_SHARED_FIXTURE_INPUTS,
 }
 
 SLOW_MODEL_CTESTS = {
@@ -1364,10 +1389,12 @@ SLOW_MODEL_CTESTS = {
     "test-tty-model": ("tty-model", "tty_model_test"),
     "test-ramfs-model": ("ramfs-model", "ramfs_model_test"),
     "test-vfs-model": ("vfs-model", "vfs_model_test"),
+    "test-elf-spawn-model": ("elf-spawn-model", "elf_spawn_model_test"),
 }
 
+# Model registration must not narrow the VM family's previous full-tier ownership.
 SHARED_QEMU_PATHS = with_path_classification_equivalents(
-    SHARED_QEMU_PATHS
+    SHARED_QEMU_PATHS + ("servers/vm/", "tests/host/vm_core_test.c")
 )
 GATE_INPUTS = {
     name: with_path_classification_equivalents(inputs)

@@ -41,9 +41,11 @@ SOURCE_SETS = {
         "servers/vm/vm_load.c",
         "servers/vm/vm_exit.c",
     ),
+    "MICROS_VM_CORE_TEST_FIXTURE_SOURCES": (
+        "tests/host/vm_core_test_fixture.c",
+    ),
     "MICROS_VM_CORE_HOST_TEST_SOURCES": (
         "tests/host/vm_core_test.c",
-        "tests/host/vm_core_test_fixture.c",
         "tests/host/vm_core_boot_test.c",
         "tests/host/vm_core_load_test.c",
         "tests/host/vm_core_abort_test.c",
@@ -802,6 +804,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     "MICROS_VM_IMAGE_SOURCES",
                     "MICROS_VM_CORE_SOURCES",
                     "MICROS_VM_CORE_HOST_TEST_SOURCES",
+                    "MICROS_VM_CORE_TEST_FIXTURE_SOURCES",
                     "MICROS_VM_SERVICE_CORE_SOURCES",
                     "MICROS_VM_SERVICE_BACKEND_SOURCES",
                     "MICROS_VM_SERVICE_HOST_TEST_SOURCES",
@@ -816,6 +819,14 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     "MICROS_VM_SERVICE_QEMU_SOURCES",
                     "MICROS_VM_SERVICE_CORE_SOURCES",
                     "MICROS_VM_SERVICE_BACKEND_SOURCES",
+                ),
+            ),
+            "elf-spawn-model": (
+                cmake_command(cmake, "add_executable", "elf_spawn_model_test"),
+                (
+                    "MICROS_VM_BOOT_VALIDATION_SOURCES", "MICROS_VM_IMAGE_SOURCES",
+                    "MICROS_VM_CORE_SOURCES", "MICROS_VM_CORE_TEST_FIXTURE_SOURCES",
+                    "MICROS_VM_SERVICE_CORE_SOURCES",
                 ),
             ),
             "micros": (

@@ -13,6 +13,11 @@ layer, and native service evidence as mapped in
 [the coordinator implementation](pm-spawn-coordinator.md). Those new owners
 borrow the existing state and buffers; they do not change the boot/core/image
 ABI or replace the preserved synthetic and scratch adapters.
+The existing VM native fixture now has its own shared source set so that the
+new slow composed model can borrow its sole context. The `vm-core` CTest
+retains its original six-case prefix and appends eight service-adapter cases;
+the separate model is authorized by ADR-0050, not by the source-only
+correction below.
 
 Implementation must not begin until
 [ADR-0057](../adr/0057-vm-service-source-decomposition.md) is Accepted and its

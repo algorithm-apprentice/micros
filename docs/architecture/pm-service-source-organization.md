@@ -499,22 +499,24 @@ The Accepted coordinator extension adds the current
 `MICROS_PM_COORDINATOR_SOURCES` constructor owner and
 `MICROS_PM_COORDINATOR_HOST_TEST_SOURCES` configuration suite. Its supported
 header and native-suite header are declarations-only. `pm_coordinator_test`
-expands both new sets and the existing PM core once, increasing the core's
-consumer count from six to seven without changing the five service branches.
+expands both new sets and the existing PM core once. The fast target adds
+the seventh core consumer; the persistent composed lifecycle model adds the
+eighth without changing the five service branches.
 Configuration and VFS/VM codec cases share one fast `pm-coordinator` CTest
 in both native aggregates. The codec borrows common endpoint and byte
 primitives without lifecycle transitions; the 64-bit writer is shared with
 the unchanged application-result codec rather than duplicated. The new
 shared VM IPC header is separate from the stable kernel-operation header.
 New coordinator paths inherit their PM core/native baselines;
-unknown ownership still escalates fail-closed. The remaining transaction and
-model owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
+unknown ownership still escalates fail-closed. The transaction and model
+owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
 Trusted init now composes explicit forward, peer-result, and reverse owners.
 The coordinator native target also expands the existing spawn-request set
 once. Each of the five real PM service branches now expands coordinator,
-runtime-backend, and spawn-request sets once, giving six coordinator/backend
-consumers and thirteen spawn-request consumers while retaining the exact PM
-budget helper. Automatic transition fixtures add no mutable static state.
+runtime-backend, and spawn-request sets once. The composed lifecycle model
+adds the seventh coordinator consumer and fourteenth spawn-request consumer;
+the runtime backend still has six consumers. The exact PM budget helper is
+retained. Fast automatic transition fixtures add no mutable static state.
 One scoped native raw-register capture and two exact immutable backend-port
 tables have explicit approved owners. Callback members are distinguished
 from top-level function declarations by the private-interface gate.
