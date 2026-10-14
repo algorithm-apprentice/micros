@@ -303,13 +303,8 @@ INITIAL_FUNCTION_MIGRATION = (
     ("tests/host/scheduler_model_test.c", "run_required_prelude"),
     ("tests/host/scheduler_model_test.c", "micros_scheduler_model_test_run"),
 )
-FUNCTION_MIGRATION = tuple(
-    entry for entry in INITIAL_FUNCTION_MIGRATION
-    if entry[0] not in (
-        "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
-        "kernel/scheduler_invalid_test.c",
-        "tests/host/scheduler_test.c",
-    )
+FUNCTION_MIGRATION = (
+    ("tests/host/scheduler_model_test.c", "micros_scheduler_model_test_run"),
 )
 SHORT_PHASE_ROOTS = (
     ("kernel/scheduler.c", "micros_scheduler_start"),

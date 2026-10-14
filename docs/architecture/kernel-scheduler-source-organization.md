@@ -625,8 +625,10 @@ discharges twelve more moves and the accounting split, retaining its eleven
 case labels, complete automatic snapshots, and both automatic plan witnesses
 across the deliberate fixture reset. The independent model also discharges
 its fifteen owner moves without changing any original body or its distinct
-fixture policy. All definition-owner moves are complete; only the model's
-three long-function semantic splits remain.
+fixture policy. Projection and deterministic-prelude phases now retain their
+complete comparisons, automatic witnesses, fixed operation order, and final
+idle/wake loop. All definition-owner moves are complete; only the model's
+mixed-operation driver semantic split remains.
 
 Run its focused implementation loop with:
 

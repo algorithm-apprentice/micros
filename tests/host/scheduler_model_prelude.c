@@ -1,7 +1,9 @@
 #include "tests/host/scheduler_model_internal.h"
 
-bool scheduler_model_run_required_prelude(
-    struct scheduler_model_fixture *fixture,struct model_state *model)
+static bool prelude_hart0_initial(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model
+)
 {
     if (
         !scheduler_model_admit(fixture, model, 0, 0, 10, 60)
@@ -47,7 +49,14 @@ bool scheduler_model_run_required_prelude(
         model->harts[0].counter;
     model->harts[0].accounted_thread = MODEL_NONE;
     ++model->coverage.thread_to_kernel;
+    return true;
+}
 
+static bool prelude_hart1_placement(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model
+)
+{
     if (
         !scheduler_model_admit(fixture, model, 3, 0, 3, 60)
         || !scheduler_model_plan_and_commit(fixture, model, 0)
@@ -63,7 +72,14 @@ bool scheduler_model_run_required_prelude(
     if (!scheduler_model_plan_and_commit(fixture, model, 0)) {
         return false;
     }
+    return true;
+}
 
+static bool prelude_policy_flags(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model
+)
+{
     if (
         micros_thread_scheduler_hold(&fixture->objects, fixture->threads[1])
             != MICROS_KERNEL_OBJECT_OK
@@ -129,7 +145,14 @@ bool scheduler_model_run_required_prelude(
     model->threads[2].remaining = 80;
     scheduler_model_queue_tail(model, 0, 3, 2);
     ++model->coverage.policy_runnable;
+    return true;
+}
 
+static bool prelude_exhaustion_rotation(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model
+)
+{
     model->harts[0].counter += 5;
     if (
         micros_scheduler_account_enter_thread(
@@ -168,7 +191,14 @@ bool scheduler_model_run_required_prelude(
     if (!scheduler_model_plan_and_commit(fixture, model, 0)) {
         return false;
     }
+    return true;
+}
 
+static bool prelude_idle_wake(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model
+)
+{
     {
         size_t slots[] = {4, 5, 6, 7};
         size_t index;
@@ -251,6 +281,27 @@ bool scheduler_model_run_required_prelude(
                 slot
             );
         }
+    }
+    return true;
+}
+
+bool scheduler_model_run_required_prelude(
+    struct scheduler_model_fixture *fixture,struct model_state *model)
+{
+    if (!prelude_hart0_initial(fixture, model)) {
+        return false;
+    }
+    if (!prelude_hart1_placement(fixture, model)) {
+        return false;
+    }
+    if (!prelude_policy_flags(fixture, model)) {
+        return false;
+    }
+    if (!prelude_exhaustion_rotation(fixture, model)) {
+        return false;
+    }
+    if (!prelude_idle_wake(fixture, model)) {
+        return false;
     }
     return true;
 }
