@@ -10,8 +10,11 @@ Implementation is in progress. The structural Red gate, five exact source sets,
 future-owner/private-contract skeletons and validation inheritance are integrated.
 Top-level syscall argument capture, ordered control decode, current-context
 preflight and operation dispatch now have their reviewed phases and owners.
-Fourteen symbol moves and eight long-function semantic splits remain in the
-other owners. Remaining skeletons do not claim that extraction is complete.
+Trap context, user/supervisor interrupt, syscall-return, fault, armed-test and
+ordered compile-time hook phases now have their reviewed owners; the original
+three trap-test statics have one private context. Twelve symbol moves and six
+long-function semantic splits remain in the runtime-evidence and generator
+owners. Remaining skeletons do not claim that extraction is complete.
 
 ## Base, outcome, and non-goals
 

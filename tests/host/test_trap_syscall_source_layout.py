@@ -255,7 +255,10 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
      "test_bootstrap_launcher_console_begin"),
     ("tests/host/runtime_test.c", "tests/host/runtime_wrapper_test.c", "test_memory_support"),
 )
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
+    if entry[0] != "kernel/trap.c"
+)
 
 LONG_FUNCTION_REQUIREMENTS = {
     ("kernel/trap.c", "handle_vm_self_fault"): (
@@ -299,6 +302,10 @@ INITIAL_LONG_FUNCTION_MIGRATION = tuple(LONG_FUNCTION_REQUIREMENTS)
 LONG_FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
     if entry != ("kernel/syscall.c", "micros_syscall_handle_user_ecall")
+    and entry not in (
+        ("kernel/trap.c", "handle_vm_self_fault"),
+        ("kernel/trap.c", "micros_trap_dispatch"),
+    )
 )
 
 HELPER_MIGRATION_ANCHORS = {
@@ -1065,16 +1072,21 @@ def bind_arguments(
         variable, addressed = bindings[match.group(1)]
         return variable + ("." if addressed else "->") + match.group(2)
 
+    def reference(match: re.Match) -> str:
+        dereference = match.group("dereference")
+        variable, addressed = bindings[dereference or match.group("reference")]
+        if dereference:
+            return variable if addressed else "*" + variable
+        return ("&" if addressed else "") + variable
+
     if bindings:
         names = "|".join(map(re.escape, bindings))
         body = replace_code(body, rf"\b({names})\s*->\s*([A-Za-z_]\w*)", member)
         body = replace_code(
-            body, rf"(?<![\w*])\*\s*({names})\b",
-            lambda match: bindings[match.group(1)][0] if bindings[match.group(1)][1] else match.group(),
-        )
-        body = replace_code(
-            body, rf"(?<![\w.>])\b({names})\b(?!\s*(?:->|\.))",
-            lambda match: ("&" if bindings[match.group(1)][1] else "") + bindings[match.group(1)][0],
+            body,
+            rf"(?<![\w*])\*\s*(?P<dereference>{names})\b"
+            rf"|(?<![\w.>])\b(?P<reference>{names})\b(?!\s*(?:->|\.))",
+            reference,
         )
     return body
 
@@ -1327,9 +1339,18 @@ def named_phases(
     return phases
 
 
+def c_statement_text(body: str) -> str:
+    """Keep exact CPP branches in flow_events, not C call/assignment text."""
+    return re.sub(
+        r"(?m)^[ \t]*#(?:[^\n]*\\\n)*[^\n]*",
+        lambda match: re.sub(r"[^\n]", " ", match.group()),
+        c_lexical_text(body),
+    )
+
+
 def flow_events(body: str) -> tuple[tuple[str, str], ...]:
     body = re.sub(r"\\\n\s*", " ", body)
-    lexical = c_lexical_text(body)
+    lexical = c_statement_text(body)
     events = []
     for match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", lexical):
         name = match.group(1)
@@ -1360,7 +1381,7 @@ def flow_hash(events: tuple[tuple[str, str], ...]) -> str:
 
 
 def call_arguments(body: str) -> tuple[tuple[str, str], ...]:
-    lexical = c_lexical_text(body)
+    lexical = c_statement_text(body)
     records = []
     for match in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", lexical):
         name = match.group(1)
@@ -1373,7 +1394,7 @@ def call_arguments(body: str) -> tuple[tuple[str, str], ...]:
 
 
 def state_effects(body: str) -> tuple[tuple[str, str], ...]:
-    lexical = c_lexical_text(body)
+    lexical = c_statement_text(body)
     records = []
     for match in re.finditer(r"<<=|>>=|[+\-*/%&|^]=|(?<![=!<>])=(?!=)|\+\+|--", lexical):
         prefix = lexical[:match.start()]
@@ -1420,7 +1441,7 @@ FLOW_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
         "9e1ed2977fc525df28fda9e19a3dc348193fe7f648c68bfd98fb570b47ba9e5a",
     ("kernel/trap.c", "micros_trap_dispatch"):
-        "37f9965d805a4aae0d5c5a03ffa4dea727e5b170a54a7bbee49853aa41a3d175",
+        "36f33362bf68427adab2b3b147a2f240f4a3aa52ae8e6f408567e389a5464cc8",
     ("kernel/syscall.c", "micros_syscall_handle_user_ecall"):
         "ab58456b79105687aff83d51e976824a7c206927d6f6c07173983e65f6565a38",
     ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"):
@@ -1454,7 +1475,7 @@ CALL_ARGUMENT_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
         "275b1a8752330c14b663bf2358b6af38b71b47225cbd76bb5280757252cb8ebd",
     ("kernel/trap.c", "micros_trap_dispatch"):
-        "642f733ae865fdb0817a0a97096835b12656652d18d4857a43e688d4cd2634d1",
+        "4380b7d4047b8e1bdb244789306380cc0e04ca6cd4218abc0f2f60f4ac9bd6fc",
     ("kernel/syscall.c", "micros_syscall_handle_user_ecall"):
         "427f59ffd7cc8bf23df261b7d10add022f6a45220b63ee7b8c4dca2ad038c7cc",
     ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"):
@@ -1486,7 +1507,7 @@ CALL_ARGUMENT_HASHES = {
 }
 STATE_EFFECT_HASHES = dict(zip(FLOW_HASHES, (
     "451022fb7f571b8c42db9b47cac810eb7d0e62c8dadb7288e2cc5cb8dba0e9f4",
-    "38d0b2c15b86d75acee6b2adb1564110310b988dd09e88b4a185ab926c3769f6",
+    "9c03e35dbc5920986255da52447f0317065b9a6f9fae0ba2c6b431ca11b2e3ef",
     "2e8120ce3815308518be643b132cf77397d6d50dff9a45873d80475db9f5bc2c",
     "36d5e62b02d902f28f4ca4c81d78b2f108e61c576e52ee5f42aeb85d59097763",
     "8e138f1cf07693cb21a3e92eb31aed3e8ef327f9afde380800c26e7f8d0218a2",
@@ -1499,7 +1520,7 @@ STATE_EFFECT_HASHES = dict(zip(FLOW_HASHES, (
     "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "f98e43752640c35a25dc09683774b59846eee92ee6ff4c80602a0954a0fea6cb",
-    "e3ae3f80aaf230df2f0f35144b318791fd80464d9b6efd4b1d7c7e32eed2b041",
+    "abc827e71ad0ae12cdc420ef4dfd4852484f509d3964a86601cdd39538349109",
     "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
 )))
 
@@ -3073,6 +3094,111 @@ class TrapSyscallValidExtractionTest(MetaFixtureState, unittest.TestCase):
             flow_hash(call_arguments(projected)),
         )
         self.layout(texts).test_syscall_early_decode_and_unknown_operation_precedence_are_unchanged()
+
+    def scalar_output_fixture(self) -> tuple[dict[str, str], str]:
+        texts = dict(self.fixtures)
+        declarations = "\nenum fault_action action;\nuint64_t count;\nconst char *ownership_name;\n"
+        statements = """
+    count = 0;
+    action = FAULT_ACTION_FATAL;
+    if (action == FAULT_ACTION_FATAL) {
+        ownership_name = "wired";
+        micros_observe(count, action, ownership_name);
+    }
+"""
+        texts["kernel/trap.c"] = (
+            "void entry(void) {" + declarations
+            + " trap_set_outputs(&action, &count, &ownership_name); }\n"
+        )
+        texts["kernel/trap_fault.c"] = (
+            "void trap_set_outputs(enum fault_action *action, uint64_t *count, "
+            "const char **ownership_name) {"
+            + replace_code(statements, r"\b(action|count|ownership_name)\b", r"*\1") + "}\n"
+        )
+        return texts, "{" + declarations + statements + "}"
+
+    def test_scalar_output_phase_preserves_exact_address_and_dereference_transport(self) -> None:
+        texts, original = self.scalar_output_fixture()
+        projected = projected_body(texts, "kernel/trap.c", "entry", True)
+        self.assertEqual(compact(original), compact(projected))
+        for projection in (flow_events, call_arguments, state_effects):
+            self.assertEqual(projection(original), projection(projected))
+
+    def test_scalar_output_transport_rejects_type_pointer_and_duplicate_effect_drift(self) -> None:
+        for path, before, after in (
+            ("kernel/trap_fault.c", "uint64_t *count", "uint32_t *count"),
+            ("kernel/trap_fault.c", "*action = FAULT_ACTION_FATAL", "action = FAULT_ACTION_FATAL"),
+            ("kernel/trap_fault.c", "micros_observe(*count,", "micros_observe(count,"),
+            ("kernel/trap.c", "trap_set_outputs(&action, &count, &ownership_name);",
+             "trap_set_outputs(&action, &count, &ownership_name);"
+             "trap_set_outputs(&action, &count, &ownership_name);"),
+        ):
+            with self.subTest(mutation=after):
+                texts, original = self.scalar_output_fixture()
+                self.assertIn(before, texts[path])
+                texts[path] = texts[path].replace(before, after, 1)
+                try:
+                    projected = projected_body(texts, "kernel/trap.c", "entry", True)
+                except AssertionError:
+                    continue
+                self.assertNotEqual(
+                    (flow_events(original), call_arguments(original), state_effects(original)),
+                    (flow_events(projected), call_arguments(projected), state_effects(projected)),
+                )
+
+    def guarded_phase_fixture(self) -> tuple[dict[str, str], str]:
+        texts = dict(self.fixtures)
+        guarded = """
+#if defined(MICROS_BUILD_RAMFS_SERVICE_TEST) \\
+    || defined(MICROS_BUILD_VFS_SERVICE_TEST)
+    if (!micros_fixture_hook(hart, frame)) {
+        MICROS_TRAP_PANIC(hart->hardware_id, "fixture-mismatch", frame);
+    }
+#endif
+"""
+        declaration = (
+            "enum micros_syscall_return syscall_return = micros_dispatch(hart, frame);\n"
+        )
+        texts["kernel/trap.c"] = (
+            "void entry(struct micros_hart *hart, struct micros_trap_frame *frame) {\n"
+            "trap_test_hooks_phase(hart, frame);\n" + declaration + "}\n"
+        )
+        texts["kernel/trap_test_hooks.c"] = (
+            "void trap_test_hooks_phase(struct micros_hart *hart, struct micros_trap_frame *frame) {\n"
+            + guarded + "(void)hart; (void)frame;\n}\n"
+        )
+        return texts, "{" + guarded + declaration + "}"
+
+    def test_guarded_phase_noop_parameters_do_not_create_preprocessor_calls_or_effects(self) -> None:
+        texts, original = self.guarded_phase_fixture()
+        projected = projected_body(texts, "kernel/trap.c", "entry", True)
+        for projection in (flow_events, call_arguments, state_effects):
+            with self.subTest(projection=projection.__name__):
+                self.assertEqual(projection(original), projection(projected))
+        self.assertNotIn("endif", [name for name, _ in call_arguments(projected)])
+        self.assertEqual(
+            [("cpp:if", "defined(MICROS_BUILD_RAMFS_SERVICE_TEST)||defined(MICROS_BUILD_VFS_SERVICE_TEST)"),
+             ("cpp:endif", "")],
+            [event for event in flow_events(projected) if event[0].startswith("cpp:")],
+        )
+
+    def test_guarded_phase_projection_still_detects_cpp_calls_predicates_and_effects(self) -> None:
+        for before, after in (
+            ("|| defined(MICROS_BUILD_VFS_SERVICE_TEST)", "&& defined(MICROS_BUILD_VFS_SERVICE_TEST)"),
+            ("#endif", "#endif\nhidden_work();"),
+            ("if (!micros_fixture_hook(", "if (micros_fixture_hook("),
+            ("(void)hart;", "frame->a7 = 0; (void)hart;"),
+        ):
+            with self.subTest(mutation=after):
+                texts, original = self.guarded_phase_fixture()
+                path = "kernel/trap_test_hooks.c"
+                self.assertIn(before, texts[path])
+                texts[path] = texts[path].replace(before, after, 1)
+                projected = projected_body(texts, "kernel/trap.c", "entry", True)
+                self.assertNotEqual(
+                    (flow_events(original), call_arguments(original), state_effects(original)),
+                    (flow_events(projected), call_arguments(projected), state_effects(projected)),
+                )
 
     def test_automatic_role_context_preserves_canaries_locals_and_complete_script(self) -> None:
         texts = self.role_fixture()
