@@ -552,8 +552,17 @@ The implementation begins with the planned structural Red gate
 stable hashes, fourteen function moves, seven image-object owners, retained
 entry/assembly symbols, exact helper/context fields and lifetimes, recursive
 dependencies, nine long-function semantic migrations, expanded route/call/
-hook/selector/error ordering, source-bound panic evidence, case/protocol
-scripts, generator identity/bytes, and validation inheritance.
+hook/selector/error ordering and exit values/boundaries, source-bound panic
+evidence, case/protocol scripts, generator identity/bytes, and validation
+inheritance.
+
+The ordered comparison includes return values, required return/goto/break/
+continue boundaries, and target labels. Only an unreachable void continuation
+immediately after a standalone non-returning trap panic in the same
+preprocessor branch may be normalized as outlining glue; reachable exits and
+selector values are never omitted.
+Void-phase local returns are not caller exits; early local returns require a
+verified caller-exit or function-tail continuation that preserves their scope.
 
 Narrow extraction evidence uses the existing native `user-runtime`, trap,
 timer, nested-trap, MMU, user-execution, captured IPC/grant, VM self-fault,

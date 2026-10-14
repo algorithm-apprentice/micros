@@ -1245,7 +1245,7 @@ def projected_body(
     body = c_function_body(texts[path], name)
     if not expand:
         return canonical_names(project_contexts(texts, path, name, body), family_for(path))
-    _, parameters = function_signature(texts[path], name)
+    caller_result, parameters = function_signature(texts[path], name)
     variables = typed_variables(body, parameters)
     for declaration in file_scope_objects(texts[path]):
         constant = re.fullmatch(
@@ -1285,6 +1285,31 @@ def projected_body(
         )[1:-1]
         start, end = call.start(), closing + 1
         before, after = body[:start], body[end:]
+        if result == "void":
+            tail = re.search(r"\breturn\s*;\s*$", c_statement_text(phase))
+            if tail is not None:
+                phase = phase[:tail.start()]
+            local_returns = tuple(re.finditer(r"\breturn\b([^;]*);", c_statement_text(phase)))
+            if local_returns:
+                continuation = re.match(
+                    r"\s*;\s*return\s*(true|false)?\s*;",
+                    c_lexical_text(after),
+                )
+                value = continuation.group(1) if continuation is not None else None
+                if continuation is not None and (
+                    (caller_result == "void" and value is None)
+                    or (caller_result == "bool" and value in {"true", "false"})
+                ):
+                    exit_statement = "return " + (value or "") + ";"
+                elif caller_result == "void" and re.fullmatch(
+                    r"\s*;\s*\}\s*", c_lexical_text(after),
+                ):
+                    exit_statement = "return;"
+                else:
+                    raise AssertionError(f"phase local return lacks a verified caller exit: {called}")
+                if any(c_exit_value(phase[item.start(1):item.end(1)]) for item in local_returns):
+                    raise AssertionError(f"value-producing local return in void phase: {called}")
+                phase = replace_code(phase, r"\breturn\s*;", exit_statement)
         guard = re.search(r"\bif\s*\(\s*(!?)\s*$", before)
         if guard:
             suffix = re.match(r"\s*\)\s*\{\s*return\s*([^;{}]*);\s*\}", after)
@@ -1365,6 +1390,29 @@ def c_statement_text(body: str) -> str:
     )
 
 
+def c_exit_value(expression: str) -> str:
+    tokens = re.findall(
+        r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|/\*.*?\*/|//[^\n]*|[^\s]''',
+        expression,
+        re.DOTALL,
+    )
+    return "".join(token for token in tokens if not token.startswith(("//", "/*")))
+
+
+def is_outlined_panic_continuation(body: str, position: int) -> bool:
+    """Ignore only an unreachable void continuation after a standalone panic."""
+    prefix = c_lexical_text(body[:position])
+    calls = tuple(re.finditer(
+        r"(?:^|[;{}])\s*MICROS_TRAP_PANIC\s*\(",
+        prefix,
+    ))
+    if not calls:
+        return False
+    opening = prefix.index("(", calls[-1].start())
+    closing = matching_close(prefix, opening)
+    return prefix[closing + 1:].strip() == ";"
+
+
 def flow_events(body: str) -> tuple[tuple[str, str], ...]:
     body = re.sub(r"\\\n\s*", " ", body)
     lexical = c_statement_text(body)
@@ -1388,6 +1436,25 @@ def flow_events(body: str) -> tuple[tuple[str, str], ...]:
         prefix = lexical[:match.start()]
         start = max(prefix.rfind(";"), prefix.rfind("{"), prefix.rfind("}")) + 1
         events.append((match.start(), "ternary", compact(prefix[start:])))
+    for match in re.finditer(
+        r"\b(return|goto|break|continue)\b([^;]*);",
+        lexical,
+    ):
+        kind = match.group(1)
+        value = c_exit_value(body[match.start(2):match.end(2)])
+        if (
+            kind == "return"
+            and not value
+            and is_outlined_panic_continuation(body, match.start())
+        ):
+            continue
+        events.append((match.start(), "exit:" + kind, value))
+    for match in re.finditer(
+        r"(?:^|[;{}])\s*([A-Za-z_]\w*)\s*:",
+        lexical,
+    ):
+        if match.group(1) != "default":
+            events.append((match.start(1), "label", match.group(1)))
     for match in re.finditer(r'"(?:\\.|[^"\\])*"(?:\s*"(?:\\.|[^"\\])*")*', body):
         events.append((match.start(), "literal", "".join(string_records(match.group()))))
     return tuple((kind, value) for _, kind, value in sorted(events))
@@ -1456,37 +1523,37 @@ def expanded_flow(
 
 FLOW_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
-        "9e1ed2977fc525df28fda9e19a3dc348193fe7f648c68bfd98fb570b47ba9e5a",
+        "10cf4d87fdfe994d381602ebd62571fc55bf6f342242644195d9e28d73454436",
     ("kernel/trap.c", "micros_trap_dispatch"):
-        "36f33362bf68427adab2b3b147a2f240f4a3aa52ae8e6f408567e389a5464cc8",
+        "e857330fcf6bd58411890e3b3fe1d6c73e108141380b9fef4235fa7f27c87da3",
     ("kernel/syscall.c", "micros_syscall_handle_user_ecall"):
-        "ab58456b79105687aff83d51e976824a7c206927d6f6c07173983e65f6565a38",
+        "77b73b4ead6b26f742cf9f6c63525d25a7353232e070fa3d0964ae969308c988",
     ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"):
-        "bdfe24a4ee0268b29ea0ca362f1a431c480dc0f98aa43adcafdb9d1345096c89",
+        "86dd24387fcccee09e52601f702555f265176ea342f808446058720ce2fab469",
     ("tests/qemu/user_runtime_service.c", "run_client"):
-        "56643148f001fd2faaa15d4eb1f70e571657726b923b3ed4f9ee05acce2f3da3",
+        "0b156c9c4ff1b0ae2ce91d73372385c8e9889ccb49e01fdb9f6b2c9035202a40",
     ("tests/qemu/user_runtime_service.c", "run_server"):
-        "73c23d07c56d6db65e239ea4ae519f3a070ad8a34526ee67631d0021359b1457",
+        "520d29ba795f88fc20b1a6f91c28280f0d33283dcdbe309ce788f3280a7f6431",
     ("tests/host/runtime_test.c", "test_ipc_wrappers"):
-        "007fa47af4af0186935a0b36ae56a16c2aa818e7bbd06c295d1bd02229f415f5",
+        "34fc29d906519622aa79674e170b977b21c1cce5560fe3177ee1f14b5d29731e",
     ("tests/host/runtime_test.c", "test_grant_wrappers"):
-        "35b4f5285d831d369f43709e2473d87a70677d6758981ea108cbf58e6a83e4d6",
+        "cae796af2f3927f5e689a8762c6cf43204791cdd62bfacac955f96ef6082e6dd",
     ("kernel/user_runtime_test.c", "micros_user_runtime_test_finish"):
-        "1144244c317573d88d8f84e6df4cc412bf865c14cf36a593997f83c9d4b54ec0",
+        "e63cb9d25364af7a93576eedc639a255afc65bbc9d568ada091019a02ef5ba2f",
     ("tests/qemu/user_runtime_service.c", "run_peer"):
-        "44512976b5cdd0ebaa14ce41d95893964bd37b309ff2d5a2c07d8e24b1b6ac64",
+        "f33445976217e63228f4dbdde2f62cfa58b983bb1571e0a17613fc73bdea9446",
     ("tests/qemu/user_runtime_service.c", "micros_service_main"):
-        "131203d89ccdd78d28355124f7cfe1d642944783b51a6b55b89e4079649505b5",
+        "da1d6a6e10de727dd65939b72d0adccfc34af1e3c966e07880bbdc4a4aec6f71",
     ("tests/host/runtime_test.c", "main"):
-        "37cea9bbe4c92810a2cf43d4263bff6f705125fc89d6d9bc8c4262a47afe5c63",
+        "50aedaf4b8b34308a6ebd00fc6e6e3dc203f8f75040427777a7afcf3252f6d73",
     ("tests/host/runtime_test.c", "test_bootstrap_launcher_console_begin"):
-        "1a518a99248d98d4f8630a11ae63cb247a2f6f062a85a51084f27882ef7d936e",
+        "e676ff632d681b9db032c6d972e8ff9b67a755f98c44303777b0000a5c0d0141",
     ("tests/host/runtime_test.c", "test_memory_support"):
-        "81a681f7b8c521e65cb841d7ad976f3327424cd3b63bde7298f8857e56226647",
+        "2ab190366b843c3eea29a9b1703ebf6a048c0d3667b5194f81a253654ab431cb",
     ("kernel/trap.c", "micros_trap_nested_panic"):
         "3cbef9098bef9f966e80741f6cf94b22ed06e97cc902eece363c084dc629cf36",
     ("kernel/syscall.c", "decode_vm_handoff_request"):
-        "20add5d8200bc890551f5e5eece1bede6c9f23d70e30292ef98cb1c403067952",
+        "ffeecf3cdb1d833b42102eb44a3d92bd8ede4f893669e82a606320832affd420",
 }
 CALL_ARGUMENT_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
@@ -2109,6 +2176,11 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         positions = [entry.index(item) for item in ordered]
         self.assertEqual(sorted(positions), positions)
         self.assertEqual(1, compact(entry).count("frame->sepc+=4;"))
+        early = entry[:entry.index("micros_kernel_object_runtime_authoritative_registry(")]
+        self.assertEqual(
+            ("MICROS_SYSCALL_RETURN_NORMAL",) * 4,
+            tuple(value for kind, value in flow_events(early) if kind == "exit:return"),
+        )
         default = entry[entry.index("default:"):]
         self.assertIn("MICROS_SYSCALL_ABI_ARGUMENT", default)
         self.assertIn("MICROS_SYSCALL_RETURN_NORMAL", default)
@@ -2603,10 +2675,10 @@ META_BODY_HASHES = {
     "test_ipc_wrappers": "c5014d739ccecc8cb61b28e448ee0e4810005130320849df35c4ac06edfb9a1b",
     "test_grant_wrappers": "632a750a217fc518c31c51f1a128206c5a3efa703c6006f063de24724139d4a9",
 }
-META_SYSCALL_FLOW_HASH = "ea50c47e7ef378b4184938a6621b8b90440d96535111aee4ddf49d4e7053cdcd"
+META_SYSCALL_FLOW_HASH = "08cbcc97546ceec935ef648f29c8718abe5f16fb87f428fa9637ff0d3af04bab"
 META_SYSCALL_ARGUMENT_HASH = "f50382985aedc88210c79e179195c815eb9a3c4cb5bffdfb97477c1024d62888"
 META_SYSCALL_EFFECT_HASH = "b1ead58ea1aec3017fde17408c192ae30f77117b56fad80aa9be0f26bbdd23fa"
-META_TRAP_FLOW_HASH = "ea9e0c7f19868ade09f33cf34fdf831ec50d60984e96942a3837c8d426041a1b"
+META_TRAP_FLOW_HASH = "2f3402053f7c96840a8d94b4a876ee4198d7a528d6cb87d49bd76b68dfc8e40b"
 META_VM_FINGERPRINT = "4eb8157382b483abd3a48d79ac8768610deeada348d9c421b5fe7c9fd8d6a083"
 
 
@@ -2753,6 +2825,56 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         with patch(f"{__name__}.LONG_FUNCTION_MIGRATION", ()):
             with self.assertRaisesRegex(AssertionError, "outlived its exact migration anchor"):
                 find_owner(self.texts, "kernel/syscall.c", "decode_vm_handoff_request")
+
+    def test_semantic_evidence_rejects_return_selector_and_exit_boundary_changes(self) -> None:
+        selector = (
+            "{ if (invalid_control) { frame->a0 = MICROS_SYSCALL_ABI_ARGUMENT; "
+            "return MICROS_SYSCALL_RETURN_NORMAL; } resolve_context(); }"
+        )
+        cases = (
+            (selector, selector.replace("RETURN_NORMAL", "RETURN_CAPTURED")),
+            (selector, selector.replace("return MICROS_SYSCALL_RETURN_NORMAL;", "")),
+            ("{ dispatch(); return; resume(); }", "{ dispatch(); resume(); }"),
+            ("{ return dispatch(); }", "{ dispatch(); }"),
+            ("{ if (failed) { goto failure; } failure: stop(); }",
+             "{ if (failed) { goto retry; } failure: stop(); }"),
+            ("{ while (active) { handle(); break; } }",
+             "{ while (active) { handle(); } }"),
+            ("{ while (active) { handle(); continue; } }",
+             "{ while (active) { handle(); } }"),
+            ("{ if (failed) { goto failure; } work();\nfailure: stop(); }",
+             "{ if (failed) { goto failure; }\nfailure: work(); stop(); }"),
+        )
+        for original, changed in cases:
+            with self.subTest(changed=changed):
+                self.assertNotEqual(flow_events(original), flow_events(changed))
+
+    def test_only_unreachable_outlining_continuations_are_normalized(self) -> None:
+        panic = 'MICROS_TRAP_PANIC(hart, "fatal", frame);'
+        self.assertEqual(
+            flow_events("{ " + panic + " }"),
+            flow_events("{ " + panic + " return; }"),
+        )
+        for before in (
+            "{ ordinary_call(); ",
+            "{ if (failed) { " + panic + " } ",
+            "{\n#ifdef FEATURE\n" + panic + "\n#endif\n",
+            "{\n#if FEATURE\n" + panic + "\n#else\n",
+            "{ bool ignored = failed ? (" + panic[:-1] + ", true) : false; ",
+        ):
+            with self.subTest(before=before):
+                self.assertNotEqual(
+                    flow_events(before + "}"),
+                    flow_events(before + "return; }"),
+                )
+        self.assertNotEqual(
+            flow_events("{ " + panic + " }"),
+            flow_events("{ " + panic + " return MICROS_SYSCALL_RETURN_CAPTURED; }"),
+        )
+        self.assertNotEqual(
+            flow_events('{ return "two words"; }'),
+            flow_events('{ return "twowords"; }'),
+        )
 
     def test_private_headers_reject_inline_objects_aliases_and_executable_macros(self) -> None:
         path = "kernel/trap_internal.h"
@@ -3111,6 +3233,43 @@ class TrapSyscallValidExtractionTest(MetaFixtureState, unittest.TestCase):
             flow_hash(call_arguments(projected)),
         )
         self.layout(texts).test_syscall_early_decode_and_unknown_operation_precedence_are_unchanged()
+
+    def test_void_phase_tail_return_is_not_a_caller_exit(self) -> None:
+        texts = dict(self.fixtures)
+        texts["kernel/trap.c"] = (
+            "void entry(bool external) { if (external) { trap_external(); } micros_resume(); }"
+        )
+        texts["kernel/trap_interrupt.c"] = (
+            "void trap_external(void) { micros_handle(); return; }"
+        )
+        expected = "{ if (external) { micros_handle(); return; } micros_resume(); }"
+        projected = projected_body(texts, "kernel/trap.c", "entry", True)
+        self.assertNotEqual(flow_events(expected), flow_events(projected))
+        texts["kernel/trap.c"] = (
+            "void entry(bool external) { if (external) { trap_external(); return; } micros_resume(); }"
+        )
+        self.assertEqual(
+            flow_events(expected),
+            flow_events(projected_body(texts, "kernel/trap.c", "entry", True)),
+        )
+
+    def test_void_phase_early_returns_require_a_verified_caller_exit(self) -> None:
+        texts = dict(self.fixtures)
+        texts["kernel/trap.c"] = (
+            "void entry(bool stopped) { trap_work(stopped); micros_resume(); }"
+        )
+        texts["kernel/trap_interrupt.c"] = (
+            "void trap_work(bool stopped) { if (stopped) { return; } micros_handle(); }"
+        )
+        with self.assertRaisesRegex(AssertionError, "local return"):
+            projected_body(texts, "kernel/trap.c", "entry", True)
+        texts["kernel/trap.c"] = (
+            "bool entry(bool stopped) { trap_work(stopped); return true; }"
+        )
+        self.assertEqual(
+            flow_events("{ if (stopped) { return true; } micros_handle(); return true; }"),
+            flow_events(projected_body(texts, "kernel/trap.c", "entry", True)),
+        )
 
     def scalar_output_fixture(self) -> tuple[dict[str, str], str]:
         texts = dict(self.fixtures)
