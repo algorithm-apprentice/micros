@@ -3,6 +3,7 @@
 #include "lib/runtime/raw_syscall.h"
 #include "micros/sv39.h"
 #include "micros/vm.h"
+#include "tests/qemu/application_runtime_fixture.h"
 
 #ifdef MICROS_PM_SERVICE_TEST
 
@@ -14,10 +15,6 @@ enum {
 
 #define MICROS_PM_TEST_PAGE_DIGEST_OFFSET UINT64_C(14695981039346656037)
 #define MICROS_PM_TEST_PAGE_DIGEST_PRIME UINT64_C(1099511628211)
-
-extern const uint8_t micros_pm_lifecycle_child_start[];
-extern const uint8_t micros_pm_lifecycle_child_end[];
-extern const uint8_t micros_pm_lifecycle_child_pm_endpoint[];
 
 static void pm_test_write_u64_le(uint8_t *bytes, uint64_t value)
 {
@@ -134,43 +131,19 @@ static uint64_t pm_test_page_plan_digest(
 }
 
 static bool pm_test_write_child_page(
+    size_t page_index,
     uint32_t pm_endpoint,
     volatile uint8_t *scratch
 )
 {
-    uintptr_t blob_start =
-        (uintptr_t)micros_pm_lifecycle_child_start;
-    uintptr_t blob_end =
-        (uintptr_t)micros_pm_lifecycle_child_end;
-    uintptr_t endpoint_address =
-        (uintptr_t)micros_pm_lifecycle_child_pm_endpoint;
-    size_t blob_size;
-    size_t endpoint_offset;
-    size_t index;
-
-    if (
-        blob_end < blob_start
-        || endpoint_address < blob_start
-        || endpoint_address + sizeof(uint32_t) > blob_end
-    ) {
-        return false;
-    }
-    blob_size = blob_end - blob_start;
-    endpoint_offset = endpoint_address - blob_start;
-    if (blob_size > MICROS_SV39_PAGE_SIZE) {
-        return false;
-    }
-    for (index = 0; index < MICROS_SV39_PAGE_SIZE; ++index) {
-        scratch[index] = 0;
-    }
-    for (index = 0; index < blob_size; ++index) {
-        scratch[index] = micros_pm_lifecycle_child_start[index];
-    }
-    for (index = 0; index < sizeof(uint32_t); ++index) {
-        scratch[endpoint_offset + index] =
-            (uint8_t)(pm_endpoint >> (index * 8));
-    }
-    return true;
+    return vm_application_test_fill_page(
+        page_index,
+        (uint8_t *)(uintptr_t)scratch,
+        pm_endpoint,
+        micros_bootstrap_service_config.services[
+            MICROS_PM_TEST_PROBE_SERVICE_ID - 1
+        ].endpoint
+    );
 }
 
 static bool pm_test_initialize_pages(
@@ -207,16 +180,8 @@ static bool pm_test_initialize_pages(
         ) {
             return false;
         }
-        if (index == 0) {
-            if (!pm_test_write_child_page(pm_endpoint, scratch)) {
-                return false;
-            }
-        } else {
-            size_t byte_index;
-
-            for (byte_index = 0; byte_index < MICROS_SV39_PAGE_SIZE; ++byte_index) {
-                scratch[byte_index] = 0;
-            }
+        if (!pm_test_write_child_page(index, pm_endpoint, scratch)) {
+            return false;
         }
         if (
             micros_runtime_raw_syscall(
@@ -236,15 +201,19 @@ static bool pm_test_initialize_pages(
     return true;
 }
 
-static void pm_test_build_freeze_plan(
+static bool pm_test_build_freeze_plan(
     uint64_t load_token,
     const uint64_t frames[MICROS_PM_TEST_FRAME_COUNT],
     const uint32_t permissions[MICROS_PM_TEST_DATA_FRAME_COUNT],
     struct micros_vm_load_freeze_plan *plan
 )
 {
+    uint64_t stack_pointer;
     size_t index;
 
+    if (!vm_application_test_stack_pointer(&stack_pointer)) {
+        return false;
+    }
     plan->version = MICROS_VM_LOAD_FREEZE_PLAN_VERSION;
     plan->size = MICROS_VM_LOAD_FREEZE_PLAN_SIZE;
     plan->load_token = load_token;
@@ -253,10 +222,11 @@ static void pm_test_build_freeze_plan(
             frames[MICROS_PM_TEST_DATA_FRAME_COUNT + index];
     }
     plan->entry = MICROS_APPLICATION_ENTRY;
-    plan->stack_pointer = MICROS_APPLICATION_STACK_TOP - 16;
+    plan->stack_pointer = stack_pointer;
     plan->image_page_count = 3;
     plan->data_page_count = MICROS_PM_TEST_DATA_FRAME_COUNT;
     plan->page_plan_digest = pm_test_page_plan_digest(frames, permissions);
+    return true;
 }
 
 static bool pm_test_load_child(
@@ -325,9 +295,11 @@ static bool pm_test_load_child(
     )) {
         return false;
     }
-    pm_test_build_freeze_plan(
+    if (!pm_test_build_freeze_plan(
         begin_result.load_token, frames, permissions, &freeze_plan
-    );
+    )) {
+        return false;
+    }
     if (
         freeze_plan.page_plan_digest == 0
         || micros_runtime_raw_syscall(

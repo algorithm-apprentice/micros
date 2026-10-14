@@ -182,6 +182,7 @@ option(
     "Build the invalid selected scheduler context panic image"
     OFF
 )
+option(MICROS_BUILD_APPLICATION_IMAGES "Build checked standalone application images and seed" OFF)
 option(MICROS_ENABLE_SANITIZERS "Enable host-test sanitizers" ON)
 
 set(
@@ -246,6 +247,12 @@ set(
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_structure.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_instructions.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/user_elf_policy.py"
+)
+set(
+    MICROS_APPLICATION_ELF_CHECKER_SOURCES
+    ${MICROS_USER_ELF_CHECKER_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/application_elf_policy.py"
 )
 
 set(
@@ -1223,11 +1230,15 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         application_runtime_test
+        lib/runtime/application.c
         lib/runtime/application_stack.c
+        lib/runtime/runtime.c
         ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
         tests/host/spawn_abi_test_fixture.c
         tests/host/application_runtime_test.c
+        tests/host/application_runtime_test_fixture.c
+        tests/host/application_runtime_frontend_test.c
     )
     target_include_directories(
         application_runtime_test
@@ -2550,6 +2561,171 @@ set(MICROS_LINKER_SCRIPT
 set(MICROS_USER_LINKER_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtime/user.ld"
 )
+set(MICROS_APPLICATION_LINKER_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtime/application.ld"
+)
+
+if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES)
+    function(micros_add_application target output_name)
+        add_executable(
+            "${target}"
+            lib/runtime/application.c
+            lib/runtime/application_stack.c
+            lib/runtime/application_start.S
+            lib/runtime/memory.c
+            lib/runtime/memory_symbols.c
+            lib/runtime/raw_syscall.S
+            lib/runtime/runtime.c
+            ${ARGN}
+        )
+        set_target_properties(
+            "${target}"
+            PROPERTIES
+                OUTPUT_NAME "${output_name}"
+                SUFFIX ".elf"
+                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/applications"
+                LINK_DEPENDS
+                    "${MICROS_APPLICATION_LINKER_SCRIPT};${MICROS_APPLICATION_ELF_CHECKER_SOURCES}"
+        )
+        target_include_directories(
+            "${target}"
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        )
+        target_compile_features("${target}" PRIVATE c_std_17)
+        target_compile_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -msmall-data-limit=0
+                -mno-save-restore
+                -ffunction-sections
+                -fdata-sections
+                -g0
+                -Os
+                "$<$<COMPILE_LANGUAGE:C>:-std=c17;-ffreestanding;-fno-builtin;-fno-common;-fno-pic;-fno-pie;-fno-stack-protector;-fno-unwind-tables;-fno-asynchronous-unwind-tables>"
+                "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wpedantic;-Wmissing-prototypes;-Wstrict-prototypes>"
+        )
+        target_link_options(
+            "${target}"
+            PRIVATE
+                -march=rv64imac_zicsr_zifencei
+                -mabi=lp64
+                -mcmodel=medany
+                -nostdlib
+                -static
+                "--ld-path=${MICROS_LD_LLD}"
+                "-Wl,-T,${MICROS_APPLICATION_LINKER_SCRIPT}"
+                -Wl,--build-id=none
+                -Wl,--fatal-warnings
+                -Wl,--gc-sections
+                -Wl,--no-relax
+                -Wl,-z,max-page-size=4096
+                -Wl,-z,common-page-size=4096
+        )
+        add_custom_command(
+            TARGET "${target}"
+            POST_BUILD
+            COMMAND
+                "${MICROS_PYTHON}" -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py"
+                --elf "$<TARGET_FILE:${target}>"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endfunction()
+    micros_add_application(
+        micros_application_runtime_probe
+        micros-application-runtime-probe
+        tests/qemu/application_runtime_probe.c
+    )
+    if(MICROS_BUILD_APPLICATION_IMAGES)
+        micros_add_application(
+            micros_application_minimal_probe
+            micros-application-minimal-probe
+            tests/qemu/application_minimal_probe.c
+        )
+    endif()
+    set(
+        MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE
+        "${CMAKE_BINARY_DIR}/generated/application_runtime_fixture.c"
+    )
+    add_custom_command(
+        OUTPUT "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
+        COMMAND
+            "${MICROS_PYTHON}" -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_runtime_fixture.py"
+            --elf "$<TARGET_FILE:micros_application_runtime_probe>"
+            --output "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
+        DEPENDS
+            micros_application_runtime_probe
+            ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_runtime_fixture.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_user_runtime_fixture.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/qemu/application_runtime_fixture.h"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    set_source_files_properties(
+        "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
+        PROPERTIES GENERATED TRUE
+    )
+    if(MICROS_BUILD_APPLICATION_IMAGES)
+        set(
+            MICROS_APPLICATION_RUNTIME_ARTIFACT
+            "${CMAKE_BINARY_DIR}/applications/micros-application-runtime-probe.runtime.elf"
+        )
+        set(
+            MICROS_APPLICATION_SEED_IMAGE
+            "${CMAKE_BINARY_DIR}/applications/application-seed.bin"
+        )
+        add_custom_command(
+            OUTPUT "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+            COMMAND
+                "${CMAKE_COMMAND}" -E copy_if_different
+                "$<TARGET_FILE:micros_application_runtime_probe>"
+                "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+            COMMAND
+                "${MICROS_PYTHON}" -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py"
+                --elf "$<TARGET_FILE:micros_application_runtime_probe>"
+                --runtime-elf "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+            DEPENDS
+                micros_application_runtime_probe
+                ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+        add_custom_command(
+            OUTPUT "${MICROS_APPLICATION_SEED_IMAGE}"
+            COMMAND
+                "${MICROS_PYTHON}" -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_seed.py"
+                --elf "$<TARGET_FILE:micros_application_runtime_probe>"
+                --runtime-elf "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+                --output "${MICROS_APPLICATION_SEED_IMAGE}"
+            DEPENDS
+                micros_application_runtime_probe
+                "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+                ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_seed.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+        add_custom_target(
+            build-application-images
+            DEPENDS
+                micros_application_runtime_probe
+                micros_application_minimal_probe
+                "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
+                "${MICROS_APPLICATION_SEED_IMAGE}"
+        )
+    endif()
+endif()
 
 if(MICROS_BUILD_USER_RUNTIME_TEST)
     add_executable(
@@ -2956,7 +3132,8 @@ if(
             target_sources(
                 micros_vm_server
                 PRIVATE
-                    tests/qemu/pm_lifecycle_child.S
+                    "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
+                    tests/qemu/application_runtime_vm.c
             )
             target_compile_definitions(
                 micros_vm_server
@@ -4052,6 +4229,8 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
             "MICROS_TRAP_READY"
             --marker
             "MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received prepare=aborted-reprepared activate=committed exit=detached-released resources=clean process-generation=advanced thread-generation=advanced tokens=advanced"
+            --marker
+            "MICROS_APPLICATION_RUNTIME_TEST_PASS image=checked argc=2 env=1 auxv=validated gp-tp=zero return=pm-exit code=37 cleanup=complete"
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

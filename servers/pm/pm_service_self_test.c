@@ -246,7 +246,9 @@ static bool prepare_abort_and_reprepare_child(struct pm_self_test *scenario)
 
 static bool activate_commit_and_capture_child_exit(struct pm_self_test *scenario)
 {
-    return !(
+    struct micros_pm_request decoded;
+
+    if (
         micros_pm_control_activate(
             scenario->reservation.transaction,
             scenario->load_token,
@@ -267,10 +269,13 @@ static bool activate_commit_and_capture_child_exit(struct pm_self_test *scenario
         || scenario->child_request.source != scenario->prepared.endpoint
         || scenario->child_request.type != MICROS_PM_MESSAGE_EXIT
         || scenario->child_request.reply_token == 0
-        || !pm_service_bytes_are_zero(
-            scenario->child_request.payload,
-            sizeof(scenario->child_request.payload)
-        )
+    ) {
+        return false;
+    }
+    return (
+        micros_pm_decode_request(&scenario->child_request, &decoded)
+            == MICROS_PM_PROTOCOL_OK
+        && decoded.exit_code == MICROS_PM_TEST_APPLICATION_EXIT_CODE
     );
 }
 

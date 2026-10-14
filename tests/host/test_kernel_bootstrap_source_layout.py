@@ -706,7 +706,7 @@ LAUNCHER_WORKFLOWS = (
 QEMU_TARGET_HASHES = dict(zip(LAUNCHER_WORKFLOWS, (
     "c9ae167f43d2f1e5626a350b1dff6335c1e85be734cd5195c73da90126d5239d",
     "0582ecd5f53324fd0d95f21ea4694d8aef2c15b1fd860e832dbdf8cff4cae11a",
-    "47f334f1094e1f3e0d523665244fe0cd423e281ffe1db5d58abfe7791e219ee9",
+    "c5e7f3c5fb212b3e7169104af5139ff8c5c8609703b9fe7ad15250fdba95ce93",
     "2db5f5287440d21ce9ddff8a840ab7fdfb7987bbff97ecec49831a4009b0526d",
     "e749cfc5b07cbd28fffc897c4d2ef90e83582d4ccdc0942278749ef07ae583ca",
     "f8ebbc4f698709571f37a2d0c47f86db4a6940392e3bc561eab2b5aa21c9f94a",
@@ -2033,7 +2033,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                                     '"${CMAKE_CURRENT_SOURCE_DIR}/include")'))
             self.assertIn(compact(includes), allowed)
         self.assertEqual(
-            "61d9ad47dd24b97af078699f0f0e17ffa6c641342ba09f764ecbc3e7e4cbfff4",
+            "680591f0bec9c2a413790cfb38f4835528ff8771d8263ab6f98a63c414000867",
             hashlib.sha256((REPOSITORY_ROOT / "CMakePresets.json").read_bytes()).hexdigest(),
         )
         presets = json.loads(read_source("CMakePresets.json"))

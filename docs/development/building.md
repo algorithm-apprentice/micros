@@ -943,6 +943,41 @@ checker enforces the freestanding service-ELF contract and requires the
 complete `PT_LOAD` footprint plus one external stack page to fit within the
 80-page VFS process limit.
 
+## Application runtime and image validation
+
+Build the standalone application images and checked executable seed with:
+
+```bash
+cmake --workflow --preset build-application-images
+```
+
+The separate application entry accepts the ADR-0050 canonical initial
+argv/env/auxv stack and converts normal C return into PM `EXIT`. The service
+entry and service checker remain unchanged. This workflow checks the normal
+runtime probe and a data-free/aligned minimal program, preserves all checked
+header/program/load bytes in the runtime artifact, and uses the existing
+RAMFS encoder for `applications/application-seed.bin`.
+Artifacts are under `build/riscv64-application-images/`.
+
+The existing PM component now runs a checked application rather than the
+instruction-only child:
+
+```bash
+cmake --workflow --preset test-qemu-pm-service
+```
+
+It retains all reserve/prepare/abort/reprepare/activation/exit/release checks
+and additionally requires:
+
+```text
+MICROS_APPLICATION_RUNTIME_TEST_PASS image=checked argc=2 env=1 auxv=validated gp-tp=zero return=pm-exit code=37 cleanup=complete
+```
+
+This is not the final dynamic PID-1/reaper, inherited-descriptor, spawn
+rollback, wait or production-init gate. See the
+[implementation map](../architecture/application-runtime.md) for the exact
+boundary.
+
 ## RAMFS service acceptance
 
 Build and run the dependency-closed launcher/VM/PM/TTY/RAMFS/VFS gate with:

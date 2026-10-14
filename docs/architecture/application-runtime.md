@@ -8,10 +8,13 @@ initial-stack, host-image and normal-return contracts in
 merged as #87 / `b6b291d9f7acf922759b732362be38a1ad67ecd1`.
 Its task is `elf-spawn-app-runtime`. The production coordinator #118 and
 ELF-checker correction #126 are merged predecessors.
-The native decoder and separate host application-image policy are implemented
-with focused boundary and full/runtime-byte-parity cases. Target
-assembly/frontend, generated checked seed artifacts and the component
-extension remain in progress, not delivered.
+The decoder, frontend, separate target entry, host application-image policy
+and checked image/seed workflow are implemented. Native publication/exit
+cases and the extended PM component prove a checked standalone application,
+canonical arguments and auxv, normal-return exit and complete component
+cleanup. Implementation #127 records current author evidence; merge requires
+the complete author gate and clean independent review. No full PID-1
+integration is claimed.
 
 The no-argument service entry, service linker/checker behavior, raw syscall
 ABI, bootstrap configuration, immutable application profile and PM lifecycle
@@ -31,8 +34,13 @@ scenario remains the dependent `elf-spawn-implementation` task.
 | `lib/runtime/application_start.S` | Separate fixed `_start`, explicit `gp`/`tp` clearing, original-SP transfer, and fatal breakpoint loops |
 | `lib/runtime/application.ld` | Application-specific fixed image and resident bounds |
 | `tools/check_application_elf.py` and private application-policy owner | Full-link application policy and checked seeded-artifact parity, reusing existing ELF representation and structural owners |
-| `tests/host/application_runtime_test.c` and focused private fixture/case owners as needed | Native decoder, frontend publication, failure and exact PM-wire evidence |
+| `tests/host/application_runtime_test.c`, its private fixture leaf and frontend cases | Native decoder, frontend publication, failure and exact PM-wire evidence |
 | Checked application fixture and existing PM/VM component adapters | Real target startup/normal-return evidence before the final PID-1 integration |
+
+The native entry/stack cases borrow only
+`application_runtime_test_fixture.c`; frontend cases own their one mock
+context and never call back into the entry module for fixture state.
+`application_runtime_vm.c` is the application-owned target adapter.
 
 These are implementation owners, not a second ABI specification. The stack
 layout, bounds, auxv order and `int micros_application_main(int, char *[],
@@ -106,6 +114,18 @@ service-startup policy or add an application switch to that checker.
 
 The host checker enforces the complete ADR-0050 runtime subset and stronger
 full-link closure before a stripped image can enter a RAMFS seed.
+The dedicated application linker discards non-load RISC-V attribute metadata
+so LLD cannot add an `ATTRIBUTES` program header to the required exact
+three-`PT_LOAD` shape. The service linker remains unchanged.
+Minimum zero read-only padding and the runtime's zero-initialized writable
+page-size global keep the required permission classes present without user
+sentinels. That existing runtime object is explicitly file-backed; linker
+padding alone would not establish a writable section flag.
+The section placement applies only to ELF targets; native Mach-O checks use
+the host's ordinary data placement with identical runtime values.
+Initialized data closes at the following BSS alignment. A separate
+minimal-main image with aligned zero state is a permanent link-policy
+regression.
 The seeded artifact must retain the checked ELF header, program headers,
 entry and every load byte; removed debug/symbol metadata grants no exception
 to executable-byte parity. Bounds and denied features are not widened.
@@ -123,6 +143,20 @@ removed. Keeping a checked full image as the seed payload is valid; no
 stripping step may silently rewrite a required header or load byte.
 `build-application-images` exposes the checked image/seed artifacts, not a
 claim that the later production PID-1 scenario has run.
+
+```text
+cmake --workflow --preset build-application-images
+```
+
+The workflow checks both the runtime probe and the data-free/aligned minimal
+application. It writes their full link images, the runtime probe's
+byte-preserving copy and `application-seed.bin` under
+`build/riscv64-application-images/applications/`.
+The dedicated seed contains `/bin/application-probe` with execute permission;
+it does not replace the ordinary RAMFS seed or publish production init.
+Its generator validates one immutable ELF snapshot and stages that snapshot
+through the existing RAMFS encoder, rather than reopening an unchecked
+source file or duplicating the filesystem format.
 
 ## Target component and later integration
 

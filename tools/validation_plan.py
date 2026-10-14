@@ -62,6 +62,7 @@ IMAGE_WORKFLOWS = (
     "build-ramfs-service-image",
     "build-tty-service-image",
     "build-vfs-service-image",
+    "build-application-images",
 )
 
 IMAGE_INPUTS = {
@@ -93,6 +94,21 @@ IMAGE_INPUTS = {
         "lib/runtime/",
         "servers/vfs/",
         "tools/check_user_elf.py",
+    ),
+    "build-application-images": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "cmake/",
+        "include/micros/",
+        "lib/runtime/",
+        "tests/qemu/application_runtime_probe.c",
+        "tests/qemu/application_minimal_probe.c",
+        "tests/qemu/pm_service_protocol.h",
+        "tools/check_user_elf.py",
+        "tools/check_application_elf.py",
+        "tools/application_elf_policy.py",
+        "tools/generate_application_seed.py",
+        "tools/generate_ramfs_seed.py",
     ),
 }
 
@@ -827,6 +843,13 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 
 HOST_UNIT_ONLY_INPUTS = (
     "tests/host/application_runtime_test.c",
+    "tests/host/application_runtime_test_fixture.c",
+    "tests/host/application_runtime_frontend_test.c",
+    "tests/host/application_runtime_test_internal.h",
+    "tests/host/application_elf_test_fixture.py",
+    "tests/host/test_check_application_elf.py",
+    "tests/host/test_generate_application_runtime_fixture.py",
+    "tests/host/test_generate_application_seed.py",
     "tests/host/test_user_elf_source_layout.py",
     "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",
@@ -1520,6 +1543,23 @@ GATE_INPUTS["test-qemu-vm-self-fault-sealed"] = GATE_INPUTS[
 for bootstrap_workflow in BOOTSTRAP_CROSS_GATE_WORKFLOWS:
     GATE_INPUTS[bootstrap_workflow] += BOOTSTRAP_CROSS_GATE_INPUTS
 
+APPLICATION_RUNTIME_COMPONENT_INPUTS = (
+    "lib/runtime/application.c",
+    "lib/runtime/application_stack.c",
+    "lib/runtime/application_start.S",
+    "lib/runtime/application.ld",
+    "lib/runtime/application_internal.h",
+    "include/micros/application_runtime.h",
+    "tests/qemu/application_runtime_probe.c",
+    "tests/qemu/application_runtime_vm.c",
+    "tests/qemu/application_runtime_fixture.h",
+    "tools/check_application_elf.py",
+    "tools/application_elf_policy.py",
+    "tools/generate_application_runtime_fixture.py",
+    "tools/generate_user_runtime_fixture.py",
+)
+GATE_INPUTS["test-qemu-pm-service"] += APPLICATION_RUNTIME_COMPONENT_INPUTS
+
 SLOW_MODEL_INPUTS = {
     "test-ipc-model": (
         "CMakeLists.txt",
@@ -1894,7 +1934,7 @@ def documented_image_workflows(root):
         content = source.read()
     return set(
         re.findall(
-            r"cmake --workflow --preset (build-[a-z0-9-]+-image)",
+            r"cmake --workflow --preset (build-[a-z0-9-]+-images?)(?![a-z0-9-])",
             content,
         )
     )
@@ -1936,7 +1976,7 @@ def validate_inventory(root):
     image_inventory = {
         name
         for name in workflows
-        if name.startswith("build-") and name.endswith("-image")
+        if name.startswith("build-") and name.endswith(("-image", "-images"))
     }
     if image_inventory != set(IMAGE_WORKFLOWS):
         raise ValueError("image workflow inventory is out of sync")

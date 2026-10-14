@@ -1872,7 +1872,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         cmake = read_source("CMakeLists.txt")
         restored = restored_cmake(cmake)
         self.assertEqual(
-            "a16740592236b052207a3ad63bf7931579bd8aa88391659d50a619bb6996d466",
+            "aa876467ef08e8d5de3ff65482c05e9619f322f0b43ef111d7ac58acb7e21cde",
             compact_hash(restored),
             "trap sets and call sites remain exact alongside the Accepted scheduler wiring",
         )
@@ -2323,7 +2323,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
             else:
                 self.assertIn(RUNTIME_MARKER.rstrip(), block)
         self.assertEqual(
-            "61d9ad47dd24b97af078699f0f0e17ffa6c641342ba09f764ecbc3e7e4cbfff4",
+            "680591f0bec9c2a413790cfb38f4835528ff8771d8263ab6f98a63c414000867",
             hashlib.sha256(read_source("CMakePresets.json").encode()).hexdigest(),
         )
 
@@ -2336,7 +2336,9 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
             "kernel/user_runtime_test.c": (False, ("test-qemu-user-runtime",), ()),
             "tests/qemu/user_runtime_service.c": (False, ("test-qemu-user-runtime",), ()),
             "tests/host/runtime_test.c": (False, ("test-qemu-user-runtime",), ()),
-            GENERATOR_PATH: (False, ("test-qemu-user-runtime",), ()),
+            GENERATOR_PATH: (
+                False, ("test-qemu-user-runtime", "test-qemu-pm-service"), (),
+            ),
         }
         for path, (full, workflows, models) in baselines.items():
             with self.subTest(path=path):
@@ -2475,7 +2477,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                     )
 
 
-BASE_PLANNER_AST_HASH = "80c64ee63a841226d6fa2092dd4158fd289342b7b4b3ad294639b483bc37f55e"
+BASE_PLANNER_AST_HASH = "acfeed03002fe6b790f88b40c7be4ecefeb6dde35638159c40f4198bc505bdac"
 EXPECT_TRUE_HASH = "3ef0a1204f1dfeb937f4dc99626fcbda4e9a8e1c387b703679c34a798e91c31c"
 
 

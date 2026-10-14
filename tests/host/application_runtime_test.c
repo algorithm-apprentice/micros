@@ -2,136 +2,28 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "lib/runtime/application_internal.h"
-#include "tests/host/spawn_abi_test_internal.h"
-
-struct startup_fixture {
-    uint8_t page[MICROS_APPLICATION_STACK_PAGE_SIZE];
-    struct micros_application_stack_plan plan;
-    struct micros_application_stack_values values;
-};
-
-static bool prepare_stack(
-    struct startup_fixture *fixture,
-    uint16_t argument_count,
-    uint16_t environment_count
-)
-{
-    static const char *const argument_text[] = {
-        "probe", "child", "three", "four", "five", "six", "seven", "eight",
-    };
-    static const char *const environment_text[] = {
-        "A=one", "B=two", "C=three", "D=four",
-        "E=five", "F=six", "G=seven", "H=eight",
-    };
-    struct spawn_abi_test_context *context = spawn_abi_test_context_get();
-    struct test_string path = spawn_abi_test_literal_string("/bin/probe");
-    struct test_string arguments[MICROS_SPAWN_ARGUMENT_CAPACITY];
-    struct test_string environment[MICROS_SPAWN_ENVIRONMENT_CAPACITY];
-    size_t request_size;
-    size_t index;
-
-    EXPECT_TRUE(
-        argument_count != 0
-        && argument_count <= MICROS_SPAWN_ARGUMENT_CAPACITY
-        && environment_count <= MICROS_SPAWN_ENVIRONMENT_CAPACITY
-    );
-    for (index = 0; index < argument_count; ++index) {
-        arguments[index] = spawn_abi_test_literal_string(argument_text[index]);
-    }
-    for (index = 0; index < environment_count; ++index) {
-        environment[index] = spawn_abi_test_literal_string(environment_text[index]);
-    }
-    fixture->values = (struct micros_application_stack_values){
-        .pm_endpoint = UINT32_C(0x00001002),
-        .vfs_endpoint = UINT32_C(0x00001003),
-        .pid = UINT64_C(0x0000000100000007),
-    };
-    request_size = spawn_abi_test_build_spawn_request(
-        context, &path, arguments, argument_count,
-        environment, environment_count, NULL, 0
-    );
-    EXPECT_TRUE(
-        micros_application_stack_build(
-            context->request_bytes, request_size, &fixture->values,
-            fixture->page, sizeof(fixture->page), &fixture->plan
-        ) == MICROS_APPLICATION_STACK_OK
-    );
-    return true;
-}
-
-static bool expect_rejection(
-    const uint8_t *page,
-    size_t page_size,
-    uint64_t stack_pointer,
-    enum micros_application_startup_error expected
-)
-{
-    struct micros_application_startup startup;
-    uint8_t preserved[sizeof(startup)];
-
-    memset(&startup, 0xa5, sizeof(startup));
-    memcpy(preserved, &startup, sizeof(preserved));
-    EXPECT_TRUE(
-        micros_application_startup_decode(
-            page, page_size, stack_pointer, &startup
-        ) == expected
-        && memcmp(&startup, preserved, sizeof(startup)) == 0
-    );
-    return true;
-}
-
-static bool decode_fixture(
-    const struct startup_fixture *fixture,
-    uint32_t argument_count,
-    uint32_t environment_count
-)
-{
-    struct micros_application_startup startup;
-    uint8_t preserved[sizeof(fixture->page)];
-
-    memcpy(preserved, fixture->page, sizeof(preserved));
-    memset(&startup, 0xa5, sizeof(startup));
-    EXPECT_TRUE(
-        micros_application_startup_decode(
-            fixture->page, sizeof(fixture->page),
-            fixture->plan.stack_pointer, &startup
-        ) == MICROS_APPLICATION_STARTUP_OK
-        && startup.argument_count == argument_count
-        && startup.environment_count == environment_count
-        && startup.arguments_address
-            == MICROS_APPLICATION_STACK_BASE + fixture->plan.arguments_offset
-        && startup.environment_address
-            == MICROS_APPLICATION_STACK_BASE + fixture->plan.environment_offset
-        && startup.pm_endpoint == fixture->values.pm_endpoint
-        && startup.vfs_endpoint == fixture->values.vfs_endpoint
-        && startup.pid == fixture->values.pid
-        && startup.page_size == MICROS_APPLICATION_STACK_PAGE_SIZE
-        && memcmp(fixture->page, preserved, sizeof(preserved)) == 0
-    );
-    return true;
-}
+#include "tests/host/application_runtime_test_internal.h"
 
 static bool test_canonical_initial_stack(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
-    EXPECT_TRUE(decode_fixture(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_decode_fixture(&fixture, 2, 1));
     return true;
 }
 
 static bool test_all_vector_counts(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     uint16_t arguments;
     uint16_t environment;
 
     for (arguments = 1; arguments <= MICROS_SPAWN_ARGUMENT_CAPACITY; ++arguments) {
         for (environment = 0; environment <= MICROS_SPAWN_ENVIRONMENT_CAPACITY;
              ++environment) {
-            EXPECT_TRUE(prepare_stack(&fixture, arguments, environment));
-            EXPECT_TRUE(decode_fixture(&fixture, arguments, environment));
+            EXPECT_TRUE(application_test_prepare_stack(&fixture, arguments, environment));
+            EXPECT_TRUE(application_test_decode_fixture(&fixture, arguments, environment));
         }
     }
     return true;
@@ -139,7 +31,7 @@ static bool test_all_vector_counts(void)
 
 static bool test_argument_rejections_preserve_output(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     uint64_t pointers[] = {
         0, MICROS_APPLICATION_STACK_BASE,
         MICROS_APPLICATION_STACK_TOP - MICROS_APPLICATION_STACK_OCCUPIED_MAX - 16,
@@ -149,24 +41,24 @@ static bool test_argument_rejections_preserve_output(void)
                       MICROS_APPLICATION_STACK_PAGE_SIZE + 1};
     size_t index;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_expect_rejection(
         NULL, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_ARGUMENT
     ));
     for (index = 0; index < sizeof(pointers) / sizeof(pointers[0]); ++index) {
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), pointers[index],
             MICROS_APPLICATION_STARTUP_ERROR_ARGUMENT
         ));
     }
     for (index = 0; index < sizeof(sizes) / sizeof(sizes[0]); ++index) {
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizes[index], fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_ARGUMENT
         ));
     }
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer + 8,
         MICROS_APPLICATION_STARTUP_ERROR_ARGUMENT
     ));
@@ -180,19 +72,19 @@ static bool test_argument_rejections_preserve_output(void)
 
 static bool test_vector_shapes(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     uint8_t preserved[MICROS_APPLICATION_STACK_PAGE_SIZE];
     uint64_t invalid_counts[] = {0, MICROS_SPAWN_ARGUMENT_CAPACITY + 1, UINT64_MAX};
     size_t index;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
     memcpy(preserved, fixture.page, sizeof(preserved));
     for (index = 0; index < sizeof(invalid_counts) / sizeof(invalid_counts[0]); ++index) {
         memcpy(fixture.page, preserved, sizeof(preserved));
         spawn_abi_test_write_u64_le(
             &fixture.page[fixture.plan.argc_offset], invalid_counts[index]
         );
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
         ));
@@ -201,17 +93,17 @@ static bool test_vector_shapes(void)
     spawn_abi_test_write_u64_le(
         &fixture.page[fixture.plan.arguments_offset + 2 * sizeof(uint64_t)], 1
     );
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
     ));
-    EXPECT_TRUE(prepare_stack(&fixture, 1, MICROS_SPAWN_ENVIRONMENT_CAPACITY));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 1, MICROS_SPAWN_ENVIRONMENT_CAPACITY));
     spawn_abi_test_write_u64_le(
         &fixture.page[fixture.plan.environment_offset
             + MICROS_SPAWN_ENVIRONMENT_CAPACITY * sizeof(uint64_t)],
         MICROS_APPLICATION_STACK_BASE + fixture.plan.strings_offset
     );
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
     ));
@@ -220,7 +112,7 @@ static bool test_vector_shapes(void)
 
 static bool test_auxiliary_shape_and_values(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     uint8_t preserved[MICROS_APPLICATION_STACK_PAGE_SIZE];
     uint64_t bad_endpoints[] = {
         0, 1, MICROS_ENDPOINT_NONE, MICROS_ENDPOINT_ANY,
@@ -230,14 +122,14 @@ static bool test_auxiliary_shape_and_values(void)
     size_t index;
     size_t role;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
     memcpy(preserved, fixture.page, sizeof(preserved));
     for (index = 0; index < MICROS_APPLICATION_AUXV_COUNT; ++index) {
         memcpy(fixture.page, preserved, sizeof(preserved));
         spawn_abi_test_write_u64_le(
             &fixture.page[fixture.plan.auxiliary_offset + index * 16], 99
         );
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
         ));
@@ -249,7 +141,7 @@ static bool test_auxiliary_shape_and_values(void)
                 &fixture.page[fixture.plan.auxiliary_offset + role * 16 + 8],
                 bad_endpoints[index]
             );
-            EXPECT_TRUE(expect_rejection(
+            EXPECT_TRUE(application_test_expect_rejection(
                 fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
                 MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
             ));
@@ -261,7 +153,7 @@ static bool test_auxiliary_shape_and_values(void)
             &fixture.page[fixture.plan.auxiliary_offset + role * 16 + 8],
             role == 4 ? 1 : 0
         );
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
         ));
@@ -271,7 +163,7 @@ static bool test_auxiliary_shape_and_values(void)
 
 static bool test_string_pointer_authority_and_density(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     uint8_t preserved[MICROS_APPLICATION_STACK_PAGE_SIZE];
     uint64_t pointers[] = {
         0, MICROS_APPLICATION_STACK_BASE - 1, MICROS_APPLICATION_STACK_TOP,
@@ -279,14 +171,14 @@ static bool test_string_pointer_authority_and_density(void)
     };
     size_t index;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
     memcpy(preserved, fixture.page, sizeof(preserved));
     for (index = 0; index < sizeof(pointers) / sizeof(pointers[0]); ++index) {
         memcpy(fixture.page, preserved, sizeof(preserved));
         spawn_abi_test_write_u64_le(
             &fixture.page[fixture.plan.arguments_offset], pointers[index]
         );
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
         ));
@@ -301,7 +193,7 @@ static bool test_string_pointer_authority_and_density(void)
         spawn_abi_test_write_u64_le(
             &fixture.page[offset], index == 0 ? value + 1 : value
         );
-        EXPECT_TRUE(expect_rejection(
+        EXPECT_TRUE(application_test_expect_rejection(
             fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
             MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
         ));
@@ -311,28 +203,28 @@ static bool test_string_pointer_authority_and_density(void)
 
 static bool test_padding_and_runtime_reserve(void)
 {
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     size_t padding;
 
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 0));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 0));
     padding = fixture.plan.environment_offset + sizeof(uint64_t);
     EXPECT_TRUE(padding < fixture.plan.auxiliary_offset);
     fixture.page[padding] = 1;
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
     ));
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
     EXPECT_TRUE(fixture.plan.frame_size < fixture.plan.occupied_size);
     fixture.page[MICROS_APPLICATION_STACK_PAGE_SIZE - 1] = 1;
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
     ));
-    EXPECT_TRUE(prepare_stack(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_prepare_stack(&fixture, 2, 1));
     fixture.page[0] = 0xa5;
     fixture.page[fixture.plan.argc_offset - 1] = 0x5a;
-    EXPECT_TRUE(decode_fixture(&fixture, 2, 1));
+    EXPECT_TRUE(application_test_decode_fixture(&fixture, 2, 1));
     return true;
 }
 
@@ -341,7 +233,7 @@ static bool test_maximum_string_and_occupancy(void)
     struct spawn_abi_test_context *context = spawn_abi_test_context_get();
     struct test_string path = spawn_abi_test_literal_string("/bin/probe");
     struct test_string argument;
-    struct startup_fixture fixture;
+    struct application_runtime_fixture fixture;
     struct micros_application_startup startup;
     size_t request_size;
 
@@ -364,9 +256,9 @@ static bool test_maximum_string_and_occupancy(void)
             fixture.page, sizeof(fixture.page), &fixture.plan
         ) == MICROS_APPLICATION_STACK_OK
     );
-    EXPECT_TRUE(decode_fixture(&fixture, 1, 0));
+    EXPECT_TRUE(application_test_decode_fixture(&fixture, 1, 0));
     fixture.page[MICROS_APPLICATION_STACK_PAGE_SIZE - 1] = 'x';
-    EXPECT_TRUE(expect_rejection(
+    EXPECT_TRUE(application_test_expect_rejection(
         fixture.page, sizeof(fixture.page), fixture.plan.stack_pointer,
         MICROS_APPLICATION_STARTUP_ERROR_MALFORMED
     ));
@@ -399,6 +291,10 @@ int main(void)
         {"local string authority and density", test_string_pointer_authority_and_density},
         {"padding and live runtime reserve", test_padding_and_runtime_reserve},
         {"maximum strings and initial occupancy", test_maximum_string_and_occupancy},
+        {"validated frontend publication and normal return", test_application_frontend_valid},
+        {"malformed startup never enters application code", test_application_frontend_invalid},
+        {"every unexpected exit return is fatal", test_application_exit_return_failure},
+        {"frontend argument failures preserve publication", test_application_frontend_argument_errors},
     };
     size_t index;
 

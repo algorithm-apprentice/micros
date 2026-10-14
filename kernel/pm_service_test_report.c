@@ -257,6 +257,11 @@ static _Noreturn void report_success_and_shutdown(void)
         "process-generation=advanced thread-generation=advanced "
         "tokens=advanced\n"
     );
+    uart_write(
+        "MICROS_APPLICATION_RUNTIME_TEST_PASS image=checked "
+        "argc=2 env=1 auxv=validated gp-tp=zero "
+        "return=pm-exit code=37 cleanup=complete\n"
+    );
     uart_flush();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,

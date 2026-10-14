@@ -261,6 +261,15 @@
       }
     },
     {
+      "name": "riscv64-application-images",
+      "displayName": "RISC-V 64 checked application images and seed",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-application-images",
+      "cacheVariables": {
+        "MICROS_BUILD_APPLICATION_IMAGES": "ON"
+      }
+    },
+    {
       "name": "riscv64-vm-ready-early-test",
       "displayName": "RISC-V 64 early VM readiness role-gate test",
       "inherits": "riscv64-debug",
@@ -619,6 +628,13 @@
       "configurePreset": "riscv64-vfs-service-image",
       "targets": [
         "micros_vfs_service"
+      ]
+    },
+    {
+      "name": "build-application-images",
+      "configurePreset": "riscv64-application-images",
+      "targets": [
+        "build-application-images"
       ]
     },
     {
@@ -1201,6 +1217,20 @@
         {
           "type": "build",
           "name": "build-vfs-service-image"
+        }
+      ]
+    },
+    {
+      "name": "build-application-images",
+      "displayName": "Build and validate application ELF/runtime parity and RAMFS seed",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-application-images"
+        },
+        {
+          "type": "build",
+          "name": "build-application-images"
         }
       ]
     },
