@@ -86,6 +86,17 @@ struct scheduler_model_fixture {
 struct scheduler_model_fixture *scheduler_model_fixture(void);
 bool micros_scheduler_model_test_run(void);
 
+bool scheduler_model_apply_operation(
+    struct scheduler_model_fixture *fixture,
+    struct model_state *model,
+    struct model_thread *thread,
+    size_t step,
+    uint32_t value,
+    size_t slot,
+    size_t hart,
+    const char **operation_out
+);
+
 bool scheduler_model_handles_equal(
     struct micros_thread_handle left,
     struct micros_thread_handle right

@@ -4,8 +4,8 @@ This is the exact design contract for the six scheduler sources in
 [the source-module audit](source-module-audit.md).
 [ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) is Accepted
 after a clean independent design review. Its separate design merged as PR #123,
-commit `dac947c839455900264c338c5c09952f68e147c7`. Implementation starts on a
-fresh branch from that merged outcome.
+commit `dac947c839455900264c338c5c09952f68e147c7`. Implementation now exposes all
+specified owners and phases on a fresh branch from that merged outcome.
 
 ## Base, outcome, and non-goals
 
@@ -611,24 +611,21 @@ initializers, scratch and ABI objects, automatic lifetimes; twelve semantic
 outlines and short-root boundaries; case/model/script identities; CPP guards;
 and validation inheritance.
 
-The initial green integration wires all six source sets and private headers,
-starting with 138 owner moves and twelve semantic splits. The portable core
-now discharges its 47 moves and three semantic splits; its largest function
-is 71 lines. Target runtime also discharges its 29 moves and selected-return
-split, with named first-start/idle boundaries and one seven-field context.
-Normal target evidence discharges another 26 moves and three long-function
-splits, retaining its 48-field context, two separate idle-bypass ABI objects,
-and original live supervisor-return invocation. Invalid-context evidence also
-discharges its nine moves and setup split, retaining one eleven-field context
-and exact guarded corruption/snapshot behavior. Native functional evidence
-discharges twelve more moves and the accounting split, retaining its eleven
-case labels, complete automatic snapshots, and both automatic plan witnesses
-across the deliberate fixture reset. The independent model also discharges
-its fifteen owner moves without changing any original body or its distinct
-fixture policy. Projection and deterministic-prelude phases now retain their
-complete comparisons, automatic witnesses, fixed operation order, and final
-idle/wake loop. All definition-owner moves are complete; only the model's
-mixed-operation driver semantic split remains.
+All six source sets and private headers are integrated. Both active migration
+collections are literal empty tuples; their frozen inventories retain all
+138 original moves and twelve semantic splits. The largest C function is
+111 lines. The five contexts, sole workspace, separate ABI objects, automatic
+witnesses, and original live supervisor-return invocations retain their
+specified ownership and duration.
+
+The model driver now exposes ten explicit operations, checked dispatch,
+common per-step projection, and final coverage. Its six guarded switch skips
+become verified callee-local success returns: the dispatcher still leaves only
+its selected case, and the driver still performs common projection. The gate
+checks this scope/continuation separately from C predicates and writes, just
+as it checks CPP guards and case labels separately from C statement facts.
+Expected inventories remain derived from the immutable reviewed source, not
+from the outlined implementation.
 
 Run its focused implementation loop with:
 

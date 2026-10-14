@@ -303,9 +303,7 @@ INITIAL_FUNCTION_MIGRATION = (
     ("tests/host/scheduler_model_test.c", "run_required_prelude"),
     ("tests/host/scheduler_model_test.c", "micros_scheduler_model_test_run"),
 )
-FUNCTION_MIGRATION = (
-    ("tests/host/scheduler_model_test.c", "micros_scheduler_model_test_run"),
-)
+FUNCTION_MIGRATION = ()
 SHORT_PHASE_ROOTS = (
     ("kernel/scheduler.c", "micros_scheduler_start"),
     ("kernel/scheduler.c", "micros_scheduler_idle_select"),
@@ -690,21 +688,21 @@ Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ed
 Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e
 Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ed3bb12dc024358e1c462a08e Ea292155051e6195d23c4e06a
 W9a52010ac3b237bd80850572 W628221d37b4d472c528b5cf1 W395fb6484eaf9da4a9f12639 W2f3a54de5f6f857565f9ae39
-Wa884226a22a57e797c17c3d2 Wf411dd5bebe62f9a5e629dd7 Wd389771b7adc009560076ac2 Wadf8076aa6a6caf26faabc24
+Wa884226a22a57e797c17c3d2 Wf411dd5bebe62f9a5e629dd7 Wd389771b7adc009560076ac2 W9b0d2c2563ce4a54fc0e659b
 W3e15c60667e3c88b19e4c90f Wa2fb4fea1c8a50687b6c5a36 Wa2fb4fea1c8a50687b6c5a36 Wcba35eb27c708f77f3dea8b8
-Wcba35eb27c708f77f3dea8b8 W0583b043e8d095e24ee4ed32 W6f0774a33e2b38b4cf537a62 W8fc47b73a933f41f10d22564
+Wcba35eb27c708f77f3dea8b8 W0583b043e8d095e24ee4ed32 W93c6b16f8af7fc5019e57f19 W8fc47b73a933f41f10d22564
 Wd9bf2445473f52f38ac47917 W900c34df22b61b1efec6463c W900c34df22b61b1efec6463c W5af7c5cb5d7d4ec49c5caad0
-W5af7c5cb5d7d4ec49c5caad0 Wd85b59dd5d185a68621209b0 W01f1fa3bb2fdaebcb9922594 W0b89a49f3106e978979d309f
-W270c8cc27b3bada311f981c3 Wfb67e4649e46703f5ba76ba0 W0b677e909825410a388be391 W0b677e909825410a388be391
-W6d611321495dabee8c600728 W42cd9f751ce007e33e2299bd We5636919c31582d45cea18e7 We2744a6c75846388cd602bc9
+W5af7c5cb5d7d4ec49c5caad0 Wce42c82c689ac641e7f11a9b W01f1fa3bb2fdaebcb9922594 W0b89a49f3106e978979d309f
+W6b16ef4a272ec046369984be Wfb67e4649e46703f5ba76ba0 W0b677e909825410a388be391 W0b677e909825410a388be391
+Wb8b1d3c722ec78cc2496c3a7 W2fc47a56cdda39a58b846491 We5636919c31582d45cea18e7 We2744a6c75846388cd602bc9
 Wabdd56e8fe3a726e0e114c01 Wabdd56e8fe3a726e0e114c01 Wabdd56e8fe3a726e0e114c01 Wabdd56e8fe3a726e0e114c01
 W8c35606253a29602faa65a64 W8c35606253a29602faa65a64 W4a2c6af5ad9c9403eb67ae43 W66edb0ba297b6a48a93fcf54
 W66edb0ba297b6a48a93fcf54 W66edb0ba297b6a48a93fcf54 W66edb0ba297b6a48a93fcf54 Wba23eaa71d0cfdc44652a9ff
-W02c3aa58026c607b5b07dd01 W4ff458d4e4042614bb3f3f86 W3e8a724a58bcb312104e0119 Wf938accd12da8b3f24e6d3d2
+W02c3aa58026c607b5b07dd01 W5e663e8c6616741d67f8fcef W3e8a724a58bcb312104e0119 Wf938accd12da8b3f24e6d3d2
 W10d1eb8c90afe3a807ff7586 Wed55570b52f887a4f8936a90 We91c18a6dead1a92224f36b9 We91c18a6dead1a92224f36b9
-W9ec7b91718d629e079f1bb44 W5757e1a4ab88f163201fb663 W79cfd81f5099147b81fd02f4 W0dcaba2b45c7513a7df3b79e
+W9ec7b91718d629e079f1bb44 W5757e1a4ab88f163201fb663 Wd6b83905c6f3cdc31895516d W0dcaba2b45c7513a7df3b79e
 W0dcaba2b45c7513a7df3b79e W98874e5e9bbd53d97f8090b2 W202ba3460add13ff22eb094f Wccb7388a43ad960b3a11430b
-W3ded423fc6c29f8de37a20ac Wa6e732de1fd819176bb3bb92 W84ada898a3c9cc00f0a40612 Wdd03166876035b737ebf9b5e
+W6e060217f2c70dfb7d5400af Wa6e732de1fd819176bb3bb92 W84ada898a3c9cc00f0a40612 Wdd03166876035b737ebf9b5e
 Wdf47f0ac7ceb2dbc5e6d4732 W1a820d9b3c3016d6daa56b63 W89dd6f1e9be9fbf4620bb907 W16c180843e4a30c251c6dd8e
 W71f8ad9610d63df957f08acf Wde6e735911abf2273a64d21c W4727187fcf73db943b3d543c W1faf188de36e335bb0e158bd
 W9b7cf82b6e93b490f13e3b42 W1ffbada5fcd405a66d9f7c40
@@ -938,6 +936,19 @@ FAMILY_METADATA = (
     (False, ("test-qemu-scheduler-invalid-outgoing", "test-qemu-scheduler-invalid-next"), (), ()),
     (True, (), (), ()),
     (True, (), (), ()),
+)
+
+MODEL_OPERATION_HANDLERS = (
+    (0, "apply_hold", "hold", "thread"),
+    (1, "apply_wake", "wake", "thread"),
+    (2, "apply_set_no_quantum", "set-no-quantum", "thread"),
+    (3, "apply_clear_no_quantum", "clear-no-quantum", "thread"),
+    (4, "apply_return", "return", "kernel"),
+    (5, "apply_enter_thread", "enter-thread", None),
+    (6, "apply_user_trap", "user-trap", None),
+    (7, "apply_enter_idle", "enter-idle", None),
+    (8, "apply_idle_trap", "idle-trap", None),
+    (9, "apply_policy", "policy", "thread"),
 )
 
 
@@ -1211,6 +1222,11 @@ def semantic_facts(text: str) -> Counter[str]:
             parens -= 1
         elif char in "{}" and parens == 0:
             start = index + 1
+        elif char == ":" and parens == 0 and re.fullmatch(
+            r"\s*(?:case\s+(?:\d+|[A-Za-z_]\w*)|default)\s*:",
+            lexical[start:index + 1],
+        ):
+            start = index + 1
         elif char == ";" and parens == 0:
             statement = text[start:index + 1]
             selected = c_lexical_text(statement)
@@ -1235,7 +1251,10 @@ def parsed_fact_inventory(frozen: str) -> Counter[str]:
     return Counter(frozen.split())
 
 
-def fact_text(function: Function, family: int, records: dict[str, Function]) -> str:
+def fact_text(
+    function: Function, family: int, records: dict[str, Function],
+    automatic_model: bool = False,
+) -> str:
     text = normalized_body(function, family, records)
     # Only original automatic values may be transported by typed reference.
     # This is not alias analysis and never normalizes registry/thread authority.
@@ -1269,7 +1288,10 @@ def fact_text(function: Function, family: int, records: dict[str, Function]) -> 
                 )
             text = re.sub(rf"\b{name}\s*->", name + ".", text)
             text = re.sub(rf"\(\s*\*\s*{name}\s*\)", name, text)
-            if type_name == "scheduler_accounting_commit" and name == "accounting":
+            if (
+                type_name == "scheduler_accounting_commit" and name == "accounting"
+                or automatic_model and type_name == "model_state" and name == "model"
+            ):
                 for called, arguments, start, end in reversed(call_sites(text)):
                     actuals = split_arguments(arguments)
                     if name in actuals:
@@ -1328,14 +1350,104 @@ def require_loop_projection(driver: str, step_helper: str = "") -> None:
     self_draws = [call for call, _, _, _ in call_sites(driver) if call == "next_random"]
     if len(self_draws) != 1:
         raise AssertionError("one post-update random draw per model step")
-    if "continue" in tokens(driver):
+    lexical = c_statement_text(driver)
+    loop = re.search(r"\bfor\s*\(\s*step\s*=", lexical)
+    if loop is None:
+        raise AssertionError("missing replay loop")
+    opening = lexical.find("(", loop.start())
+    closing = matching_lexical(lexical, opening)
+    brace = closing + 1
+    while brace < len(lexical) and lexical[brace].isspace():
+        brace += 1
+    if brace == len(lexical) or lexical[brace] != "{":
+        raise AssertionError("model replay loop requires its complete body")
+    end = matching_lexical(lexical, brace, "{", "}")
+    body = driver[brace + 1:end]
+    require_order(body, "next_random(&random_state)", "model_matches")
+    if "continue" in tokens(body):
         raise AssertionError("skipped/rejected steps must reach common projection")
     if step_helper and re.search(
-        rf"\breturn\s+{re.escape(step_helper)}\s*\(", c_lexical_text(driver),
+        rf"\breturn\s+{re.escape(step_helper)}\s*\(", c_statement_text(body),
     ):
         raise AssertionError("local helper success cannot exit the model caller")
-    if re.search(r"\breturn\s+true\s*;", driver[:driver.rfind("model_matches")]):
+    if re.search(r"\breturn\s+true\s*;", body[:body.rfind("model_matches")]):
         raise AssertionError("premature driver success bypasses common projection")
+
+
+def guarded_success_conditions(text: str) -> tuple[str, ...]:
+    lexical = c_statement_text(text)
+    result = []
+    for selected in re.finditer(r"\bif\s*\(", lexical):
+        opening = lexical.find("(", selected.start())
+        closing = matching_lexical(lexical, opening)
+        brace = closing + 1
+        while brace < len(lexical) and lexical[brace].isspace():
+            brace += 1
+        if brace < len(lexical) and lexical[brace] == "{":
+            end = matching_lexical(lexical, brace, "{", "}")
+            if compact(text[brace + 1:end]) == "return true ;":
+                result.append(compact(text[selected.start():closing + 1]))
+    return tuple(result)
+
+
+def model_operation_continuation_facts(
+    driver: Function, dispatch: Function, records: dict[str, Function],
+) -> Counter[str]:
+    require_loop_projection(driver.body, dispatch.name)
+    require_error_propagation(driver.body, dispatch.name, "true")
+    entries = [arguments for name, arguments, _, _ in call_sites(driver.body) if name == dispatch.name]
+    if len(entries) != 1 or split_arguments(entries[0])[-1] != "&operation":
+        raise AssertionError("model step must retain its exact caller-owned operation label")
+    lexical = c_statement_text(dispatch.body)
+    switch = re.search(r"\bswitch\s*\(\s*value\s*%\s*10\s*\)", lexical)
+    if switch is None:
+        raise AssertionError("model operation decoder changed")
+    opening = lexical.find("{", switch.end())
+    end = matching_lexical(lexical, opening, "{", "}")
+    body = dispatch.body[opening + 1:end]
+    labels = tuple(re.finditer(r"\bcase\s+(\d+)\s*:|\bdefault\s*:", c_statement_text(body)))
+    observed = tuple(int(label.group(1)) if label.group(1) is not None else 9 for label in labels)
+    if observed != tuple(contract[0] for contract in MODEL_OPERATION_HANDLERS):
+        raise AssertionError("model case order or membership changed")
+    skips = 0
+    for index, (_, name, operation, kind) in enumerate(MODEL_OPERATION_HANDLERS):
+        case_end = labels[index + 1].start() if index + 1 < len(labels) else len(body)
+        case = body[labels[index].end():case_end]
+        calls = [arguments for called, arguments, _, _ in call_sites(case) if called == name]
+        if len(calls) != 1 or split_arguments(calls[0])[-1] != "operation_out":
+            raise AssertionError("operation label output lost across dispatch")
+        require_error_propagation(case, name, "true")
+        if not compact(case).endswith("break ;") or tokens(case).count("break") != 1:
+            raise AssertionError("successful operation must leave only its dispatch case")
+        if name not in records:
+            raise AssertionError(f"missing model operation: {name}")
+        handler = records[name]
+        text = fact_text(handler, 5, records, automatic_model=True)
+        require_order(text, f'operation = "{operation}";', "*operation_out = operation;")
+        if any(called in {"next_random", "model_matches"} for called, _, _, _ in call_sites(text)):
+            raise AssertionError("an operation cannot draw randomness or replace common projection")
+        conditions = guarded_success_conditions(text)
+        expected = ()
+        if kind == "thread":
+            expected = (compact(
+                "if (thread->assigned && model.harts[hart].accounting_owner "
+                "== MICROS_SCHEDULER_ACCOUNTING_THREAD)"
+            ),)
+        elif kind == "kernel":
+            expected = (compact(
+                "if (model.harts[hart].accounting_owner "
+                "!= MICROS_SCHEDULER_ACCOUNTING_KERNEL)"
+            ),)
+        if conditions != expected:
+            raise AssertionError("skipped operation changed its original accounting-owner guard")
+        if not compact(text).endswith("return true ;"):
+            raise AssertionError("operation success lost its local continuation")
+        if len(re.findall(r"\breturn\s+true\s*;", c_statement_text(text))) != len(expected) + 1:
+            raise AssertionError("unverified early operation success")
+        if "break" in tokens(text) or "continue" in tokens(text):
+            raise AssertionError("an operation helper cannot exit its caller's control scope")
+        skips += len(expected)
+    return Counter({key: count * skips for key, count in fact_keys("break;").items()})
 
 
 def require_selector_modes(normal: str, captured: str, selector: str) -> None:
@@ -1514,17 +1626,25 @@ def phase_records(
     return tuple(result)
 
 
-def phase_text(root: Function, family: int, records: dict[str, Function]) -> str:
+def phase_text(
+    root: Function, family: int, records: dict[str, Function],
+    automatic_model: bool = False,
+) -> str:
     """Order source facts at concrete phase call sites, without interpreting C."""
     phase_records(root, family, records)
-    text = fact_text(root, family, records)
+    automatic_model = automatic_model or root.name == "micros_scheduler_model_test_run"
+    text = fact_text(root, family, records, automatic_model)
     original_identities = {
         name for names in ORIGINAL_FUNCTIONS[ORIGINAL_SOURCES[family]].values()
         for name in names
     }
     for name, _, _, end in reversed(call_sites(text)):
         if name in records and original_name(name, family) not in original_identities:
-            text = text[:end] + "\n{" + phase_text(records[name], family, records) + "}\n" + text[end:]
+            text = (
+                text[:end] + "\n{"
+                + phase_text(records[name], family, records, automatic_model)
+                + "}\n" + text[end:]
+            )
     return text
 
 
@@ -2050,7 +2170,15 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             root = find_original(self.records[family], family, name)
             actual = Counter()
             for phase in phase_records(root, family, self.records[family]):
-                actual.update(fact_keys(fact_text(phase, family, self.records[family])))
+                actual.update(fact_keys(fact_text(
+                    phase, family, self.records[family],
+                    automatic_model=name == "micros_scheduler_model_test_run",
+                )))
+            if name == "micros_scheduler_model_test_run":
+                actual.update(model_operation_continuation_facts(
+                    root, self.records[5]["scheduler_model_apply_operation"],
+                    self.records[5],
+                ))
             missing = parsed_fact_inventory(expected) - actual
             self.assertEqual({}, dict(missing), (name, "lost predicates/calls/arguments/writes/return values/control exits"))
 
@@ -2451,6 +2579,10 @@ return true;
         ):
             with self.assertRaises(AssertionError):
                 require_loop_projection(bad, "step_action")
+        require_loop_projection(
+            driver.replace("return true;", "return verify_coverage(&model);"),
+            "verify_coverage",
+        )
 
     def test_facts_keep_predicates_arguments_writes_results_and_exits(self) -> None:
         source = "if (flags == 0) { result = update(objects, value); return result; }"
@@ -2471,6 +2603,13 @@ return true;
         )
         self.assertEqual(fact_keys(write), fact_keys(guarded))
         self.assertEqual((), call_sites("#endif\n(void)saved_status;"))
+
+    def test_switch_case_label_is_separate_from_its_C_write_fact(self) -> None:
+        write = 'operation = "hold";'
+        self.assertEqual(fact_keys(write), fact_keys("case 0:\n" + write))
+        self.assertNotEqual(
+            fact_keys(write), fact_keys('case 0:\noperation = "wake";'),
+        )
 
     def test_next_context_fault_and_helper_call_keep_the_profile_guard(self) -> None:
         write = "objects->threads[threads[1].slot].user_context.sp = 1;"
@@ -2563,6 +2702,76 @@ do { \\
                 "assertion_macro", signature, shortened, 1, (),
             ), 4)),
         )
+
+    def test_model_reference_transport_distinguishes_root_value_from_pointer(self) -> None:
+        signature = "bool phase(struct model_state *model)"
+        body = "queue_remove(model, hart, priority, slot); model->coverage.flag_first++;"
+        record = Function("phase", signature, body, 1, ())
+        expected = "queue_remove(&model, hart, priority, slot); model.coverage.flag_first++;"
+        self.assertEqual(
+            compact(expected),
+            compact(fact_text(record, 5, {}, automatic_model=True)),
+        )
+        self.assertEqual(
+            compact(body.replace("model->", "model.")),
+            compact(fact_text(record, 5, {})),
+        )
+        untyped = Function("phase", "bool phase(void *model)", body, 1, ())
+        self.assertNotEqual(
+            compact(expected),
+            compact(fact_text(untyped, 5, {}, automatic_model=True)),
+        )
+
+    def test_local_operation_skip_still_reaches_dispatch_and_common_projection(self) -> None:
+        driver = Function("driver", "bool driver(void)", """
+for (step = 1; step <= MODEL_STEPS; ++step) {
+    value = next_random(&random_state);
+    if (!dispatch(fixture, &model, thread, step, value, slot, hart, &operation)) {
+        return false;
+    }
+    if (!model_matches(&model, step, operation, value)) { return false; }
+}
+return true;
+""", 1, ())
+        dispatch = Function("dispatch", "bool dispatch(void)", """
+switch (value % 10) {
+case 0:
+    if (!apply_hold(fixture, model, thread, step, value, slot, hart, operation_out)) {
+        return false;
+    }
+    break;
+}
+return true;
+""", 1, ())
+        handler = Function("apply_hold", "bool apply_hold(struct model_state *model)", """
+const char *operation;
+operation = "hold";
+*operation_out = operation;
+if (thread->assigned && model->harts[hart].accounting_owner == MICROS_SCHEDULER_ACCOUNTING_THREAD) {
+    return true;
+}
+++model->coverage.flag_first;
+return true;
+""", 1, ())
+        contract = ((0, "apply_hold", "hold", "thread"),)
+        with patch(__name__ + ".MODEL_OPERATION_HANDLERS", contract):
+            self.assertEqual(
+                fact_keys("break;"),
+                model_operation_continuation_facts(
+                    driver, dispatch, {"apply_hold": handler},
+                ),
+            )
+            for bad_driver, bad_dispatch, bad_handler in (
+                (Function(driver.name, driver.signature, driver.body.replace("return false;", "return true;", 1), 1, ()), dispatch, handler),
+                (driver, Function(dispatch.name, dispatch.signature, dispatch.body.replace("    break;", ""), 1, ()), handler),
+                (driver, Function(dispatch.name, dispatch.signature, dispatch.body.replace("!apply_hold", "apply_hold"), 1, ()), handler),
+                (driver, dispatch, Function(handler.name, handler.signature, handler.body.replace("== MICROS_SCHEDULER_ACCOUNTING_THREAD", "!= MICROS_SCHEDULER_ACCOUNTING_THREAD"), 1, ())),
+                (driver, dispatch, Function(handler.name, handler.signature, handler.body + "\nreturn true;", 1, ())),
+            ):
+                with self.assertRaises(AssertionError):
+                    model_operation_continuation_facts(
+                        bad_driver, bad_dispatch, {"apply_hold": bad_handler},
+                    )
 
 
 if __name__ == "__main__":

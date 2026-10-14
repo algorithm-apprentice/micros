@@ -186,10 +186,11 @@ after the separate design is reviewed, Accepted and merged.
 The scheduler correction defined by Accepted ADR-0062 preserves `scheduler_test` /
 `scheduler-core`, the exact eleven native cases, its 4,096-step two-hart
 model, three scheduler QEMU workflows, and all downstream production
-consumers. Implementation starts only after the separate design is reviewed,
-Accepted, and merged. Its structural Red records 38 C sources, six private
-headers, six source sets, 138 original-definition moves, and twelve
-long-function semantic migrations. The five existing-state consolidations,
+consumers. Its separately reviewed design merged as #123. Implementation
+began with a structural Red recording 38 C sources, six private headers,
+six source sets, 138 original-definition moves, and twelve long-function
+semantic migrations; both active migrations are now empty. The five
+existing-state consolidations,
 sole planning workspace, automatic plans/snapshots/reference state, assembly
 ABI objects, original entry continuation, exact LCG/prelude/draws/eighteen
 coverage checks, deferred completion, timer-before-commit, markers, and
