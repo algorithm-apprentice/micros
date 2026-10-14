@@ -75,3 +75,4 @@ to make the project appear more consistent than it was.
 | [0057](0057-vm-service-source-decomposition.md) | VM service source decomposition | Accepted |
 | [0058](0058-pm-service-source-decomposition.md) | PM service source decomposition | Accepted |
 | [0059](0059-kernel-ipc-source-decomposition.md) | Kernel IPC source decomposition | Accepted |
+| [0060](0060-kernel-bootstrap-source-decomposition.md) | Kernel bootstrap source decomposition | Proposed |

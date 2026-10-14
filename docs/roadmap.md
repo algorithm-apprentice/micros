@@ -278,6 +278,15 @@ specified portable, captured-syscall, native/reference-model, and target
 owners, with empty migrations and fail-closed structural enforcement. It
 adds no new IPC behavior or execution.
 
+The next selected high-risk dependency-ready maintenance design is Proposed
+[ADR-0060](adr/0060-kernel-bootstrap-source-decomposition.md), with the exact
+[bootstrap source contract](architecture/kernel-bootstrap-source-organization.md).
+It separates immutable validation, privileged preparation/rollback,
+diagnostics, captured control, boot entry, launcher and native evidence
+without changing the runtime graph or bootstrap behavior. Only its design
+task is active; implementation remains pending until independent design
+review, acceptance and merge.
+
 ## v0.1 completion goal
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
