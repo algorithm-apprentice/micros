@@ -305,3 +305,24 @@ The resulting `micros` design must therefore:
    and
 10. leave init, shell commands, dynamic linking, destructive `exec`, `fork`,
     page faults, and signals to later dependency-ready work.
+
+## Application-startup implementation trace
+
+The Step 14 application runtime additionally rechecked the fixed local
+`lib/csu/arch/riscv/crt0.S:36-44` and
+`lib/csu/common/crt0-common.c:145-191`. Architecture entry delegates to
+common startup, which binds the environment from `ps_strings`, performs
+hosted initialization, and converts normal `main` return to `exit`.
+The existing [runtime study](minix-user-service-runtime.md) remains the
+source for the full hosted and service-specific trace.
+
+| Application choice | ADR-0025 classification | Existing authority |
+| --- | --- | --- |
+| Application code receives argument/environment vectors and normal return becomes process exit | Baseline parity | ADR-0050 replaces the service-only staged entry at the dependency-ready application boundary. |
+| RV64 direct initial-stack decoding, fixed entry and explicit unused `gp`/`tp` | Required adaptation | Accepted RISC-V/toolchain and standalone image contracts replace NetBSD `ps_strings` and machine startup. |
+| Complete bounded pointer/string/auxv validation before calling application code | Compatible extension | ADR-0050's canonical stack, exact endpoint generations and publication boundary remain authoritative. |
+| No hosted libc, TLS, constructors or finalizers | Staged substitution | The runtime remains freestanding; those facilities require later reviewed requirements, not application startup. |
+| PM IPC exit rather than hosted `exit`, with fatal unexpected return | Required adaptation | Accepted PM authority and no-reply exit semantics replace the hosted termination path. |
+
+These are implementation classifications of already Accepted behavior, not
+permission to copy runtime source or import deferred hosted facilities.

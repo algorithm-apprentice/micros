@@ -135,6 +135,7 @@ CHECKER_QEMU = (
 )
 CHECKER_IMAGES = (
     "build-tty-service-image", "build-ramfs-service-image", "build-vfs-service-image",
+    "build-application-images",
 )
 
 SYMBOL_OWNER_MIGRATION = ()
@@ -608,8 +609,17 @@ def build_errors(text):
     if "".join(block.split()) != "".join(expected.split()):
         errors.append("checker source set is not the exact ordered complete family")
     variable = "${MICROS_USER_ELF_CHECKER_SOURCES}"
-    if text.count(variable) != 10:
-        errors.append("checker needs two link and eight generated-fixture dependency uses")
+    application = cmake_command(text, "set", "MICROS_APPLICATION_ELF_CHECKER_SOURCES")
+    application_expected = (
+        "set(MICROS_APPLICATION_ELF_CHECKER_SOURCES "
+        "${MICROS_USER_ELF_CHECKER_SOURCES} "
+        '"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py" '
+        '"${CMAKE_CURRENT_SOURCE_DIR}/tools/application_elf_policy.py")'
+    )
+    if "".join(application.split()) != "".join(application_expected.split()):
+        errors.append("application checking must retain every shared and private owner")
+    if text.count(variable) != 11:
+        errors.append("checker needs two links, eight fixtures and one complete application reuse")
     if text.count('"${MICROS_USER_LINKER_SCRIPT};' + variable + '"') != 2:
         errors.append("both user link templates need every checker input")
     for output in FIXTURE_OUTPUTS:

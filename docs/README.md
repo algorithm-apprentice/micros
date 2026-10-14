@@ -27,6 +27,9 @@ This directory contains the design baseline for `micros`.
 - [PM spawn and exit coordinator](architecture/pm-spawn-coordinator.md)
   maps the Accepted post-handoff transaction to lifecycle, peer-adapter,
   commit, rollback, and native-model implementation owners.
+- [Application runtime implementation map](architecture/application-runtime.md)
+  maps the Accepted initial stack, separate startup, PM return-exit,
+  checked images, and component evidence without claiming PID-1 integration.
 - [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.

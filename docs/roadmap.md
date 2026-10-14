@@ -192,6 +192,15 @@ exit/wait completion with a separate mixed native reference model. Its
 and validation. Application argv/env startup and the final dynamic PID-1
 spawn/wait fixture remain later Step 14 integrations.
 
+The application-runtime slice is now dependency-ready after the separately
+reviewed ELF-checker correction #126. Its
+[implementation map](architecture/application-runtime.md) fixes the separate
+startup/decoder/normal-return/image owners and native/component evidence
+under existing ADR-0050. Code now proves checked application entry and normal
+return through the existing PM component, plus standalone image/seed parity.
+Implementation #127 owns its complete author and independent-review evidence;
+the full dynamic PID-1 gate remains a later dependent outcome.
+
 ADR-0047's static TTY boundary is now implemented. VM installs one exact
 post-handoff UART device leaf before TTY release; TTY then initializes the
 NS16550A, commits console ownership through operation 14, and acknowledges

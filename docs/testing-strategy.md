@@ -355,6 +355,12 @@ VFS pass marker.
 
 ### ELF spawn Step 14 evidence
 
+The [application runtime implementation map](architecture/application-runtime.md)
+separates the native `application-runtime` decoder/frontend checks from
+the existing PM component's checked application entry and return-exit proof.
+The full production PID-1 integration remains a later dependent gate;
+neither native startup decoding nor the PM component alone claims it.
+
 Before the host application checker reuses the existing image tooling,
 the separate [user ELF checker source correction](architecture/user-elf-checker-source-organization.md)
 must pass its design/implementation barriers. Accepted ADR-0063 preserves

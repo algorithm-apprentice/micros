@@ -241,6 +241,64 @@ class ValidationPlanTests(unittest.TestCase):
             validation_plan.plan([path], "fast", "main"),
         )
 
+    def test_documented_image_inventory_accepts_plural_names_not_prefixes(self):
+        content = (
+            "cmake --workflow --preset build-tty-service-image\n"
+            "cmake --workflow --preset build-application-images\n"
+            "cmake --workflow --preset build-application-images-extra\n"
+        )
+        with mock.patch("builtins.open", mock.mock_open(read_data=content)):
+            self.assertEqual(
+                {"build-tty-service-image", "build-application-images"},
+                validation_plan.documented_image_workflows("/repository"),
+            )
+
+    def test_application_runtime_component_inputs_do_not_leak_into_inherited_gates(self):
+        for path in (
+            "lib/runtime/application.c",
+            "lib/runtime/application_stack.c",
+            "lib/runtime/application_start.S",
+            "lib/runtime/application.ld",
+            "lib/runtime/application_internal.h",
+            "tests/qemu/application_runtime_probe.c",
+            "tests/qemu/application_runtime_vm.c",
+            "tests/qemu/application_runtime_fixture.h",
+            "tools/check_application_elf.py",
+            "tools/application_elf_policy.py",
+            "tools/generate_application_runtime_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(validation_plan.requires_full_tier([path]))
+                self.assertEqual(
+                    ["test-qemu-pm-service"], validation_plan.affected_workflows([path]),
+                )
+                self.assertEqual([], validation_plan.affected_slow_models([path]))
+        self.assertEqual(
+            ["test-qemu-user-runtime", "test-qemu-pm-service"],
+            validation_plan.affected_workflows(["tools/generate_user_runtime_fixture.py"]),
+        )
+        self.assertEqual(
+            list(validation_plan.QEMU_WORKFLOWS),
+            validation_plan.affected_workflows(["include/micros/application_runtime.h"]),
+        )
+
+    def test_application_native_and_host_evidence_is_explicitly_host_only(self):
+        for path in (
+            "tests/host/application_runtime_test.c",
+            "tests/host/application_runtime_test_fixture.c",
+            "tests/host/application_runtime_frontend_test.c",
+            "tests/host/application_runtime_test_internal.h",
+            "tests/host/application_elf_test_fixture.py",
+            "tests/host/test_check_application_elf.py",
+            "tests/host/test_generate_application_runtime_fixture.py",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, validation_plan.HOST_UNIT_ONLY_INPUTS)
+                self.assertFalse(validation_plan.requires_full_tier([path]))
+                self.assertEqual([], validation_plan.affected_workflows([path]))
+                self.assertEqual([], validation_plan.affected_slow_models([path]))
+                self.assertEqual([], validation_plan.affected_image_workflows([path]))
+
     def test_syscall_production_paths_own_acceptance_gates(self):
         for path in (
             "kernel/ipc_abi.c",
