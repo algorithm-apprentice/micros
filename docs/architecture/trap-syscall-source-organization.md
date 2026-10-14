@@ -7,10 +7,11 @@ after a clean independent design review. Its separate design merged as PR #121,
 commit `358285ee41d923817702e74ae849fa12f8feec0c`.
 
 Implementation is in progress. The structural Red gate, five exact source sets,
-empty future owners/private contracts and validation inheritance are integrated.
-The original five C bodies remain unchanged; all fourteen symbol moves and
-nine long-function semantic splits are still pending. Empty skeletons do not
-claim that the reviewed extraction is complete.
+future-owner/private-contract skeletons and validation inheritance are integrated.
+Top-level syscall argument capture, ordered control decode, current-context
+preflight and operation dispatch now have their reviewed phases and owners.
+Fourteen symbol moves and eight long-function semantic splits remain in the
+other owners. Remaining skeletons do not claim that extraction is complete.
 
 ## Base, outcome, and non-goals
 

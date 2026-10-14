@@ -296,7 +296,10 @@ LONG_FUNCTION_REQUIREMENTS = {
     ),
 }
 INITIAL_LONG_FUNCTION_MIGRATION = tuple(LONG_FUNCTION_REQUIREMENTS)
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
+    if entry != ("kernel/syscall.c", "micros_syscall_handle_user_ecall")
+)
 
 HELPER_MIGRATION_ANCHORS = {
     "kernel/trap_context.c": ("kernel/trap.c", "micros_trap_dispatch"),
@@ -2366,13 +2369,312 @@ BASE_PLANNER_AST_HASH = "ac35423bbc70573c04a3f35e2bb3b170b4c761e84e844666c00c16e
 EXPECT_TRUE_HASH = "3ef0a1204f1dfeb937f4dc99626fcbda4e9a8e1c387b703679c34a798e91c31c"
 
 
-class TrapSyscallFailClosedMutationTest(unittest.TestCase):
+# Small projection inputs, not snapshots of the audited implementations.
+META_BODIES = {
+    "find_page": """{
+    size_t index;
+
+    for (index = 0; index < images[actor].page_count; ++index) {
+        if (
+            images[actor].pages[index].virtual_address
+                == virtual_address
+        ) {
+            return &images[actor].pages[index];
+        }
+    }
+    return NULL;
+}""",
+    "micros_syscall_handle_user_ecall": """{
+    struct micros_syscall_context context;
+    struct micros_syscall_arguments arguments;
+    struct micros_bootstrap_control_request bootstrap_request;
+    union micros_vm_handoff_decoded_request vm_handoff_request;
+    struct micros_pm_control_request pm_control_request;
+    struct micros_tty_control_request tty_control_request;
+    const struct micros_thread *thread;
+    const struct micros_process *process;
+    if (hart == NULL || frame == NULL) {
+        panic_syscall(hart, frame, "syscall-argument");
+    }
+    if (frame->sepc > UINT64_MAX - 4) {
+        panic_syscall(hart, frame, "syscall-sepc-overflow");
+    }
+    arguments = capture_arguments(frame);
+    frame->sepc += 4;
+    if (
+        arguments.a7 == MICROS_SYSCALL_ABI_BOOTSTRAP_CONTROL
+        && micros_bootstrap_control_decode(&arguments, &bootstrap_request) != MICROS_SYSCALL_ABI_OK
+    ) {
+        frame->a0 = (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    if (arguments.a7 == MICROS_SYSCALL_ABI_VM_HANDOFF
+        && decode_vm_handoff_request(&arguments, &vm_handoff_request) != MICROS_SYSCALL_ABI_OK) {
+        frame->a0 = (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    if (arguments.a7 == MICROS_SYSCALL_ABI_PM_CONTROL
+        && micros_pm_control_decode(&arguments, &pm_control_request) != MICROS_SYSCALL_ABI_OK) {
+        frame->a0 = (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    if (arguments.a7 == MICROS_SYSCALL_ABI_TTY_CONTROL
+        && micros_tty_control_decode(&arguments, &tty_control_request) != MICROS_SYSCALL_ABI_OK) {
+        frame->a0 = (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    context.objects = micros_kernel_object_runtime_authoritative_registry();
+    context.hart = micros_kernel_object_runtime_boot_hart_handle();
+    if (micros_hart_current_thread(context.objects, context.hart, &context.current) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_resolve(context.objects, context.current, &thread) != MICROS_KERNEL_OBJECT_OK
+        || micros_process_resolve(context.objects, thread->owner, &process) != MICROS_KERNEL_OBJECT_OK) {
+        panic_syscall(hart, frame, "syscall-current-invariant");
+    }
+    context.process = thread->owner;
+    switch (arguments.a7) {
+    default:
+        frame->a0 = (uint64_t)(int64_t)MICROS_SYSCALL_ABI_ARGUMENT;
+        return MICROS_SYSCALL_RETURN_NORMAL;
+    }
+    (void)bootstrap_request;
+    (void)vm_handoff_request;
+    (void)pm_control_request;
+    (void)tty_control_request;
+    (void)process;
+}""",
+    "run_client": """{
+    struct micros_ipc_message message;
+    volatile uint64_t canary_before =
+        MICROS_USER_RUNTIME_TEST_CANARY_BEFORE;
+    volatile uint64_t canary_after =
+        MICROS_USER_RUNTIME_TEST_CANARY_AFTER;
+    micros_grant_t read_grant = MICROS_GRANT_NONE;
+    micros_grant_t write_grant = MICROS_GRANT_NONE;
+    uint64_t probe_result;
+    size_t index;
+
+    fill_message(&message, MICROS_USER_RUNTIME_TEST_MESSAGE_CALL_ONE, UINT8_C(0x20));
+    probe_result = read_grant + write_grant;
+    for (index = 0; index < TEST_TRANSFER_SIZE; ++index) {
+        message.payload[index] = (uint8_t)probe_result;
+    }
+    if (micros_runtime_call(micros_user_runtime_test_config.server_endpoint, &message) != MICROS_SYSCALL_ABI_OK
+        || canary_before != MICROS_USER_RUNTIME_TEST_CANARY_BEFORE
+        || canary_after != MICROS_USER_RUNTIME_TEST_CANARY_AFTER) {
+        return UINT64_C(0x202);
+    }
+    if (micros_runtime_grant_revoke(read_grant) != MICROS_SYSCALL_ABI_OK) {
+        return UINT64_C(0x207);
+    }
+    micros_user_runtime_test_config.status |=
+        MICROS_USER_RUNTIME_TEST_STATUS_GRANTS | MICROS_USER_RUNTIME_TEST_STATUS_COMPLETE;
+    if (
+        micros_runtime_receive(MICROS_ENDPOINT_ANY, &message) == MICROS_SYSCALL_ABI_OK
+    ) {
+        return UINT64_C(0x20a);
+    }
+    return UINT64_C(0x20b);
+}""",
+    "run_server": """{
+    struct micros_ipc_message message;
+    struct micros_ipc_message reply;
+    micros_grant_t read_grant;
+    micros_grant_t write_grant;
+    uint64_t token;
+    size_t index;
+
+    if (micros_runtime_receive(MICROS_ENDPOINT_ANY, &message) != MICROS_SYSCALL_ABI_OK) {
+        return UINT64_C(0x401);
+    }
+    token = message.reply_token;
+    read_grant = get_u32(message.payload);
+    write_grant = get_u32(message.payload + 4);
+    for (index = 0; index < TEST_TRANSFER_SIZE; ++index) {
+        reply.payload[index] = (uint8_t)write_grant;
+    }
+    if (micros_runtime_grant_validate(micros_user_runtime_test_config.client_endpoint,
+        read_grant, 0, TEST_TRANSFER_SIZE, MICROS_GRANT_PERMISSION_READ) != MICROS_SYSCALL_ABI_OK) {
+        return UINT64_C(0x40a);
+    }
+    (void)micros_runtime_reply(token, &reply);
+    return 0;
+}""",
+    "run_peer": """{
+    struct micros_ipc_message message;
+    if (micros_runtime_receive(MICROS_ENDPOINT_ANY, &message) == MICROS_SYSCALL_ABI_OK) {
+        return UINT64_C(0x302);
+    }
+    return UINT64_C(0x303);
+}""",
+    "micros_trap_dispatch": """{
+    struct micros_hart *hart;
+    bool user_timer = false;
+    bool user_external = false;
+    enum micros_syscall_return syscall_return;
+    if (
+        !user_timer
+            && !user_external
+    ) {
+#ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
+        (void)micros_user_runtime_test_before_ecall(hart, frame);
+#endif
+        syscall_return = micros_syscall_handle_user_ecall(hart, frame);
+        (void)(syscall_return == MICROS_SYSCALL_RETURN_CAPTURED
+            ? micros_scheduler_select_captured_user_return(hart, frame)
+            : micros_scheduler_select_user_return(hart, frame));
+    }
+    if (frame->a7 == MICROS_SYSCALL_ABI_TTY_CONTROL) {
+        record_tty_owner_failure();
+    }
+    MICROS_TRAP_PANIC(hart->hardware_id, "unexpected-exception", frame);
+}""",
+    "handle_vm_self_fault": """{
+    if (frame->scause == cause_code) {
+        frame->sepc += 4;
+        return true;
+    }
+    return false;
+}""",
+    "test_ipc_wrappers": """{
+    errno = ERANGE;
+    return true;
+}""",
+    "test_grant_wrappers": """{
+    int64_t error;
+    for (error = MICROS_SYSCALL_ABI_ARGUMENT; error >= MICROS_SYSCALL_ABI_RANGE; --error) {
+        errno = EILSEQ;
+    }
+    return true;
+}""",
+}
+META_RETURNS = {
+    "find_page": "static struct mapped_page *",
+    "micros_syscall_handle_user_ecall": "enum micros_syscall_return",
+    "run_client": "static uint64_t", "run_server": "static uint64_t", "run_peer": "static uint64_t",
+    "micros_trap_dispatch": "void", "handle_vm_self_fault": "static bool",
+    "test_ipc_wrappers": "static bool", "test_grant_wrappers": "static bool",
+}
+META_BODY_HASHES = {
+    "find_page": "a20fb703529a6330558e00178740324f314d1c914e1afa74fa41f3912e485054",
+    "micros_syscall_handle_user_ecall": "75b61fbb74123967771e7f2eed028c21bc5cab51efd9d973a426d782ee8da0c2",
+    "run_client": "e5a126d239a755026c694956aacb92e56831880918aa24b4c4195014cd4040f0",
+    "run_server": "5c9e708180044756a62808d6d84ce95a61b44c2728131783c99990c7e9ad18dc",
+    "run_peer": "b52f85967cfd56466f35bbad733b3b8c8ce1988efc29e1b865f8b8b1855b102e",
+    "micros_trap_dispatch": "69cc7d0153ea592669403ea0a34ec3ecd4de3342f6d42e1a238e3194d00edacf",
+    "handle_vm_self_fault": "0fa72d270c22f8842a47778b5b87c7a25d22d47e04b988913c7d8de62838a3c5",
+    "test_ipc_wrappers": "c5014d739ccecc8cb61b28e448ee0e4810005130320849df35c4ac06edfb9a1b",
+    "test_grant_wrappers": "632a750a217fc518c31c51f1a128206c5a3efa703c6006f063de24724139d4a9",
+}
+META_SYSCALL_FLOW_HASH = "ea50c47e7ef378b4184938a6621b8b90440d96535111aee4ddf49d4e7053cdcd"
+META_SYSCALL_ARGUMENT_HASH = "f50382985aedc88210c79e179195c815eb9a3c4cb5bffdfb97477c1024d62888"
+META_SYSCALL_EFFECT_HASH = "b1ead58ea1aec3017fde17408c192ae30f77117b56fad80aa9be0f26bbdd23fa"
+META_TRAP_FLOW_HASH = "ea9e0c7f19868ade09f33cf34fdf831ec50d60984e96942a3837c8d426041a1b"
+META_VM_FINGERPRINT = "4eb8157382b483abd3a48d79ac8768610deeada348d9c421b5fe7c9fd8d6a083"
+
+
+def meta_fixture_sources() -> dict[str, str]:
+    texts = {path: "" for path in (*all_sources(), *PRIVATE_HEADERS)}
+    texts["kernel/trap.c"] = "\n".join("static " + field for field in TRAP_FIELDS)
+    texts["kernel/user_runtime_test.c"] = "\n".join((
+        *("static " + field for field in KERNEL_FIELDS[:-1]),
+        "static size_t returned_actor = USER_RUNTIME_PROCESS_COUNT;",
+        *SAVED_REGISTER_OBJECTS,
+        "static const uint64_t USER_RUNTIME_TIMER_INTERVAL = UINT64_C(0x000000003b9aca00);",
+    ))
+    texts["tests/qemu/user_runtime_service.c"] = "\n".join(IMAGE_OBJECTS)
+    texts["tests/host/runtime_test.c"] = (
+        "struct raw_capture {\n" + "\n".join(RAW_FIELDS) + "\n};\nstatic struct raw_capture capture;\n"
+    )
+    for path, _, name, _ in owner_specs():
+        if name in META_BODIES and name != "micros_syscall_handle_user_ecall":
+            arguments = ", ".join(ORIGINAL_PARAMETERS[path][name]) or "void"
+            texts[path] += f"\n{META_RETURNS[name]} {name}({arguments})\n{META_BODIES[name]}\n"
+    texts["kernel/trap.c"] += "\nbool micros_trap_run_self_test(void) { return true; }\n"
+    texts["kernel/syscall.c"] += (
+        "\nstatic _Noreturn void panic_syscall(struct micros_hart *hart, struct micros_trap_frame *frame, const char *reason)"
+        "\n{ MICROS_TRAP_PANIC(hart->hardware_id, reason, frame); }\n"
+        "static struct micros_syscall_arguments capture_arguments(const struct micros_trap_frame *frame)"
+        "\n{ return (struct micros_syscall_arguments){ .a0 = frame->a0, .a1 = frame->a1, .a2 = frame->a2,"
+        " .a3 = frame->a3, .a4 = frame->a4, .a5 = frame->a5, .a6 = frame->a6, .a7 = frame->a7 }; }\n"
+        "union micros_vm_handoff_decoded_request {\n"
+        + "\n".join(RECORD_FIELDS["micros_vm_handoff_decoded_request"]) + "\n};\n"
+        "static enum micros_syscall_abi_result decode_vm_handoff_request("
+        "const struct micros_syscall_arguments *arguments, union micros_vm_handoff_decoded_request *request)"
+        "\n{ return micros_vm_handoff_decode(arguments, &request->ready); }\n"
+    )
+    texts["kernel/syscall.c"] += (
+        "\nenum micros_syscall_return micros_syscall_handle_user_ecall("
+        + ", ".join(HART_FRAME_PARAMETERS) + ")\n"
+        + META_BODIES["micros_syscall_handle_user_ecall"] + "\n"
+    )
+    return texts
+
+
+META_GENERATOR = (
+    "FIXTURE_SYMBOLS = " + repr(FIXTURE_SYMBOLS) + "\n"
+    "IMAGE_SEGMENT_COUNT = 3\n\n"
+    """def _format_bytes(data):
+    return data.hex()
+
+
+def render_fixture(image):
+    symbols = image.symbols
+    loads = image.loads
+
+    def containing_load(symbol_name, size):
+        for program in loads:
+            if symbols[symbol_name] >= program.address and size <= program.size:
+                return program
+        raise ValueError(symbol_name)
+
+    config_load = containing_load("micros_user_runtime_test_config", 48)
+    rodata_load = containing_load("micros_user_runtime_test_rodata", 8)
+    output = ['#include "kernel/user_runtime_image.h"',
+              "micros_user_runtime_test_image = {",
+              str(config_load), str(rodata_load)]
+    symbol_fields = """
+    + repr(tuple(zip(FIXTURE_FIELDS, FIXTURE_SYMBOLS))) + """
+    return "\\n".join(output)
+
+
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--elf", required=True)
+    parser.add_argument("--output", required=True)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    try:
+        return render_fixture(parse_arguments(argv).elf)
+    except OSError as error:
+        raise SystemExit(f"user runtime fixture generation failed: {error}")
+"""
+)
+META_GENERATOR_HASHES = {
+    "_format_bytes": "5eed2fc95fffb17e29bda54e2da8ad44be702cdecfb2836c389574d7bff64d3f",
+    "render_fixture": "57d5f9c9de446104e63f090a8228643ed00dedc0841dbbddac2df3dbc6ab5b51",
+    "parse_arguments": "d5495393a9e9c4c2a1a9737eeb96775bf9c56b39d44226807defe0aca15832fa",
+    "main": "681c0978028daddd76c0e11f78b7308ab5c922d5b03e7eafe3e9bf67d1ac01ba",
+    "containing_load": "a1035d4320d824c0630d630509983c49a23b1da194fa6bcafe09af7e7fa45d5f",
+}
+
+
+class MetaFixtureState:
+    def setUp(self) -> None:
+        for name, value in (
+            ("SYMBOL_OWNER_MIGRATION", INITIAL_SYMBOL_OWNER_MIGRATION),
+            ("LONG_FUNCTION_MIGRATION", INITIAL_LONG_FUNCTION_MIGRATION),
+        ):
+            scoped = patch(f"{__name__}.{name}", value)
+            scoped.start()
+            self.addCleanup(scoped.stop)
+
+
+class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.texts = {
-            path: read_source(path) if (REPOSITORY_ROOT / path).is_file() else ""
-            for path in all_sources()
-        }
+        cls.texts = meta_fixture_sources()
 
     def test_missing_duplicate_and_third_owner_definitions_are_rejected(self) -> None:
         old = "kernel/trap.c"
@@ -2487,7 +2789,7 @@ class TrapSyscallFailClosedMutationTest(unittest.TestCase):
 
     def test_route_projection_detects_predicate_cpp_hook_and_selector_mutations(self) -> None:
         body = c_function_body(self.texts["kernel/trap.c"], "micros_trap_dispatch")
-        expected = FLOW_HASHES["kernel/trap.c", "micros_trap_dispatch"]
+        expected = META_TRAP_FLOW_HASH
         changes = (
             ("!user_timer\n            && !user_external", "!user_timer\n            || !user_external"),
             ("#ifdef MICROS_BUILD_RAMFS_SERVICE_TEST", "#ifdef MICROS_BUILD_VFS_SERVICE_TEST"),
@@ -2526,9 +2828,7 @@ class TrapSyscallFailClosedMutationTest(unittest.TestCase):
             with self.subTest(original=old, root=name, replacement=after):
                 body = c_function_body(self.texts[old], name)
                 self.assertIn(before, body)
-                self.assertNotEqual(ORIGINAL_BODY_HASHES[old][name], compact_hash(body.replace(before, after, 1)))
-                if (old, name) in FLOW_HASHES and "errno =" not in before:
-                    self.assertNotEqual(FLOW_HASHES[old, name], flow_hash(flow_events(body.replace(before, after, 1))))
+                self.assertNotEqual(META_BODY_HASHES[name], compact_hash(body.replace(before, after, 1)))
 
     def test_body_fingerprint_rejects_renamed_and_compressed_long_algorithms(self) -> None:
         old = "kernel/trap.c"
@@ -2536,12 +2836,12 @@ class TrapSyscallFailClosedMutationTest(unittest.TestCase):
         body = c_function_body(self.texts[old], name)
         renamed = re.sub(r"\bframe\b", "renamed_frame", body)
         compressed = re.sub(r"\s+", " ", renamed)
-        self.assertEqual(LONG_FUNCTION_REQUIREMENTS[old, name][1], body_fingerprint(compressed))
+        self.assertEqual(META_VM_FINGERPRINT, body_fingerprint(compressed))
         first = "{ int value = 1; value += 2; }"
         second = "{int renamed=1;renamed+=2;}"
         self.assertEqual(body_fingerprint(first), body_fingerprint(second))
         self.assertNotEqual(body_fingerprint(first), body_fingerprint("{ int value = 1; value -= 2; }"))
-        generator = ast.parse(read_source(GENERATOR_PATH))
+        generator = ast.parse(META_GENERATOR)
         render = next(node for node in generator.body if isinstance(node, ast.FunctionDef) and node.name == "render_fixture")
         renamed = copy.deepcopy(render)
         renamed.name = "renamed_render"
@@ -2581,12 +2881,10 @@ class TrapSyscallFailClosedMutationTest(unittest.TestCase):
                 planner_ast_without_new_paths(changed)
 
 
-class TrapSyscallValidExtractionTest(unittest.TestCase):
+class TrapSyscallValidExtractionTest(MetaFixtureState, unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.originals = {
-            path: read_source(path) for path in (*all_sources(), *PRIVATE_HEADERS)
-        }
+        cls.fixtures = meta_fixture_sources()
 
     def layout(self, texts: dict[str, str]) -> TrapSyscallSourceLayoutTest:
         case = TrapSyscallSourceLayoutTest()
@@ -2605,7 +2903,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         return text[:match.start()] + definition + text[opening + len(body):]
 
     def runtime_fixture(self) -> dict[str, str]:
-        texts = dict(self.originals)
+        texts = dict(self.fixtures)
         old = "kernel/user_runtime_test.c"
         final = "kernel/user_runtime_test_image.c"
         body = c_function_body(texts[old], "find_page")
@@ -2635,7 +2933,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         return texts
 
     def syscall_fixture(self) -> dict[str, str]:
-        texts = dict(self.originals)
+        texts = dict(self.fixtures)
         path = "kernel/syscall.c"
         body = c_function_body(texts[path], "micros_syscall_handle_user_ecall")
         early = body.index("    if (\n        arguments.a7")
@@ -2688,7 +2986,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
             "struct micros_syscall_context *context, const struct micros_syscall_arguments *arguments)\n"
             "{\n" + operation + "\n}\n"
         )
-        prefix = self.originals[path][:self.originals[path].index("static _Noreturn void panic_syscall")]
+        prefix = self.fixtures[path][:self.fixtures[path].index("static _Noreturn void panic_syscall")]
         union = re.search(
             r"union micros_vm_handoff_decoded_request\s*\{[^{}]*\};", texts[path],
         ).group()
@@ -2728,7 +3026,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         return texts
 
     def role_fixture(self) -> dict[str, str]:
-        texts = dict(self.originals)
+        texts = dict(self.fixtures)
         old = "tests/qemu/user_runtime_service.c"
         final = "tests/qemu/user_runtime_client.c"
         body = c_function_body(texts[old], "run_client")
@@ -2759,19 +3057,19 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
     def test_moved_short_helper_accepts_the_exact_typed_runtime_borrow(self) -> None:
         texts = self.runtime_fixture()
         self.assertEqual(
-            ORIGINAL_BODY_HASHES["kernel/user_runtime_test.c"]["find_page"],
+            META_BODY_HASHES["find_page"],
             compact_hash(helper_body(texts, "kernel/user_runtime_test.c", "find_page")),
         )
 
     def test_named_syscall_phases_preserve_early_decode_context_dispatch_and_projection(self) -> None:
         texts = self.syscall_fixture()
         self.assertEqual(
-            FLOW_HASHES["kernel/syscall.c", "micros_syscall_handle_user_ecall"],
+            META_SYSCALL_FLOW_HASH,
             flow_hash(expanded_flow(texts, "kernel/syscall.c", "micros_syscall_handle_user_ecall")),
         )
         projected = expanded_helper_body(texts, "kernel/syscall.c", "micros_syscall_handle_user_ecall")
         self.assertEqual(
-            CALL_ARGUMENT_HASHES["kernel/syscall.c", "micros_syscall_handle_user_ecall"],
+            META_SYSCALL_ARGUMENT_HASH,
             flow_hash(call_arguments(projected)),
         )
         self.layout(texts).test_syscall_early_decode_and_unknown_operation_precedence_are_unchanged()
@@ -2781,10 +3079,13 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         moving = tuple(item for item in SYMBOL_OWNER_MIGRATION if item[2] != "run_client")
         with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", moving):
             self.assertEqual(
-                ORIGINAL_BODY_HASHES["tests/qemu/user_runtime_service.c"]["run_client"],
+                META_BODY_HASHES["run_client"],
                 compact_hash(helper_body(texts, "tests/qemu/user_runtime_service.c", "run_client")),
             )
-            self.layout(texts).test_role_scripts_keep_automatic_state_terminal_receives_canaries_and_status_codes()
+            self.assertEqual(
+                META_BODY_HASHES["run_client"],
+                compact_hash(expanded_helper_body(texts, "tests/qemu/user_runtime_service.c", "run_client")),
+            )
 
     def test_runtime_context_parameter_and_pure_borrow_argument_are_not_extra_behavior(self) -> None:
         texts = self.runtime_fixture()
@@ -2798,7 +3099,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
             "{ return user_runtime_test_find_page(user_runtime_test_state(), actor, virtual_address); }\n"
         )
         self.assertEqual(
-            ORIGINAL_BODY_HASHES["kernel/user_runtime_test.c"]["find_page"],
+            META_BODY_HASHES["find_page"],
             compact_hash(helper_body(texts, "kernel/user_runtime_test.c", "find_page")),
         )
         projected = projected_body(texts, owner, "user_runtime_test_lookup", True)
@@ -2808,7 +3109,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         # Record field names are not parameters and must not be renamed.
         renamed[owner] = renamed[owner].replace(".address", ".virtual_address")
         self.assertEqual(
-            ORIGINAL_BODY_HASHES["kernel/user_runtime_test.c"]["find_page"],
+            META_BODY_HASHES["find_page"],
             compact_hash(helper_body(renamed, "kernel/user_runtime_test.c", "find_page")),
         )
 
@@ -2832,15 +3133,15 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
             "struct micros_hart *hart, struct micros_trap_frame *frame);\n"
         )
         projected = expanded_helper_body(texts, path, name)
-        self.assertEqual(FLOW_HASHES[path, name], flow_hash(flow_events(projected)))
-        self.assertEqual(CALL_ARGUMENT_HASHES[path, name], flow_hash(call_arguments(projected)))
-        self.assertEqual(STATE_EFFECT_HASHES[path, name], flow_hash(state_effects(projected)))
+        self.assertEqual(META_SYSCALL_FLOW_HASH, flow_hash(flow_events(projected)))
+        self.assertEqual(META_SYSCALL_ARGUMENT_HASH, flow_hash(call_arguments(projected)))
+        self.assertEqual(META_SYSCALL_EFFECT_HASH, flow_hash(state_effects(projected)))
         pending = tuple(item for item in LONG_FUNCTION_MIGRATION if item != (path, name))
         with patch(f"{__name__}.LONG_FUNCTION_MIGRATION", pending):
             self.layout(texts).test_completed_long_migrations_require_multiple_real_named_phases()
 
     def test_server_automatic_context_preserves_original_uninitialized_locals(self) -> None:
-        texts = dict(self.originals)
+        texts = dict(self.fixtures)
         old = "tests/qemu/user_runtime_service.c"
         final = "tests/qemu/user_runtime_responders.c"
         body = c_function_body(texts[old], "run_server")
@@ -2861,17 +3162,17 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         moving = tuple(item for item in SYMBOL_OWNER_MIGRATION if item[2] != "run_server")
         with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", moving):
             self.assertEqual(
-                ORIGINAL_BODY_HASHES[old]["run_server"],
+                META_BODY_HASHES["run_server"],
                 compact_hash(helper_body(texts, old, "run_server")),
             )
-            self.layout(texts).test_role_scripts_keep_automatic_state_terminal_receives_canaries_and_status_codes()
+            self.assertEqual(META_BODY_HASHES["run_server"], compact_hash(expanded_helper_body(texts, old, "run_server")))
 
     def test_new_runtime_context_layout_is_private_but_every_member_type_is_exact(self) -> None:
         texts = self.runtime_fixture()
         header = "kernel/user_runtime_test_internal.h"
         texts[header] = texts[header].replace("\n".join(KERNEL_FIELDS), "\n".join(reversed(KERNEL_FIELDS)))
         self.assertEqual(
-            ORIGINAL_BODY_HASHES["kernel/user_runtime_test.c"]["find_page"],
+            META_BODY_HASHES["find_page"],
             compact_hash(helper_body(texts, "kernel/user_runtime_test.c", "find_page")),
         )
 
@@ -2883,7 +3184,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         moving = tuple(item for item in SYMBOL_OWNER_MIGRATION if item[2] != "run_client")
         with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", moving):
             self.assertEqual(
-                ORIGINAL_BODY_HASHES["tests/qemu/user_runtime_service.c"]["run_client"],
+                META_BODY_HASHES["run_client"],
                 compact_hash(helper_body(texts, "tests/qemu/user_runtime_service.c", "run_client")),
             )
 
@@ -2911,8 +3212,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         moving = tuple(item for item in SYMBOL_OWNER_MIGRATION if item[2] != "run_client")
         with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", moving):
             projected = expanded_helper_body(texts, "tests/qemu/user_runtime_service.c", "run_client")
-            self.assertEqual(ORIGINAL_BODY_HASHES["tests/qemu/user_runtime_service.c"]["run_client"], compact_hash(projected))
-            self.layout(texts).test_role_scripts_keep_automatic_state_terminal_receives_canaries_and_status_codes()
+            self.assertEqual(META_BODY_HASHES["run_client"], compact_hash(projected))
 
     def test_role_context_may_initialize_the_same_canaries_with_immediate_assignments(self) -> None:
         texts = self.role_fixture()
@@ -2925,7 +3225,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         moving = tuple(item for item in SYMBOL_OWNER_MIGRATION if item[2] != "run_client")
         with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", moving):
             self.assertEqual(
-                ORIGINAL_BODY_HASHES["tests/qemu/user_runtime_service.c"]["run_client"],
+                META_BODY_HASHES["run_client"],
                 compact_hash(helper_body(texts, "tests/qemu/user_runtime_service.c", "run_client")),
             )
 
@@ -2946,7 +3246,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
             body = helper_body(texts, "kernel/user_runtime_test.c", "find_page")
         except AssertionError:
             return
-        self.assertNotEqual(ORIGINAL_BODY_HASHES["kernel/user_runtime_test.c"]["find_page"], compact_hash(body))
+        self.assertNotEqual(META_BODY_HASHES["find_page"], compact_hash(body))
 
     def assert_syscall_rejected(self, texts: dict[str, str]) -> None:
         try:
@@ -2955,9 +3255,9 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
             return
         self.assertNotEqual(
             (
-                FLOW_HASHES["kernel/syscall.c", "micros_syscall_handle_user_ecall"],
-                CALL_ARGUMENT_HASHES["kernel/syscall.c", "micros_syscall_handle_user_ecall"],
-                STATE_EFFECT_HASHES["kernel/syscall.c", "micros_syscall_handle_user_ecall"],
+                META_SYSCALL_FLOW_HASH,
+                META_SYSCALL_ARGUMENT_HASH,
+                META_SYSCALL_EFFECT_HASH,
             ),
             (flow_hash(flow_events(body)), flow_hash(call_arguments(body)), flow_hash(state_effects(body))),
         )
@@ -3042,7 +3342,7 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
                     except AssertionError:
                         continue
                     self.assertNotEqual(
-                        ORIGINAL_BODY_HASHES["tests/qemu/user_runtime_service.c"]["run_client"],
+                        META_BODY_HASHES["run_client"],
                         compact_hash(body),
                     )
         texts = self.role_fixture()
@@ -3059,11 +3359,18 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         )
         texts["kernel/user_runtime_test_image.c"] = ""
         case = self.layout(texts)
-        with self.assertRaises(AssertionError):
-            case.test_pending_symbols_and_helpers_allow_only_the_exact_unchanged_old_body()
+        with patch(f"{__name__}.owner_specs", return_value=((
+            "kernel/user_runtime_test.c", "kernel/user_runtime_test_image.c",
+            "find_page", "user_runtime_test_find_page",
+        ),)):
+            with self.assertRaises(AssertionError):
+                case.test_pending_symbols_and_helpers_allow_only_the_exact_unchanged_old_body()
 
     def test_generator_public_signatures_and_pending_private_body_are_still_exact(self) -> None:
-        original = read_source(GENERATOR_PATH)
+        original = META_GENERATOR
+        with patch(f"{__name__}.GENERATOR_BODY_HASHES", META_GENERATOR_HASHES), \
+                patch(f"{__name__}.read_source", side_effect=lambda path: original if path == GENERATOR_PATH else read_source_original(path)):
+            TrapSyscallSourceLayoutTest().test_generator_cli_symbols_fields_and_existing_helper_bodies_are_preserved()
         for before, after in (
             ("def render_fixture(image):", "def render_fixture(image, extra=None):"),
             ('parser.add_argument("--elf"', 'parser.add_argument("--input"'),
@@ -3071,12 +3378,13 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         ):
             with self.subTest(mutation=after):
                 changed = original.replace(before, after, 1)
-                with patch(f"{__name__}.read_source", side_effect=lambda path: changed if path == GENERATOR_PATH else read_source_original(path)):
+                with patch(f"{__name__}.GENERATOR_BODY_HASHES", META_GENERATOR_HASHES), \
+                        patch(f"{__name__}.read_source", side_effect=lambda path: changed if path == GENERATOR_PATH else read_source_original(path)):
                     with self.assertRaises(AssertionError):
                         TrapSyscallSourceLayoutTest().test_generator_cli_symbols_fields_and_existing_helper_bodies_are_preserved()
 
     def test_generator_private_lookup_may_transport_symbols_and_loads_explicitly(self) -> None:
-        text = read_source(GENERATOR_PATH)
+        text = META_GENERATOR
         start = text.index("    def containing_load(")
         end = text.index("    config_load =", start)
         helper = text[start:end]
@@ -3086,9 +3394,54 @@ class TrapSyscallValidExtractionTest(unittest.TestCase):
         rendered = rendered.replace("containing_load(", "containing_load(symbols, loads, ")
         rendered = rendered.replace("\ndef render_fixture(", "\n" + helper + "\n\ndef render_fixture(", 1)
         pending = tuple(item for item in LONG_FUNCTION_MIGRATION if item != (GENERATOR_PATH, "render_fixture"))
-        with patch(f"{__name__}.LONG_FUNCTION_MIGRATION", pending), \
+        with patch(f"{__name__}.GENERATOR_BODY_HASHES", META_GENERATOR_HASHES), \
+                patch(f"{__name__}.LONG_FUNCTION_MIGRATION", pending), \
                 patch(f"{__name__}.read_source", side_effect=lambda path: rendered if path == GENERATOR_PATH else read_source_original(path)):
             TrapSyscallSourceLayoutTest().test_generator_cli_symbols_fields_and_existing_helper_bodies_are_preserved()
+
+
+class TrapSyscallMetaFixtureLifecycleTest(unittest.TestCase):
+    def assert_isolated_state(self, symbols: tuple, longs: tuple) -> None:
+        reads = []
+        fixture_paths = {*all_sources(), *PRIVATE_HEADERS, GENERATOR_PATH}
+
+        def extracted_source(path: str) -> str:
+            if path in fixture_paths:
+                reads.append(path)
+                return "/* completed responsibility owner: no original monolith */\n"
+            return read_source_original(path)
+
+        cases = (
+            TrapSyscallFailClosedMutationTest("test_pending_migration_cannot_accept_a_premature_move_or_disappear"),
+            TrapSyscallFailClosedMutationTest("test_context_and_image_storage_reject_partial_migration_arrays_and_initializers"),
+            TrapSyscallFailClosedMutationTest("test_native_argument_shape_negative_loop_and_protocol_order_changes_are_detected"),
+            TrapSyscallValidExtractionTest("test_named_syscall_phases_preserve_early_decode_context_dispatch_and_projection"),
+            TrapSyscallValidExtractionTest("test_moved_short_helper_accepts_the_exact_typed_runtime_borrow"),
+            TrapSyscallValidExtractionTest("test_role_terminal_phase_keeps_the_same_automatic_context_and_return_codes"),
+            TrapSyscallValidExtractionTest("test_server_automatic_context_preserves_original_uninitialized_locals"),
+            TrapSyscallValidExtractionTest("test_generator_public_signatures_and_pending_private_body_are_still_exact"),
+            TrapSyscallValidExtractionTest("test_generator_private_lookup_may_transport_symbols_and_loads_explicitly"),
+        )
+        with patch(f"{__name__}.SYMBOL_OWNER_MIGRATION", symbols), \
+                patch(f"{__name__}.LONG_FUNCTION_MIGRATION", longs), \
+                patch(f"{__name__}.read_source", side_effect=extracted_source):
+            result = unittest.TestResult()
+            unittest.TestSuite(cases).run(result)
+            self.assertEqual([], result.errors + result.failures)
+            self.assertEqual(9, result.testsRun)
+            self.assertEqual([], result.skipped)
+            self.assertEqual((symbols, longs), (SYMBOL_OWNER_MIGRATION, LONG_FUNCTION_MIGRATION))
+        self.assertEqual([], reads, "meta fixtures must not reconstruct pending sources from live owners")
+
+    def test_meta_fixtures_are_isolated_from_the_extracted_syscall_state(self) -> None:
+        self.assert_isolated_state(
+            INITIAL_SYMBOL_OWNER_MIGRATION,
+            tuple(entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
+                  if entry != ("kernel/syscall.c", "micros_syscall_handle_user_ecall")),
+        )
+
+    def test_meta_fixtures_are_isolated_from_eventually_final_migrations(self) -> None:
+        self.assert_isolated_state((), ())
 
 
 read_source_original = read_source
