@@ -8,9 +8,10 @@ initial-stack, host-image and normal-return contracts in
 merged as #87 / `b6b291d9f7acf922759b732362be38a1ad67ecd1`.
 Its task is `elf-spawn-app-runtime`. The production coordinator #118 and
 ELF-checker correction #126 are merged predecessors.
-The initial native decoder slice is implemented and passes its focused
-boundary cases. Target assembly/frontend, application image policy, checked
-seed artifacts and the component extension remain in progress, not delivered.
+The native decoder and separate host application-image policy are implemented
+with focused boundary and full/runtime-byte-parity cases. Target
+assembly/frontend, generated checked seed artifacts and the component
+extension remain in progress, not delivered.
 
 The no-argument service entry, service linker/checker behavior, raw syscall
 ABI, bootstrap configuration, immutable application profile and PM lifecycle
@@ -108,6 +109,18 @@ full-link closure before a stripped image can enter a RAMFS seed.
 The seeded artifact must retain the checked ELF header, program headers,
 entry and every load byte; removed debug/symbol metadata grants no exception
 to executable-byte parity. Bounds and denied features are not widened.
+The implemented checker entry is:
+
+```text
+python3 tools/check_application_elf.py --elf FULL_LINK_ELF
+python3 tools/check_application_elf.py --elf FULL_LINK_ELF --runtime-elf SEEDED_ELF
+```
+
+The second form validates the full link image first, then checks the seeded
+runtime subset without following its section/symbol metadata. Header and
+program-header bytes must remain identical even when non-load metadata is
+removed. Keeping a checked full image as the seed payload is valid; no
+stripping step may silently rewrite a required header or load byte.
 `build-application-images` exposes the checked image/seed artifacts, not a
 claim that the later production PID-1 scenario has run.
 
