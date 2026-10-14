@@ -623,8 +623,10 @@ discharges its nine moves and setup split, retaining one eleven-field context
 and exact guarded corruption/snapshot behavior. Native functional evidence
 discharges twelve more moves and the accounting split, retaining its eleven
 case labels, complete automatic snapshots, and both automatic plan witnesses
-across the deliberate fixture reset. Only the model's fifteen owner moves
-and three long-function splits remain.
+across the deliberate fixture reset. The independent model also discharges
+its fifteen owner moves without changing any original body or its distinct
+fixture policy. All definition-owner moves are complete; only the model's
+three long-function semantic splits remain.
 
 Run its focused implementation loop with:
 

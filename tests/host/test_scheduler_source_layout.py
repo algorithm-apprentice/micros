@@ -288,14 +288,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
     if original != final
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[0] not in (
-        "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
-        "kernel/scheduler_invalid_test.c",
-        "tests/host/scheduler_test.c",
-    )
-)
+SYMBOL_OWNER_MIGRATION = ()
 INITIAL_FUNCTION_MIGRATION = (
     ("kernel/scheduler_core.c", "micros_scheduler_commit_ipc_transitions"),
     ("kernel/scheduler_core.c", "micros_scheduler_core_validate"),
