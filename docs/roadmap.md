@@ -289,13 +289,13 @@ specified source owners and semantic phases with empty migrations, preserved
 evidence and fail-closed structural enforcement. It adds no bootstrap behavior,
 application runtime or dynamic PID-1 integration.
 
-The next selected high-risk dependency-ready correction is Proposed
+The next selected high-risk dependency-ready correction is Accepted
 [ADR-0061](adr/0061-trap-and-syscall-source-decomposition.md) and its exact
 [trap/syscall source contract](architecture/trap-syscall-source-organization.md).
 It preserves the current trap/call algorithm, register custody, and runtime
-evidence while exposing named authority and task phases. Only its
-documentation-first design is active; implementation remains blocked on the
-separate reviewed design merge.
+evidence while exposing named authority and task phases. Its independent design
+review is clean; implementation follows only after the separate reviewed
+design merge.
 
 ## v0.1 completion goal
 

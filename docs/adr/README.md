@@ -76,4 +76,4 @@ to make the project appear more consistent than it was.
 | [0058](0058-pm-service-source-decomposition.md) | PM service source decomposition | Accepted |
 | [0059](0059-kernel-ipc-source-decomposition.md) | Kernel IPC source decomposition | Accepted |
 | [0060](0060-kernel-bootstrap-source-decomposition.md) | Kernel bootstrap source decomposition | Accepted |
-| [0061](0061-trap-and-syscall-source-decomposition.md) | Trap and syscall source decomposition | Proposed |
+| [0061](0061-trap-and-syscall-source-decomposition.md) | Trap and syscall source decomposition | Accepted |

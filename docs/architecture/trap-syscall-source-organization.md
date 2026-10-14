@@ -2,9 +2,9 @@
 
 This is the exact design contract for the six trap/syscall correction sources
 in [the source-module audit](source-module-audit.md).
-[ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) is Proposed.
-Implementation remains pending until independent design review, Acceptance,
-and the separate design merge.
+[ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) is Accepted
+after a clean independent design review. Implementation remains pending until
+the separate design merge.
 
 ## Base, outcome, and non-goals
 
