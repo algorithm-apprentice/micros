@@ -84,9 +84,12 @@ The correction preserves:
 The complete six-file checker set becomes a dependency of both existing
 user-image link templates and all eight generated-fixture dependency blocks.
 Checker command lines still invoke only `tools/check_user_elf.py`.
-Classification changes are limited to two exact source-equivalence rows and
-registration of one host-only structural gate. Planner execution and reuse
-policy do not change.
+Classification changes are limited to two exact source-equivalence rows,
+registration of one host-only structural gate, and data-only expansion of
+`IMAGE_INPUTS` through the existing equivalence helper. The current planner
+expands QEMU and model maps but not the image map; the image expansion is
+required to preserve all three image owners for the new checker paths.
+Original selector functions and execution/reuse policy do not change.
 
 ## Non-goals
 

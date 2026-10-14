@@ -272,8 +272,15 @@ Add exactly two `PATH_CLASSIFICATION_EQUIVALENTS` rows:
 the five private production paths inherit `tools/check_user_elf.py`;
 the five private host paths inherit `tests/host/test_check_user_elf.py`.
 Register only `tests/host/test_user_elf_source_layout.py` as a new
-`HOST_UNIT_ONLY_INPUTS` entry. The original planner functions, selection,
-execution, discovery, and reuse remain unchanged.
+`HOST_UNIT_ONLY_INPUTS` entry. Also expand each `IMAGE_INPUTS` tuple through
+the existing `with_path_classification_equivalents` helper, using the same
+data-initialization pattern as `GATE_INPUTS` and `SLOW_MODEL_INPUTS`.
+Without that explicit image-map expansion, the new checker paths inherit
+QEMU ownership but silently lose all three image workflows.
+This adds no selector function or policy: existing path classifications
+remain identical, and the new paths receive their exact baseline image
+owners. Original planner functions, execution, discovery, and reuse remain
+unchanged.
 
 The baseline metadata was measured independently:
 
@@ -328,6 +335,8 @@ wrong record fields, diagnostic reordering or loss, early success/return,
 wrong helper transport, escaping fixture storage, altered fixture bytes,
 duplicate/disappearing test discovery, missing transitive build dependency,
 and any metadata reduction or expansion.
+In particular, removing image-map expansion while retaining both equivalence
+rows must fail the four-dimensional inheritance check.
 
 CLI regressions exercise package and direct invocation from a separate
 working directory, success, argument errors, caught malformed inputs,
