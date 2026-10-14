@@ -13,9 +13,11 @@ their reviewed owners and named phases. Privileged runtime state,
 preparation/image access, reverse cleanup, validation and diagnostics now have
 their reviewed owners and one ten-field context. Captured bootstrap control
 now separates common authority from release, readiness, completion and failure
-transactions. The active migrations retain 46 symbols and 18 long functions
-in the other existing owners; remaining skeletons do not claim that the final
-decomposition is complete.
+transactions. Native fixtures, case domains, reference oracle and replay now
+have their reviewed owners while retaining the three existing executions.
+The moving-symbol migration is empty; five long functions remain in the image,
+boot, launcher and generator owners. Remaining skeletons do not claim that the
+final decomposition is complete.
 
 ## Reviewed base and scope
 
