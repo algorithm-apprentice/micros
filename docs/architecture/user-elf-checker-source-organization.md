@@ -11,7 +11,9 @@ Independent design review found one image-inheritance gap, which was
 corrected and independently re-reviewed with no substantive issue remaining.
 The design merged separately as #125 /
 `53dd53293c2c27b2405730032ceb22bf187ac49d`. Its dependent implementation
-is in progress; no owner or semantic migration is yet claimed complete.
+is in progress. All 24 moving production functions and 44 checker data/type
+declarations now have their specified owners with original bodies preserved.
+Host ownership and both semantic function migrations remain pending.
 
 The single outcome is a behavior-preserving correction of
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.

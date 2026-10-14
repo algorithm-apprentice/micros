@@ -138,11 +138,6 @@ CHECKER_IMAGES = (
 )
 
 SYMBOL_OWNER_MIGRATION = (
-    "tools/user_elf_format.py",
-    "tools/user_elf_parse.py",
-    "tools/user_elf_structure.py",
-    "tools/user_elf_instructions.py",
-    "tools/user_elf_policy.py",
     "tests/host/user_elf_test_fixture.py",
     "tests/host/user_elf_parse_cases.py",
     "tests/host/user_elf_structure_cases.py",
