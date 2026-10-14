@@ -3,8 +3,9 @@
 This is the exact design contract for the six scheduler sources in
 [the source-module audit](source-module-audit.md).
 [ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) is Accepted
-after a clean independent design review. Implementation remains pending until
-the separate design merge.
+after a clean independent design review. Its separate design merged as PR #123,
+commit `dac947c839455900264c338c5c09952f68e147c7`. Implementation starts on a
+fresh branch from that merged outcome.
 
 ## Base, outcome, and non-goals
 
@@ -602,13 +603,23 @@ typed existing-context transport may be normalized; predicates, calls,
 arguments, writes, return values, and control exits are not discarded.
 Both active migration collections are literal empty collections at completion.
 
-The planned `tests/host/test_scheduler_source_layout.py` reuses existing
+`tests/host/test_scheduler_source_layout.py` reuses existing
 lexical/CMake helpers. It checks the exact 38/six/six inventory and every
 consumer; stable hashes and supported definitions; all original owners;
 private declarations/recursive dependencies; exact context fields/qualifiers/
 initializers, scratch and ABI objects, automatic lifetimes; twelve semantic
 outlines and short-root boundaries; case/model/script identities; CPP guards;
 and validation inheritance.
+
+The initial green integration wires all six source sets and private headers;
+the 138 owner moves and twelve semantic splits remain explicit pending
+migrations until their corresponding extraction commits.
+
+Run its focused implementation loop with:
+
+```bash
+python3 -m unittest tests.host.test_scheduler_source_layout
+```
 
 Use bounded concrete source checks for the critical minimal-accounting,
 normal/captured, all-record-preflight, timer-before-commit, same-image
@@ -640,6 +651,14 @@ Narrow extraction evidence uses existing `scheduler-core` and relevant
 object/endpoint/IPC native cases, then existing scheduler, invalid-context,
 timer, user-execution, captured-IPC, and buffer-loss-panic QEMU workflows as
 appropriate. Run only gates invalidated by the current extraction.
+
+The focused portable build and combined native selectors are:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target kernel_objects_test scheduler_test endpoint_test
+ctest --test-dir build/host-debug --output-on-failure -R '^(kernel-objects|scheduler-core|endpoint-profile)$'
+```
 
 Before independent implementation review, stage the complete change, prove
 clean tracked/untracked task state, record HEAD/tree/exact commands/results,

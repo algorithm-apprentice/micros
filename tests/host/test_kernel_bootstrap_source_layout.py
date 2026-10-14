@@ -1213,8 +1213,9 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             for source in ("kernel/bootstrap_control.c", "kernel/bootstrap_control_core.c"):
                 self.assertEqual(1, block.count(source), (target, source))
         native_control = cmake_command(cmake, "add_executable", "bootstrap_control_test")
-        for source in ("kernel/endpoint.c", "kernel/kernel_objects.c", "kernel/scheduler_core.c"):
+        for source in ("kernel/endpoint.c", "kernel/kernel_objects.c"):
             self.assertEqual(1, native_control.count(source), source)
+        self.assertEqual(1, native_control.count("${MICROS_SCHEDULER_CORE_SOURCES}"))
         self.assertEqual(1, native_control.count("${MICROS_IPC_CORE_SOURCES}"))
         self.assertEqual(
             1, cmake_command(cmake, "add_executable", "fdt_test").count("kernel/fdt.c"),

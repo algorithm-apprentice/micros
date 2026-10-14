@@ -1,0 +1,6 @@
+#ifndef MICROS_KERNEL_SCHEDULER_TEST_INTERNAL_H
+#define MICROS_KERNEL_SCHEDULER_TEST_INTERNAL_H
+
+#include "micros/scheduler.h"
+
+#endif
