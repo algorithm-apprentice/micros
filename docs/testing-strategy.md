@@ -183,6 +183,23 @@ evidence precedes one complete current author PR plan; independent reviewers
 inspect rather than routinely rerun the evidence. Implementation starts only
 after the separate design is reviewed, Accepted and merged.
 
+The scheduler correction proposed by ADR-0062 preserves `scheduler_test` /
+`scheduler-core`, the exact eleven native cases, its 4,096-step two-hart
+model, three scheduler QEMU workflows, and all downstream production
+consumers. Implementation starts only after the separate design is reviewed,
+Accepted, and merged. Its structural Red records 38 C sources, six private
+headers, six source sets, 138 original-definition moves, and twelve
+long-function semantic migrations. The five existing-state consolidations,
+sole planning workspace, automatic plans/snapshots/reference state, assembly
+ABI objects, original entry continuation, exact LCG/prelude/draws/eighteen
+coverage checks, deferred completion, timer-before-commit, markers, and
+eight-second timeouts remain unchanged. Bounded source/exit checks complement
+existing semantic evidence, not a general C interpreter. Each split path
+inherits all four original metadata dimensions; the native sources retain
+full-tier classification despite empty separate workflow metadata. Narrow
+green extraction precedes one authoritative final author PR plan; independent
+reviewers inspect rather than routinely rerun the author's evidence.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

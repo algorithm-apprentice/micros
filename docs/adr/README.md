@@ -77,3 +77,4 @@ to make the project appear more consistent than it was.
 | [0059](0059-kernel-ipc-source-decomposition.md) | Kernel IPC source decomposition | Accepted |
 | [0060](0060-kernel-bootstrap-source-decomposition.md) | Kernel bootstrap source decomposition | Accepted |
 | [0061](0061-trap-and-syscall-source-decomposition.md) | Trap and syscall source decomposition | Accepted |
+| [0062](0062-kernel-scheduler-source-decomposition.md) | Kernel scheduler source decomposition | Proposed |
