@@ -293,9 +293,12 @@ The next selected high-risk dependency-ready correction is Accepted
 [ADR-0061](adr/0061-trap-and-syscall-source-decomposition.md) and its exact
 [trap/syscall source contract](architecture/trap-syscall-source-organization.md).
 It preserves the current trap/call algorithm, register custody, and runtime
-evidence while exposing named authority and task phases. Its independent design
-review is clean; implementation follows only after the separate reviewed
-design merge.
+evidence while exposing named authority and task phases. Its independently
+reviewed design is Accepted and merged as #121. The implementation now
+separates the specified owners with empty fourteen-symbol/nine-function
+migrations, unchanged architecture and runtime surfaces, and fail-closed
+source/build/evidence enforcement. It adds no application runtime or dynamic
+PID-1 behavior.
 
 ## v0.1 completion goal
 

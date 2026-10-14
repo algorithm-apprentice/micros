@@ -255,10 +255,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
      "test_bootstrap_launcher_console_begin"),
     ("tests/host/runtime_test.c", "tests/host/runtime_wrapper_test.c", "test_memory_support"),
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[0] not in ("kernel/trap.c", "kernel/user_runtime_test.c")
-)
+SYMBOL_OWNER_MIGRATION = ()
 
 LONG_FUNCTION_REQUIREMENTS = {
     ("kernel/trap.c", "handle_vm_self_fault"): (
@@ -299,16 +296,7 @@ LONG_FUNCTION_REQUIREMENTS = {
     ),
 }
 INITIAL_LONG_FUNCTION_MIGRATION = tuple(LONG_FUNCTION_REQUIREMENTS)
-LONG_FUNCTION_MIGRATION = tuple(
-    entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
-    if entry != ("kernel/syscall.c", "micros_syscall_handle_user_ecall")
-    and entry not in (
-        ("kernel/trap.c", "handle_vm_self_fault"),
-        ("kernel/trap.c", "micros_trap_dispatch"),
-        ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"),
-        (GENERATOR_PATH, "render_fixture"),
-    )
-)
+LONG_FUNCTION_MIGRATION = ()
 
 HELPER_MIGRATION_ANCHORS = {
     "kernel/trap_context.c": ("kernel/trap.c", "micros_trap_dispatch"),
