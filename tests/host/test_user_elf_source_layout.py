@@ -568,16 +568,30 @@ def import_errors(texts):
     errors = []
     for path in PRODUCTION:
         for node in ast.walk(parse_source(texts.get(path, ""))):
-            if isinstance(node, ast.ImportFrom):
+            if isinstance(node, ast.Import):
+                references = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
                 if any(alias.name == "*" for alias in node.names):
                     errors.append(f"wildcard import: {path}")
                 module = node.module or ""
+                if node.level:
+                    package = path.split("/")[:-1]
+                    if node.level > len(package):
+                        errors.append(f"out-of-package relative import: {path}")
+                        continue
+                    prefix = package[:len(package) - node.level + 1]
+                    module = ".".join((*prefix, *module.split("."))) if module else ".".join(prefix)
+                references = (
+                    ["tools." + alias.name for alias in node.names]
+                    if module == "tools" else [module]
+                )
+            else:
+                continue
+            for module in references:
                 referenced = module.replace(".", "/") + ".py"
-                if module == "tools" and any(
-                    alias.name == "check_user_elf" for alias in node.names
-                ):
-                    referenced = ENTRY
-                if referenced in PRODUCTION and referenced not in allowed[path]:
+                test_code = module == "tests" or module.startswith("tests.")
+                wrong_owner = module.startswith("tools.") and referenced not in allowed[path]
+                if test_code or wrong_owner:
                     errors.append(f"forbidden import: {path} -> {referenced}")
     return errors
 
@@ -941,11 +955,28 @@ def _validate_symbols(image, loads):
     def test_facade_backedge_and_wildcard_fail(self):
         for extra in (
             "from tools import check_user_elf\n",
+            "import tools.check_user_elf as facade\n",
+            "from tools import user_elf_policy as policy\n",
+            "from . import check_user_elf\n",
+            "from tests.host import user_elf_test_fixture\n",
             "from tools.user_elf_parse import *\n",
         ):
-            texts = dict(self.texts)
-            texts[FORMAT] = texts.get(FORMAT, "") + "\n" + extra
-            self.assertTrue(import_errors(texts))
+            with self.subTest(extra=extra):
+                texts = dict(self.texts)
+                texts[FORMAT] = texts.get(FORMAT, "") + "\n" + extra
+                self.assertTrue(import_errors(texts))
+
+    def test_import_graph_accepts_equivalent_static_spellings(self):
+        for extra in (
+            "import tools.user_elf_format as binary_format\n",
+            "from tools import user_elf_format as binary_format\n",
+            "from . import user_elf_format as binary_format\n",
+            "from .user_elf_format import ElfImage\n",
+        ):
+            with self.subTest(extra=extra):
+                texts = dict(self.texts)
+                texts[PARSE] += "\n" + extra
+                self.assertEqual([], import_errors(texts))
 
     def test_incomplete_transitive_dependency_fails(self):
         cmake = (ROOT / "CMakeLists.txt").read_text()
