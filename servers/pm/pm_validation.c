@@ -131,6 +131,26 @@ static bool validation_reserved_fields_are_clear(
     );
 }
 
+static bool validation_mapping_identity_is_valid(
+    const struct micros_pm_process_record *record
+)
+{
+    bool mapped = (
+        record->state == MICROS_PM_PROCESS_RUNNING
+        || (
+            record->state == MICROS_PM_PROCESS_EXITING
+            && (
+                record->exit_stage == MICROS_PM_EXIT_STAGE_STOPPED
+                || record->exit_stage == MICROS_PM_EXIT_STAGE_VM_RELEASE_PENDING
+            )
+        )
+    );
+
+    return mapped
+        ? record->load_token != 0 && record->mapping_generation != 0
+        : record->load_token == 0 && record->mapping_generation == 0;
+}
+
 static bool validation_released_record_is_valid(
     const struct micros_pm_process_record *record
 )
@@ -452,7 +472,10 @@ enum micros_pm_model_error micros_pm_table_validate(
     for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
         const struct micros_pm_process_record *record = &table->records[index];
 
-        if (!validation_reserved_fields_are_clear(record)) {
+        if (
+            !validation_reserved_fields_are_clear(record)
+            || !validation_mapping_identity_is_valid(record)
+        ) {
             return MICROS_PM_MODEL_ERROR_INVARIANT;
         }
         if (

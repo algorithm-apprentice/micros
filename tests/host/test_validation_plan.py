@@ -139,6 +139,29 @@ class ValidationPlanTests(unittest.TestCase):
             commands,
         )
 
+    def test_composed_lifecycle_inputs_select_the_elf_spawn_model(self):
+        for path in (
+            "servers/pm/pm_coordinator.c",
+            "servers/vfs/vfs_core.c",
+            "tests/host/vfs_test_fixture.c",
+            "tests/host/elf_spawn_model_test.c",
+            "tests/host/elf_spawn_model_internal.h",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(
+                    validation_plan.ELF_SPAWN_MODEL,
+                    validation_plan.plan([path], "fast"),
+                )
+        for path in (
+            "servers/vm/vm_core.c",
+            "servers/vm/vm_service_core.c",
+            "tests/host/vm_core_test_fixture.c",
+        ):
+            with self.subTest(full_tier_vm_input=path):
+                self.assertTrue(validation_plan.requires_full_tier([path]))
+                self.assertIn(validation_plan.UNIT_FULL, validation_plan.plan([path], "fast"))
+                self.assertIn("test-elf-spawn-model", validation_plan.affected_slow_models([path]))
+
     def test_address_space_split_paths_inherit_exact_gate_ownership(
         self,
     ):

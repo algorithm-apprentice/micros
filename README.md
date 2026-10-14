@@ -104,6 +104,7 @@ cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-ramfs-model
+cmake --workflow --preset test-elf-spawn-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic

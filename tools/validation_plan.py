@@ -14,6 +14,7 @@ IPC_MODEL = ("cmake", "--workflow", "--preset", "test-ipc-model")
 TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 VFS_MODEL = ("cmake", "--workflow", "--preset", "test-vfs-model")
+ELF_SPAWN_MODEL = ("cmake", "--workflow", "--preset", "test-elf-spawn-model")
 DOCS = ("python3", "tools/check_docs.py")
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
@@ -337,6 +338,13 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/vm/vm_load.c",
             "servers/vm/vm_exit.c",
             "servers/vm/vm_internal.h",
+            "servers/vm/vm_service_core.h",
+            "servers/vm/vm_service_core.c",
+            "servers/vm/vm_service_protocol.c",
+            "servers/vm/vm_service_load.c",
+            "servers/vm/vm_service_release.c",
+            "servers/vm/vm_service_backend.c",
+            "servers/vm/vm_service_internal.h",
         ),
     ),
     (
@@ -356,6 +364,11 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/vm_core_abort_test.c",
             "tests/host/vm_core_validation_test.c",
             "tests/host/vm_core_test_internal.h",
+            "tests/host/vm_service_test_fixture.c",
+            "tests/host/vm_service_test.c",
+            "tests/host/vm_service_protocol_test.c",
+            "tests/host/vm_service_backend_test.c",
+            "tests/host/vm_service_test_internal.h",
         ),
     ),
     (
@@ -367,6 +380,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/qemu/vm_server_tty.c",
             "tests/qemu/vm_server_scratch.c",
             "tests/qemu/vm_server_pm.c",
+            "tests/qemu/vm_server_control.c",
             "tests/qemu/vm_server_internal.h",
         ),
     ),
@@ -391,6 +405,17 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/pm/pm_exit.c",
             "servers/pm/pm_wait.c",
             "servers/pm/pm_internal.h",
+            "servers/pm/pm_coordinator.c",
+            "servers/pm/pm_coordinator_protocol.c",
+            "servers/pm/pm_coordinator_peers.c",
+            "servers/pm/pm_coordinator_spawn.c",
+            "servers/pm/pm_coordinator_rollback.c",
+            "servers/pm/pm_coordinator_requests.c",
+            "servers/pm/pm_coordinator_frontend.c",
+            "servers/pm/pm_coordinator_exit.c",
+            "servers/pm/pm_coordinator_wait.c",
+            "servers/pm/pm_coordinator_internal.h",
+            "servers/pm/pm_coordinator.h",
         ),
     ),
     (
@@ -402,6 +427,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "servers/pm/pm_service_self_test.c",
             "servers/pm/pm_service_scratch.c",
             "servers/pm/pm_service_internal.h",
+            "servers/pm/pm_service_backend.c",
         ),
     ),
     (
@@ -421,6 +447,17 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/pm_model_operations.c",
             "tests/host/pm_test_internal.h",
             "tests/host/pm_model_test_internal.h",
+            "tests/host/pm_coordinator_test.c",
+            "tests/host/pm_coordinator_configuration_test.c",
+            "tests/host/pm_coordinator_protocol_test.c",
+            "tests/host/pm_coordinator_spawn_fixture.c",
+            "tests/host/pm_coordinator_spawn_fixture.h",
+            "tests/host/pm_coordinator_spawn_test.c",
+            "tests/host/pm_coordinator_request_test.c",
+            "tests/host/pm_coordinator_exit_fixture.c",
+            "tests/host/pm_coordinator_exit_wait_test.c",
+            "tests/host/pm_coordinator_backend_test.c",
+            "tests/host/pm_coordinator_test_internal.h",
         ),
     ),
     (
@@ -567,6 +604,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",
     "tests/host/test_kernel_address_space_source_layout.py",
     "tests/host/test_frame_ownership_source_layout.py",
@@ -1321,6 +1359,29 @@ SLOW_MODEL_INPUTS = {
         "include/micros/vfs.h",
         "servers/vfs/",
     ) + VFS_SHARED_FIXTURE_INPUTS + VFS_MODEL_TEST_INPUTS,
+    "test-elf-spawn-model": (
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "include/micros/",
+        "lib/spawn/",
+        "lib/vm/",
+        "servers/pm/",
+        "servers/vm/",
+        "servers/vfs/",
+        "kernel/frame_allocator.c",
+        "kernel/frame_ownership.c",
+        "kernel/vm_bootstrap.c",
+        "tests/host/vm_core_test.c",
+        "tests/host/elf_spawn_model_test.c",
+        "tests/host/elf_spawn_model_context.c",
+        "tests/host/elf_spawn_model_kernel.c",
+        "tests/host/elf_spawn_model_vm.c",
+        "tests/host/elf_spawn_model_transport.c",
+        "tests/host/elf_spawn_model_operations.c",
+        "tests/host/elf_spawn_model_reference.c",
+        "tests/host/elf_spawn_model_compare.c",
+        "tests/host/elf_spawn_model_internal.h",
+    ) + VFS_SHARED_FIXTURE_INPUTS,
 }
 
 SLOW_MODEL_CTESTS = {
@@ -1328,10 +1389,12 @@ SLOW_MODEL_CTESTS = {
     "test-tty-model": ("tty-model", "tty_model_test"),
     "test-ramfs-model": ("ramfs-model", "ramfs_model_test"),
     "test-vfs-model": ("vfs-model", "vfs_model_test"),
+    "test-elf-spawn-model": ("elf-spawn-model", "elf_spawn_model_test"),
 }
 
+# Model registration must not narrow the VM family's previous full-tier ownership.
 SHARED_QEMU_PATHS = with_path_classification_equivalents(
-    SHARED_QEMU_PATHS
+    SHARED_QEMU_PATHS + ("servers/vm/", "tests/host/vm_core_test.c")
 )
 GATE_INPUTS = {
     name: with_path_classification_equivalents(inputs)

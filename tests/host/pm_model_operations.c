@@ -47,6 +47,29 @@ static bool model_reserve_spawn(struct pm_model_context *context)
     return true;
 }
 
+static bool activate_selected_spawn(
+    struct pm_model_context *context,
+    struct pm_model_record *record,
+    micros_endpoint_t endpoint
+)
+{
+    uint64_t reply_token = 0;
+
+    PM_MODEL_EXPECT(context,
+        micros_pm_spawn_activate(
+            &context->table,
+            record->handle,
+            endpoint,
+            &reply_token
+        ) == MICROS_PM_MODEL_OK
+        && reply_token == record->reply_token
+    );
+    record->state = MICROS_PM_PROCESS_RUNNING;
+    record->spawn_stage = MICROS_PM_SPAWN_NONE;
+    record->endpoint = endpoint;
+    return true;
+}
+
 static bool advance_selected_spawn(struct pm_model_context *context, uint16_t slot)
 {
     struct pm_model_record *record
@@ -95,6 +118,8 @@ static bool advance_selected_spawn(struct pm_model_context *context, uint16_t sl
         );
         record->spawn_stage
             = MICROS_PM_SPAWN_VM_MAPPINGS_FROZEN;
+        record->load_token = token;
+        record->mapping_generation = token + 1;
     } else if (
         record->spawn_stage
         == MICROS_PM_SPAWN_VM_MAPPINGS_FROZEN
@@ -140,24 +165,11 @@ static bool advance_selected_spawn(struct pm_model_context *context, uint16_t sl
         record->spawn_stage
             = MICROS_PM_SPAWN_PM_VFS_COMMITTED;
     } else {
-        uint64_t reply_token = 0;
-
         endpoint = (
             record->handle.generation
             << MICROS_ENDPOINT_SLOT_BITS
         ) | record->handle.slot;
-        PM_MODEL_EXPECT(context,
-            micros_pm_spawn_activate(
-                &context->table,
-                record->handle,
-                endpoint,
-                &reply_token
-            ) == MICROS_PM_MODEL_OK
-            && reply_token == record->reply_token
-        );
-        record->state = MICROS_PM_PROCESS_RUNNING;
-        record->spawn_stage = MICROS_PM_SPAWN_NONE;
-        record->endpoint = endpoint;
+        return activate_selected_spawn(context, record, endpoint);
     }
     return true;
 }
@@ -285,6 +297,8 @@ static bool model_advance_exit(struct pm_model_context *context, uint64_t choice
             );
             record->exit_stage
                 = MICROS_PM_EXIT_STAGE_KERNEL_PROCESS_EMPTY;
+            record->load_token = 0;
+            record->mapping_generation = 0;
         } else {
             uint16_t zombie_slot;
 

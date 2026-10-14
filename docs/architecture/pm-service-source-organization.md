@@ -66,7 +66,8 @@ The authoritative final PR plan remains the gate described below.
 
 ## Preserved contracts
 
-The following headers remain byte-for-byte stable:
+The completed ADR-0058 source-only correction preserved these headers
+byte-for-byte:
 
 ```text
 include/micros/pm.h
@@ -79,9 +80,23 @@ kernel/pm_service_test_fixture.h
 tests/qemu/pm_service_protocol.h
 ```
 
-No public declaration, structure, capacity, result, phase, token, protocol,
-ELF policy, stack layout, privilege, scheduling policy, or syscall changes.
+That correction changed no public declaration, structure, capacity, result,
+phase, token, protocol, ELF policy, stack layout, privilege, scheduling policy,
+or syscall.
 `servers/pm/pm_control.c` remains an unchanged, cohesive syscall wrapper.
+
+The later Accepted ADR-0050
+[coordinator extension](pm-spawn-coordinator.md) adds `load_token` and
+`mapping_generation` to the portable PM process record so activation retains
+the identity needed by exit. Its header hash is updated for that specific
+behavior extension; the seven other headers and all user/syscall wire layouts
+remain unchanged. Complete validation and the independent PM model now check
+the active pair through activation, detach, and VM-release acknowledgment.
+The same extension separates private activation and exit-begin preflight
+plans from their non-failing commit helpers. They stay with the existing
+spawn/exit owners; the public lifecycle APIs compose those helpers without
+changing their supported signatures. Structural ownership checks reject
+validation, lookup, or early return inside the irreversible local commit.
 
 ADR-0050's existing PM budget must be enforced for every service variant.
 At the reviewed base the common user-ELF check had no PM-specific resident
@@ -121,10 +136,17 @@ Preserve the exact current behavior:
 - at most two ordered wait outcomes, independently accepted or restored; and
 - no record release before successful wait-reply acceptance.
 
-The current target service still rejects ordinary successful application
-operations. Its isolated self-test exercises the existing synthetic kernel
-lifecycle, not production PM/VFS/VM coordination or PID 1. This decomposition
-does not implement that later coordinator.
+At completion of the source-only correction, the target service still rejected
+ordinary successful application operations. Its isolated self-test exercised
+the existing synthetic kernel lifecycle, not production PM/VFS/VM coordination
+or PID 1. That correction did not implement the later coordinator.
+
+The Accepted coordinator extension now wires the real runtime ports and
+application dispatch into the same service owners. Full configured peer
+bindings initialize coordinator mode before readiness; shorter preserved
+fixtures remain explicitly static-only. Reply-required outcomes retain atomic
+reply/receive, while accepted exit, blocked wait, already completed wait
+replies, and parent-loss suppression return to plain receive.
 
 ## Portable PM owners
 
@@ -472,6 +494,32 @@ Existing VM, VFS, frame, and kernel PM-control sets remain unchanged and are
 still expanded as before. `pm_control.c`, the two existing PM assembly paths,
 probe, generated fixture, and resident limits stay with their current
 consumers. No raw split-source listing is left beside its new source set.
+
+The Accepted coordinator extension adds the current
+`MICROS_PM_COORDINATOR_SOURCES` constructor owner and
+`MICROS_PM_COORDINATOR_HOST_TEST_SOURCES` configuration suite. Its supported
+header and native-suite header are declarations-only. `pm_coordinator_test`
+expands both new sets and the existing PM core once. The fast target adds
+the seventh core consumer; the persistent composed lifecycle model adds the
+eighth without changing the five service branches.
+Configuration and VFS/VM codec cases share one fast `pm-coordinator` CTest
+in both native aggregates. The codec borrows common endpoint and byte
+primitives without lifecycle transitions; the 64-bit writer is shared with
+the unchanged application-result codec rather than duplicated. The new
+shared VM IPC header is separate from the stable kernel-operation header.
+New coordinator paths inherit their PM core/native baselines;
+unknown ownership still escalates fail-closed. The transaction and model
+owners follow the [coordinator implementation map](pm-spawn-coordinator.md).
+Trusted init now composes explicit forward, peer-result, and reverse owners.
+The coordinator native target also expands the existing spawn-request set
+once. Each of the five real PM service branches now expands coordinator,
+runtime-backend, and spawn-request sets once. The composed lifecycle model
+adds the seventh coordinator consumer and fourteenth spawn-request consumer;
+the runtime backend still has six consumers. The exact PM budget helper is
+retained. Fast automatic transition fixtures add no mutable static state.
+One scoped native raw-register capture and two exact immutable backend-port
+tables have explicit approved owners. Callback members are distinguished
+from top-level function declarations by the private-interface gate.
 
 ## Validation and structural gate
 

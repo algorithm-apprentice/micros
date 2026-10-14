@@ -676,6 +676,24 @@ set(
 )
 
 set(
+    MICROS_PM_COORDINATOR_SOURCES
+    servers/pm/pm_coordinator.c
+    servers/pm/pm_coordinator_protocol.c
+    servers/pm/pm_coordinator_peers.c
+    servers/pm/pm_coordinator_spawn.c
+    servers/pm/pm_coordinator_rollback.c
+    servers/pm/pm_coordinator_requests.c
+    servers/pm/pm_coordinator_frontend.c
+    servers/pm/pm_coordinator_exit.c
+    servers/pm/pm_coordinator_wait.c
+)
+
+set(
+    MICROS_PM_RUNTIME_BACKEND_SOURCES
+    servers/pm/pm_service_backend.c
+)
+
+set(
     MICROS_SPAWN_REQUEST_SOURCES
     lib/spawn/spawn_request.c
     lib/spawn/spawn_stack_layout.c
@@ -702,6 +720,19 @@ set(
     tests/host/pm_model_test.c
     tests/host/pm_model_reference.c
     tests/host/pm_model_operations.c
+)
+
+set(
+    MICROS_PM_COORDINATOR_HOST_TEST_SOURCES
+    tests/host/pm_coordinator_test.c
+    tests/host/pm_coordinator_configuration_test.c
+    tests/host/pm_coordinator_protocol_test.c
+    tests/host/pm_coordinator_spawn_fixture.c
+    tests/host/pm_coordinator_spawn_test.c
+    tests/host/pm_coordinator_request_test.c
+    tests/host/pm_coordinator_exit_fixture.c
+    tests/host/pm_coordinator_exit_wait_test.c
+    tests/host/pm_coordinator_backend_test.c
 )
 
 set(
@@ -742,13 +773,50 @@ set(
 )
 
 set(
+    MICROS_VM_CORE_TEST_FIXTURE_SOURCES
+    tests/host/vm_core_test_fixture.c
+)
+
+set(
     MICROS_VM_CORE_HOST_TEST_SOURCES
     tests/host/vm_core_test.c
-    tests/host/vm_core_test_fixture.c
     tests/host/vm_core_boot_test.c
     tests/host/vm_core_load_test.c
     tests/host/vm_core_abort_test.c
     tests/host/vm_core_validation_test.c
+)
+
+set(
+    MICROS_VM_SERVICE_CORE_SOURCES
+    servers/vm/vm_service_core.c
+    servers/vm/vm_service_protocol.c
+    servers/vm/vm_service_load.c
+    servers/vm/vm_service_release.c
+)
+
+set(
+    MICROS_VM_SERVICE_BACKEND_SOURCES
+    servers/vm/vm_service_backend.c
+)
+
+set(
+    MICROS_VM_SERVICE_HOST_TEST_SOURCES
+    tests/host/vm_service_test_fixture.c
+    tests/host/vm_service_test.c
+    tests/host/vm_service_protocol_test.c
+    tests/host/vm_service_backend_test.c
+)
+
+set(
+    MICROS_ELF_SPAWN_MODEL_SOURCES
+    tests/host/elf_spawn_model_test.c
+    tests/host/elf_spawn_model_context.c
+    tests/host/elf_spawn_model_kernel.c
+    tests/host/elf_spawn_model_vm.c
+    tests/host/elf_spawn_model_transport.c
+    tests/host/elf_spawn_model_operations.c
+    tests/host/elf_spawn_model_reference.c
+    tests/host/elf_spawn_model_compare.c
 )
 
 set(
@@ -760,6 +828,7 @@ set(
     tests/qemu/vm_server_tty.c
     tests/qemu/vm_server_scratch.c
     tests/qemu/vm_server_pm.c
+    tests/qemu/vm_server_control.c
 )
 
 set(
@@ -908,6 +977,48 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_PM_CORE_HOST_TEST_SOURCES}
     )
     add_executable(
+        pm_coordinator_test
+        ${MICROS_PM_CORE_SOURCES}
+        ${MICROS_PM_COORDINATOR_SOURCES}
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+        servers/pm/pm_control.c
+        lib/runtime/runtime.c
+        ${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}
+    )
+    target_include_directories(
+        pm_coordinator_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(pm_coordinator_test PRIVATE c_std_17)
+    target_compile_options(
+        pm_coordinator_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    if(
+        MICROS_ENABLE_SANITIZERS
+        AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU"
+    )
+        target_compile_options(
+            pm_coordinator_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            pm_coordinator_test
+            PRIVATE -fsanitize=address,undefined
+        )
+    endif()
+    add_executable(
         spawn_abi_test
         ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
@@ -923,7 +1034,45 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
         ${MICROS_VM_CORE_HOST_TEST_SOURCES}
+        ${MICROS_VM_CORE_TEST_FIXTURE_SOURCES}
+        ${MICROS_VM_SERVICE_CORE_SOURCES}
+        ${MICROS_VM_SERVICE_BACKEND_SOURCES}
+        ${MICROS_VM_SERVICE_HOST_TEST_SOURCES}
+        lib/runtime/runtime.c
     )
+    add_executable(
+        elf_spawn_model_test
+        kernel/frame_allocator.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
+        kernel/vm_bootstrap.c
+        ${MICROS_VM_BOOT_VALIDATION_SOURCES}
+        ${MICROS_VM_IMAGE_SOURCES}
+        ${MICROS_VM_CORE_SOURCES}
+        ${MICROS_VM_SERVICE_CORE_SOURCES}
+        ${MICROS_VM_CORE_TEST_FIXTURE_SOURCES}
+        ${MICROS_PM_CORE_SOURCES}
+        ${MICROS_PM_COORDINATOR_SOURCES}
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_VFS_PORTABLE_SOURCES}
+        ${MICROS_VFS_TEST_FIXTURE_SOURCES}
+        servers/vfs/vfs_service_core.c
+        ${MICROS_ELF_SPAWN_MODEL_SOURCES}
+    )
+    target_include_directories(
+        elf_spawn_model_test
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(elf_spawn_model_test PRIVATE c_std_17)
+    target_compile_options(
+        elf_spawn_model_test
+        PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes
+    )
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(
+            elf_spawn_model_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined
+        )
+        target_link_options(elf_spawn_model_test PRIVATE -fsanitize=address,undefined)
+    endif()
     add_executable(
         ramfs_seed_test
         servers/ramfs/ramfs_seed.c
@@ -1927,8 +2076,11 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
     add_test(NAME pm-lifecycle COMMAND pm_test)
+    add_test(NAME pm-coordinator COMMAND pm_coordinator_test)
     add_test(NAME spawn-abi COMMAND spawn_abi_test)
     add_test(NAME vm-core COMMAND vm_core_test)
+    add_test(NAME elf-spawn-model COMMAND elf_spawn_model_test)
+    set_tests_properties(elf-spawn-model PROPERTIES LABELS slow)
     add_test(
         NAME ramfs-seed
         COMMAND ramfs_seed_test "${MICROS_RAMFS_SEED_IMAGE}"
@@ -1994,6 +2146,7 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            pm_coordinator_test
             spawn_abi_test
             vm_core_test
             ramfs_seed_test
@@ -2070,6 +2223,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
 
     add_custom_target(
+        test-elf-spawn-model
+        COMMAND
+            "${CMAKE_CTEST_COMMAND}"
+            --test-dir
+            "${CMAKE_BINARY_DIR}"
+            --output-on-failure
+            -R
+            elf-spawn-model
+        DEPENDS elf_spawn_model_test
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+
+    add_custom_target(
         test-unit
         COMMAND
             "${CMAKE_CTEST_COMMAND}"
@@ -2100,6 +2267,8 @@ if(MICROS_BUILD_HOST_TESTS)
             bootstrap_control_test
             vm_bootstrap_test
             pm_test
+            pm_coordinator_test
+            elf_spawn_model_test
             spawn_abi_test
             vm_core_test
             ramfs_seed_test
@@ -2493,6 +2662,8 @@ if(
             ${MICROS_VM_BOOT_VALIDATION_SOURCES}
             ${MICROS_VM_IMAGE_SOURCES}
             ${MICROS_VM_CORE_SOURCES}
+            ${MICROS_VM_SERVICE_CORE_SOURCES}
+            ${MICROS_VM_SERVICE_BACKEND_SOURCES}
             tests/qemu/vm_self_fault.S
             ${MICROS_VM_SERVICE_QEMU_SOURCES}
         )
@@ -2580,6 +2751,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
                 tests/qemu/vm_scratch_preemption_peer.S
             )
             target_compile_definitions(
@@ -2635,6 +2809,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
                 tests/qemu/pm_service_report.S
             )
             target_compile_definitions(
@@ -2689,6 +2866,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_tty_service_vfs
@@ -2741,6 +2921,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_vfs_service_probe
@@ -2799,6 +2982,9 @@ if(
                 servers/pm/pm_control.c
                 ${MICROS_PM_CORE_SOURCES}
                 ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
             )
             micros_add_bootstrap_user(
                 micros_ramfs_service_vfs

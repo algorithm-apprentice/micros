@@ -225,3 +225,27 @@ bool pm_service_validate_configuration(void)
     }
     return true;
 }
+
+void pm_service_configure_coordinator(struct pm_service_context *context)
+{
+    struct micros_pm_coordinator_bindings bindings;
+
+    if (micros_bootstrap_service_config.service_count < 6) {
+        context->coordinator_mode = PM_SERVICE_COORDINATOR_STATIC_ONLY;
+        return;
+    }
+    bindings.self = micros_bootstrap_service_config.self_endpoint;
+    bindings.vm = micros_bootstrap_service_config.services[1].endpoint;
+    bindings.vfs = micros_bootstrap_service_config.services[5].endpoint;
+    bindings.reserved = 0;
+    if (
+        micros_bootstrap_service_config.services[1].service_id != 2
+        || micros_bootstrap_service_config.services[5].service_id != 6
+        || micros_pm_coordinator_initialize(
+            &context->coordinator, &context->process_table, &bindings
+        ) != MICROS_PM_COORDINATOR_OK
+    ) {
+        __builtin_trap();
+    }
+    context->coordinator_mode = PM_SERVICE_COORDINATOR_READY;
+}

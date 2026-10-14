@@ -185,8 +185,12 @@ ADR-0050 now extends PM-only kernel control across hidden process reservation,
 token-bound execution preparation and rollback, atomic activation, ordered
 exit detach, and empty-process release. An isolated launcher/VM/PM QEMU fixture
 loads and runs a synthetic four-page child and returns every child resource to
-baseline. VFS transaction coordination, argv/env startup, PM table commit, and
-the final dynamic PID-1 spawn/wait fixture remain later Step 14 integrations.
+baseline. The production PM/VFS/VM coordinator now adds ordinary protocol
+composition, exact rollback, immediate PM publication commits, and ordered
+exit/wait completion with a separate mixed native reference model. Its
+[implementation map](architecture/pm-spawn-coordinator.md) records ownership
+and validation. Application argv/env startup and the final dynamic PID-1
+spawn/wait fixture remain later Step 14 integrations.
 
 ADR-0047's static TTY boundary is now implemented. VM installs one exact
 post-handoff UART device leaf before TTY release; TTY then initializes the

@@ -26,6 +26,9 @@ void micros_service_main(void)
     if (!vm_server_complete_handoff()) {
         __builtin_trap();
     }
+    if (!vm_server_configure_control(context)) {
+        __builtin_trap();
+    }
 #ifdef MICROS_VM_SELF_FAULT_RUNNING
     micros_vm_trigger_self_fault();
 #endif
@@ -61,7 +64,16 @@ void micros_service_main(void)
             __builtin_trap();
         }
 #elif defined(MICROS_VM_TTY_HANDOFF_TEST)
-        __builtin_trap();
+        if (!vm_server_serve_control(context, &message)) {
+            __builtin_trap();
+        }
+#else
+        if (
+            context->control_mode == VM_SERVER_CONTROL_READY
+            && !vm_server_serve_control(context, &message)
+        ) {
+            __builtin_trap();
+        }
 #endif
     }
 }

@@ -9,6 +9,7 @@
 #include "micros/bootstrap_control.h"
 #include "micros/vm_bootstrap.h"
 #include "servers/vm/vm_core.h"
+#include "servers/vm/vm_service_core.h"
 #include "tests/qemu/vm_handoff_protocol.h"
 
 #if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
@@ -66,9 +67,17 @@ struct vm_tty_mapping_descriptor {
 };
 #endif
 
+enum vm_server_control_mode {
+    VM_SERVER_CONTROL_UNINITIALIZED,
+    VM_SERVER_CONTROL_STATIC_ONLY,
+    VM_SERVER_CONTROL_READY,
+};
+
 struct vm_server_context {
     volatile uint64_t vm_data;
     struct micros_vm_state vm_state;
+    struct micros_vm_service control;
+    enum vm_server_control_mode control_mode;
 #if !defined(MICROS_PM_SERVICE_TEST) \
     && !defined(MICROS_VM_TTY_HANDOFF_TEST) \
     && !defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
@@ -100,6 +109,10 @@ int vm_server_find_service(uint32_t service_id);
 bool vm_server_validate_configuration(void);
 bool vm_server_send_ready(void);
 bool vm_server_complete_handoff(void);
+bool vm_server_configure_control(struct vm_server_context *context);
+bool vm_server_serve_control(
+    struct vm_server_context *context, const struct micros_ipc_message *request
+);
 void micros_vm_trigger_self_fault(void);
 
 #if !defined(MICROS_PM_SERVICE_TEST) \

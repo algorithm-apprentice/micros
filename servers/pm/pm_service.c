@@ -15,6 +15,7 @@ void micros_service_main(void)
     ) {
         __builtin_trap();
     }
+    pm_service_configure_coordinator(context);
 #ifdef MICROS_PM_SERVICE_TEST
     pm_service_copy_bytes(
         &context->initial_table,
@@ -70,16 +71,29 @@ void micros_service_main(void)
             struct micros_ipc_message reply;
             uint64_t reply_token = message.reply_token;
 
-            pm_service_serve_request(context, &message, &reply);
+            enum micros_pm_coordinator_response_kind kind =
+                pm_service_serve_request(context, &message, &reply);
             pm_service_clear_bytes(&message, sizeof(message));
-            if (
-                micros_runtime_reply_receive(
+            if (kind == MICROS_PM_COORDINATOR_RESPONSE_REPLY) {
+                if (micros_runtime_reply_receive(
                     reply_token,
                     &reply,
                     MICROS_ENDPOINT_ANY,
                     &message
-                ) != MICROS_SYSCALL_ABI_OK
+                ) != MICROS_SYSCALL_ABI_OK) {
+                    __builtin_trap();
+                }
+            } else if (
+                kind == MICROS_PM_COORDINATOR_RESPONSE_PARENT_LOST
+                || kind == MICROS_PM_COORDINATOR_RESPONSE_EXIT_ACCEPTED
+                || kind == MICROS_PM_COORDINATOR_RESPONSE_WAIT_BLOCKED
+                || kind == MICROS_PM_COORDINATOR_RESPONSE_WAIT_REPLY_COMPLETED
             ) {
+                if (micros_runtime_receive(MICROS_ENDPOINT_ANY, &message)
+                    != MICROS_SYSCALL_ABI_OK) {
+                    __builtin_trap();
+                }
+            } else {
                 __builtin_trap();
             }
 #endif

@@ -5,9 +5,15 @@
 #include "micros/bootstrap_control.h"
 #include "servers/pm/pm_control.h"
 #include "servers/pm/pm_core.h"
+#include "servers/pm/pm_coordinator.h"
 
 enum {
     MICROS_PM_SERVICE_ID = 3,
+};
+
+enum pm_service_coordinator_mode {
+    PM_SERVICE_COORDINATOR_STATIC_ONLY = 0,
+    PM_SERVICE_COORDINATOR_READY,
 };
 
 #ifdef MICROS_PM_SERVICE_TEST
@@ -23,6 +29,8 @@ void micros_vm_scratch_preemption_peer_run(uint64_t magic);
 struct pm_service_context {
     struct micros_pm_table process_table;
     volatile uint64_t pm_service_data;
+    struct micros_pm_coordinator coordinator;
+    enum pm_service_coordinator_mode coordinator_mode;
 #ifdef MICROS_PM_SERVICE_TEST
     struct micros_pm_table initial_table;
 #endif
@@ -37,6 +45,8 @@ bool pm_service_bytes_are_zero(const uint8_t *bytes, size_t size);
 void pm_service_write_u32_le(uint8_t *bytes, uint32_t value);
 uint32_t pm_service_read_u32_le(const uint8_t *bytes);
 bool pm_service_validate_configuration(void);
+void pm_service_configure_coordinator(struct pm_service_context *context);
+const struct micros_pm_coordinator_backend *pm_service_backend_get(void);
 bool pm_service_send_ready(void);
 #if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST) \
     || defined(MICROS_PM_SERVICE_TEST)
@@ -51,7 +61,7 @@ uint64_t pm_service_read_u64_le(const uint8_t *bytes);
 _Noreturn void pm_service_run_self_test(struct pm_service_context *context);
 #endif
 #ifndef MICROS_VM_SCRATCH_PREEMPTION_TEST
-void pm_service_serve_request(
+enum micros_pm_coordinator_response_kind pm_service_serve_request(
     struct pm_service_context *context,
     const struct micros_ipc_message *request,
     struct micros_ipc_message *reply

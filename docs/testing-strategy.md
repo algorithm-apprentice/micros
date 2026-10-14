@@ -403,7 +403,8 @@ Performance budgets are:
 Budgets are review signals, not reasons to hide necessary coverage.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
-`test-tty-model`, `test-ramfs-model`, `test-vfs-model`, and the complete
+`test-tty-model`, `test-ramfs-model`, `test-vfs-model`,
+`test-elf-spawn-model`, and the complete
 `test-unit` gate. The standalone image workflows are
 `build-tty-service-image`, `build-ramfs-service-image`, and
 `build-vfs-service-image`. The implemented
@@ -441,6 +442,7 @@ cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-vfs-model
+cmake --workflow --preset test-elf-spawn-model
 cmake --workflow --preset test-unit
 cmake --workflow --preset build-tty-service-image
 cmake --workflow --preset build-ramfs-service-image

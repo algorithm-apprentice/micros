@@ -130,6 +130,9 @@ bool pm_model_compare(
         || !init_record->reaper
         || init_record->pid != 1
         || init_record->endpoint != UINT32_C(0x00001000)
+        || init_record->load_token != reference->records[init.slot].load_token
+        || init_record->mapping_generation
+            != reference->records[init.slot].mapping_generation
         || init_record->wait.active != reference->wait.active
         || init_record->wait.result_ready
             != reference->wait.result_ready
@@ -172,6 +175,8 @@ bool pm_model_compare(
                 actual->state != MICROS_PM_PROCESS_FREE
                 || actual->generation
                     != reference->generations[index]
+                || actual->load_token != 0
+                || actual->mapping_generation != 0
             ) {
                 return false;
             }
@@ -194,6 +199,14 @@ bool pm_model_compare(
             || actual->exit_stage != expected->exit_stage
             || actual->exit_transaction != expected->transaction
             || actual->endpoint != expected->endpoint
+            || actual->load_token != (
+                expected->state == MICROS_PM_PROCESS_SPAWNING
+                    ? 0 : expected->load_token
+            )
+            || actual->mapping_generation != (
+                expected->state == MICROS_PM_PROCESS_SPAWNING
+                    ? 0 : expected->mapping_generation
+            )
         ) {
             return false;
         }

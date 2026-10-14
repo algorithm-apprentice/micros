@@ -19,6 +19,8 @@ struct pm_model_record {
     uint64_t pid;
     uint64_t transaction;
     uint64_t reply_token;
+    uint64_t load_token;
+    uint64_t mapping_generation;
     micros_endpoint_t endpoint;
     int32_t exit_code;
 };

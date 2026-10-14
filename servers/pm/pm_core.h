@@ -171,6 +171,8 @@ struct micros_pm_process_record {
     bool reaper;
     uint16_t reserved0;
     micros_endpoint_t endpoint;
+    uint64_t load_token;
+    uint64_t mapping_generation;
     enum micros_pm_spawn_stage spawn_stage;
     struct micros_pm_spawn_resources spawn;
     enum micros_pm_exit_stage exit_stage;

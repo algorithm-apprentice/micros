@@ -40,6 +40,8 @@ bool test_runtime_gate_and_spawn(void)
         && record->spawn_stage
             == MICROS_PM_SPAWN_PM_RECORD_RESERVED
         && record->endpoint == MICROS_ENDPOINT_NONE
+        && record->load_token == 0
+        && record->mapping_generation == 0
         && table.reaper.generation == 0
     );
     EXPECT_TRUE(
@@ -49,9 +51,21 @@ bool test_runtime_gate_and_spawn(void)
         && record->state == MICROS_PM_PROCESS_RUNNING
         && record->reaper
         && record->endpoint == UINT32_C(0x00001000)
+        && record->load_token == 13
+        && record->mapping_generation == 14
         && table.reaper.slot == init.slot
         && table.reaper.generation == init.generation
     );
+    table.records[init.slot].load_token = 0;
+    EXPECT_TRUE(
+        micros_pm_table_validate(&table) == MICROS_PM_MODEL_ERROR_INVARIANT
+    );
+    table.records[init.slot].load_token = 13;
+    table.records[init.slot].mapping_generation = 0;
+    EXPECT_TRUE(
+        micros_pm_table_validate(&table) == MICROS_PM_MODEL_ERROR_INVARIANT
+    );
+    table.records[init.slot].mapping_generation = 14;
     EXPECT_TRUE(
         micros_pm_begin_spawn(&table, init, 101, &child, &pid)
             == MICROS_PM_MODEL_OK
@@ -67,6 +81,8 @@ bool test_runtime_gate_and_spawn(void)
             UINT32_C(0x00002001),
             101
         )
+        && record->load_token == 13
+        && record->mapping_generation == 14
         && micros_pm_table_validate(&table) == MICROS_PM_MODEL_OK
     );
     return true;
