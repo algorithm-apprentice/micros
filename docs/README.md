@@ -31,6 +31,7 @@ This directory contains the design baseline for `micros`.
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
+- [Trap and syscall source organization](architecture/trap-syscall-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
