@@ -315,6 +315,22 @@ SYMBOL_OWNER_MIGRATION = tuple(
          "micros_bootstrap_runtime_complete"),
         ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
          "micros_bootstrap_classify_ready"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_runtime_state.c",
+         "micros_bootstrap_runtime_state"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_runtime_state.c",
+         "micros_bootstrap_runtime_authoritative_state"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_runtime_state.c",
+         "micros_bootstrap_runtime_is_active_controller"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_runtime_validation.c",
+         "micros_bootstrap_runtime_validate"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_runtime_validation.c",
+         "micros_bootstrap_runtime_validate_vm_prepared"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_diagnostics.c",
+         "micros_bootstrap_runtime_record_failure"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_diagnostics.c",
+         "micros_bootstrap_runtime_fail"),
+        ("kernel/bootstrap_runtime.c", "kernel/bootstrap_diagnostics.c",
+         "micros_bootstrap_runtime_check_deadline"),
     )
 )
 
@@ -437,6 +453,8 @@ LONG_FUNCTION_MIGRATION = tuple(
         ("kernel/bootstrap_manifest.c", "stable_service_profiles_match"),
         ("kernel/bootstrap_manifest.c", "validate_profile_relationships"),
         ("kernel/bootstrap_manifest.c", "micros_bootstrap_manifest_validate_detailed"),
+        ("kernel/bootstrap_runtime.c", "prepare_services"),
+        ("kernel/bootstrap_runtime.c", "micros_bootstrap_runtime_prepare"),
     )
 )
 
