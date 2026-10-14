@@ -257,7 +257,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = (
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[0] != "kernel/trap.c"
+    if entry[0] not in ("kernel/trap.c", "kernel/user_runtime_test.c")
 )
 
 LONG_FUNCTION_REQUIREMENTS = {
@@ -305,6 +305,8 @@ LONG_FUNCTION_MIGRATION = tuple(
     and entry not in (
         ("kernel/trap.c", "handle_vm_self_fault"),
         ("kernel/trap.c", "micros_trap_dispatch"),
+        ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"),
+        (GENERATOR_PATH, "render_fixture"),
     )
 )
 
@@ -1029,11 +1031,14 @@ def typed_variables(body: str, parameters: tuple[tuple[str, str], ...]) -> dict[
         r"\s*[*\s]*"
     )
     for match in re.finditer(
-        rf"(?m)^[ \t]*({type_pattern})([A-Za-z_]\w*)\s*(\[[^\];]+\])?\s*(?=[;=])",
+        rf"(?m)^[ \t]*({type_pattern})([A-Za-z_]\w*)\s*(\[[^\];]*\])?\s*(?=[;=])",
         c_lexical_text(body),
     ):
         type_name = compact(re.sub(r"\bstatic\b", "", match.group(1)))
-        result[match.group(2)] = type_name + ("*" if match.group(3) else "")
+        name = match.group(2)
+        result[name] = type_name + ("*" if match.group(3) else "")
+        if match.group(3):
+            result[f"sizeof({name})/sizeof({name}[0])"] = "size_t"
     return result
 
 
@@ -1058,7 +1063,9 @@ def bind_arguments(
             storage = context_storage(sources, context.group(1), mode, fields)
             borrowed_context(sources, borrow.group(1), context.group(1), storage, PHASE_PREFIXES[family])
             supplied = expected
-        elif re.fullmatch(r"[A-Za-z_]\w*", variable) and variable in variables:
+        elif variable in variables and (
+            not addressed or re.fullmatch(r"[A-Za-z_]\w*", variable)
+        ):
             supplied = variables[variable] + ("*" if addressed else "")
         else:
             raise AssertionError(f"unverified phase argument transport: {argument}")
@@ -1252,6 +1259,14 @@ def projected_body(
         return canonical_names(project_contexts(texts, path, name, body), family_for(path))
     _, parameters = function_signature(texts[path], name)
     variables = typed_variables(body, parameters)
+    for declaration in file_scope_objects(texts[path]):
+        constant = re.fullmatch(
+            r"static\s+const\s+(uint64_t)\s+([A-Z_][A-Z0-9_]*)\s*"
+            r"=\s*UINT64_C\(\s*(?:0x[0-9a-fA-F]+|[0-9]+)\s*\)\s*;",
+            declaration,
+        )
+        if constant is not None:
+            variables.setdefault(constant.group(2), constant.group(1))
     family = family_for(path)
     sources = projection_sources(texts, path)
     known = {spelling for old, _, local, qualified in owner_specs()
@@ -1285,6 +1300,20 @@ def projected_body(
         guard = re.search(r"\bif\s*\(\s*(!?)\s*$", before)
         if guard:
             suffix = re.match(r"\s*\)\s*\{\s*return\s*([^;{}]*);\s*\}", after)
+            continuation = "return " + suffix.group(1) + ";" if suffix is not None else ""
+            if suffix is None and family == "MICROS_USER_RUNTIME_KERNEL_TEST_SOURCES":
+                suffix = re.match(r"\s*\)\s*\{\s*goto\s+failure\s*;\s*\}", after)
+                labels = tuple(re.finditer(r"\bfailure\s*:", c_lexical_text(body)))
+                if (
+                    suffix is None
+                    or guard.group(1) != "!"
+                    or len(labels) != 1
+                    or labels[0].start() <= closing
+                    or re.match(r"\s*else\b", after[suffix.end():])
+                    or re.search(r"\bgoto\b|(?m:^\s*[A-Za-z_]\w*\s*:)", c_lexical_text(phase))
+                ):
+                    raise AssertionError(f"unverified local failure phase guard: {called}")
+                continuation = "goto failure;"
             if suffix is None or result != "bool":
                 raise AssertionError(f"unverified phase result guard: {called}")
             success, failure = ("true", "false") if guard.group(1) else ("false", "true")
@@ -1295,7 +1324,7 @@ def projected_body(
             returns = re.findall(r"\breturn\s+([^;]+);", c_lexical_text(phase))
             if any(compact(value) != failure for value in returns):
                 raise AssertionError(f"unverified phase result transport: {called}")
-            phase = replace_code(phase, rf"\breturn\s+{failure}\s*;", "return " + suffix.group(1) + ";")
+            phase = replace_code(phase, rf"\breturn\s+{failure}\s*;", continuation)
             start, end = guard.start(), end + suffix.end()
         else:
             returning = re.search(r"\breturn\s*$", before)
@@ -3145,6 +3174,119 @@ class TrapSyscallValidExtractionTest(MetaFixtureState, unittest.TestCase):
                     (flow_events(original), call_arguments(original), state_effects(original)),
                     (flow_events(projected), call_arguments(projected), state_effects(projected)),
                 )
+
+    def runtime_failure_phase_fixture(self) -> tuple[dict[str, str], str]:
+        texts = dict(self.fixtures)
+        texts["kernel/user_runtime_test.c"] = """
+void entry(void)
+{
+    if (!user_runtime_test_prepare_phase()) {
+        goto failure;
+    }
+    micros_start();
+failure:
+    micros_fail();
+}
+"""
+        texts["kernel/user_runtime_test_setup.c"] = """
+bool user_runtime_test_prepare_phase(void)
+{
+    if (!micros_check()) {
+        return false;
+    }
+    return true;
+}
+"""
+        return texts, """{
+    if (!micros_check()) {
+        goto failure;
+    }
+    micros_start();
+failure:
+    micros_fail();
+}"""
+
+    def test_runtime_false_phase_preserves_the_same_local_failure_continuation(self) -> None:
+        texts, original = self.runtime_failure_phase_fixture()
+        projected = projected_body(texts, "kernel/user_runtime_test.c", "entry", True)
+        self.assertEqual(compact(original), compact(projected))
+        for projection in (flow_events, call_arguments, state_effects):
+            self.assertEqual(projection(original), projection(projected))
+
+    def test_runtime_failure_phase_rejects_changed_guards_labels_and_helper_exits(self) -> None:
+        entry = "kernel/user_runtime_test.c"
+        phase = "kernel/user_runtime_test_setup.c"
+        for path, before, after in (
+            (entry, "if (!user_runtime_test_prepare_phase()", "if (user_runtime_test_prepare_phase()"),
+            (entry, "user_runtime_test_prepare_phase())", "user_runtime_test_prepare_phase() || hidden_work())"),
+            (entry, "goto failure;", "goto alternate;"),
+            (entry, "failure:", "alternate:"),
+            (entry, "failure:", "failure: failure:"),
+            (entry, "goto failure;\n    }", "goto failure;\n    } else { hidden_work(); }"),
+            (phase, "return false;", "return false || hidden_work();"),
+            (phase, "return true;", "return false;"),
+            (phase, "return false;", "goto failure;"),
+        ):
+            with self.subTest(path=path, mutation=after):
+                texts, _ = self.runtime_failure_phase_fixture()
+                self.assertIn(before, texts[path])
+                texts[path] = texts[path].replace(before, after, 1)
+                with self.assertRaises(AssertionError):
+                    projected_body(texts, entry, "entry", True)
+
+    def runtime_input_phase_fixture(self) -> tuple[dict[str, str], str]:
+        texts = dict(self.fixtures)
+        declaration = (
+            "static const uint64_t USER_RUNTIME_TIMER_INTERVAL = UINT64_C(0x3b9aca00);\n"
+        )
+        local = (
+            "static const struct micros_privilege_profile profiles[] = { { .id = 1 } };\n"
+        )
+        texts["kernel/user_runtime_test.c"] = (
+            declaration + "void entry(void) {\n" + local
+            + "user_runtime_test_mechanisms(profiles, sizeof(profiles) / sizeof(profiles[0]), "
+            "USER_RUNTIME_TIMER_INTERVAL);\n}\n"
+        )
+        texts["kernel/user_runtime_test_setup.c"] = """
+void user_runtime_test_mechanisms(
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    uint64_t interval
+)
+{
+    micros_mechanisms(profiles, profile_count, interval);
+}
+"""
+        return texts, (
+            "{" + local + "micros_mechanisms(profiles, sizeof(profiles) / sizeof(profiles[0]), "
+            "USER_RUNTIME_TIMER_INTERVAL); }"
+        )
+
+    def test_runtime_phase_preserves_local_array_extent_and_same_owner_scalar_constant(self) -> None:
+        texts, original = self.runtime_input_phase_fixture()
+        projected = projected_body(texts, "kernel/user_runtime_test.c", "entry", True)
+        self.assertEqual(compact(original), compact(projected))
+        for projection in (flow_events, call_arguments, state_effects):
+            self.assertEqual(projection(original), projection(projected))
+
+    def test_runtime_phase_inputs_reject_mutability_extent_pointer_and_type_drift(self) -> None:
+        entry = "kernel/user_runtime_test.c"
+        phase = "kernel/user_runtime_test_setup.c"
+        for path, before, after in (
+            (entry, "static const uint64_t USER_RUNTIME_TIMER_INTERVAL", "static uint64_t USER_RUNTIME_TIMER_INTERVAL"),
+            (entry, "static const uint64_t USER_RUNTIME_TIMER_INTERVAL", "static const uint32_t USER_RUNTIME_TIMER_INTERVAL"),
+            (entry, "sizeof(profiles[0])", "sizeof(profiles[1])"),
+            (entry, "profiles[] = { { .id = 1 } }", "*profiles"),
+            (entry, "user_runtime_test_mechanisms(profiles,", "user_runtime_test_mechanisms(profiles + 1,"),
+            (entry, "USER_RUNTIME_TIMER_INTERVAL);", "hidden_work());"),
+            (phase, "size_t profile_count", "uint32_t profile_count"),
+        ):
+            with self.subTest(path=path, mutation=after):
+                texts, _ = self.runtime_input_phase_fixture()
+                self.assertIn(before, texts[path])
+                texts[path] = texts[path].replace(before, after, 1)
+                with self.assertRaises(AssertionError):
+                    projected_body(texts, entry, "entry", True)
 
     def guarded_phase_fixture(self) -> tuple[dict[str, str], str]:
         texts = dict(self.fixtures)

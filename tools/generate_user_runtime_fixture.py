@@ -38,7 +38,7 @@ def _format_bytes(data):
     return "\n".join(lines) + "\n"
 
 
-def render_fixture(image):
+def _validated_fixture_inputs(image):
     errors = check_user_elf.validate_elf(image)
     if errors:
         raise check_user_elf.ElfFormatError("; ".join(errors))
@@ -108,10 +108,10 @@ def render_fixture(image):
             raise check_user_elf.ElfFormatError(
                 f"fixture symbol {symbol_name} is not executable"
             )
-    output = [
-        '#include "kernel/user_runtime_image.h"',
-        "",
-    ]
+    return symbols, loads
+
+
+def _append_segment_bytes(output, image, loads):
     for index, program in enumerate(loads):
         file_bytes = image.data[
             program.offset : program.offset + program.file_size
@@ -124,6 +124,9 @@ def render_fixture(image):
                 "",
             )
         )
+
+
+def _append_image_record(output, image, symbols, loads):
     output.extend(
         (
             "const struct micros_user_runtime_image",
@@ -173,6 +176,16 @@ def render_fixture(image):
             f"        .{field} = UINT64_C(0x{symbols[symbol].value:016x}),"
         )
     output.extend(("    };", ""))
+
+
+def render_fixture(image):
+    symbols, loads = _validated_fixture_inputs(image)
+    output = [
+        '#include "kernel/user_runtime_image.h"',
+        "",
+    ]
+    _append_segment_bytes(output, image, loads)
+    _append_image_record(output, image, symbols, loads)
     return "\n".join(output)
 
 
