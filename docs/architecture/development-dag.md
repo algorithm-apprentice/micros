@@ -333,8 +333,10 @@ The selected [ELF checker tooling correction](user-elf-checker-source-organizati
 also precedes the host application checker in item 8: existing parsing and
 structural validation acquire explicit owners before reuse, without
 duplicating service policy or changing this runtime graph. Accepted
-ADR-0063 has passed independent design review; implementation remains pending
-the separate design merge.
+ADR-0063's design #125 and implementation #126 are merged. The checked
+application runtime #127 is also merged; the final
+[dynamic PID-1 integration](elf-spawn-integration.md) now composes the
+production mechanisms without changing this runtime graph.
 The separately reviewed
 [kernel IPC correction](kernel-ipc-source-organization.md) applies the audit's
 before-next-touch rule to existing Step 6/7 mechanisms. It does not change

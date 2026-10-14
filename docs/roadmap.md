@@ -189,17 +189,20 @@ baseline. The production PM/VFS/VM coordinator now adds ordinary protocol
 composition, exact rollback, immediate PM publication commits, and ordered
 exit/wait completion with a separate mixed native reference model. Its
 [implementation map](architecture/pm-spawn-coordinator.md) records ownership
-and validation. Application argv/env startup and the final dynamic PID-1
-spawn/wait fixture remain later Step 14 integrations.
+and validation. The checked application runtime is merged as #127;
+the final dynamic PID-1 spawn/wait fixture remains the dependency-ready
+Step 14 integration.
 
-The application-runtime slice is now dependency-ready after the separately
+The application-runtime slice is merged after the separately
 reviewed ELF-checker correction #126. Its
 [implementation map](architecture/application-runtime.md) fixes the separate
 startup/decoder/normal-return/image owners and native/component evidence
 under existing ADR-0050. Code now proves checked application entry and normal
 return through the existing PM component, plus standalone image/seed parity.
-Implementation #127 owns its complete author and independent-review evidence;
-the full dynamic PID-1 gate remains a later dependent outcome.
+Implementation #127 passed the complete author gate and independent review
+and merged with the identical reviewed tree. The
+[final ELF spawn integration map](architecture/elf-spawn-integration.md)
+records the remaining six-production-service dynamic PID-1 gate.
 
 ADR-0047's static TTY boundary is now implemented. VM installs one exact
 post-handoff UART device leaf before TTY release; TTY then initializes the
@@ -336,8 +339,8 @@ Independent design review is clean after correction of one image-inheritance
 gap, and the design merged separately as #125. Implementation now separates
 all specified owners and both semantic phase roots with literal-empty
 migrations, unchanged fixture/case identities, and added CLI contracts.
-Implementation #126 records the evidence; its merge requires full author
-validation and a clean independent implementation review. Application
+Implementation #126 passed full author validation and clean independent
+implementation review and is merged. Application
 startup is not part of this source-only outcome.
 
 ## v0.1 completion goal
