@@ -620,8 +620,11 @@ Normal target evidence discharges another 26 moves and three long-function
 splits, retaining its 48-field context, two separate idle-bypass ABI objects,
 and original live supervisor-return invocation. Invalid-context evidence also
 discharges its nine moves and setup split, retaining one eleven-field context
-and exact guarded corruption/snapshot behavior. The remaining 27 owner moves
-and four long-function splits belong to native evidence.
+and exact guarded corruption/snapshot behavior. Native functional evidence
+discharges twelve more moves and the accounting split, retaining its eleven
+case labels, complete automatic snapshots, and both automatic plan witnesses
+across the deliberate fixture reset. Only the model's fifteen owner moves
+and three long-function splits remain.
 
 Run its focused implementation loop with:
 

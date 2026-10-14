@@ -293,6 +293,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if entry[0] not in (
         "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
         "kernel/scheduler_invalid_test.c",
+        "tests/host/scheduler_test.c",
     )
 )
 INITIAL_FUNCTION_MIGRATION = (
@@ -314,6 +315,7 @@ FUNCTION_MIGRATION = tuple(
     if entry[0] not in (
         "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
         "kernel/scheduler_invalid_test.c",
+        "tests/host/scheduler_test.c",
     )
 )
 SHORT_PHASE_ROOTS = (
@@ -2266,6 +2268,18 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             all_text = "\n".join(self.texts.get(path, "") for path in (*paths, PRIVATE_HEADERS[family]))
             macros = macro_records(all_text)
             self.assertEqual(len(macros), len({name for name, _ in macros}))
+            if family == 4:
+                macros = tuple(
+                    (
+                        name,
+                        normalized_body(Function(
+                            "assertion_macro",
+                            "void assertion_macro(struct scheduler_host_fixture *fixture)",
+                            text, 1, (),
+                        ), family, self.records[family]),
+                    )
+                    for name, text in macros
+                )
             macro_text = "\n".join(text for _, text in sorted(macros))
             self.assertEqual(FROZEN_MACROS[family], digest(macro_text), paths[0])
             if family in FROZEN_CONSTANTS:
@@ -2540,6 +2554,27 @@ for (index = 0; index < sizeof(*candidate); ++index) {
         ), body, 1, ())
         self.assertEqual(compact(expected), compact(fact_text(typed, 1, {})))
         self.assertNotEqual(compact(expected), compact(fact_text(untyped, 1, {})))
+
+    def test_original_snapshot_macro_keeps_its_full_object_copy(self) -> None:
+        signature = "void assertion_macro(struct scheduler_host_fixture *fixture)"
+        body = """
+#define EXPECT_UNCHANGED(expected, expression) \\
+do { \\
+    struct micros_kernel_objects before = fixture->objects; \\
+    EXPECT_ERROR((expected), (expression)); \\
+    EXPECT_TRUE(memcmp(&fixture->objects, &before, sizeof(fixture->objects)) == 0); \\
+} while (false)
+"""
+        original = body.replace("fixture->objects", "objects")
+        typed = Function("assertion_macro", signature, body, 1, ())
+        self.assertEqual(digest(original), digest(normalized_body(typed, 4)))
+        shortened = body.replace("sizeof(fixture->objects)", "sizeof(uint64_t)")
+        self.assertNotEqual(
+            digest(original),
+            digest(normalized_body(Function(
+                "assertion_macro", signature, shortened, 1, (),
+            ), 4)),
+        )
 
 
 if __name__ == "__main__":
