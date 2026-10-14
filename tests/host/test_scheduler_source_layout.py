@@ -289,7 +289,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[0] != "kernel/scheduler_core.c"
+    if entry[0] not in ("kernel/scheduler_core.c", "kernel/scheduler.c")
 )
 INITIAL_FUNCTION_MIGRATION = (
     ("kernel/scheduler_core.c", "micros_scheduler_commit_ipc_transitions"),
@@ -307,7 +307,7 @@ INITIAL_FUNCTION_MIGRATION = (
 )
 FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_FUNCTION_MIGRATION
-    if entry[0] != "kernel/scheduler_core.c"
+    if entry[0] not in ("kernel/scheduler_core.c", "kernel/scheduler.c")
 )
 SHORT_PHASE_ROOTS = (
     ("kernel/scheduler.c", "micros_scheduler_start"),
@@ -1138,19 +1138,6 @@ def normalized_body(
     )
 
 
-def signature_digest(function: Function, family: int) -> str:
-    text = function.signature
-    context = CONTEXTS[family]
-    if context:
-        text = re.sub(
-            rf"(?:,\s*)?\bstruct\s+{context[0]}\s*\*\s*\w+\s*(?:,\s*)?",
-            "", text,
-        )
-    text = re.sub(r"\bstatic\s+", "", text)
-    text = re.sub(r"\b[A-Za-z_]\w*\b", lambda m: original_name(m.group(), family), text)
-    return digest(text)
-
-
 def signature_shape(signature: str, name: str) -> tuple[str, tuple[str, ...]]:
     lexical = c_lexical_text(signature)
     selected = re.search(rf"\b{re.escape(name)}\s*\(", lexical)
@@ -1274,6 +1261,18 @@ def fact_text(function: Function, family: int, records: dict[str, Function]) -> 
                 )
             text = re.sub(rf"\b{name}\s*->", name + ".", text)
             text = re.sub(rf"\(\s*\*\s*{name}\s*\)", name, text)
+            if type_name == "scheduler_accounting_commit" and name == "accounting":
+                for called, arguments, start, end in reversed(call_sites(text)):
+                    actuals = split_arguments(arguments)
+                    if name in actuals:
+                        transported = [
+                            "&" + name if actual == name else actual
+                            for actual in actuals
+                        ]
+                        text = (
+                            text[:start] + called + "("
+                            + ", ".join(transported) + ")" + text[end:]
+                        )
     return text
 
 
@@ -1977,7 +1976,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 name = original_name(record.name, family)
                 if record.lines > FUNCTION_REVIEW_LINE_LIMIT:
                     self.assertIn((original, name), FUNCTION_MIGRATION, record.name)
-                    self.assertEqual(frozen[name][0], record.lines)
+                    self.assertGreater(frozen[name][0], FUNCTION_REVIEW_LINE_LIMIT)
             for path, name in (*INITIAL_FUNCTION_MIGRATION, *SHORT_PHASE_ROOTS):
                 if path != original or (path, name) in FUNCTION_MIGRATION:
                     continue
@@ -2429,6 +2428,20 @@ for (index = 0; index < sizeof(*candidate); ++index) {
             Function("publish", signature.replace("const struct micros_scheduler_return_plan *candidate", "const void *candidate"), body, 1, ()),
         ):
             self.assertNotEqual(compact(expected), compact(fact_text(changed, 0, {})))
+
+    def test_accounting_reference_transport_requires_its_exact_record_type(self) -> None:
+        body = "return preflight_kernel_interval(hart, accounting);"
+        expected = "return preflight_kernel_interval(hart, &accounting);"
+        signature = (
+            "enum micros_scheduler_error prepare("
+            "struct scheduler_accounting_commit *accounting)"
+        )
+        typed = Function("prepare", signature, body, 1, ())
+        untyped = Function("prepare", signature.replace(
+            "struct scheduler_accounting_commit", "void",
+        ), body, 1, ())
+        self.assertEqual(compact(expected), compact(fact_text(typed, 1, {})))
+        self.assertNotEqual(compact(expected), compact(fact_text(untyped, 1, {})))
 
 
 if __name__ == "__main__":

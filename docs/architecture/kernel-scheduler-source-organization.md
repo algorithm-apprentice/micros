@@ -614,8 +614,10 @@ and validation inheritance.
 The initial green integration wires all six source sets and private headers,
 starting with 138 owner moves and twelve semantic splits. The portable core
 now discharges its 47 moves and three semantic splits; its largest function
-is 71 lines. The remaining 91 owner moves and nine long-function splits
-belong to target runtime and native/target evidence.
+is 71 lines. Target runtime also discharges its 29 moves and selected-return
+split, with named first-start/idle boundaries and one seven-field context.
+The remaining 62 owner moves and eight long-function splits belong to
+native/target evidence.
 
 Run its focused implementation loop with:
 
