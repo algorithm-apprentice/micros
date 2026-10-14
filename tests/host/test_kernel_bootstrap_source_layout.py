@@ -455,6 +455,10 @@ LONG_FUNCTION_MIGRATION = tuple(
         ("kernel/bootstrap_manifest.c", "micros_bootstrap_manifest_validate_detailed"),
         ("kernel/bootstrap_runtime.c", "prepare_services"),
         ("kernel/bootstrap_runtime.c", "micros_bootstrap_runtime_prepare"),
+        ("kernel/bootstrap_syscall.c", "handle_console_begin"),
+        ("kernel/bootstrap_syscall.c", "handle_release"),
+        ("kernel/bootstrap_syscall.c", "handle_accept_ready"),
+        ("kernel/bootstrap_syscall.c", "micros_bootstrap_handle_captured_user_ecall"),
     )
 )
 

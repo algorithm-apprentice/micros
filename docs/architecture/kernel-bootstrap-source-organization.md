@@ -11,9 +11,11 @@ private-header/source skeletons and validation inheritance are integrated.
 Portable common/profile/manifest validation and runtime transitions now have
 their reviewed owners and named phases. Privileged runtime state,
 preparation/image access, reverse cleanup, validation and diagnostics now have
-their reviewed owners and one ten-field context. The active migrations retain
-46 symbols and 22 long functions in the other existing owners; remaining
-skeletons do not claim that the final decomposition is complete.
+their reviewed owners and one ten-field context. Captured bootstrap control
+now separates common authority from release, readiness, completion and failure
+transactions. The active migrations retain 46 symbols and 18 long functions
+in the other existing owners; remaining skeletons do not claim that the final
+decomposition is complete.
 
 ## Reviewed base and scope
 
