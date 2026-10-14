@@ -735,9 +735,78 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/runtime_test_internal.h",
         ),
     ),
+    (
+        "kernel/scheduler_core.c",
+        (
+            "kernel/scheduler_core_queue.c",
+            "kernel/scheduler_core_validate.c",
+            "kernel/scheduler_core_policy.c",
+            "kernel/scheduler_core_ipc.c",
+            "kernel/scheduler_core_ipc_transition.c",
+            "kernel/scheduler_core_return_plan.c",
+            "kernel/scheduler_core_return.c",
+            "kernel/scheduler_core_accounting.c",
+            "kernel/scheduler_core_private.h",
+        ),
+    ),
+    (
+        "kernel/scheduler.c",
+        (
+            "kernel/scheduler_context.c",
+            "kernel/scheduler_completion.c",
+            "kernel/scheduler_return.c",
+            "kernel/scheduler_interrupt.c",
+            "kernel/scheduler_idle.c",
+            "kernel/scheduler_test_support.c",
+            "kernel/scheduler_runtime_internal.h",
+        ),
+    ),
+    (
+        "kernel/scheduler_test.c",
+        (
+            "kernel/scheduler_test_state.c",
+            "kernel/scheduler_test_fixture.c",
+            "kernel/scheduler_test_completion.c",
+            "kernel/scheduler_test_interrupt.c",
+            "kernel/scheduler_test_trap.c",
+            "kernel/scheduler_test_finish.c",
+            "kernel/scheduler_test_internal.h",
+        ),
+    ),
+    (
+        "kernel/scheduler_invalid_test.c",
+        (
+            "kernel/scheduler_invalid_test_state.c",
+            "kernel/scheduler_invalid_test_fixture.c",
+            "kernel/scheduler_invalid_test_observation.c",
+            "kernel/scheduler_invalid_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/scheduler_test.c",
+        (
+            "tests/host/scheduler_test_fixture.c",
+            "tests/host/scheduler_queue_test.c",
+            "tests/host/scheduler_return_test.c",
+            "tests/host/scheduler_accounting_test.c",
+            "tests/host/scheduler_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/scheduler_model_test.c",
+        (
+            "tests/host/scheduler_model_fixture.c",
+            "tests/host/scheduler_model_reference.c",
+            "tests/host/scheduler_model_projection.c",
+            "tests/host/scheduler_model_prelude.c",
+            "tests/host/scheduler_model_operations.c",
+            "tests/host/scheduler_model_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",

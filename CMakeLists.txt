@@ -921,6 +921,68 @@ set(
 )
 
 set(
+    MICROS_SCHEDULER_CORE_SOURCES
+    kernel/scheduler_core.c
+    kernel/scheduler_core_queue.c
+    kernel/scheduler_core_validate.c
+    kernel/scheduler_core_policy.c
+    kernel/scheduler_core_ipc.c
+    kernel/scheduler_core_ipc_transition.c
+    kernel/scheduler_core_return_plan.c
+    kernel/scheduler_core_return.c
+    kernel/scheduler_core_accounting.c
+)
+
+set(
+    MICROS_SCHEDULER_RUNTIME_SOURCES
+    kernel/scheduler.c
+    kernel/scheduler_context.c
+    kernel/scheduler_completion.c
+    kernel/scheduler_return.c
+    kernel/scheduler_interrupt.c
+    kernel/scheduler_idle.c
+    kernel/scheduler_test_support.c
+)
+
+set(
+    MICROS_SCHEDULER_QEMU_TEST_SOURCES
+    kernel/scheduler_test.c
+    kernel/scheduler_test_state.c
+    kernel/scheduler_test_fixture.c
+    kernel/scheduler_test_completion.c
+    kernel/scheduler_test_interrupt.c
+    kernel/scheduler_test_trap.c
+    kernel/scheduler_test_finish.c
+)
+
+set(
+    MICROS_SCHEDULER_INVALID_QEMU_TEST_SOURCES
+    kernel/scheduler_invalid_test.c
+    kernel/scheduler_invalid_test_state.c
+    kernel/scheduler_invalid_test_fixture.c
+    kernel/scheduler_invalid_test_observation.c
+)
+
+set(
+    MICROS_SCHEDULER_HOST_TEST_SOURCES
+    tests/host/scheduler_test.c
+    tests/host/scheduler_test_fixture.c
+    tests/host/scheduler_queue_test.c
+    tests/host/scheduler_return_test.c
+    tests/host/scheduler_accounting_test.c
+)
+
+set(
+    MICROS_SCHEDULER_MODEL_HOST_TEST_SOURCES
+    tests/host/scheduler_model_test.c
+    tests/host/scheduler_model_fixture.c
+    tests/host/scheduler_model_reference.c
+    tests/host/scheduler_model_projection.c
+    tests/host/scheduler_model_prelude.c
+    tests/host/scheduler_model_operations.c
+)
+
+set(
     MICROS_TRAP_SOURCES
     kernel/trap.c
     kernel/trap_context.c
@@ -986,7 +1048,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         kernel_objects_test
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         tests/host/kernel_objects_test.c
     )
     add_executable(
@@ -994,21 +1056,21 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES}
     )
     add_executable(
         scheduler_test
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         tests/host/ipc_current_guard_test.c
-        tests/host/scheduler_model_test.c
-        tests/host/scheduler_test.c
+        ${MICROS_SCHEDULER_MODEL_HOST_TEST_SOURCES}
+        ${MICROS_SCHEDULER_HOST_TEST_SOURCES}
     )
     add_executable(
         endpoint_test
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         kernel/endpoint.c
         kernel/grant.c
         kernel/grant_abi.c
@@ -1039,7 +1101,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         ipc_model_test
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         kernel/endpoint.c
         kernel/grant.c
         kernel/grant_copy_core.c
@@ -1073,7 +1135,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/endpoint.c
         ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_BOOTSTRAP_CONTROL_HOST_TEST_SOURCES}
     )
     add_executable(
@@ -1094,7 +1156,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         ${MICROS_PM_CONTROL_CORE_SOURCES}
-        kernel/scheduler_core.c
+        ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_PM_CORE_SOURCES}
         ${MICROS_PM_CONTROL_HOST_TEST_SOURCES}
@@ -1427,6 +1489,7 @@ if(MICROS_BUILD_HOST_TESTS)
     target_include_directories(
         scheduler_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
@@ -3279,8 +3342,8 @@ add_executable(
     ${MICROS_SYSCALL_SOURCES}
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
-    kernel/scheduler_core.c
-    kernel/scheduler.c
+    ${MICROS_SCHEDULER_CORE_SOURCES}
+    ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
     kernel/panic.c
     kernel/plic.c
@@ -4858,7 +4921,7 @@ if(MICROS_BUILD_SCHEDULER_TEST)
         micros
         PRIVATE
             arch/riscv64/scheduler_test.S
-            kernel/scheduler_test.c
+            ${MICROS_SCHEDULER_QEMU_TEST_SOURCES}
     )
 endif()
 
@@ -4870,7 +4933,7 @@ if(
         micros
         PRIVATE
             arch/riscv64/scheduler_test.S
-            kernel/scheduler_invalid_test.c
+            ${MICROS_SCHEDULER_INVALID_QEMU_TEST_SOURCES}
     )
 endif()
 
