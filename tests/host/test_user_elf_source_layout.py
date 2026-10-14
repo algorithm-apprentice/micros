@@ -138,7 +138,7 @@ CHECKER_IMAGES = (
 )
 
 SYMBOL_OWNER_MIGRATION = ()
-FUNCTION_MIGRATION = ("build_elf",)
+FUNCTION_MIGRATION = ()
 
 FROZEN_AST = {
     "ELF_CLASS_64": "a736a124de6b9502565aa1f30ea741dfd57af693da130c39b4de302a091f4438",
@@ -414,6 +414,80 @@ FIXTURE_CALLS = {
     ),
 }
 
+FIXTURE_OUTLINE_SAMPLE = """
+def _fixture_text():
+    text = bytearray(b"T")
+    return text
+def _fixture_symbols(base, undefined_symbol):
+    symbol_strings = b"S"
+    symbol_table = b"Y"
+    return symbol_strings, symbol_table
+def _fixture_elf_header(image, layout):
+    image.append(layout.base)
+def _fixture_program_headers(image, layout, data_bytes):
+    image.extend(data_bytes)
+def _fixture_load_sections(layout, data_section_name, data_bytes, section_name_offsets):
+    sections = [layout.data_offset]
+    return sections
+def _fixture_metadata_sections(
+    sections, layout, extra_relocation, symbol_table, symbol_strings,
+    section_strings, section_name_offsets,
+):
+    if extra_relocation:
+        sections.append(layout.relocation_offset)
+def _fixture_section_headers(
+    image, layout, data_section_name, extra_relocation, data_bytes,
+    symbol_table, symbol_strings, section_strings, section_name_offsets,
+):
+    sections = _fixture_load_sections(layout, data_section_name, data_bytes, section_name_offsets)
+    _fixture_metadata_sections(sections, layout, extra_relocation, symbol_table, symbol_strings, section_strings, section_name_offsets)
+    for index, section in enumerate(sections):
+        image.append(section + layout.section_offset)
+def build_elf(*, data_section_name=".data", extra_relocation=False, undefined_symbol=False):
+    base = text_offset = rodata_offset = data_offset = relocation_offset = symbol_offset = string_offset = section_string_offset = section_offset = section_count = symbol_section_index = string_section_index = section_string_index = 0
+    text = _fixture_text()
+    rodata = b"R"
+    data_bytes = b"D"
+    symbol_strings, symbol_table = _fixture_symbols(base, undefined_symbol)
+    section_name_offsets = {}
+    section_strings = b"N"
+    image = bytearray()
+    layout = FixtureLayout(
+        base=base, text_offset=text_offset, rodata_offset=rodata_offset,
+        data_offset=data_offset, relocation_offset=relocation_offset,
+        symbol_offset=symbol_offset, string_offset=string_offset,
+        section_string_offset=section_string_offset, section_offset=section_offset,
+        section_count=section_count, symbol_section_index=symbol_section_index,
+        string_section_index=string_section_index, section_string_index=section_string_index,
+    )
+    _fixture_elf_header(image, layout)
+    _fixture_program_headers(image, layout, data_bytes)
+    _fixture_section_headers(image, layout, data_section_name, extra_relocation, data_bytes, symbol_table, symbol_strings, section_strings, section_name_offsets)
+    metadata = {}
+    return image, metadata
+"""
+FIXTURE_EXPANDED_SAMPLE = """
+def build_elf(*, data_section_name=".data", extra_relocation=False, undefined_symbol=False):
+    base = text_offset = rodata_offset = data_offset = relocation_offset = symbol_offset = string_offset = section_string_offset = section_offset = section_count = symbol_section_index = string_section_index = section_string_index = 0
+    text = bytearray(b"T")
+    rodata = b"R"
+    data_bytes = b"D"
+    symbol_strings = b"S"
+    symbol_table = b"Y"
+    section_name_offsets = {}
+    section_strings = b"N"
+    image = bytearray()
+    image.append(base)
+    image.extend(data_bytes)
+    sections = [data_offset]
+    if extra_relocation:
+        sections.append(relocation_offset)
+    for index, section in enumerate(sections):
+        image.append(section + section_offset)
+    metadata = {}
+    return image, metadata
+"""
+
 
 class LayoutFields(ast.NodeTransformer):
     def visit_Attribute(self, node):
@@ -585,6 +659,7 @@ class UserElfSourceLayoutTest(unittest.TestCase):
             values = ast.literal_eval(node.value)
             self.assertEqual(len(values), len(set(values)))
             self.assertLessEqual(set(values), permitted)
+            self.assertEqual((), values, "the reviewed source correction is complete")
 
     def test_private_import_graph_is_acyclic(self):
         self.assertEqual([], import_errors(self.texts))
@@ -807,6 +882,51 @@ def _validate_symbols(image, loads):
                     expanded_symbols(
                         texts, "sample", one_definition(texts, "sample", "_validate_symbols"),
                     )
+
+    def test_fixture_phase_expansion_has_exact_borrows_and_live_layout(self):
+        texts = {"sample": FIXTURE_OUTLINE_SAMPLE}
+        root = one_definition(texts, "sample", "build_elf")
+        expected = ast.parse(FIXTURE_EXPANDED_SAMPLE).body[0]
+        self.assertEqual(
+            ast_key(expected), ast_key(expanded_fixture(texts, "sample", root)),
+        )
+        mutations = (
+            ("base=base", "base=data_offset"),
+            ("image.append(layout.base)", "return image"),
+            ("image.append(layout.base)", "layout.base = 1"),
+            (
+                "\n    _fixture_program_headers(image, layout, data_bytes)\n",
+                "\n    _fixture_program_headers(image, layout, symbol_table)\n",
+            ),
+            ("return symbol_strings, symbol_table", "return symbol_table, symbol_strings"),
+        )
+        for old, new in mutations:
+            with self.subTest(mutation=new):
+                self.assertEqual(1, FIXTURE_OUTLINE_SAMPLE.count(old))
+                changed = {"sample": FIXTURE_OUTLINE_SAMPLE.replace(old, new)}
+                with self.assertRaises(AssertionError):
+                    expanded_fixture(
+                        changed, "sample", one_definition(changed, "sample", "build_elf"),
+                    )
+        root = one_definition(texts, "sample", "build_elf")
+        index = next(
+            index for index, node in enumerate(root.body)
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "layout"
+                    for target in node.targets)
+        )
+        root.body[index], root.body[index + 1] = root.body[index + 1], root.body[index]
+        with self.assertRaises(AssertionError):
+            expanded_fixture(texts, "sample", root)
+        changed = {
+            "sample": FIXTURE_OUTLINE_SAMPLE.replace(
+                "layout.data_offset", "other.layout.data_offset",
+            ),
+        }
+        folded = expanded_fixture(
+            changed, "sample", one_definition(changed, "sample", "build_elf"),
+        )
+        self.assertNotEqual(ast_key(expected), ast_key(folded))
 
     def test_duplicate_wrapper_type_and_policy_copies_fail(self):
         for extra in (

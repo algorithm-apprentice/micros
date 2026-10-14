@@ -1,8 +1,27 @@
 """Private service-ELF byte fixture and validation adapter."""
 
+from dataclasses import dataclass
 import struct
+from typing import Optional
 
 from tools import check_user_elf
+
+
+@dataclass(frozen=True)
+class FixtureLayout:
+    base: int
+    text_offset: int
+    rodata_offset: int
+    data_offset: int
+    relocation_offset: Optional[int]
+    symbol_offset: int
+    string_offset: int
+    section_string_offset: int
+    section_offset: int
+    section_count: int
+    symbol_section_index: int
+    string_section_index: int
+    section_string_index: int
 
 
 def align(value, alignment):
@@ -29,62 +48,13 @@ def build_elf(
     text_offset = 0x1000
     rodata_offset = 0x2000
     data_offset = 0x3000
-    text = bytearray(check_user_elf.PAGE_SIZE)
-    words = (
-        0x00000193,
-        0x00000213,
-        0x00000097,
-        0x018080E7,
-        0x00100073,
-        0x0000006F,
-        0x00000073,
-        0x00008067,
-        0x00008067,
-    )
-    struct.pack_into("<9I", text, 0, *words)
+    text = _fixture_text()
     rodata = bytes([0x5A]) * check_user_elf.PAGE_SIZE
     data_bytes = bytes.fromhex("1122334455667788")
 
-    symbol_names = list(check_user_elf.REQUIRED_SYMBOLS)
-    if undefined_symbol:
-        symbol_names.append("host_dependency")
-    symbol_strings, symbol_name_offsets = make_string_table(symbol_names)
-
-    symbols = [bytes(check_user_elf.SYMBOL.size)]
-
-    def add_symbol(name, section, value, size=0, symbol_type=0):
-        symbols.append(
-            check_user_elf.SYMBOL.pack(
-                symbol_name_offsets[name],
-                (
-                    check_user_elf.SYMBOL_BIND_GLOBAL << 4
-                    | symbol_type
-                ),
-                0,
-                section,
-                value,
-                size,
-            )
-        )
-
-    add_symbol("_start", 1, base, 24, 2)
-    add_symbol("micros_service_main", 1, base + 32, 4, 2)
-    add_symbol("micros_runtime_raw_syscall", 1, base + 24, 8, 2)
-    add_symbol("micros_runtime_service_returned", 1, base + 16)
-    add_symbol("__micros_user_image_start", 1, base)
-    add_symbol("__micros_user_text_start", 1, base)
-    add_symbol("__micros_user_text_end", 2, base + 0x1000)
-    add_symbol("__micros_user_rodata_start", 2, base + 0x1000)
-    add_symbol("__micros_user_rodata_end", 3, base + 0x2000)
-    add_symbol("__micros_user_data_start", 3, base + 0x2000)
-    add_symbol("__micros_user_data_end", 3, base + 0x2008)
-    add_symbol("__micros_user_bss_start", 4, base + 0x2008)
-    add_symbol("__micros_user_bss_end", 4, base + 0x3000)
-    add_symbol("__micros_user_image_end", 4, base + 0x3000)
-    if undefined_symbol:
-        add_symbol("host_dependency", 0, 0)
-    symbol_table = b"".join(symbols)
-
+    symbol_strings, symbol_table = _fixture_symbols(
+        base, undefined_symbol,
+    )
     section_names = [
         ".text",
         ".rodata",
@@ -129,6 +99,105 @@ def build_elf(
         section_string_offset : section_string_offset + len(section_strings)
     ] = section_strings
 
+    layout = FixtureLayout(
+        base=base,
+        text_offset=text_offset,
+        rodata_offset=rodata_offset,
+        data_offset=data_offset,
+        relocation_offset=relocation_offset,
+        symbol_offset=symbol_offset,
+        string_offset=string_offset,
+        section_string_offset=section_string_offset,
+        section_offset=section_offset,
+        section_count=section_count,
+        symbol_section_index=symbol_section_index,
+        string_section_index=string_section_index,
+        section_string_index=section_string_index,
+    )
+    _fixture_elf_header(image, layout)
+    _fixture_program_headers(image, layout, data_bytes)
+    _fixture_section_headers(
+        image,
+        layout,
+        data_section_name,
+        extra_relocation,
+        data_bytes,
+        symbol_table,
+        symbol_strings,
+        section_strings,
+        section_name_offsets,
+    )
+    metadata = {
+        "program_offset": check_user_elf.ELF_HEADER.size,
+        "section_offset": section_offset,
+        "symbol_offset": symbol_offset,
+        "raw_symbol_index": 3,
+        "text_offset": text_offset,
+    }
+    return image, metadata
+
+
+def _fixture_text():
+    text = bytearray(check_user_elf.PAGE_SIZE)
+    words = (
+        0x00000193,
+        0x00000213,
+        0x00000097,
+        0x018080E7,
+        0x00100073,
+        0x0000006F,
+        0x00000073,
+        0x00008067,
+        0x00008067,
+    )
+    struct.pack_into("<9I", text, 0, *words)
+    return text
+
+
+def _fixture_symbols(base, undefined_symbol):
+    symbol_names = list(check_user_elf.REQUIRED_SYMBOLS)
+    if undefined_symbol:
+        symbol_names.append("host_dependency")
+    symbol_strings, symbol_name_offsets = make_string_table(symbol_names)
+
+    symbols = [bytes(check_user_elf.SYMBOL.size)]
+
+    def add_symbol(name, section, value, size=0, symbol_type=0):
+        symbols.append(
+            check_user_elf.SYMBOL.pack(
+                symbol_name_offsets[name],
+                (
+                    check_user_elf.SYMBOL_BIND_GLOBAL << 4
+                    | symbol_type
+                ),
+                0,
+                section,
+                value,
+                size,
+            )
+        )
+
+    add_symbol("_start", 1, base, 24, 2)
+    add_symbol("micros_service_main", 1, base + 32, 4, 2)
+    add_symbol("micros_runtime_raw_syscall", 1, base + 24, 8, 2)
+    add_symbol("micros_runtime_service_returned", 1, base + 16)
+    add_symbol("__micros_user_image_start", 1, base)
+    add_symbol("__micros_user_text_start", 1, base)
+    add_symbol("__micros_user_text_end", 2, base + 0x1000)
+    add_symbol("__micros_user_rodata_start", 2, base + 0x1000)
+    add_symbol("__micros_user_rodata_end", 3, base + 0x2000)
+    add_symbol("__micros_user_data_start", 3, base + 0x2000)
+    add_symbol("__micros_user_data_end", 3, base + 0x2008)
+    add_symbol("__micros_user_bss_start", 4, base + 0x2008)
+    add_symbol("__micros_user_bss_end", 4, base + 0x3000)
+    add_symbol("__micros_user_image_end", 4, base + 0x3000)
+    if undefined_symbol:
+        add_symbol("host_dependency", 0, 0)
+    symbol_table = b"".join(symbols)
+    return (symbol_strings, symbol_table)
+
+
+def _fixture_elf_header(image, layout):
     identification = bytearray(16)
     identification[:4] = b"\x7fELF"
     identification[4] = check_user_elf.ELF_CLASS_64
@@ -141,24 +210,27 @@ def build_elf(
         check_user_elf.ELF_TYPE_EXECUTABLE,
         check_user_elf.ELF_MACHINE_RISCV,
         check_user_elf.ELF_VERSION_CURRENT,
-        base,
+        layout.base,
         check_user_elf.ELF_HEADER.size,
-        section_offset,
+        layout.section_offset,
         check_user_elf.ELF_FLAG_RISCV_RVC,
         check_user_elf.ELF_HEADER.size,
         check_user_elf.PROGRAM_HEADER.size,
         3,
         check_user_elf.SECTION_HEADER.size,
-        section_count,
-        section_string_index,
+        layout.section_count,
+        layout.section_string_index,
     )
+
+
+def _fixture_program_headers(image, layout, data_bytes):
     programs = (
         (
             check_user_elf.PROGRAM_LOAD,
             check_user_elf.PROGRAM_READ | check_user_elf.PROGRAM_EXECUTE,
-            text_offset,
-            base,
-            base,
+            layout.text_offset,
+            layout.base,
+            layout.base,
             0x1000,
             0x1000,
             0x1000,
@@ -166,9 +238,9 @@ def build_elf(
         (
             check_user_elf.PROGRAM_LOAD,
             check_user_elf.PROGRAM_READ,
-            rodata_offset,
-            base + 0x1000,
-            base + 0x1000,
+            layout.rodata_offset,
+            layout.base + 0x1000,
+            layout.base + 0x1000,
             0x1000,
             0x1000,
             0x1000,
@@ -176,9 +248,9 @@ def build_elf(
         (
             check_user_elf.PROGRAM_LOAD,
             check_user_elf.PROGRAM_READ | check_user_elf.PROGRAM_WRITE,
-            data_offset,
-            base + 0x2000,
-            base + 0x2000,
+            layout.data_offset,
+            layout.base + 0x2000,
+            layout.base + 0x2000,
             len(data_bytes),
             0x1000,
             0x1000,
@@ -192,14 +264,47 @@ def build_elf(
             *program,
         )
 
+
+def _fixture_section_headers(
+    image,
+    layout,
+    data_section_name,
+    extra_relocation,
+    data_bytes,
+    symbol_table,
+    symbol_strings,
+    section_strings,
+    section_name_offsets,
+):
+    sections = _fixture_load_sections(
+        layout, data_section_name, data_bytes, section_name_offsets,
+    )
+    _fixture_metadata_sections(
+        sections, layout, extra_relocation, symbol_table, symbol_strings,
+        section_strings, section_name_offsets,
+    )
+    for index, section in enumerate(sections):
+        check_user_elf.SECTION_HEADER.pack_into(
+            image,
+            layout.section_offset + index * check_user_elf.SECTION_HEADER.size,
+            *section,
+        )
+
+
+def _fixture_load_sections(
+    layout,
+    data_section_name,
+    data_bytes,
+    section_name_offsets,
+):
     sections = [
         (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         (
             section_name_offsets[".text"],
             check_user_elf.SECTION_PROGBITS,
             check_user_elf.SECTION_ALLOC | check_user_elf.SECTION_EXECUTE,
-            base,
-            text_offset,
+            layout.base,
+            layout.text_offset,
             0x1000,
             0,
             0,
@@ -210,8 +315,8 @@ def build_elf(
             section_name_offsets[".rodata"],
             check_user_elf.SECTION_PROGBITS,
             check_user_elf.SECTION_ALLOC,
-            base + 0x1000,
-            rodata_offset,
+            layout.base + 0x1000,
+            layout.rodata_offset,
             0x1000,
             0,
             0,
@@ -222,8 +327,8 @@ def build_elf(
             section_name_offsets[data_section_name],
             check_user_elf.SECTION_PROGBITS,
             check_user_elf.SECTION_ALLOC | check_user_elf.SECTION_WRITE,
-            base + 0x2000,
-            data_offset,
+            layout.base + 0x2000,
+            layout.data_offset,
             len(data_bytes),
             0,
             0,
@@ -234,8 +339,8 @@ def build_elf(
             section_name_offsets[".bss"],
             check_user_elf.SECTION_NOBITS,
             check_user_elf.SECTION_ALLOC | check_user_elf.SECTION_WRITE,
-            base + 0x2008,
-            data_offset + len(data_bytes),
+            layout.base + 0x2008,
+            layout.data_offset + len(data_bytes),
             0xFF8,
             0,
             0,
@@ -243,6 +348,18 @@ def build_elf(
             0,
         ),
     ]
+    return sections
+
+
+def _fixture_metadata_sections(
+    sections,
+    layout,
+    extra_relocation,
+    symbol_table,
+    symbol_strings,
+    section_strings,
+    section_name_offsets,
+):
     if extra_relocation:
         sections.append(
             (
@@ -250,9 +367,9 @@ def build_elf(
                 check_user_elf.SECTION_RELA,
                 0,
                 0,
-                relocation_offset,
+                layout.relocation_offset,
                 24,
-                symbol_section_index,
+                layout.symbol_section_index,
                 1,
                 8,
                 24,
@@ -265,9 +382,9 @@ def build_elf(
                 check_user_elf.SECTION_SYMTAB,
                 0,
                 0,
-                symbol_offset,
+                layout.symbol_offset,
                 len(symbol_table),
-                string_section_index,
+                layout.string_section_index,
                 1,
                 8,
                 check_user_elf.SYMBOL.size,
@@ -277,7 +394,7 @@ def build_elf(
                 check_user_elf.SECTION_STRTAB,
                 0,
                 0,
-                string_offset,
+                layout.string_offset,
                 len(symbol_strings),
                 0,
                 0,
@@ -289,7 +406,7 @@ def build_elf(
                 check_user_elf.SECTION_STRTAB,
                 0,
                 0,
-                section_string_offset,
+                layout.section_string_offset,
                 len(section_strings),
                 0,
                 0,
@@ -298,20 +415,6 @@ def build_elf(
             ),
         )
     )
-    for index, section in enumerate(sections):
-        check_user_elf.SECTION_HEADER.pack_into(
-            image,
-            section_offset + index * check_user_elf.SECTION_HEADER.size,
-            *section,
-        )
-    metadata = {
-        "program_offset": check_user_elf.ELF_HEADER.size,
-        "section_offset": section_offset,
-        "symbol_offset": symbol_offset,
-        "raw_symbol_index": 3,
-        "text_offset": text_offset,
-    }
-    return image, metadata
 
 
 def validation_errors(image):
