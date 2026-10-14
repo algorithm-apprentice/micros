@@ -7,10 +7,11 @@ and its design merged as PR #119, commit
 `531b191529c53f900dee1cb4b642bb85d58138c7`.
 
 Implementation is in progress. The structural Red gate, nine source sets,
-private-header/source skeletons and validation inheritance are integrated
-before extraction. The current 60-symbol and 27-function migrations still
-retain the existing implementation owners; skeleton presence does not claim
-that the final decomposition is complete.
+private-header/source skeletons and validation inheritance are integrated.
+Portable common/profile/manifest validation and runtime transitions now have
+their reviewed owners and named phases. The active migrations retain 54
+symbols and 24 long functions in the other existing owners; remaining
+skeletons do not claim that the final decomposition is complete.
 
 ## Reviewed base and scope
 

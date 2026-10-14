@@ -1,4 +1,4 @@
-#include "micros/bootstrap.h"
+#include "kernel/bootstrap_manifest_internal.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -7,104 +7,6 @@
 #include "micros/sv39.h"
 #include "micros/tty.h"
 #include "micros/vm_bootstrap.h"
-
-static void copy_bytes(void *destination, const void *source, size_t size)
-{
-    unsigned char *destination_bytes = destination;
-    const unsigned char *source_bytes = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        destination_bytes[index] = source_bytes[index];
-    }
-}
-
-static void clear_bytes(void *storage, size_t size)
-{
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static bool bytes_are_zero(const void *storage, size_t size)
-{
-    const unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool pointer_is_aligned(const void *pointer, size_t alignment)
-{
-    return (uintptr_t)pointer % alignment == 0;
-}
-
-static bool fixed_name_is_canonical(
-    const char name[MICROS_BOOTSTRAP_NAME_SIZE]
-)
-{
-    bool found_nul = false;
-    size_t index;
-
-    if (name[0] == '\0') {
-        return false;
-    }
-    for (index = 0; index < MICROS_BOOTSTRAP_NAME_SIZE; ++index) {
-        if (name[index] == '\0') {
-            found_nul = true;
-        } else if (found_nul) {
-            return false;
-        }
-    }
-    return found_nul;
-}
-
-static bool fixed_names_equal(
-    const char left[MICROS_BOOTSTRAP_NAME_SIZE],
-    const char right[MICROS_BOOTSTRAP_NAME_SIZE]
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_BOOTSTRAP_NAME_SIZE; ++index) {
-        if (left[index] != right[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool fixed_name_matches_literal(
-    const char name[MICROS_BOOTSTRAP_NAME_SIZE],
-    const char *literal
-)
-{
-    size_t index = 0;
-
-    while (literal[index] != '\0') {
-        if (
-            index >= MICROS_BOOTSTRAP_NAME_SIZE
-            || name[index] != literal[index]
-        ) {
-            return false;
-        }
-        ++index;
-    }
-    for (; index < MICROS_BOOTSTRAP_NAME_SIZE; ++index) {
-        if (name[index] != '\0') {
-            return false;
-        }
-    }
-    return true;
-}
 
 static const struct micros_bootstrap_expected_service *find_expected(
     const struct micros_bootstrap_expected_service *expected,
@@ -138,521 +40,6 @@ static const struct micros_bootstrap_image_info *find_image(
     return NULL;
 }
 
-static const struct micros_privilege_profile *find_profile(
-    const struct micros_privilege_profile *profiles,
-    size_t count,
-    uint8_t profile_id
-)
-{
-    size_t index;
-
-    for (index = 0; index < count; ++index) {
-        if (profiles[index].id == profile_id) {
-            return &profiles[index];
-        }
-    }
-    return NULL;
-}
-
-static bool profile_matches(
-    const struct micros_privilege_profile *profile,
-    uint8_t id,
-    const char *name,
-    uint32_t operations,
-    uint32_t call_targets,
-    uint32_t notify_targets,
-    uint64_t kernel_operations
-)
-{
-    return profile != NULL
-        && profile->id == id
-        && fixed_name_matches_literal(profile->name, name)
-        && profile->operations == operations
-        && profile->call_targets == call_targets
-        && profile->send_targets == 0
-        && profile->notify_targets == notify_targets
-        && profile->kernel_operations == kernel_operations;
-}
-
-static bool stable_service_profiles_match(
-    const struct micros_privilege_profile *profiles,
-    size_t profile_count
-)
-{
-    const uint32_t launcher_target =
-        UINT32_C(1)
-        << MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER;
-    const uint32_t bootstrap_service_operations =
-        MICROS_PRIVILEGE_OPERATION_RECEIVE
-        | MICROS_PRIVILEGE_OPERATION_CALL;
-
-    return profile_matches(
-        find_profile(
-            profiles,
-            profile_count,
-            MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
-        ),
-        MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,
-        "BOOTSTRAP_LAUNCHER",
-        MICROS_PRIVILEGE_OPERATION_RECEIVE
-            | MICROS_PRIVILEGE_OPERATION_REPLY,
-        0,
-        0,
-        MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
-    )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_VM
-            ),
-            MICROS_PRIVILEGE_PROFILE_VM,
-            "VM",
-            bootstrap_service_operations
-                | MICROS_PRIVILEGE_OPERATION_REPLY,
-            launcher_target,
-            0,
-            MICROS_KERNEL_OPERATION_VM_HANDOFF
-        )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_PM
-            ),
-            MICROS_PRIVILEGE_PROFILE_PM,
-            "PM",
-            bootstrap_service_operations
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
-            launcher_target
-                | (
-                    UINT32_C(1)
-                    << MICROS_PRIVILEGE_PROFILE_VM
-                ) | (
-                    UINT32_C(1)
-                    << MICROS_PRIVILEGE_PROFILE_VFS
-                ),
-            0,
-            MICROS_KERNEL_OPERATION_PM_CONTROL
-        )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_TTY
-            ),
-            MICROS_PRIVILEGE_PROFILE_TTY,
-            "TTY",
-            bootstrap_service_operations
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-                | MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            launcher_target,
-            UINT32_C(1) << MICROS_PRIVILEGE_PROFILE_VFS,
-            MICROS_KERNEL_OPERATION_TTY_CONTROL
-        )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_RAMFS
-            ),
-            MICROS_PRIVILEGE_PROFILE_RAMFS,
-            "RAMFS",
-            bootstrap_service_operations
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
-            launcher_target,
-            0,
-            0
-        )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_VFS
-            ),
-            MICROS_PRIVILEGE_PROFILE_VFS,
-            "VFS",
-            bootstrap_service_operations
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE,
-            launcher_target
-                | (
-                    UINT32_C(1)
-                    << MICROS_PRIVILEGE_PROFILE_TTY
-                ) | (
-                    UINT32_C(1)
-                    << MICROS_PRIVILEGE_PROFILE_RAMFS
-                ),
-            0,
-            0
-        )
-        && profile_matches(
-            find_profile(
-                profiles,
-                profile_count,
-                MICROS_PRIVILEGE_PROFILE_APPLICATION
-            ),
-            MICROS_PRIVILEGE_PROFILE_APPLICATION,
-            "APPLICATION",
-            MICROS_PRIVILEGE_OPERATION_CALL,
-            (
-                UINT32_C(1)
-                << MICROS_PRIVILEGE_PROFILE_PM
-            ) | (
-                UINT32_C(1)
-                << MICROS_PRIVILEGE_PROFILE_VFS
-            ),
-            0,
-            0
-        );
-}
-
-static enum micros_bootstrap_error validate_profile_table(
-    const struct micros_privilege_profile *profiles,
-    size_t profile_count
-)
-{
-    size_t index;
-
-    if (
-        profile_count == 0
-        || profile_count > MICROS_PRIVILEGE_PROFILE_CAPACITY
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_PROFILE;
-    }
-    for (index = 0; index < profile_count; ++index) {
-        const struct micros_privilege_profile *profile =
-            &profiles[index];
-        size_t character_index;
-        size_t other;
-
-        if (
-            profile->id == 0
-            || profile->id >= MICROS_PRIVILEGE_PROFILE_CAPACITY
-            || !fixed_name_is_canonical(profile->name)
-            || profile->operations == 0
-            || (
-                profile->operations
-                & ~MICROS_PRIVILEGE_OPERATION_DEFINED_MASK
-            ) != 0
-            || (
-                profile->call_targets != 0
-                && (
-                    profile->operations
-                    & MICROS_PRIVILEGE_OPERATION_CALL
-                ) == 0
-            )
-            || (
-                profile->send_targets != 0
-                && (
-                    profile->operations
-                    & MICROS_PRIVILEGE_OPERATION_SEND
-                ) == 0
-            )
-            || (
-                profile->notify_targets != 0
-                && (
-                    profile->operations
-                    & MICROS_PRIVILEGE_OPERATION_NOTIFY
-                ) == 0
-            )
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_PROFILE;
-        }
-        for (
-            character_index = 0;
-            character_index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE
-                && profile->name[character_index] != '\0';
-            ++character_index
-        ) {
-            unsigned char character =
-                (unsigned char)profile->name[character_index];
-
-            if (character < 0x20 || character > 0x7e) {
-                return MICROS_BOOTSTRAP_ERROR_PROFILE;
-            }
-        }
-        for (other = 0; other < index; ++other) {
-            if (
-                profiles[other].id == profile->id
-                || fixed_names_equal(
-                    profiles[other].name,
-                    profile->name
-                )
-            ) {
-                return MICROS_BOOTSTRAP_ERROR_PROFILE;
-            }
-        }
-    }
-    return MICROS_BOOTSTRAP_OK;
-}
-
-static enum micros_bootstrap_error validate_profile_relationships(
-    const struct micros_bootstrap_manifest *manifest,
-    const struct micros_privilege_profile *profiles,
-    size_t profile_count,
-    uint8_t controller_profile_id
-)
-{
-    const struct micros_privilege_profile *controller =
-        find_profile(
-            profiles,
-            profile_count,
-            controller_profile_id
-        );
-    uint32_t controller_target;
-    uint32_t installed_profile_targets = 0;
-    uint8_t vm_profile_id = 0;
-    uint8_t pm_profile_id = 0;
-    uint8_t console_profile_id = 0;
-    size_t index;
-
-    if (controller == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_PROFILE;
-    }
-    controller_target = UINT32_C(1) << controller_profile_id;
-    if (
-        controller->operations
-            != (
-                MICROS_PRIVILEGE_OPERATION_RECEIVE
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-            )
-        || controller->call_targets != 0
-        || controller->send_targets != 0
-        || controller->notify_targets != 0
-        || controller->kernel_operations
-            != MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_PROFILE;
-    }
-    for (index = 0; index < profile_count; ++index) {
-        installed_profile_targets |=
-            UINT32_C(1) << profiles[index].id;
-    }
-    for (index = 0; index < profile_count; ++index) {
-        if (
-            (
-                profiles[index].call_targets
-                | profiles[index].send_targets
-                | profiles[index].notify_targets
-            ) & ~installed_profile_targets
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_PROFILE;
-        }
-    }
-    for (index = 0; index < manifest->header.entry_count; ++index) {
-        if (
-            (
-                manifest->entries[index].role_flags
-                & MICROS_BOOTSTRAP_ROLE_VM
-            ) != 0
-        ) {
-            vm_profile_id = manifest->entries[index].profile_id;
-        }
-        if (
-            (
-                manifest->entries[index].role_flags
-                & MICROS_BOOTSTRAP_ROLE_PM
-            ) != 0
-        ) {
-            pm_profile_id = manifest->entries[index].profile_id;
-        }
-        if (
-            (
-                manifest->entries[index].role_flags
-                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
-            ) != 0
-        ) {
-            console_profile_id =
-                manifest->entries[index].profile_id;
-        }
-    }
-    if (
-        pm_profile_id != 0
-        && (
-            controller_profile_id
-                != MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER
-            || vm_profile_id != MICROS_PRIVILEGE_PROFILE_VM
-            || pm_profile_id != MICROS_PRIVILEGE_PROFILE_PM
-            || !stable_service_profiles_match(
-                profiles,
-                profile_count
-            )
-        )
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_PROFILE;
-    }
-    for (index = 0; index < profile_count; ++index) {
-        uint64_t expected_kernel_operations =
-            profiles[index].id == controller_profile_id
-            ? MICROS_KERNEL_OPERATION_BOOTSTRAP_CONTROL
-            : (
-                profiles[index].id == vm_profile_id
-                ? MICROS_KERNEL_OPERATION_VM_HANDOFF
-                : (
-                    profiles[index].id == pm_profile_id
-                    ? MICROS_KERNEL_OPERATION_PM_CONTROL
-                    : (
-                        pm_profile_id != 0
-                        && profiles[index].id
-                            == MICROS_PRIVILEGE_PROFILE_TTY
-                        ? MICROS_KERNEL_OPERATION_TTY_CONTROL
-                        : 0
-                    )
-                )
-            );
-
-        if (
-            profiles[index].kernel_operations
-                != expected_kernel_operations
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_PROFILE;
-        }
-    }
-    for (index = 0; index < manifest->header.entry_count; ++index) {
-        const struct micros_bootstrap_manifest_entry *entry =
-            &manifest->entries[index];
-        const struct micros_privilege_profile *profile;
-
-        if (entry->profile_id == controller_profile_id) {
-            if (
-                (
-                    entry->role_flags
-                    & MICROS_BOOTSTRAP_ROLE_CONTROLLER
-                ) == 0
-            ) {
-                return MICROS_BOOTSTRAP_ERROR_PROFILE;
-            }
-            continue;
-        }
-        if (
-            (
-                entry->role_flags
-                & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
-            ) != 0
-        ) {
-            profile = find_profile(
-                profiles,
-                profile_count,
-                entry->profile_id
-            );
-            if (
-                console_profile_id
-                    != MICROS_PRIVILEGE_PROFILE_TTY
-                || profile == NULL
-                || profile->operations
-                    != (
-                        MICROS_PRIVILEGE_OPERATION_RECEIVE
-                        | MICROS_PRIVILEGE_OPERATION_CALL
-                        | MICROS_PRIVILEGE_OPERATION_REPLY
-                        | MICROS_PRIVILEGE_OPERATION_NOTIFY
-                    )
-                || profile->call_targets != controller_target
-                || profile->send_targets != 0
-                || profile->notify_targets
-                    != (
-                        UINT32_C(1)
-                        << MICROS_PRIVILEGE_PROFILE_VFS
-                    )
-                || profile->kernel_operations
-                    != MICROS_KERNEL_OPERATION_TTY_CONTROL
-            ) {
-                return MICROS_BOOTSTRAP_ERROR_PROFILE;
-            }
-            continue;
-        }
-        if (
-            entry->profile_id
-                == MICROS_PRIVILEGE_PROFILE_APPLICATION
-            || (
-                (
-                    entry->role_flags
-                    & MICROS_BOOTSTRAP_ROLE_VM
-                ) != 0
-                && entry->profile_id
-                    != MICROS_PRIVILEGE_PROFILE_VM
-            )
-            || (
-                (
-                    entry->role_flags
-                    & MICROS_BOOTSTRAP_ROLE_PM
-                ) != 0
-                && entry->profile_id
-                    != MICROS_PRIVILEGE_PROFILE_PM
-            )
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_PROFILE;
-        }
-        profile = find_profile(
-            profiles,
-            profile_count,
-            entry->profile_id
-        );
-        if (
-            profile == NULL
-            || profile->operations
-                != (
-                    MICROS_PRIVILEGE_OPERATION_RECEIVE
-                    | MICROS_PRIVILEGE_OPERATION_CALL
-                    | (
-                        (
-                            entry->role_flags
-                            & MICROS_BOOTSTRAP_ROLE_VM
-                        ) != 0
-                        ? MICROS_PRIVILEGE_OPERATION_REPLY
-                        : 0
-                    )
-                    | (
-                        (
-                            entry->role_flags
-                            & MICROS_BOOTSTRAP_ROLE_PM
-                        ) != 0
-                        ? (
-                            MICROS_PRIVILEGE_OPERATION_REPLY
-                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
-                        )
-                        : 0
-                    )
-                    | (
-                        entry->profile_id
-                            == MICROS_PRIVILEGE_PROFILE_RAMFS
-                        ? (
-                            MICROS_PRIVILEGE_OPERATION_REPLY
-                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
-                        )
-                        : 0
-                    )
-                    | (
-                        entry->profile_id
-                            == MICROS_PRIVILEGE_PROFILE_VFS
-                        ? (
-                            MICROS_PRIVILEGE_OPERATION_REPLY
-                            | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
-                        )
-                        : 0
-                    )
-                )
-            || (
-                profile->call_targets & controller_target
-            ) == 0
-            || (
-                profile->call_targets & ~installed_profile_targets
-            ) != 0
-            || (
-                profile->call_targets
-                & (UINT32_C(1) << entry->profile_id)
-            ) != 0
-            || profile->send_targets != 0
-            || profile->notify_targets != 0
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_PROFILE;
-        }
-    }
-    return MICROS_BOOTSTRAP_OK;
-}
-
 static enum micros_bootstrap_error validate_header(
     const struct micros_bootstrap_manifest *manifest
 )
@@ -673,7 +60,7 @@ static enum micros_bootstrap_error validate_header(
         || header->flags != 0
         || header->reserved0 != 0
         || header->reserved1 != 0
-        || !bytes_are_zero(
+        || !bootstrap_manifest_bytes_are_zero(
             header->reserved2,
             sizeof(header->reserved2)
         )
@@ -703,11 +90,17 @@ static enum micros_bootstrap_error validate_entry_shape(
         || entry->stack_page_count == 0
         || entry->profile_id == 0
         || entry->user_page_limit == 0
-        || !bytes_are_zero(entry->reserved0, sizeof(entry->reserved0))
+        || !bootstrap_manifest_bytes_are_zero(
+            entry->reserved0,
+            sizeof(entry->reserved0)
+        )
         || entry->reserved1 != 0
-        || !bytes_are_zero(entry->reserved2, sizeof(entry->reserved2))
-        || !fixed_name_is_canonical(entry->service_name)
-        || !fixed_name_is_canonical(entry->profile_name)
+        || !bootstrap_manifest_bytes_are_zero(
+            entry->reserved2,
+            sizeof(entry->reserved2)
+        )
+        || !bootstrap_manifest_fixed_name_is_canonical(entry->service_name)
+        || !bootstrap_manifest_fixed_name_is_canonical(entry->profile_name)
         || (entry->role_flags & ~MICROS_BOOTSTRAP_ROLE_DEFINED_MASK) != 0
     ) {
         return MICROS_BOOTSTRAP_ERROR_SHAPE;
@@ -858,80 +251,63 @@ static enum micros_bootstrap_error validate_image_bound(
     return MICROS_BOOTSTRAP_OK;
 }
 
-enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
+static enum micros_bootstrap_error validation_failure(
+    struct micros_bootstrap_diagnostic *diagnostic,
+    enum micros_bootstrap_error error,
+    enum micros_bootstrap_diagnostic_reason reason,
+    uint32_t service_id,
+    uint64_t detail
+)
+{
+    if (diagnostic != NULL) {
+        *diagnostic = (struct micros_bootstrap_diagnostic){
+            .reason = reason,
+            .service_id = service_id,
+            .endpoint = MICROS_ENDPOINT_NONE,
+            .detail = detail,
+        };
+    }
+    return error;
+}
+
+static enum micros_bootstrap_error validate_arguments(
     const struct micros_bootstrap_manifest *manifest,
     const struct micros_bootstrap_expected_service *expected_services,
-    size_t expected_service_count,
     const struct micros_bootstrap_image_info *images,
-    size_t image_count,
     const struct micros_privilege_profile *profiles,
-    size_t profile_count,
-    uint64_t available_user_pages,
     struct micros_bootstrap_manifest_plan *plan,
     struct micros_bootstrap_diagnostic *diagnostic
 )
 {
-    struct micros_bootstrap_manifest_plan candidate;
-    uint64_t active_ids = 0;
-    uint64_t selected_ids = 0;
-    uint64_t total_pages = 0;
-    uint64_t prepared_mapping_count = 0;
-    uint32_t controller_count = 0;
-    uint32_t vm_count = 0;
-    uint32_t console_count = 0;
-    uint32_t pm_count = 0;
-    uint8_t controller_profile_id = 0;
-    const struct micros_bootstrap_manifest_entry *pm_entry = NULL;
-    const struct micros_bootstrap_manifest_entry *pm_identity_entry =
-        NULL;
-    const struct micros_bootstrap_manifest_entry *console_entry = NULL;
-    const struct micros_bootstrap_manifest_entry
-        *console_identity_entry = NULL;
-    size_t index;
-    enum micros_bootstrap_error error;
-
-#define RETURN_DIAGNOSTIC(error_value, reason_value, service_value, detail_value) \
-    do { \
-        if (diagnostic != NULL) { \
-            *diagnostic = (struct micros_bootstrap_diagnostic){ \
-                .reason = (reason_value), \
-                .service_id = (service_value), \
-                .endpoint = MICROS_ENDPOINT_NONE, \
-                .detail = (detail_value), \
-            }; \
-        } \
-        return (error_value); \
-    } while (false)
-
     if (
         manifest == NULL
         || expected_services == NULL
         || images == NULL
         || profiles == NULL
         || plan == NULL
-        || !pointer_is_aligned(
+        || !bootstrap_manifest_pointer_is_aligned(
             manifest,
             _Alignof(struct micros_bootstrap_manifest)
         )
-        || !pointer_is_aligned(
+        || !bootstrap_manifest_pointer_is_aligned(
             expected_services,
             _Alignof(struct micros_bootstrap_expected_service)
         )
-        || !pointer_is_aligned(
+        || !bootstrap_manifest_pointer_is_aligned(
             images,
             _Alignof(struct micros_bootstrap_image_info)
         )
-        || !pointer_is_aligned(
+        || !bootstrap_manifest_pointer_is_aligned(
             profiles,
             _Alignof(struct micros_privilege_profile)
         )
-        || !pointer_is_aligned(
+        || !bootstrap_manifest_pointer_is_aligned(
             plan,
             _Alignof(struct micros_bootstrap_manifest_plan)
         )
         || (
             diagnostic != NULL
-            && !pointer_is_aligned(
+            && !bootstrap_manifest_pointer_is_aligned(
                 diagnostic,
                 _Alignof(struct micros_bootstrap_diagnostic)
             )
@@ -939,10 +315,22 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
     ) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
-    clear_bytes(&candidate, sizeof(candidate));
-    error = validate_header(manifest);
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_manifest_tables(
+    const struct micros_bootstrap_manifest *manifest,
+    size_t expected_service_count,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    enum micros_bootstrap_error error = validate_header(manifest);
+
     if (error != MICROS_BOOTSTRAP_OK) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_HEADER,
             0,
@@ -950,16 +338,18 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         );
     }
     if (expected_service_count != manifest->header.entry_count) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             MICROS_BOOTSTRAP_ERROR_IDENTITY,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             0,
             0
         );
     }
-    error = validate_profile_table(profiles, profile_count);
+    error = bootstrap_manifest_validate_profile_table(profiles, profile_count);
     if (error != MICROS_BOOTSTRAP_OK) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE,
             0,
@@ -967,7 +357,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
         );
     }
     if (
-        !bytes_are_zero(
+        !bootstrap_manifest_bytes_are_zero(
             &manifest->entries[manifest->header.entry_count],
             (
                 MICROS_BOOTSTRAP_SERVICE_CAPACITY
@@ -975,244 +365,393 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
             ) * sizeof(manifest->entries[0])
         )
     ) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             MICROS_BOOTSTRAP_ERROR_SHAPE,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             0,
             0
         );
     }
-    for (index = 0; index < manifest->header.entry_count; ++index) {
-        const struct micros_bootstrap_manifest_entry *entry =
-            &manifest->entries[index];
-        const struct micros_bootstrap_expected_service *expected;
-        const struct micros_bootstrap_image_info *image;
-        const struct micros_privilege_profile *profile;
-        size_t other;
+    return MICROS_BOOTSTRAP_OK;
+}
 
-        error = validate_entry_shape(entry);
-        if (error != MICROS_BOOTSTRAP_OK) {
-            RETURN_DIAGNOSTIC(
-                error,
-                MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
-                entry->service_id <= 63 ? entry->service_id : 0,
-                0
-            );
-        }
-        for (other = 0; other < index; ++other) {
-            const struct micros_bootstrap_manifest_entry *prior =
-                &manifest->entries[other];
+static enum micros_bootstrap_error validate_entry_identity(
+    const struct micros_bootstrap_manifest *manifest,
+    size_t index,
+    const struct micros_bootstrap_expected_service *expected_services,
+    size_t expected_service_count,
+    const struct micros_bootstrap_expected_service **expected_entry,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    const struct micros_bootstrap_manifest_entry *entry =
+        &manifest->entries[index];
+    const struct micros_bootstrap_expected_service *expected;
+    size_t other;
 
-            if (
-                prior->service_id == entry->service_id
-                || prior->image_id == entry->image_id
-                || prior->process_slot == entry->process_slot
-                || fixed_names_equal(
-                    prior->service_name,
-                    entry->service_name
-                )
-                || fixed_names_equal(
-                    prior->profile_name,
-                    entry->profile_name
-                )
-            ) {
-                RETURN_DIAGNOSTIC(
-                    MICROS_BOOTSTRAP_ERROR_IDENTITY,
-                    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
-                    entry->service_id,
-                    0
-                );
-            }
-        }
-        expected = find_expected(
-            expected_services,
-            expected_service_count,
-            entry->service_id
-        );
+    for (other = 0; other < index; ++other) {
+        const struct micros_bootstrap_manifest_entry *prior =
+            &manifest->entries[other];
+
         if (
-            expected == NULL
-            || expected->reserved != 0
-            || expected->image_id != entry->image_id
-            || expected->process_slot != entry->process_slot
-            || expected->profile_id != entry->profile_id
-            || expected->prerequisites != entry->prerequisites
-            || expected->role_flags != entry->role_flags
-            || expected->device_base != entry->device_base
-            || expected->device_length != entry->device_length
-            || expected->irq_source != entry->irq_source
-            || !fixed_names_equal(
-                expected->service_name,
+            prior->service_id == entry->service_id
+            || prior->image_id == entry->image_id
+            || prior->process_slot == entry->process_slot
+            || bootstrap_manifest_fixed_names_equal(
+                prior->service_name,
                 entry->service_name
             )
-            || !fixed_names_equal(
-                expected->profile_name,
+            || bootstrap_manifest_fixed_names_equal(
+                prior->profile_name,
                 entry->profile_name
             )
         ) {
-            RETURN_DIAGNOSTIC(
+            return validation_failure(
+                diagnostic,
                 MICROS_BOOTSTRAP_ERROR_IDENTITY,
                 MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
                 entry->service_id,
                 0
             );
         }
-        profile = find_profile(profiles, profile_count, entry->profile_id);
-        if (
-            profile == NULL
-            || !fixed_names_equal(profile->name, entry->profile_name)
-            || profile->call_targets != expected->call_targets
-        ) {
-            RETURN_DIAGNOSTIC(
-                MICROS_BOOTSTRAP_ERROR_PROFILE,
-                MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE,
-                entry->service_id,
-                0
-            );
-        }
-        image = find_image(images, image_count, entry->image_id);
-        error = validate_image_bound(entry, image);
-        if (error != MICROS_BOOTSTRAP_OK) {
-            RETURN_DIAGNOSTIC(
-                error,
-                MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
-                entry->service_id,
-                0
-            );
-        }
-        {
-            uint64_t entry_mapping_count =
-                (uint64_t)image->page_count
-                + entry->stack_page_count;
+    }
+    expected = find_expected(
+        expected_services,
+        expected_service_count,
+        entry->service_id
+    );
+    if (
+        expected == NULL
+        || expected->reserved != 0
+        || expected->image_id != entry->image_id
+        || expected->process_slot != entry->process_slot
+        || expected->profile_id != entry->profile_id
+        || expected->prerequisites != entry->prerequisites
+        || expected->role_flags != entry->role_flags
+        || expected->device_base != entry->device_base
+        || expected->device_length != entry->device_length
+        || expected->irq_source != entry->irq_source
+        || !bootstrap_manifest_fixed_names_equal(
+            expected->service_name,
+            entry->service_name
+        )
+        || !bootstrap_manifest_fixed_names_equal(
+            expected->profile_name,
+            entry->profile_name
+        )
+    ) {
+        return validation_failure(
+            diagnostic,
+            MICROS_BOOTSTRAP_ERROR_IDENTITY,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+            entry->service_id,
+            0
+        );
+    }
+    *expected_entry = expected;
+    return MICROS_BOOTSTRAP_OK;
+}
 
-            if (
-                (entry->role_flags
-                    & MICROS_BOOTSTRAP_ROLE_CONTROLLER)
-                    != 0
-            ) {
-                ++entry_mapping_count;
-            }
-            if (
-                UINT64_MAX - prepared_mapping_count
-                    < entry_mapping_count
-            ) {
-                RETURN_DIAGNOSTIC(
-                    MICROS_BOOTSTRAP_ERROR_RANGE,
-                    MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
-                    entry->service_id,
-                    0
-                );
-            }
-            prepared_mapping_count += entry_mapping_count;
-        }
-        if (UINT64_MAX - total_pages < entry->user_page_limit) {
-            RETURN_DIAGNOSTIC(
-                MICROS_BOOTSTRAP_ERROR_RANGE,
-                MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
-                entry->service_id,
-                0
-            );
-        }
-        total_pages += entry->user_page_limit;
-        active_ids |= UINT64_C(1) << (entry->service_id - 1);
-        controller_count += (
-            entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER
-        ) != 0;
-        vm_count += (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) != 0;
-        console_count += (
-            entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
-        ) != 0;
-        pm_count += (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) != 0;
-        if (
-            entry->service_id == 3
-            && entry->process_slot == 2
-            && entry->profile_id == MICROS_PRIVILEGE_PROFILE_PM
-            && fixed_name_matches_literal(entry->service_name, "pm")
-            && fixed_name_matches_literal(entry->profile_name, "PM")
-        ) {
-            pm_identity_entry = entry;
-        }
-        if (
-            entry->service_id == MICROS_TTY_SERVICE_ID
-            && entry->process_slot == MICROS_TTY_PROCESS_SLOT
-            && entry->profile_id == MICROS_PRIVILEGE_PROFILE_TTY
-            && fixed_name_matches_literal(entry->service_name, "tty")
-            && fixed_name_matches_literal(entry->profile_name, "TTY")
-        ) {
-            console_identity_entry = entry;
-        }
-        if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER) {
-            candidate.controller_service_id = entry->service_id;
-            controller_profile_id = entry->profile_id;
-        }
-        if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) {
-            candidate.vm_service_id = entry->service_id;
-        }
-        if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER) {
-            candidate.console_service_id = entry->service_id;
-            console_entry = entry;
-        }
-        if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) {
-            candidate.pm_service_id = entry->service_id;
-            pm_entry = entry;
-        }
+static enum micros_bootstrap_error validate_entry_profile(
+    const struct micros_bootstrap_manifest_entry *entry,
+    const struct micros_bootstrap_expected_service *expected,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    const struct micros_privilege_profile *profile =
+        bootstrap_manifest_find_profile(
+            profiles,
+            profile_count,
+            entry->profile_id
+        );
+
+    if (
+        profile == NULL
+        || !bootstrap_manifest_fixed_names_equal(
+            profile->name,
+            entry->profile_name
+        )
+        || profile->call_targets != expected->call_targets
+    ) {
+        return validation_failure(
+            diagnostic,
+            MICROS_BOOTSTRAP_ERROR_PROFILE,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE,
+            entry->service_id,
+            0
+        );
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_entry_image(
+    const struct micros_bootstrap_manifest_entry *entry,
+    const struct micros_bootstrap_image_info *images,
+    size_t image_count,
+    struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    const struct micros_bootstrap_image_info *image =
+        find_image(images, image_count, entry->image_id);
+    enum micros_bootstrap_error error = validate_image_bound(entry, image);
+    uint64_t entry_mapping_count;
+
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return validation_failure(
+            diagnostic,
+            error,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
+            entry->service_id,
+            0
+        );
+    }
+    entry_mapping_count =
+        (uint64_t)image->page_count + entry->stack_page_count;
+    if (
+        (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER) != 0
+    ) {
+        ++entry_mapping_count;
     }
     if (
-        controller_count != 1
-        || vm_count > 1
-        || console_count > 1
-        || pm_count > 1
+        UINT64_MAX - candidate->prepared_mapping_count
+            < entry_mapping_count
+    ) {
+        return validation_failure(
+            diagnostic,
+            MICROS_BOOTSTRAP_ERROR_RANGE,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_IMAGE,
+            entry->service_id,
+            0
+        );
+    }
+    candidate->prepared_mapping_count += entry_mapping_count;
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error account_entry(
+    const struct micros_bootstrap_manifest_entry *entry,
+    struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    if (UINT64_MAX - candidate->total_pages < entry->user_page_limit) {
+        return validation_failure(
+            diagnostic,
+            MICROS_BOOTSTRAP_ERROR_RANGE,
+            MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+            entry->service_id,
+            0
+        );
+    }
+    candidate->total_pages += entry->user_page_limit;
+    candidate->active_ids |= UINT64_C(1) << (entry->service_id - 1);
+    candidate->controller_count += (
+        entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER
+    ) != 0;
+    candidate->vm_count += (
+        entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM
+    ) != 0;
+    candidate->console_count += (
+        entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER
+    ) != 0;
+    candidate->pm_count += (
+        entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM
+    ) != 0;
+    if (
+        entry->service_id == 3
+        && entry->process_slot == 2
+        && entry->profile_id == MICROS_PRIVILEGE_PROFILE_PM
+        && bootstrap_manifest_fixed_name_matches_literal(
+            entry->service_name,
+            "pm"
+        )
+        && bootstrap_manifest_fixed_name_matches_literal(
+            entry->profile_name,
+            "PM"
+        )
+    ) {
+        candidate->pm_identity_entry = entry;
+    }
+    if (
+        entry->service_id == MICROS_TTY_SERVICE_ID
+        && entry->process_slot == MICROS_TTY_PROCESS_SLOT
+        && entry->profile_id == MICROS_PRIVILEGE_PROFILE_TTY
+        && bootstrap_manifest_fixed_name_matches_literal(
+            entry->service_name,
+            "tty"
+        )
+        && bootstrap_manifest_fixed_name_matches_literal(
+            entry->profile_name,
+            "TTY"
+        )
+    ) {
+        candidate->console_identity_entry = entry;
+    }
+    if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONTROLLER) {
+        candidate->plan.controller_service_id = entry->service_id;
+        candidate->controller_profile_id = entry->profile_id;
+    }
+    if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_VM) {
+        candidate->plan.vm_service_id = entry->service_id;
+    }
+    if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER) {
+        candidate->plan.console_service_id = entry->service_id;
+        candidate->console_entry = entry;
+    }
+    if (entry->role_flags & MICROS_BOOTSTRAP_ROLE_PM) {
+        candidate->plan.pm_service_id = entry->service_id;
+        candidate->pm_entry = entry;
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_entries(
+    const struct micros_bootstrap_manifest *manifest,
+    const struct micros_bootstrap_expected_service *expected_services,
+    size_t expected_service_count,
+    const struct micros_bootstrap_image_info *images,
+    size_t image_count,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    size_t index;
+
+    for (index = 0; index < manifest->header.entry_count; ++index) {
+        const struct micros_bootstrap_manifest_entry *entry =
+            &manifest->entries[index];
+        const struct micros_bootstrap_expected_service *expected;
+        enum micros_bootstrap_error error;
+
+        error = validate_entry_shape(entry);
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return validation_failure(
+                diagnostic,
+                error,
+                MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
+                entry->service_id <= 63 ? entry->service_id : 0,
+                0
+            );
+        }
+        error = validate_entry_identity(
+            manifest,
+            index,
+            expected_services,
+            expected_service_count,
+            &expected,
+            diagnostic
+        );
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
+        }
+        error = validate_entry_profile(
+            entry,
+            expected,
+            profiles,
+            profile_count,
+            diagnostic
+        );
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
+        }
+        error = validate_entry_image(
+            entry,
+            images,
+            image_count,
+            candidate,
+            diagnostic
+        );
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
+        }
+        error = account_entry(entry, candidate, diagnostic);
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
+        }
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_aggregate_bounds(
+    const struct micros_bootstrap_manifest *manifest,
+    uint64_t available_user_pages,
+    const struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    if (
+        candidate->controller_count != 1
+        || candidate->vm_count > 1
+        || candidate->console_count > 1
+        || candidate->pm_count > 1
         || (
-            vm_count != 0
-            && prepared_mapping_count
+            candidate->vm_count != 0
+            && candidate->prepared_mapping_count
                 > MICROS_VM_MAX_STATIC_MAPPINGS
         )
-        || total_pages != manifest->header.total_user_page_limit
-        || total_pages > available_user_pages
+        || candidate->total_pages != manifest->header.total_user_page_limit
+        || candidate->total_pages > available_user_pages
     ) {
         enum micros_bootstrap_error aggregate_error =
-            controller_count != 1
-                || vm_count > 1
-                || console_count > 1
-                || pm_count > 1
+            candidate->controller_count != 1
+                || candidate->vm_count > 1
+                || candidate->console_count > 1
+                || candidate->pm_count > 1
                 ? MICROS_BOOTSTRAP_ERROR_ROLE
                 : MICROS_BOOTSTRAP_ERROR_RANGE;
 
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             aggregate_error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             0,
             0
         );
     }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_console_role(
+    const struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    const struct micros_bootstrap_manifest_entry *console_entry =
+        candidate->console_entry;
+
     if (
-        (console_entry == NULL && console_identity_entry != NULL)
+        (console_entry == NULL && candidate->console_identity_entry != NULL)
         || (
             console_entry != NULL
             && (
-                pm_entry == NULL
-                || console_entry->service_id
-                    != MICROS_TTY_SERVICE_ID
-                || console_entry->process_slot
-                    != MICROS_TTY_PROCESS_SLOT
-                || console_entry->profile_id
-                    != MICROS_PRIVILEGE_PROFILE_TTY
-                || !fixed_name_matches_literal(
+                candidate->pm_entry == NULL
+                || console_entry->service_id != MICROS_TTY_SERVICE_ID
+                || console_entry->process_slot != MICROS_TTY_PROCESS_SLOT
+                || console_entry->profile_id != MICROS_PRIVILEGE_PROFILE_TTY
+                || !bootstrap_manifest_fixed_name_matches_literal(
                     console_entry->service_name,
                     "tty"
                 )
-                || !fixed_name_matches_literal(
+                || !bootstrap_manifest_fixed_name_matches_literal(
                     console_entry->profile_name,
                     "TTY"
                 )
                 || console_entry->prerequisites
                     != (
                         UINT64_C(1)
-                        << (candidate.pm_service_id - 1)
+                        << (candidate->plan.pm_service_id - 1)
                     )
             )
         )
     ) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             MICROS_BOOTSTRAP_ERROR_ROLE,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             console_entry != NULL
@@ -1221,62 +760,118 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
             0
         );
     }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_pm_role(
+    const struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    const struct micros_bootstrap_manifest_entry *pm_entry =
+        candidate->pm_entry;
+    const struct micros_bootstrap_manifest_entry *pm_identity_entry =
+        candidate->pm_identity_entry;
+
     if (
         (
-            pm_count == 0
+            candidate->pm_count == 0
             && pm_identity_entry != NULL
-            && vm_count == 1
+            && candidate->vm_count == 1
             && pm_identity_entry->prerequisites
                 == (
                     UINT64_C(1)
-                    << (candidate.vm_service_id - 1)
+                    << (candidate->plan.vm_service_id - 1)
                 )
         )
         || (
             pm_entry != NULL
             && (
-                vm_count != 1
+                candidate->vm_count != 1
                 || pm_entry->service_id != 3
                 || pm_entry->process_slot != 2
-                || pm_entry->profile_id
-                    != MICROS_PRIVILEGE_PROFILE_PM
-                || !fixed_name_matches_literal(
+                || pm_entry->profile_id != MICROS_PRIVILEGE_PROFILE_PM
+                || !bootstrap_manifest_fixed_name_matches_literal(
                     pm_entry->service_name,
                     "pm"
                 )
-                || !fixed_name_matches_literal(
+                || !bootstrap_manifest_fixed_name_matches_literal(
                     pm_entry->profile_name,
                     "PM"
                 )
                 || pm_entry->prerequisites
                     != (
                         UINT64_C(1)
-                        << (candidate.vm_service_id - 1)
+                        << (candidate->plan.vm_service_id - 1)
                     )
             )
         )
     ) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             MICROS_BOOTSTRAP_ERROR_ROLE,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_ENTRY,
             pm_entry != NULL ? pm_entry->service_id : 3,
             0
         );
     }
-    error = validate_profile_relationships(
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_aggregate_roles(
+    const struct micros_bootstrap_manifest *manifest,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    uint64_t available_user_pages,
+    const struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    enum micros_bootstrap_error error = validate_aggregate_bounds(
+        manifest,
+        available_user_pages,
+        candidate,
+        diagnostic
+    );
+
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_console_role(candidate, diagnostic);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_pm_role(candidate, diagnostic);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = bootstrap_manifest_validate_profile_relationships(
         manifest,
         profiles,
         profile_count,
-        controller_profile_id
+        candidate->controller_profile_id
     );
     if (error != MICROS_BOOTSTRAP_OK) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             error,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_PROFILE,
             0,
             0
         );
     }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_topology(
+    const struct micros_bootstrap_manifest *manifest,
+    struct bootstrap_manifest_candidate *candidate,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    uint64_t selected_ids = 0;
+    size_t index;
+
     for (index = 0; index < manifest->header.entry_count; ++index) {
         uint32_t best_id = UINT32_MAX;
         size_t best_index = SIZE_MAX;
@@ -1301,7 +896,7 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
             }
         }
         if (best_index == SIZE_MAX) {
-            uint64_t unresolved = active_ids & ~selected_ids;
+            uint64_t unresolved = candidate->active_ids & ~selected_ids;
             uint32_t implicated_service = 0;
             size_t unresolved_index;
 
@@ -1327,38 +922,109 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
                     implicated_service = candidate_id;
                 }
             }
-            RETURN_DIAGNOSTIC(
+            return validation_failure(
+                diagnostic,
                 MICROS_BOOTSTRAP_ERROR_TOPOLOGY,
                 MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE,
                 implicated_service,
                 unresolved
             );
         }
-        candidate.ordered_service_ids[index] = best_id;
-        candidate.ordered_manifest_indices[index] =
+        candidate->plan.ordered_service_ids[index] = best_id;
+        candidate->plan.ordered_manifest_indices[index] =
             (uint16_t)best_index;
         selected_ids |= UINT64_C(1) << (best_id - 1);
     }
     if (
-        candidate.ordered_service_ids[0]
-            != candidate.controller_service_id
+        candidate->plan.ordered_service_ids[0]
+            != candidate->plan.controller_service_id
     ) {
-        RETURN_DIAGNOSTIC(
+        return validation_failure(
+            diagnostic,
             MICROS_BOOTSTRAP_ERROR_TOPOLOGY,
             MICROS_BOOTSTRAP_DIAGNOSTIC_MANIFEST_CYCLE,
-            candidate.controller_service_id,
+            candidate->plan.controller_service_id,
             UINT64_C(1)
-                << (candidate.controller_service_id - 1)
+                << (candidate->plan.controller_service_id - 1)
         );
     }
-    candidate.entry_count = manifest->header.entry_count;
-    candidate.total_user_page_limit =
-        manifest->header.total_user_page_limit;
-    copy_bytes(plan, &candidate, sizeof(*plan));
-    if (diagnostic != NULL) {
-        clear_bytes(diagnostic, sizeof(*diagnostic));
+    return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_manifest_validate_detailed(
+    const struct micros_bootstrap_manifest *manifest,
+    const struct micros_bootstrap_expected_service *expected_services,
+    size_t expected_service_count,
+    const struct micros_bootstrap_image_info *images,
+    size_t image_count,
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    uint64_t available_user_pages,
+    struct micros_bootstrap_manifest_plan *plan,
+    struct micros_bootstrap_diagnostic *diagnostic
+)
+{
+    struct bootstrap_manifest_candidate candidate;
+    enum micros_bootstrap_error error;
+
+    error = validate_arguments(
+        manifest,
+        expected_services,
+        images,
+        profiles,
+        plan,
+        diagnostic
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
-#undef RETURN_DIAGNOSTIC
+    bootstrap_manifest_clear_bytes(&candidate, sizeof(candidate));
+    error = validate_manifest_tables(
+        manifest,
+        expected_service_count,
+        profiles,
+        profile_count,
+        diagnostic
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_entries(
+        manifest,
+        expected_services,
+        expected_service_count,
+        images,
+        image_count,
+        profiles,
+        profile_count,
+        &candidate,
+        diagnostic
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_aggregate_roles(
+        manifest,
+        profiles,
+        profile_count,
+        available_user_pages,
+        &candidate,
+        diagnostic
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_topology(manifest, &candidate, diagnostic);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    candidate.plan.entry_count = manifest->header.entry_count;
+    candidate.plan.total_user_page_limit =
+        manifest->header.total_user_page_limit;
+    bootstrap_manifest_copy_bytes(plan, &candidate.plan, sizeof(*plan));
+    if (diagnostic != NULL) {
+        bootstrap_manifest_clear_bytes(diagnostic, sizeof(*diagnostic));
+    }
     return MICROS_BOOTSTRAP_OK;
 }
 
@@ -1386,335 +1052,4 @@ enum micros_bootstrap_error micros_bootstrap_manifest_validate(
         plan,
         NULL
     );
-}
-
-static struct micros_bootstrap_runtime_entry *runtime_entry(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
-        }
-    }
-    return NULL;
-}
-
-static const struct micros_bootstrap_runtime_entry *runtime_entry_const(
-    const struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
-        }
-    }
-    return NULL;
-}
-
-enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
-    const struct micros_bootstrap_manifest *manifest,
-    const struct micros_bootstrap_manifest_plan *plan,
-    struct micros_bootstrap_runtime *runtime
-)
-{
-    struct micros_bootstrap_runtime candidate;
-    size_t index;
-
-    if (manifest == NULL || plan == NULL || runtime == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    clear_bytes(&candidate, sizeof(candidate));
-    if (
-        !pointer_is_aligned(
-            manifest,
-            _Alignof(struct micros_bootstrap_manifest)
-        )
-        || !pointer_is_aligned(
-            plan,
-            _Alignof(struct micros_bootstrap_manifest_plan)
-        )
-        || !pointer_is_aligned(
-            runtime,
-            _Alignof(struct micros_bootstrap_runtime)
-        )
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (!bytes_are_zero(runtime, sizeof(*runtime))) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    if (
-        plan->entry_count == 0
-        || plan->entry_count != manifest->header.entry_count
-        || plan->controller_service_id == 0
-        || plan->ordered_service_ids[0]
-            != plan->controller_service_id
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
-    }
-    candidate.phase = MICROS_BOOTSTRAP_PHASE_RUNNING;
-    candidate.entry_count = plan->entry_count;
-    candidate.next_order_index = 1;
-    candidate.controller_service_id = plan->controller_service_id;
-    for (index = 0; index < plan->entry_count; ++index) {
-        const struct micros_bootstrap_manifest_entry *manifest_entry =
-            &manifest->entries[index];
-        struct micros_bootstrap_runtime_entry *entry =
-            &candidate.entries[index];
-
-        entry->service_id = manifest_entry->service_id;
-        entry->prerequisites = manifest_entry->prerequisites;
-        entry->ready_timeout_counter_ticks =
-            manifest_entry->ready_timeout_counter_ticks;
-        if (
-            entry->service_id == plan->controller_service_id
-        ) {
-            entry->state = MICROS_BOOTSTRAP_SERVICE_READY;
-            entry->endpoint_state =
-                MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
-            entry->profile_installed = true;
-            entry->scheduler_assigned = true;
-        } else {
-            entry->state = MICROS_BOOTSTRAP_SERVICE_PREPARED;
-            entry->endpoint_state =
-                MICROS_BOOTSTRAP_ENDPOINT_RESERVED;
-        }
-        candidate.ordered_service_ids[index] =
-            plan->ordered_service_ids[index];
-    }
-    copy_bytes(runtime, &candidate, sizeof(*runtime));
-    return MICROS_BOOTSTRAP_OK;
-}
-
-static enum micros_bootstrap_error runtime_release(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id,
-    uint64_t now,
-    uint64_t retained_deadline,
-    bool retain_deadline
-)
-{
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *entry;
-    uint64_t ready_ids = 0;
-    size_t index;
-
-    if (runtime == NULL || service_id == 0) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    if (runtime_entry(runtime, service_id) == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (
-        runtime->starting_service_id != 0
-        || runtime->next_order_index >= runtime->entry_count
-        || runtime->ordered_service_ids[runtime->next_order_index]
-            != service_id
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    copy_bytes(&candidate, runtime, sizeof(candidate));
-    entry = runtime_entry(&candidate, service_id);
-    if (
-        entry == NULL
-        || entry->state != MICROS_BOOTSTRAP_SERVICE_PREPARED
-        || entry->endpoint_state
-            != MICROS_BOOTSTRAP_ENDPOINT_RESERVED
-        || entry->profile_installed
-        || entry->scheduler_assigned
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    for (index = 0; index < candidate.entry_count; ++index) {
-        if (
-            candidate.entries[index].state
-                == MICROS_BOOTSTRAP_SERVICE_READY
-        ) {
-            ready_ids |= UINT64_C(1)
-                << (candidate.entries[index].service_id - 1);
-        }
-    }
-    if ((entry->prerequisites & ~ready_ids) != 0) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    if (entry->ready_timeout_counter_ticks == 0) {
-        return MICROS_BOOTSTRAP_ERROR_RANGE;
-    }
-    if (retain_deadline) {
-        if (retained_deadline == 0 || now >= retained_deadline) {
-            return MICROS_BOOTSTRAP_ERROR_STATE;
-        }
-    } else if (
-        UINT64_MAX - now < entry->ready_timeout_counter_ticks
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_RANGE;
-    }
-    entry->profile_installed = true;
-    entry->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
-    entry->scheduler_assigned = true;
-    entry->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
-    entry->ready_deadline = retain_deadline
-        ? retained_deadline
-        : now + entry->ready_timeout_counter_ticks;
-    candidate.starting_service_id = service_id;
-    copy_bytes(runtime, &candidate, sizeof(*runtime));
-    return MICROS_BOOTSTRAP_OK;
-}
-
-enum micros_bootstrap_error micros_bootstrap_runtime_release(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id,
-    uint64_t now
-)
-{
-    return runtime_release(runtime, service_id, now, 0, false);
-}
-
-enum micros_bootstrap_error
-micros_bootstrap_runtime_release_retaining_deadline(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id,
-    uint64_t now,
-    uint64_t deadline
-)
-{
-    return runtime_release(
-        runtime,
-        service_id,
-        now,
-        deadline,
-        true
-    );
-}
-
-enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id,
-    uint64_t now
-)
-{
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *entry;
-
-    if (runtime == NULL || service_id == 0) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    if (runtime_entry(runtime, service_id) == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (runtime->starting_service_id != service_id) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    copy_bytes(&candidate, runtime, sizeof(candidate));
-    entry = runtime_entry(&candidate, service_id);
-    if (
-        entry == NULL
-        || entry->state != MICROS_BOOTSTRAP_SERVICE_STARTING
-        || entry->ready_deadline == 0
-        || now >= entry->ready_deadline
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    entry->state = MICROS_BOOTSTRAP_SERVICE_READY;
-    entry->ready_deadline = 0;
-    candidate.starting_service_id = 0;
-    ++candidate.next_order_index;
-    copy_bytes(runtime, &candidate, sizeof(*runtime));
-    return MICROS_BOOTSTRAP_OK;
-}
-
-enum micros_bootstrap_error micros_bootstrap_runtime_complete(
-    struct micros_bootstrap_runtime *runtime
-)
-{
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *controller;
-    size_t index;
-
-    if (runtime == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    if (
-        runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
-        || runtime->starting_service_id != 0
-        || runtime->next_order_index != runtime->entry_count
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (
-            runtime->entries[index].state
-                != MICROS_BOOTSTRAP_SERVICE_READY
-            || runtime->entries[index].ready_deadline != 0
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_STATE;
-        }
-    }
-    copy_bytes(&candidate, runtime, sizeof(candidate));
-    controller = runtime_entry(
-        &candidate,
-        candidate.controller_service_id
-    );
-    if (
-        controller == NULL
-        || controller->endpoint_state
-            != MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
-        || !controller->profile_installed
-        || !controller->scheduler_assigned
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
-    }
-    controller->endpoint_state =
-        MICROS_BOOTSTRAP_ENDPOINT_SOURCE_ONLY;
-    controller->scheduler_assigned = false;
-    candidate.phase = MICROS_BOOTSTRAP_PHASE_SEALED;
-    candidate.controller_service_id = 0;
-    copy_bytes(runtime, &candidate, sizeof(*runtime));
-    return MICROS_BOOTSTRAP_OK;
-}
-
-enum micros_bootstrap_ready_class micros_bootstrap_classify_ready(
-    const struct micros_bootstrap_runtime *runtime,
-    uint32_t source_service_id,
-    uint32_t payload_service_id,
-    bool message_shape_valid
-)
-{
-    const struct micros_bootstrap_runtime_entry *entry;
-
-    if (!message_shape_valid) {
-        return MICROS_BOOTSTRAP_READY_MALFORMED;
-    }
-    if (runtime == NULL || source_service_id == 0) {
-        return MICROS_BOOTSTRAP_READY_FOREIGN;
-    }
-    entry = runtime_entry_const(runtime, source_service_id);
-    if (entry == NULL) {
-        return MICROS_BOOTSTRAP_READY_FOREIGN;
-    }
-    if (source_service_id == runtime->starting_service_id) {
-        return payload_service_id == source_service_id
-            ? MICROS_BOOTSTRAP_READY_ACCEPT
-            : MICROS_BOOTSTRAP_READY_MALFORMED;
-    }
-    if (entry->state == MICROS_BOOTSTRAP_SERVICE_READY) {
-        return MICROS_BOOTSTRAP_READY_DUPLICATE;
-    }
-    if (entry->state == MICROS_BOOTSTRAP_SERVICE_PREPARED) {
-        return MICROS_BOOTSTRAP_READY_EARLY;
-    }
-    return MICROS_BOOTSTRAP_READY_FOREIGN;
 }

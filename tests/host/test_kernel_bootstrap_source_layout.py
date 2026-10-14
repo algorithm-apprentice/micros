@@ -300,7 +300,23 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in FINAL_OWNER_GROUPS.items() for name in names
 )
 # Delete exact entries only after their definitions reach the final owner.
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
+    if entry not in (
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_runtime_initialize"),
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_runtime_release"),
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_runtime_release_retaining_deadline"),
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_runtime_accept_ready"),
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_runtime_complete"),
+        ("kernel/bootstrap_manifest.c", "kernel/bootstrap_transitions.c",
+         "micros_bootstrap_classify_ready"),
+    )
+)
 
 # Physical lengths, rename/format-independent body fingerprints, and the
 # Accepted semantic phase outlines all come from REVIEWED_BASE.
@@ -415,7 +431,14 @@ LONG_FUNCTION_REQUIREMENTS = {
     ),
 }
 INITIAL_LONG_FUNCTION_MIGRATION = tuple(LONG_FUNCTION_REQUIREMENTS)
-LONG_FUNCTION_MIGRATION = INITIAL_LONG_FUNCTION_MIGRATION
+LONG_FUNCTION_MIGRATION = tuple(
+    entry for entry in INITIAL_LONG_FUNCTION_MIGRATION
+    if entry not in (
+        ("kernel/bootstrap_manifest.c", "stable_service_profiles_match"),
+        ("kernel/bootstrap_manifest.c", "validate_profile_relationships"),
+        ("kernel/bootstrap_manifest.c", "micros_bootstrap_manifest_validate_detailed"),
+    )
+)
 
 RETAINED_OWNER_GROUPS = {
     "kernel/bootstrap_manifest.c": (

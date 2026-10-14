@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_generate_bootstrap_fixture import bootstrap_image
@@ -81,6 +82,10 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
             probe_image(),
         )
 
+        self.assertEqual(
+            "6b988f6fc51404decf3411d27e8102b1d88f6f4af3400ac63490ee89fc53da8f",
+            hashlib.sha256(output.encode("utf-8")).hexdigest(),
+        )
         self.assertIn("micros_vm_handoff_test_images", output)
         self.assertIn("MICROS_BOOTSTRAP_ROLE_VM", output)
         self.assertIn(
