@@ -1,0 +1,6 @@
+#ifndef MICROS_TESTS_HOST_RUNTIME_TEST_INTERNAL_H
+#define MICROS_TESTS_HOST_RUNTIME_TEST_INTERNAL_H
+
+#include "micros/runtime.h"
+
+#endif

@@ -3,8 +3,14 @@
 This is the exact design contract for the six trap/syscall correction sources
 in [the source-module audit](source-module-audit.md).
 [ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) is Accepted
-after a clean independent design review. Implementation remains pending until
-the separate design merge.
+after a clean independent design review. Its separate design merged as PR #121,
+commit `358285ee41d923817702e74ae849fa12f8feec0c`.
+
+Implementation is in progress. The structural Red gate, five exact source sets,
+empty future owners/private contracts and validation inheritance are integrated.
+The original five C bodies remain unchanged; all fourteen symbol moves and
+nine long-function semantic splits are still pending. Empty skeletons do not
+claim that the reviewed extraction is complete.
 
 ## Base, outcome, and non-goals
 

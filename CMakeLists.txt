@@ -920,6 +920,51 @@ set(
     tests/host/fdt_memory_test.c
 )
 
+set(
+    MICROS_TRAP_SOURCES
+    kernel/trap.c
+    kernel/trap_context.c
+    kernel/trap_user.c
+    kernel/trap_interrupt.c
+    kernel/trap_syscall.c
+    kernel/trap_fault.c
+    kernel/trap_test.c
+    kernel/trap_test_hooks.c
+)
+
+set(
+    MICROS_SYSCALL_SOURCES
+    kernel/syscall.c
+    kernel/syscall_decode.c
+    kernel/syscall_context.c
+)
+
+set(
+    MICROS_USER_RUNTIME_KERNEL_TEST_SOURCES
+    kernel/user_runtime_test.c
+    kernel/user_runtime_test_state.c
+    kernel/user_runtime_test_image.c
+    kernel/user_runtime_test_setup.c
+    kernel/user_runtime_test_trap.c
+    kernel/user_runtime_test_cleanup.c
+    kernel/user_runtime_test_report.c
+)
+
+set(
+    MICROS_USER_RUNTIME_SERVICE_TEST_SOURCES
+    tests/qemu/user_runtime_service.c
+    tests/qemu/user_runtime_service_common.c
+    tests/qemu/user_runtime_client.c
+    tests/qemu/user_runtime_responders.c
+)
+
+set(
+    MICROS_RUNTIME_HOST_TEST_SOURCES
+    tests/host/runtime_test.c
+    tests/host/runtime_test_fixture.c
+    tests/host/runtime_wrapper_test.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
@@ -1012,7 +1057,7 @@ if(MICROS_BUILD_HOST_TESTS)
         lib/runtime/memory.c
         lib/runtime/runtime.c
         tests/qemu/bootstrap_launcher_control.c
-        tests/host/runtime_test.c
+        ${MICROS_RUNTIME_HOST_TEST_SOURCES}
     )
     add_executable(
         bootstrap_test
@@ -2401,7 +2446,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
         lib/runtime/runtime.c
         lib/runtime/start.S
         tests/qemu/user_runtime_probe.S
-        tests/qemu/user_runtime_service.c
+        ${MICROS_USER_RUNTIME_SERVICE_TEST_SOURCES}
     )
     set_target_properties(
         micros_user_runtime_service
@@ -3231,7 +3276,7 @@ add_executable(
     kernel/ipc_buffer.c
     kernel/ipc_runtime.c
     ${MICROS_IPC_SYSCALL_SOURCES}
-    kernel/syscall.c
+    ${MICROS_SYSCALL_SOURCES}
     kernel/kernel_object_runtime.c
     kernel/kernel_objects.c
     kernel/scheduler_core.c
@@ -3244,7 +3289,7 @@ add_executable(
     ${MICROS_PM_CONTROL_TARGET_SOURCES}
     kernel/sv39.c
     kernel/timer.c
-    kernel/trap.c
+    ${MICROS_TRAP_SOURCES}
     kernel/trap_route_core.c
     kernel/tty_control_core.c
     kernel/tty_control_syscall.c
@@ -3290,7 +3335,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
         PRIVATE
             "${MICROS_USER_RUNTIME_FIXTURE_SOURCE}"
             arch/riscv64/user_runtime_test.S
-            kernel/user_runtime_test.c
+            ${MICROS_USER_RUNTIME_KERNEL_TEST_SOURCES}
     )
 endif()
 

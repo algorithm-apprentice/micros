@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_check_user_elf import build_elf
@@ -52,6 +53,12 @@ class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
             fixture_image()
         )
 
+        encoded = output.encode("utf-8")
+        self.assertEqual(53812, len(encoded))
+        self.assertEqual(
+            "7a9432c01e562e89d270452df361e0610796c4cbb107a2bce9f1384b7b6a60ea",
+            hashlib.sha256(encoded).hexdigest(),
+        )
         self.assertIn("segment_0_bytes", output)
         self.assertIn(".segment_count = 3", output)
         self.assertIn(
@@ -95,6 +102,49 @@ class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
 
         with self.assertRaises(check_user_elf.ElfFormatError):
             generate_user_runtime_fixture.render_fixture(image)
+
+    def test_preserves_fixture_permission_error_order(self):
+        cases = (
+            (
+                {"micros_user_runtime_test_rodata": 0x2000},
+                "fixture rodata probe is not in the read-only segment",
+            ),
+            (
+                {"micros_user_runtime_test_rodata_fault": 0x1000},
+                "fixture symbol micros_user_runtime_test_rodata_fault "
+                "is not executable",
+            ),
+            (
+                {"micros_user_runtime_test_rodata_resume": 0x1000},
+                "fixture symbol micros_user_runtime_test_rodata_resume "
+                "is not executable",
+            ),
+            (
+                {
+                    "micros_user_runtime_test_config": 0x1000,
+                    "micros_user_runtime_test_rodata": 0x2000,
+                },
+                "fixture configuration is not in the writable segment",
+            ),
+        )
+        for offsets, expected_error in cases:
+            image = fixture_image()
+            image = replace(
+                image,
+                symbols=tuple(
+                    replace(
+                        symbol,
+                        value=check_user_elf.USER_BASE + offsets[symbol.name],
+                    )
+                    if symbol.name in offsets
+                    else symbol
+                    for symbol in image.symbols
+                ),
+            )
+            with self.subTest(offsets=offsets):
+                with self.assertRaises(check_user_elf.ElfFormatError) as raised:
+                    generate_user_runtime_fixture.render_fixture(image)
+                self.assertEqual(expected_error, str(raised.exception))
 
 
 if __name__ == "__main__":
