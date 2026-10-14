@@ -1,5 +1,14 @@
 #include "scheduler_core_private.h"
 
+struct scheduler_ipc_transition_candidate {
+    struct micros_thread_handle handle;
+    struct micros_thread *thread;
+    struct micros_hart *hart;
+    uint32_t clear_flags;
+    uint32_t set_flags;
+    uint32_t resulting_flags;
+};
+
 static bool ipc_transition_clear_flags_are_valid(uint32_t flags)
 {
     return (
@@ -23,32 +32,14 @@ static bool ipc_transition_set_flags_are_valid(uint32_t flags)
     );
 }
 
-enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
-    struct micros_kernel_objects *objects,
+static enum micros_kernel_object_error preflight_transition_shapes(
     const struct micros_scheduler_ipc_transition *requests,
     size_t request_count
 )
 {
-    struct {
-        struct micros_thread_handle handle;
-        struct micros_thread *thread;
-        struct micros_hart *hart;
-        uint32_t clear_flags;
-        uint32_t set_flags;
-        uint32_t resulting_flags;
-    } transitions[MICROS_THREAD_CAPACITY];
-    enum micros_kernel_object_error error;
     size_t index;
     size_t other_index;
 
-    if (
-        objects == NULL
-        || requests == NULL
-        || request_count < 1
-        || request_count > MICROS_THREAD_CAPACITY
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
     for (index = 0; index < request_count; ++index) {
         if (
             !ipc_transition_clear_flags_are_valid(
@@ -75,10 +66,19 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
             }
         }
     }
-    error = micros_scheduler_core_validate(objects);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+static enum micros_kernel_object_error preflight_transition_candidates(
+    struct micros_kernel_objects *objects,
+    const struct micros_scheduler_ipc_transition *requests,
+    size_t request_count,
+    struct scheduler_ipc_transition_candidate *transitions
+)
+{
+    enum micros_kernel_object_error error;
+    size_t index;
+
     for (index = 0; index < request_count; ++index) {
         transitions[index].handle = requests[index].handle;
         transitions[index].clear_flags =
@@ -137,6 +137,16 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
             return error;
         }
     }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+static void commit_transition_candidates(
+    struct micros_kernel_objects *objects,
+    struct scheduler_ipc_transition_candidate *transitions,
+    size_t request_count
+)
+{
+    size_t index;
 
     for (index = 0; index < request_count; ++index) {
         transitions[index].thread->runtime_flags =
@@ -149,6 +159,45 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
             );
         }
     }
+}
+
+enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
+    struct micros_kernel_objects *objects,
+    const struct micros_scheduler_ipc_transition *requests,
+    size_t request_count
+)
+{
+    struct scheduler_ipc_transition_candidate transitions[
+        MICROS_THREAD_CAPACITY
+    ];
+    enum micros_kernel_object_error error;
+
+    if (
+        objects == NULL
+        || requests == NULL
+        || request_count < 1
+        || request_count > MICROS_THREAD_CAPACITY
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = preflight_transition_shapes(requests, request_count);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = micros_scheduler_core_validate(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = preflight_transition_candidates(
+        objects,
+        requests,
+        request_count,
+        transitions
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    commit_transition_candidates(objects, transitions, request_count);
     return MICROS_KERNEL_OBJECT_OK;
 }
 

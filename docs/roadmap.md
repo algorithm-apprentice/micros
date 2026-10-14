@@ -307,9 +307,11 @@ The design separates queue, IPC transaction, validation, planning/commit,
 accounting, target completion/return/interrupt/idle, and independent evidence
 owners while retaining all current behavior. It names 38 C sources, six
 private contracts, six source sets, 138 moving definitions, and twelve
-semantic long-function splits. Its independent design review is clean;
-implementation remains pending until the separate design merge. This does not
-add application startup, dynamic PID-1 integration, or a new runtime dependency.
+semantic long-function splits. Its independently reviewed design merged as
+#123. Implementation now separates the portable core owners and their required
+semantic phases; target-runtime and evidence extraction remain in progress.
+This does not add application startup, dynamic PID-1 integration, or a new
+runtime dependency.
 
 ## v0.1 completion goal
 

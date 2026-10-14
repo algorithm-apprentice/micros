@@ -104,30 +104,27 @@ static size_t scratch_pick(void)
     return MICROS_THREAD_CAPACITY;
 }
 
-enum micros_kernel_object_error micros_hart_plan_user_return(
+static void clear_return_candidate(
+    struct micros_scheduler_return_plan *candidate
+)
+{
+    unsigned char *bytes = (unsigned char *)candidate;
+    size_t index;
+
+    for (index = 0; index < sizeof(*candidate); ++index) {
+        bytes[index] = 0;
+    }
+}
+
+static enum micros_kernel_object_error preflight_return_plan(
     const struct micros_kernel_objects *objects,
     struct micros_hart_handle hart_handle,
-    struct micros_scheduler_return_plan *plan
+    const struct micros_hart **hart_result
 )
 {
     const struct micros_hart *hart;
-    struct micros_scheduler_return_plan candidate;
-    size_t selected_slot;
-    size_t renew_count = 0;
-    size_t index;
-    size_t priority;
     enum micros_kernel_object_error error;
 
-    if (plan == NULL) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
-    {
-        unsigned char *bytes = (unsigned char *)&candidate;
-
-        for (index = 0; index < sizeof(candidate); ++index) {
-            bytes[index] = 0;
-        }
-    }
     error = micros_scheduler_core_validate(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
@@ -152,15 +149,16 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    error = scratch_load(objects, hart);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
+    *hart_result = hart;
+    return MICROS_KERNEL_OBJECT_OK;
+}
 
-    candidate.hart = hart_handle;
-    candidate.outgoing = hart->current_thread;
-    scheduler_core_bitmap_clear(candidate.renew_bitmap);
-    scheduler_core_bitmap_clear(candidate.ready_bitmap);
+static void repair_preempted_candidate(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_scheduler_return_plan *candidate
+)
+{
     if (!scheduler_core_thread_handle_is_null(hart->current_thread)) {
         const struct micros_thread *current =
             &objects->threads[hart->current_thread.slot];
@@ -173,7 +171,7 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
                 current->runtime_flags
                 & ~MICROS_THREAD_RTS_PREEMPTED;
 
-            candidate.repair_preempted = true;
+            candidate->repair_preempted = true;
             if (resulting == 0) {
                 if (current->remaining_counter_ticks == 0) {
                     scratch_tail(
@@ -189,6 +187,17 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
             }
         }
     }
+}
+
+static enum micros_kernel_object_error select_and_renew_candidate(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_scheduler_return_plan *candidate,
+    size_t *selected_slot_out
+)
+{
+    size_t selected_slot;
+    size_t renew_count = 0;
 
     selected_slot = (
         !scheduler_core_thread_handle_is_null(hart->current_thread)
@@ -207,7 +216,7 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
         if (
             selected->remaining_counter_ticks != 0
             || scheduler_core_bitmap_test(
-                candidate.renew_bitmap,
+                candidate->renew_bitmap,
                 selected_slot
             )
         ) {
@@ -216,8 +225,8 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
         if (++renew_count > MICROS_THREAD_CAPACITY) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
-        scheduler_core_bitmap_set(candidate.renew_bitmap, selected_slot);
-        candidate.renew_quantum = true;
+        scheduler_core_bitmap_set(candidate->renew_bitmap, selected_slot);
+        candidate->renew_quantum = true;
         if (!selected->scheduler_preemptible) {
             break;
         }
@@ -231,7 +240,103 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
         );
         selected_slot = scratch_pick();
     }
+    *selected_slot_out = selected_slot;
+    return MICROS_KERNEL_OBJECT_OK;
+}
 
+static void project_candidate_queues(
+    const struct micros_kernel_objects *objects,
+    struct micros_scheduler_return_plan *candidate
+)
+{
+    size_t index;
+    size_t priority;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        candidate->ready_next[index] = scheduler_core_null_thread_handle();
+    }
+    for (
+        priority = 0;
+        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
+        ++priority
+    ) {
+        size_t count = plan_scratch.counts[priority];
+
+        candidate->ready_head[priority] = scheduler_core_null_thread_handle();
+        candidate->ready_tail[priority] = scheduler_core_null_thread_handle();
+        for (index = 0; index < count; ++index) {
+            uint16_t slot = plan_scratch.slots[priority][index];
+            struct micros_thread_handle handle = {
+                slot,
+                objects->threads[slot].generation,
+            };
+
+            scheduler_core_bitmap_set(candidate->ready_bitmap, slot);
+            if (index == 0) {
+                candidate->ready_head[priority] = handle;
+            } else {
+                uint16_t previous_slot =
+                    plan_scratch.slots[priority][index - 1];
+
+                candidate->ready_next[previous_slot] = handle;
+            }
+            candidate->ready_tail[priority] = handle;
+        }
+    }
+}
+
+static void publish_return_candidate(
+    struct micros_scheduler_return_plan *plan,
+    const struct micros_scheduler_return_plan *candidate
+)
+{
+    unsigned char *destination = (unsigned char *)plan;
+    const unsigned char *source =
+        (const unsigned char *)candidate;
+    size_t index;
+
+    for (index = 0; index < sizeof(*candidate); ++index) {
+        destination[index] = source[index];
+    }
+}
+
+enum micros_kernel_object_error micros_hart_plan_user_return(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_scheduler_return_plan *plan
+)
+{
+    const struct micros_hart *hart;
+    struct micros_scheduler_return_plan candidate;
+    size_t selected_slot;
+    enum micros_kernel_object_error error;
+
+    if (plan == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    clear_return_candidate(&candidate);
+    error = preflight_return_plan(objects, hart_handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = scratch_load(objects, hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    candidate.hart = hart_handle;
+    candidate.outgoing = hart->current_thread;
+    scheduler_core_bitmap_clear(candidate.renew_bitmap);
+    scheduler_core_bitmap_clear(candidate.ready_bitmap);
+    repair_preempted_candidate(objects, hart, &candidate);
+    error = select_and_renew_candidate(
+        objects,
+        hart,
+        &candidate,
+        &selected_slot
+    );
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
     if (selected_slot == MICROS_THREAD_CAPACITY) {
         candidate.action = MICROS_SCHEDULER_RETURN_ENTER_IDLE;
         candidate.selected = scheduler_core_null_thread_handle();
@@ -247,45 +352,7 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
             ? MICROS_SCHEDULER_RETURN_KEEP_CURRENT
             : MICROS_SCHEDULER_RETURN_SELECT_THREAD;
     }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        candidate.ready_next[index] = scheduler_core_null_thread_handle();
-    }
-    for (
-        priority = 0;
-        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
-        ++priority
-    ) {
-        size_t count = plan_scratch.counts[priority];
-
-        candidate.ready_head[priority] = scheduler_core_null_thread_handle();
-        candidate.ready_tail[priority] = scheduler_core_null_thread_handle();
-        for (index = 0; index < count; ++index) {
-            uint16_t slot = plan_scratch.slots[priority][index];
-            struct micros_thread_handle handle = {
-                slot,
-                objects->threads[slot].generation,
-            };
-
-            scheduler_core_bitmap_set(candidate.ready_bitmap, slot);
-            if (index == 0) {
-                candidate.ready_head[priority] = handle;
-            } else {
-                uint16_t previous_slot =
-                    plan_scratch.slots[priority][index - 1];
-
-                candidate.ready_next[previous_slot] = handle;
-            }
-            candidate.ready_tail[priority] = handle;
-        }
-    }
-    {
-        unsigned char *destination = (unsigned char *)plan;
-        const unsigned char *source =
-            (const unsigned char *)&candidate;
-
-        for (index = 0; index < sizeof(candidate); ++index) {
-            destination[index] = source[index];
-        }
-    }
+    project_candidate_queues(objects, &candidate);
+    publish_return_candidate(plan, &candidate);
     return MICROS_KERNEL_OBJECT_OK;
 }

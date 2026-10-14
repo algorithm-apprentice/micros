@@ -305,7 +305,10 @@ INITIAL_FUNCTION_MIGRATION = (
     ("tests/host/scheduler_model_test.c", "run_required_prelude"),
     ("tests/host/scheduler_model_test.c", "micros_scheduler_model_test_run"),
 )
-FUNCTION_MIGRATION = INITIAL_FUNCTION_MIGRATION
+FUNCTION_MIGRATION = tuple(
+    entry for entry in INITIAL_FUNCTION_MIGRATION
+    if entry[0] != "kernel/scheduler_core.c"
+)
 SHORT_PHASE_ROOTS = (
     ("kernel/scheduler.c", "micros_scheduler_start"),
     ("kernel/scheduler.c", "micros_scheduler_idle_select"),
@@ -1249,12 +1252,28 @@ def fact_text(function: Function, family: int, records: dict[str, Function]) -> 
         ("model_state", ("model",)),
     ):
         for name in names:
-            if re.search(
+            if not re.search(
                 rf"\bstruct\s+{type_name}\s*\*\s*{name}\b", function.signature,
             ):
-                text = re.sub(rf"\b{name}\s*->", name + ".", text)
-            if re.search(rf"\bstruct\s+{type_name}\s*\*\s*{name}\b", function.signature):
-                text = re.sub(rf"\(\s*\*\s*{name}\s*\)", name, text)
+                continue
+            if type_name == "micros_scheduler_return_plan" and name == "candidate":
+                text = re.sub(
+                    r"\bsizeof\s*\(\s*candidate\s*\)",
+                    "sizeof_pointer_candidate",
+                    text,
+                )
+                text = re.sub(
+                    r"\bsizeof\s*\(\s*\*\s*candidate\s*\)",
+                    "sizeof(candidate)",
+                    text,
+                )
+                text = re.sub(
+                    r"(\(\s*(?:const\s+)?unsigned\s+char\s*\*\s*\))\s*candidate\b",
+                    r"\1 &candidate",
+                    text,
+                )
+            text = re.sub(rf"\b{name}\s*->", name + ".", text)
+            text = re.sub(rf"\(\s*\*\s*{name}\s*\)", name, text)
     return text
 
 
@@ -1466,7 +1485,7 @@ def phase_records(
 def phase_text(root: Function, family: int, records: dict[str, Function]) -> str:
     """Order source facts at concrete phase call sites, without interpreting C."""
     phase_records(root, family, records)
-    text = normalized_body(root, family, records)
+    text = fact_text(root, family, records)
     original_identities = {
         name for names in ORIGINAL_FUNCTIONS[ORIGINAL_SOURCES[family]].values()
         for name in names
@@ -1980,11 +1999,12 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                         if called not in records or original_name(called, family) in frozen:
                             continue
                         callee = records[called]
-                        if re.search(r"\bbool\b|\benum\b", callee.signature):
+                        return_type = signature_shape(callee.signature, callee.name)[0]
+                        if re.search(r"\bbool\b|\benum\b", return_type):
                             success = (
-                                "true" if re.search(r"\bbool\b", callee.signature)
-                                else "MICROS_KERNEL_OBJECT_OK" if "micros_kernel_object_error" in callee.signature
-                                else "MICROS_SCHEDULER_TEST_CONTINUE" if "micros_scheduler_test_trap_action" in callee.signature
+                                "true" if re.search(r"\bbool\b", return_type)
+                                else "MICROS_KERNEL_OBJECT_OK" if "micros_kernel_object_error" in return_type
+                                else "MICROS_SCHEDULER_TEST_CONTINUE" if "micros_scheduler_test_trap_action" in return_type
                                 else "MICROS_SCHEDULER_OK"
                             )
                             require_error_propagation(normalized_body(phase, family, records), called, success)
@@ -2225,6 +2245,10 @@ class SchedulerSourceSafetyFixtureTest(unittest.TestCase):
             definition.replace("uint64_t", "uint32_t"),
         ):
             self.assertNotEqual(expected, signature_shape(changed, "check"))
+        self.assertEqual(
+            "static void",
+            signature_shape("static void phase(bool *seen, enum owner mode)", "phase")[0],
+        )
 
     def test_extern_declarations_do_not_create_storage(self) -> None:
         source = (
@@ -2382,6 +2406,29 @@ return true;
         self.assertNotEqual(compact(normalized_body(typed, 4)), compact(normalized_body(untyped, 4)))
         self.assertEqual("scheduler_host_unrecognized", original_name("scheduler_host_unrecognized", 4))
         self.assertEqual("handles_equal", original_name("scheduler_host_handles_equal", 4))
+
+    def test_automatic_candidate_reference_preserves_byte_extent(self) -> None:
+        signature = (
+            "void publish(struct micros_scheduler_return_plan *plan, "
+            "const struct micros_scheduler_return_plan *candidate)"
+        )
+        body = """
+unsigned char *destination = (unsigned char *)plan;
+const unsigned char *source = (const unsigned char *)candidate;
+for (index = 0; index < sizeof(*candidate); ++index) {
+    destination[index] = source[index];
+}
+"""
+        expected = body.replace(
+            "(const unsigned char *)candidate", "(const unsigned char *)&candidate",
+        ).replace("sizeof(*candidate)", "sizeof(candidate)")
+        positive = Function("publish", signature, body, 1, ())
+        self.assertEqual(compact(expected), compact(fact_text(positive, 0, {})))
+        for changed in (
+            Function("publish", signature, body.replace("sizeof(*candidate)", "sizeof(candidate)"), 1, ()),
+            Function("publish", signature.replace("const struct micros_scheduler_return_plan *candidate", "const void *candidate"), body, 1, ()),
+        ):
+            self.assertNotEqual(compact(expected), compact(fact_text(changed, 0, {})))
 
 
 if __name__ == "__main__":

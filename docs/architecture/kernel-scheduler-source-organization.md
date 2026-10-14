@@ -611,9 +611,11 @@ initializers, scratch and ABI objects, automatic lifetimes; twelve semantic
 outlines and short-root boundaries; case/model/script identities; CPP guards;
 and validation inheritance.
 
-The initial green integration wires all six source sets and private headers;
-the 138 owner moves and twelve semantic splits remain explicit pending
-migrations until their corresponding extraction commits.
+The initial green integration wires all six source sets and private headers,
+starting with 138 owner moves and twelve semantic splits. The portable core
+now discharges its 47 moves and three semantic splits; its largest function
+is 71 lines. The remaining 91 owner moves and nine long-function splits
+belong to target runtime and native/target evidence.
 
 Run its focused implementation loop with:
 
