@@ -39,6 +39,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel scheduler source organization](architecture/kernel-scheduler-source-organization.md)
   defines queue, IPC transaction, validation, planning, accounting, target
   return, fixture, and independent-model ownership before implementation.
+- [User ELF checker source organization](architecture/user-elf-checker-source-organization.md)
+  defines exact decoding, structural validation, service policy, instruction,
+  CLI, fixture, and discovery ownership before application-checker reuse.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -81,6 +84,9 @@ This directory contains the design baseline for `micros`.
   traces process entry, libc initialization, IPC vectors, grant and safe-copy
   wrappers, and the service-startup boundary used by the freestanding runtime
   design.
+- [MINIX user ELF checker source-organization baseline](research/minix-user-elf-checker-source-organization.md)
+  classifies the existing host parsing, executable-shape, startup-policy,
+  and deterministic fixture checks before their source-only correction.
 - [MINIX RS and SEF bootstrap study](research/minix-rs-sef-bootstrap.md)
   traces static service descriptors, inhibited privilege setup, endpoint
   visibility, initialization callbacks, readiness replies, boot ordering,

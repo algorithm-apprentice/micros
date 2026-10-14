@@ -292,3 +292,12 @@ owners; original assembly custody, automatic witnesses, execution identities,
 and four-dimensional validation classification remain unchanged.
 Implementation starts only after the separate design is independently
 reviewed, Accepted, and merged.
+
+The selected user ELF checker correction is defined by Proposed
+[ADR-0063](../adr/0063-user-elf-checker-source-decomposition.md) and its exact
+[source contract](user-elf-checker-source-organization.md).
+It separates binary representation/decoding, structural checks, service
+policy, bounded instruction inspection, CLI, and private host evidence while
+preserving the old facade, error order, fixture bytes, discovery identities,
+and transitive validation ownership. Its implementation remains pending
+independent design Acceptance and merge.

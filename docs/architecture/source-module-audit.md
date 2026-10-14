@@ -117,7 +117,14 @@ the next behavior-bearing change to their own subsystem.
 | Unit | Signal files | Required outcome | Task pair |
 | --- | ---: | --- | --- |
 | QEMU runner tooling | 2 | Separate outcome parsing, command construction, serial driving, CLI construction, and host tests without changing the command interface or accepted markers. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
-| ELF checker tooling | 2 | Separate ELF parsing, structural validation, policy validation, CLI construction, and host tests without changing the command interface. | `elf-tooling-decomposition-design` / `elf-tooling-decomposition-implementation` |
+| ELF checker tooling | 2 | Apply Proposed [ADR-0063](../adr/0063-user-elf-checker-source-decomposition.md) and the exact [user ELF checker source contract](user-elf-checker-source-organization.md), after independent design Acceptance and merge: separate parsing, structure, service policy, instructions, CLI, fixtures, and case discovery without changing accepted inputs, outputs, or the command interface. | `elf-tooling-decomposition-design` / `elf-tooling-decomposition-implementation` |
+
+The selected ELF tooling correction precedes the application host checker
+within `elf-spawn-app-runtime`. It exposes existing representation and
+structural owners before that consumer expands the family, rather than
+duplicating service-checker logic. It does not add a runtime-DAG node or block
+unrelated Step 14 work. Implementation remains pending until this separate
+design is reviewed, Accepted, and merged.
 
 The independent validation-plan deduplication task is not part of this source
 decomposition. The
