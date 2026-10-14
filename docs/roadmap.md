@@ -278,7 +278,7 @@ specified portable, captured-syscall, native/reference-model, and target
 owners, with empty migrations and fail-closed structural enforcement. It
 adds no new IPC behavior or execution.
 
-The next selected high-risk dependency-ready maintenance design is Accepted
+The bootstrap maintenance correction follows Accepted
 [ADR-0060](adr/0060-kernel-bootstrap-source-decomposition.md), with the exact
 [bootstrap source contract](architecture/kernel-bootstrap-source-organization.md).
 It separates immutable validation, privileged preparation/rollback,
@@ -288,6 +288,14 @@ reviewed design is Accepted and merged. The implementation now exposes the
 specified source owners and semantic phases with empty migrations, preserved
 evidence and fail-closed structural enforcement. It adds no bootstrap behavior,
 application runtime or dynamic PID-1 integration.
+
+The next selected high-risk dependency-ready correction is Proposed
+[ADR-0061](adr/0061-trap-and-syscall-source-decomposition.md) and its exact
+[trap/syscall source contract](architecture/trap-syscall-source-organization.md).
+It preserves the current trap/call algorithm, register custody, and runtime
+evidence while exposing named authority and task phases. Only its
+documentation-first design is active; implementation remains blocked on the
+separate reviewed design merge.
 
 ## v0.1 completion goal
 

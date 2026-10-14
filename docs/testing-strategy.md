@@ -170,6 +170,18 @@ generator bytes and imported helper interfaces remain unchanged.
 Narrow extraction evidence precedes one complete author PR plan; independent
 reviewers inspect rather than routinely rerun that evidence.
 
+The Proposed trap/syscall correction in ADR-0061 preserves `runtime_test` /
+`user-runtime`, the existing standalone runtime test ELF and twelve-second
+QEMU runtime gate, and every current trap/interrupt/IPC/grant/VM/console
+workflow. Its planned structural Red gate records exactly fourteen moving
+functions and nine long-function semantic splits. Exact route/hook/error/
+selector order, original-frame supervisor register capture, three existing
+evidence contexts, seven image ABI objects, native case order, all budgets,
+generator bytes, markers and timeouts remain unchanged. Narrow extraction
+evidence precedes one complete current author PR plan; independent reviewers
+inspect rather than routinely rerun the evidence. Implementation starts only
+after the separate design is reviewed, Accepted and merged.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |
