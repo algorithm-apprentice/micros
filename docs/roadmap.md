@@ -289,7 +289,7 @@ specified source owners and semantic phases with empty migrations, preserved
 evidence and fail-closed structural enforcement. It adds no bootstrap behavior,
 application runtime or dynamic PID-1 integration.
 
-The next selected high-risk dependency-ready correction is Accepted
+The reviewed trap/syscall correction follows Accepted
 [ADR-0061](adr/0061-trap-and-syscall-source-decomposition.md) and its exact
 [trap/syscall source contract](architecture/trap-syscall-source-organization.md).
 It preserves the current trap/call algorithm, register custody, and runtime
@@ -299,6 +299,17 @@ separates the specified owners with empty fourteen-symbol/nine-function
 migrations, unchanged architecture and runtime surfaces, and fail-closed
 source/build/evidence enforcement. It adds no application runtime or dynamic
 PID-1 behavior.
+
+The next selected high-risk dependency-ready correction is Accepted
+[ADR-0062](adr/0062-kernel-scheduler-source-decomposition.md) and its exact
+[scheduler source contract](architecture/kernel-scheduler-source-organization.md).
+The design separates queue, IPC transaction, validation, planning/commit,
+accounting, target completion/return/interrupt/idle, and independent evidence
+owners while retaining all current behavior. It names 38 C sources, six
+private contracts, six source sets, 138 moving definitions, and twelve
+semantic long-function splits. Its independent design review is clean;
+implementation remains pending until the separate design merge. This does not
+add application startup, dynamic PID-1 integration, or a new runtime dependency.
 
 ## v0.1 completion goal
 

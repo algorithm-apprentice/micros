@@ -31,9 +31,14 @@ This directory contains the design baseline for `micros`.
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
-- [Trap and syscall source organization](architecture/trap-syscall-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
+- [Trap and syscall source organization](architecture/trap-syscall-source-organization.md)
+  defines routed context, interrupts, syscall authority, return, bounded
+  hooks, and retained runtime-evidence ownership.
+- [Kernel scheduler source organization](architecture/kernel-scheduler-source-organization.md)
+  defines queue, IPC transaction, validation, planning, accounting, target
+  return, fixture, and independent-model ownership before implementation.
 - [VFS test source organization](architecture/vfs-test-source-organization.md)
   defines the exact behavior, fixture, model, target, and tooling boundaries
   required before VFS exit-cleanup coverage is added.
@@ -51,6 +56,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
+- [MINIX kernel scheduler source-organization baseline](research/minix-kernel-scheduler-source-organization.md)
+  traces those fixed-reference responsibilities and classifies the existing
+  adaptations before the source-only scheduler correction.
 - [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
   traces endpoint validation, privilege checks, send/receive queues,
   request/reply blocking, notifications, deadlock detection, and exit cleanup.
