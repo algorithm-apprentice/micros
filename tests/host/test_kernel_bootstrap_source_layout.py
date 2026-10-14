@@ -1873,6 +1873,14 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         stop = self.helper_body("kernel/main.c", "stop_after_reset_failure")
         self.assertIn('"MICROS_TEST_FAILURE sbi-system-reset-returned\\n"', stop)
         self.assertIn('volatile("wfi")', compact(stop))
+        panic_target = cmake_command(
+            read_source("CMakeLists.txt"), "add_custom_target", "test-qemu-panic",
+        )
+        panic_source = path.replace(".c", "[.]c")
+        self.assertIn(
+            f'"MICROS_PANIC_SOURCE file={panic_source} line=0x[0-9a-f]{{16}}"',
+            panic_target,
+        )
 
     def test_captured_authority_dispatch_and_ready_seal_commit_order_are_preserved(self) -> None:
         family = SOURCE_SETS["MICROS_BOOTSTRAP_SYSCALL_SOURCES"]

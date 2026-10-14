@@ -4998,7 +4998,7 @@ if(MICROS_BUILD_PANIC_TEST)
             --marker
             "MICROS_PANIC_HART mode=S id=0x0000000000000000"
             --pattern
-            "MICROS_PANIC_SOURCE file=kernel/main[.]c line=0x[0-9a-f]{16}"
+            "MICROS_PANIC_SOURCE file=kernel/boot_component_tests[.]c line=0x[0-9a-f]{16}"
             --pattern
             "MICROS_PANIC_MACHINE sstatus=0x[0-9a-f]{16} scause=0x[0-9a-f]{16} stval=0x[0-9a-f]{16} sepc=0x[0-9a-f]{16} ra=0x[0-9a-f]{16} sp=0x[0-9a-f]{16}"
             --expect

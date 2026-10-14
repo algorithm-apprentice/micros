@@ -275,6 +275,9 @@ move implementation out of the mechanisms they exercise.
 
 This is source extraction, not a runtime test registry or a new boot framework.
 The source-only correction does not touch trap/syscall mechanism policy.
+Panic source-location records identify the moved call site. The intentional
+panic gate therefore requires `kernel/boot_component_tests.c`, while its
+reason, complete record shape, machine-state fields and timeout remain exact.
 
 ## Launcher source ownership
 
