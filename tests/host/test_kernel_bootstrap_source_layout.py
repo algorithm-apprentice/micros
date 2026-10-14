@@ -564,6 +564,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         ("tests/host/bootstrap_control_test.c", "test_pm_completion_wakes_only_any_receiver"),
         ("tests/host/bootstrap_control_test.c", "test_image_catalog"),
         ("tests/host/fdt_test.c", "build_fixture"),
+        ("kernel/main.c", "kernel_main"),
     )
 )
 

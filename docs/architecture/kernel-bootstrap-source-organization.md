@@ -15,9 +15,10 @@ their reviewed owners and one ten-field context. Captured bootstrap control
 now separates common authority from release, readiness, completion and failure
 transactions. Native fixtures, case domains, reference oracle and replay now
 have their reviewed owners while retaining the three existing executions.
-The moving-symbol migration is empty; five long functions remain in the image,
-boot, launcher and generator owners. Remaining skeletons do not claim that the
-final decomposition is complete.
+Boot entry now keeps one automatic context and delegates ordered foundation
+and compile-time component phases. The moving-symbol migration is empty; four
+long functions remain in the image, launcher and generator owners. Remaining
+skeletons do not claim that the final decomposition is complete.
 
 ## Reviewed base and scope
 
