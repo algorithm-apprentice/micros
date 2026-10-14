@@ -1,0 +1,6 @@
+#ifndef MICROS_KERNEL_BOOTSTRAP_MANIFEST_INTERNAL_H
+#define MICROS_KERNEL_BOOTSTRAP_MANIFEST_INTERNAL_H
+
+#include "micros/bootstrap.h"
+
+#endif

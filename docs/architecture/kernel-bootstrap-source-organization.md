@@ -1,9 +1,16 @@
 # Kernel Bootstrap Source Organization
 
-This is the design-only source contract for the bootstrap correction in
-[the source-module audit](source-module-audit.md). Implementation is blocked
-until [ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) is
-Accepted and its design pull request has merged.
+This is the source contract for the bootstrap correction in
+[the source-module audit](source-module-audit.md).
+[ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) is Accepted
+and its design merged as PR #119, commit
+`531b191529c53f900dee1cb4b642bb85d58138c7`.
+
+Implementation is in progress. The structural Red gate, nine source sets,
+private-header/source skeletons and validation inheritance are integrated
+before extraction. The current 60-symbol and 27-function migrations still
+retain the existing implementation owners; skeleton presence does not claim
+that the final decomposition is complete.
 
 ## Reviewed base and scope
 

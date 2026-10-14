@@ -601,9 +601,94 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "kernel/ipc_syscall_test_internal.h",
         ),
     ),
+    (
+        "kernel/bootstrap_manifest.c",
+        (
+            "kernel/bootstrap_manifest_common.c",
+            "kernel/bootstrap_manifest_profiles.c",
+            "kernel/bootstrap_transitions.c",
+            "kernel/bootstrap_manifest_internal.h",
+        ),
+    ),
+    (
+        "kernel/bootstrap_runtime.c",
+        (
+            "kernel/bootstrap_runtime_state.c",
+            "kernel/bootstrap_preparation.c",
+            "kernel/bootstrap_preparation_image.c",
+            "kernel/bootstrap_preparation_rollback.c",
+            "kernel/bootstrap_runtime_validation.c",
+            "kernel/bootstrap_diagnostics.c",
+            "kernel/bootstrap_runtime_internal.h",
+        ),
+    ),
+    (
+        "kernel/bootstrap_syscall.c",
+        (
+            "kernel/bootstrap_syscall_common.c",
+            "kernel/bootstrap_syscall_release.c",
+            "kernel/bootstrap_syscall_ready.c",
+            "kernel/bootstrap_syscall_complete.c",
+            "kernel/bootstrap_syscall_failure.c",
+            "kernel/bootstrap_syscall_internal.h",
+        ),
+    ),
+    (
+        "kernel/main.c",
+        (
+            "kernel/boot_foundation.c",
+            "kernel/boot_component_tests.c",
+            "kernel/boot_internal.h",
+        ),
+    ),
+    (
+        "tests/qemu/bootstrap_launcher.c",
+        (
+            "tests/qemu/bootstrap_launcher_common.c",
+            "tests/qemu/bootstrap_launcher_manifest.c",
+            "tests/qemu/bootstrap_launcher_protocol.c",
+            "tests/qemu/bootstrap_launcher_control.c",
+            "tests/qemu/bootstrap_launcher_internal.h",
+        ),
+    ),
+    (
+        "tests/host/bootstrap_manifest_test.c",
+        (
+            "tests/host/bootstrap_manifest_fixture.c",
+            "tests/host/bootstrap_manifest_acceptance_test.c",
+            "tests/host/bootstrap_manifest_topology_test.c",
+            "tests/host/bootstrap_manifest_tty_test.c",
+            "tests/host/bootstrap_runtime_test.c",
+            "tests/host/bootstrap_runtime_model.c",
+            "tests/host/bootstrap_runtime_reference.c",
+            "tests/host/bootstrap_manifest_test_internal.h",
+            "tests/host/bootstrap_runtime_model_internal.h",
+        ),
+    ),
+    (
+        "tests/host/bootstrap_control_test.c",
+        (
+            "tests/host/bootstrap_control_fixture.c",
+            "tests/host/bootstrap_control_abi_test.c",
+            "tests/host/bootstrap_control_lifecycle_test.c",
+            "tests/host/bootstrap_control_completion_test.c",
+            "tests/host/bootstrap_control_image_catalog_test.c",
+            "tests/host/bootstrap_control_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/fdt_test.c",
+        (
+            "tests/host/fdt_test_fixture.c",
+            "tests/host/fdt_header_test.c",
+            "tests/host/fdt_memory_test.c",
+            "tests/host/fdt_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",
     "tests/host/test_kernel_address_space_source_layout.py",

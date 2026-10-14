@@ -840,13 +840,93 @@ set(
     kernel/vm_scratch_preemption_test_trap.c
 )
 
+set(
+    MICROS_BOOTSTRAP_MANIFEST_SOURCES
+    kernel/bootstrap_manifest.c
+    kernel/bootstrap_manifest_common.c
+    kernel/bootstrap_manifest_profiles.c
+    kernel/bootstrap_transitions.c
+)
+
+set(
+    MICROS_BOOTSTRAP_IMAGE_SOURCES
+    kernel/bootstrap_image.c
+)
+
+set(
+    MICROS_BOOTSTRAP_RUNTIME_SOURCES
+    kernel/bootstrap_runtime.c
+    kernel/bootstrap_runtime_state.c
+    kernel/bootstrap_preparation.c
+    kernel/bootstrap_preparation_image.c
+    kernel/bootstrap_preparation_rollback.c
+    kernel/bootstrap_runtime_validation.c
+    kernel/bootstrap_diagnostics.c
+)
+
+set(
+    MICROS_BOOTSTRAP_SYSCALL_SOURCES
+    kernel/bootstrap_syscall.c
+    kernel/bootstrap_syscall_common.c
+    kernel/bootstrap_syscall_release.c
+    kernel/bootstrap_syscall_ready.c
+    kernel/bootstrap_syscall_complete.c
+    kernel/bootstrap_syscall_failure.c
+)
+
+set(
+    MICROS_BOOT_FOUNDATION_SOURCES
+    kernel/main.c
+    kernel/boot_foundation.c
+    kernel/boot_component_tests.c
+)
+
+set(
+    MICROS_BOOTSTRAP_LAUNCHER_SOURCES
+    tests/qemu/bootstrap_launcher.c
+    tests/qemu/bootstrap_launcher_common.c
+    tests/qemu/bootstrap_launcher_manifest.c
+    tests/qemu/bootstrap_launcher_protocol.c
+    tests/qemu/bootstrap_launcher_control.c
+)
+
+set(
+    MICROS_BOOTSTRAP_MANIFEST_HOST_TEST_SOURCES
+    tests/host/bootstrap_manifest_test.c
+    tests/host/bootstrap_manifest_fixture.c
+    tests/host/bootstrap_manifest_acceptance_test.c
+    tests/host/bootstrap_manifest_topology_test.c
+    tests/host/bootstrap_manifest_tty_test.c
+    tests/host/bootstrap_runtime_test.c
+    tests/host/bootstrap_runtime_model.c
+    tests/host/bootstrap_runtime_reference.c
+)
+
+set(
+    MICROS_BOOTSTRAP_CONTROL_HOST_TEST_SOURCES
+    tests/host/bootstrap_control_test.c
+    tests/host/bootstrap_control_fixture.c
+    tests/host/bootstrap_control_abi_test.c
+    tests/host/bootstrap_control_lifecycle_test.c
+    tests/host/bootstrap_control_completion_test.c
+    tests/host/bootstrap_control_image_catalog_test.c
+)
+
+set(
+    MICROS_FDT_HOST_TEST_SOURCES
+    tests/host/fdt_test.c
+    tests/host/fdt_test_fixture.c
+    tests/host/fdt_header_test.c
+    tests/host/fdt_memory_test.c
+)
+
 if(MICROS_BUILD_HOST_TESTS)
     enable_testing()
 
     add_executable(
         fdt_test
         kernel/fdt.c
-        tests/host/fdt_test.c
+        ${MICROS_FDT_HOST_TEST_SOURCES}
     )
     add_executable(
         frame_allocator_test
@@ -936,20 +1016,20 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         bootstrap_test
-        kernel/bootstrap_manifest.c
-        tests/host/bootstrap_manifest_test.c
+        ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
+        ${MICROS_BOOTSTRAP_MANIFEST_HOST_TEST_SOURCES}
     )
     add_executable(
         bootstrap_control_test
         kernel/bootstrap_control.c
         kernel/bootstrap_control_core.c
-        kernel/bootstrap_image.c
-        kernel/bootstrap_manifest.c
+        ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
+        ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
         kernel/endpoint.c
         ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         kernel/scheduler_core.c
-        tests/host/bootstrap_control_test.c
+        ${MICROS_BOOTSTRAP_CONTROL_HOST_TEST_SOURCES}
     )
     add_executable(
         vm_bootstrap_test
@@ -2641,8 +2721,7 @@ if(
     micros_add_bootstrap_user(
         micros_bootstrap_launcher
         micros-bootstrap-launcher
-        tests/qemu/bootstrap_launcher_control.c
-        tests/qemu/bootstrap_launcher.c
+        ${MICROS_BOOTSTRAP_LAUNCHER_SOURCES}
     )
     if(
         MICROS_BUILD_VM_HANDOFF_TEST
@@ -3131,11 +3210,11 @@ add_executable(
     ${MICROS_KERNEL_ADDRESS_SPACE_SOURCES}
     kernel/bootstrap_control.c
     kernel/bootstrap_control_core.c
-    kernel/bootstrap_image.c
-    kernel/bootstrap_manifest.c
+    ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
+    ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
     kernel/bootstrap_memory.c
-    kernel/bootstrap_runtime.c
-    kernel/bootstrap_syscall.c
+    ${MICROS_BOOTSTRAP_RUNTIME_SOURCES}
+    ${MICROS_BOOTSTRAP_SYSCALL_SOURCES}
     kernel/endpoint.c
     kernel/fdt.c
     kernel/frame_allocator.c
@@ -3157,7 +3236,7 @@ add_executable(
     kernel/kernel_objects.c
     kernel/scheduler_core.c
     kernel/scheduler.c
-    kernel/main.c
+    ${MICROS_BOOT_FOUNDATION_SOURCES}
     kernel/panic.c
     kernel/plic.c
     kernel/plic_core.c
