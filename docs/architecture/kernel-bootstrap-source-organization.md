@@ -16,9 +16,10 @@ now separates common authority from release, readiness, completion and failure
 transactions. Native fixtures, case domains, reference oracle and replay now
 have their reviewed owners while retaining the three existing executions.
 Boot entry now keeps one automatic context and delegates ordered foundation
-and compile-time component phases. The moving-symbol migration is empty; four
-long functions remain in the image, launcher and generator owners. Remaining
-skeletons do not claim that the final decomposition is complete.
+and compile-time component phases. The launcher now separates its automatic
+serial orchestration, independent manifest validation, protocol classification,
+common data and private control transport. The moving-symbol migration is
+empty; two long functions remain in the image and generator owners.
 
 ## Reviewed base and scope
 

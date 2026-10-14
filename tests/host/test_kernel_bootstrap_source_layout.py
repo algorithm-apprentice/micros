@@ -565,6 +565,8 @@ LONG_FUNCTION_MIGRATION = tuple(
         ("tests/host/bootstrap_control_test.c", "test_image_catalog"),
         ("tests/host/fdt_test.c", "build_fixture"),
         ("kernel/main.c", "kernel_main"),
+        ("tests/qemu/bootstrap_launcher.c", "validate_manifest"),
+        ("tests/qemu/bootstrap_launcher.c", "micros_service_main"),
     )
 )
 
