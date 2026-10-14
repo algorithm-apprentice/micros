@@ -106,6 +106,52 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
                 probe_image(),
             )
 
+    def test_rejects_vm_boot_object_size_and_alignment(self):
+        for change in (
+            {"size": 364703},
+            {"value": check_user_elf.USER_BASE + 3 * 4096 + 8},
+        ):
+            image = vm_image()
+            image = replace(
+                image,
+                symbols=tuple(
+                    replace(symbol, **change)
+                    if symbol.name == "micros_vm_boot_info"
+                    else symbol
+                    for symbol in image.symbols
+                ),
+            )
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(
+                    check_user_elf.ElfFormatError,
+                    "VM boot information has wrong size or alignment",
+                ):
+                    generate_vm_handoff_fixture.render_fixture(
+                        bootstrap_image(), image, probe_image()
+                    )
+
+    def test_rejects_vm_boot_object_configuration_overlap(self):
+        image = vm_image()
+        image = replace(
+            image,
+            symbols=tuple(
+                replace(
+                    symbol,
+                    value=check_user_elf.USER_BASE + 3 * 4096,
+                )
+                if symbol.name == "micros_bootstrap_service_config"
+                else symbol
+                for symbol in image.symbols
+            ),
+        )
+        with self.assertRaisesRegex(
+            check_user_elf.ElfFormatError,
+            "VM boot information overlaps bootstrap configuration",
+        ):
+            generate_vm_handoff_fixture.render_fixture(
+                bootstrap_image(), image, probe_image()
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
