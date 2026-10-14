@@ -289,7 +289,9 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
-    if entry[0] not in ("kernel/scheduler_core.c", "kernel/scheduler.c")
+    if entry[0] not in (
+        "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
+    )
 )
 INITIAL_FUNCTION_MIGRATION = (
     ("kernel/scheduler_core.c", "micros_scheduler_commit_ipc_transitions"),
@@ -307,7 +309,9 @@ INITIAL_FUNCTION_MIGRATION = (
 )
 FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_FUNCTION_MIGRATION
-    if entry[0] not in ("kernel/scheduler_core.c", "kernel/scheduler.c")
+    if entry[0] not in (
+        "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
+    )
 )
 SHORT_PHASE_ROOTS = (
     ("kernel/scheduler.c", "micros_scheduler_start"),
@@ -1106,10 +1110,15 @@ def normalized_body(
         locals_found = re.findall(local_pattern, text)
         context_names = parameter_names + [name for name, _ in locals_found]
         for name in context_names:
-            for field in context_fields(family):
-                text = re.sub(
-                    rf"\b{re.escape(name)}\s*->\s*{field}\b", field, text,
-                )
+            fields = "|".join(map(re.escape, context_fields(family)))
+            lexical = c_lexical_text(text)
+            accesses = tuple(re.finditer(
+                rf"\b{re.escape(name)}\s*->\s*({fields})\b", lexical,
+            ))
+            for access in reversed(accesses):
+                if lexical[:access.start()].rstrip().endswith(("->", ".")):
+                    raise AssertionError(f"member selector is not borrowed context: {name}")
+                text = text[:access.start()] + access.group(1) + text[access.end():]
         text = re.sub(local_pattern, "", text)
         # A private original may acquire only this typed borrowed parameter.
         # Do not erase arbitrary extra call arguments or new helper calls.
@@ -1836,7 +1845,10 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                     if name in {"EXPECT_TRUE", "EXPECT_ERROR", "EXPECT_UNCHANGED", "MODEL_FAIL"}:
                         self.assertEqual(4 if name.startswith("EXPECT") else 5, family)
                     else:
-                        self.assertNotIn("(", macro.split(name, 1)[1].splitlines()[0], "new executable macro")
+                        self.assertNotRegex(
+                            macro, rf"^\s*#\s*define\s+{re.escape(name)}\(",
+                            "new executable macro",
+                        )
                         self.assertNotRegex(macro, r"\b(?:return|if|for|while|goto)\b|->|[{};]")
                 self.assertNotRegex(text, r"\bextern\s+(?!const\b|const\s)[^;()]*\b(?:objects|context|fixture|plan_scratch)\s*;")
 
@@ -2405,6 +2417,12 @@ return true;
         self.assertNotEqual(compact(normalized_body(typed, 4)), compact(normalized_body(untyped, 4)))
         self.assertEqual("scheduler_host_unrecognized", original_name("scheduler_host_unrecognized", 4))
         self.assertEqual("handles_equal", original_name("scheduler_host_handles_equal", 4))
+        for body in (
+            "return other->fixture->objects.initialized;",
+            "return other.fixture->objects.initialized;",
+        ):
+            with self.subTest(body=body), self.assertRaises(AssertionError):
+                normalized_body(Function("example", signature, body, 1, ()), 4)
 
     def test_automatic_candidate_reference_preserves_byte_extent(self) -> None:
         signature = (

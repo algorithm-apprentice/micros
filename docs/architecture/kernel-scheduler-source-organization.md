@@ -616,8 +616,10 @@ starting with 138 owner moves and twelve semantic splits. The portable core
 now discharges its 47 moves and three semantic splits; its largest function
 is 71 lines. Target runtime also discharges its 29 moves and selected-return
 split, with named first-start/idle boundaries and one seven-field context.
-The remaining 62 owner moves and eight long-function splits belong to
-native/target evidence.
+Normal target evidence discharges another 26 moves and three long-function
+splits, retaining its 48-field context, two separate idle-bypass ABI objects,
+and original live supervisor-return invocation. The remaining 36 owner moves
+and five long-function splits belong to invalid-context and native evidence.
 
 Run its focused implementation loop with:
 
