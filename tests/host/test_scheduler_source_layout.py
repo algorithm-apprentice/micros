@@ -24,6 +24,7 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_if_blocks,
 )
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
+from tests.host.test_trap_syscall_source_layout import c_statement_text
 from tests.host.test_vm_service_source_layout import c_declaration_text, file_scope_objects
 
 
@@ -291,6 +292,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
     entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION
     if entry[0] not in (
         "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
+        "kernel/scheduler_invalid_test.c",
     )
 )
 INITIAL_FUNCTION_MIGRATION = (
@@ -311,6 +313,7 @@ FUNCTION_MIGRATION = tuple(
     entry for entry in INITIAL_FUNCTION_MIGRATION
     if entry[0] not in (
         "kernel/scheduler_core.c", "kernel/scheduler.c", "kernel/scheduler_test.c",
+        "kernel/scheduler_invalid_test.c",
     )
 )
 SHORT_PHASE_ROOTS = (
@@ -585,14 +588,14 @@ C03cd500cd8cb945d1e223cb2 Cc627088628b1dffcbb732d0f Cd72602943c3aa476133cd83d Cb
 Cbdcd6c056369167f98e2515d Ca068fea27f51c53fb78786e6 Ceea4223866f66eb000fc31c1 C1472842b6b7af9d64220d946
 C22b021e3b0ae42d80e8f2334 Cabd0b9464885bd81b8714d18 C91a23ba9e34f5d1b1c2af5e7 C27f290f30faaa78366079234
 C27f290f30faaa78366079234 C6af08c0fec094f868bb755b6 C7b2188d9d274d914a5c06ab1 Ccf7942c2623f56a4af244db1
-C981e1de14d1019314918e907 C82d830f83503a349ee21eb42 C96587221cb3f2859b2fbc503 C42ed2cae3f30feedc8edffb6
+C981e1de14d1019314918e907 C82d830f83503a349ee21eb42 C42ed2cae3f30feedc8edffb6
 Caa2fb0afe8c08147f553475f Cf096cc194ccef1a6c30f8b4f C3f13d9fbbbc15fd397ced04f C0554f8f2f4ad863352dbf736
 C4074ec1048501d56272bf2aa P5aa3d04fdcea8f128242efbe Pc9f43b35f1d487673ccb0526 P7afa06e37afe0ba2febf9770
 P8c6bc0ab1280fe16b88ee05f P5f66a48633e4bb17d1f7e5f8 P805cbb71b19d14d4132339a0 E4ff3ac512c54c9a3d17eeb60
 E4ff3ac512c54c9a3d17eeb60 E4ff3ac512c54c9a3d17eeb60 E4ff3ac512c54c9a3d17eeb60 W65f9344a3defd26952bd14d9
 Wac55d520aed0a0dfb7a23b47 W8b92a8094f8942f20b8f0fbb Wdf32d4880068404091f942d4 W5c6d4508dc8f9a9fb0b6fcc4
 W86e89d9464eea60a1455147d We90561124d9bac0141b2248e W7d32d62143fad20d86d7b413 Wcd8c201cf51d09b033f061d3
-W9bdcaa4ec3079f062d2c2667 W2a13e96b757983b86cefcfd8 W686bcd69303951499100958a
+W9bdcaa4ec3079f062d2c2667 W2a13e96b757983b86cefcfd8 W80ed63a80061c5782f30315b
 """,
     ("tests/host/scheduler_test.c", "test_accounting_owners_are_separate"): """
 C486be4bde26b2c3e5d102a5d C486be4bde26b2c3e5d102a5d C8550e84c3f9db5697c26ee5a C8550e84c3f9db5697c26ee5a
@@ -802,7 +805,7 @@ Caa2fb0afe8c08147f553475f Caa2fb0afe8c08147f553475f Caa2fb0afe8c08147f553475f Ca
 C21937dedf4d624323df870b2 C398e79cf3fafff910551dbe1 C26cacf70f59bb8d647b249a3 C027e69e9cb7be7615f140b33
 Cd674735342207bd1851e3502 C5d41a9bcc6317fb035bfad77 C5d41a9bcc6317fb035bfad77 C4c62cbafdf3648dfdb0b7313
 C3a82334c14d75ff948927e2a C3dc8fc2deb48358eb88edfc2 C3f42a36b10338bc47edf2387 C7715b4845da8ad9e29152a72
-C7dae15d5cc038d74234206ed Cfd255dec21efce861bd5cd0b C269b4c1697f652f27a9f238a C96587221cb3f2859b2fbc503
+C7dae15d5cc038d74234206ed Cfd255dec21efce861bd5cd0b C269b4c1697f652f27a9f238a
 C1e064a81a88d14a53194589b Pd902ac2426e5e4d99fc1c663 Pbb80def48e1c7dd65f8c8afd P6cca91e9a3054e96b0ef0a95
 P9565009dbb7460c8b8184e34 P9565009dbb7460c8b8184e34 P9565009dbb7460c8b8184e34 P9565009dbb7460c8b8184e34
 Pc8c9d6a0aca59fdfbae13cec P5cde7883d4c9be6161901d30 Pa43c02ce6e1ca861e2952627 P60531da912bca4a64958a1e7
@@ -1179,7 +1182,7 @@ def object_definitions(text: str) -> tuple[str, ...]:
 
 
 def call_sites(text: str) -> tuple[tuple[str, str, int, int], ...]:
-    lexical = c_lexical_text(text)
+    lexical = c_statement_text(text)
     result = []
     for match in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", lexical):
         name = match.group(1)
@@ -1194,6 +1197,12 @@ def call_sites(text: str) -> tuple[tuple[str, str, int, int], ...]:
 def semantic_facts(text: str) -> Counter[str]:
     """Concrete calls, conditions, writes, and exits; no C evaluation/inlining."""
     lexical = c_lexical_text(text)
+    statements = c_statement_text(text)
+    text = "".join(
+        original if before == after else after
+        for original, before, after in zip(text, lexical, statements)
+    )
+    lexical = statements
     facts = Counter()
     for name, arguments, _, _ in call_sites(text):
         facts["call:" + digest(name + "(" + arguments + ")")] += 1
@@ -1428,6 +1437,31 @@ def require_minimal_accounting(text: str, idle: bool = False) -> None:
         text, "hart->accounting_owner = MICROS_SCHEDULER_ACCOUNTING_KERNEL;",
         "hart->accounting_started_at = counter;",
     )
+
+
+def require_guarded_next_corruption(
+    root: Function, records: dict[str, Function],
+) -> None:
+    expected = ("ifdef MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST",)
+    sites = []
+    pattern = (
+        r"\bobjects\s*->\s*threads\s*\[\s*threads\s*\[\s*1\s*\]"
+        r"\s*\.\s*slot\s*\]\s*\.\s*user_context\s*\.\s*sp\s*=\s*1\s*;"
+    )
+    for record in records.values():
+        body = normalized_body(record, 3, records)
+        for selected in re.finditer(pattern, c_lexical_text(body)):
+            guards = record.guards + cpp_guards(body, selected.start())
+            sites.append((record.name, guards))
+    if len(sites) != 1 or sites[0][1] != expected:
+        raise AssertionError("next-context corruption requires its one exact profile guard")
+    owner = sites[0][0]
+    if owner != root.name:
+        calls = [
+            start for name, _, start, _ in call_sites(root.body) if name == owner
+        ]
+        if len(calls) != 1 or cpp_guards(root.body, calls[0]) != expected:
+            raise AssertionError("next-context injection call escaped its profile guard")
 
 
 def frozen_functions(original: str) -> dict[str, tuple[int, str]]:
@@ -2030,6 +2064,24 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             missing = parsed_fact_inventory(expected) - actual
             self.assertEqual({}, dict(missing), (name, "lost predicates/calls/arguments/writes/return values/control exits"))
 
+    def test_next_context_fault_keeps_its_exact_compile_time_profile(self) -> None:
+        root = find_original(
+            self.records[3], 3, "micros_scheduler_invalid_runtime_run_self_test",
+        )
+        require_guarded_next_corruption(root, self.records[3])
+
+    def test_first_start_hook_keeps_its_scheduler_test_profile(self) -> None:
+        root = find_original(self.records[1], 1, "micros_scheduler_start")
+        calls = [
+            start for name, _, start, _ in call_sites(root.body)
+            if name == "micros_scheduler_test_after_start"
+        ]
+        self.assertEqual(1, len(calls))
+        self.assertEqual(
+            ("ifdef MICROS_BUILD_SCHEDULER_TEST",),
+            cpp_guards(root.body, calls[0]),
+        )
+
     def test_minimal_accounting_and_nonrecursive_validation(self) -> None:
         for name, idle in (
             ("micros_scheduler_account_user_trap", False),
@@ -2408,6 +2460,34 @@ return true;
         ):
             self.assertTrue(expected - fact_keys(changed))
         self.assertEqual(expected, fact_keys("/* formatting only */\n" + source))
+
+    def test_cpp_guard_is_separate_from_its_C_write_fact(self) -> None:
+        write = "objects->threads[threads[1].slot].user_context.sp = 1;"
+        guarded = (
+            "#ifdef MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST\n"
+            + write + "\n#endif\n"
+        )
+        self.assertEqual(fact_keys(write), fact_keys(guarded))
+        self.assertEqual((), call_sites("#endif\n(void)saved_status;"))
+
+    def test_next_context_fault_and_helper_call_keep_the_profile_guard(self) -> None:
+        write = "objects->threads[threads[1].slot].user_context.sp = 1;"
+        guard = ("ifdef MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST",)
+        body = "#ifdef MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST\n"
+        direct = Function("entry", "void entry(void)", body + write + "\n#endif", 1, ())
+        require_guarded_next_corruption(direct, {"entry": direct})
+        entry = Function("entry", "void entry(void)", body + "inject(objects);\n#endif", 1, ())
+        helper = Function("inject", "void inject(void)", write, 1, guard)
+        require_guarded_next_corruption(entry, {"entry": entry, "inject": helper})
+        for changed_entry, changed_helper in (
+            (Function("entry", entry.signature, "inject(objects);", 1, ()), helper),
+            (entry, Function("inject", helper.signature, write, 1, ())),
+            (entry, Function("inject", helper.signature, write + write, 1, guard)),
+        ):
+            with self.assertRaises(AssertionError):
+                require_guarded_next_corruption(
+                    changed_entry, {"entry": changed_entry, "inject": changed_helper},
+                )
 
     def test_typed_context_transport_never_normalizes_arbitrary_aliases(self) -> None:
         signature = "bool example(struct scheduler_host_fixture *fixture)"

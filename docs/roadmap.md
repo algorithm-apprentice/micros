@@ -308,9 +308,9 @@ accounting, target completion/return/interrupt/idle, and independent evidence
 owners while retaining all current behavior. It names 38 C sources, six
 private contracts, six source sets, 138 moving definitions, and twelve
 semantic long-function splits. Its independently reviewed design merged as
-#123. Implementation now separates portable-core, target-runtime, and normal
-target-evidence owners and their required semantic phases; invalid-context
-and native evidence extraction remains in progress.
+#123. Implementation now separates portable-core, target-runtime, and both
+target-evidence families with their required semantic phases; native evidence
+extraction remains in progress.
 This does not add application startup, dynamic PID-1 integration, or a new
 runtime dependency.
 

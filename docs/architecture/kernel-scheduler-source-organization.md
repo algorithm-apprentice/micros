@@ -618,8 +618,10 @@ is 71 lines. Target runtime also discharges its 29 moves and selected-return
 split, with named first-start/idle boundaries and one seven-field context.
 Normal target evidence discharges another 26 moves and three long-function
 splits, retaining its 48-field context, two separate idle-bypass ABI objects,
-and original live supervisor-return invocation. The remaining 36 owner moves
-and five long-function splits belong to invalid-context and native evidence.
+and original live supervisor-return invocation. Invalid-context evidence also
+discharges its nine moves and setup split, retaining one eleven-field context
+and exact guarded corruption/snapshot behavior. The remaining 27 owner moves
+and four long-function splits belong to native evidence.
 
 Run its focused implementation loop with:
 
