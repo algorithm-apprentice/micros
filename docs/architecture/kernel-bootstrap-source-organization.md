@@ -6,20 +6,15 @@ This is the source contract for the bootstrap correction in
 and its design merged as PR #119, commit
 `531b191529c53f900dee1cb4b642bb85d58138c7`.
 
-Implementation is in progress. The structural Red gate, nine source sets,
-private-header/source skeletons and validation inheritance are integrated.
-Portable common/profile/manifest validation and runtime transitions now have
-their reviewed owners and named phases. Privileged runtime state,
-preparation/image access, reverse cleanup, validation and diagnostics now have
-their reviewed owners and one ten-field context. Captured bootstrap control
-now separates common authority from release, readiness, completion and failure
-transactions. Native fixtures, case domains, reference oracle and replay now
-have their reviewed owners while retaining the three existing executions.
-Boot entry now keeps one automatic context and delegates ordered foundation
-and compile-time component phases. The launcher now separates its automatic
-serial orchestration, independent manifest validation, protocol classification,
-common data and private control transport. The moving-symbol migration is
-empty; two long functions remain in the image and generator owners.
+Implementation now separates the specified portable, privileged, captured
+control, boot, launcher and native evidence owners through nine exact source
+sets and declarations-only private contracts. The target runtime consolidates
+only the ten existing fields; boot, launcher, native fixtures and the reference
+oracle retain their automatic lifetimes. Image-catalog and shared descriptor
+validation expose named phases without changing their interfaces or output.
+Both active migrations are empty. The structural gate retains the reviewed
+60-symbol and 27-long-function inventories and enforces the final owners,
+preserved interfaces, evidence identities and validation inheritance.
 
 ## Reviewed base and scope
 
@@ -34,7 +29,7 @@ changes source ownership, private helper boundaries, and named function phases,
 not the manifest, boot algorithm, privilege policy, readiness protocol, syscall
 ABI, target behavior, or evidence identity.
 
-The ten audited sources currently contain 12,621 physical lines:
+At this reviewed base, the ten audited sources contain 12,621 physical lines:
 
 | Current source | Lines | Responsibility mixed in the current owner |
 | --- | ---: | --- |

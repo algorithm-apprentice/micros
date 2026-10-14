@@ -161,8 +161,9 @@ The kernel bootstrap correction defined by Accepted ADR-0060 preserves
 `bootstrap_test` / `bootstrap-manifest`, `bootstrap_control_test` /
 `bootstrap-control`, `fdt_test` / `fdt-parser`, the existing launcher ELF,
 all component/prefix/fatal workflows, and the shared fixture generator.
-Its implementation starts with a structural gate, a 60-symbol owner migration
-and a 27-function long migration. Native case order, the 4,096-step reference
+Its implementation began with a structural gate, a 60-symbol owner migration
+and a 27-function long migration; both active migrations are now empty.
+Native case order, the 4,096-step reference
 model seed/draw/dispatch/comparison and last-16 failure trace, automatic
 fixture lifetimes, three static catalog pages, target branch/commit order,
 generator bytes and imported helper interfaces remain unchanged.

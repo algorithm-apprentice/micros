@@ -31,7 +31,7 @@ def _format_bytes(data):
     return "\n".join(lines) + "\n"
 
 
-def _validated_descriptor(image, prefix):
+def _validated_loads_and_symbols(image):
     errors = check_user_elf.validate_elf(image)
     if errors:
         raise check_user_elf.ElfFormatError("; ".join(errors))
@@ -57,6 +57,10 @@ def _validated_descriptor(image, prefix):
         raise check_user_elf.ElfFormatError(
             "unexpected bootstrap load-segment count"
         )
+    return symbols, loads
+
+
+def _validated_configuration(image, symbols, loads):
     config = symbols[CONFIG_SYMBOL]
     if config.size != 128 or config.value % 8 != 0:
         raise check_user_elf.ElfFormatError(
@@ -95,6 +99,10 @@ def _validated_descriptor(image, prefix):
             raise check_user_elf.ElfFormatError(
                 "bootstrap configuration initial bytes are nonzero"
             )
+    return config
+
+
+def _validated_vm_boot_info(image, symbols, loads, config):
     vm_boot_info = symbols.get(VM_BOOT_INFO_SYMBOL)
     vm_boot_info_address = 0
     vm_boot_info_size = 0
@@ -148,6 +156,15 @@ def _validated_descriptor(image, prefix):
                 )
         vm_boot_info_address = vm_boot_info.value
         vm_boot_info_size = vm_boot_info.size
+    return vm_boot_info_address, vm_boot_info_size
+
+
+def _validated_descriptor(image, prefix):
+    symbols, loads = _validated_loads_and_symbols(image)
+    config = _validated_configuration(image, symbols, loads)
+    vm_boot_info_address, vm_boot_info_size = _validated_vm_boot_info(
+        image, symbols, loads, config
+    )
     page_count = sum(program.memory_size // PAGE_SIZE for program in loads)
     return {
         "prefix": prefix,

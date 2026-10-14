@@ -58,30 +58,19 @@ static bool ranges_overlap(
     );
 }
 
-static enum micros_bootstrap_error validate_image(
+struct image_validation {
+    uint64_t next_address;
+    uint64_t page_count;
+    bool entry_found;
+    bool config_found;
+    bool vm_boot_info_found;
+};
+
+static enum micros_bootstrap_error validate_image_shape(
     const struct micros_bootstrap_image *image,
-    struct micros_bootstrap_image_info *info
+    bool has_vm_boot_info
 )
 {
-    static const uint32_t expected_flags[
-        MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT
-    ] = {
-        MICROS_BOOTSTRAP_IMAGE_READ
-            | MICROS_BOOTSTRAP_IMAGE_EXECUTE,
-        MICROS_BOOTSTRAP_IMAGE_READ,
-        MICROS_BOOTSTRAP_IMAGE_READ
-            | MICROS_BOOTSTRAP_IMAGE_WRITE,
-    };
-    uint64_t next_address = MICROS_USER_VIRTUAL_BASE;
-    uint64_t page_count = 0;
-    bool entry_found = false;
-    bool config_found = false;
-    bool vm_boot_info_found = false;
-    bool has_vm_boot_info =
-        image->vm_boot_info_address != 0
-        || image->vm_boot_info_size != 0;
-    size_t index;
-
     if (
         image->version != MICROS_BOOTSTRAP_IMAGE_VERSION
         || image->image_id == 0
@@ -119,6 +108,119 @@ static enum micros_bootstrap_error validate_image(
     ) {
         return MICROS_BOOTSTRAP_ERROR_IMAGE;
     }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_segment_shape(
+    const struct micros_bootstrap_image_segment *segment,
+    size_t index,
+    uint64_t next_address
+)
+{
+    static const uint32_t expected_flags[
+        MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT
+    ] = {
+        MICROS_BOOTSTRAP_IMAGE_READ
+            | MICROS_BOOTSTRAP_IMAGE_EXECUTE,
+        MICROS_BOOTSTRAP_IMAGE_READ,
+        MICROS_BOOTSTRAP_IMAGE_READ
+            | MICROS_BOOTSTRAP_IMAGE_WRITE,
+    };
+
+    if (
+        segment->virtual_address != next_address
+        || segment->memory_size == 0
+        || segment->memory_size % MICROS_SV39_PAGE_SIZE != 0
+        || segment->file_size > segment->memory_size
+        || segment->flags != expected_flags[index]
+        || (
+            segment->file_size != 0
+            && segment->file_bytes == NULL
+        )
+        || UINT64_MAX - segment->virtual_address
+            < segment->memory_size
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_IMAGE;
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static bool validate_segment_objects(
+    const struct micros_bootstrap_image *image,
+    const struct micros_bootstrap_image_segment *segment,
+    uint64_t segment_end,
+    bool has_vm_boot_info,
+    struct image_validation *validation
+)
+{
+    if (
+        image->entry >= segment->virtual_address
+        && image->entry < segment_end
+    ) {
+        validation->entry_found = (
+            segment->flags
+            & MICROS_BOOTSTRAP_IMAGE_EXECUTE
+        ) != 0;
+    }
+    if (
+        image->config_address >= segment->virtual_address
+        && image->config_address < segment_end
+    ) {
+        if (
+            validation->config_found
+            || UINT64_MAX - image->config_address
+                < image->config_size
+            || image->config_address + image->config_size
+                > segment_end
+            || (
+                segment->flags
+                & MICROS_BOOTSTRAP_IMAGE_WRITE
+            ) == 0
+            || !range_bytes_are_zero(
+                segment,
+                image->config_address,
+                image->config_size
+            )
+        ) {
+            return false;
+        }
+        validation->config_found = true;
+    }
+    if (
+        has_vm_boot_info
+        && image->vm_boot_info_address
+            >= segment->virtual_address
+        && image->vm_boot_info_address < segment_end
+    ) {
+        if (
+            validation->vm_boot_info_found
+            || image->vm_boot_info_size
+                > segment_end - image->vm_boot_info_address
+            || (
+                segment->flags
+                & MICROS_BOOTSTRAP_IMAGE_WRITE
+            ) == 0
+            || !range_bytes_are_zero(
+                segment,
+                image->vm_boot_info_address,
+                image->vm_boot_info_size
+            )
+        ) {
+            return false;
+        }
+        validation->vm_boot_info_found = true;
+    }
+    return true;
+}
+
+static enum micros_bootstrap_error validate_image_segments(
+    const struct micros_bootstrap_image *image,
+    bool has_vm_boot_info,
+    struct image_validation *validation
+)
+{
+    size_t index;
+
     for (
         index = 0;
         index < MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT;
@@ -127,97 +229,68 @@ static enum micros_bootstrap_error validate_image(
         const struct micros_bootstrap_image_segment *segment =
             &image->segments[index];
         uint64_t segment_end;
+        enum micros_bootstrap_error error = validate_segment_shape(
+            segment,
+            index,
+            validation->next_address
+        );
 
-        if (
-            segment->virtual_address != next_address
-            || segment->memory_size == 0
-            || segment->memory_size % MICROS_SV39_PAGE_SIZE != 0
-            || segment->file_size > segment->memory_size
-            || segment->flags != expected_flags[index]
-            || (
-                segment->file_size != 0
-                && segment->file_bytes == NULL
-            )
-            || UINT64_MAX - segment->virtual_address
-                < segment->memory_size
-        ) {
-            return MICROS_BOOTSTRAP_ERROR_IMAGE;
+        if (error != MICROS_BOOTSTRAP_OK) {
+            return error;
         }
         segment_end =
             segment->virtual_address + segment->memory_size;
         if (
-            image->entry >= segment->virtual_address
-            && image->entry < segment_end
+            !validate_segment_objects(
+                image,
+                segment,
+                segment_end,
+                has_vm_boot_info,
+                validation
+            )
         ) {
-            entry_found = (
-                segment->flags
-                & MICROS_BOOTSTRAP_IMAGE_EXECUTE
-            ) != 0;
+            return MICROS_BOOTSTRAP_ERROR_IMAGE;
         }
         if (
-            image->config_address >= segment->virtual_address
-            && image->config_address < segment_end
-        ) {
-            if (
-                config_found
-                || UINT64_MAX - image->config_address
-                    < image->config_size
-                || image->config_address + image->config_size
-                    > segment_end
-                || (
-                    segment->flags
-                    & MICROS_BOOTSTRAP_IMAGE_WRITE
-                ) == 0
-                || !range_bytes_are_zero(
-                    segment,
-                    image->config_address,
-                    image->config_size
-                )
-            ) {
-                return MICROS_BOOTSTRAP_ERROR_IMAGE;
-            }
-            config_found = true;
-        }
-        if (
-            has_vm_boot_info
-            && image->vm_boot_info_address
-                >= segment->virtual_address
-            && image->vm_boot_info_address < segment_end
-        ) {
-            if (
-                vm_boot_info_found
-                || image->vm_boot_info_size
-                    > segment_end - image->vm_boot_info_address
-                || (
-                    segment->flags
-                    & MICROS_BOOTSTRAP_IMAGE_WRITE
-                ) == 0
-                || !range_bytes_are_zero(
-                    segment,
-                    image->vm_boot_info_address,
-                    image->vm_boot_info_size
-                )
-            ) {
-                return MICROS_BOOTSTRAP_ERROR_IMAGE;
-            }
-            vm_boot_info_found = true;
-        }
-        if (
-            UINT64_MAX - page_count
+            UINT64_MAX - validation->page_count
                 < segment->memory_size / MICROS_SV39_PAGE_SIZE
         ) {
             return MICROS_BOOTSTRAP_ERROR_RANGE;
         }
-        page_count +=
+        validation->page_count +=
             segment->memory_size / MICROS_SV39_PAGE_SIZE;
-        next_address = segment_end;
+        validation->next_address = segment_end;
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error validate_image(
+    const struct micros_bootstrap_image *image,
+    struct micros_bootstrap_image_info *info
+)
+{
+    struct image_validation validation = {
+        .next_address = MICROS_USER_VIRTUAL_BASE,
+    };
+    bool has_vm_boot_info =
+        image->vm_boot_info_address != 0
+        || image->vm_boot_info_size != 0;
+    enum micros_bootstrap_error error =
+        validate_image_shape(image, has_vm_boot_info);
+
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = validate_image_segments(image, has_vm_boot_info, &validation);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
     if (
-        !entry_found
-        || !config_found
-        || (has_vm_boot_info && !vm_boot_info_found)
-        || image->image_end != next_address
-        || image->page_count != page_count
+        !validation.entry_found
+        || !validation.config_found
+        || (has_vm_boot_info && !validation.vm_boot_info_found)
+        || image->image_end != validation.next_address
+        || image->page_count != validation.page_count
     ) {
         return MICROS_BOOTSTRAP_ERROR_IMAGE;
     }
