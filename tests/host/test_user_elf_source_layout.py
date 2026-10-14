@@ -137,12 +137,7 @@ CHECKER_IMAGES = (
     "build-tty-service-image", "build-ramfs-service-image", "build-vfs-service-image",
 )
 
-SYMBOL_OWNER_MIGRATION = (
-    "tests/host/user_elf_test_fixture.py",
-    "tests/host/user_elf_parse_cases.py",
-    "tests/host/user_elf_structure_cases.py",
-    "tests/host/user_elf_policy_cases.py",
-)
+SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_MIGRATION = ("build_elf",)
 
 FROZEN_AST = {
@@ -669,7 +664,12 @@ class UserElfSourceLayoutTest(unittest.TestCase):
             definitions = [node for node in ast.walk(parse_source(text))
                            if isinstance(node, ast.FunctionDef)]
             if not SYMBOL_OWNER_MIGRATION:
-                self.assertTrue(definitions, path)
+                if path == TEST_ENTRY:
+                    self.assertIsInstance(
+                        one_definition(self.texts, path, "UserElfCheckerTest"), ast.ClassDef,
+                    )
+                else:
+                    self.assertTrue(definitions, path)
             for node in definitions:
                 if node.name not in FUNCTION_MIGRATION:
                     self.assertLessEqual(node.end_lineno - node.lineno + 1, 120,
