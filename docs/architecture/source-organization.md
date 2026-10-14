@@ -282,7 +282,7 @@ object validation and the authoritative IPC runtime remain in their current
 owners. Implementation is blocked until that design is independently
 reviewed, Accepted, and merged.
 
-The scheduler correction is proposed by
+The scheduler correction is defined by Accepted
 [ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) and
 [Kernel Scheduler Source Organization](kernel-scheduler-source-organization.md).
 It separates portable queue/transaction/validation/planning/accounting,

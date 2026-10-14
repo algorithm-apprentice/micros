@@ -300,17 +300,16 @@ migrations, unchanged architecture and runtime surfaces, and fail-closed
 source/build/evidence enforcement. It adds no application runtime or dynamic
 PID-1 behavior.
 
-The next selected high-risk dependency-ready correction is proposed
+The next selected high-risk dependency-ready correction is Accepted
 [ADR-0062](adr/0062-kernel-scheduler-source-decomposition.md) and its exact
 [scheduler source contract](architecture/kernel-scheduler-source-organization.md).
 The design separates queue, IPC transaction, validation, planning/commit,
 accounting, target completion/return/interrupt/idle, and independent evidence
 owners while retaining all current behavior. It names 38 C sources, six
 private contracts, six source sets, 138 moving definitions, and twelve
-semantic long-function splits. Implementation remains pending until the
-separate design is independently reviewed, Accepted, and merged. This does
-not add application startup, dynamic PID-1 integration, or a new runtime
-dependency.
+semantic long-function splits. Its independent design review is clean;
+implementation remains pending until the separate design merge. This does not
+add application startup, dynamic PID-1 integration, or a new runtime dependency.
 
 ## v0.1 completion goal
 

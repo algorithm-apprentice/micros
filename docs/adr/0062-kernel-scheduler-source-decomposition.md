@@ -1,6 +1,6 @@
 # ADR-0062: Kernel Scheduler Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-14
 - Related:
   [ADR-0025](0025-minix-behavioral-baseline-before-optimization.md),

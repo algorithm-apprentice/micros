@@ -2,9 +2,9 @@
 
 This is the exact design contract for the six scheduler sources in
 [the source-module audit](source-module-audit.md).
-[ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) is Proposed.
-Implementation remains pending until independent design review, Acceptance,
-and the separate design merge.
+[ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) is Accepted
+after a clean independent design review. Implementation remains pending until
+the separate design merge.
 
 ## Base, outcome, and non-goals
 

@@ -183,7 +183,7 @@ evidence precedes one complete current author PR plan; independent reviewers
 inspect rather than routinely rerun the evidence. Implementation starts only
 after the separate design is reviewed, Accepted and merged.
 
-The scheduler correction proposed by ADR-0062 preserves `scheduler_test` /
+The scheduler correction defined by Accepted ADR-0062 preserves `scheduler_test` /
 `scheduler-core`, the exact eleven native cases, its 4,096-step two-hart
 model, three scheduler QEMU workflows, and all downstream production
 consumers. Implementation starts only after the separate design is reviewed,
