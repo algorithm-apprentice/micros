@@ -61,7 +61,7 @@ static enum micros_pm_coordinator_error finish_public_spawn(
 {
     struct micros_pm_coordinator_response built;
     enum micros_pm_coordinator_error error;
-    bool lost = spawn->coordinator->parent_lost;
+    bool lost;
 
     if (step == PM_COORDINATOR_REJECTED || step == PM_COORDINATOR_PARENT_GONE) {
         error = pm_coordinator_rollback_spawn(spawn);
@@ -71,6 +71,7 @@ static enum micros_pm_coordinator_error finish_public_spawn(
     } else if (step != PM_COORDINATOR_ADVANCED) {
         return MICROS_PM_COORDINATOR_ERROR_INVARIANT;
     }
+    lost = spawn->coordinator->parent_lost;
     spawn->coordinator->spawn_pending = false;
     spawn->coordinator->pending_parent_reply = 0;
     spawn->coordinator->parent_lost = false;

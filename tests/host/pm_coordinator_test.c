@@ -21,6 +21,7 @@ int main(void)
         {"coordinator public failure results", test_coordinator_public_failure_results},
         {"coordinator public preflight results", test_coordinator_public_preflight_results},
         {"coordinator parent loss rollback", test_coordinator_parent_loss_rollback},
+        {"coordinator parent loss during rollback", test_coordinator_parent_loss_during_rollback},
         {"coordinator public capacity and unknown grant", test_coordinator_public_capacity_and_unknown_grant},
         {"coordinator parent loss after publication", test_coordinator_parent_loss_after_publication},
         {"coordinator exit and blocked wait", test_coordinator_exit_and_blocked_wait},

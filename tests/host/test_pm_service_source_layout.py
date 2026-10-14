@@ -864,6 +864,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 "test_coordinator_init_preflight_preserves_pid",
                 "test_coordinator_public_spawn", "test_coordinator_public_failure_results",
                 "test_coordinator_public_preflight_results", "test_coordinator_parent_loss_rollback",
+                "test_coordinator_parent_loss_during_rollback",
                 "test_coordinator_public_capacity_and_unknown_grant",
                 "test_coordinator_parent_loss_after_publication",
                 "test_coordinator_exit_and_blocked_wait", "test_coordinator_exit_failure_boundaries",

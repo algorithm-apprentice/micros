@@ -179,6 +179,51 @@ bool test_coordinator_parent_loss_rollback(void)
     return true;
 }
 
+bool test_coordinator_parent_loss_during_rollback(void)
+{
+    const uint32_t cleanup[] = {
+        COORDINATOR_MOCK_REVERT_HIDDEN, COORDINATOR_MOCK_ABORT_PREPARED,
+        COORDINATOR_MOCK_ABORT_DESCRIPTORS, COORDINATOR_MOCK_ABORT_LOAD,
+        COORDINATOR_MOCK_RELEASE_IMAGE, COORDINATOR_MOCK_ABORT_RESERVED,
+    };
+    const struct micros_ipc_message no_reply = {.source = MICROS_ENDPOINT_NONE};
+    size_t index;
+
+    for (index = 0; index < sizeof(cleanup) / sizeof(cleanup[0]); ++index) {
+        struct coordinator_spawn_fixture fixture;
+        struct micros_ipc_message message;
+        struct micros_pm_coordinator_response response;
+        struct micros_pm_process_record parent;
+
+        COORDINATOR_EXPECT(coordinator_spawn_fixture_initialize_parent(&fixture));
+        parent = fixture.table.records[0];
+        fixture.fail_step = COORDINATOR_MOCK_ACTIVATE;
+        fixture.cancel_step = cleanup[index];
+        message = coordinator_spawn_fixture_request(&fixture);
+        COORDINATOR_EXPECT(
+            micros_pm_coordinator_spawn_request(
+                &fixture.coordinator, coordinator_spawn_fixture_backend(), &fixture,
+                &message, &response
+            ) == MICROS_PM_COORDINATOR_OK
+            && !fixture.violation
+            && response.kind == MICROS_PM_COORDINATOR_RESPONSE_PARENT_LOST
+            && response.reply_token == 0
+            && memcmp(&response.message, &no_reply, sizeof(no_reply)) == 0
+            && coordinator_spawn_fixture_resources_are_empty(&fixture)
+            && fixture.table.records[1].state == MICROS_PM_PROCESS_FREE
+            && memcmp(&fixture.table.records[0], &parent, sizeof(parent)) == 0
+            && fixture.table.last_pid == 2 && fixture.coordinator.last_spawn_token == 2
+            && !fixture.coordinator.spawn_pending && !fixture.coordinator.parent_lost
+            && fixture.coordinator.pending_parent_reply == 0
+            && fixture.trace_count >= sizeof(cleanup) / sizeof(cleanup[0])
+            && memcmp(&fixture.trace[fixture.trace_count - sizeof(cleanup) / sizeof(cleanup[0])],
+                      cleanup, sizeof(cleanup)) == 0
+            && micros_pm_table_validate(&fixture.table) == MICROS_PM_MODEL_OK
+        );
+    }
+    return true;
+}
+
 bool test_coordinator_public_capacity_and_unknown_grant(void)
 {
     struct coordinator_spawn_fixture fixture;

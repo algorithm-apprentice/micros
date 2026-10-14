@@ -137,6 +137,9 @@ child/status field.
 The explicit PM-owned parent-loss input matches the pending reply token.
 Every successful preactivation phase records its owned resource before
 checking that input; a just-created request grant is revoked before unwind.
+The final reply decision reads the sticky parent-loss input only after all
+rollback calls finish. Loss accepted during any reverse release still
+suppresses the original reply while preserving complete reverse cleanup.
 Rollback suppresses the reply and clears pending coordinator state. Once
 activation succeeds, cancellation cannot unwind the running child: mandatory
 VM/VFS commits still finish before reply suppression. The input denotes reply
