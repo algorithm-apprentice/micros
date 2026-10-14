@@ -1,9 +1,20 @@
 # Kernel Bootstrap Source Organization
 
-This is the design-only source contract for the bootstrap correction in
-[the source-module audit](source-module-audit.md). Implementation is blocked
-until [ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) is
-Accepted and its design pull request has merged.
+This is the source contract for the bootstrap correction in
+[the source-module audit](source-module-audit.md).
+[ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) is Accepted
+and its design merged as PR #119, commit
+`531b191529c53f900dee1cb4b642bb85d58138c7`.
+
+Implementation now separates the specified portable, privileged, captured
+control, boot, launcher and native evidence owners through nine exact source
+sets and declarations-only private contracts. The target runtime consolidates
+only the ten existing fields; boot, launcher, native fixtures and the reference
+oracle retain their automatic lifetimes. Image-catalog and shared descriptor
+validation expose named phases without changing their interfaces or output.
+Both active migrations are empty. The structural gate retains the reviewed
+60-symbol and 27-long-function inventories and enforces the final owners,
+preserved interfaces, evidence identities and validation inheritance.
 
 ## Reviewed base and scope
 
@@ -18,7 +29,7 @@ changes source ownership, private helper boundaries, and named function phases,
 not the manifest, boot algorithm, privilege policy, readiness protocol, syscall
 ABI, target behavior, or evidence identity.
 
-The ten audited sources currently contain 12,621 physical lines:
+At this reviewed base, the ten audited sources contain 12,621 physical lines:
 
 | Current source | Lines | Responsibility mixed in the current owner |
 | --- | ---: | --- |
@@ -264,6 +275,9 @@ move implementation out of the mechanisms they exercise.
 
 This is source extraction, not a runtime test registry or a new boot framework.
 The source-only correction does not touch trap/syscall mechanism policy.
+Panic source-location records identify the moved call site. The intentional
+panic gate therefore requires `kernel/boot_component_tests.c`, while its
+reason, complete record shape, machine-state fields and timeout remain exact.
 
 ## Launcher source ownership
 

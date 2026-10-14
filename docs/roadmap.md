@@ -283,9 +283,11 @@ The next selected high-risk dependency-ready maintenance design is Accepted
 [bootstrap source contract](architecture/kernel-bootstrap-source-organization.md).
 It separates immutable validation, privileged preparation/rollback,
 diagnostics, captured control, boot entry, launcher and native evidence
-without changing the runtime graph or bootstrap behavior. Its independent
-design review is clean; implementation follows as a separate behavior-preserving
-outcome after the design merge.
+without changing the runtime graph or bootstrap behavior. Its independently
+reviewed design is Accepted and merged. The implementation now exposes the
+specified source owners and semantic phases with empty migrations, preserved
+evidence and fail-closed structural enforcement. It adds no bootstrap behavior,
+application runtime or dynamic PID-1 integration.
 
 ## v0.1 completion goal
 

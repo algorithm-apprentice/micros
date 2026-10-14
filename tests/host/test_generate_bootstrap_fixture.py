@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_check_user_elf import build_elf
@@ -35,6 +36,10 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
             bootstrap_image(),
         )
 
+        self.assertEqual(
+            "e264c2a10046d0c188f4d581354c40bf8cd7ea1ada24f3da1dd049c96df64782",
+            hashlib.sha256(output.encode("utf-8")).hexdigest(),
+        )
         self.assertIn("micros_bootstrap_test_images", output)
         self.assertIn(".image_id = 101", output)
         self.assertIn(".image_id = 103", output)

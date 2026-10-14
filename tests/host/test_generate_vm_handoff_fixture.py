@@ -1,4 +1,5 @@
 from dataclasses import replace
+import hashlib
 import unittest
 
 from tests.host.test_generate_bootstrap_fixture import bootstrap_image
@@ -81,6 +82,10 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
             probe_image(),
         )
 
+        self.assertEqual(
+            "6b988f6fc51404decf3411d27e8102b1d88f6f4af3400ac63490ee89fc53da8f",
+            hashlib.sha256(output.encode("utf-8")).hexdigest(),
+        )
         self.assertIn("micros_vm_handoff_test_images", output)
         self.assertIn("MICROS_BOOTSTRAP_ROLE_VM", output)
         self.assertIn(
@@ -99,6 +104,52 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
                 bootstrap_image(),
                 bootstrap_image(),
                 probe_image(),
+            )
+
+    def test_rejects_vm_boot_object_size_and_alignment(self):
+        for change in (
+            {"size": 364703},
+            {"value": check_user_elf.USER_BASE + 3 * 4096 + 8},
+        ):
+            image = vm_image()
+            image = replace(
+                image,
+                symbols=tuple(
+                    replace(symbol, **change)
+                    if symbol.name == "micros_vm_boot_info"
+                    else symbol
+                    for symbol in image.symbols
+                ),
+            )
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(
+                    check_user_elf.ElfFormatError,
+                    "VM boot information has wrong size or alignment",
+                ):
+                    generate_vm_handoff_fixture.render_fixture(
+                        bootstrap_image(), image, probe_image()
+                    )
+
+    def test_rejects_vm_boot_object_configuration_overlap(self):
+        image = vm_image()
+        image = replace(
+            image,
+            symbols=tuple(
+                replace(
+                    symbol,
+                    value=check_user_elf.USER_BASE + 3 * 4096,
+                )
+                if symbol.name == "micros_bootstrap_service_config"
+                else symbol
+                for symbol in image.symbols
+            ),
+        )
+        with self.assertRaisesRegex(
+            check_user_elf.ElfFormatError,
+            "VM boot information overlaps bootstrap configuration",
+        ):
+            generate_vm_handoff_fixture.render_fixture(
+                bootstrap_image(), image, probe_image()
             )
 
 
