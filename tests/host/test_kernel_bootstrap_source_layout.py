@@ -956,7 +956,11 @@ def header_executable_text(relative: str) -> str:
 
 def c_function_body(text: str, name: str) -> str:
     lexical = c_lexical_text(text)
-    match = re.search(rf"\b{re.escape(name)}\s*\([^;{{}}]*\)\s*\{{", lexical)
+    candidates = re.finditer(rf"\b{re.escape(name)}\s*\([^;{{}}]*\)\s*\{{", lexical)
+    match = next((
+        candidate for candidate in candidates
+        if lexical.count("{", 0, candidate.start()) == lexical.count("}", 0, candidate.start())
+    ), None)
     if match is None:
         raise AssertionError(f"missing function body: {name}")
     start = match.end() - 1
@@ -1219,8 +1223,19 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             for source in ("kernel/bootstrap_control.c", "kernel/bootstrap_control_core.c"):
                 self.assertEqual(1, block.count(source), (target, source))
         native_control = cmake_command(cmake, "add_executable", "bootstrap_control_test")
-        for source in ("kernel/endpoint.c", "kernel/kernel_objects.c"):
-            self.assertEqual(1, native_control.count(source), source)
+        self.assertEqual(1, native_control.count("kernel/kernel_objects.c"))
+        self.assertEqual(1, native_control.count("${MICROS_ENDPOINT_CORE_SOURCES}"))
+        endpoint_set = cmake_command(cmake, "set", "MICROS_ENDPOINT_CORE_SOURCES")
+        self.assertEqual(
+            (
+                "kernel/endpoint.c", "kernel/endpoint_codec.c", "kernel/endpoint_identity.c",
+                "kernel/endpoint_registry.c", "kernel/endpoint_privilege.c",
+                "kernel/endpoint_completion_validation.c", "kernel/endpoint_queue_validation.c",
+                "kernel/endpoint_object_validation.c", "kernel/endpoint_publication.c",
+                "kernel/endpoint_close.c",
+            ),
+            tuple(re.findall(r"kernel/[A-Za-z0-9_]+\.c", endpoint_set)),
+        )
         self.assertEqual(1, native_control.count("${MICROS_SCHEDULER_CORE_SOURCES}"))
         self.assertEqual(1, native_control.count("${MICROS_IPC_CORE_SOURCES}"))
         self.assertEqual(

@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text
+from tests.host.test_endpoint_source_layout import endpoint_cmake_projection
 from tests.host.test_kernel_bootstrap_source_layout import c_function_body, local_include_closure
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 from tests.host.test_pm_service_source_layout import cmake_commands
@@ -1613,6 +1614,7 @@ def fixture_parameter_matches(family):
 
 
 def restored_cmake(text):
+    text = endpoint_cmake_projection(text)
     for family, (name, paths) in enumerate(SOURCE_SETS.items()):
         blocks = cmake_commands(text, "set", name)
         if not blocks:

@@ -150,6 +150,51 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        "kernel/endpoint.c",
+        (
+            "kernel/endpoint_codec.c",
+            "kernel/endpoint_identity.c",
+            "kernel/endpoint_registry.c",
+            "kernel/endpoint_privilege.c",
+            "kernel/endpoint_completion_validation.c",
+            "kernel/endpoint_queue_validation.c",
+            "kernel/endpoint_object_validation.c",
+            "kernel/endpoint_publication.c",
+            "kernel/endpoint_close.c",
+            "kernel/endpoint_private.h",
+        ),
+    ),
+    (
+        "tests/host/endpoint_test.c",
+        (
+            "tests/host/endpoint_test_fixture.c",
+            "tests/host/endpoint_identity_test.c",
+            "tests/host/endpoint_profile_test.c",
+            "tests/host/endpoint_validation_test.c",
+            "tests/host/endpoint_lifecycle_test.c",
+            "tests/host/endpoint_source_only_test.c",
+            "tests/host/endpoint_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/endpoint_model_test.c",
+        (
+            "tests/host/endpoint_model_fixture.c",
+            "tests/host/endpoint_model_reference.c",
+            "tests/host/endpoint_model_projection.c",
+            "tests/host/endpoint_model_operations.c",
+            "tests/host/endpoint_model_internal.h",
+        ),
+    ),
+    (
+        "kernel/endpoint_test.c",
+        (
+            "kernel/endpoint_test_fixture.c",
+            "kernel/endpoint_test_scenarios.c",
+            "kernel/endpoint_test_internal.h",
+        ),
+    ),
+    (
         "servers/ramfs/ramfs_core.c",
         (
             "servers/ramfs/ramfs_codec.c",
@@ -952,6 +997,7 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",
     "tests/host/test_ramfs_source_layout.py",
+    "tests/host/test_endpoint_source_layout.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",

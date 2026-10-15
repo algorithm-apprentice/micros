@@ -26,7 +26,7 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6",
+    "CMakeLists.txt": "50cac89bbc8dfc0246b97d36be3585ff53f7e86c3dbc772539a6f8352e05db7d",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
 QEMU_RUNNER_DIGEST = "9e54f744074d077d05b52880495b73f7c74ae1db0a6ad751f8b7024688bf79e3"

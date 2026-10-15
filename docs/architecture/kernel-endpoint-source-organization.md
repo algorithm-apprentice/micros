@@ -479,6 +479,122 @@ author plan. Squash invalidates old-HEAD receipts even for an identical tree.
 
 ## Implementation sequence and design barrier
 
+### Current implementation progress
+
+Design #135 is merged as `b99a035`. The first implementation slice exposes
+the fifteen original codec definitions and fourteen necessary cross-owner
+prototypes, with exact complete-body reconstruction. All 98 original bodies
+and fifteen stable neighboring artifacts are frozen from the immutable base.
+The definition inspector now rejects earlier call sites and prototypes,
+with an independent regression; its one initial endpoint fingerprint was
+corrected from the unchanged Git baseline before any C movement.
+The existing literal-preserving token utility moved unchanged to the shared
+lexical helper owner, with its complete original AST enforced.
+
+All 25 final source paths, four private headers, four source sets and nine
+consumer operands are wired once. Not-yet-extracted owners are explicitly
+declarations-only compilation units; they do not duplicate fixture storage or
+claim completed ownership. This keeps the entire authorized recipe inverse
+provable while subsequent green commits move real definitions.
+The resulting complete CMake digest is
+`50cac89bbc8dfc0246b97d36be3585ff53f7e86c3dbc772539a6f8352e05db7d`;
+only its admitted literal is maintained after restoring the whole base
+`cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6`.
+Existing native include search roots are unchanged; private includes resolve
+relative to their actual source owners.
+
+All 369 source-layout checks, native endpoint/profile and combined IPC-model
+executions, and the actual endpoint/grant QEMU scenario pass for this slice.
+The following slice also exposes identity/ownership queries, registry
+initialization/validation, and checked profile-query owners: 31 original
+definitions now have their required owners, with 22 necessary private
+prototypes and unchanged complete bodies and recipe.
+Portable source ownership is now complete: all 67 original definitions occupy
+their ten required owners, with exactly 31 necessary private declarations.
+Completion/queue/object validation and publication/close remain acyclic,
+while the five supported checked resolution/authorization entry points form
+the small facade. The legacy six-function prevalidated interface and every
+original body remain unchanged.
+The deterministic native family now also has its seven required owners and
+one exact five-field static fixture. Its nine stateful case roots borrow the
+same fixture once; setup receives that pointer, pure helpers and encoding
+do not gain ambient context, and original resets/snapshots/macros/25-case
+runner remain exact under typed reconstruction.
+The independent model now also exposes its five owners and separate
+five-field production/trace fixture. Expected slots, coverage, random state
+and loop work retain their original automatic lifetime. Only the entry
+borrows the fixture; setup/trace mutation and readonly failure/projection
+helpers receive exact typed pointers. Raw operation-name bytes, model types,
+all fifteen original model bodies, draw/trace/comparison order and resets
+remain exact. The active 90-owner migration is now a literal empty tuple.
+The public validators now have 26/34-line outlines and four 66/65/108/80-line
+profile, record, process and thread passes. Exact whole-body projection
+preserves original counter bounds, header/error precedence, every invariant,
+and one caller-owned queued-thread witness shared across process and thread
+closure; helpers do not introduce early success or another witness.
+The shorter initializer now exposes candidate preparation, closed-target
+proof and non-failing profile publication. The original automatic array and
+mask remain caller-owned; exact projection preserves dirty/initialized/
+capacity/duplicate/target precedence and copy/count/magic order. Publication
+uses the frozen full registry-array extent rather than the decayed parameter
+size. Independent mask-binding, extent and early-publication mutants reject
+drift. The native runner now has an 18-line ordered control loop and its
+single exact 25-case file-static readonly table. Raw literal, callback, type
+and scope checks precede reconstruction of the entire original main body;
+case order, output and first failure remain unchanged.
+Independent model comparison now has a 72-line header/free-slot/count outline
+and 46/78-line live-identity and endpoint-phase tasks. Exact scope-aware
+projection restores only the original unused/closed slot `continue` exits;
+helper-local success cannot skip remaining slots, trace diagnostics or
+aggregate counts. The held-thread native scenario now has three 47/51/41-line
+installation-denial, profile-publication and close/cleanup tasks with a
+ten-line root. Its only work fields are the original endpoint and context;
+only the original context-pattern initializer runs, without aggregate zeroing
+or a second context. The lifecycle/authorization case now has five ordered
+hidden-reservation, profile-publication, asymmetric-authority,
+stale/operation-precedence and final-relationship tasks with a 14-line root.
+Its only initializers remain the original zero endpoint pair and NULL record;
+raw original-body proof preserves all authority, output-sentinel and
+bound-release checks. Source-only evidence now has four 58/39/48/22-line
+prepare-acknowledgment, seal/validate, new-authority denial and drain/close
+tasks with an eleven-line root. The original endpoint pair, record,
+receiver and loop index remain automatic; only the original NULL-record
+initializer runs. Complete body proof retains the canonical ACK mutation/
+restoration, closing-output sentinel, staged-source close refusal and final
+clear-before-close order. Rejected-profile evidence now has five original
+setup, duplicate, shape/name, target-mask and capacity tasks. Its sole
+automatic work holds the original two-profile array and registry snapshot.
+The actual file-local rejection macro is raw-verified before reconstruction
+at its original definition/undef positions; reset, snapshot, mutation and
+comparison order are unchanged. The complete model runner now has a 33-line
+root with setup, two-draw/script, eight-operation dispatch, trace/comparison,
+cleanup and nineteen-counter coverage tasks. Run and iteration work contain
+only the original four fields each; the constant seed stays in entry and
+only the original model/coverage clears run. Actual raw seventeen-pair
+scripts remain unique readonly objects in the original runner owner.
+Authorization keeps its original case-scoped locals and two extra draws
+before selection or any no-slot exit; four tasks preserve reply-receive
+priority, reply, target selection and target authority. The full original
+659-line body reconstructs with helper success mapped only to original case
+breaks, never the outer trace/comparison. The target now has a 37-line entry,
+three fixture tasks and five scenario tasks. Its original eighteen work
+fields remain automatic, saved IRQ status and `passed = false` stay in the
+entry, and one common `done` restores that status on every path. The actual
+readonly profile table and invalid profile have unique fixture ownership.
+Finite reconstruction rejoins only the original runtime/client short-circuit
+condition; all other first-failure boundaries, grant prepare/close/commit,
+generation reuse, stale denial and success-only cleanup remain exact.
+Both owner and long-function migration collections are now literal empty
+tuples, with all original bodies reconstructed and all intended C owners
+containing their real tasks. Final guards also require the two migration
+declarations to be literal empty AST tuples and every evidence definition,
+including file-local phases, to use its accepted family namespace.
+Complete current final-author/profile-reuse
+acceptance and independent implementation review remain required; this is
+not a completed endpoint correction.
+
+### Reviewed sequence
+
 1. Structural Red and immutable source/body/storage/execution/metadata facts.
 2. Portable representation/identity, registry/privilege, complete validation,
    publication/close and facade owners; narrow native evidence.

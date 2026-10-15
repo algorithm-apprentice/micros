@@ -12,6 +12,10 @@ import unittest
 from unittest.mock import patch
 
 from tests.host import test_vm_service_source_layout as vm_layout
+from tests.host.test_endpoint_source_layout import (
+    alias_rows as endpoint_alias_rows,
+    endpoint_cmake_projection,
+)
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
     c_lexical_text,
@@ -1769,7 +1773,7 @@ def check_storage(texts: dict[str, str]) -> None:
 
 
 def restored_cmake(text: str) -> str:
-    restored = text
+    restored = endpoint_cmake_projection(text)
     for name, sources in SOURCE_SETS.items():
         blocks = cmake_commands(restored, "set", name)
         if len(blocks) != 1:
@@ -1805,8 +1809,9 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
                 for family, paths in SOURCE_SETS.items()
             }
             expected.update(ramfs_alias_rows())
+            expected.update(endpoint_alias_rows())
             selected = {old: aliases for old, aliases in value if old in expected}
-            if selected != expected or sum(old in expected for old, _ in value) != 11:
+            if selected != expected or sum(old in expected for old, _ in value) != 15:
                 raise AssertionError("missing/duplicate/wrong same-owner classification aliases")
             node.value.elts = [
                 item for item in node.value.elts if ast.literal_eval(item)[0] not in expected
@@ -1814,7 +1819,10 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
             found.add(target.id)
         elif target.id == "HOST_UNIT_ONLY_INPUTS":
             value = ast.literal_eval(node.value)
-            additions = (STRUCTURAL_TEST_PATH, "tests/host/test_ramfs_source_layout.py")
+            additions = (
+                STRUCTURAL_TEST_PATH, "tests/host/test_ramfs_source_layout.py",
+                "tests/host/test_endpoint_source_layout.py",
+            )
             if any(value.count(path) != 1 for path in additions):
                 raise AssertionError("the structural gate must be explicitly host-unit-only once")
             node.value.elts = [
@@ -3070,11 +3078,12 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         aliases = tuple(
             (paths[0], (*paths[1:], FAMILY_HEADERS[family]))
             for family, paths in SOURCE_SETS.items()
-        ) + ramfs_alias_rows()
+        ) + ramfs_alias_rows() + endpoint_alias_rows()
         planner = (
             f"PATH_CLASSIFICATION_EQUIVALENTS = {aliases!r}\n"
             f"HOST_UNIT_ONLY_INPUTS = ({STRUCTURAL_TEST_PATH!r}, "
-            "'tests/host/test_ramfs_source_layout.py')\n"
+            "'tests/host/test_ramfs_source_layout.py', "
+            "'tests/host/test_endpoint_source_layout.py')\n"
         )
         planner_ast_without_new_paths(planner)
         for changed in (
@@ -3083,6 +3092,8 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
             planner.replace("kernel/syscall_context.c", "kernel/trap_user.c"),
             planner.replace("servers/ramfs/ramfs_state.c", "servers/ramfs/unreviewed.c"),
             planner.replace("tests/host/test_ramfs_source_layout.py", "tests/host/other_ramfs.py"),
+            planner.replace("kernel/endpoint_codec.c", "kernel/unreviewed_endpoint.c"),
+            planner.replace("tests/host/test_endpoint_source_layout.py", "tests/host/other_endpoint.py"),
         ):
             with self.assertRaises(AssertionError):
                 planner_ast_without_new_paths(changed)
