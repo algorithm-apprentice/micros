@@ -262,6 +262,62 @@ set(
 )
 
 set(
+    MICROS_RAMFS_CORE_SOURCES
+    servers/ramfs/ramfs_core.c
+    servers/ramfs/ramfs_codec.c
+    servers/ramfs/ramfs_ownership.c
+    servers/ramfs/ramfs_state.c
+    servers/ramfs/ramfs_transfer.c
+    servers/ramfs/ramfs_namespace.c
+    servers/ramfs/ramfs_io.c
+    servers/ramfs/ramfs_directory.c
+)
+
+set(
+    MICROS_RAMFS_HOST_TEST_SOURCES
+    tests/host/ramfs_test.c
+    tests/host/ramfs_test_fixture.c
+    tests/host/ramfs_protocol_test.c
+    tests/host/ramfs_namespace_test.c
+    tests/host/ramfs_io_test.c
+    tests/host/ramfs_directory_test.c
+)
+
+set(
+    MICROS_RAMFS_SEED_HOST_TEST_SOURCES
+    tests/host/ramfs_seed_test.c
+    tests/host/ramfs_seed_test_fixture.c
+    tests/host/ramfs_seed_boundary_test.c
+    tests/host/ramfs_seed_corruption_test.c
+)
+
+set(
+    MICROS_RAMFS_MODEL_HOST_TEST_SOURCES
+    tests/host/ramfs_model_test.c
+    tests/host/ramfs_model_fixture.c
+    tests/host/ramfs_model_reference.c
+    tests/host/ramfs_model_projection.c
+    tests/host/ramfs_model_protocol.c
+    tests/host/ramfs_model_operations.c
+)
+
+set(
+    MICROS_RAMFS_QEMU_PEER_SOURCES
+    tests/qemu/ramfs_service_vfs.c
+    tests/qemu/ramfs_service_vfs_fixture.c
+    tests/qemu/ramfs_service_vfs_ramfs.c
+    tests/qemu/ramfs_service_vfs_scenario.c
+    tests/qemu/ramfs_service_vfs_tty.c
+)
+
+set(
+    MICROS_RAMFS_QEMU_REPORT_SOURCES
+    kernel/ramfs_service_test.c
+    kernel/ramfs_service_test_fixture.c
+    kernel/ramfs_service_test_report.c
+)
+
+set(
     MICROS_RAMFS_SEED_IMAGE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
 )
@@ -1376,21 +1432,21 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         ramfs_seed_test
         servers/ramfs/ramfs_seed.c
-        tests/host/ramfs_seed_test.c
+        ${MICROS_RAMFS_SEED_HOST_TEST_SOURCES}
     )
     add_dependencies(ramfs_seed_test ramfs_seed_image)
     add_executable(
         ramfs_test
-        servers/ramfs/ramfs_core.c
+        ${MICROS_RAMFS_CORE_SOURCES}
         servers/ramfs/ramfs_seed.c
-        tests/host/ramfs_test.c
+        ${MICROS_RAMFS_HOST_TEST_SOURCES}
     )
     add_dependencies(ramfs_test ramfs_seed_image)
     add_executable(
         ramfs_model_test
-        servers/ramfs/ramfs_core.c
+        ${MICROS_RAMFS_CORE_SOURCES}
         servers/ramfs/ramfs_seed.c
-        tests/host/ramfs_model_test.c
+        ${MICROS_RAMFS_MODEL_HOST_TEST_SOURCES}
     )
     add_dependencies(ramfs_model_test ramfs_seed_image)
     add_executable(
@@ -3104,7 +3160,7 @@ if(
             micros_ramfs_service
             micros-ramfs-service
             "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
-            servers/ramfs/ramfs_core.c
+            ${MICROS_RAMFS_CORE_SOURCES}
             servers/ramfs/ramfs_seed.c
             servers/ramfs/ramfs_service.c
         )
@@ -3582,7 +3638,7 @@ if(
                 micros_ramfs_service_vfs
                 micros-ramfs-service-vfs
                 tests/qemu/ramfs_service_report.S
-                tests/qemu/ramfs_service_vfs.c
+                ${MICROS_RAMFS_QEMU_PEER_SOURCES}
             )
             set(
                 MICROS_RAMFS_SERVICE_FIXTURE_SOURCE
@@ -3972,7 +4028,7 @@ if(MICROS_BUILD_RAMFS_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
-            kernel/ramfs_service_test.c
+            ${MICROS_RAMFS_QEMU_REPORT_SOURCES}
     )
 endif()
 

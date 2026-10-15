@@ -3,8 +3,10 @@
 This is the implementation-ready contract for the seven RAMFS signal files
 in [the source-module audit](source-module-audit.md).
 [ADR-0066](../adr/0066-ramfs-source-decomposition.md) is Accepted after clean
-independent design and bounded correction review. Implementation has not
-started and remains dependent on the separate design merge in PR #133.
+independent design and bounded correction review. The separate design merged
+as PR #133, commit `cac6282edbf303fc81bcffdb3387b23e70e6da17`.
+Implementation follows the required final source map below; explicit owner
+and semantic migrations distinguish pending extraction from completed work.
 
 ## Base, goal, and authority
 
@@ -75,6 +77,11 @@ assertions, report symbols/instructions, budget/checker options, generated
 seed bytes, and all current runtime command lines remain unchanged. Source
 locations in assertions/panics follow the true new owner; do not spoof
 `__FILE__`, `__LINE__`, or assembly labels.
+The split model's shared failure leaf receives the caller's `__FILE__`
+alongside its existing line argument. The existing `MODEL_EXPECT` supplies
+both at the call site so a moved fixture logger cannot pair its own filename
+with another module's line. The failure format and complete trace are
+unchanged; this is private source-location transport, not a new error policy.
 
 ## Exact source sets and private contracts
 
@@ -265,6 +272,10 @@ static volatile uint64_t vfs_initialized_data = 0x52414d4653564653
 Aggregating the initialized word with large zero buffers would change
 file-backed ELF data and is forbidden. The six-service kernel profile,
 expected-service, policy, and runtime configuration tables remain const.
+The split entry reads the initialized word through a narrow `uint64_t`
+query whose sole action is the same volatile read. Its place before
+configuration validation is unchanged. The public configuration object,
+initialized word, and four-field BSS context remain three separate objects.
 
 Automatic result/message/handle/path arrays, rejected seed plans, case
 locals, validator `seen_blocks`, traversal cursors, write ranges, model
@@ -358,9 +369,10 @@ All thirteen coverage fields retain their check order: mount at least two;
 absolute lookup, relative lookup, create, mkdir, read, write, getdents,
 putnode, stale, malformed, grant failure, and no-space all nonzero.
 Keep every reply field, whole-bus, node/block/data, scratch, and reference
-comparison and the complete failure operation trace. Record the reviewed
-base's actual successful trace before implementation and require the same
-trace afterward; do not derive its expected value from rewritten code.
+comparison and the complete failure operation trace. The reviewed base's
+actual successful trace, recorded before extraction, is `0x79bfaa8d631a40bf`.
+Require the same trace afterward; do not derive its expected value from
+rewritten code.
 
 The peer entry retains configuration, pre-ready report, filesystem scenario,
 ready acknowledgment, TTY pass marker/collect/drain, and final report in that
@@ -426,7 +438,7 @@ do not discard the new sets or arbitrary recipe changes in that oracle.
 
 ### Closed recipe declaration maintenance
 
-ADR-0064/0065's `RECIPE_DIGESTS["CMakeLists.txt"]` currently admits SHA-256
+At the reviewed base, ADR-0064/0065's `RECIPE_DIGESTS["CMakeLists.txt"]` admits SHA-256
 `afb07b0e891e11c677782570ac5a5310dd3cd3d2418c5b741555fe0263a04877`.
 The source-set move must not leave all three supported workflows ineligible.
 
@@ -446,6 +458,11 @@ profile name, three-workflow inventory, closure algorithms, complete
 source/tool/environment identities, strict receipt checks, and fail-closed
 fallback. This is maintenance of a separately reviewed exact declaration,
 not generalized source-list normalization during reuse.
+The complete six-set movement now reconstructs that immutable base exactly.
+Its one maintained full-recipe declaration is
+`cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6`;
+unreviewed recipe bytes still reject before build metadata is collected.
+Actual current-candidate producer/reuse acceptance remains required below.
 
 The implementation's current full producer plus bounded actual reuse
 acceptance must demonstrate native, smoke, and TTY-image receipts remain
@@ -471,6 +488,101 @@ long C functions and the Python renderer in a separate frozen semantic
 inventory. During green extraction only explicit pending entries may retain
 their reviewed-base owners/bodies. Both active collections are literal empty
 tuples before review.
+All 180 owner moves are now complete across the exact 32 C sources and six
+private contracts; the active owner collection is a literal empty tuple.
+The facade now exposes a 68-line typed operation dispatcher and 78-line
+public orchestration root. Its bounded phase projection reconstructs the
+complete immutable original body, including default failure, result bindings,
+caller error propagation, final validation, and reply order. Write now has a
+102-line checked staging root and 55-line atomic commit task. Its exact
+tail-call projection preserves the original allocation/data/size/result
+order, scratch clearing, and invariant-only failure after possible mutation;
+the node pointer and independently reset loop counter remain automatic.
+The Python renderer now exposes descriptor, topology, budget, image, explicit
+service-entry, manifest and report tasks; its largest function is 56 lines.
+Known-helper AST projection reconstructs the complete immutable original
+module, including CLI/error behavior, exact bindings, evaluation/output
+order, and the single manifest tuple publication. Pure tuple helpers cannot
+hide effects, defaults, decorators, suspension, or caller exits; independent
+fixtures enforce those boundaries across supported Python AST versions.
+The two long seed corruption cases now expose eight ordered layout,
+metadata, extent/digest, reserved-byte, length, byte, and special-name tasks.
+Their 9/13-line roots preserve exact first-failure short-circuit; original
+offsets remain automatic and only the needed const scalars are borrowed by
+value. Bounded chain projection restores every original statement and
+rejects early successful exits, wrong bindings/order, or caller continuation.
+Directory functional evidence now exposes seed records, cursor steps,
+namespace continuation, and EOF/error tasks with a 12-line root. One
+automatic work record contains only its original action, message, root, and
+file locals, with only the original root initializer applied. Typed work
+projection restores the exact original declarations and body; it rejects
+whole-work zeroing/copy/publication or additional fields. Protocol and
+regular-I/O evidence use the same checked automatic-work mechanism:
+six protocol and five I/O tasks retain all original objects, result-loop
+variables, reset/copy/failure snapshots, sparse data, maximum-size and
+block-capacity proofs. Their 14/13-line roots initialize only the original
+root handle and preserve the full first-failure order. The model script now
+has a 9-line selector and 73/81-line setup/proof tasks. Exact step partitions
+0-5 and 6-15, one common root query, direct returns, and both false defaults
+reconstruct the immutable sixteen-step switch. Its five readonly arrays
+retain distinct static duration and are not duplicated. Independent reference
+lookup now has a 57-line complete preflight and 92-line confined walk/ref
+publication task. Its exact tail-call/local projection retains full path-byte
+and component validation before traversal, error precedence, confinement,
+automatic traversal storage and final reference mutation; expected logic
+still does not use production helpers. Production create/mkdir now exposes
+91-line authority/capacity/grant staging, 77-line staged-name/duplicate/state
+validation with local cleanup, and 41-line void/non-failing node publication.
+Nested typed projection preserves every original check, scratch-clear exit,
+node/link/reference/count mutation and result order, including the helper's
+own cleanup labels and direct caller error return. Production lookup now
+exposes 103-line authority/grant/full-path staging, 115-line confined
+traversal and ordinary-error cleanup, and 24-line scratch-tolerant validation
+and reference publication. Exact nested projection preserves missing-name
+versus later-overlong-component precedence, empty/trailing path rules,
+confinement, refcount overflow, every scratch-clear exit and mutation order.
+The target filesystem scenario now has five ordered mount/seed, rights/EOF,
+stale/directory, file-reference, and sparse/enumeration/release tasks with a
+12-line root. Its original result and five handle locals remain one
+uninitialized automatic work record. The six unique readonly arrays retain
+static duration in the same owner; actual raw literals and const/static
+declarations are checked before reconstructing their original local prefix.
+The authenticated kernel report now has a 106-line observation/authentication/
+dispatch/readiness/drain/shutdown outline, a 46-line resumable pre-ready
+proof, and 50-line final-runtime validation. Exact projection preserves all
+original getter order, PC/current-generation checks, failure codes,
+STARTING versus all-ready states, `sepc += 4`, non-returning panics and
+successful shutdown; all borrowed state pointers and counters stay automatic.
+Creation functional evidence now has five file/duplicate, mkdir/parent,
+mode/range, name/copy and capacity tasks with a 17-line root. Its four
+original malformed-name bytes are explicitly initialized in the same
+automatic work record, before the unchanged root initializer; no blanket
+initialization, duplicate buffer or lost `sizeof` extent is introduced.
+Full typed projection retains original resets, the 61-node fill and no-copy
+exhaustion proof. Lookup functional evidence now has six ordered reference,
+confinement, path-bound, non-directory, malformed/range and grant/overflow
+tasks with a 26-line root. Ten unique readonly paths keep static duration;
+four original mutable arrays keep exact automatic extents and initial
+bytes, without whole-work initialization or extra buffers. Raw actual
+constant checks and typed projection preserve the entire original case,
+including missing-before-overlong error precedence. Complete validation now
+has a 97-line outline and five 34/78/54/33/39-line empty-node, namespace,
+block-witness, link and physical-ownership tasks. One caller-owned automatic
+block witness and the original live/allocated counters remain authoritative;
+helper counters are automatic and reset before use. Exact projection
+preserves null-argument precedence, true/false scratch policy, strict
+parent-before-child ordering, every invariant and whole-state closure.
+Both active migration collections are now literal empty tuples; the frozen
+180-owner and sixteen-C/one-Python inventories remain unchanged. The specified
+shorter operations also have named boundaries: initialization validates its
+caller-owned seed plan, imports without a new failure path, then retains
+post-validation and zero-on-invariant-failure; read returns exact staged
+copy/clear/result publication; getdents builds records using its original
+caller-owned cursor/count before checked copy and reply; model projection
+short-circuits header/scratch, every node, and every physical block without
+duplicate failure reporting. Complete original-body projection retains all
+four contracts and their automatic lifetimes. Complete current author/profile
+reuse evidence and independent implementation review still govern completion.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;
@@ -481,6 +593,10 @@ parent-order weakening, dropped state/data comparisons, lost grant revoke,
 reordered commit, reset of loaded seed, changed initialized storage, and
 callee-local success incorrectly replacing caller failure. This supplements
 real semantic evidence and full review, not a general C interpreter.
+Kernel configuration checks retain both declaration shape and complete raw
+initializer tokens, including all nineteen service/profile string literals.
+Lexically masked inspection text is not a source-copy or literal oracle;
+the raw-range regression rejects that loss independently.
 
 The narrow implementation loop is:
 

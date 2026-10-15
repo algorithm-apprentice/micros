@@ -1797,13 +1797,16 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
         if not isinstance(target, ast.Name):
             continue
         if target.id == "PATH_CLASSIFICATION_EQUIVALENTS":
+            from tests.host.test_ramfs_source_layout import alias_rows as ramfs_alias_rows
+
             value = ast.literal_eval(node.value)
             expected = {
                 paths[0]: (*paths[1:], FAMILY_HEADERS[family])
                 for family, paths in SOURCE_SETS.items()
             }
+            expected.update(ramfs_alias_rows())
             selected = {old: aliases for old, aliases in value if old in expected}
-            if selected != expected or sum(old in expected for old, _ in value) != 5:
+            if selected != expected or sum(old in expected for old, _ in value) != 11:
                 raise AssertionError("missing/duplicate/wrong same-owner classification aliases")
             node.value.elts = [
                 item for item in node.value.elts if ast.literal_eval(item)[0] not in expected
@@ -1811,10 +1814,11 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
             found.add(target.id)
         elif target.id == "HOST_UNIT_ONLY_INPUTS":
             value = ast.literal_eval(node.value)
-            if value.count(STRUCTURAL_TEST_PATH) != 1:
+            additions = (STRUCTURAL_TEST_PATH, "tests/host/test_ramfs_source_layout.py")
+            if any(value.count(path) != 1 for path in additions):
                 raise AssertionError("the structural gate must be explicitly host-unit-only once")
             node.value.elts = [
-                item for item in node.value.elts if ast.literal_eval(item) != STRUCTURAL_TEST_PATH
+                item for item in node.value.elts if ast.literal_eval(item) not in additions
             ]
             found.add(target.id)
         elif target.id == "PLANNER_INPUTS":
@@ -1908,9 +1912,9 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         cmake = read_source("CMakeLists.txt")
         restored = restored_cmake(cmake)
         self.assertEqual(
-            "59bb9f516b321d4d33ed55919eaedeb81a2042f269d3c4b9c58394a3a6a2ef34",
+            "eb9c397f6fef1ab1967c398002dbe570c262aacd17400a5b5d2dec87e2b6e727",
             compact_hash(restored),
-            "trap sets and call sites remain exact alongside the Accepted scheduler wiring",
+            "trap wiring stays exact alongside independently reconstructed ADR-0066 RAMFS source operands",
         )
         for source in all_sources():
             self.assertEqual(1, cmake.count(source), source)
@@ -3049,6 +3053,8 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         self.assertEqual(python_body_fingerprint(render), python_body_fingerprint(renamed))
 
     def test_cmake_and_planner_inventory_fail_closed_without_touching_files(self) -> None:
+        from tests.host.test_ramfs_source_layout import alias_rows as ramfs_alias_rows
+
         cmake = "\n".join(
             f"set({name} {' '.join(paths)})\nconsumer(${{{name}}})"
             for name, paths in SOURCE_SETS.items()
@@ -3064,16 +3070,19 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         aliases = tuple(
             (paths[0], (*paths[1:], FAMILY_HEADERS[family]))
             for family, paths in SOURCE_SETS.items()
-        )
+        ) + ramfs_alias_rows()
         planner = (
             f"PATH_CLASSIFICATION_EQUIVALENTS = {aliases!r}\n"
-            f"HOST_UNIT_ONLY_INPUTS = ({STRUCTURAL_TEST_PATH!r},)\n"
+            f"HOST_UNIT_ONLY_INPUTS = ({STRUCTURAL_TEST_PATH!r}, "
+            "'tests/host/test_ramfs_source_layout.py')\n"
         )
         planner_ast_without_new_paths(planner)
         for changed in (
             planner.replace("'kernel/trap_context.c', ", "", 1),
             planner.replace(STRUCTURAL_TEST_PATH, "tests/host/other.py"),
             planner.replace("kernel/syscall_context.c", "kernel/trap_user.c"),
+            planner.replace("servers/ramfs/ramfs_state.c", "servers/ramfs/unreviewed.c"),
+            planner.replace("tests/host/test_ramfs_source_layout.py", "tests/host/other_ramfs.py"),
         ):
             with self.assertRaises(AssertionError):
                 planner_ast_without_new_paths(changed)
