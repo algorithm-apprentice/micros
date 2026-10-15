@@ -163,11 +163,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    pair for pair in INITIAL_SYMBOL_OWNER_MIGRATION
-    if not (
-        pair[0] == 0
-        and any(pair[1] in ORIGINAL_FUNCTIONS[0][owner] for owner in (1, 2, 3, 4))
-    )
+    pair for pair in INITIAL_SYMBOL_OWNER_MIGRATION if pair[0] != 0
 )
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 CORE_DAG = {

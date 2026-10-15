@@ -104,4 +104,57 @@ bool endpoint_process_threads_have_clear_ipc_state(
     struct micros_process_handle process
 );
 
+bool endpoint_delivery_state_is_clear(
+    const struct micros_thread *thread
+);
+
+bool endpoint_reply_wait_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+);
+
+bool endpoint_source_only_process_threads_are_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process
+);
+
+bool endpoint_staged_delivery_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_thread *thread
+);
+
+bool endpoint_staged_error_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+);
+
+bool endpoint_staged_no_message_success_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_thread *thread
+);
+
+bool endpoint_queue_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint,
+    struct micros_thread_handle head,
+    struct micros_thread_handle tail,
+    enum micros_ipc_queue_kind kind,
+    bool seen[MICROS_THREAD_CAPACITY]
+);
+
+bool endpoint_pending_notification_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint
+);
+
+bool endpoint_has_matchable_work(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint
+);
+
 #endif

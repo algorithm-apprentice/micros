@@ -509,7 +509,13 @@ The following slice also exposes identity/ownership queries, registry
 initialization/validation, and checked profile-query owners: 31 original
 definitions now have their required owners, with 22 necessary private
 prototypes and unchanged complete bodies and recipe.
-Fifty-nine original owner moves and all ten original long-function
+Portable source ownership is now complete: all 67 original definitions occupy
+their ten required owners, with exactly 31 necessary private declarations.
+Completion/queue/object validation and publication/close remain acyclic,
+while the five supported checked resolution/authorization entry points form
+the small facade. The legacy six-function prevalidated interface and every
+original body remain unchanged.
+Twenty-eight original owner moves and all ten original long-function
 migrations remain pending. Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
