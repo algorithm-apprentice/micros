@@ -505,7 +505,11 @@ relative to their actual source owners.
 
 All 369 source-layout checks, native endpoint/profile and combined IPC-model
 executions, and the actual endpoint/grant QEMU scenario pass for this slice.
-Seventy-five original owner moves and all ten original long-function
+The following slice also exposes identity/ownership queries, registry
+initialization/validation, and checked profile-query owners: 31 original
+definitions now have their required owners, with 22 necessary private
+prototypes and unchanged complete bodies and recipe.
+Fifty-nine original owner moves and all ten original long-function
 migrations remain pending. Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
