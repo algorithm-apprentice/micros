@@ -515,7 +515,12 @@ Completion/queue/object validation and publication/close remain acyclic,
 while the five supported checked resolution/authorization entry points form
 the small facade. The legacy six-function prevalidated interface and every
 original body remain unchanged.
-Twenty-eight original owner moves and all ten original long-function
+The deterministic native family now also has its seven required owners and
+one exact five-field static fixture. Its nine stateful case roots borrow the
+same fixture once; setup receives that pointer, pure helpers and encoding
+do not gain ambient context, and original resets/snapshots/macros/25-case
+runner remain exact under typed reconstruction.
+Fourteen original model owner moves and all ten original long-function
 migrations remain pending. Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

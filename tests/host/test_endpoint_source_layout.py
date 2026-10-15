@@ -14,6 +14,7 @@ from tests.host.test_frame_ownership_source_layout import (
 )
 from tests.host.test_kernel_bootstrap_source_layout import c_function_body
 from tests.host.test_pm_service_source_layout import cmake_commands
+from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
 
@@ -23,6 +24,15 @@ REVIEWED_BASE = "7e107f5189cbf6f3aa44dfc05652d041e803c60c"
 BASE_CMAKE_DIGEST = "cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6"
 BASE_CTOKENS_AST = "3e378fcb1e32c96d05240c3d80401d159715196d92de372d8ca92cdddd9a3cd8"
 MODEL_TYPES_DIGEST = "d6da66f1eb42b10fd121f8316a01b5cedbf6c80bb31696a5b3693779f349fb2e"
+NATIVE_ASSERTION_DIGEST = "a6a8819676540e04acd7f9d209aacfca43a90794c5f37f5462f32b2b91d205a1"
+NATIVE_CONTEXT_FIELDS = ("registry", "objects", "processes", "threads", "hart")
+NATIVE_CONTEXT_CASES = (
+    "test_profile_table_is_immutable_and_specific", "test_invalid_profile_tables_preserve_storage",
+    "test_validator_rejects_corruption", "test_endpoint_lifecycle_and_authorization",
+    "test_profile_install_and_close_require_held_threads", "test_resolution_rejects_unimplemented_slots",
+    "test_endpoint_reuse_rejects_stale_generation", "test_source_only_seal_preserves_staged_source",
+    "test_relationship_validator_rejects_corruption",
+)
 STRUCTURAL_TEST_PATH = "tests/host/test_endpoint_source_layout.py"
 CORE_SOURCES = (
     "kernel/endpoint.c",
@@ -163,7 +173,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    pair for pair in INITIAL_SYMBOL_OWNER_MIGRATION if pair[0] != 0
+    pair for pair in INITIAL_SYMBOL_OWNER_MIGRATION if pair[0] == 2
 )
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 CORE_DAG = {
@@ -321,9 +331,21 @@ def private_name(name):
     return name if name.startswith("endpoint_") else "endpoint_" + name
 
 
+def native_name(name):
+    if name == "main":
+        return name
+    if name.startswith("test_endpoint_"):
+        name = name[len("test_endpoint_"):]
+    elif name.startswith("test_"):
+        name = name[len("test_"):]
+    return "endpoint_test_" + name
+
+
 def normal_names(family):
     if family == 0:
         return {private_name(name): name for name in CORE_PRIVATE_EXPORTS}
+    if family == 1:
+        return {native_name(name): name for names in ORIGINAL_FUNCTIONS[1].values() for name in names}
     return {}
 
 
@@ -346,6 +368,10 @@ def original_locations(family):
     renames = normal_names(family)
     locations = {}
     for path, spelling in owned_definitions(family):
+        if family == 1 and spelling == "endpoint_test_context":
+            if path != family_paths(1)[1]:
+                raise AssertionError("native fixture getter has one exact owner")
+            continue
         name = renames.get(spelling, spelling)
         if name not in expected or name in locations:
             raise AssertionError(f"unknown/duplicate original or unreviewed phase: {family}/{spelling}")
@@ -353,6 +379,48 @@ def original_locations(family):
     if set(locations) != expected:
         raise AssertionError("missing original definitions")
     return locations
+
+
+def native_fixture_body_tokens(name, body):
+    body = list(body)
+    borrow = list(tokens("struct endpoint_test_fixture *fixture = endpoint_test_context();"))
+    if name in NATIVE_CONTEXT_CASES:
+        if body[:1 + len(borrow)] != ["{"] + borrow:
+            raise AssertionError("native case roots borrow exactly one fixture without resetting it")
+        del body[1:1 + len(borrow)]
+    result = []
+    index = 0
+    call = list(tokens("setup_lifecycle_fixture(fixture)"))
+    while index < len(body):
+        if body[index:index + len(call)] == call:
+            result.extend(tokens("setup_lifecycle_fixture()"))
+            index += len(call)
+        elif body[index:index + 2] == ["setup_lifecycle_fixture", "("]:
+            raise AssertionError("native setup must receive the exact borrowed fixture")
+        elif body[index:index + 2] == ["fixture", "->"]:
+            if index != 0 and body[index - 1] in (".", "->"):
+                raise AssertionError("fixture transport cannot qualify a structure member as a global root")
+            field = body[index + 2:index + 3]
+            if not field or field[0] not in NATIVE_CONTEXT_FIELDS:
+                raise AssertionError("native fixture may transport only the five original fields")
+            result.extend(field)
+            index += 3
+        else:
+            if body[index] == "fixture":
+                raise AssertionError("native fixture cannot be copied, blanket-cleared, published or retained")
+            result.append(body[index])
+            index += 1
+    return tuple(result)
+
+
+def original_body_digest(family, name, text):
+    names = normal_names(family)
+    body = tuple(names.get(token, token) for token in tokens(text))
+    if family == 1 and any(
+        spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
+    ):
+        body = native_fixture_body_tokens(name, body)
+    return digest_bytes(json.dumps(body, separators=(",", ":")).encode())
 
 
 def source_set_block(name, paths):
@@ -429,7 +497,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 with self.subTest(family=family, name=name):
                     self.assertEqual(
                         BASELINE_BODIES[family][name],
-                        body_digest(c_function_body(source(path), spelling), normal_names(family)),
+                        original_body_digest(family, name, c_function_body(source(path), spelling)),
                         REVIEWED_BASE,
                     )
 
@@ -519,6 +587,66 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
                 self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()))
+
+    def test_native_fixture_has_exact_original_fields_resets_and_single_root_borrows(self):
+        header = source(PRIVATE_HEADERS[1])
+        fields = re.findall(r"struct endpoint_test_fixture\s*\{([^{}]*)\}", header)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(tokens(
+            "struct micros_endpoint_registry registry; struct micros_kernel_objects objects; "
+            "struct micros_process_handle processes[2]; struct micros_thread_handle threads[2]; "
+            "struct micros_hart_handle hart;"
+        ), tokens(fields[0]))
+        fixture = source(family_paths(1)[1])
+        self.assertEqual(
+            tokens("{ return &fixture_state; }"), tokens(c_function_body(fixture, "endpoint_test_context")),
+        )
+        self.assertEqual(1, fixture.count("static struct endpoint_test_fixture fixture_state;"))
+        self.assertEqual(16, len(owned_definitions(1)))
+        for path in family_paths(1):
+            expected = ("static struct endpoint_test_fixture fixture_state;",) if path == family_paths(1)[1] else ()
+            self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(path)))))
+            self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
+        macro = header[header.index("#define EXPECT_TRUE"):header.index("struct endpoint_test_fixture {")]
+        self.assertEqual(NATIVE_ASSERTION_DIGEST, body_digest(macro))
+        for name, (path, spelling) in original_locations(1).items():
+            text = source(path)
+            if name in NATIVE_CONTEXT_CASES:
+                self.assertEqual(
+                    1, c_function_body(text, spelling).count("endpoint_test_context()"), name,
+                )
+            elif name != "main":
+                self.assertNotIn("endpoint_test_context(", c_function_body(text, spelling), name)
+        setup = c_function_body(fixture, native_name("setup_lifecycle_fixture"))
+        self.assertNotIn("sizeof(*fixture)", setup)
+        self.assertNotIn("memset(fixture", setup)
+        self.assertEqual({}, c_function_definitions(header))
+        self.assertNotIn('"kernel/endpoint_private.h"', header)
+
+    def test_native_transport_distinguishes_global_roots_from_structure_members_and_scope(self):
+        name = NATIVE_CONTEXT_CASES[0]
+        current = (
+            "{ struct endpoint_test_fixture *fixture = endpoint_test_context(); "
+            "snapshot = fixture->objects.processes[index]; "
+            "if (!setup_lifecycle_fixture(fixture)) { return false; } "
+            "copy(&fixture->registry, sizeof(fixture->registry)); return true; }"
+        )
+        expected = (
+            "{ snapshot = objects.processes[index]; if (!setup_lifecycle_fixture()) { return false; } "
+            "copy(&registry, sizeof(registry)); return true; }"
+        )
+        self.assertEqual(tokens(expected), native_fixture_body_tokens(name, tokens(current)))
+        for changed in (
+            current.replace("fixture->objects", "fixture->unknown"),
+            current.replace("fixture->objects.processes", "fixture->objects.fixture->processes"),
+            current.replace("return true;", "memset(fixture, 0, sizeof(*fixture)); return true;"),
+            current.replace("struct endpoint_test_fixture *fixture", "static struct endpoint_test_fixture *fixture"),
+            current.replace("setup_lifecycle_fixture(fixture)", "setup_lifecycle_fixture(other)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_fixture_body_tokens(name, tokens(changed))
+        changed = current.replace("return false;", "return true;")
+        self.assertNotEqual(tokens(expected), native_fixture_body_tokens(name, tokens(changed)))
 
     def test_all_four_classification_dimensions_and_host_gate_are_unchanged(self):
         qemu = [
