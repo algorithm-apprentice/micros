@@ -53,6 +53,9 @@ This directory contains the design baseline for `micros`.
   required before VFS exit-cleanup coverage is added.
 - [Development dependency DAG](architecture/development-dag.md) converts the
   cyclic runtime architecture into an acyclic implementation sequence.
+- [Validation evidence and owned build changes](architecture/validation-evidence.md)
+  records the Accepted exact-candidate command-reuse and bounded CMake
+  classification contract; existing fresh execution remains authoritative.
 
 ## Research
 
@@ -136,6 +139,10 @@ This directory contains the design baseline for `micros`.
   capture, and the current source-only correction.
 
 ## Planning and verification
+
+- [MINIX validation-driver baseline](research/minix-validation-driver-baseline.md)
+  traces fixed test identity/selection/outcomes and classifies the proposed
+  development-only evidence extension without importing the hosted runner.
 
 - [Roadmap](roadmap.md) defines milestones, exit criteria, deferred scope, and
   major risks.

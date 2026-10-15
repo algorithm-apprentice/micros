@@ -349,6 +349,13 @@ startup is not part of this source-only outcome.
 
 ## v0.1 completion goal
 
+The independent validation-efficiency task follows Accepted
+[ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
+[exact evidence contract](architecture/validation-evidence.md).
+Its design review is clean; paired implementation starts after design merge.
+It does not alter the runtime DAG, reduce mandatory coverage or authorize
+receipt reuse before the separate implementation merges.
+
 `micros` v0.1 is complete when a clean checkout builds with the documented
 LLVM/LLD/CMake/Ninja toolchain, boots under RISC-V64 QEMU `virt` through
 OpenSBI, and reaches a shell that runs `echo`, `cat`, `ls`, and `ps`.
