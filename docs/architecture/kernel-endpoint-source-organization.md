@@ -479,6 +479,39 @@ author plan. Squash invalidates old-HEAD receipts even for an identical tree.
 
 ## Implementation sequence and design barrier
 
+### Current implementation progress
+
+Design #135 is merged as `b99a035`. The first implementation slice exposes
+the fifteen original codec definitions and fourteen necessary cross-owner
+prototypes, with exact complete-body reconstruction. All 98 original bodies
+and fifteen stable neighboring artifacts are frozen from the immutable base.
+The definition inspector now rejects earlier call sites and prototypes,
+with an independent regression; its one initial endpoint fingerprint was
+corrected from the unchanged Git baseline before any C movement.
+The existing literal-preserving token utility moved unchanged to the shared
+lexical helper owner, with its complete original AST enforced.
+
+All 25 final source paths, four private headers, four source sets and nine
+consumer operands are wired once. Not-yet-extracted owners are explicitly
+declarations-only compilation units; they do not duplicate fixture storage or
+claim completed ownership. This keeps the entire authorized recipe inverse
+provable while subsequent green commits move real definitions.
+The resulting complete CMake digest is
+`50cac89bbc8dfc0246b97d36be3585ff53f7e86c3dbc772539a6f8352e05db7d`;
+only its admitted literal is maintained after restoring the whole base
+`cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6`.
+Existing native include search roots are unchanged; private includes resolve
+relative to their actual source owners.
+
+All 369 source-layout checks, native endpoint/profile and combined IPC-model
+executions, and the actual endpoint/grant QEMU scenario pass for this slice.
+Seventy-five original owner moves and all ten original long-function
+migrations remain pending. Complete current final-author/profile-reuse
+acceptance and independent implementation review remain required; this is
+not a completed endpoint correction.
+
+### Reviewed sequence
+
 1. Structural Red and immutable source/body/storage/execution/metadata facts.
 2. Portable representation/identity, registry/privilege, complete validation,
    publication/close and facade owners; narrow native evidence.

@@ -3,262 +3,13 @@
 #include <stdint.h>
 
 #include "endpoint_internal.h"
+#include "endpoint_private.h"
 #include "micros/bootstrap_control.h"
 
-#define MICROS_ENDPOINT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534550)
-
-_Static_assert(
-    MICROS_PROCESS_CAPACITY <= (1U << MICROS_ENDPOINT_SLOT_BITS),
-    "implemented process capacity must fit the endpoint ABI"
+static bool endpoint_is_pending_notification_source(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_endpoint_record *source
 );
-_Static_assert(
-    MICROS_PROCESS_GENERATION_MAX == MICROS_ENDPOINT_GENERATION_MAX,
-    "process and endpoint generation limits must match"
-);
-_Static_assert(
-    MICROS_PROCESS_CAPACITY == 64,
-    "pending notification bitmap requires one bit per endpoint slot"
-);
-
-static bool storage_is_zero(
-    const struct micros_endpoint_registry *registry
-)
-{
-    const unsigned char *bytes = (const unsigned char *)registry;
-    size_t index;
-
-    for (index = 0; index < sizeof(*registry); ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void clear_bytes(void *storage, size_t size)
-{
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static void copy_bytes(
-    void *destination,
-    const void *source,
-    size_t size
-)
-{
-    unsigned char *destination_bytes = destination;
-    const unsigned char *source_bytes = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        destination_bytes[index] = source_bytes[index];
-    }
-}
-
-static bool bytes_equal(
-    const void *left,
-    const void *right,
-    size_t size
-)
-{
-    const unsigned char *left_bytes = left;
-    const unsigned char *right_bytes = right;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (left_bytes[index] != right_bytes[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool bytes_are_zero(const void *storage, size_t size)
-{
-    const unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool names_equal(
-    const char *left,
-    const char *right
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE; ++index) {
-        if (left[index] != right[index]) {
-            return false;
-        }
-        if (left[index] == '\0') {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool profile_is_zero(
-    const struct micros_privilege_profile *profile
-)
-{
-    const unsigned char *bytes = (const unsigned char *)profile;
-    size_t index;
-
-    for (index = 0; index < sizeof(*profile); ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool endpoint_record_is_zero(
-    const struct micros_endpoint_record *endpoint
-)
-{
-    size_t index;
-
-    if (
-        endpoint->state != MICROS_ENDPOINT_STATE_FREE
-        || endpoint->owner.slot != 0
-        || endpoint->owner.generation != 0
-        || endpoint->value != 0
-        || endpoint->sender_head.slot != 0
-        || endpoint->sender_head.generation != 0
-        || endpoint->sender_tail.slot != 0
-        || endpoint->sender_tail.generation != 0
-        || endpoint->receiver_head.slot != 0
-        || endpoint->receiver_head.generation != 0
-        || endpoint->receiver_tail.slot != 0
-        || endpoint->receiver_tail.generation != 0
-        || endpoint->pending_notification_sources != 0
-        || endpoint->pending_kernel_events != 0
-    ) {
-        return false;
-    }
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        if (endpoint->pending_events[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool endpoint_ipc_state_is_zero(
-    const struct micros_endpoint_record *endpoint
-)
-{
-    size_t index;
-
-    if (
-        endpoint->sender_head.slot != 0
-        || endpoint->sender_head.generation != 0
-        || endpoint->sender_tail.slot != 0
-        || endpoint->sender_tail.generation != 0
-        || endpoint->receiver_head.slot != 0
-        || endpoint->receiver_head.generation != 0
-        || endpoint->receiver_tail.slot != 0
-        || endpoint->receiver_tail.generation != 0
-        || endpoint->pending_notification_sources != 0
-        || endpoint->pending_kernel_events != 0
-    ) {
-        return false;
-    }
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        if (endpoint->pending_events[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool thread_handle_is_zero(
-    struct micros_thread_handle handle
-)
-{
-    return handle.slot == 0 && handle.generation == 0;
-}
-
-static bool thread_handle_is_shallow_valid(
-    struct micros_thread_handle handle
-)
-{
-    return (
-        handle.slot < MICROS_THREAD_CAPACITY
-        && handle.generation != 0
-    );
-}
-
-static bool queue_pair_is_shallow_valid(
-    struct micros_thread_handle head,
-    struct micros_thread_handle tail
-)
-{
-    if (thread_handle_is_zero(head)) {
-        return thread_handle_is_zero(tail);
-    }
-    return (
-        thread_handle_is_shallow_valid(head)
-        && thread_handle_is_shallow_valid(tail)
-    );
-}
-
-static bool pending_notification_state_is_shallow_valid(
-    const struct micros_endpoint_record *endpoint
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        bool source_pending =
-            (
-                endpoint->pending_notification_sources
-                & (UINT64_C(1) << index)
-            ) != 0;
-
-        if (source_pending != (endpoint->pending_events[index] != 0)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void clear_endpoint_record(
-    struct micros_endpoint_record *endpoint
-)
-{
-    size_t index;
-
-    endpoint->state = MICROS_ENDPOINT_STATE_FREE;
-    endpoint->owner.slot = 0;
-    endpoint->owner.generation = 0;
-    endpoint->value = 0;
-    endpoint->sender_head.slot = 0;
-    endpoint->sender_head.generation = 0;
-    endpoint->sender_tail.slot = 0;
-    endpoint->sender_tail.generation = 0;
-    endpoint->receiver_head.slot = 0;
-    endpoint->receiver_head.generation = 0;
-    endpoint->receiver_tail.slot = 0;
-    endpoint->receiver_tail.generation = 0;
-    endpoint->pending_notification_sources = 0;
-    endpoint->pending_kernel_events = 0;
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        endpoint->pending_events[index] = 0;
-    }
-}
 
 static bool process_handles_equal(
     struct micros_process_handle left,
@@ -280,82 +31,6 @@ static bool thread_handles_equal(
         left.slot == right.slot
         && left.generation == right.generation
     );
-}
-
-static enum micros_endpoint_error canonicalize_profile(
-    const struct micros_privilege_profile *source,
-    struct micros_privilege_profile *destination
-)
-{
-    size_t index;
-    bool terminated = false;
-
-    if (
-        source == NULL
-        || destination == NULL
-        || source->id == 0
-        || source->id >= MICROS_PRIVILEGE_PROFILE_CAPACITY
-        || source->operations == 0
-        || (
-            source->operations
-            & ~MICROS_PRIVILEGE_OPERATION_DEFINED_MASK
-        ) != 0
-    ) {
-        return MICROS_ENDPOINT_ERROR_PROFILE;
-    }
-    clear_bytes(destination, sizeof(*destination));
-    destination->id = source->id;
-    for (
-        index = 0;
-        index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE;
-        ++index
-    ) {
-        unsigned char character = (unsigned char)source->name[index];
-
-        if (character == '\0') {
-            terminated = true;
-            break;
-        }
-        if (character < 0x20 || character > 0x7e) {
-            return MICROS_ENDPOINT_ERROR_PROFILE;
-        }
-        destination->name[index] = (char)character;
-    }
-    if (!terminated || index == 0) {
-        return MICROS_ENDPOINT_ERROR_PROFILE;
-    }
-    destination->operations = source->operations;
-    destination->call_targets = source->call_targets;
-    destination->send_targets = source->send_targets;
-    destination->notify_targets = source->notify_targets;
-    destination->kernel_operations = source->kernel_operations;
-
-    if (
-        (
-            destination->call_targets != 0
-            && (
-                destination->operations
-                & MICROS_PRIVILEGE_OPERATION_CALL
-            ) == 0
-        )
-        || (
-            destination->send_targets != 0
-            && (
-                destination->operations
-                & MICROS_PRIVILEGE_OPERATION_SEND
-            ) == 0
-        )
-        || (
-            destination->notify_targets != 0
-            && (
-                destination->operations
-                & MICROS_PRIVILEGE_OPERATION_NOTIFY
-            ) == 0
-        )
-    ) {
-        return MICROS_ENDPOINT_ERROR_PROFILE;
-    }
-    return MICROS_ENDPOINT_OK;
 }
 
 static enum micros_endpoint_error require_initialized(
@@ -449,7 +124,7 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
     if (registry == NULL || profiles == NULL) {
         return MICROS_ENDPOINT_ERROR_ARGUMENT;
     }
-    if (!storage_is_zero(registry)) {
+    if (!endpoint_storage_is_zero(registry)) {
         if (
             registry->initialization_magic
                 == MICROS_ENDPOINT_REGISTRY_MAGIC
@@ -465,11 +140,11 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
         return MICROS_ENDPOINT_ERROR_CAPACITY;
     }
 
-    clear_bytes(candidate_profiles, sizeof(candidate_profiles));
+    endpoint_clear_bytes(candidate_profiles, sizeof(candidate_profiles));
     for (source_index = 0; source_index < profile_count; ++source_index) {
         struct micros_privilege_profile canonical;
         enum micros_endpoint_error error =
-            canonicalize_profile(
+            endpoint_canonicalize_profile(
                 &profiles[source_index],
                 &canonical
             );
@@ -488,7 +163,7 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
 
             if (
                 other_id < MICROS_PRIVILEGE_PROFILE_CAPACITY
-                && names_equal(
+                && endpoint_names_equal(
                     canonical.name,
                     candidate_profiles[other_id].name
                 )
@@ -521,7 +196,7 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
         }
     }
 
-    copy_bytes(
+    endpoint_copy_bytes(
         registry->profiles,
         candidate_profiles,
         sizeof(candidate_profiles)
@@ -550,7 +225,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
         registry->profile_count == 0
         || registry->profile_count
             >= MICROS_PRIVILEGE_PROFILE_CAPACITY
-        || !profile_is_zero(&registry->profiles[0])
+        || !endpoint_profile_is_zero(&registry->profiles[0])
     ) {
         return MICROS_ENDPOINT_ERROR_INVARIANT;
     }
@@ -560,16 +235,16 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
         struct micros_privilege_profile canonical;
 
         if (profile->id == 0) {
-            if (!profile_is_zero(profile)) {
+            if (!endpoint_profile_is_zero(profile)) {
                 return MICROS_ENDPOINT_ERROR_INVARIANT;
             }
             continue;
         }
         if (
             profile->id != index
-            || canonicalize_profile(profile, &canonical)
+            || endpoint_canonicalize_profile(profile, &canonical)
                 != MICROS_ENDPOINT_OK
-            || !bytes_equal(profile, &canonical, sizeof(canonical))
+            || !endpoint_bytes_equal(profile, &canonical, sizeof(canonical))
         ) {
             return MICROS_ENDPOINT_ERROR_INVARIANT;
         }
@@ -579,7 +254,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
 
             if (
                 other->id != 0
-                && names_equal(profile->name, other->name)
+                && endpoint_names_equal(profile->name, other->name)
             ) {
                 return MICROS_ENDPOINT_ERROR_INVARIANT;
             }
@@ -640,15 +315,15 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
                     == MICROS_ENDPOINT_STATE_SOURCE_ONLY
             )
             && (
-                !queue_pair_is_shallow_valid(
+                !endpoint_queue_pair_is_shallow_valid(
                     endpoint->sender_head,
                     endpoint->sender_tail
                 )
-                || !queue_pair_is_shallow_valid(
+                || !endpoint_queue_pair_is_shallow_valid(
                     endpoint->receiver_head,
                     endpoint->receiver_tail
                 )
-                || !pending_notification_state_is_shallow_valid(
+                || !endpoint_pending_notification_state_is_shallow_valid(
                     endpoint
                 )
             )
@@ -945,7 +620,7 @@ static bool delivery_state_is_clear(
 {
     return (
         !thread->ipc_delivery_pending
-        && bytes_are_zero(
+        && endpoint_bytes_are_zero(
             &thread->ipc_inbound_message,
             sizeof(thread->ipc_inbound_message)
         )
@@ -1019,12 +694,12 @@ static bool reply_wait_state_is_valid(
 
     if (
         thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
-        || !thread_handle_is_zero(thread->ipc_next)
+        || !endpoint_thread_handle_is_zero(thread->ipc_next)
         || (
             thread->runtime_flags
             & MICROS_THREAD_RTS_IPC_MASK
         ) != MICROS_THREAD_RTS_IPC_REPLY
-        || !bytes_are_zero(
+        || !endpoint_bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
         )
@@ -1246,12 +921,12 @@ static bool staged_delivery_state_is_valid(
 
     if (
         thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
-        || !thread_handle_is_zero(thread->ipc_next)
+        || !endpoint_thread_handle_is_zero(thread->ipc_next)
         || (
             thread->runtime_flags
             & MICROS_THREAD_RTS_IPC_MASK
         ) != 0
-        || !bytes_are_zero(
+        || !endpoint_bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
         )
@@ -1339,12 +1014,12 @@ static bool staged_error_state_is_valid(
 
     return (
         thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
-        && thread_handle_is_zero(thread->ipc_next)
+        && endpoint_thread_handle_is_zero(thread->ipc_next)
         && (
             thread->runtime_flags
             & MICROS_THREAD_RTS_IPC_MASK
         ) == 0
-        && bytes_are_zero(
+        && endpoint_bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
         )
@@ -1352,7 +1027,7 @@ static bool staged_error_state_is_valid(
         && thread->ipc_receive_source == 0
         && thread->ipc_receive_buffer == 0
         && thread->ipc_delivery_pending
-        && bytes_are_zero(
+        && endpoint_bytes_are_zero(
             &thread->ipc_inbound_message,
             sizeof(thread->ipc_inbound_message)
         )
@@ -1375,12 +1050,12 @@ static bool staged_no_message_success_state_is_valid(
 
     return (
         thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
-        && thread_handle_is_zero(thread->ipc_next)
+        && endpoint_thread_handle_is_zero(thread->ipc_next)
         && (
             thread->runtime_flags
             & MICROS_THREAD_RTS_IPC_MASK
         ) == 0
-        && bytes_are_zero(
+        && endpoint_bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
         )
@@ -1388,7 +1063,7 @@ static bool staged_no_message_success_state_is_valid(
         && thread->ipc_receive_source == 0
         && thread->ipc_receive_buffer == 0
         && thread->ipc_delivery_pending
-        && bytes_are_zero(
+        && endpoint_bytes_are_zero(
             &thread->ipc_inbound_message,
             sizeof(thread->ipc_inbound_message)
         )
@@ -1425,7 +1100,7 @@ static bool receiver_queue_state_is_valid(
             & MICROS_THREAD_RTS_IPC_MASK
         ) != MICROS_THREAD_RTS_IPC_RECEIVE
         || !process_handles_equal(thread->owner, endpoint->owner)
-        || !bytes_are_zero(
+        || !endpoint_bytes_are_zero(
             &thread->ipc_outbound_message,
             sizeof(thread->ipc_outbound_message)
         )
@@ -1469,8 +1144,8 @@ static bool endpoint_queue_is_valid(
     struct micros_thread_handle current = head;
     size_t steps;
 
-    if (thread_handle_is_zero(head)) {
-        return thread_handle_is_zero(tail);
+    if (endpoint_thread_handle_is_zero(head)) {
+        return endpoint_thread_handle_is_zero(tail);
     }
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
         const struct micros_thread *thread;
@@ -1501,9 +1176,9 @@ static bool endpoint_queue_is_valid(
             return false;
         }
         if (thread_handles_equal(current, tail)) {
-            return thread_handle_is_zero(thread->ipc_next);
+            return endpoint_thread_handle_is_zero(thread->ipc_next);
         }
-        if (thread_handle_is_zero(thread->ipc_next)) {
+        if (endpoint_thread_handle_is_zero(thread->ipc_next)) {
             return false;
         }
         current = thread->ipc_next;
@@ -1519,7 +1194,7 @@ static bool pending_notification_state_is_valid(
 {
     size_t index;
 
-    if (!pending_notification_state_is_shallow_valid(endpoint)) {
+    if (!endpoint_pending_notification_state_is_shallow_valid(endpoint)) {
         return false;
     }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
@@ -1604,7 +1279,7 @@ static bool endpoint_has_matchable_work(
         endpoint->receiver_head;
     size_t receiver_steps;
 
-    if (thread_handle_is_zero(endpoint->receiver_head)) {
+    if (endpoint_thread_handle_is_zero(endpoint->receiver_head)) {
         return false;
     }
     for (
@@ -1627,7 +1302,7 @@ static bool endpoint_has_matchable_work(
         ) {
             return true;
         }
-        if (!thread_handle_is_zero(sender_handle)) {
+        if (!endpoint_thread_handle_is_zero(sender_handle)) {
             for (
                 sender_steps = 0;
                 sender_steps < MICROS_THREAD_CAPACITY;
@@ -2013,11 +1688,6 @@ enum micros_endpoint_error micros_endpoint_activate(
     return MICROS_ENDPOINT_OK;
 }
 
-static bool endpoint_is_pending_notification_source(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_endpoint_record *source
-);
-
 enum micros_endpoint_error micros_endpoint_preflight_publish(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -2349,7 +2019,7 @@ void micros_endpoint_close_commit_prevalidated(
     struct micros_process *process =
         &objects->processes[owner.slot];
 
-    clear_endpoint_record(record);
+    endpoint_clear_endpoint_record(record);
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;
 }

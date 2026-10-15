@@ -1,0 +1,6 @@
+#ifndef MICROS_TESTS_HOST_ENDPOINT_MODEL_INTERNAL_H
+#define MICROS_TESTS_HOST_ENDPOINT_MODEL_INTERNAL_H
+
+#include "micros/endpoint.h"
+
+#endif

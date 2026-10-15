@@ -22,6 +22,7 @@ from tests.host.test_frame_ownership_source_layout import (
     c_signature_start,
     cmake_command,
     cmake_if_blocks,
+    tokens,
 )
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 from tests.host.test_trap_syscall_source_layout import c_statement_text
@@ -950,20 +951,6 @@ MODEL_OPERATION_HANDLERS = (
     (8, "apply_idle_trap", "idle-trap", None),
     (9, "apply_policy", "policy", "thread"),
 )
-
-
-def tokens(text: str) -> tuple[str, ...]:
-    pattern = (
-        r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|'
-        r"'(?:\\.|[^'\\])*'|[A-Za-z_]\w*|"
-        r"0[xX][0-9a-fA-F]+[uUlL]*|\d+[uUlL]*|"
-        r">>=|<<=|->|\+\+|--|==|!=|<=|>=|&&|\|\||"
-        r"\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<|>>|[^\s]"
-    )
-    return tuple(
-        match.group() for match in re.finditer(pattern, text)
-        if not match.group().startswith(("//", "/*"))
-    )
 
 
 def compact(text: str) -> str:

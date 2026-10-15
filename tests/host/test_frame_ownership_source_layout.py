@@ -434,6 +434,20 @@ def c_lexical_text(text: str) -> str:
     return "".join(output)
 
 
+def tokens(text: str) -> tuple[str, ...]:
+    pattern = (
+        r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|'
+        r"'(?:\\.|[^'\\])*'|[A-Za-z_]\w*|"
+        r"0[xX][0-9a-fA-F]+[uUlL]*|\d+[uUlL]*|"
+        r">>=|<<=|->|\+\+|--|==|!=|<=|>=|&&|\|\||"
+        r"\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<|>>|[^\s]"
+    )
+    return tuple(
+        match.group() for match in re.finditer(pattern, text)
+        if not match.group().startswith(("//", "/*"))
+    )
+
+
 def matching_open_parenthesis(text: str, close_index: int) -> int:
     depth = 0
 

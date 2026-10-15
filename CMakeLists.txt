@@ -262,6 +262,47 @@ set(
 )
 
 set(
+    MICROS_ENDPOINT_CORE_SOURCES
+    kernel/endpoint.c
+    kernel/endpoint_codec.c
+    kernel/endpoint_identity.c
+    kernel/endpoint_registry.c
+    kernel/endpoint_privilege.c
+    kernel/endpoint_completion_validation.c
+    kernel/endpoint_queue_validation.c
+    kernel/endpoint_object_validation.c
+    kernel/endpoint_publication.c
+    kernel/endpoint_close.c
+)
+
+set(
+    MICROS_ENDPOINT_HOST_TEST_SOURCES
+    tests/host/endpoint_test.c
+    tests/host/endpoint_test_fixture.c
+    tests/host/endpoint_identity_test.c
+    tests/host/endpoint_profile_test.c
+    tests/host/endpoint_validation_test.c
+    tests/host/endpoint_lifecycle_test.c
+    tests/host/endpoint_source_only_test.c
+)
+
+set(
+    MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES
+    tests/host/endpoint_model_test.c
+    tests/host/endpoint_model_fixture.c
+    tests/host/endpoint_model_reference.c
+    tests/host/endpoint_model_projection.c
+    tests/host/endpoint_model_operations.c
+)
+
+set(
+    MICROS_ENDPOINT_QEMU_TEST_SOURCES
+    kernel/endpoint_test.c
+    kernel/endpoint_test_fixture.c
+    kernel/endpoint_test_scenarios.c
+)
+
+set(
     MICROS_RAMFS_CORE_SOURCES
     servers/ramfs/ramfs_core.c
     servers/ramfs/ramfs_codec.c
@@ -1156,7 +1197,7 @@ if(MICROS_BUILD_HOST_TESTS)
         endpoint_test
         kernel/kernel_objects.c
         ${MICROS_SCHEDULER_CORE_SOURCES}
-        kernel/endpoint.c
+        ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant.c
         kernel/grant_abi.c
         kernel/grant_copy_core.c
@@ -1180,18 +1221,18 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/host/ipc_queue_mutation_test.c
         ${MICROS_IPC_REPLY_HOST_TEST_SOURCES}
         tests/host/ipc_state_test.c
-        tests/host/endpoint_model_test.c
-        tests/host/endpoint_test.c
+        ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
+        ${MICROS_ENDPOINT_HOST_TEST_SOURCES}
     )
     add_executable(
         ipc_model_test
         kernel/kernel_objects.c
         ${MICROS_SCHEDULER_CORE_SOURCES}
-        kernel/endpoint.c
+        ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant.c
         kernel/grant_copy_core.c
         ${MICROS_IPC_CORE_SOURCES}
-        tests/host/endpoint_model_test.c
+        ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
         tests/host/grant_test.c
         tests/host/grant_copy_test.c
         ${MICROS_IPC_CLOSE_HOST_TEST_SOURCES}
@@ -1217,7 +1258,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/bootstrap_control_core.c
         ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
         ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
-        kernel/endpoint.c
+        ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         ${MICROS_SCHEDULER_CORE_SOURCES}
@@ -1237,7 +1278,7 @@ if(MICROS_BUILD_HOST_TESTS)
         pm_test
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/endpoint.c
+        ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
         kernel/kernel_objects.c
         ${MICROS_PM_CONTROL_CORE_SOURCES}
@@ -3784,7 +3825,7 @@ add_executable(
     kernel/bootstrap_memory.c
     ${MICROS_BOOTSTRAP_RUNTIME_SOURCES}
     ${MICROS_BOOTSTRAP_SYSCALL_SOURCES}
-    kernel/endpoint.c
+    ${MICROS_ENDPOINT_CORE_SOURCES}
     kernel/fdt.c
     kernel/frame_allocator.c
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
@@ -5302,7 +5343,7 @@ if(MICROS_BUILD_ENDPOINT_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/endpoint_test.c
+            ${MICROS_ENDPOINT_QEMU_TEST_SOURCES}
     )
 endif()
 
