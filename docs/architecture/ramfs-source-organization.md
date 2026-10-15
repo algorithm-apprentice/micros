@@ -196,15 +196,18 @@ it explicitly to phases. No helper reaches back into the `main` owner.
 | Owner beneath `tests/host/` | Original definitions |
 | --- | --- |
 | `ramfs_model_test.c` | `run_model`, `main`: initialization, scripted/capacity/random selection, coverage, and output. |
-| `ramfs_model_fixture.c` | `load_seed`, `model_failure`, `model_copy`, `record_operation`; original model, separate seed storage, and const `model_io`. |
+| `ramfs_model_fixture.c` | `write_u32_le`, `write_u64_le`, `load_seed`, `model_failure`, `model_copy`, `record_operation`; original model, separate seed storage, and const `model_io`. |
 | `ramfs_model_reference.c` | All twenty `initialize_reference_node`, `initialize_reference`, and `reference_*` definitions: independent expected transitions and handle/path/record math. |
 | `ramfs_model_projection.c` | `compare_state`: complete production/reference validation and comparison. |
-| `ramfs_model_protocol.c` | Four LE helpers, six request builders, `execute_call`, `prepare_bus`, and `execute_mount`, `execute_lookup`, `execute_create`, `execute_write`, `execute_read`, `execute_getdents`, `execute_putnode`, `execute_stale`, `execute_malformed`. |
+| `ramfs_model_protocol.c` | `read_u32_le`, `read_u64_le`, six request builders, `execute_call`, `prepare_bus`, and `execute_mount`, `execute_lookup`, `execute_create`, `execute_write`, `execute_read`, `execute_getdents`, `execute_putnode`, `execute_stale`, `execute_malformed`. |
 | `ramfs_model_operations.c` | `next_random`, `build_absolute_path`, `random_live_slot`, `random_referenced_nonroot_slot`, `execute_random_operation`, `execute_scripted_operation`. |
 
-Fixture/failure/trace are leaves. Reference transitions use only their own
-representation and public protocol constants, never production private
-functions or projected production values. Projection may call read-only
+Fixture/failure/trace and the two shared byte writers are leaves.
+Reference directory-record rendering and protocol request construction use
+the same existing byte-writer bodies through that leaf; reference never
+calls a protocol action or reply reader. Reference transitions use only
+their own representation and public protocol constants, never production
+private functions or projected production values. Projection may call read-only
 `reference_handle`; reference transitions never call projection.
 Protocol actions apply independent reference transitions, execute the real
 call, compare reply/storage, and project complete state. Operations call
