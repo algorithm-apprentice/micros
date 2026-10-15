@@ -84,6 +84,30 @@ MODEL_CONTEXT_HELPERS = {
 NATIVE_ASSERTION_DIGEST = "a6a8819676540e04acd7f9d209aacfca43a90794c5f37f5462f32b2b91d205a1"
 NATIVE_RUNNER_TABLE_DIGEST = "2c71f3886b3dc3a68d7269ccd129036db53da625993828c8a12697eeb109f9e1"
 REJECTED_TABLE_MACRO_DIGEST = "e5ecf37d829a27ad4c2b16a6c4ae3d129da83a8816af2bb54e2e4fe71e142915"
+QEMU_PROFILE_DATA_DIGEST = "1689296a2a7a3923bc0e89fa318d5636694d0e214342117fd27cf915d5a5a169"
+QEMU_WORK_DECLARATIONS = (
+    "struct micros_kernel_objects *objects; struct micros_endpoint_registry *registry; "
+    "struct micros_grant_registry *grant_registry; struct micros_grant_cancel_plan cancel_plan; "
+    "struct micros_grant_record grant_record; struct micros_process_handle processes[2]; "
+    "struct micros_process_handle replacement_process; struct micros_thread_handle threads[2]; "
+    "struct micros_thread_handle replacement_thread; micros_endpoint_t endpoints[2]; "
+    "micros_endpoint_t replacement_endpoint; micros_grant_t read_grant; micros_grant_t write_grant; "
+    "micros_grant_t revoked_grant; const struct micros_endpoint_record *record; "
+    "size_t baseline_processes; size_t baseline_threads; size_t baseline_harts;"
+)
+QEMU_WORK_FIELDS = (
+    "objects", "registry", "grant_registry", "cancel_plan", "grant_record", "processes",
+    "replacement_process", "threads", "replacement_thread", "endpoints", "replacement_endpoint",
+    "read_grant", "write_grant", "revoked_grant", "record", "baseline_processes", "baseline_threads", "baseline_harts",
+)
+QEMU_FIXTURE_TASKS = (
+    "endpoint_qemu_capture_baseline", "endpoint_qemu_initialize_runtimes", "endpoint_qemu_reserve_clients",
+)
+QEMU_SCENARIO_TASKS = (
+    "endpoint_qemu_require_held_owners", "endpoint_qemu_publish_and_check_authority",
+    "endpoint_qemu_prepare_grant_cancellation", "endpoint_qemu_close_commit_and_reuse",
+    "endpoint_qemu_reject_stale_and_cleanup",
+)
 NATIVE_CONTEXT_FIELDS = ("registry", "objects", "processes", "threads", "hart")
 NATIVE_CONTEXT_CASES = (
     "test_profile_table_is_immutable_and_specific", "test_invalid_profile_tables_preserve_storage",
@@ -232,9 +256,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-LONG_FUNCTION_MIGRATION = (
-    (3, "micros_endpoint_runtime_run_self_test"),
-)
+LONG_FUNCTION_MIGRATION = ()
 REGISTRY_VALIDATION_DECLARATIONS = (
     "uint32_t installed = 0; size_t observed_count = 0; size_t index; size_t other_index;"
 )
@@ -565,6 +587,11 @@ def original_locations(family):
             owner = 0 if spelling in MODEL_RUN_HELPERS else 4
             if path != family_paths(2)[owner]:
                 raise AssertionError("model run/operation tasks retain their exact control or operation owner")
+            continue
+        if family == 3 and spelling in (*QEMU_FIXTURE_TASKS, *QEMU_SCENARIO_TASKS):
+            owner = 1 if spelling in QEMU_FIXTURE_TASKS else 2
+            if path != family_paths(3)[owner]:
+                raise AssertionError("target preparation/scenario tasks retain their exact owners")
             continue
         name = renames.get(spelling, spelling)
         if name not in expected or name in locations:
@@ -1106,6 +1133,93 @@ def model_runner_body_tokens(caller, phases, operations, authorization, scripts)
     return model_work_body_tokens(body)
 
 
+def qemu_profile_data(text):
+    lexical = c_lexical_text(text)
+    objects = []
+    for name in (r"profiles\[2\]", "invalid_profile"):
+        matches = tuple(re.finditer(
+            r"(?m)^static const struct micros_privilege_profile " + name + r"\s*=\s*\{", lexical,
+        ))
+        if len(matches) != 1:
+            raise AssertionError("target fixture owns one exact readonly profile table and invalid profile")
+        match = matches[0]
+        if lexical.count("{", 0, match.start()) != lexical.count("}", 0, match.start()):
+            raise AssertionError("target readonly profiles share only their fixture owner's file scope")
+        opening = match.end() - 1
+        depth = 0
+        closing = None
+        for index in range(opening, len(lexical)):
+            depth += int(lexical[index] == "{") - int(lexical[index] == "}")
+            if depth == 0:
+                closing = index
+                break
+        if closing is None:
+            raise AssertionError("unterminated target profile initializer")
+        end = closing + 1
+        while end < len(lexical) and lexical[end].isspace():
+            end += 1
+        if lexical[end:end + 1] != ";":
+            raise AssertionError("target profile objects end at their exact original declarations")
+        objects.append(text[match.start():end + 1])
+    raw = "\n".join(objects)
+    if body_digest(raw) != QEMU_PROFILE_DATA_DIGEST:
+        raise AssertionError("actual target profile names, types, masks, literals or order changed")
+    return raw
+
+
+def qemu_failure_condition_tokens(body):
+    inner = phase_inner_tokens(body)
+    if inner[:2] != ["if", "("]:
+        raise AssertionError("split runtime predicates contain only their one original failure condition")
+    depth = 0
+    closing = None
+    for index in range(1, len(inner)):
+        depth += int(inner[index] == "(") - int(inner[index] == ")")
+        if depth == 0:
+            closing = index
+            break
+    if closing is None or inner[closing + 1:] != list(tokens("{ return false; }")):
+        raise AssertionError("split runtime predicate preserves its sole failure and non-failing completion")
+    return inner[2:closing]
+
+
+def qemu_phase_body_tokens(body):
+    inner = phase_inner_tokens(body)
+    result = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "return":
+            if inner[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError("target task failure returns only to the entry's common done label")
+            result.extend(tokens("goto done;"))
+            index += 3
+        else:
+            result.append(inner[index])
+            index += 1
+    return result
+
+
+def qemu_entry_body_tokens(caller, tasks, profiles):
+    body = list(tokens(caller))
+    work = list(tokens("struct endpoint_qemu_work work;"))
+    if body[:1 + len(work)] != ["{"] + work:
+        raise AssertionError("target entry keeps one uninitialized original-field-only automatic work lifetime")
+    body[1:1 + len(work)] = tokens(profiles + QEMU_WORK_DECLARATIONS)
+    for task in (QEMU_FIXTURE_TASKS[0], *QEMU_SCENARIO_TASKS):
+        body = replace_one_token_sequence(
+            body, "if (!" + task + "(&work)) { goto done; }", qemu_phase_body_tokens(tasks[task]),
+        )
+    condition = (
+        *qemu_failure_condition_tokens(tasks[QEMU_FIXTURE_TASKS[1]]),
+        "||",
+        *qemu_failure_condition_tokens(tasks[QEMU_FIXTURE_TASKS[2]]),
+    )
+    body = replace_one_token_sequence(
+        body, "!endpoint_qemu_initialize_runtimes(&work) || !endpoint_qemu_reserve_clients(&work)", condition,
+    )
+    return native_work_field_tokens(body, {"fields": QEMU_WORK_FIELDS})
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
     body = tokens(text)
@@ -1146,6 +1260,13 @@ def original_body_digest(family, name, text):
             {helper: c_function_body(operations, helper) for helper in MODEL_AUTHORIZATION_HELPERS},
             model_script_data(owner),
         )
+    if family == 3 and (3, name) not in LONG_FUNCTION_MIGRATION:
+        owners = (source(family_paths(3)[1]), source(family_paths(3)[2]))
+        tasks = {
+            task: c_function_body(owners[owner], task)
+            for owner, names in enumerate((QEMU_FIXTURE_TASKS, QEMU_SCENARIO_TASKS)) for task in names
+        }
+        body = qemu_entry_body_tokens(text, tasks, qemu_profile_data(owners[0]))
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
@@ -1933,6 +2054,147 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual(len(declarations), len(set(declarations)))
         self.assertEqual(exports, set(declarations))
+
+    def test_qemu_tasks_keep_exact_original_automatic_work_and_irq_entry_lifetime(self):
+        header = source(PRIVATE_HEADERS[3])
+        fields = re.findall(r"struct endpoint_qemu_work\s*\{([^{}]*)\}", header)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(tokens(QEMU_WORK_DECLARATIONS), tokens(fields[0]))
+        owners = {name: path for path, name in owned_definitions(3)}
+        for owner, names in ((1, QEMU_FIXTURE_TASKS), (2, QEMU_SCENARIO_TASKS)):
+            for name in names:
+                self.assertEqual(family_paths(3)[owner], owners.get(name), name)
+                self.assertLessEqual(owned_definitions(3)[owners[name], name], 120)
+                text = source(owners[name])
+                signatures = re.findall(rf"(?m)^bool {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures), name)
+                self.assertEqual(tokens(f"bool {name}(struct endpoint_qemu_work *work) {{"), tokens(signatures[0]))
+                body = c_function_body(text, name)
+                self.assertNotIn("riscv_irq_", body)
+                self.assertNotIn("saved_status", body)
+                self.assertNotIn("passed", body)
+        entry = c_function_body(source(family_paths(3)[0]), "micros_endpoint_runtime_run_self_test")
+        self.assertEqual(1, entry.count("struct endpoint_qemu_work work;"))
+        self.assertEqual(1, entry.count("riscv_irq_save()"))
+        self.assertEqual(1, entry.count("riscv_irq_restore(saved_status)"))
+        self.assertEqual(1, len(re.findall(r"\bdone\s*:", entry)))
+        self.assertIn("bool passed = false;", entry)
+        self.assertNotIn("memset(", entry)
+        self.assertEqual(9, len(owners))
+        declarations = re.findall(r"\b(endpoint_qemu_\w+)\s*\([^;{}]*\)\s*;", c_lexical_text(header))
+        self.assertEqual(set((*QEMU_FIXTURE_TASKS, *QEMU_SCENARIO_TASKS)), set(declarations))
+        self.assertEqual(len(declarations), len(set(declarations)))
+        self.assertEqual({}, c_function_definitions(header))
+
+    def test_qemu_split_runtime_predicates_keep_short_circuit_actions_and_failure_scope(self):
+        current = (
+            "{ if (cold_probe() != NOT_INITIALIZED || "
+            "(work->registry = acquire()) == NULL || initialize() != OK) { return false; } return true; }"
+        )
+        expected = (
+            "cold_probe() != NOT_INITIALIZED || (work->registry = acquire()) == NULL || initialize() != OK"
+        )
+        self.assertEqual(tokens(expected), tuple(qemu_failure_condition_tokens(current)))
+        for changed in (
+            current.replace("{ if", "{ reset_runtime(); if", 1),
+            current.replace("return false;", "return true;", 1),
+            current.replace("return false;", "goto done;", 1),
+            current.replace("return false;", "restore_interrupts(); return false;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                qemu_failure_condition_tokens(changed)
+        changed = current.replace("initialize() != OK", "initialize() == OK")
+        self.assertNotEqual(tokens(expected), tuple(qemu_failure_condition_tokens(changed)))
+
+    def test_qemu_projection_keeps_one_irq_scope_first_failure_and_success_only_cleanup(self):
+        tasks = {
+            QEMU_FIXTURE_TASKS[0]: (
+                "{ work->objects = acquire_objects(); if (work->objects == NULL) { return false; } "
+                "work->baseline_processes = work->objects->live_process_count; return true; }"
+            ),
+            QEMU_FIXTURE_TASKS[1]: "{ if (cold() != NOT_READY || initialize() != OK) { return false; } return true; }",
+            QEMU_FIXTURE_TASKS[2]: (
+                "{ if (create(work->objects, &work->processes[0]) != OK || "
+                "reserve(work->registry, &work->endpoints[0]) != OK) { return false; } return true; }"
+            ),
+            QEMU_SCENARIO_TASKS[0]: "{ if (held_release_denied()) { return false; } return true; }",
+            QEMU_SCENARIO_TASKS[1]: "{ if (visibility_or_authority_failed()) { return false; } return true; }",
+            QEMU_SCENARIO_TASKS[2]: "{ if (prepare_cancel(&work->cancel_plan) != OK) { return false; } return true; }",
+            QEMU_SCENARIO_TASKS[3]: (
+                "{ if (ipc_close(work->endpoints[0]) != OK || "
+                "commit_cancel(&work->cancel_plan) != OK || reuse_generation() != OK) { return false; } return true; }"
+            ),
+            QEMU_SCENARIO_TASKS[4]: (
+                "{ if (deny_stale() != STALE || cleanup() != OK || "
+                "work->objects->live_process_count != work->baseline_processes) { return false; } return true; }"
+            ),
+        }
+        profiles = "static const struct micros_privilege_profile profiles[2] = {{.id = 1}, {.id = 2}};"
+        caller = (
+            "{ struct endpoint_qemu_work work; uintptr_t saved_status; bool passed = false; "
+            "saved_status = riscv_irq_save(); if (!endpoint_qemu_capture_baseline(&work)) { goto done; } "
+            "if (!endpoint_qemu_initialize_runtimes(&work) || !endpoint_qemu_reserve_clients(&work)) { goto done; } "
+            + " ".join("if (!" + task + "(&work)) { goto done; }" for task in QEMU_SCENARIO_TASKS)
+            + " passed = true; done: riscv_irq_restore(saved_status); return passed; }"
+        )
+        expected = (
+            "{ " + profiles + QEMU_WORK_DECLARATIONS + "uintptr_t saved_status; bool passed = false; "
+            "saved_status = riscv_irq_save(); objects = acquire_objects(); if (objects == NULL) { goto done; } "
+            "baseline_processes = objects->live_process_count; "
+            "if (cold() != NOT_READY || initialize() != OK || create(objects, &processes[0]) != OK || "
+            "reserve(registry, &endpoints[0]) != OK) { goto done; } "
+            "if (held_release_denied()) { goto done; } if (visibility_or_authority_failed()) { goto done; } "
+            "if (prepare_cancel(&cancel_plan) != OK) { goto done; } "
+            "if (ipc_close(endpoints[0]) != OK || commit_cancel(&cancel_plan) != OK || reuse_generation() != OK) { goto done; } "
+            "if (deny_stale() != STALE || cleanup() != OK || objects->live_process_count != baseline_processes) { goto done; } "
+            "passed = true; done: riscv_irq_restore(saved_status); return passed; }"
+        )
+        self.assertEqual(tokens(expected), qemu_entry_body_tokens(caller, tasks, profiles))
+        for changed in (
+            caller.replace("goto done;", "return false;", 1),
+            caller.replace("struct endpoint_qemu_work work;", "static struct endpoint_qemu_work work;"),
+            caller.replace("endpoint_qemu_capture_baseline(&work)", "endpoint_qemu_capture_baseline(&other)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                qemu_entry_body_tokens(changed, tasks, profiles)
+        for changed in (
+            caller.replace("riscv_irq_restore(saved_status);", ""),
+            caller.replace("bool passed = false;", "bool passed = true;"),
+            caller.replace(
+                "if (!endpoint_qemu_reject_stale_and_cleanup(&work)) { goto done; }",
+                "done: if (!endpoint_qemu_reject_stale_and_cleanup(&work)) { goto done; }",
+            ),
+        ):
+            self.assertNotEqual(tokens(expected), qemu_entry_body_tokens(changed, tasks, profiles))
+        task = QEMU_SCENARIO_TASKS[2]
+        with self.assertRaises(AssertionError):
+            qemu_entry_body_tokens(caller, {**tasks, task: tasks[task].replace("return false;", "return true;")}, profiles)
+
+    def test_qemu_readonly_data_and_private_edges_admit_no_new_mutable_context(self):
+        paths = family_paths(3)
+        fixture = source(paths[1])
+        raw = qemu_profile_data(fixture)
+        for path in paths:
+            expected = file_scope_objects(raw) if path == paths[1] else ()
+            self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(path)))))
+            self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
+            self.assertIn('#include "endpoint_test_internal.h"', source(path))
+        for changed in (
+            fixture.replace('"CLIENT"', '"WRONG"'),
+            fixture.replace("static const struct", "static struct", 1),
+            "void local(void) {\n" + fixture + "\n}",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                qemu_profile_data(changed)
+        owners = {name: path for path, name in owned_definitions(3)}
+        edges = set()
+        for name, path in owners.items():
+            calls = set(re.findall(r"[A-Za-z_]\w*", c_lexical_text(c_function_body(source(path), name))))
+            for callee in calls & set(owners):
+                if owners[callee] != path:
+                    self.assertEqual(paths[0], path)
+                    edges.add((owners[callee], path))
+        self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
 
     def test_validators_expose_exact_profile_record_process_and_thread_passes(self):
         parameters = {

@@ -576,8 +576,17 @@ Authorization keeps its original case-scoped locals and two extra draws
 before selection or any no-slot exit; four tasks preserve reply-receive
 priority, reply, target selection and target authority. The full original
 659-line body reconstructs with helper success mapped only to original case
-breaks, never the outer trace/comparison. Only the target runtime entry
-remains an original long-function migration.
+breaks, never the outer trace/comparison. The target now has a 37-line entry,
+three fixture tasks and five scenario tasks. Its original eighteen work
+fields remain automatic, saved IRQ status and `passed = false` stay in the
+entry, and one common `done` restores that status on every path. The actual
+readonly profile table and invalid profile have unique fixture ownership.
+Finite reconstruction rejoins only the original runtime/client short-circuit
+condition; all other first-failure boundaries, grant prepare/close/commit,
+generation reuse, stale denial and success-only cleanup remain exact.
+Both owner and long-function migration collections are now literal empty
+tuples, with all original bodies reconstructed and all intended C owners
+containing their real tasks.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
