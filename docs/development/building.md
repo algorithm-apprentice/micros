@@ -373,6 +373,10 @@ require the exact clean staged candidate. Ordinary dirty tracked fresh
 iteration remains supported, but cannot publish reusable or final evidence.
 The final author still supplies the complete plan, clean tracked/index state,
 no untracked task files and independent review.
+Nonempty sanitizer option/symbolizer overrides are outside the initial reuse
+profile; their external option/suppression files are not silently ignored.
+They remain unchanged for fresh iteration. Ordinary unstaged tracked
+deletions are likewise fresh-only iteration, not reusable or final evidence.
 
 The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,

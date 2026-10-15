@@ -28,6 +28,10 @@ Deleted and renamed paths keep both identities.
 It computes required commands before consulting evidence. A receipt cannot
 select paths, change ownership, lower a tier, cover a different command,
 remove a diff check, approve a review or authorize merge.
+Executing modes capture the candidate before inventory/path discovery, verify
+the same identity after selection and pass that identity into execution.
+Execution may not establish a newer baseline for an already selected plan.
+Plan-only mode remains nonexecuting and does not capture a staged tree.
 
 An explicit full tier always executes fresh. Existing invocations without
 reuse execute fresh. Documentation and the three staged/worktree/branch
@@ -89,6 +93,8 @@ task inputs.
 
 Legacy fresh iteration, including `--tier fast --execute`, continues to
 allow unstaged tracked edits. It retains the existing untracked-file refusal.
+A missing indexed path has an explicit absent marker in dirty source
+identity; an unstaged deletion is not a preflight filesystem failure.
 A dirty fresh execution cannot publish reusable evidence or become final
 author evidence, but receipt eligibility does not make that iteration fail.
 Fresh execution still invalidates any previous success before attempting a
@@ -218,6 +224,11 @@ For this profile, these are the authoritative resolution rules:
   Native Python test subprocesses are the current reviewed
   Python CLI and CMake configuration probes; their runtime/tool closure is
   included, not omitted because they are children of unittest.
+  Nonempty sanitizer override/symbolizer variables, including `ASAN_OPTIONS`,
+  `UBSAN_OPTIONS`, `LSAN_OPTIONS` and `LLVM_SYMBOLIZER_OPTS`, make this initial
+  profile ineligible: option includes, suppressions and external executables
+  are not admitted by an environment-string digest. Fresh execution preserves
+  those variables unchanged.
 
 Tree fingerprints include relative names, kinds, modes, regular-file bytes,
 link spelling/target and directory membership. Deduplicating resolved files

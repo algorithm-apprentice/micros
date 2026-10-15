@@ -294,6 +294,18 @@ class ValidationExecutionTests(unittest.TestCase):
         self.assertEqual(1, len(self.calls))
         self.assertEqual("REUSED", report["commands"][0]["status"])
 
+    def test_execution_cannot_replace_the_expected_planning_candidate(self):
+        expected = self.candidate
+        self.candidate = validation_context.Candidate(
+            expected.repository, {**expected.source, "tree": "d" * 40}, True,
+        )
+        status, report, _ = self.execute(
+            [workflow("test-unit")], expected_source=expected,
+        )
+        self.assertNotEqual(0, status)
+        self.assertEqual("NOT_RUN", report["commands"][0]["status"])
+        self.assertEqual([], self.calls)
+
 
 class ValidationExecutionArgumentsTests(unittest.TestCase):
     def test_supported_modes_are_explicit(self):
@@ -318,6 +330,54 @@ class ValidationExecutionArgumentsTests(unittest.TestCase):
             with self.subTest(arguments=arguments), redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
                     validation_plan.parse_arguments(arguments)
+
+
+class ValidationPlanningIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.root = "/repo"
+        self.before = validation_context.Candidate(
+            {"root": self.root, "git_common": "/repo/.git"},
+            {"head": "a" * 40, "tree": "b" * 40, "source_sha256": "c" * 64}, True,
+        )
+        self.current = self.before
+        self.addCleanup(mock.patch.stopall)
+        mock.patch("tools.validation_plan.planner_root", return_value=self.root).start()
+        mock.patch("tools.validation_plan.validate_inventory").start()
+        mock.patch("tools.validation_plan.ensure_execution_ready").start()
+        self.capture = mock.patch(
+            "tools.validation_context.capture_candidate",
+            side_effect=lambda root: self.current,
+        ).start()
+        self.discover = mock.patch(
+            "tools.validation_plan.changed_paths", return_value=["docs/readme.md"]
+        ).start()
+        self.execute = mock.patch(
+            "tools.validation_execution.execute_plan", return_value=0
+        ).start()
+
+    def test_staged_code_change_after_discovery_cannot_keep_a_docs_only_plan(self):
+        def changed(base, root):
+            self.current = validation_context.Candidate(
+                self.before.repository,
+                {**self.before.source, "tree": "d" * 40}, True,
+            )
+            return ["docs/readme.md"]
+
+        self.discover.side_effect = changed
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                validation_plan.main(["--tier", "pr", "--execute"])
+        self.execute.assert_not_called()
+
+    def test_execution_receives_the_candidate_captured_before_discovery(self):
+        validation_plan.main(["--tier", "pr", "--execute"])
+        self.assertEqual(self.before, self.execute.call_args.kwargs["expected_source"])
+
+    def test_plan_only_remains_nonexecuting_and_does_not_capture_write_tree(self):
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(0, validation_plan.main(["--tier", "pr"]))
+        self.capture.assert_not_called()
+        self.execute.assert_not_called()
 
 
 if __name__ == "__main__":

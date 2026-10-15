@@ -12,7 +12,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tools import validation_build_impact, validation_execution
+from tools import validation_build_impact, validation_context, validation_execution
 
 
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
@@ -2139,12 +2139,18 @@ def main(argv=None):
     arguments = parse_arguments(argv)
     root = planner_root()
     try:
+        expected_source = (
+            validation_context.capture_candidate(root)
+            if arguments.execute or arguments.record_workflow else None
+        )
         validate_inventory(root)
         if arguments.record_workflow:
             ensure_execution_ready(root)
+            if validation_context.capture_candidate(root) != expected_source:
+                raise ValueError("source identity changed while selecting the canonical workflow")
             return validation_execution.execute_plan(
                 root, [workflow(arguments.record_workflow)],
-                canonical_workflows(), gate_only=True,
+                canonical_workflows(), gate_only=True, expected_source=expected_source,
             )
         discovered = changed_paths(arguments.base, root)
         explicit = [
@@ -2159,10 +2165,13 @@ def main(argv=None):
     if arguments.execute:
         try:
             ensure_execution_ready(root)
+            if validation_context.capture_candidate(root) != expected_source:
+                raise ValueError("source identity changed while selecting required validation coverage")
         except ValueError as error:
             raise SystemExit(str(error)) from error
         return validation_execution.execute_plan(
             root, commands, canonical_workflows(), reuse=arguments.reuse,
+            expected_source=expected_source,
         )
     for command in commands:
         print(shlex.join(command), flush=True)

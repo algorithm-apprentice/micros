@@ -172,7 +172,7 @@ def _report(source, entries, *, gate_only, success):
     }, sort_keys=True, separators=(",", ":")), flush=True)
 
 
-def execute_plan(root, commands, workflows, *, reuse=False, gate_only=False):
+def execute_plan(root, commands, workflows, *, reuse=False, gate_only=False, expected_source=None):
     root = Path(root).resolve()
     commands = [tuple(command) for command in commands]
     workflows = frozenset(workflows)
@@ -187,7 +187,7 @@ def execute_plan(root, commands, workflows, *, reuse=False, gate_only=False):
     if gate_only:
         print("GATE-ONLY: fresh workflow evidence, not final author validation", flush=True)
     try:
-        source = _source(root)
+        source = _source(root, expected_source)
         if not source.clean and (reuse or gate_only):
             raise ExecutionError("reuse/record requires the exact clean staged candidate")
         if not source.clean:

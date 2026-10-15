@@ -70,7 +70,13 @@ def validate_environment(environment, *, target):
     }
     rejected = [
         name for name, value in environment.items()
-        if value and (name in forbidden or name.startswith(("DYLD_", "QEMU_")))
+        if value and (
+            name in forbidden or name == "LLVM_SYMBOLIZER_OPTS"
+            or name.startswith((
+                "DYLD_", "QEMU_", "ASAN_", "UBSAN_", "LSAN_", "TSAN_",
+                "MSAN_", "HWASAN_", "DFSAN_", "SCUDO_", "GWP_ASAN_", "SANITIZER_",
+            ))
+        )
     ]
     for name in ("SDKROOT", "CPATH", "LIBRARY_PATH"):
         if environment.get(name) and any(
@@ -227,7 +233,11 @@ def _index_entries(tracked, root):
             raise UnsupportedContext("unmerged or unsupported index entry")
         relative = os.fsdecode(filename)
         path = root / relative
-        mode = path.lstat().st_mode
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError:
+            entries.append((fields, relative, path, None, None))
+            continue
         resolved = path.resolve(strict=True)
         if not _inside(resolved, (root,)):
             raise UnsupportedContext("source link escapes the repository")
@@ -235,6 +245,8 @@ def _index_entries(tracked, root):
             regular.add(resolved)
         entries.append((fields, relative, path, mode, resolved))
     for fields, _, _, mode, resolved in entries:
+        if mode is None:
+            continue
         if fields[0] == b"120000":
             if not stat.S_ISLNK(mode) or resolved not in regular:
                 raise UnsupportedContext("source link target is not a reviewed regular input")
@@ -277,13 +289,20 @@ def capture_candidate(root):
     tracked = _run(("git", "ls-files", "--stage", "-z"), cwd=root)
     digest = hashlib.sha256()
     exact = True
+    missing = []
     for fields, relative, path, mode, _ in _index_entries(tracked, root):
-        exact = _matches_index(path, fields, mode) and exact
         digest.update(json.dumps([relative, fields[0].decode()]).encode())
-        digest.update(fingerprint_tree(path, (root,)).encode())
+        if mode is None:
+            exact = False
+            missing.append(relative)
+            digest.update(b"\0absent-tracked-input\0")
+        else:
+            exact = _matches_index(path, fields, mode) and exact
+            digest.update(fingerprint_tree(path, (root,)).encode())
     clean = not _run(("git", "diff", "--name-only", "-z"), cwd=root) and exact
     return Candidate(repository, {
         "head": head, "tree": tree, "source_sha256": digest.hexdigest(),
+        "missing_paths": missing,
     }, clean)
 
 

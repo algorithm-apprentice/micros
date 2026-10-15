@@ -516,6 +516,31 @@ class ValidationContextTests(unittest.TestCase):
             with self.assertRaises(validation_context.UnsupportedContext):
                 validation_context.capture_candidate(self.root)
 
+    def test_sanitizer_override_inputs_are_ineligible_not_untracked_dependencies(self):
+        baseline = {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}
+        for name, value in (
+            ("ASAN_OPTIONS", "include=/external/options"),
+            ("UBSAN_OPTIONS", "suppressions=/external/suppressions"),
+            ("LSAN_OPTIONS", "include=/external/options"),
+            ("ASAN_SYMBOLIZER_PATH", "/external/symbolizer"),
+            ("LLVM_SYMBOLIZER_OPTS", "--obj=/external/image"),
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context.validate_environment({**baseline, name: value}, target=False)
+
+    def test_unstaged_tracked_deletion_has_explicit_dirty_source_identity(self):
+        source, responses, query = self.candidate_fixture()
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            before = validation_context.capture_candidate(self.root)
+            source.unlink()
+            responses[("diff", "--name-only", "-z")] = b"source.c\0"
+            after = validation_context.capture_candidate(self.root)
+        self.assertFalse(after.clean)
+        self.assertEqual(["source.c"], after.source["missing_paths"])
+        self.assertEqual(before.source["tree"], after.source["tree"])
+        self.assertNotEqual(before.source["source_sha256"], after.source["source_sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()
