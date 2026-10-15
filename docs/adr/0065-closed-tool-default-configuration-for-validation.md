@@ -1,0 +1,119 @@
+# ADR-0065: Closed Tool Default Configuration for Validation
+
+- Status: Proposed
+- Date: 2026-10-15
+- Refines: ADR-0032, ADR-0033, ADR-0034, ADR-0064
+- Supersedes in part, only after Acceptance: ADR-0064's initial admitted-root
+  restriction, solely for the selected Homebrew LLVM installation's
+  recognized `etc/clang` configuration alias under the conditions below
+
+## Context
+
+Design #129 is merged. Its implementation draft #130 correctly found a
+previously unmodeled input: the selected versioned LLVM installation exposes
+`etc/clang` as a link to the Homebrew prefix's non-versioned `etc/clang`.
+The actual directory exists and contains compiler configuration files.
+The initial profile's strict root check correctly refuses both target
+workflows instead of publishing incomplete evidence.
+
+The author preserved three green commits, closed #130 without merging and
+abandoned its branch. Implementation remains blocked while this corrective
+design is reviewed. No native/QEMU/image execution or receipt-reuse success
+was inferred from the read-only metadata probes.
+
+This is a development-tool closure correction, not a MINIX runtime change.
+The fixed [MINIX validation baseline](../research/minix-validation-driver-baseline.md)
+and all coverage, source, ownership, freshness and phase rules remain intact.
+
+## Decision
+
+The corrected initial profile retains the three workflows in
+[the canonical validation contract](../architecture/validation-evidence.md).
+It adds one exact compiler-configuration data root and makes implicit tool
+configuration explicit rather than ignoring it.
+
+### Compiler configuration
+
+Reusable recording requires the caller's inherited
+`CLANG_NO_DEFAULT_CONFIG=1`. The tool does not insert or remove this variable
+silently. Default/fresh iteration without it keeps existing behavior and is
+ineligible for reusable evidence.
+
+LLVM's
+[fixed driver source](https://github.com/llvm/llvm-project/blob/1ee8805f01a663b7f2b09215a8eab5ab2d15ce35/clang/lib/Driver/Driver.cpp#L1426-L1434)
+disables automatic configuration loading when that variable is nonempty.
+Its
+[explicit-configuration path](https://github.com/llvm/llvm-project/blob/1ee8805f01a663b7f2b09215a8eab5ab2d15ce35/clang/lib/Driver/Driver.cpp#L1330-L1395)
+is separate. Therefore selected compile/link recipes must also contain no
+explicit `--config`, `--config=`, configuration-directory override or
+response-file argument. `CCC_OVERRIDE_OPTIONS` and other unresolved compiler
+argument-injection inputs make the workflow ineligible. Unsupported driver
+families or unrecognized default-config semantics also remain ineligible.
+The v1 declarations recognize Apple Clang major21 for the native host and
+LLVM Clang major23 for the RV64 target. Other driver families or majors run
+fresh without reusable receipts. Exact executable bytes and versions remain
+fingerprinted; the family check never makes a patch-version change reusable.
+
+The sole new root admission is:
+
+- identify the selected LLVM versioned Cellar installation from the actual
+  pinned compiler, not an environment-supplied prefix;
+- recognize only that installation's `etc/clang` alias;
+- derive the expected target as the same Homebrew prefix's `etc/clang`;
+- require an existing directory with exactly that resolved target;
+- fingerprint the alias kind, spelling and target, and the complete target
+  tree's names, kinds, modes, file bytes and link identities.
+
+An absent alias has an explicit absent identity. A real directory already
+inside the versioned installation needs no external-root exception.
+Wrong targets, unreadable/dangling aliases or another escaping link remain
+ineligible. This does not authorize following arbitrary package links.
+
+The configuration tree is opaque input data, never parsed or executed.
+Automatic loading is disabled and explicit loading is excluded, so config
+file contents cannot introduce transitive runtime inputs. Even so, their
+complete identity is checked; the alias is not omitted from the manifest.
+No raw configuration contents or environment values enter receipts or logs.
+
+### QEMU default configuration
+
+The current runner does not pass `-no-user-config`. The upstream
+[fixed default-config loader](https://github.com/qemu/qemu/blob/8ee6c77176cfee03be0ec7665b6652b2f31f1531/system/vl.c#L2342-L2354)
+reads relocated `CONFIG_QEMU_CONFDIR/qemu.conf`; absence is permitted, while
+a present file can add otherwise undeclared guest inputs.
+
+The initial Homebrew profile therefore requires explicit absent identities
+for both the selected versioned QEMU installation's `etc/qemu/qemu.conf`
+and the same Homebrew prefix's `etc/qemu/qemu.conf`. The installed layout,
+relocated data roots and compiled default-config location must match this
+reviewed layout. Unknown layouts or any file, directory, symlink or unreadable
+state at either location are ineligible. No user configuration is opened,
+interpreted, copied or silently disabled.
+
+The current no-explicit-configuration guest command remains unchanged.
+An explicit config option or response input makes the profile ineligible.
+This is stricter receipt eligibility, not a change to guest invocation.
+
+## Preserved invariants and non-goals
+
+This decision does not change gate coverage, Git discovery, exact HEAD/tree
+binding, log publication, invalidation, locking, fresh defaults/full,
+independent review or source-oracle independence. It adds no general compiler
+or QEMU configuration parser, package resolver, environment normalization,
+arbitrary-command cache, configuration migration or operating-system change.
+Installed paths and content digests remain runtime data.
+
+## Acceptance and phase barrier
+
+Design authors only documents and passes documentation/structure plus the
+three diff checks. Independent design review must be clean before Acceptance
+and merge. No implementation, tests, models, harnesses or prototype belongs
+to this corrective design.
+
+Only then may `validation-plan-dedup-implementation` restart from current
+`main`, referencing this design and #129. It must test alias mutation,
+wrong/dangling/unreadable targets, new config members, missing disable flags,
+explicit/response/injected arguments and QEMU default-file presence.
+Every unsupported case stays fresh without a reusable receipt.
+Actual native, smoke and image producer/reuse demonstrations and a fresh full
+milestone gate remain mandatory before independent implementation review.

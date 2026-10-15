@@ -224,6 +224,52 @@ are not. An unreadable tree, escaping/unknown link or dependency makes reuse
 ineligible. Runtime-discovered installation paths/digests are data, not an
 opportunity to extend these admitted input classes.
 
+### Proposed default-configuration correction
+
+Proposed
+[ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
+corrects the concrete initial-profile omission found in abandoned
+implementation #130. It is not active before separate design review,
+Acceptance and merge. The implementation todo is blocked in the meantime.
+Unknown roots continue to be rejected; no workaround was merged.
+
+After that barrier, the initial profile requires an inherited
+`CLANG_NO_DEFAULT_CONFIG=1` and excludes explicit compiler configuration,
+response files and unresolved argument-injection environment. Only the
+selected LLVM Cellar installation's `etc/clang` alias may add the derived
+same-prefix `etc/clang` directory as opaque, completely fingerprinted data.
+No other escaping package link is admitted. Raw config bytes are not logged;
+disabled automatic loading is not inferred merely from a successful marker.
+
+The QEMU profile additionally requires both its versioned-installation and
+same-prefix `etc/qemu/qemu.conf` locations to remain absent, with explicit
+checked absence identities. An unknown layout, config option or present
+file/directory/link makes the workflow ineligible, not silently reconfigured.
+The guest command and all required gates remain unchanged.
+
+The already required native shim/import closure also distinguishes declared
+SDK paths from arbitrary include/library overrides. Active SDK/toolchain
+paths are fully hashed. Standard `/usr/local/include` and `/usr/local/lib`
+fallback locations may have explicit absent identities only; their presence
+is not permission to admit another input root. `PYTHONNOUSERSITE=1` remains
+mandatory. The inactive standard Xcode Python startup declaration
+`Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth` may be
+recognized only at SHA-256
+`7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373`
+with `SETUPTOOLS_USE_DISTUTILS` absent or exactly `stdlib`.
+Any other startup file, activation or import customization is ineligible.
+The complete framework tree is still fingerprinted.
+
+Driver invocation spelling remains part of the command identity. Resolving
+`ld.lld` to its executable bytes must not replace it with the multicall name
+`lld` for execution or version queries. Runtime metadata refers to the active
+arm64 slice, actual CTest programs rather than data/intermediates, and Python
+extension loaders in the actual interpreter's rpath context.
+Ninja's unselected sibling-output edges cannot hide inputs: missing input
+identities remain unsupported, and complete configured regular-output
+inventory covers sibling artifacts. These are bounded resolution rules,
+not permission to infer behavioral ownership from build membership.
+
 ## Receipt lifecycle
 
 One OS-backed exclusive lock protects the resolved repository-local store.
