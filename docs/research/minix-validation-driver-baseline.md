@@ -58,3 +58,35 @@ within-plan duplicate check.
 
 See [the Accepted decision](../adr/0064-fail-closed-validation-evidence-reuse.md)
 and [the exact contract](../architecture/validation-evidence.md).
+
+## Default-configuration closure correction
+
+Implementation draft #130 was closed without merge after a read-only
+installed-tool trace found the selected LLVM installation's `etc/clang`
+alias resolves to the same Homebrew prefix's non-versioned `etc/clang`.
+The directory contains Darwin configuration files. The initial admitted
+roots do not close that input, so both target profiles correctly remained
+ineligible. Native metadata closure is not a native gate execution or proof
+that the target profiles work.
+
+The fixed LLVM driver source linked by
+[Accepted ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
+separates disabled automatic loading from still-possible explicit loading.
+That requires both a declared disable policy and exclusion of explicit,
+response and unresolved injected options; hashing a directory alone cannot
+prove transitive config inputs are closed.
+
+The installed QEMU reports a prefix-contained default `etc/qemu/qemu.conf`
+location; neither it nor the same-prefix global location exists in the
+observed reference configuration. Its fixed upstream loader accepts absence.
+The `qemu-bundle` location beside the resolved executable is also absent.
+Upstream relocation can redirect config and firmware beneath such a bundle,
+so all three absence checks must precede any QEMU metadata invocation.
+Checking only the two config paths and data-root containment is insufficient.
+Existing read-only Ninja
+command inventories contain166 smoke and11 TTY-image commands, with no
+explicit configuration or response inputs. These are metadata observations,
+not executable design prototypes or successful workflow receipts.
+
+These are compatible development-only extensions under ADR-0025. No MINIX
+runner mechanism or operating-system behavior is changed.
