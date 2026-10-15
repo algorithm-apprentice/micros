@@ -490,8 +490,13 @@ their reviewed-base owners/bodies. Both active collections are literal empty
 tuples before review.
 All 180 owner moves are now complete across the exact 32 C sources and six
 private contracts; the active owner collection is a literal empty tuple.
-The sixteen C plus one Python semantic migrations are still pending.
-Completing source ownership alone does not complete this implementation.
+The facade now exposes a 68-line typed operation dispatcher and 78-line
+public orchestration root. Its bounded phase projection reconstructs the
+complete immutable original body, including default failure, result bindings,
+caller error propagation, final validation, and reply order. Fifteen C plus
+one Python semantic migrations remain pending, alongside the specified
+shorter-operation outlines. Completing source ownership alone does not
+complete this implementation.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;

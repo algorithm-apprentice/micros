@@ -18,6 +18,75 @@ static enum micros_ramfs_result protocol_result(
     }
 }
 
+static enum micros_ramfs_core_error dispatch_request(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    const struct micros_ramfs_io *io,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result
+)
+{
+    enum micros_ramfs_core_error error = MICROS_RAMFS_CORE_OK;
+
+    switch (request->type) {
+    case MICROS_RAMFS_MESSAGE_MOUNT:
+        *result = ramfs_handle_mount(state, fields);
+        break;
+    case MICROS_RAMFS_MESSAGE_LOOKUP:
+        error = ramfs_handle_lookup(
+            state,
+            request,
+            io,
+            fields,
+            result
+        );
+        break;
+    case MICROS_RAMFS_MESSAGE_CREATE:
+    case MICROS_RAMFS_MESSAGE_MKDIR:
+        error = ramfs_handle_create_or_mkdir(
+            state,
+            request,
+            io,
+            fields,
+            result
+        );
+        break;
+    case MICROS_RAMFS_MESSAGE_READ:
+        error = ramfs_handle_read(
+            state,
+            request,
+            io,
+            fields,
+            result
+        );
+        break;
+    case MICROS_RAMFS_MESSAGE_WRITE:
+        error = ramfs_handle_write(
+            state,
+            request,
+            io,
+            fields,
+            result
+        );
+        break;
+    case MICROS_RAMFS_MESSAGE_GETDENTS:
+        error = ramfs_handle_getdents(
+            state,
+            request,
+            io,
+            fields,
+            result
+        );
+        break;
+    case MICROS_RAMFS_MESSAGE_PUTNODE:
+        *result = ramfs_handle_putnode(state, request);
+        break;
+    default:
+        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
+    }
+    return error;
+}
+
 enum micros_ramfs_core_error micros_ramfs_handle_call(
     struct micros_ramfs_state *state,
     const struct micros_ipc_message *message,
@@ -79,63 +148,13 @@ enum micros_ramfs_core_error micros_ramfs_handle_call(
     }
 
     result = MICROS_RAMFS_RESULT_OK;
-    error = MICROS_RAMFS_CORE_OK;
-    switch (request.type) {
-    case MICROS_RAMFS_MESSAGE_MOUNT:
-        result = ramfs_handle_mount(state, &fields);
-        break;
-    case MICROS_RAMFS_MESSAGE_LOOKUP:
-        error = ramfs_handle_lookup(
-            state,
-            &request,
-            io,
-            &fields,
-            &result
-        );
-        break;
-    case MICROS_RAMFS_MESSAGE_CREATE:
-    case MICROS_RAMFS_MESSAGE_MKDIR:
-        error = ramfs_handle_create_or_mkdir(
-            state,
-            &request,
-            io,
-            &fields,
-            &result
-        );
-        break;
-    case MICROS_RAMFS_MESSAGE_READ:
-        error = ramfs_handle_read(
-            state,
-            &request,
-            io,
-            &fields,
-            &result
-        );
-        break;
-    case MICROS_RAMFS_MESSAGE_WRITE:
-        error = ramfs_handle_write(
-            state,
-            &request,
-            io,
-            &fields,
-            &result
-        );
-        break;
-    case MICROS_RAMFS_MESSAGE_GETDENTS:
-        error = ramfs_handle_getdents(
-            state,
-            &request,
-            io,
-            &fields,
-            &result
-        );
-        break;
-    case MICROS_RAMFS_MESSAGE_PUTNODE:
-        result = ramfs_handle_putnode(state, &request);
-        break;
-    default:
-        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-    }
+    error = dispatch_request(
+        state,
+        &request,
+        io,
+        &fields,
+        &result
+    );
     if (error != MICROS_RAMFS_CORE_OK) {
         return error;
     }

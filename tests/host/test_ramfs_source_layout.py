@@ -279,7 +279,9 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
+LONG_FUNCTION_MIGRATION = tuple(
+    entry for entry in LONG_FUNCTIONS if entry != (0, "micros_ramfs_handle_call")
+)
 
 # BEGIN IMMUTABLE BASELINE DATA
 BASELINE_BODIES = {0: {'protocol_result': '02a1a2f4f9f9938f5183c64a2ac52bd381128e5fd6332b7ebb2a21d5670e2a43',
@@ -705,8 +707,52 @@ def peer_read_tokens(name, tokens):
     return tuple(output)
 
 
+def dispatcher_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    call = list(body_tokens(
+        "error = dispatch_request(state, &request, io, &fields, &result);"
+    ))
+    locations = [
+        index for index in range(len(caller))
+        if caller[index:index + len(call)] == call
+    ]
+    if len(locations) != 1:
+        raise AssertionError("dispatch must return into the caller's existing error guard exactly once")
+    initialization = list(body_tokens(
+        "enum micros_ramfs_core_error error = MICROS_RAMFS_CORE_OK;"
+    ))
+    terminal = list(body_tokens("return error;"))
+    if phase[:1] != ["{"] or phase[-1:] != ["}"]:
+        raise AssertionError("dispatch must have one bounded function body")
+    if phase[1:1 + len(initialization)] != initialization or phase[-1 - len(terminal):-1] != terminal:
+        raise AssertionError("dispatch must retain typed error initialization and return its exact error")
+    inner = phase[1 + len(initialization):-1 - len(terminal)]
+    expanded = list(body_tokens("error = MICROS_RAMFS_CORE_OK;"))
+    index = 0
+    while index < len(inner):
+        token = inner[index]
+        if inner[index:index + 3] == ["request", "-", ">"]:
+            expanded.extend(("request", "."))
+            index += 3
+        elif inner[index:index + 2] == ["*", "result"]:
+            expanded.append("result")
+            index += 2
+        elif token in ("request", "fields", "result"):
+            expanded.extend(("&", token))
+            index += 1
+        else:
+            expanded.append(token)
+            index += 1
+    position = locations[0]
+    return tuple(caller[:position] + expanded + caller[position + len(call):])
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
+    if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
+        phase = c_function_body(source(family_paths(0)[0]), "dispatch_request")
+        tokens = dispatcher_body_tokens(text, phase)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1161,6 +1207,25 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                             original_body_digest(family, name, c_function_body(source(path), spelling)),
                         )
 
+    def test_facade_exposes_a_typed_operation_dispatch_phase(self):
+        text = source(family_paths(0)[0])
+        definitions = c_function_definitions(text)
+        self.assertIn("dispatch_request", definitions)
+        self.assertLessEqual(definitions["dispatch_request"], 120)
+        self.assertLessEqual(definitions["micros_ramfs_handle_call"], 120)
+        signature = re.findall(
+            r"(?m)^static enum micros_ramfs_core_error dispatch_request\([^;{}]*\)\s*\{",
+            text,
+        )
+        self.assertEqual(1, len(signature))
+        expected = (
+            "static enum micros_ramfs_core_error dispatch_request("
+            "struct micros_ramfs_state *state, const struct micros_ramfs_request *request, "
+            "const struct micros_ramfs_io *io, struct ramfs_result_fields *fields, "
+            "enum micros_ramfs_result *result) {"
+        )
+        self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
         for family in range(6):
@@ -1403,6 +1468,49 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             peer_read_tokens(
                 "micros_service_main", fixture_transport_tokens(4, "micros_service_main", body_tokens(changed)),
             ),
+        )
+
+    def test_dispatch_projection_preserves_pointer_bindings_default_and_caller_exit(self):
+        caller = (
+            "{ enum micros_ramfs_core_error error; result = OK; "
+            "error = dispatch_request(state, &request, io, &fields, &result); "
+            "if (error != CORE_OK) { return error; } validate(state); }"
+        )
+        phase = (
+            "{ enum micros_ramfs_core_error error = MICROS_RAMFS_CORE_OK; "
+            "switch (request->type) { case MOUNT: *result = mount(state, fields); break; "
+            "case READ: error = read(state, request, io, fields, result); break; "
+            "default: return INVARIANT; } return error; }"
+        )
+        expected = (
+            "{ enum micros_ramfs_core_error error; result = OK; error = MICROS_RAMFS_CORE_OK; "
+            "switch (request.type) { case MOUNT: result = mount(state, &fields); break; "
+            "case READ: error = read(state, &request, io, &fields, &result); break; "
+            "default: return INVARIANT; } if (error != CORE_OK) { return error; } validate(state); }"
+        )
+        self.assertEqual(body_tokens(expected), dispatcher_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("&request", "&other"),
+            caller.replace("error = dispatch_request", "ignored = dispatch_request"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                dispatcher_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("return error;", "return MICROS_RAMFS_CORE_OK;"),
+            phase.replace("enum micros_ramfs_core_error error", "int error"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                dispatcher_body_tokens(caller, changed)
+        for changed in (
+            phase.replace("return INVARIANT", "return CORE_OK"),
+            phase.replace("fields, result", "fields, fields"),
+            phase.replace("request->type", "request->source"),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(body_tokens(expected), dispatcher_body_tokens(caller, changed))
+        self.assertNotEqual(
+            body_tokens(expected),
+            dispatcher_body_tokens(caller.replace("return error;", "return CORE_OK;"), phase),
         )
 
 
