@@ -8,14 +8,18 @@ struct endpoint_held_case {
     struct micros_user_context context;
 };
 
-bool endpoint_test_lifecycle_and_authorization(void)
-{
-    struct endpoint_test_fixture *fixture = endpoint_test_context();
-    micros_endpoint_t endpoints[2] = {0, 0};
+struct endpoint_lifecycle_case {
+    micros_endpoint_t endpoints[2];
     micros_endpoint_t stale_endpoint;
     struct micros_process_handle stale_target;
-    const struct micros_endpoint_record *record = NULL;
+    const struct micros_endpoint_record *record;
+};
 
+static bool lifecycle_hidden_reservation(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_lifecycle_case *work
+)
+{
     EXPECT_TRUE(endpoint_test_setup_lifecycle_fixture(fixture));
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
@@ -23,7 +27,7 @@ bool endpoint_test_lifecycle_and_authorization(void)
             &fixture->registry,
             &fixture->objects,
             fixture->processes[0],
-            &endpoints[0]
+            &work->endpoints[0]
         )
     );
     EXPECT_ERROR(
@@ -31,32 +35,40 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_resolve_internal(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
-            &record
+            work->endpoints[0],
+            &work->record
         )
     );
-    EXPECT_TRUE(record->state == MICROS_ENDPOINT_STATE_RESERVED);
-    record = (const struct micros_endpoint_record *)(uintptr_t)1;
+    EXPECT_TRUE(work->record->state == MICROS_ENDPOINT_STATE_RESERVED);
+    work->record = (const struct micros_endpoint_record *)(uintptr_t)1;
     EXPECT_ERROR(
         MICROS_ENDPOINT_ERROR_STATE,
         micros_endpoint_resolve_active(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
-            &record
+            work->endpoints[0],
+            &work->record
         )
     );
     EXPECT_TRUE(
-        record
+        work->record
             == (const struct micros_endpoint_record *)(uintptr_t)1
     );
+    return true;
+}
+
+static bool lifecycle_profile_publication(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_lifecycle_case *work
+)
+{
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
         micros_endpoint_reserve(
             &fixture->registry,
             &fixture->objects,
             fixture->processes[1],
-            &endpoints[1]
+            &work->endpoints[1]
         )
     );
     EXPECT_OBJECT_ERROR(
@@ -98,7 +110,7 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_activate(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0]
+            work->endpoints[0]
         )
     );
     EXPECT_ERROR(
@@ -106,17 +118,25 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_activate(
             &fixture->registry,
             &fixture->objects,
-            endpoints[1]
+            work->endpoints[1]
         )
     );
+    return true;
+}
+
+static bool lifecycle_asymmetric_authority(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_lifecycle_case *work
+)
+{
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             MICROS_PRIVILEGE_OPERATION_CALL,
-            endpoints[1]
+            work->endpoints[1]
         )
     );
     EXPECT_ERROR(
@@ -124,9 +144,9 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             MICROS_PRIVILEGE_OPERATION_SEND,
-            endpoints[1]
+            work->endpoints[1]
         )
     );
     EXPECT_ERROR(
@@ -134,9 +154,9 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            endpoints[1]
+            work->endpoints[1]
         )
     );
     EXPECT_ERROR(
@@ -144,9 +164,9 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            endpoints[0]
+            work->endpoints[0]
         )
     );
     EXPECT_ERROR(
@@ -154,9 +174,9 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[1],
+            work->endpoints[1],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            endpoints[0]
+            work->endpoints[0]
         )
     );
     EXPECT_ERROR(
@@ -164,25 +184,33 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[1],
+            work->endpoints[1],
             MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            endpoints[1]
+            work->endpoints[1]
         )
     );
-    stale_target.slot = fixture->processes[1].slot;
-    stale_target.generation = fixture->processes[1].generation + 1;
+    return true;
+}
+
+static bool lifecycle_stale_and_operation_precedence(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_lifecycle_case *work
+)
+{
+    work->stale_target.slot = fixture->processes[1].slot;
+    work->stale_target.generation = fixture->processes[1].generation + 1;
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
-        micros_endpoint_pack(stale_target, &stale_endpoint)
+        micros_endpoint_pack(work->stale_target, &work->stale_endpoint)
     );
     EXPECT_ERROR(
         MICROS_ENDPOINT_ERROR_STALE,
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             MICROS_PRIVILEGE_OPERATION_SEND,
-            stale_endpoint
+            work->stale_endpoint
         )
     );
     EXPECT_ERROR(
@@ -190,9 +218,9 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_target(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             0,
-            stale_endpoint
+            work->stale_endpoint
         )
     );
     EXPECT_ERROR(
@@ -200,7 +228,7 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_operation(
             &fixture->registry,
             &fixture->objects,
-            endpoints[1],
+            work->endpoints[1],
             MICROS_PRIVILEGE_OPERATION_REPLY
         )
     );
@@ -209,10 +237,17 @@ bool endpoint_test_lifecycle_and_authorization(void)
         micros_endpoint_authorize_kernel_operation(
             &fixture->registry,
             &fixture->objects,
-            endpoints[0],
+            work->endpoints[0],
             3
         )
     );
+    return true;
+}
+
+static bool lifecycle_final_relationship(
+    struct endpoint_test_fixture *fixture
+)
+{
     EXPECT_OBJECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_thread_release(&fixture->objects, fixture->threads[0])
@@ -229,6 +264,21 @@ bool endpoint_test_lifecycle_and_authorization(void)
         )
     );
     return true;
+}
+
+bool endpoint_test_lifecycle_and_authorization(void)
+{
+    struct endpoint_test_fixture *fixture = endpoint_test_context();
+    struct endpoint_lifecycle_case work;
+
+    work.endpoints[0] = 0;
+    work.endpoints[1] = 0;
+    work.record = NULL;
+    return lifecycle_hidden_reservation(fixture, &work)
+        && lifecycle_profile_publication(fixture, &work)
+        && lifecycle_asymmetric_authority(fixture, &work)
+        && lifecycle_stale_and_operation_precedence(fixture, &work)
+        && lifecycle_final_relationship(fixture);
 }
 
 static bool held_installation_denied(

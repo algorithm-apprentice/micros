@@ -550,7 +550,12 @@ aggregate counts. The held-thread native scenario now has three 47/51/41-line
 installation-denial, profile-publication and close/cleanup tasks with a
 ten-line root. Its only work fields are the original endpoint and context;
 only the original context-pattern initializer runs, without aggregate zeroing
-or a second context. Five original long-function migrations remain pending,
+or a second context. The lifecycle/authorization case now has five ordered
+hidden-reservation, profile-publication, asymmetric-authority,
+stale/operation-precedence and final-relationship tasks with a 14-line root.
+Its only initializers remain the original zero endpoint pair and NULL record;
+raw original-body proof preserves all authority, output-sentinel and
+bound-release checks. Four original long-function migrations remain pending,
 including the target entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is

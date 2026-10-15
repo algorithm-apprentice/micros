@@ -181,7 +181,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = (
     (1, "test_invalid_profile_tables_preserve_storage"),
-    (1, "test_endpoint_lifecycle_and_authorization"),
     (1, "test_source_only_seal_preserves_staged_source"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
@@ -214,6 +213,27 @@ INITIALIZER_HELPERS = (
 )
 MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
 NATIVE_CASE_WORK = {
+    "test_endpoint_lifecycle_and_authorization": {
+        "owner": 5,
+        "tag": "endpoint_lifecycle_case",
+        "fields": ("endpoints", "stale_endpoint", "stale_target", "record"),
+        "declarations": (
+            "micros_endpoint_t endpoints[2]; micros_endpoint_t stale_endpoint; "
+            "struct micros_process_handle stale_target; const struct micros_endpoint_record *record;"
+        ),
+        "original": (
+            "micros_endpoint_t endpoints[2] = {0, 0}; micros_endpoint_t stale_endpoint; "
+            "struct micros_process_handle stale_target; const struct micros_endpoint_record *record = NULL;"
+        ),
+        "outlined": (
+            "struct endpoint_lifecycle_case work; work.endpoints[0] = 0; work.endpoints[1] = 0; work.record = NULL;"
+        ),
+        "phases": (
+            "lifecycle_hidden_reservation", "lifecycle_profile_publication", "lifecycle_asymmetric_authority",
+            "lifecycle_stale_and_operation_precedence", "lifecycle_final_relationship",
+        ),
+        "fixture_only": ("lifecycle_final_relationship",),
+    },
     "test_profile_install_and_close_require_held_threads": {
         "owner": 5,
         "tag": "endpoint_held_case",
@@ -679,7 +699,10 @@ def native_case_body_tokens(caller, specification, bodies):
     if caller[:1 + len(borrow) + len(outlined)] != ["{"] + borrow + outlined:
         raise AssertionError("native work is automatic and initializes only its original declared values")
     tail = list(tokens(
-        "return " + " && ".join(phase + "(fixture, &work)" for phase in specification["phases"]) + ";"
+        "return " + " && ".join(
+            phase + ("(fixture)" if phase in specification.get("fixture_only", ()) else "(fixture, &work)")
+            for phase in specification["phases"]
+        ) + ";"
     ))
     if caller != ["{"] + borrow + outlined + tail + ["}"]:
         raise AssertionError("native case phases preserve ordered first-failure AND and exact work binding")
@@ -1068,8 +1091,9 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 signatures = re.findall(rf"(?m)^static bool {phase}\([^;{{}}]*\)\s*\{{", text)
                 self.assertEqual(1, len(signatures))
                 self.assertEqual(tokens(
-                    "static bool " + phase + "(struct endpoint_test_fixture *fixture, struct "
-                    + specification["tag"] + " *work) {"
+                    "static bool " + phase + "(struct endpoint_test_fixture *fixture"
+                    + ("" if phase in specification.get("fixture_only", ()) else ", struct " + specification["tag"] + " *work")
+                    + ") {"
                 ), tokens(signatures[0]))
 
     def test_native_work_projection_retains_initializer_lifetime_and_macro_failure_order(self):
