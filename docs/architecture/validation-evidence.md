@@ -4,13 +4,15 @@
 
 This is the design contract for Accepted
 [ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md).
-It is not implemented. Existing fresh planner behavior remains authoritative
-until the separately reviewed implementation merges.
+The implementation source owners and command interfaces are listed below.
+Fresh planner execution remains the default; opt-in receipts do not approve
+review or merge.
 
 The paired tasks are `validation-plan-dedup-design` and
-`validation-plan-dedup-implementation`. Independent design review is clean;
-implementation may start only after design merge. No executable prototype or
-build change belongs to design.
+`validation-plan-dedup-implementation`. Original design #129 and corrective
+design #131 are merged; their independent reviews are clean. The fresh
+implementation follows both contracts. No executable prototype or build
+change belonged to either design.
 
 The goal is to avoid re-executing an already successful exact current-context
 command, and avoid unrelated guests for a strictly recognizable existing
@@ -26,6 +28,10 @@ Deleted and renamed paths keep both identities.
 It computes required commands before consulting evidence. A receipt cannot
 select paths, change ownership, lower a tier, cover a different command,
 remove a diff check, approve a review or authorize merge.
+Executing modes capture the candidate before inventory/path discovery, verify
+the same identity after selection and pass that identity into execution.
+Execution may not establish a newer baseline for an already selected plan.
+Plan-only mode remains nonexecuting and does not capture a staged tree.
 
 An explicit full tier always executes fresh. Existing invocations without
 reuse execute fresh. Documentation and the three staged/worktree/branch
@@ -87,6 +93,8 @@ task inputs.
 
 Legacy fresh iteration, including `--tier fast --execute`, continues to
 allow unstaged tracked edits. It retains the existing untracked-file refusal.
+A missing indexed path has an explicit absent marker in dirty source
+identity; an unstaged deletion is not a preflight filesystem failure.
 A dirty fresh execution cannot publish reusable evidence or become final
 author evidence, but receipt eligibility does not make that iteration fail.
 Fresh execution still invalidates any previous success before attempting a
@@ -216,6 +224,11 @@ For this profile, these are the authoritative resolution rules:
   Native Python test subprocesses are the current reviewed
   Python CLI and CMake configuration probes; their runtime/tool closure is
   included, not omitted because they are children of unittest.
+  Nonempty sanitizer override/symbolizer variables, including `ASAN_OPTIONS`,
+  `UBSAN_OPTIONS`, `LSAN_OPTIONS` and `LLVM_SYMBOLIZER_OPTS`, make this initial
+  profile ineligible: option includes, suppressions and external executables
+  are not admitted by an environment-string digest. Fresh execution preserves
+  those variables unchanged.
 
 Tree fingerprints include relative names, kinds, modes, regular-file bytes,
 link spelling/target and directory membership. Deduplicating resolved files
@@ -377,10 +390,22 @@ remains exact. Full remains coverage-equivalent to the documented matrix.
 
 ## Responsibility owners
 
+Implementation follows merged design #129 at
+`0f61a2b2ff2b80aa34f55c51352407090f96b5d0` and correction #131 at
+`b3f042c00c660c8ad69156e83f1a23c692582a30`, in these green slices:
+bounded CMake/Git-layer classification; receipt identity/publication and
+failure tests; supported context/artifact closure; canonical CLI execution
+and provenance; then actual recording/reuse and the fresh full milestone
+gate. No slice may relax the Accepted contract or its independent oracles.
+
 | Planned owner | Responsibility |
 | --- | --- |
 | `tools/validation_plan.py` | Existing root/discovery/inventory/selection facade and CLI |
-| `tools/validation_evidence.py` | Canonical execution, candidate/context manifests, ledger lifecycle and provenance |
+| `tools/validation_evidence.py` | Ledger ownership, strict receipts, complete logs and atomic invalidation/publication |
+| `tools/validation_context.py` | Exact staged/source identity, fixed tool/runtime profile and complete-manifest orchestration |
+| `tools/validation_inputs.py` | Shared content/mode/membership identities and bounded read-only metadata I/O |
+| `tools/validation_build_manifest.py` | Selected Ninja/CTest recipes, dependency records and complete artifact inventories |
+| `tools/validation_execution.py` | Canonical execution, source/context postflight, receipt consumption and attributed outcomes |
 | `tools/validation_build_impact.py` | Bounded before/after CMake recognition and explicit impact result |
 | Corresponding focused host tests | Independent receipt/classifier negative cases and fake subprocess counts |
 | Existing planner/source-layout tests | Preserve fail-closed path coverage and independent expected-value oracles |
@@ -389,6 +414,12 @@ No production or operating-system interface changes. No test success is
 inferred from an artifact without an actual successful producer execution.
 The independent source-layout expectations must not import production owner
 tables simply to remove duplication.
+
+The private dependency direction is planner -> execution -> context ->
+selected-build manifest -> input identities. Context also reads the input
+identity owner directly; neither leaf imports the facade, execution or
+planner. Frozen function-body evidence preserves the extracted algorithms,
+and explicit import/ownership tests protect the narrow shared contract.
 
 ## Acceptance evidence
 

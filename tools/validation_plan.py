@@ -6,6 +6,13 @@ import os
 import re
 import shlex
 import subprocess
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools import validation_build_impact, validation_context, validation_execution
 
 
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
@@ -126,7 +133,19 @@ IMAGE_INPUTS = {
 PLANNER_INPUTS = (
     "tools/validation_plan.py",
     "tests/host/test_validation_plan.py",
+    "tools/validation_build_impact.py",
+    "tests/host/test_validation_build_impact.py",
+    "tools/validation_evidence.py",
+    "tests/host/test_validation_evidence.py",
+    "tools/validation_context.py",
+    "tests/host/test_validation_context.py",
+    "tools/validation_execution.py",
+    "tests/host/test_validation_execution.py",
+    "tools/validation_inputs.py",
+    "tools/validation_build_manifest.py",
+    "tests/host/test_validation_context_layout.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
+    "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
 )
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
@@ -1914,6 +1933,25 @@ def changed_paths(base, root):
     return sorted(paths)
 
 
+def repository_plan(root, paths, tier, base="origin/main"):
+    if tier == "full" or "CMakeLists.txt" not in paths:
+        return plan(paths, tier, base)
+    owners = validation_build_impact.discover(root, base)
+    if owners is None:
+        return plan(paths, tier, base)
+    remaining = [path for path in paths if path != "CMakeLists.txt"]
+    commands = plan(remaining, tier, base)[:-3]
+    if not any(command in (UNIT_FAST, UNIT_FULL) for command in commands):
+        commands.insert(0, UNIT_FAST if tier == "fast" else UNIT_FULL)
+    if tier == "pr":
+        append_unique(commands, SMOKE)
+    for name in QEMU_WORKFLOWS:
+        if name in owners:
+            append_unique(commands, workflow(name))
+    commands.extend(diff_commands(base))
+    return commands
+
+
 def untracked_paths(root):
     completed = subprocess.run(
         ("git", "ls-files", "--others", "--exclude-standard"),
@@ -2065,20 +2103,55 @@ def validate_inventory(root):
             raise ValueError("slow-model tier membership is out of sync")
 
 
+def canonical_workflows():
+    return (
+        UNIT_FAST[-1], UNIT_FULL[-1],
+        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS,
+    )
+
+
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--tier", choices=("fast", "pr", "full"), default="fast")
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--execute", action="store_true")
-    return parser.parse_args(argv)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--reuse", action="store_true")
+    mode.add_argument("--fresh", action="store_true")
+    parser.add_argument("--record-workflow", choices=canonical_workflows())
+    arguments = parser.parse_args(argv)
+    if (arguments.reuse or arguments.fresh) and not arguments.execute:
+        parser.error("--reuse/--fresh requires authoritative --execute")
+    if arguments.reuse and arguments.tier == "full":
+        parser.error("explicit full validation always executes fresh")
+    if arguments.record_workflow and (
+        arguments.execute or arguments.path or arguments.tier != "fast"
+        or arguments.base != "origin/main"
+    ):
+        parser.error("gate-only recording cannot select a plan, paths, base or nondefault tier")
+    if arguments.base.startswith("-"):
+        parser.error("--base must identify a Git revision, not an option")
+    return arguments
 
 
 def main(argv=None):
     arguments = parse_arguments(argv)
     root = planner_root()
     try:
+        expected_source = (
+            validation_context.capture_candidate(root)
+            if arguments.execute or arguments.record_workflow else None
+        )
         validate_inventory(root)
+        if arguments.record_workflow:
+            ensure_execution_ready(root)
+            if validation_context.capture_candidate(root) != expected_source:
+                raise ValueError("source identity changed while selecting the canonical workflow")
+            return validation_execution.execute_plan(
+                root, [workflow(arguments.record_workflow)],
+                canonical_workflows(), gate_only=True, expected_source=expected_source,
+            )
         discovered = changed_paths(arguments.base, root)
         explicit = [
             normalize_explicit_path(path, root, os.getcwd())
@@ -2087,17 +2160,21 @@ def main(argv=None):
         paths = combine_paths(discovered, explicit)
     except ValueError as error:
         raise SystemExit(str(error)) from error
-    commands = plan(paths, arguments.tier, arguments.base)
+    commands = repository_plan(root, paths, arguments.tier, arguments.base)
 
     if arguments.execute:
         try:
             ensure_execution_ready(root)
+            if validation_context.capture_candidate(root) != expected_source:
+                raise ValueError("source identity changed while selecting required validation coverage")
         except ValueError as error:
             raise SystemExit(str(error)) from error
+        return validation_execution.execute_plan(
+            root, commands, canonical_workflows(), reuse=arguments.reuse,
+            expected_source=expected_source,
+        )
     for command in commands:
         print(shlex.join(command), flush=True)
-        if arguments.execute:
-            subprocess.run(command, check=True, cwd=root)
     return 0
 
 

@@ -1817,8 +1817,42 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
                 item for item in node.value.elts if ast.literal_eval(item) != STRUCTURAL_TEST_PATH
             ]
             found.add(target.id)
+        elif target.id == "PLANNER_INPUTS":
+            additions = {
+                "tools/validation_build_impact.py",
+                "tests/host/test_validation_build_impact.py",
+                "tools/validation_evidence.py",
+                "tests/host/test_validation_evidence.py",
+                "tools/validation_context.py",
+                "tests/host/test_validation_context.py",
+                "tools/validation_execution.py",
+                "tests/host/test_validation_execution.py",
+                "tools/validation_inputs.py",
+                "tools/validation_build_manifest.py",
+                "tests/host/test_validation_context_layout.py",
+                "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
+            }
+            value = ast.literal_eval(node.value)
+            if any(value.count(path) != 1 for path in additions):
+                raise AssertionError("reviewed validation extension inputs must occur once")
+            node.value.elts = [
+                item for item in node.value.elts if ast.literal_eval(item) not in additions
+            ]
     if found != {"PATH_CLASSIFICATION_EQUIVALENTS", "HOST_UNIT_ONLY_INPUTS"}:
         raise AssertionError("planner classification assignments are missing")
+    bootstrap = ast.parse(
+        'if __package__ in (None, ""):\n'
+        '    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n'
+    ).body[0]
+    tree.body = [
+        node for node in tree.body
+        if not isinstance(node, (ast.Import, ast.ImportFrom))
+        and not (
+            isinstance(node, ast.FunctionDef)
+            and node.name in ("main", "parse_arguments", "repository_plan", "canonical_workflows")
+        )
+        and ast.dump(node, include_attributes=False) != ast.dump(bootstrap, include_attributes=False)
+    ]
     return tree
 
 
@@ -2380,12 +2414,12 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         ):
             self.assertEqual([], classifier([STRUCTURAL_TEST_PATH]))
 
-    def test_planner_changes_are_only_aliases_and_the_host_gate_not_policy(self) -> None:
+    def test_original_planner_ownership_remains_exact_under_adr0064(self) -> None:
         tree = planner_ast_without_new_paths(read_source("tools/validation_plan.py"))
         self.assertEqual(
             BASE_PLANNER_AST_HASH,
             hashlib.sha256(ast.dump(tree, include_attributes=False).encode()).hexdigest(),
-            "all original metadata and execution/reuse/discovery policy must remain unchanged",
+            "original ownership/pure planning stays exact; ADR-0064 owns the reviewed CLI extension",
         )
 
     def test_exact_nine_active_long_migrations_match_actual_signals_and_bodies(self) -> None:
@@ -2479,7 +2513,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                     )
 
 
-BASE_PLANNER_AST_HASH = "4e402e7be4bebd08665e5023497d2f69d95fa8ba5842ea975c36f3d7f2e1670b"
+BASE_PLANNER_AST_HASH = "6db092d80f6a5ee9a84c3801440a9bab6b1a59e39fe99b251b4d92f6ccad730a"
 EXPECT_TRUE_HASH = "3ef0a1204f1dfeb937f4dc99626fcbda4e9a8e1c387b703679c34a798e91c31c"
 
 
