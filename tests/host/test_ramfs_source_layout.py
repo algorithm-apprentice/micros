@@ -111,6 +111,28 @@ FIXTURE_TRANSPORTS = {
         SEED_CONTEXT_FIELDS, SEED_CONTEXT_FUNCTIONS,
     ),
 }
+MODEL_STATE_FIELDS = (
+    "seed", "random_state", "trace_hash", "step", "trace", "production",
+    "reference", "bus", "coverage", "directory_cursor",
+    "model_directory_slot", "capacity_file_slot",
+)
+MODEL_TYPE_DIGEST = "93a26c70d7060c60dc9de8fd965111b93d4057895f39e4ee0f4d7ebe65dce702"
+MODEL_MACRO_DIGEST = "f986d01714b3d8caf017f82eebd4e2d8de6de768d0878a543d7ad316c348de18"
+DATA_RENAMES = {
+    1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
+    3: {"ramfs_model_io": "model_io"},
+}
+MODEL_EXPECT_WITH_FILE = r"""#define MODEL_EXPECT(selected, expression) \
+    do { \
+        if (!(expression)) { \
+            return ramfs_model_model_failure( \
+                (selected), \
+                #expression, \
+                __FILE__, \
+                __LINE__ \
+            ); \
+        } \
+    } while (false)"""
 
 ORIGINAL_FUNCTIONS = (
     {
@@ -235,7 +257,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (3, 4, 5)
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (4, 5)
 )
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 
@@ -549,13 +571,70 @@ def fixture_transport_tokens(family, name, tokens):
     return tuple(output)
 
 
+def model_transport_tokens(name, tokens):
+    tokens = list(tokens)
+    if name == "run_model":
+        bindings = list(body_tokens(
+            "struct ramfs_model *selected = ramfs_model_context(); "
+            "const struct ramfs_model_seed *seed_info = ramfs_model_seed_context();"
+        ))
+        if tokens[1:1 + len(bindings)] != bindings:
+            raise AssertionError("model driver must borrow distinct typed model and seed stores")
+        del tokens[1:1 + len(bindings)]
+    output = []
+    index = 0
+    seed_fields = ("seed_image", "seed_image_size")
+    while index < len(tokens):
+        token = tokens[index]
+        if name == "run_model" and tokens[index:index + 3] == ["selected", "-", ">"]:
+            if index + 3 >= len(tokens) or tokens[index + 3] not in MODEL_STATE_FIELDS:
+                raise AssertionError("unknown running-model field")
+            output.extend(("model", ".", tokens[index + 3]))
+            index += 4
+        elif name == "run_model" and tokens[index:index + 5] == ["sizeof", "(", "*", "selected", ")"]:
+            output.extend(("sizeof", "(", "model", ")"))
+            index += 5
+        elif name == "run_model" and token == "selected":
+            output.extend(("&", "model"))
+            index += 1
+        elif (
+            name == "run_model" and tokens[index:index + 3] == ["seed_info", "-", ">"]
+            or name == "load_seed" and tokens[index:index + 2] == ["seed_fixture", "."]
+        ):
+            prefix_length = 3 if name == "run_model" else 2
+            field_index = index + prefix_length
+            if field_index >= len(tokens) or tokens[field_index] not in seed_fields:
+                raise AssertionError("seed access must stay in its separate two-field store")
+            output.append(tokens[field_index])
+            index = field_index + 1
+        else:
+            output.append("__FILE__" if name == "model_failure" and token == "file_name" else token)
+            index += 1
+    return tuple(output)
+
+
+def require_model_failure_macro(macro):
+    tokens = list(body_tokens(macro))
+    if tuple(tokens) != body_tokens(MODEL_EXPECT_WITH_FILE):
+        raise AssertionError("model failures must carry the actual caller file/line and immediate exit")
+    index = tokens.index("__FILE__")
+    if tokens[index:index + 3] != ["__FILE__", ",", "\\"]:
+        raise AssertionError("unexpected caller-file argument boundary")
+    del tokens[index:index + 3]
+    restored = tuple("model_failure" if token == "ramfs_model_model_failure" else token for token in tokens)
+    if digest_bytes(json.dumps(restored, separators=(",", ":")).encode()) != MODEL_MACRO_DIGEST:
+        raise AssertionError("model assertion behavior differs beyond verified caller-file transport")
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
+    if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
+        tokens = model_transport_tokens(name, tokens)
     renames = normal_names(family)
-    if family == 1:
-        constants = {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"}
+    if family in DATA_RENAMES:
+        constants = DATA_RENAMES[family]
         for index, token in enumerate(tokens):
             if token in constants and (
                 tokens[index - 1:index] == (".",)
@@ -804,6 +883,87 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertIn("struct micros_ramfs_seed_plan plan;", rejection)
         self.assertNotIn("static struct micros_ramfs_seed_plan", rejection)
 
+    def test_model_types_seed_lifetime_and_callback_identity_are_exact(self):
+        paths = family_paths(3)
+        header = source(PRIVATE_HEADERS[3])
+        types = header[header.index("enum {"):header.index("struct ramfs_model_seed {")].strip()
+        self.assertEqual(MODEL_TYPE_DIGEST, body_digest(types))
+        seed_fields = re.findall(r"struct ramfs_model_seed\s*\{([^{}]*)\}", header)
+        self.assertEqual(1, len(seed_fields))
+        self.assertEqual(
+            body_tokens("uint8_t seed_image[MICROS_RAMFS_SEED_IMAGE_MAX]; size_t seed_image_size;"),
+            body_tokens(seed_fields[0]),
+        )
+        expected_objects = (
+            "static struct ramfs_model model;",
+            "static struct ramfs_model_seed seed_fixture;",
+            "const struct micros_ramfs_io ramfs_model_io = { .copy = model_copy, .context = &model, };",
+        )
+        for path in paths:
+            expected = expected_objects if path == paths[1] else ()
+            self.assertEqual(
+                tuple(map(body_tokens, expected)),
+                tuple(map(body_tokens, file_scope_objects(source(path)))),
+                path,
+            )
+            self.assertNotIn('"servers/ramfs/ramfs_internal.h"', source(path))
+        for getter, storage in (
+            ("ramfs_model_context", "model"),
+            ("ramfs_model_seed_context", "seed_fixture"),
+        ):
+            self.assertEqual(
+                body_tokens("{ return &" + storage + "; }"),
+                body_tokens(c_function_body(source(paths[1]), getter)),
+            )
+        self.assertEqual(56, len(owned_definitions(3)))
+        self.assertEqual({}, c_function_definitions(header))
+        self.assertEqual((), file_scope_objects(header))
+        self.assertIn("const struct ramfs_model_seed *ramfs_model_seed_context(void);", header)
+        self.assertIn("    const char *file_name,\n    int line", header)
+
+    def test_independent_model_dependency_graph_has_no_protocol_backedge(self):
+        paths = family_paths(3)
+        definitions = owned_definitions(3)
+        owners = {name: path for path, name in definitions}
+        self.assertEqual(len(owners), len(definitions))
+        allowed = {0: {1, 2, 3, 4, 5}, 1: set(), 2: {1}, 3: {1, 2}, 4: {1, 2, 3}, 5: {1, 2, 4}}
+        edges = set()
+        exports = set()
+        for path, name in definitions:
+            calls = set(re.findall(
+                r"\b([A-Za-z_]\w*)\s*\(", c_lexical_text(c_function_body(source(path), name)),
+            ))
+            if "MODEL_EXPECT" in calls:
+                calls.add("ramfs_model_model_failure")
+            for callee in calls & set(owners):
+                dependency = owners[callee]
+                if dependency == path:
+                    continue
+                self.assertIn(paths.index(dependency), allowed[paths.index(path)], (path, callee))
+                edges.add((dependency, path))
+                exports.add(callee)
+        self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
+        header = source(PRIVATE_HEADERS[3]).split("#define MODEL_EXPECT", 1)[0]
+        declarations = re.findall(r"\b(ramfs_model_\w*)\s*\([^;{}]*\)\s*;", c_lexical_text(header))
+        self.assertEqual(len(declarations), len(set(declarations)))
+        self.assertEqual(exports, set(declarations))
+        writer = c_function_body(source(paths[2]), "reference_write_record")
+        self.assertIn("ramfs_model_write_u32_le", writer)
+        self.assertIn("ramfs_model_write_u64_le", writer)
+
+    def test_model_failure_payload_uses_actual_caller_location_and_preserves_trace(self):
+        header = source(PRIVATE_HEADERS[3])
+        macro = header[header.index("#define MODEL_EXPECT"):header.rindex("#endif")].strip()
+        require_model_failure_macro(macro)
+        for changed in (
+            macro.replace("__FILE__", '"old-owner.c"'),
+            macro.replace("#expression,", "__FILE__,").replace("                __FILE__, \\\n                __LINE__", "                #expression, \\\n                __LINE__"),
+            macro.replace("return ramfs_model_model_failure", "ramfs_model_model_failure"),
+            macro.replace("__LINE__", "__LINE__ + 1"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                require_model_failure_macro(changed)
+
     def test_original_bodies_remain_frozen_during_owner_moves(self):
         for family, owners in enumerate(ORIGINAL_FUNCTIONS):
             definitions = owned_definitions(family)
@@ -991,6 +1151,39 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             original_body_digest(
                 1, "case", "{ fixture->corrupt_state.ramfs_test_vfs_endpoint = 5; }",
             )
+
+    def test_model_borrow_transport_cannot_reset_seed_or_drop_comparison_and_failure(self):
+        bindings = (
+            "struct ramfs_model *selected = ramfs_model_context(); "
+            "const struct ramfs_model_seed *seed_info = ramfs_model_seed_context(); "
+        )
+        body = (
+            "{ " + bindings
+            + "memset(selected, 0, sizeof(*selected)); selected->seed = seed; "
+            "initialize(seed_info->seed_image, seed_info->seed_image_size); "
+            "if (!compare(selected)) return false; }"
+        )
+        expected = (
+            "{ memset(&model, 0, sizeof(model)); model.seed = seed; "
+            "initialize(seed_image, seed_image_size); if (!compare(&model)) return false; }"
+        )
+        self.assertEqual(body_tokens(expected), model_transport_tokens("run_model", body_tokens(body)))
+        for changed in (
+            body.replace("selected->seed =", "selected->unreviewed ="),
+            body.replace("seed_info->seed_image,", "seed_info->production,"),
+            body.replace("const struct ramfs_model_seed", "struct ramfs_model"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_transport_tokens("run_model", body_tokens(changed))
+        for changed in (
+            body.replace("memset(selected,", "memset(seed_info,"),
+            body.replace("return false", "return true"),
+            body.replace("if (!compare(selected)) return false;", ""),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(
+                    body_tokens(expected), model_transport_tokens("run_model", body_tokens(changed)),
+                )
 
 
 if __name__ == "__main__":

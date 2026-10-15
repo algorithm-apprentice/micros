@@ -1912,7 +1912,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         cmake = read_source("CMakeLists.txt")
         restored = restored_cmake(cmake)
         self.assertEqual(
-            "4e3c2061eddfef823af1fcacd7543c80b9041a860f42d6bacfccbdc5a7d9b4f8",
+            "769ca0308d96e97509656aaf5d8255a01089dad1b56037fc2b30ac72c766e895",
             compact_hash(restored),
             "trap wiring stays exact alongside independently reconstructed ADR-0066 RAMFS source operands",
         )

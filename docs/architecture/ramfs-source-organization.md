@@ -77,6 +77,11 @@ assertions, report symbols/instructions, budget/checker options, generated
 seed bytes, and all current runtime command lines remain unchanged. Source
 locations in assertions/panics follow the true new owner; do not spoof
 `__FILE__`, `__LINE__`, or assembly labels.
+The split model's shared failure leaf receives the caller's `__FILE__`
+alongside its existing line argument. The existing `MODEL_EXPECT` supplies
+both at the call site so a moved fixture logger cannot pair its own filename
+with another module's line. The failure format and complete trace are
+unchanged; this is private source-location transport, not a new error policy.
 
 ## Exact source sets and private contracts
 
