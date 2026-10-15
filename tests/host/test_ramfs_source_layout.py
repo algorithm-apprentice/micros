@@ -143,6 +143,13 @@ MODEL_SCRIPT_ROOT = (
     "if (selected->step <= 5) { return scripted_setup(selected, root); } "
     "return scripted_proofs(selected, root); }"
 )
+VALIDATOR_PHASES = (
+    ("empty_node_is_canonical", ("node",), "size_t logical;"),
+    ("node_namespace_is_canonical", ("state", "node", "index"), "size_t sibling;"),
+    ("node_blocks_are_canonical", ("state", "node", "index", "seen_blocks"), "size_t logical;"),
+    ("node_links_are_canonical", ("state",), "size_t index;"),
+    ("block_ownership_is_canonical", ("state", "seen_blocks", "&used_blocks"), "size_t index;"),
+)
 PEER_RESULT_TYPE_DIGEST = "8e7637dec192ddb613c8fc031ffc39791653e1b0f4b8d8f043d4efe9cfc55803"
 KERNEL_CONST_OBJECT_DIGEST = "49d4895ed14632490d6f1dfddfb0c18a52acd9ae7787eeaff0dea63b63f15cab"
 KERNEL_RAW_OBJECT_DIGEST = "fed126e702cae04edc462115554a1f1dc14fa3a17d26415691f3275c5736df6b"
@@ -497,7 +504,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-LONG_FUNCTION_MIGRATION = ((0, "validate_state"),)
+LONG_FUNCTION_MIGRATION = ()
 
 # BEGIN IMMUTABLE BASELINE DATA
 BASELINE_BODIES = {0: {'protocol_result': '02a1a2f4f9f9938f5183c64a2ac52bd381128e5fd6332b7ebb2a21d5670e2a43',
@@ -1336,6 +1343,59 @@ def kernel_report_body_tokens(caller, pre_ready, final_state):
     return tuple(caller)
 
 
+def validator_body_tokens(caller, phases):
+    caller = list(body_tokens(caller))
+    node = list(body_tokens("const struct micros_ramfs_node *node = &state->nodes[index];"))
+    positions = [
+        index for index in range(len(caller))
+        if caller[index:index + len(node)] == node
+    ]
+    if len(positions) != 1:
+        raise AssertionError("whole-state validation retains one authoritative per-node walk")
+    position = positions[0] + len(node)
+    caller[position:position] = body_tokens("size_t logical; size_t sibling;")
+    for (name, arguments, declarations), body in phases:
+        guard = list(body_tokens(
+            f"if (!{name}({', '.join(arguments)})) {{ return MICROS_RAMFS_CORE_ERROR_INVARIANT; }}"
+        ))
+        positions = [
+            index for index in range(len(caller))
+            if caller[index:index + len(guard)] == guard
+        ]
+        if len(positions) != 1:
+            raise AssertionError(f"validator phase must preserve exact failure/type/witness binding: {name}")
+        tokens = list(body_tokens(body))
+        locals_ = list(body_tokens(declarations))
+        success = list(body_tokens("return true;"))
+        if (
+            tokens[:1] != ["{"] or tokens[1:1 + len(locals_)] != locals_
+            or tokens[-1:] != ["}"] or tokens[-1 - len(success):-1] != success
+        ):
+            raise AssertionError(f"validator phase must retain typed automatic locals and one final success: {name}")
+        inner = tokens[1 + len(locals_):-1 - len(success)]
+        counter = locals_[1]
+        first = inner.index(counter) if counter in inner else None
+        if first is None or inner[first - 2:first] != ["for", "("] or inner[first + 1:first + 3] != ["=", "0"]:
+            raise AssertionError(f"phase counter must be reset before use: {name}")
+        statements = []
+        index = 0
+        while index < len(inner):
+            if inner[index] == "return":
+                if inner[index:index + 3] != ["return", "false", ";"]:
+                    raise AssertionError(f"validator phase cannot turn caller rejection into success: {name}")
+                statements.extend(("return", "MICROS_RAMFS_CORE_ERROR_INVARIANT", ";"))
+                index += 3
+            elif name == "block_ownership_is_canonical" and inner[index:index + 2] == ["*", "used_blocks"]:
+                statements.append("used_blocks")
+                index += 2
+            else:
+                statements.append(inner[index])
+                index += 1
+        position = positions[0]
+        caller[position:position + len(guard)] = statements
+    return tuple(caller)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1358,6 +1418,13 @@ def original_body_digest(family, name, text):
             c_function_body(owner, "publish_lookup_reference"),
         )
         tokens = production_lookup_body_tokens(text, walk)
+    if family == 0 and name == "validate_state" and (0, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(0)[3])
+        phases = [
+            (specification, c_function_body(owner, specification[0]))
+            for specification in VALIDATOR_PHASES
+        ]
+        tokens = validator_body_tokens(text, phases)
     if family == 2 and name in SEED_CASE_PHASES and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
         phases = [
@@ -2233,6 +2300,31 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             self.assertEqual(body_tokens(signature), body_tokens(actual[0]))
         self.assertLessEqual(definitions["micros_ramfs_service_test_handle_trap"], 120)
 
+    def test_whole_state_validation_exposes_exact_node_namespace_block_and_link_tasks(self):
+        text = source(family_paths(0)[3])
+        definitions = c_function_definitions(text)
+        signatures = {
+            "empty_node_is_canonical": "const struct micros_ramfs_node *node",
+            "node_namespace_is_canonical": (
+                "const struct micros_ramfs_state *state, const struct micros_ramfs_node *node, size_t index"
+            ),
+            "node_blocks_are_canonical": (
+                "const struct micros_ramfs_state *state, const struct micros_ramfs_node *node, "
+                "size_t index, bool *seen_blocks"
+            ),
+            "node_links_are_canonical": "const struct micros_ramfs_state *state",
+            "block_ownership_is_canonical": (
+                "const struct micros_ramfs_state *state, const bool *seen_blocks, size_t *used_blocks"
+            ),
+        }
+        for name, parameters in signatures.items():
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            actual = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+            self.assertEqual(1, len(actual))
+            self.assertEqual(body_tokens(f"static bool {name}({parameters}) {{"), body_tokens(actual[0]))
+        self.assertLessEqual(definitions["ramfs_validate_state"], 120)
+
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
         for family in range(6):
@@ -2775,6 +2867,56 @@ def render_fixture(image, limit):
         self.assertNotEqual(
             body_tokens(expected),
             kernel_report_body_tokens(caller, pre.replace("sepc += 4", "sepc += 2"), final),
+        )
+
+    def test_validator_projection_preserves_single_witness_failures_and_checked_counters(self):
+        guards = [
+            f"if (!{name}({', '.join(arguments)})) {{ return MICROS_RAMFS_CORE_ERROR_INVARIANT; }}"
+            for name, arguments, _ in VALIDATOR_PHASES
+        ]
+        caller = (
+            "{ bool seen_blocks[CAP] = {false}; size_t live_count = 0; size_t used_blocks = 0; size_t index; "
+            "for (index = 0; index < NODES; ++index) { "
+            "const struct micros_ramfs_node *node = &state->nodes[index]; "
+            "if (!node->live) { " + guards[0] + " continue; } ++live_count; "
+            + guards[1] + guards[2] + " } " + guards[3] + guards[4] + " return CORE_OK; }"
+        )
+        bodies = (
+            "{ size_t logical; for (logical = 0; logical < BLOCKS; ++logical) { if (bad()) { return false; } } return true; }",
+            "{ size_t sibling; for (sibling = 0; sibling < NAMES; ++sibling) { check_name(); } return true; }",
+            "{ size_t logical; for (logical = 0; logical < BLOCKS; ++logical) { seen_blocks[logical] = true; } return true; }",
+            "{ size_t index; for (index = 0; index < NODES; ++index) { check_links(); } return true; }",
+            "{ size_t index; for (index = 0; index < BLOCKS; ++index) { if (bad_owner()) { return false; } ++*used_blocks; } return true; }",
+        )
+        phases = tuple(zip(VALIDATOR_PHASES, bodies))
+        expected = caller.replace(
+            "const struct micros_ramfs_node *node = &state->nodes[index];",
+            "const struct micros_ramfs_node *node = &state->nodes[index]; size_t logical; size_t sibling;",
+        )
+        for guard, (specification, body) in zip(guards, phases):
+            declarations = specification[2]
+            inner = body[body.index(declarations) + len(declarations):body.rindex("return true;")]
+            expected = expected.replace(
+                guard, inner.replace("return false;", "return MICROS_RAMFS_CORE_ERROR_INVARIANT;").replace("++*used_blocks", "++used_blocks"),
+            )
+        self.assertEqual(body_tokens(expected), validator_body_tokens(caller, phases))
+        for changed in (
+            caller.replace("seen_blocks, &used_blocks", "seen_blocks, &live_count"),
+            caller.replace("return MICROS_RAMFS_CORE_ERROR_INVARIANT;", "return CORE_OK;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                validator_body_tokens(changed, phases)
+        for body in (
+            bodies[0].replace("size_t logical", "static size_t logical"),
+            bodies[0].replace("logical = 0", "logical = 1"),
+            bodies[0].replace("return false;", "return true;"),
+        ):
+            with self.subTest(body=body), self.assertRaises(AssertionError):
+                validator_body_tokens(caller, ((VALIDATOR_PHASES[0], body), *phases[1:]))
+        changed = list(bodies)
+        changed[2] = changed[2].replace("= true", "= false")
+        self.assertNotEqual(
+            body_tokens(expected), validator_body_tokens(caller, tuple(zip(VALIDATOR_PHASES, changed))),
         )
 
     def test_reference_walk_projection_keeps_preflight_error_precedence_and_direct_publication(self):

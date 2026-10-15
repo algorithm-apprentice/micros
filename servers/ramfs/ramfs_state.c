@@ -5,6 +5,249 @@
 #define MICROS_RAMFS_INITIALIZATION_MAGIC \
     UINT64_C(0x4d4943524f535246)
 
+static bool empty_node_is_canonical(
+    const struct micros_ramfs_node *node
+)
+{
+    size_t logical;
+
+    if (
+        node->generation != 0
+        || node->mode != 0
+        || node->link_count != 0
+        || node->reference_count != 0
+        || node->name_length != 0
+        || node->reserved1 != 0
+        || node->parent != 0
+        || node->size != 0
+        || !ramfs_bytes_are_zero(
+            node->reserved0,
+            sizeof(node->reserved0)
+        )
+        || !ramfs_bytes_are_zero(node->name, sizeof(node->name))
+    ) {
+        return false;
+    }
+    for (
+        logical = 0;
+        logical < MICROS_RAMFS_BLOCK_CAPACITY;
+        ++logical
+    ) {
+        if (node->blocks[logical] != MICROS_RAMFS_BLOCK_NONE) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool node_namespace_is_canonical(
+    const struct micros_ramfs_state *state,
+    const struct micros_ramfs_node *node,
+    size_t index
+)
+{
+    size_t sibling;
+
+    if (index == 0) {
+        if (
+            node->generation != 1
+            || !ramfs_node_is_directory(node)
+            || node->parent != ramfs_node_handle(0, node)
+            || node->name_length != 0
+            || !ramfs_bytes_are_zero(node->name, sizeof(node->name))
+        ) {
+            return false;
+        }
+    } else {
+        uint16_t parent_slot;
+        uint32_t parent_generation;
+
+        if (
+            node->name_length == 0
+            || node->name_length > MICROS_RAMFS_NAME_MAX
+            || !ramfs_decode_handle(
+                node->parent,
+                &parent_slot,
+                &parent_generation
+            )
+            || parent_slot >= index
+            || !state->nodes[parent_slot].live
+            || state->nodes[parent_slot].generation
+                != parent_generation
+            || !ramfs_node_is_directory(&state->nodes[parent_slot])
+        ) {
+            return false;
+        }
+        for (sibling = 0; sibling < node->name_length; ++sibling) {
+            if (
+                node->name[sibling] == 0
+                || node->name[sibling] == '/'
+            ) {
+                return false;
+            }
+        }
+        if (
+            (
+                node->name_length == 1
+                && node->name[0] == '.'
+            )
+            || (
+                node->name_length == 2
+                && node->name[0] == '.'
+                && node->name[1] == '.'
+            )
+            || !ramfs_bytes_are_zero(
+                &node->name[node->name_length],
+                MICROS_RAMFS_NAME_MAX - node->name_length
+            )
+        ) {
+            return false;
+        }
+        for (sibling = 1; sibling < index; ++sibling) {
+            const struct micros_ramfs_node *candidate =
+                &state->nodes[sibling];
+
+            if (
+                candidate->live
+                && candidate->parent == node->parent
+                && ramfs_names_equal(candidate, node)
+            ) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool node_blocks_are_canonical(
+    const struct micros_ramfs_state *state,
+    const struct micros_ramfs_node *node,
+    size_t index,
+    bool *seen_blocks
+)
+{
+    size_t logical;
+
+    if (ramfs_node_is_directory(node)) {
+        if (node->size != 0) {
+            return false;
+        }
+        for (
+            logical = 0;
+            logical < MICROS_RAMFS_BLOCK_CAPACITY;
+            ++logical
+        ) {
+            if (node->blocks[logical] != MICROS_RAMFS_BLOCK_NONE) {
+                return false;
+            }
+        }
+    } else {
+        if (
+            !ramfs_node_is_regular(node)
+            || node->size > MICROS_RAMFS_FILE_SIZE_MAX
+        ) {
+            return false;
+        }
+        for (
+            logical = 0;
+            logical < MICROS_RAMFS_BLOCK_CAPACITY;
+            ++logical
+        ) {
+            uint16_t block = node->blocks[logical];
+
+            if (block == MICROS_RAMFS_BLOCK_NONE) {
+                continue;
+            }
+            if (
+                block >= MICROS_RAMFS_BLOCK_CAPACITY
+                || seen_blocks[block]
+                || (uint64_t)logical * MICROS_RAMFS_BLOCK_SIZE
+                    >= node->size
+                || state->block_owner[block] != index
+                || state->block_logical[block] != logical
+            ) {
+                return false;
+            }
+            seen_blocks[block] = true;
+        }
+    }
+    return true;
+}
+
+static bool node_links_are_canonical(
+    const struct micros_ramfs_state *state
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_RAMFS_NODE_CAPACITY; ++index) {
+        const struct micros_ramfs_node *node = &state->nodes[index];
+        uint32_t expected_links;
+        size_t child;
+
+        if (!node->live) {
+            continue;
+        }
+        expected_links = ramfs_node_is_directory(node) ? 2 : 1;
+        if (ramfs_node_is_directory(node)) {
+            for (child = 1; child < MICROS_RAMFS_NODE_CAPACITY; ++child) {
+                if (
+                    state->nodes[child].live
+                    && ramfs_node_is_directory(&state->nodes[child])
+                    && state->nodes[child].parent
+                        == ramfs_node_handle((uint16_t)index, node)
+                ) {
+                    ++expected_links;
+                }
+            }
+        }
+        if (node->link_count != expected_links) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool block_ownership_is_canonical(
+    const struct micros_ramfs_state *state,
+    const bool *seen_blocks,
+    size_t *used_blocks
+)
+{
+    size_t index;
+
+    for (index = 0; index < MICROS_RAMFS_BLOCK_CAPACITY; ++index) {
+        uint16_t owner = state->block_owner[index];
+        uint16_t logical = state->block_logical[index];
+
+        if (owner == MICROS_RAMFS_NODE_NONE) {
+            if (
+                logical != MICROS_RAMFS_BLOCK_NONE
+                || seen_blocks[index]
+                || !ramfs_bytes_are_zero(
+                    state->data[index],
+                    MICROS_RAMFS_BLOCK_SIZE
+                )
+            ) {
+                return false;
+            }
+            continue;
+        }
+        if (
+            owner >= MICROS_RAMFS_NODE_CAPACITY
+            || logical >= MICROS_RAMFS_BLOCK_CAPACITY
+            || !seen_blocks[index]
+            || !state->nodes[owner].live
+            || !ramfs_node_is_regular(&state->nodes[owner])
+            || state->nodes[owner].blocks[logical] != index
+        ) {
+            return false;
+        }
+        ++*used_blocks;
+    }
+    return true;
+}
+
 enum micros_ramfs_core_error ramfs_validate_state(
     const struct micros_ramfs_state *state,
     bool require_clear_scratch
@@ -45,35 +288,10 @@ enum micros_ramfs_core_error ramfs_validate_state(
     for (index = 0; index < MICROS_RAMFS_NODE_CAPACITY; ++index) {
         const struct micros_ramfs_node *node =
             &state->nodes[index];
-        size_t logical;
-        size_t sibling;
 
         if (!node->live) {
-            if (
-                node->generation != 0
-                || node->mode != 0
-                || node->link_count != 0
-                || node->reference_count != 0
-                || node->name_length != 0
-                || node->reserved1 != 0
-                || node->parent != 0
-                || node->size != 0
-                || !ramfs_bytes_are_zero(
-                    node->reserved0,
-                    sizeof(node->reserved0)
-                )
-                || !ramfs_bytes_are_zero(node->name, sizeof(node->name))
-            ) {
+            if (!empty_node_is_canonical(node)) {
                 return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            for (
-                logical = 0;
-                logical < MICROS_RAMFS_BLOCK_CAPACITY;
-                ++logical
-            ) {
-                if (node->blocks[logical] != MICROS_RAMFS_BLOCK_NONE) {
-                    return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-                }
             }
             continue;
         }
@@ -95,117 +313,12 @@ enum micros_ramfs_core_error ramfs_validate_state(
             return MICROS_RAMFS_CORE_ERROR_INVARIANT;
         }
 
-        if (index == 0) {
-            if (
-                node->generation != 1
-                || !ramfs_node_is_directory(node)
-                || node->parent != ramfs_node_handle(0, node)
-                || node->name_length != 0
-                || !ramfs_bytes_are_zero(node->name, sizeof(node->name))
-            ) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-        } else {
-            uint16_t parent_slot;
-            uint32_t parent_generation;
-
-            if (
-                node->name_length == 0
-                || node->name_length > MICROS_RAMFS_NAME_MAX
-                || !ramfs_decode_handle(
-                    node->parent,
-                    &parent_slot,
-                    &parent_generation
-                )
-                || parent_slot >= index
-                || !state->nodes[parent_slot].live
-                || state->nodes[parent_slot].generation
-                    != parent_generation
-                || !ramfs_node_is_directory(&state->nodes[parent_slot])
-            ) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            for (sibling = 0; sibling < node->name_length; ++sibling) {
-                if (
-                    node->name[sibling] == 0
-                    || node->name[sibling] == '/'
-                ) {
-                    return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-                }
-            }
-            if (
-                (
-                    node->name_length == 1
-                    && node->name[0] == '.'
-                )
-                || (
-                    node->name_length == 2
-                    && node->name[0] == '.'
-                    && node->name[1] == '.'
-                )
-                || !ramfs_bytes_are_zero(
-                    &node->name[node->name_length],
-                    MICROS_RAMFS_NAME_MAX - node->name_length
-                )
-            ) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            for (sibling = 1; sibling < index; ++sibling) {
-                const struct micros_ramfs_node *candidate =
-                    &state->nodes[sibling];
-
-                if (
-                    candidate->live
-                    && candidate->parent == node->parent
-                    && ramfs_names_equal(candidate, node)
-                ) {
-                    return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-                }
-            }
+        if (!node_namespace_is_canonical(state, node, index)) {
+            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
         }
 
-        if (ramfs_node_is_directory(node)) {
-            if (node->size != 0) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            for (
-                logical = 0;
-                logical < MICROS_RAMFS_BLOCK_CAPACITY;
-                ++logical
-            ) {
-                if (node->blocks[logical] != MICROS_RAMFS_BLOCK_NONE) {
-                    return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-                }
-            }
-        } else {
-            if (
-                !ramfs_node_is_regular(node)
-                || node->size > MICROS_RAMFS_FILE_SIZE_MAX
-            ) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            for (
-                logical = 0;
-                logical < MICROS_RAMFS_BLOCK_CAPACITY;
-                ++logical
-            ) {
-                uint16_t block = node->blocks[logical];
-
-                if (block == MICROS_RAMFS_BLOCK_NONE) {
-                    continue;
-                }
-                if (
-                    block >= MICROS_RAMFS_BLOCK_CAPACITY
-                    || seen_blocks[block]
-                    || (uint64_t)logical * MICROS_RAMFS_BLOCK_SIZE
-                        >= node->size
-                    || state->block_owner[block] != index
-                    || state->block_logical[block] != logical
-                ) {
-                    return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-                }
-                seen_blocks[block] = true;
-            }
+        if (!node_blocks_are_canonical(state, node, index, seen_blocks)) {
+            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
         }
     }
 
@@ -220,60 +333,12 @@ enum micros_ramfs_core_error ramfs_validate_state(
         return MICROS_RAMFS_CORE_ERROR_INVARIANT;
     }
 
-    for (index = 0; index < MICROS_RAMFS_NODE_CAPACITY; ++index) {
-        const struct micros_ramfs_node *node = &state->nodes[index];
-        uint32_t expected_links;
-        size_t child;
-
-        if (!node->live) {
-            continue;
-        }
-        expected_links = ramfs_node_is_directory(node) ? 2 : 1;
-        if (ramfs_node_is_directory(node)) {
-            for (child = 1; child < MICROS_RAMFS_NODE_CAPACITY; ++child) {
-                if (
-                    state->nodes[child].live
-                    && ramfs_node_is_directory(&state->nodes[child])
-                    && state->nodes[child].parent
-                        == ramfs_node_handle((uint16_t)index, node)
-                ) {
-                    ++expected_links;
-                }
-            }
-        }
-        if (node->link_count != expected_links) {
-            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-        }
+    if (!node_links_are_canonical(state)) {
+        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
     }
 
-    for (index = 0; index < MICROS_RAMFS_BLOCK_CAPACITY; ++index) {
-        uint16_t owner = state->block_owner[index];
-        uint16_t logical = state->block_logical[index];
-
-        if (owner == MICROS_RAMFS_NODE_NONE) {
-            if (
-                logical != MICROS_RAMFS_BLOCK_NONE
-                || seen_blocks[index]
-                || !ramfs_bytes_are_zero(
-                    state->data[index],
-                    MICROS_RAMFS_BLOCK_SIZE
-                )
-            ) {
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            continue;
-        }
-        if (
-            owner >= MICROS_RAMFS_NODE_CAPACITY
-            || logical >= MICROS_RAMFS_BLOCK_CAPACITY
-            || !seen_blocks[index]
-            || !state->nodes[owner].live
-            || !ramfs_node_is_regular(&state->nodes[owner])
-            || state->nodes[owner].blocks[logical] != index
-        ) {
-            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-        }
-        ++used_blocks;
+    if (!block_ownership_is_canonical(state, seen_blocks, &used_blocks)) {
+        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
     }
     if (used_blocks != state->allocated_block_count) {
         return MICROS_RAMFS_CORE_ERROR_INVARIANT;

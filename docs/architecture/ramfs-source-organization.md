@@ -565,10 +565,17 @@ tasks with a 26-line root. Ten unique readonly paths keep static duration;
 four original mutable arrays keep exact automatic extents and initial
 bytes, without whole-work initialization or extra buffers. Raw actual
 constant checks and typed projection preserve the entire original case,
-including missing-before-overlong error precedence. One C semantic migration
-remains pending, alongside the specified
-shorter-operation outlines. Completing source ownership alone does not
-complete this implementation.
+including missing-before-overlong error precedence. Complete validation now
+has a 97-line outline and five 34/78/54/33/39-line empty-node, namespace,
+block-witness, link and physical-ownership tasks. One caller-owned automatic
+block witness and the original live/allocated counters remain authoritative;
+helper counters are automatic and reset before use. Exact projection
+preserves null-argument precedence, true/false scratch policy, strict
+parent-before-child ordering, every invariant and whole-state closure.
+Both active migration collections are now literal empty tuples; the frozen
+180-owner and sixteen-C/one-Python inventories remain unchanged. Specified
+shorter-operation outlines, complete current author/profile-reuse evidence,
+and independent implementation review still govern completion.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;
