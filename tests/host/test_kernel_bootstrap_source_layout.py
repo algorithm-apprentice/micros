@@ -1223,7 +1223,18 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             for source in ("kernel/bootstrap_control.c", "kernel/bootstrap_control_core.c"):
                 self.assertEqual(1, block.count(source), (target, source))
         native_control = cmake_command(cmake, "add_executable", "bootstrap_control_test")
-        self.assertEqual(1, native_control.count("kernel/kernel_objects.c"))
+        self.assertEqual(1, native_control.count("${MICROS_KERNEL_OBJECT_CORE_SOURCES}"))
+        object_set = cmake_command(cmake, "set", "MICROS_KERNEL_OBJECT_CORE_SOURCES")
+        self.assertEqual(
+            (
+                "kernel/kernel_objects.c", "kernel/kernel_object_state.c",
+                "kernel/kernel_object_identity.c", "kernel/kernel_object_stack.c",
+                "kernel/kernel_object_process.c", "kernel/kernel_object_thread.c",
+                "kernel/kernel_object_context.c", "kernel/kernel_object_hart.c",
+                "kernel/kernel_object_validation.c",
+            ),
+            tuple(re.findall(r"kernel/[A-Za-z0-9_]+\.c", object_set)),
+        )
         self.assertEqual(1, native_control.count("${MICROS_ENDPOINT_CORE_SOURCES}"))
         endpoint_set = cmake_command(cmake, "set", "MICROS_ENDPOINT_CORE_SOURCES")
         self.assertEqual(

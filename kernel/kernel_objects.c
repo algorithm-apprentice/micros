@@ -4,174 +4,7 @@
 
 #include "scheduler_core_internal.h"
 
-#define MICROS_KERNEL_OBJECTS_MAGIC UINT64_C(0x4d4943524f534f42)
-
-static bool bytes_are_zero(const void *storage, size_t size)
-{
-    const unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void clear_bytes(void *storage, size_t size)
-{
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static bool storage_is_zero(
-    const struct micros_kernel_objects *objects
-)
-{
-    return bytes_are_zero(objects, sizeof(*objects));
-}
-
-static bool process_handle_is_valid(
-    struct micros_process_handle handle
-)
-{
-    return (
-        handle.slot < MICROS_PROCESS_CAPACITY
-        && handle.generation != 0
-        && handle.generation <= MICROS_PROCESS_GENERATION_MAX
-    );
-}
-
-static bool thread_handle_is_valid(
-    struct micros_thread_handle handle
-)
-{
-    return (
-        handle.slot < MICROS_THREAD_CAPACITY
-        && handle.generation != 0
-    );
-}
-
-static bool hart_handle_is_valid(struct micros_hart_handle handle)
-{
-    return (
-        handle.slot < MICROS_HART_CAPACITY
-        && handle.generation != 0
-    );
-}
-
-static bool thread_handles_equal(
-    struct micros_thread_handle left,
-    struct micros_thread_handle right
-)
-{
-    return (
-        left.slot == right.slot
-        && left.generation == right.generation
-    );
-}
-
-static bool thread_handle_is_null(
-    struct micros_thread_handle handle
-)
-{
-    return handle.generation == 0;
-}
-
-static bool hart_handle_is_null(struct micros_hart_handle handle)
-{
-    return handle.generation == 0;
-}
-
-static bool thread_scheduler_metadata_is_zero(
-    const struct micros_thread *thread
-)
-{
-    return (
-        thread->runtime_flags == 0
-        && !thread->scheduler_assigned
-        && !thread->scheduler_preemptible
-        && thread->scheduler_priority == 0
-        && hart_handle_is_null(thread->scheduler_hart)
-        && thread->quantum_counter_ticks == 0
-        && thread->remaining_counter_ticks == 0
-        && !thread->ready_linked
-        && thread_handle_is_null(thread->ready_next)
-    );
-}
-
-static void clear_thread_scheduler_metadata(
-    struct micros_thread *thread
-)
-{
-    thread->runtime_flags = 0;
-    thread->scheduler_assigned = false;
-    thread->scheduler_preemptible = false;
-    thread->scheduler_priority = 0;
-    thread->scheduler_hart.slot = 0;
-    thread->scheduler_hart.generation = 0;
-    thread->quantum_counter_ticks = 0;
-    thread->remaining_counter_ticks = 0;
-    thread->ready_linked = false;
-    thread->ready_next.slot = 0;
-    thread->ready_next.generation = 0;
-}
-
-bool micros_thread_ipc_state_is_clear(
-    const struct micros_thread *thread
-)
-{
-    if (thread == NULL) {
-        return false;
-    }
-    return (
-        thread->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
-        && thread->ipc_next.slot == 0
-        && thread->ipc_next.generation == 0
-        && bytes_are_zero(
-            &thread->ipc_outbound_message,
-            sizeof(thread->ipc_outbound_message)
-        )
-        && thread->ipc_send_destination == 0
-        && thread->ipc_receive_source == 0
-        && thread->ipc_receive_buffer == 0
-        && !thread->ipc_delivery_pending
-        && bytes_are_zero(
-            &thread->ipc_inbound_message,
-            sizeof(thread->ipc_inbound_message)
-        )
-        && thread->ipc_staged_result == MICROS_IPC_OK
-        && thread->ipc_reply_token == 0
-        && thread->ipc_reply_callee == 0
-    );
-}
-
-static void clear_thread_ipc_state(struct micros_thread *thread)
-{
-    thread->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
-    thread->ipc_next.slot = 0;
-    thread->ipc_next.generation = 0;
-    clear_bytes(
-        &thread->ipc_outbound_message,
-        sizeof(thread->ipc_outbound_message)
-    );
-    thread->ipc_send_destination = 0;
-    thread->ipc_receive_source = 0;
-    thread->ipc_receive_buffer = 0;
-    thread->ipc_delivery_pending = false;
-    clear_bytes(
-        &thread->ipc_inbound_message,
-        sizeof(thread->ipc_inbound_message)
-    );
-    thread->ipc_staged_result = MICROS_IPC_OK;
-    thread->ipc_reply_token = 0;
-    thread->ipc_reply_callee = 0;
-}
+#include "kernel_object_private.h"
 
 static bool stack_range_is_valid(
     uintptr_t bottom,
@@ -198,63 +31,6 @@ static bool ranges_overlap(
     return first_bottom < second_top && second_bottom < first_top;
 }
 
-static void copy_user_context(
-    struct micros_user_context *destination,
-    const struct micros_user_context *source
-)
-{
-    unsigned char *destination_bytes =
-        (unsigned char *)destination;
-    const unsigned char *source_bytes =
-        (const unsigned char *)source;
-    size_t index;
-
-    for (index = 0; index < sizeof(*destination); ++index) {
-        destination_bytes[index] = source_bytes[index];
-    }
-}
-
-static void clear_user_context(struct micros_user_context *context)
-{
-    unsigned char *bytes = (unsigned char *)context;
-    size_t index;
-
-    for (index = 0; index < sizeof(*context); ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static bool user_context_is_zero(
-    const struct micros_user_context *context
-)
-{
-    const unsigned char *bytes =
-        (const unsigned char *)context;
-    size_t index;
-
-    for (index = 0; index < sizeof(*context); ++index) {
-        if (bytes[index] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool trap_anchor_is_zero(
-    const struct micros_hart_trap_anchor *trap
-)
-{
-    return (
-        trap->primary_stack_top == 0
-        && trap->primary_stack_bottom == 0
-        && trap->emergency_stack_top == 0
-        && trap->emergency_stack_bottom == 0
-        && trap->entry_t0 == 0
-        && trap->entry_t1 == 0
-        && trap->entry_t2 == 0
-    );
-}
-
 static bool trap_anchor_stacks_are_valid(
     const struct micros_hart_trap_anchor *trap
 )
@@ -279,147 +55,6 @@ static bool trap_anchor_stacks_are_valid(
     );
 }
 
-static enum micros_kernel_object_error require_initialized(
-    const struct micros_kernel_objects *objects
-)
-{
-    if (objects == NULL) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
-    if (objects->initialization_magic != MICROS_KERNEL_OBJECTS_MAGIC) {
-        return MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED;
-    }
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-static enum micros_kernel_object_error resolve_process_mutable(
-    struct micros_kernel_objects *objects,
-    struct micros_process_handle handle,
-    struct micros_process **process
-)
-{
-    struct micros_process *candidate;
-
-    if (!process_handle_is_valid(handle)) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    candidate = &objects->processes[handle.slot];
-    if (
-        candidate->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || candidate->generation != handle.generation
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    *process = candidate;
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-static enum micros_kernel_object_error resolve_thread_mutable(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    struct micros_thread **thread
-)
-{
-    struct micros_thread *candidate;
-
-    if (!thread_handle_is_valid(handle)) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    candidate = &objects->threads[handle.slot];
-    if (
-        candidate->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || candidate->generation != handle.generation
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    *thread = candidate;
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-static enum micros_kernel_object_error resolve_hart_mutable(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle handle,
-    struct micros_hart **hart
-)
-{
-    struct micros_hart *candidate;
-
-    if (!hart_handle_is_valid(handle)) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    candidate = &objects->harts[handle.slot];
-    if (
-        candidate->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || candidate->generation != handle.generation
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_STALE;
-    }
-    *hart = candidate;
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-static bool timer_state_is_initial(
-    const struct micros_hart_timer_state *timer
-)
-{
-    return (
-        !timer->initialized
-        && !timer->active
-        && timer->interval == 0
-        && timer->deadline == 0
-        && timer->ticks == 0
-        && timer->test_stop_after == 0
-    );
-}
-
-enum micros_kernel_object_error micros_process_next_generation(
-    uint16_t slot,
-    uint32_t current_generation,
-    uint32_t *next_generation
-)
-{
-    uint32_t candidate;
-    uint32_t endpoint;
-
-    if (
-        next_generation == NULL
-        || slot >= (UINT16_C(1) << MICROS_PROCESS_SLOT_BITS)
-        || current_generation > MICROS_PROCESS_GENERATION_MAX
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
-    if (current_generation == MICROS_PROCESS_GENERATION_MAX) {
-        return MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
-    }
-
-    candidate = current_generation + 1;
-    endpoint = (candidate << MICROS_PROCESS_SLOT_BITS) | slot;
-    if (
-        endpoint == MICROS_PROCESS_ENDPOINT_NONE
-        || endpoint == MICROS_PROCESS_ENDPOINT_ANY
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
-    }
-
-    *next_generation = candidate;
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-enum micros_kernel_object_error micros_thread_next_generation(
-    uint32_t current_generation,
-    uint32_t *next_generation
-)
-{
-    if (next_generation == NULL) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
-    if (current_generation == UINT32_MAX) {
-        return MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED;
-    }
-    *next_generation = current_generation + 1;
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
 enum micros_kernel_object_error micros_kernel_objects_initialize(
     struct micros_kernel_objects *objects,
     size_t max_threads_per_process,
@@ -442,7 +77,7 @@ enum micros_kernel_object_error micros_kernel_objects_initialize(
     if (objects->initialization_magic == MICROS_KERNEL_OBJECTS_MAGIC) {
         return MICROS_KERNEL_OBJECT_ERROR_ALREADY_INITIALIZED;
     }
-    if (!storage_is_zero(objects)) {
+    if (!kernel_object_storage_is_zero(objects)) {
         return MICROS_KERNEL_OBJECT_ERROR_STORAGE;
     }
 
@@ -468,11 +103,11 @@ enum micros_kernel_object_error micros_process_resolve(
     if (objects == NULL || process == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (!process_handle_is_valid(handle)) {
+    if (!kernel_object_process_handle_is_valid(handle)) {
         return MICROS_KERNEL_OBJECT_ERROR_STALE;
     }
     candidate = &objects->processes[handle.slot];
@@ -497,7 +132,7 @@ enum micros_kernel_object_error micros_process_create(
     if (objects == NULL || handle == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -544,7 +179,7 @@ enum micros_kernel_object_error micros_process_create_at(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -592,11 +227,11 @@ enum micros_kernel_object_error micros_process_release(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_process_mutable(objects, handle, &process);
+    error = kernel_object_resolve_process_mutable(objects, handle, &process);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -649,11 +284,11 @@ enum micros_kernel_object_error micros_thread_resolve(
     if (objects == NULL || thread == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (!thread_handle_is_valid(handle)) {
+    if (!kernel_object_thread_handle_is_valid(handle)) {
         return MICROS_KERNEL_OBJECT_ERROR_STALE;
     }
     candidate = &objects->threads[handle.slot];
@@ -683,11 +318,11 @@ micros_thread_attach_execution_context(
     if (objects == NULL || context == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_thread_mutable(
+    error = kernel_object_resolve_thread_mutable(
         objects,
         thread_handle,
         &thread
@@ -763,7 +398,7 @@ micros_thread_attach_execution_context(
     thread->context_attached = true;
     thread->kernel_stack_bottom = kernel_stack_bottom;
     thread->kernel_stack_top = kernel_stack_top;
-    copy_user_context(&thread->user_context, context);
+    kernel_object_copy_user_context(&thread->user_context, context);
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -782,11 +417,11 @@ micros_thread_capture_execution_context(
     if (objects == NULL || context == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_thread_mutable(
+    error = kernel_object_resolve_thread_mutable(
         objects,
         thread_handle,
         &thread
@@ -802,7 +437,7 @@ micros_thread_capture_execution_context(
 
         if (
             hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread_handles_equal(
+            && kernel_object_thread_handles_equal(
                 hart->current_thread,
                 thread_handle
             )
@@ -816,7 +451,7 @@ micros_thread_capture_execution_context(
     if (current_count > 1) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
-    copy_user_context(&thread->user_context, context);
+    kernel_object_copy_user_context(&thread->user_context, context);
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -851,7 +486,7 @@ micros_thread_inspect_execution_context(
     if (!thread->context_attached) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    copy_user_context(context, &thread->user_context);
+    kernel_object_copy_user_context(context, &thread->user_context);
     *kernel_stack_bottom = thread->kernel_stack_bottom;
     *kernel_stack_top = thread->kernel_stack_top;
     return MICROS_KERNEL_OBJECT_OK;
@@ -870,11 +505,11 @@ micros_thread_detach_execution_context(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_thread_mutable(
+    error = kernel_object_resolve_thread_mutable(
         objects,
         thread_handle,
         &thread
@@ -895,7 +530,7 @@ micros_thread_detach_execution_context(
 
         if (
             hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread_handles_equal(
+            && kernel_object_thread_handles_equal(
                 hart->current_thread,
                 thread_handle
             )
@@ -906,7 +541,7 @@ micros_thread_detach_execution_context(
     thread->context_attached = false;
     thread->kernel_stack_bottom = 0;
     thread->kernel_stack_top = 0;
-    clear_user_context(&thread->user_context);
+    kernel_object_clear_user_context(&thread->user_context);
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -923,11 +558,11 @@ micros_process_attach_address_space(
     if (objects == NULL || root == 0) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_process_mutable(
+    error = kernel_object_resolve_process_mutable(
         objects,
         process_handle,
         &process
@@ -955,11 +590,11 @@ micros_process_detach_address_space(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_process_mutable(
+    error = kernel_object_resolve_process_mutable(
         objects,
         process_handle,
         &process
@@ -991,11 +626,11 @@ enum micros_kernel_object_error micros_thread_create(
     if (objects == NULL || handle == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_process_mutable(objects, owner, &process);
+    error = kernel_object_resolve_process_mutable(objects, owner, &process);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1033,8 +668,8 @@ enum micros_kernel_object_error micros_thread_create(
         thread->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
         thread->generation = generation;
         thread->owner = owner;
-        clear_thread_scheduler_metadata(thread);
-        clear_thread_ipc_state(thread);
+        kernel_object_clear_thread_scheduler_metadata(thread);
+        kernel_object_clear_thread_ipc_state(thread);
         thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
         ++process->live_thread_count;
         ++objects->live_thread_count;
@@ -1059,11 +694,11 @@ enum micros_kernel_object_error micros_thread_release(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_thread_mutable(objects, handle, &thread);
+    error = kernel_object_resolve_thread_mutable(objects, handle, &thread);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1080,12 +715,12 @@ enum micros_kernel_object_error micros_thread_release(
 
         if (
             hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread_handles_equal(hart->current_thread, handle)
+            && kernel_object_thread_handles_equal(hart->current_thread, handle)
         ) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
     }
-    error = resolve_process_mutable(objects, thread->owner, &owner);
+    error = kernel_object_resolve_process_mutable(objects, thread->owner, &owner);
     if (
         error != MICROS_KERNEL_OBJECT_OK
         || owner->live_thread_count == 0
@@ -1110,12 +745,12 @@ enum micros_kernel_object_error micros_thread_release(
     }
     thread->owner.slot = 0;
     thread->owner.generation = 0;
-    clear_thread_scheduler_metadata(thread);
-    clear_thread_ipc_state(thread);
+    kernel_object_clear_thread_scheduler_metadata(thread);
+    kernel_object_clear_thread_ipc_state(thread);
     thread->context_attached = false;
     thread->kernel_stack_bottom = 0;
     thread->kernel_stack_top = 0;
-    clear_user_context(&thread->user_context);
+    kernel_object_clear_user_context(&thread->user_context);
     --owner->live_thread_count;
     --objects->live_thread_count;
     return MICROS_KERNEL_OBJECT_OK;
@@ -1133,11 +768,11 @@ enum micros_kernel_object_error micros_hart_resolve(
     if (objects == NULL || hart == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (!hart_handle_is_valid(handle)) {
+    if (!kernel_object_hart_handle_is_valid(handle)) {
         return MICROS_KERNEL_OBJECT_ERROR_STALE;
     }
     candidate = &objects->harts[handle.slot];
@@ -1163,7 +798,7 @@ enum micros_kernel_object_error micros_hart_register(
     if (objects == NULL || handle == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1221,7 +856,7 @@ enum micros_kernel_object_error micros_hart_resolve_context(
     if (objects == NULL || hart == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1257,11 +892,11 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = resolve_hart_mutable(objects, handle, &hart);
+    error = kernel_object_resolve_hart_mutable(objects, handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1392,7 +1027,7 @@ enum micros_kernel_object_error micros_hart_current_thread(
     if (objects == NULL || thread == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1434,7 +1069,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
     enum micros_kernel_object_error error;
     size_t index;
 
-    error = require_initialized(objects);
+    error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -1525,8 +1160,8 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || thread->context_attached
                 || thread->kernel_stack_bottom != 0
                 || thread->kernel_stack_top != 0
-                || !user_context_is_zero(&thread->user_context)
-                || !thread_scheduler_metadata_is_zero(thread)
+                || !kernel_object_user_context_is_zero(&thread->user_context)
+                || !kernel_object_thread_scheduler_metadata_is_zero(thread)
                 || !micros_thread_ipc_state_is_clear(thread)
                 || micros_thread_next_generation(
                     thread->generation,
@@ -1543,7 +1178,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                     thread->runtime_flags
                     & ~MICROS_THREAD_RTS_DEFINED_MASK
                 ) != 0
-                || !process_handle_is_valid(thread->owner)
+                || !kernel_object_process_handle_is_valid(thread->owner)
                 || objects->processes[thread->owner.slot].slot_state
                     != MICROS_KERNEL_OBJECT_SLOT_LIVE
                 || objects->processes[thread->owner.slot].generation
@@ -1558,11 +1193,11 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                         != MICROS_THREAD_RTS_INACTIVE
                     || thread->scheduler_preemptible
                     || thread->scheduler_priority != 0
-                    || !hart_handle_is_null(thread->scheduler_hart)
+                    || !kernel_object_hart_handle_is_null(thread->scheduler_hart)
                     || thread->quantum_counter_ticks != 0
                     || thread->remaining_counter_ticks != 0
                     || thread->ready_linked
-                    || !thread_handle_is_null(thread->ready_next)
+                    || !kernel_object_thread_handle_is_null(thread->ready_next)
                 )
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
@@ -1632,7 +1267,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
             } else if (
                 thread->kernel_stack_bottom != 0
                 || thread->kernel_stack_top != 0
-                || !user_context_is_zero(&thread->user_context)
+                || !kernel_object_user_context_is_zero(&thread->user_context)
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
@@ -1646,8 +1281,8 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || thread->context_attached
                 || thread->kernel_stack_bottom != 0
                 || thread->kernel_stack_top != 0
-                || !user_context_is_zero(&thread->user_context)
-                || !thread_scheduler_metadata_is_zero(thread)
+                || !kernel_object_user_context_is_zero(&thread->user_context)
+                || !kernel_object_thread_scheduler_metadata_is_zero(thread)
                 || !micros_thread_ipc_state_is_clear(thread)
                 || micros_thread_next_generation(
                     thread->generation,
@@ -1692,7 +1327,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || hart->trap_installed
                 || hart->idle_primary_stack_bottom != 0
                 || hart->idle_primary_stack_top != 0
-                || !trap_anchor_is_zero(&hart->trap)
+                || !kernel_object_trap_anchor_is_zero(&hart->trap)
                 || hart->current_thread.generation != 0
                 || hart->accounting_owner
                     != MICROS_SCHEDULER_ACCOUNTING_NONE
@@ -1703,7 +1338,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 || hart->interrupt_depth != 0
                 || hart->preempt_disable_count != 0
                 || hart->reschedule_pending
-                || !timer_state_is_initial(&hart->timer)
+                || !kernel_object_timer_state_is_initial(&hart->timer)
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
@@ -1817,14 +1452,14 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
                 }
             }
         } else if (
-            !trap_anchor_is_zero(&hart->trap)
+            !kernel_object_trap_anchor_is_zero(&hart->trap)
             || hart->idle_primary_stack_bottom != 0
             || hart->idle_primary_stack_top != 0
         ) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
         if (!hart->timer.initialized) {
-            if (!timer_state_is_initial(&hart->timer)) {
+            if (!kernel_object_timer_state_is_initial(&hart->timer)) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
         } else if (
@@ -1843,7 +1478,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
             bool primary_is_thread;
 
             if (
-                !thread_handle_is_valid(hart->current_thread)
+                !kernel_object_thread_handle_is_valid(hart->current_thread)
                 || current_threads[hart->current_thread.slot]
             ) {
                 return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;

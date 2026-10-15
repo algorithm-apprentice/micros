@@ -5,8 +5,9 @@
 This is the exact design contract for the three kernel-object signal files
 in the [source-module audit](source-module-audit.md).
 [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) is Accepted
-after a clean independent read-only design review. Implementation remains
-pending until the separate design PR #137 merges.
+after clean independent complete and acceptance-only design reviews.
+Design #137 merged as `4a7e49764533fbbef1e2d10188f837e7f092817e`;
+implementation now proceeds on a fresh branch from that outcome.
 
 ```text
 reviewed micros base: 4eb1c4d68de3830b888a0d239a2874bd79792244
@@ -619,3 +620,31 @@ the exact obsolete local/remote branches.
 
 This design itself changes documentation only. It authors no executable
 source, test, model, harness, build scaffold or reusable prototype.
+
+### Current implementation progress
+
+The initial structural Red exposed the registry-storage helper in its old
+monolithic owner. The first implementation slice moves the original twelve
+representation and twelve identity definitions to their required owners.
+Their complete bodies and types remain frozen; the current necessary
+portable private surface is nineteen helpers, growing only to the final
+twenty-two as remaining owners move.
+
+All 76 original bodies/signatures and eighteen neighboring artifacts are
+frozen from immutable `4eb1c4d`, not rewritten output. The six shared
+inspection definitions move unchanged with whole-AST proof and compatible
+scheduler re-exports. Its existing cache/lexing fixture follows the real
+new helper owner without changing its assertions.
+
+All 23 final C paths, three headers/sets and ten source operands are wired
+once. Still-unextracted owners are explicitly declarations-only units, not
+duplicate state or claimed completed tasks. Forty-eight original owner
+moves and all twelve semantic task dispositions remain pending.
+
+The complete current portable source restores the original
+`453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
+bytes. The exact complete recipe inverse restores `50cac89...` before
+maintaining only the admitted current digest
+`44d8a8615e5465ad199ed916b30e72af05643ef00ae5ac9a7df00a0dc4cad2c1`.
+Prior scheduler/endpoint source and recipe/planner expected values remain
+unchanged under only these verified inverses.

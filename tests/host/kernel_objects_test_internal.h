@@ -1,0 +1,6 @@
+#ifndef MICROS_TESTS_HOST_KERNEL_OBJECTS_TEST_INTERNAL_H
+#define MICROS_TESTS_HOST_KERNEL_OBJECTS_TEST_INTERNAL_H
+
+#include "micros/kernel_objects.h"
+
+#endif
