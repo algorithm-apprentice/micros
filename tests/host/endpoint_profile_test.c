@@ -2,6 +2,11 @@
 
 #include <string.h>
 
+struct endpoint_rejected_profile_case {
+    struct micros_privilege_profile profiles[2];
+    struct micros_endpoint_registry before;
+};
+
 bool endpoint_test_profile_table_is_immutable_and_specific(void)
 {
     struct endpoint_test_fixture *fixture = endpoint_test_context();
@@ -116,13 +121,27 @@ bool endpoint_test_profile_table_is_immutable_and_specific(void)
     return true;
 }
 
-bool endpoint_test_invalid_profile_tables_preserve_storage(void)
-{
-    struct endpoint_test_fixture *fixture = endpoint_test_context();
-    struct micros_privilege_profile profiles[2];
-    struct micros_endpoint_registry before;
+#define EXPECT_REJECTED_TABLE(expected, statement) \
+    do { \
+        memset(&fixture->registry, 0, sizeof(fixture->registry)); \
+        work->before = fixture->registry; \
+        statement; \
+        EXPECT_ERROR( \
+            (expected), \
+            micros_endpoint_registry_initialize( \
+                &fixture->registry, \
+                work->profiles, \
+                2 \
+            ) \
+        ); \
+        EXPECT_TRUE(memcmp(&fixture->registry, &work->before, sizeof(fixture->registry)) == 0); \
+    } while (false)
 
-    profiles[0] = endpoint_test_profile(
+static bool rejected_profiles_setup(
+    struct endpoint_rejected_profile_case *work
+)
+{
+    work->profiles[0] = endpoint_test_profile(
         1,
         "ONE",
         MICROS_PRIVILEGE_OPERATION_RECEIVE,
@@ -131,7 +150,7 @@ bool endpoint_test_invalid_profile_tables_preserve_storage(void)
         0,
         0
     );
-    profiles[1] = endpoint_test_profile(
+    work->profiles[1] = endpoint_test_profile(
         2,
         "TWO",
         MICROS_PRIVILEGE_OPERATION_RECEIVE,
@@ -140,78 +159,85 @@ bool endpoint_test_invalid_profile_tables_preserve_storage(void)
         0,
         0
     );
+    return true;
+}
 
-#define EXPECT_REJECTED_TABLE(expected, statement) \
-    do { \
-        memset(&fixture->registry, 0, sizeof(fixture->registry)); \
-        before = fixture->registry; \
-        statement; \
-        EXPECT_ERROR( \
-            (expected), \
-            micros_endpoint_registry_initialize( \
-                &fixture->registry, \
-                profiles, \
-                2 \
-            ) \
-        ); \
-        EXPECT_TRUE(memcmp(&fixture->registry, &before, sizeof(fixture->registry)) == 0); \
-    } while (false)
-
+static bool rejected_duplicate_profiles(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_rejected_profile_case *work
+)
+{
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        profiles[1].id = 1
+        work->profiles[1].id = 1
     );
-    profiles[1] = endpoint_test_profile(
+    work->profiles[1] = endpoint_test_profile(
         2, "TWO", MICROS_PRIVILEGE_OPERATION_RECEIVE, 0, 0, 0, 0
     );
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        memcpy(profiles[1].name, profiles[0].name, sizeof(profiles[0].name))
+        memcpy(work->profiles[1].name, work->profiles[0].name, sizeof(work->profiles[0].name))
     );
-    profiles[1] = endpoint_test_profile(
+    work->profiles[1] = endpoint_test_profile(
         2, "TWO", MICROS_PRIVILEGE_OPERATION_RECEIVE, 0, 0, 0, 0
     );
+    return true;
+}
+
+static bool rejected_profile_shapes(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_rejected_profile_case *work
+)
+{
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        profiles[0].operations |= UINT32_C(0x80000000)
+        work->profiles[0].operations |= UINT32_C(0x80000000)
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_RECEIVE,
         0, 0, 0, 0
     );
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        profiles[0].id = 0
+        work->profiles[0].id = 0
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_RECEIVE,
         0, 0, 0, 0
     );
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        profiles[0].name[0] = '\0'
+        work->profiles[0].name[0] = '\0'
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_RECEIVE,
         0, 0, 0, 0
     );
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
         memset(
-            profiles[0].name,
+            work->profiles[0].name,
             'A',
-            sizeof(profiles[0].name)
+            sizeof(work->profiles[0].name)
         )
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_RECEIVE,
         0, 0, 0, 0
     );
+    return true;
+}
+
+static bool rejected_profile_targets(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_rejected_profile_case *work
+)
+{
     EXPECT_REJECTED_TABLE(
         MICROS_ENDPOINT_ERROR_PROFILE,
-        profiles[0].call_targets = UINT32_C(1) << 2
+        work->profiles[0].call_targets = UINT32_C(1) << 2
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_CALL,
         UINT32_C(1) << 3, 0, 0, 0
     );
@@ -219,7 +245,7 @@ bool endpoint_test_invalid_profile_tables_preserve_storage(void)
         MICROS_ENDPOINT_ERROR_PROFILE,
         (void)0
     );
-    profiles[0] = endpoint_test_profile(
+    work->profiles[0] = endpoint_test_profile(
         1, "ONE", MICROS_PRIVILEGE_OPERATION_CALL,
         UINT32_C(1), 0, 0, 0
     );
@@ -227,28 +253,47 @@ bool endpoint_test_invalid_profile_tables_preserve_storage(void)
         MICROS_ENDPOINT_ERROR_PROFILE,
         (void)0
     );
+    return true;
+}
 
-#undef EXPECT_REJECTED_TABLE
-
+static bool rejected_profile_capacities(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_rejected_profile_case *work
+)
+{
     memset(&fixture->registry, 0, sizeof(fixture->registry));
-    before = fixture->registry;
+    work->before = fixture->registry;
     EXPECT_ERROR(
         MICROS_ENDPOINT_ERROR_CAPACITY,
         micros_endpoint_registry_initialize(
             &fixture->registry,
-            profiles,
+            work->profiles,
             0
         )
     );
-    EXPECT_TRUE(memcmp(&fixture->registry, &before, sizeof(fixture->registry)) == 0);
+    EXPECT_TRUE(memcmp(&fixture->registry, &work->before, sizeof(fixture->registry)) == 0);
     EXPECT_ERROR(
         MICROS_ENDPOINT_ERROR_CAPACITY,
         micros_endpoint_registry_initialize(
             &fixture->registry,
-            profiles,
+            work->profiles,
             MICROS_PRIVILEGE_PROFILE_CAPACITY
         )
     );
-    EXPECT_TRUE(memcmp(&fixture->registry, &before, sizeof(fixture->registry)) == 0);
+    EXPECT_TRUE(memcmp(&fixture->registry, &work->before, sizeof(fixture->registry)) == 0);
     return true;
+}
+
+#undef EXPECT_REJECTED_TABLE
+
+bool endpoint_test_invalid_profile_tables_preserve_storage(void)
+{
+    struct endpoint_test_fixture *fixture = endpoint_test_context();
+    struct endpoint_rejected_profile_case work;
+
+    return rejected_profiles_setup(&work)
+        && rejected_duplicate_profiles(fixture, &work)
+        && rejected_profile_shapes(fixture, &work)
+        && rejected_profile_targets(fixture, &work)
+        && rejected_profile_capacities(fixture, &work);
 }

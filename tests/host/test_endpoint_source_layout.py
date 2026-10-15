@@ -31,6 +31,7 @@ MODEL_CONTEXT_HELPERS = {
 }
 NATIVE_ASSERTION_DIGEST = "a6a8819676540e04acd7f9d209aacfca43a90794c5f37f5462f32b2b91d205a1"
 NATIVE_RUNNER_TABLE_DIGEST = "2c71f3886b3dc3a68d7269ccd129036db53da625993828c8a12697eeb109f9e1"
+REJECTED_TABLE_MACRO_DIGEST = "e5ecf37d829a27ad4c2b16a6c4ae3d129da83a8816af2bb54e2e4fe71e142915"
 NATIVE_CONTEXT_FIELDS = ("registry", "objects", "processes", "threads", "hart")
 NATIVE_CONTEXT_CASES = (
     "test_profile_table_is_immutable_and_specific", "test_invalid_profile_tables_preserve_storage",
@@ -180,7 +181,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = (
-    (1, "test_invalid_profile_tables_preserve_storage"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
 )
@@ -212,6 +212,23 @@ INITIALIZER_HELPERS = (
 )
 MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
 NATIVE_CASE_WORK = {
+    "test_invalid_profile_tables_preserve_storage": {
+        "owner": 3,
+        "tag": "endpoint_rejected_profile_case",
+        "fields": ("profiles", "before"),
+        "declarations": (
+            "struct micros_privilege_profile profiles[2]; struct micros_endpoint_registry before;"
+        ),
+        "original": "struct micros_privilege_profile profiles[2]; struct micros_endpoint_registry before;",
+        "outlined": "struct endpoint_rejected_profile_case work;",
+        "phases": (
+            "rejected_profiles_setup", "rejected_duplicate_profiles", "rejected_profile_shapes",
+            "rejected_profile_targets", "rejected_profile_capacities",
+        ),
+        "work_only": ("rejected_profiles_setup",),
+        "macro_before": 1,
+        "undef_before": 4,
+    },
     "test_source_only_seal_preserves_staged_source": {
         "owner": 6,
         "tag": "endpoint_source_only_case",
@@ -709,7 +726,56 @@ def native_runner_table(text):
     return raw
 
 
-def native_case_body_tokens(caller, specification, bodies):
+def native_work_field_tokens(body, specification):
+    body = list(body)
+    result = []
+    index = 0
+    while index < len(body):
+        if body[index:index + 2] in (["work", "->"], ["work", "."]):
+            if index != 0 and body[index - 1] in (".", "->"):
+                raise AssertionError("work transport cannot turn an existing structure member into a global root")
+            field = body[index + 2:index + 3]
+            if not field or field[0] not in specification["fields"]:
+                raise AssertionError("native work contains only the original typed automatic objects")
+            result.extend(field)
+            index += 3
+        else:
+            if body[index] == "work":
+                raise AssertionError("native work cannot be copied, blanket-cleared, retained or published")
+            result.append(body[index])
+            index += 1
+    return tuple(result)
+
+
+def rejected_table_macro(text, specification):
+    matches = tuple(re.finditer(r"(?m)^#define EXPECT_REJECTED_TABLE\(", text))
+    if len(matches) != 1:
+        raise AssertionError("rejection cases own one exact file-local mutation/preservation macro")
+    start = matches[0].start()
+    lexical = c_lexical_text(text)
+    if lexical.count("{", 0, start) != lexical.count("}", 0, start):
+        raise AssertionError("outlined rejection macro has file scope only in its owning case module")
+    end = start
+    while True:
+        newline = text.find("\n", end)
+        if newline == -1:
+            raise AssertionError("unterminated rejection macro")
+        continued = text[end:newline].endswith("\\")
+        end = newline + 1
+        if not continued:
+            break
+    raw = text[start:end].rstrip()
+    restored = native_work_field_tokens(tokens(raw), specification)
+    restored = fixture_field_tokens(restored, NATIVE_CONTEXT_FIELDS)
+    actual = digest_bytes(json.dumps(restored, separators=(",", ":")).encode())
+    if actual != REJECTED_TABLE_MACRO_DIGEST:
+        raise AssertionError("actual rejection macro changed reset/snapshot/action/comparison or literal behavior")
+    if len(re.findall(r"(?m)^#undef EXPECT_REJECTED_TABLE\s*$", text)) != 1:
+        raise AssertionError("rejection macro has exactly one bounded file-local lifetime")
+    return raw
+
+
+def native_case_body_tokens(caller, specification, bodies, macro=None):
     caller = list(tokens(caller))
     borrow = list(tokens("struct endpoint_test_fixture *fixture = endpoint_test_context();"))
     outlined = list(tokens(specification["outlined"]))
@@ -717,7 +783,11 @@ def native_case_body_tokens(caller, specification, bodies):
         raise AssertionError("native work is automatic and initializes only its original declared values")
     tail = list(tokens(
         "return " + " && ".join(
-            phase + ("(fixture)" if phase in specification.get("fixture_only", ()) else "(fixture, &work)")
+            phase + (
+                "(fixture)" if phase in specification.get("fixture_only", ())
+                else "(&work)" if phase in specification.get("work_only", ())
+                else "(fixture, &work)"
+            )
             for phase in specification["phases"]
         ) + ";"
     ))
@@ -727,7 +797,13 @@ def native_case_body_tokens(caller, specification, bodies):
     success = list(tokens("return true;"))
     if len(bodies) != len(specification["phases"]):
         raise AssertionError("native case phase inventory is exact")
-    for body in bodies:
+    for phase_index, body in enumerate(bodies):
+        if specification.get("macro_before") == phase_index:
+            if macro is None:
+                raise AssertionError("macro reconstruction requires the verified actual source definition")
+            result.extend(tokens(macro))
+        if specification.get("undef_before") == phase_index:
+            result.extend(tokens("#undef EXPECT_REJECTED_TABLE"))
         body = list(tokens(body))
         if body[:1] != ["{"] or body[-len(success) - 1:] != success + ["}"]:
             raise AssertionError("native phase retains one terminal success")
@@ -739,23 +815,7 @@ def native_case_body_tokens(caller, specification, bodies):
             raise AssertionError("native case phases cannot borrow caller labels")
         result.extend(inner)
     result.extend(success + ["}"])
-    restored = []
-    index = 0
-    while index < len(result):
-        if result[index:index + 2] in (["work", "->"], ["work", "."]):
-            if index != 0 and result[index - 1] in (".", "->"):
-                raise AssertionError("work transport cannot turn an existing structure member into a global root")
-            field = result[index + 2:index + 3]
-            if not field or field[0] not in specification["fields"]:
-                raise AssertionError("native work contains only the original typed automatic objects")
-            restored.extend(field)
-            index += 3
-        else:
-            if result[index] == "work":
-                raise AssertionError("native work cannot be copied, blanket-cleared, retained or published")
-            restored.append(result[index])
-            index += 1
-    return tuple(restored)
+    return native_work_field_tokens(result, specification)
 
 
 def model_projection_body_tokens(caller, live, endpoint):
@@ -826,8 +886,9 @@ def original_body_digest(family, name, text):
     if family == 1 and name in NATIVE_CASE_WORK and (1, name) not in LONG_FUNCTION_MIGRATION:
         specification = NATIVE_CASE_WORK[name]
         owner = source(family_paths(1)[specification["owner"]])
+        macro = rejected_table_macro(owner, specification) if "macro_before" in specification else None
         body = native_case_body_tokens(
-            text, specification, [c_function_body(owner, phase) for phase in specification["phases"]],
+            text, specification, [c_function_body(owner, phase) for phase in specification["phases"]], macro,
         )
     if family == 2 and name == "validate_model" and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
@@ -1108,10 +1169,19 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 signatures = re.findall(rf"(?m)^static bool {phase}\([^;{{}}]*\)\s*\{{", text)
                 self.assertEqual(1, len(signatures))
                 self.assertEqual(tokens(
-                    "static bool " + phase + "(struct endpoint_test_fixture *fixture"
-                    + ("" if phase in specification.get("fixture_only", ()) else ", struct " + specification["tag"] + " *work")
+                    "static bool " + phase + "("
+                    + (
+                        "struct " + specification["tag"] + " *work" if phase in specification.get("work_only", ())
+                        else "struct endpoint_test_fixture *fixture"
+                        + ("" if phase in specification.get("fixture_only", ()) else ", struct " + specification["tag"] + " *work")
+                    )
                     + ") {"
                 ), tokens(signatures[0]))
+            if "macro_before" in specification:
+                rejected_table_macro(text, specification)
+                undef = text.index("#undef EXPECT_REJECTED_TABLE")
+                self.assertTrue(all(text.index("static bool " + phase + "(") < undef for phase in specification["phases"]))
+                self.assertLess(undef, text.index("bool " + native_name(original) + "("))
 
     def test_native_work_projection_retains_initializer_lifetime_and_macro_failure_order(self):
         specification = NATIVE_CASE_WORK["test_profile_install_and_close_require_held_threads"]
@@ -1149,6 +1219,36 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             tokens(expected),
             native_case_body_tokens(caller, specification, (bodies[0], bodies[1].replace("publish", "changed_publish"), bodies[2])),
         )
+
+    def test_rejection_macro_keeps_raw_reset_snapshot_action_and_error_order(self):
+        specification = NATIVE_CASE_WORK["test_invalid_profile_tables_preserve_storage"]
+        raw = (
+            "#define EXPECT_REJECTED_TABLE(expected, statement) \\\n"
+            "    do { \\\n"
+            "        memset(&fixture->registry, 0, sizeof(fixture->registry)); \\\n"
+            "        work->before = fixture->registry; \\\n"
+            "        statement; \\\n"
+            "        EXPECT_ERROR( \\\n"
+            "            (expected), \\\n"
+            "            micros_endpoint_registry_initialize( \\\n"
+            "                &fixture->registry, \\\n"
+            "                work->profiles, \\\n"
+            "                2 \\\n"
+            "            ) \\\n"
+            "        ); \\\n"
+            "        EXPECT_TRUE(memcmp(&fixture->registry, &work->before, sizeof(fixture->registry)) == 0); \\\n"
+            "    } while (false)"
+        )
+        text = raw + "\n#undef EXPECT_REJECTED_TABLE\n"
+        self.assertEqual(tokens(raw), tokens(rejected_table_macro(text, specification)))
+        for changed in (
+            text.replace("work->before = fixture->registry; \\\n        statement;", "statement; \\\n        work->before = fixture->registry;"),
+            text.replace("work->before", "work->unknown"),
+            text.replace("#undef EXPECT_REJECTED_TABLE", ""),
+            "bool wrong_scope(void) {\n" + text + "}\n",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                rejected_table_macro(changed, specification)
 
     def test_raw_runner_extraction_preserves_literals_callback_types_and_scope(self):
         raw = (

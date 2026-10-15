@@ -561,8 +561,13 @@ tasks with an eleven-line root. The original endpoint pair, record,
 receiver and loop index remain automatic; only the original NULL-record
 initializer runs. Complete body proof retains the canonical ACK mutation/
 restoration, closing-output sentinel, staged-source close refusal and final
-clear-before-close order. Three original long-function migrations remain
-pending, including the target entry.
+clear-before-close order. Rejected-profile evidence now has five original
+setup, duplicate, shape/name, target-mask and capacity tasks. Its sole
+automatic work holds the original two-profile array and registry snapshot.
+The actual file-local rejection macro is raw-verified before reconstruction
+at its original definition/undef positions; reset, snapshot, mutation and
+comparison order are unchanged. Two original long-function migrations remain
+pending: the complete model runner and target runtime entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
