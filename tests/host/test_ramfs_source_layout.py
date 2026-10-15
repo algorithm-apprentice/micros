@@ -11,7 +11,8 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text
-from tests.host.test_kernel_bootstrap_source_layout import c_function_body
+from tests.host.test_kernel_bootstrap_source_layout import c_function_body, local_include_closure
+from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
@@ -101,6 +102,18 @@ SEED_CONTEXT_FUNCTIONS = (
     "header_corruption_is_rejected", "record_name_and_reserved_corruption_is_rejected",
     "parent_and_mode_corruption_is_rejected", "data_and_capacity_corruption_is_rejected",
 )
+PEER_CONTEXT_FIELDS = (
+    "vfs_ramfs_buffer", "vfs_tty_buffer", "vfs_ramfs_endpoint", "vfs_tty_endpoint",
+)
+PEER_CONTEXT_FUNCTIONS = (
+    "vfs_validate_configuration", "vfs_ramfs_result_matches", "vfs_call_ramfs",
+    "vfs_call_ramfs_with_grant", "vfs_mount", "vfs_lookup", "vfs_create_node",
+    "vfs_transfer", "vfs_transfer_without_grant", "vfs_getdent", "vfs_putnode",
+    "vfs_malformed_version_is_exact", "vfs_directory_record_matches", "vfs_enumerate_root",
+    "vfs_run_filesystem_scenario", "vfs_tty_result_matches", "vfs_call_tty",
+    "vfs_receive_tty_events", "vfs_collect_tty_write", "vfs_wait_for_tty_drain",
+    "vfs_write_pass_marker",
+)
 FIXTURE_TRANSPORTS = {
     1: (
         "ramfs_test_fixture", "ramfs_test_context", "ramfs_test_",
@@ -110,6 +123,10 @@ FIXTURE_TRANSPORTS = {
         "ramfs_seed_test_fixture", "ramfs_seed_test_context", "ramfs_seed_test_",
         SEED_CONTEXT_FIELDS, SEED_CONTEXT_FUNCTIONS,
     ),
+    4: (
+        "vfs_service_fixture", "vfs_service_context", "vfs_",
+        PEER_CONTEXT_FIELDS, PEER_CONTEXT_FUNCTIONS,
+    ),
 }
 MODEL_STATE_FIELDS = (
     "seed", "random_state", "trace_hash", "step", "trace", "production",
@@ -118,9 +135,14 @@ MODEL_STATE_FIELDS = (
 )
 MODEL_TYPE_DIGEST = "93a26c70d7060c60dc9de8fd965111b93d4057895f39e4ee0f4d7ebe65dce702"
 MODEL_MACRO_DIGEST = "f986d01714b3d8caf017f82eebd4e2d8de6de768d0878a543d7ad316c348de18"
+PEER_RESULT_TYPE_DIGEST = "8e7637dec192ddb613c8fc031ffc39791653e1b0f4b8d8f043d4efe9cfc55803"
+KERNEL_CONST_OBJECT_DIGEST = "49d4895ed14632490d6f1dfddfb0c18a52acd9ae7787eeaff0dea63b63f15cab"
+KERNEL_RAW_OBJECT_DIGEST = "fed126e702cae04edc462115554a1f1dc14fa3a17d26415691f3275c5736df6b"
+KERNEL_REPORT_MACRO_DIGEST = "9107b9699d4b7b3926278a41aec3ba3c8bc2f3e3f9a79fba685ef7359a5ef57b"
 DATA_RENAMES = {
     1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
     3: {"ramfs_model_io": "model_io"},
+    5: {"ramfs_test_runtime_config": "runtime_config"},
 }
 MODEL_EXPECT_WITH_FILE = r"""#define MODEL_EXPECT(selected, expression) \
     do { \
@@ -256,9 +278,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (4, 5)
-)
+SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 
 # BEGIN IMMUTABLE BASELINE DATA
@@ -494,6 +514,50 @@ def body_digest(text, renames=None):
     return digest_bytes(json.dumps(body_tokens(text, renames), separators=(",", ":")).encode())
 
 
+def raw_const_objects(text, names):
+    lexical = c_lexical_text(text)
+    result = []
+    for name in names:
+        matches = tuple(re.finditer(
+            rf"(?m)^(?:static\s+)?const\s+struct\s+\w+\s+{re.escape(name)}\b"
+            r"\s*(?:\[[^\]]*\]\s*)?=\s*\{",
+            lexical,
+        ))
+        if len(matches) != 1:
+            raise AssertionError(f"expected one raw const initializer: {name}")
+        match = matches[0]
+        depth = 0
+        for end in range(match.end() - 1, len(lexical)):
+            if lexical[end] == "{":
+                depth += 1
+            elif lexical[end] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+        else:
+            raise AssertionError(f"unterminated const initializer: {name}")
+        end += 1
+        while end < len(lexical) and lexical[end].isspace():
+            end += 1
+        if end == len(lexical) or lexical[end] != ";":
+            raise AssertionError(f"missing const declaration terminator: {name}")
+        result.append(text[match.start():end + 1])
+    return tuple(result)
+
+
+def restored_kernel_objects(objects):
+    restored = []
+    for declaration in objects:
+        if "ramfs_test_runtime_config =" in declaration:
+            if not declaration.startswith("const struct micros_bootstrap_runtime_config "):
+                raise AssertionError("runtime configuration must remain one const object")
+            declaration = "static " + re.sub(r"\bramfs_test_runtime_config\b", "runtime_config", declaration)
+        elif not declaration.startswith("static const "):
+            raise AssertionError("kernel profile/service/policy data must stay static const")
+        restored.append(declaration)
+    return tuple(restored)
+
+
 def family_paths(family):
     return tuple(SOURCE_SETS.values())[family]
 
@@ -537,7 +601,7 @@ def normal_names(family):
 def fixture_transport_tokens(family, name, tokens):
     tag, getter, prefix, fields, context_functions = FIXTURE_TRANSPORTS[family]
     tokens = list(tokens)
-    if name == "main":
+    if name in ("main", "micros_service_main"):
         binding = list(body_tokens(
             f"struct {tag} *fixture = {getter}();"
         ))
@@ -626,12 +690,29 @@ def require_model_failure_macro(macro):
         raise AssertionError("model assertion behavior differs beyond verified caller-file transport")
 
 
+def peer_read_tokens(name, tokens):
+    if name != "micros_service_main":
+        return tokens
+    output = []
+    index = 0
+    while index < len(tokens):
+        if tokens[index:index + 3] == ("vfs_initialized_data_value", "(", ")"):
+            output.append("vfs_initialized_data")
+            index += 3
+        else:
+            output.append(tokens[index])
+            index += 1
+    return tuple(output)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
         tokens = model_transport_tokens(name, tokens)
+    if family == 4 and (ROOT / PRIVATE_HEADERS[4]).exists():
+        tokens = peer_read_tokens(name, tokens)
     renames = normal_names(family)
     if family in DATA_RENAMES:
         constants = DATA_RENAMES[family]
@@ -964,6 +1045,110 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
                 require_model_failure_macro(changed)
 
+    def test_peer_preserves_abi_initialized_data_and_only_four_bss_fields(self):
+        paths = family_paths(4)
+        header = source(PRIVATE_HEADERS[4])
+        types = header[header.index("struct vfs_ramfs_result {"):header.index("struct vfs_service_fixture {")]
+        self.assertEqual(PEER_RESULT_TYPE_DIGEST, body_digest(types))
+        fields = re.findall(r"struct vfs_service_fixture\s*\{([^{}]*)\}", header)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(body_tokens(
+            "uint8_t vfs_ramfs_buffer[MICROS_RAMFS_TRANSFER_MAX]; uint8_t vfs_tty_buffer[256]; "
+            "micros_endpoint_t vfs_ramfs_endpoint; micros_endpoint_t vfs_tty_endpoint;"
+        ), body_tokens(fields[0]))
+        objects = (
+            "volatile struct micros_bootstrap_service_config micros_bootstrap_service_config;",
+            "static struct vfs_service_fixture vfs_fixture;",
+            "static volatile uint64_t vfs_initialized_data = UINT64_C(0x52414d4653564653);",
+        )
+        for path in paths:
+            expected = objects if path == paths[1] else ()
+            self.assertEqual(
+                tuple(map(body_tokens, expected)),
+                tuple(map(body_tokens, file_scope_objects(source(path)))),
+            )
+        for getter, expression in (
+            ("vfs_service_context", "&vfs_fixture"),
+            ("vfs_initialized_data_value", "vfs_initialized_data"),
+        ):
+            self.assertEqual(
+                body_tokens("{ return " + expression + "; }"),
+                body_tokens(c_function_body(source(paths[1]), getter)),
+            )
+        self.assertEqual(38, len(owned_definitions(4)))
+        self.assertEqual(21, len(fixture_parameter_matches(4)))
+        for spelling, count in fixture_parameter_matches(4):
+            self.assertEqual(1, count, spelling)
+        self.assertIn("uint64_t vfs_initialized_data_value(void);", header)
+        self.assertIn("void micros_ramfs_service_test_report(uint64_t magic);", header)
+
+    def test_kernel_const_configuration_and_report_macros_are_base_exact(self):
+        paths = family_paths(5)
+        objects = file_scope_objects(source(paths[1]))
+        self.assertEqual(4, len(objects))
+        restored = restored_kernel_objects(objects)
+        self.assertEqual(KERNEL_CONST_OBJECT_DIGEST, body_digest("\n".join(restored)))
+        self.assertEqual(
+            KERNEL_REPORT_MACRO_DIGEST,
+            body_digest(macro_definition_text(source(paths[2]))),
+        )
+        self.assertEqual((), file_scope_objects(source(paths[0])))
+        self.assertEqual((), file_scope_objects(source(paths[2])))
+        self.assertEqual(4, len(owned_definitions(5)))
+
+    def test_kernel_configuration_preserves_raw_literals_not_only_masked_shape(self):
+        fixture = source(family_paths(5)[1])
+        objects = raw_const_objects(
+            fixture, ("profiles", "expected_services", "policies", "ramfs_test_runtime_config"),
+        )
+        self.assertEqual(
+            KERNEL_RAW_OBJECT_DIGEST,
+            body_digest("\n".join(restored_kernel_objects(objects))),
+        )
+
+    def test_raw_const_extraction_preserves_strings_and_rejects_ambiguous_bounds(self):
+        declaration = 'static const struct record profiles[] = { { .name = "quoted }; text" } };'
+        self.assertEqual((declaration,), raw_const_objects(declaration, ("profiles",)))
+        changed = declaration.replace("quoted }; text", "different")
+        self.assertNotEqual(
+            body_digest(raw_const_objects(declaration, ("profiles",))[0]),
+            body_digest(raw_const_objects(changed, ("profiles",))[0]),
+        )
+        for invalid in (declaration[:-1], declaration + "\n" + declaration):
+            with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
+                raw_const_objects(invalid, ("profiles",))
+
+    def test_private_headers_admit_only_owned_contracts_and_existing_assertion_macros(self):
+        guards = (
+            ("MICROS_SERVERS_RAMFS_INTERNAL_H",),
+            ("MICROS_TESTS_HOST_RAMFS_TEST_INTERNAL_H", "EXPECT_TRUE"),
+            ("MICROS_TESTS_HOST_RAMFS_SEED_TEST_INTERNAL_H", "EXPECT_TRUE"),
+            ("MICROS_TESTS_HOST_RAMFS_MODEL_INTERNAL_H", "MODEL_EXPECT"),
+            ("MICROS_TESTS_QEMU_RAMFS_SERVICE_VFS_INTERNAL_H",),
+            ("MICROS_KERNEL_RAMFS_SERVICE_TEST_INTERNAL_H",),
+        )
+        externs = (
+            (),
+            ("extern const micros_endpoint_t ramfs_test_vfs_endpoint;", "extern const struct micros_ramfs_io ramfs_test_io;"),
+            (),
+            ("extern const struct micros_ramfs_io ramfs_model_io;",),
+            (),
+            ("extern const struct micros_bootstrap_runtime_config ramfs_test_runtime_config;",),
+        )
+        private = set(PRIVATE_HEADERS)
+        for family, header_path in enumerate(PRIVATE_HEADERS):
+            header = source(header_path)
+            self.assertEqual(guards[family], tuple(re.findall(r"(?m)^#define\s+(\w+)", header)))
+            self.assertEqual(tuple(map(body_tokens, externs[family])), tuple(map(
+                body_tokens, re.findall(r"(?m)^extern[^;]*;", header),
+            )))
+            self.assertEqual({}, c_function_definitions(header))
+            self.assertEqual((), file_scope_objects(header))
+            for path in (*family_paths(family), header_path):
+                closure = set(local_include_closure(path))
+                self.assertEqual({header_path}, closure & private, path)
+                self.assertEqual(set(), {item for item in closure if item.endswith(".c") and item != path})
+
     def test_original_bodies_remain_frozen_during_owner_moves(self):
         for family, owners in enumerate(ORIGINAL_FUNCTIONS):
             definitions = owned_definitions(family)
@@ -1055,6 +1240,17 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
         expected = BASE_CMAKE_DIGEST if SYMBOL_OWNER_MIGRATION else digest_bytes(cmake.encode())
         self.assertEqual(expected, validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+
+    def test_unreviewed_recipe_identity_is_rejected_before_any_build_metadata(self):
+        with patch.dict("tools.validation_context.os.environ", {
+            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1",
+        }, clear=True), \
+                patch("tools.validation_context.platform_identity", return_value={}), \
+                patch("tools.validation_context._file_digest", return_value="unreviewed-recipe-bytes"), \
+                patch("tools.validation_context._cache") as cache:
+            with self.assertRaisesRegex(validation_context.UnsupportedContext, "build recipe"):
+                validation_context.collect(ROOT, "test-unit")
+            cache.assert_not_called()
 
     def test_recipe_reconstruction_rejects_unreviewed_sources_and_commands(self):
         cmake = source("CMakeLists.txt")
@@ -1184,6 +1380,30 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 self.assertNotEqual(
                     body_tokens(expected), model_transport_tokens("run_model", body_tokens(changed)),
                 )
+
+    def test_peer_borrow_preserves_volatile_read_order_and_buffer_extents(self):
+        body = (
+            "{ struct vfs_service_fixture *fixture = vfs_service_context(); "
+            "if (vfs_initialized_data_value() != MAGIC || !vfs_validate_configuration(fixture)) stop(); "
+            "clear(fixture->vfs_ramfs_buffer, sizeof(fixture->vfs_ramfs_buffer)); }"
+        )
+        expected = (
+            "{ if (vfs_initialized_data != MAGIC || !vfs_validate_configuration()) stop(); "
+            "clear(vfs_ramfs_buffer, sizeof(vfs_ramfs_buffer)); }"
+        )
+        normalized = fixture_transport_tokens(4, "micros_service_main", body_tokens(body))
+        self.assertEqual(body_tokens(expected), peer_read_tokens("micros_service_main", normalized))
+        with self.assertRaises(AssertionError):
+            fixture_transport_tokens(
+                4, "micros_service_main", body_tokens(body.replace("fixture->vfs_ramfs_buffer", "fixture->bus")),
+            )
+        changed = body.replace("vfs_initialized_data_value() != MAGIC", "MAGIC != MAGIC")
+        self.assertNotEqual(
+            body_tokens(expected),
+            peer_read_tokens(
+                "micros_service_main", fixture_transport_tokens(4, "micros_service_main", body_tokens(changed)),
+            ),
+        )
 
 
 if __name__ == "__main__":

@@ -302,6 +302,22 @@ set(
 )
 
 set(
+    MICROS_RAMFS_QEMU_PEER_SOURCES
+    tests/qemu/ramfs_service_vfs.c
+    tests/qemu/ramfs_service_vfs_fixture.c
+    tests/qemu/ramfs_service_vfs_ramfs.c
+    tests/qemu/ramfs_service_vfs_scenario.c
+    tests/qemu/ramfs_service_vfs_tty.c
+)
+
+set(
+    MICROS_RAMFS_QEMU_REPORT_SOURCES
+    kernel/ramfs_service_test.c
+    kernel/ramfs_service_test_fixture.c
+    kernel/ramfs_service_test_report.c
+)
+
+set(
     MICROS_RAMFS_SEED_IMAGE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
 )
@@ -3622,7 +3638,7 @@ if(
                 micros_ramfs_service_vfs
                 micros-ramfs-service-vfs
                 tests/qemu/ramfs_service_report.S
-                tests/qemu/ramfs_service_vfs.c
+                ${MICROS_RAMFS_QEMU_PEER_SOURCES}
             )
             set(
                 MICROS_RAMFS_SERVICE_FIXTURE_SOURCE
@@ -4012,7 +4028,7 @@ if(MICROS_BUILD_RAMFS_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
-            kernel/ramfs_service_test.c
+            ${MICROS_RAMFS_QEMU_REPORT_SOURCES}
     )
 endif()
 

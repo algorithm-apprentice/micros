@@ -272,6 +272,10 @@ static volatile uint64_t vfs_initialized_data = 0x52414d4653564653
 Aggregating the initialized word with large zero buffers would change
 file-backed ELF data and is forbidden. The six-service kernel profile,
 expected-service, policy, and runtime configuration tables remain const.
+The split entry reads the initialized word through a narrow `uint64_t`
+query whose sole action is the same volatile read. Its place before
+configuration validation is unchanged. The public configuration object,
+initialized word, and four-field BSS context remain three separate objects.
 
 Automatic result/message/handle/path arrays, rejected seed plans, case
 locals, validator `seen_blocks`, traversal cursors, write ranges, model
@@ -434,7 +438,7 @@ do not discard the new sets or arbitrary recipe changes in that oracle.
 
 ### Closed recipe declaration maintenance
 
-ADR-0064/0065's `RECIPE_DIGESTS["CMakeLists.txt"]` currently admits SHA-256
+At the reviewed base, ADR-0064/0065's `RECIPE_DIGESTS["CMakeLists.txt"]` admits SHA-256
 `afb07b0e891e11c677782570ac5a5310dd3cd3d2418c5b741555fe0263a04877`.
 The source-set move must not leave all three supported workflows ineligible.
 
@@ -454,6 +458,11 @@ profile name, three-workflow inventory, closure algorithms, complete
 source/tool/environment identities, strict receipt checks, and fail-closed
 fallback. This is maintenance of a separately reviewed exact declaration,
 not generalized source-list normalization during reuse.
+The complete six-set movement now reconstructs that immutable base exactly.
+Its one maintained full-recipe declaration is
+`cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6`;
+unreviewed recipe bytes still reject before build metadata is collected.
+Actual current-candidate producer/reuse acceptance remains required below.
 
 The implementation's current full producer plus bounded actual reuse
 acceptance must demonstrate native, smoke, and TTY-image receipts remain
@@ -479,6 +488,10 @@ long C functions and the Python renderer in a separate frozen semantic
 inventory. During green extraction only explicit pending entries may retain
 their reviewed-base owners/bodies. Both active collections are literal empty
 tuples before review.
+All 180 owner moves are now complete across the exact 32 C sources and six
+private contracts; the active owner collection is a literal empty tuple.
+The sixteen C plus one Python semantic migrations are still pending.
+Completing source ownership alone does not complete this implementation.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;
@@ -489,6 +502,10 @@ parent-order weakening, dropped state/data comparisons, lost grant revoke,
 reordered commit, reset of loaded seed, changed initialized storage, and
 callee-local success incorrectly replacing caller failure. This supplements
 real semantic evidence and full review, not a general C interpreter.
+Kernel configuration checks retain both declaration shape and complete raw
+initializer tokens, including all nineteen service/profile string literals.
+Lexically masked inspection text is not a source-copy or literal oracle;
+the raw-range regression rejects that loss independently.
 
 The narrow implementation loop is:
 

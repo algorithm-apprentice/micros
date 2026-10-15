@@ -352,10 +352,12 @@ The selected RAMFS maintenance correction is Accepted
 [RAMFS source contract](architecture/ramfs-source-organization.md).
 It exposes portable state/codec/ownership/namespace/I/O/directory work,
 native and independent-model evidence, target peer/report, and generator
-phases without changing Step 12 behavior. Design is documentation-only;
-independent design and bounded correction review are clean. Implementation
-remains pending the separate design merge. This correction adds no production
-init, shell, command, or runtime-DAG node.
+phases without changing Step 12 behavior. Its documentation-only design and
+clean bounded correction review merged as #133. Implementation now exposes
+all specified source owners, with an empty owner migration and retained
+native/model and real QEMU evidence. Semantic function migrations, complete
+current author evidence and independent implementation review remain pending.
+This correction adds no production init, shell, command, or runtime-DAG node.
 
 ## v0.1 completion goal
 
