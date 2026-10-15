@@ -559,7 +559,14 @@ original malformed-name bytes are explicitly initialized in the same
 automatic work record, before the unchanged root initializer; no blanket
 initialization, duplicate buffer or lost `sizeof` extent is introduced.
 Full typed projection retains original resets, the 61-node fill and no-copy
-exhaustion proof. Two C semantic migrations remain pending, alongside the specified
+exhaustion proof. Lookup functional evidence now has six ordered reference,
+confinement, path-bound, non-directory, malformed/range and grant/overflow
+tasks with a 26-line root. Ten unique readonly paths keep static duration;
+four original mutable arrays keep exact automatic extents and initial
+bytes, without whole-work initialization or extra buffers. Raw actual
+constant checks and typed projection preserve the entire original case,
+including missing-before-overlong error precedence. One C semantic migration
+remains pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 

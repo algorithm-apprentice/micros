@@ -180,7 +180,61 @@ SEED_CASE_PHASES = {
         ("seed_record_special_name_rejections", ("fixture", "etc", "motd")),
     ),
 }
+FUNCTIONAL_LOOKUP_READONLY = (
+    'static const uint8_t absolute_motd[] = "/etc/motd"; '
+    'static const uint8_t relative_motd[] = "etc//./motd"; '
+    'static const uint8_t empty[] = ""; '
+    'static const uint8_t parent_path[] = "../etc/motd"; '
+    'static const uint8_t confined_parent[] = "../motd"; '
+    'static const uint8_t trailing[] = "/etc/motd/"; '
+    'static const uint8_t missing[] = "/missing"; '
+    'static const uint8_t dot[] = "."; '
+    'static const uint8_t dotdot[] = ".."; '
+    'static const uint8_t parent_name[] = "../name";'
+)
 FUNCTIONAL_CASE_WORK = {
+    "lookup_semantics_and_reference_limits_are_exact": {
+        "owner": 3,
+        "tag": "ramfs_lookup_case",
+        "fields": (
+            "action", "message", "overlong", "embedded", "missing_nul",
+            "missing_then_overlong", "root", "etc", "motd",
+        ),
+        "schema": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint8_t overlong[MICROS_RAMFS_NAME_MAX + 2]; uint8_t embedded[6]; uint8_t missing_nul[4]; "
+            'uint8_t missing_then_overlong[sizeof("/missing/") + MICROS_RAMFS_NAME_MAX + 1]; '
+            "uint64_t root; uint64_t etc; uint64_t motd;"
+        ),
+        "original": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            + FUNCTIONAL_LOOKUP_READONLY
+            + r" uint8_t overlong[MICROS_RAMFS_NAME_MAX + 2]; uint8_t embedded[] = {'/', 'e', 't', '\0', 'c', '\0'}; "
+            "uint8_t missing_nul[] = {'/', 'e', 't', 'c'}; "
+            'uint8_t missing_then_overlong[sizeof("/missing/") + MICROS_RAMFS_NAME_MAX + 1]; '
+            "uint64_t root = micros_ramfs_handle(0, 1); uint64_t etc = micros_ramfs_handle(1, 1); "
+            "uint64_t motd = micros_ramfs_handle(2, 1);"
+        ),
+        "outlined": (
+            "struct ramfs_lookup_case work; "
+            "work.embedded[0] = '/'; work.embedded[1] = 'e'; work.embedded[2] = 't'; "
+            r"work.embedded[3] = '\0'; work.embedded[4] = 'c'; work.embedded[5] = '\0'; "
+            "work.missing_nul[0] = '/'; work.missing_nul[1] = 'e'; "
+            "work.missing_nul[2] = 't'; work.missing_nul[3] = 'c'; "
+            "work.root = micros_ramfs_handle(0, 1); work.etc = micros_ramfs_handle(1, 1); "
+            "work.motd = micros_ramfs_handle(2, 1);"
+        ),
+        "readonly": FUNCTIONAL_LOOKUP_READONLY,
+        "first_array": "absolute_motd",
+        "phases": (
+            ("lookup_absolute_relative_references", ("fixture", "&work")),
+            ("lookup_confined_root", ("fixture", "&work")),
+            ("lookup_trailing_missing_bounds", ("fixture", "&work")),
+            ("lookup_non_directory_starts", ("fixture", "&work")),
+            ("lookup_malformed_and_ranges", ("fixture", "&work")),
+            ("lookup_grant_and_reference_overflow", ("fixture", "&work")),
+        ),
+    },
     "handles_create_mkdir_and_capacity_are_exact": {
         "owner": 3,
         "tag": "ramfs_creation_case",
@@ -443,24 +497,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-LONG_FUNCTION_MIGRATION = tuple(
-    entry for entry in LONG_FUNCTIONS
-    if entry not in (
-        (0, "micros_ramfs_handle_call"), (0, "handle_write"), (6, "render_fixture"),
-        (2, "header_corruption_is_rejected"),
-        (2, "record_name_and_reserved_corruption_is_rejected"),
-        (1, "getdents_cursor_and_records_are_exact"),
-        (1, "protocol_mount_and_result_layout_are_exact"),
-        (1, "read_write_sparse_and_block_capacity_are_exact"),
-        (3, "execute_scripted_operation"),
-        (3, "reference_lookup"),
-        (0, "handle_create_or_mkdir"),
-        (0, "handle_lookup"),
-        (4, "vfs_run_filesystem_scenario"),
-        (5, "micros_ramfs_service_test_handle_trap"),
-        (1, "handles_create_mkdir_and_capacity_are_exact"),
-    )
-)
+LONG_FUNCTION_MIGRATION = ((0, "validate_state"),)
 
 # BEGIN IMMUTABLE BASELINE DATA
 BASELINE_BODIES = {0: {'protocol_result': '02a1a2f4f9f9938f5183c64a2ac52bd381128e5fd6332b7ebb2a21d5670e2a43',
@@ -886,16 +923,32 @@ def peer_read_tokens(name, tokens):
     return tuple(output)
 
 
-def peer_readonly_data(text):
-    starts = tuple(re.finditer(r"(?m)^static const uint8_t motd_path\[\]\s*=", text))
-    ends = tuple(re.finditer(r"(?m)^static bool filesystem_mount_seed\(", text))
+def readonly_case_data(text, first_array, first_phase, expected):
+    starts = tuple(re.finditer(rf"(?m)^static const uint8_t {re.escape(first_array)}\[\]\s*=", text))
+    ends = tuple(re.finditer(rf"(?m)^static bool {re.escape(first_phase)}\(", text))
     if len(starts) != 1 or len(ends) != 1 or starts[0].start() >= ends[0].start():
-        raise AssertionError("peer scenario must own one exact readonly static array block")
+        raise AssertionError("case must own one exact readonly static array block")
     data = text[starts[0].start():ends[0].start()]
-    if body_tokens(data) != body_tokens(PEER_READONLY_STATICS):
-        raise AssertionError("peer static arrays changed literal values, const/static lifetime or membership")
+    if body_tokens(data) != body_tokens(expected):
+        raise AssertionError("case static arrays changed literal values, const/static lifetime or membership")
     return data
 
+
+def peer_readonly_data(text):
+    return readonly_case_data(text, "motd_path", "filesystem_mount_seed", PEER_READONLY_STATICS)
+
+
+def functional_readonly_objects(text, owner):
+    for name, specification in FUNCTIONAL_CASE_WORK.items():
+        if (
+            specification["owner"] == owner and "readonly" in specification
+            and (1, name) not in LONG_FUNCTION_MIGRATION
+        ):
+            readonly_case_data(
+                text, specification["first_array"], specification["phases"][0][0], specification["readonly"],
+            )
+            return file_scope_objects(specification["readonly"])
+    return ()
 
 def dispatcher_body_tokens(caller, phase):
     caller = list(body_tokens(caller))
@@ -1315,6 +1368,7 @@ def original_body_digest(family, name, text):
     if family == 1 and name in FUNCTIONAL_CASE_WORK and (1, name) not in LONG_FUNCTION_MIGRATION:
         specification = FUNCTIONAL_CASE_WORK[name]
         owner = source(family_paths(1)[specification["owner"]])
+        functional_readonly_objects(owner, specification["owner"])
         phases = [
             (phase, c_function_body(owner, phase[0]))
             for phase in specification["phases"]
@@ -1671,7 +1725,10 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             ".copy = test_copy, .context = &test_fixture.bus, };",
         )
         for path in paths:
-            expected = expected_objects if path == paths[1] else ()
+            expected = (
+                expected_objects if path == paths[1]
+                else functional_readonly_objects(source(path), paths.index(path))
+            )
             self.assertEqual(
                 tuple(map(body_tokens, expected)),
                 tuple(map(body_tokens, file_scope_objects(source(path)))),
@@ -2026,7 +2083,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             self.assertLessEqual(set(arguments), {"fixture", "&work"})
             expected = f"static bool {name}({', '.join(parameters)}) {{"
             self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
-        self.assertEqual((), file_scope_objects(text))
+        self.assertEqual(functional_readonly_objects(text, specification["owner"]), file_scope_objects(text))
         self.assertEqual("", macro_definition_text(text))
 
     def test_directory_case_exposes_only_original_automatic_work_and_ordered_phases(self):
@@ -2038,6 +2095,9 @@ class RamfsSourceLayoutTest(unittest.TestCase):
 
     def test_creation_case_keeps_name_bytes_automatic_and_exact_initialization(self):
         self.check_functional_work_case("handles_create_mkdir_and_capacity_are_exact")
+
+    def test_lookup_case_preserves_all_static_paths_and_exact_automatic_array_extents(self):
+        self.check_functional_work_case("lookup_semantics_and_reference_limits_are_exact")
 
     def test_scripted_model_exposes_exact_setup_and_proof_tasks(self):
         text = source(family_paths(3)[5])

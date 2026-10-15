@@ -11,6 +11,365 @@ struct ramfs_creation_case {
     size_t index;
 };
 
+struct ramfs_lookup_case {
+    struct micros_ramfs_reply_action action;
+    struct micros_ipc_message message;
+    uint8_t overlong[MICROS_RAMFS_NAME_MAX + 2];
+    uint8_t embedded[6];
+    uint8_t missing_nul[4];
+    uint8_t missing_then_overlong[sizeof("/missing/") + MICROS_RAMFS_NAME_MAX + 1];
+    uint64_t root;
+    uint64_t etc;
+    uint64_t motd;
+};
+
+static const uint8_t absolute_motd[] = "/etc/motd";
+static const uint8_t relative_motd[] = "etc//./motd";
+static const uint8_t empty[] = "";
+static const uint8_t parent_path[] = "../etc/motd";
+static const uint8_t confined_parent[] = "../motd";
+static const uint8_t trailing[] = "/etc/motd/";
+static const uint8_t missing[] = "/missing";
+static const uint8_t dot[] = ".";
+static const uint8_t dotdot[] = "..";
+static const uint8_t parent_name[] = "../name";
+
+static bool lookup_absolute_relative_references(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            absolute_motd,
+            sizeof(absolute_motd),
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[16]) == work->motd);
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[24]) == 13);
+    EXPECT_TRUE(fixture->state.nodes[2].reference_count == 1);
+
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            relative_motd,
+            sizeof(relative_motd),
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(fixture->state.nodes[2].reference_count == 2);
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            empty,
+            sizeof(empty),
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[16]) == work->root);
+    EXPECT_TRUE(fixture->state.nodes[0].reference_count == 2);
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            parent_path,
+            sizeof(parent_path),
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    return true;
+}
+
+static bool lookup_confined_root(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            (const uint8_t *)"/etc",
+            5,
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[16]) == work->etc);
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->etc,
+            work->etc,
+            confined_parent,
+            sizeof(confined_parent),
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[16]) == work->motd);
+
+    ramfs_test_reset_bus(fixture);
+    work->message = ramfs_test_lookup_request(work->root, work->etc, 1, 0);
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    EXPECT_TRUE(fixture->bus.calls == 0);
+    return true;
+}
+
+static bool lookup_trailing_missing_bounds(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            trailing,
+            sizeof(trailing),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            missing,
+            sizeof(missing),
+            MICROS_RAMFS_RESULT_NOT_FOUND,
+            &work->action
+        )
+    );
+    memcpy(work->missing_then_overlong, "/missing/", sizeof("/missing/") - 1);
+    memset(
+        &work->missing_then_overlong[sizeof("/missing/") - 1],
+        'a',
+        MICROS_RAMFS_NAME_MAX + 1
+    );
+    work->missing_then_overlong[sizeof(work->missing_then_overlong) - 1] = 0;
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            work->missing_then_overlong,
+            sizeof(work->missing_then_overlong),
+            MICROS_RAMFS_RESULT_RANGE,
+            &work->action
+        )
+    );
+
+    memset(work->overlong, 'a', sizeof(work->overlong));
+    work->overlong[sizeof(work->overlong) - 1] = 0;
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            work->overlong,
+            sizeof(work->overlong),
+            MICROS_RAMFS_RESULT_RANGE,
+            &work->action
+        )
+    );
+    return true;
+}
+
+static bool lookup_non_directory_starts(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->root,
+            empty,
+            sizeof(empty),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->root,
+            dot,
+            sizeof(dot),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->root,
+            dotdot,
+            sizeof(dotdot),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->root,
+            parent_name,
+            sizeof(parent_name),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->root,
+            (const uint8_t *)"/etc",
+            5,
+            MICROS_RAMFS_RESULT_OK,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->motd,
+            work->motd,
+            dot,
+            sizeof(dot),
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
+            &work->action
+        )
+    );
+    return true;
+}
+
+static bool lookup_malformed_and_ranges(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            work->embedded,
+            sizeof(work->embedded),
+            MICROS_RAMFS_RESULT_MALFORMED,
+            &work->action
+        )
+    );
+    EXPECT_TRUE(
+        ramfs_test_lookup_path(
+            fixture,
+            work->root,
+            work->root,
+            work->missing_nul,
+            sizeof(work->missing_nul),
+            MICROS_RAMFS_RESULT_MALFORMED,
+            &work->action
+        )
+    );
+
+    ramfs_test_reset_bus(fixture);
+    work->message = ramfs_test_lookup_request(work->root, work->root, 0, 0);
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    work->message = ramfs_test_lookup_request(
+        work->root,
+        work->root,
+        MICROS_RAMFS_PATH_MAX + 1,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    work->message = ramfs_test_lookup_request(work->root, work->root, 1, UINT64_MAX);
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    return true;
+}
+
+static bool lookup_grant_and_reference_overflow(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_lookup_case *work
+)
+{
+    ramfs_test_reset_bus(fixture);
+    fixture->bus.storage[0] = 0;
+    fixture->bus.reject = true;
+    work->message = ramfs_test_lookup_request(work->root, work->root, 1, 0);
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_GRANT
+        )
+    );
+
+    fixture->state.nodes[2].reference_count = UINT32_MAX;
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, absolute_motd, sizeof(absolute_motd));
+    work->message = ramfs_test_lookup_request(
+        work->root,
+        work->root,
+        sizeof(absolute_motd),
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_NO_SPACE
+        )
+    );
+    return true;
+}
+
 static bool creation_file_and_duplicate(
     struct ramfs_test_fixture *fixture,
     struct ramfs_creation_case *work
@@ -313,320 +672,27 @@ bool ramfs_test_lookup_semantics_and_reference_limits_are_exact(
     struct ramfs_test_fixture *fixture
 )
 {
-    struct micros_ramfs_reply_action action;
-    struct micros_ipc_message message;
-    static const uint8_t absolute_motd[] = "/etc/motd";
-    static const uint8_t relative_motd[] = "etc//./motd";
-    static const uint8_t empty[] = "";
-    static const uint8_t parent_path[] = "../etc/motd";
-    static const uint8_t confined_parent[] = "../motd";
-    static const uint8_t trailing[] = "/etc/motd/";
-    static const uint8_t missing[] = "/missing";
-    static const uint8_t dot[] = ".";
-    static const uint8_t dotdot[] = "..";
-    static const uint8_t parent_name[] = "../name";
-    uint8_t overlong[MICROS_RAMFS_NAME_MAX + 2];
-    uint8_t embedded[] = {'/', 'e', 't', '\0', 'c', '\0'};
-    uint8_t missing_nul[] = {'/', 'e', 't', 'c'};
-    uint8_t missing_then_overlong[
-        sizeof("/missing/") + MICROS_RAMFS_NAME_MAX + 1
-    ];
-    uint64_t root = micros_ramfs_handle(0, 1);
-    uint64_t etc = micros_ramfs_handle(1, 1);
-    uint64_t motd = micros_ramfs_handle(2, 1);
+    struct ramfs_lookup_case work;
+    work.embedded[0] = '/';
+    work.embedded[1] = 'e';
+    work.embedded[2] = 't';
+    work.embedded[3] = '\0';
+    work.embedded[4] = 'c';
+    work.embedded[5] = '\0';
+    work.missing_nul[0] = '/';
+    work.missing_nul[1] = 'e';
+    work.missing_nul[2] = 't';
+    work.missing_nul[3] = 'c';
+    work.root = micros_ramfs_handle(0, 1);
+    work.etc = micros_ramfs_handle(1, 1);
+    work.motd = micros_ramfs_handle(2, 1);
 
-    EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            absolute_motd,
-            sizeof(absolute_motd),
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[16]) == motd);
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[24]) == 13);
-    EXPECT_TRUE(fixture->state.nodes[2].reference_count == 1);
-
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            relative_motd,
-            sizeof(relative_motd),
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(fixture->state.nodes[2].reference_count == 2);
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            empty,
-            sizeof(empty),
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[16]) == root);
-    EXPECT_TRUE(fixture->state.nodes[0].reference_count == 2);
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            parent_path,
-            sizeof(parent_path),
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            (const uint8_t *)"/etc",
-            5,
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[16]) == etc);
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            etc,
-            etc,
-            confined_parent,
-            sizeof(confined_parent),
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[16]) == motd);
-
-    ramfs_test_reset_bus(fixture);
-    message = ramfs_test_lookup_request(root, etc, 1, 0);
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-    EXPECT_TRUE(fixture->bus.calls == 0);
-
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            trailing,
-            sizeof(trailing),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            missing,
-            sizeof(missing),
-            MICROS_RAMFS_RESULT_NOT_FOUND,
-            &action
-        )
-    );
-    memcpy(missing_then_overlong, "/missing/", sizeof("/missing/") - 1);
-    memset(
-        &missing_then_overlong[sizeof("/missing/") - 1],
-        'a',
-        MICROS_RAMFS_NAME_MAX + 1
-    );
-    missing_then_overlong[sizeof(missing_then_overlong) - 1] = 0;
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            missing_then_overlong,
-            sizeof(missing_then_overlong),
-            MICROS_RAMFS_RESULT_RANGE,
-            &action
-        )
-    );
-
-    memset(overlong, 'a', sizeof(overlong));
-    overlong[sizeof(overlong) - 1] = 0;
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            overlong,
-            sizeof(overlong),
-            MICROS_RAMFS_RESULT_RANGE,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            root,
-            empty,
-            sizeof(empty),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            root,
-            dot,
-            sizeof(dot),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            root,
-            dotdot,
-            sizeof(dotdot),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            root,
-            parent_name,
-            sizeof(parent_name),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            root,
-            (const uint8_t *)"/etc",
-            5,
-            MICROS_RAMFS_RESULT_OK,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            motd,
-            motd,
-            dot,
-            sizeof(dot),
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            embedded,
-            sizeof(embedded),
-            MICROS_RAMFS_RESULT_MALFORMED,
-            &action
-        )
-    );
-    EXPECT_TRUE(
-        ramfs_test_lookup_path(
-            fixture,
-            root,
-            root,
-            missing_nul,
-            sizeof(missing_nul),
-            MICROS_RAMFS_RESULT_MALFORMED,
-            &action
-        )
-    );
-
-    ramfs_test_reset_bus(fixture);
-    message = ramfs_test_lookup_request(root, root, 0, 0);
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-    message = ramfs_test_lookup_request(
-        root,
-        root,
-        MICROS_RAMFS_PATH_MAX + 1,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-    message = ramfs_test_lookup_request(root, root, 1, UINT64_MAX);
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-
-    ramfs_test_reset_bus(fixture);
-    fixture->bus.storage[0] = 0;
-    fixture->bus.reject = true;
-    message = ramfs_test_lookup_request(root, root, 1, 0);
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_GRANT
-        )
-    );
-
-    fixture->state.nodes[2].reference_count = UINT32_MAX;
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, absolute_motd, sizeof(absolute_motd));
-    message = ramfs_test_lookup_request(
-        root,
-        root,
-        sizeof(absolute_motd),
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_NO_SPACE
-        )
-    );
-    return true;
+    return lookup_absolute_relative_references(fixture, &work)
+        && lookup_confined_root(fixture, &work)
+        && lookup_trailing_missing_bounds(fixture, &work)
+        && lookup_non_directory_starts(fixture, &work)
+        && lookup_malformed_and_ranges(fixture, &work)
+        && lookup_grant_and_reference_overflow(fixture, &work);
 }
 
 bool ramfs_test_handles_create_mkdir_and_capacity_are_exact(
