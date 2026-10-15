@@ -10,9 +10,10 @@ import re
 import unittest
 from unittest.mock import patch
 
-from tests.host.test_frame_ownership_source_layout import c_function_definitions
+from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text
 from tests.host.test_kernel_bootstrap_source_layout import c_function_body
 from tests.host.test_pm_service_source_layout import cmake_commands
+from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
 
 
@@ -201,7 +202,9 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0
     for name in names
 )
-SYMBOL_OWNER_MIGRATION = INITIAL_SYMBOL_OWNER_MIGRATION
+SYMBOL_OWNER_MIGRATION = tuple(
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (1, 2, 3, 4, 5)
+)
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 
 # BEGIN IMMUTABLE BASELINE DATA
@@ -477,6 +480,26 @@ def normal_names(family):
     }
 
 
+def restored_cmake(text):
+    for family, (name, paths) in enumerate(SOURCE_SETS.items()):
+        blocks = cmake_commands(text, "set", name)
+        if not blocks:
+            continue
+        if len(blocks) != 1 or body_tokens(blocks[0]) != body_tokens(f"set({name} {' '.join(paths)})"):
+            raise AssertionError(f"wrong RAMFS source set: {name}")
+        insertion = blocks[0] + "\n\n"
+        if text.count(insertion) != 1:
+            raise AssertionError(f"unexpected source-set insertion boundary: {name}")
+        text = text.replace(insertion, "", 1)
+        variable = "${" + name + "}"
+        if text.count(variable) != (3, 1, 1, 1, 1, 1)[family]:
+            raise AssertionError(f"wrong source-set consumer count: {name}")
+        text = text.replace(variable, paths[0])
+    if digest_bytes(text.encode()) != BASE_CMAKE_DIGEST:
+        raise AssertionError("CMake contains changes outside the exact RAMFS source operands")
+    return text
+
+
 class RamfsSourceLayoutTest(unittest.TestCase):
     maxDiff = None
 
@@ -523,6 +546,59 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                     body_tokens(blocks[0]),
                 )
                 self.assertEqual((3, 1, 1, 1, 1, 1)[family], cmake.count("${" + name + "}"))
+
+    def test_portable_private_contract_preserves_leaf_direction_and_no_new_authority(self):
+        paths = family_paths(0)
+        definitions = owned_definitions(0)
+        owners = {name: path for path, name in definitions}
+        self.assertEqual(len(definitions), len(owners))
+        edges = set()
+        exports = set()
+        allowed = {
+            0: {1, 2, 3, 5, 6, 7},
+            1: set(),
+            2: {1},
+            3: {1, 2},
+            4: set(),
+            5: {1, 2, 3, 4},
+            6: {1, 2, 3, 4},
+            7: {1, 2, 3, 4},
+        }
+        for (path, name) in definitions:
+            body = c_lexical_text(c_function_body(source(path), name))
+            for callee in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body):
+                if callee not in owners or owners[callee] == path:
+                    continue
+                dependency = owners[callee]
+                self.assertIn(paths.index(dependency), allowed[paths.index(path)])
+                edges.add((dependency, path))
+                if not callee.startswith("micros_"):
+                    exports.add(callee)
+        self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
+        header = source(PRIVATE_HEADERS[0])
+        self.assertEqual({}, c_function_definitions(header))
+        declarations = re.findall(
+            r"\b(ramfs_[A-Za-z_]\w*)\s*\([^;{}]*\)\s*;", c_lexical_text(header),
+        )
+        self.assertEqual(len(declarations), len(set(declarations)))
+        self.assertEqual(exports, set(declarations))
+        self.assertEqual(
+            ["MICROS_SERVERS_RAMFS_INTERNAL_H"],
+            re.findall(r"(?m)^#define\s+(\w+)", header),
+        )
+        fields = re.search(r"struct ramfs_result_fields\s*\{([^{}]*)\}", header)
+        self.assertIsNotNone(fields)
+        self.assertEqual(
+            body_tokens("uint64_t node; uint64_t file_size; uint64_t position; uint32_t count; uint32_t mode;"),
+            body_tokens(fields.group(1)),
+        )
+        self.assertIn(
+            "#define MICROS_RAMFS_INITIALIZATION_MAGIC \\\n"
+            "    UINT64_C(0x4d4943524f535246)",
+            source(paths[3]),
+        )
+        for path in paths:
+            self.assertNotIn("static struct micros_ramfs_state", source(path))
 
     def test_original_bodies_remain_frozen_during_owner_moves(self):
         for family, owners in enumerate(ORIGINAL_FUNCTIONS):
@@ -610,11 +686,23 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             validation_plan.plan([STRUCTURAL_TEST_PATH], "fast", "main"),
         )
 
-    def test_cmake_remains_frozen_before_source_set_wiring(self):
-        self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes((ROOT / "CMakeLists.txt").read_bytes()))
-        self.assertEqual(BASE_CMAKE_DIGEST, validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
-        for name in SOURCE_SETS:
-            self.assertEqual((), cmake_commands(source("CMakeLists.txt"), "set", name))
+    def test_recipe_reconstruction_and_closed_declaration_maintenance(self):
+        cmake = source("CMakeLists.txt")
+        self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
+        expected = BASE_CMAKE_DIGEST if SYMBOL_OWNER_MIGRATION else digest_bytes(cmake.encode())
+        self.assertEqual(expected, validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+
+    def test_recipe_reconstruction_rejects_unreviewed_sources_and_commands(self):
+        cmake = source("CMakeLists.txt")
+        restored_cmake(cmake)
+        for changed in (
+            cmake.replace("ramfs_codec.c", "ramfs_unreviewed.c", 1),
+            cmake + "\nadd_custom_target(unreviewed COMMAND true)\n",
+            cmake.replace("${MICROS_RAMFS_CORE_SOURCES}", "servers/ramfs/ramfs_core.c", 1),
+            cmake.replace("-Wall", "-Wno-all", 1),
+        ):
+            with self.subTest(changed=changed[:80]), self.assertRaises(AssertionError):
+                restored_cmake(changed)
 
     def test_body_fingerprint_rejects_literal_authority_and_order_mutations(self):
         baseline = 'if (source != endpoint) return ERROR; copy(state, "a b", \'x\'); ++state->count;'

@@ -262,6 +262,18 @@ set(
 )
 
 set(
+    MICROS_RAMFS_CORE_SOURCES
+    servers/ramfs/ramfs_core.c
+    servers/ramfs/ramfs_codec.c
+    servers/ramfs/ramfs_ownership.c
+    servers/ramfs/ramfs_state.c
+    servers/ramfs/ramfs_transfer.c
+    servers/ramfs/ramfs_namespace.c
+    servers/ramfs/ramfs_io.c
+    servers/ramfs/ramfs_directory.c
+)
+
+set(
     MICROS_RAMFS_SEED_IMAGE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
 )
@@ -1381,14 +1393,14 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(ramfs_seed_test ramfs_seed_image)
     add_executable(
         ramfs_test
-        servers/ramfs/ramfs_core.c
+        ${MICROS_RAMFS_CORE_SOURCES}
         servers/ramfs/ramfs_seed.c
         tests/host/ramfs_test.c
     )
     add_dependencies(ramfs_test ramfs_seed_image)
     add_executable(
         ramfs_model_test
-        servers/ramfs/ramfs_core.c
+        ${MICROS_RAMFS_CORE_SOURCES}
         servers/ramfs/ramfs_seed.c
         tests/host/ramfs_model_test.c
     )
@@ -3104,7 +3116,7 @@ if(
             micros_ramfs_service
             micros-ramfs-service
             "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
-            servers/ramfs/ramfs_core.c
+            ${MICROS_RAMFS_CORE_SOURCES}
             servers/ramfs/ramfs_seed.c
             servers/ramfs/ramfs_service.c
         )
