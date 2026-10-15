@@ -479,7 +479,12 @@ author plan. Squash invalidates old-HEAD receipts even for an identical tree.
 
 ## Implementation sequence and design barrier
 
-### Current implementation progress
+### Implementation evidence and completed outcome
+
+Design #135 and implementation #136 are merged. The following records the
+green-slice sequence; declarations-only units and intermediate counts refer
+to historical slices, not the completed tree. Every final owner contains
+its real tasks.
 
 Design #135 is merged as `b99a035`. The first implementation slice exposes
 the fifteen original codec definitions and fourteen necessary cross-owner
@@ -589,9 +594,20 @@ tuples, with all original bodies reconstructed and all intended C owners
 containing their real tasks. Final guards also require the two migration
 declarations to be literal empty AST tuples and every evidence definition,
 including file-local phases, to use its accepted family namespace.
-Complete current final-author/profile-reuse
-acceptance and independent implementation review remain required; this is
-not a completed endpoint correction.
+Implementation #136 completed the entire 47-command fresh author plan,
+additional actual three-profile reuse and independent read-only review with
+no substantive issue remaining. Squash
+`4eb1c4d68de3830b888a0d239a2874bd79792244` has the exact reviewed tree
+`98c6e1b0eddd06f8c2a4a4c365e5bec26fa8acf2`; main was fast-forwarded and
+both obsolete feature branches removed. This closes the endpoint correction,
+not production init/shell/commands or later maintenance.
+
+Proposed [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) defines
+a future bounded object-source inverse for this contract's retained
+`kernel/kernel_objects.c` hash. It must keep the original
+`453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
+expected value and all other artifacts unchanged. It is not usable until
+the separate object design is Accepted and merged.
 
 ### Reviewed sequence
 

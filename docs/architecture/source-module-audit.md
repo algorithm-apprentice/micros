@@ -106,7 +106,7 @@ the next behavior-bearing change to their own subsystem.
 | Kernel IPC | 11 | Apply Accepted [ADR-0059](../adr/0059-kernel-ipc-source-decomposition.md) and the exact [kernel IPC source organization](kernel-ipc-source-organization.md): separate queue/completion/token/event/deadlock/rendezvous/close owners, captured syscall adaptation, nine evidence contexts, independent reference operations, and retained target scripts. Implement only after the independently reviewed design merges. | `kernel-ipc-decomposition-design` / `kernel-ipc-decomposition-implementation` |
 | Kernel endpoints | 4 | Apply Accepted [ADR-0067](../adr/0067-kernel-endpoint-source-decomposition.md) and the exact [endpoint source contract](kernel-endpoint-source-organization.md) only after separate design merge: separate representation/identity, profile and complete validation, publication/source-only/close, native/model, and target tasks while preserving authority and real closed-profile eligibility. | `kernel-endpoint-decomposition-design` / `kernel-endpoint-decomposition-implementation` |
 | Kernel scheduler | 6 | Apply Accepted [ADR-0062](../adr/0062-kernel-scheduler-source-decomposition.md) and the exact [scheduler source contract](kernel-scheduler-source-organization.md) only after reviewed design merge: separate ready queues, IPC transactions, complete validation, planning/commit/accounting, selected completion and return, independent fixtures/models, and target evidence without changing behavior. | `kernel-scheduler-decomposition-design` / `kernel-scheduler-decomposition-implementation` |
-| Kernel objects | 3 | Separate process, thread, hart, execution-context, complete-validation, model, and target-test responsibilities while preserving distinct identities. | `kernel-object-decomposition-design` / `kernel-object-decomposition-implementation` |
+| Kernel objects | 3 | Follow Proposed [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) and the exact [object source contract](kernel-object-source-organization.md), only after reviewed design merge: separate representation/identity, process/thread/context/hart, base validation, native/model and target tasks while retaining distinct identities, original storage and real validation-profile eligibility. | `kernel-object-decomposition-design` / `kernel-object-decomposition-implementation` |
 | Kernel bootstrap | 10 | Apply Accepted [ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) and the exact [bootstrap source contract](kernel-bootstrap-source-organization.md) only after design merge: separate manifest/profile validation, preparation and rollback, diagnostics, captured control, boot entry, launcher, fixtures, reference replay and shared descriptor phases without changing behavior. | `kernel-bootstrap-decomposition-design` / `kernel-bootstrap-decomposition-implementation` |
 | Trap and syscall routing | 6 | Apply Accepted [ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) and the exact [trap/syscall source contract](trap-syscall-source-organization.md) only after design merge: separate routed context, user/supervisor interrupt, syscall, fault, return, bounded test hooks, and existing runtime evidence while preserving register custody and authority. | `trap-syscall-decomposition-design` / `trap-syscall-decomposition-implementation` |
 | Grant data plane | 7 | Preserve the cohesive grant registry while splitting non-atomic range planning, copying, syscall, model, and target-test tasks. | `grant-data-plane-decomposition-design` / `grant-data-plane-decomposition-implementation` |
@@ -208,9 +208,10 @@ Every signal file belongs to exactly one unit or exception.
 The Accepted
 [exact endpoint contract](kernel-endpoint-source-organization.md) partitions
 all 98 original definitions into 25 C sources and four private contracts,
-with 90 moves and ten required long-function dispositions. The design-only
-phase follows merged RAMFS #134; implementation remains pending until its
-own independently reviewed design merges.
+with 90 moves and ten required long-function dispositions. Design #135 and
+implementation #136 are independently reviewed and merged. The complete
+fresh author plan, actual native/smoke/TTY-image reuse and identical
+validated/reviewed squash tree close this correction.
 
 ### Kernel scheduler
 
@@ -222,6 +223,17 @@ own independently reviewed design merges.
 
 `kernel/kernel_objects.c`, `kernel/object_model_test.c`, and
 `tests/host/kernel_objects_test.c`.
+
+At the endpoint-merged base `4eb1c4d`, these sources contain 4,426 lines,
+76 definitions and eight long functions. Proposed
+[ADR-0068](../adr/0068-kernel-object-source-decomposition.md) and the exact
+[object contract](kernel-object-source-organization.md) name 23 C owners,
+three private headers/sets, 72 original moves, 22 necessary portable private
+helpers, eight long and four shorter task dispositions. The design also
+preserves the original complete object-source hash through a bounded inverse
+and avoids a retained-oracle import cycle through unchanged shared inspection.
+Implementation remains pending until independent design review and its
+separate Accepted merge.
 
 ### Kernel bootstrap
 

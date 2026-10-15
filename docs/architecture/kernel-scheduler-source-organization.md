@@ -81,6 +81,15 @@ instruction label, and delegated IPC/buffer/context/root interface.
 The existing `scheduler_core_internal.h` is a neighbor contract, not the
 place for new extraction-only declarations.
 
+Proposed [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) defines
+the next object correction. Only after its independent design acceptance
+and separate merge may the physical `kernel/kernel_objects.c` freeze above
+use the exact current-source inverse from the
+[object contract](kernel-object-source-organization.md). Its original
+`453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
+hash remains independently enforced; every other artifact above stays
+byte-exact. No implementation is authorized by the Proposed record.
+
 Panic/assertion source locations follow their actual owners. Do not spoof
 `__FILE__`, `__LINE__`, or instruction labels. Any directly coupled
 source-bound expectation must follow the real moved call site without
