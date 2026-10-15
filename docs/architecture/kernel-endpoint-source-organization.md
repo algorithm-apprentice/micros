@@ -586,7 +586,9 @@ condition; all other first-failure boundaries, grant prepare/close/commit,
 generation reuse, stale denial and success-only cleanup remain exact.
 Both owner and long-function migration collections are now literal empty
 tuples, with all original bodies reconstructed and all intended C owners
-containing their real tasks.
+containing their real tasks. Final guards also require the two migration
+declarations to be literal empty AST tuples and every evidence definition,
+including file-local phases, to use its accepted family namespace.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

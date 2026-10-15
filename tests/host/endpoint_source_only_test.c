@@ -11,7 +11,7 @@ struct endpoint_source_only_case {
     size_t index;
 };
 
-static bool source_only_prepare_acknowledgment(
+static bool endpoint_test_source_only_prepare_acknowledgment(
     struct endpoint_test_fixture *fixture,
     struct endpoint_source_only_case *work
 )
@@ -70,7 +70,7 @@ static bool source_only_prepare_acknowledgment(
     return true;
 }
 
-static bool source_only_seal_and_validate_source(
+static bool endpoint_test_source_only_seal_and_validate_source(
     struct endpoint_test_fixture *fixture,
     struct endpoint_source_only_case *work
 )
@@ -110,7 +110,7 @@ static bool source_only_seal_and_validate_source(
     return true;
 }
 
-static bool source_only_reject_new_authority(
+static bool endpoint_test_source_only_reject_new_authority(
     struct endpoint_test_fixture *fixture,
     struct endpoint_source_only_case *work
 )
@@ -159,7 +159,7 @@ static bool source_only_reject_new_authority(
     return true;
 }
 
-static bool source_only_drain_and_close(
+static bool endpoint_test_source_only_drain_and_close(
     struct endpoint_test_fixture *fixture,
     struct endpoint_source_only_case *work
 )
@@ -188,8 +188,8 @@ bool endpoint_test_source_only_seal_preserves_staged_source(void)
     struct endpoint_source_only_case work;
 
     work.record = NULL;
-    return source_only_prepare_acknowledgment(fixture, &work)
-        && source_only_seal_and_validate_source(fixture, &work)
-        && source_only_reject_new_authority(fixture, &work)
-        && source_only_drain_and_close(fixture, &work);
+    return endpoint_test_source_only_prepare_acknowledgment(fixture, &work)
+        && endpoint_test_source_only_seal_and_validate_source(fixture, &work)
+        && endpoint_test_source_only_reject_new_authority(fixture, &work)
+        && endpoint_test_source_only_drain_and_close(fixture, &work);
 }

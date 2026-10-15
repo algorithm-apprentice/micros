@@ -15,7 +15,7 @@ struct endpoint_lifecycle_case {
     const struct micros_endpoint_record *record;
 };
 
-static bool lifecycle_hidden_reservation(
+static bool endpoint_test_lifecycle_hidden_reservation(
     struct endpoint_test_fixture *fixture,
     struct endpoint_lifecycle_case *work
 )
@@ -57,7 +57,7 @@ static bool lifecycle_hidden_reservation(
     return true;
 }
 
-static bool lifecycle_profile_publication(
+static bool endpoint_test_lifecycle_profile_publication(
     struct endpoint_test_fixture *fixture,
     struct endpoint_lifecycle_case *work
 )
@@ -124,7 +124,7 @@ static bool lifecycle_profile_publication(
     return true;
 }
 
-static bool lifecycle_asymmetric_authority(
+static bool endpoint_test_lifecycle_asymmetric_authority(
     struct endpoint_test_fixture *fixture,
     struct endpoint_lifecycle_case *work
 )
@@ -192,7 +192,7 @@ static bool lifecycle_asymmetric_authority(
     return true;
 }
 
-static bool lifecycle_stale_and_operation_precedence(
+static bool endpoint_test_lifecycle_stale_and_operation_precedence(
     struct endpoint_test_fixture *fixture,
     struct endpoint_lifecycle_case *work
 )
@@ -244,7 +244,7 @@ static bool lifecycle_stale_and_operation_precedence(
     return true;
 }
 
-static bool lifecycle_final_relationship(
+static bool endpoint_test_lifecycle_final_relationship(
     struct endpoint_test_fixture *fixture
 )
 {
@@ -274,14 +274,14 @@ bool endpoint_test_lifecycle_and_authorization(void)
     work.endpoints[0] = 0;
     work.endpoints[1] = 0;
     work.record = NULL;
-    return lifecycle_hidden_reservation(fixture, &work)
-        && lifecycle_profile_publication(fixture, &work)
-        && lifecycle_asymmetric_authority(fixture, &work)
-        && lifecycle_stale_and_operation_precedence(fixture, &work)
-        && lifecycle_final_relationship(fixture);
+    return endpoint_test_lifecycle_hidden_reservation(fixture, &work)
+        && endpoint_test_lifecycle_profile_publication(fixture, &work)
+        && endpoint_test_lifecycle_asymmetric_authority(fixture, &work)
+        && endpoint_test_lifecycle_stale_and_operation_precedence(fixture, &work)
+        && endpoint_test_lifecycle_final_relationship(fixture);
 }
 
-static bool held_installation_denied(
+static bool endpoint_test_held_installation_denied(
     struct endpoint_test_fixture *fixture,
     struct endpoint_held_case *work
 )
@@ -329,7 +329,7 @@ static bool held_installation_denied(
     return true;
 }
 
-static bool held_profile_publication(
+static bool endpoint_test_held_profile_publication(
     struct endpoint_test_fixture *fixture,
     struct endpoint_held_case *work
 )
@@ -381,7 +381,7 @@ static bool held_profile_publication(
     return true;
 }
 
-static bool held_close_and_cleanup(
+static bool endpoint_test_held_close_and_cleanup(
     struct endpoint_test_fixture *fixture,
     struct endpoint_held_case *work
 )
@@ -429,9 +429,9 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
     struct endpoint_held_case work;
 
     work.context = endpoint_test_context_pattern(UINT64_C(0x1000));
-    return held_installation_denied(fixture, &work)
-        && held_profile_publication(fixture, &work)
-        && held_close_and_cleanup(fixture, &work);
+    return endpoint_test_held_installation_denied(fixture, &work)
+        && endpoint_test_held_profile_publication(fixture, &work)
+        && endpoint_test_held_close_and_cleanup(fixture, &work);
 }
 
 bool endpoint_test_reuse_rejects_stale_generation(void)

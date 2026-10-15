@@ -283,7 +283,7 @@ VALIDATOR_HELPER_OWNERS = {
 INITIALIZER_HELPERS = (
     "prepare_profile_candidates", "candidate_targets_are_closed", "publish_profile_table",
 )
-MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
+MODEL_PROJECTION_HELPERS = ("endpoint_model_live_process_and_thread_match", "endpoint_model_phase_matches")
 NATIVE_CASE_WORK = {
     "test_invalid_profile_tables_preserve_storage": {
         "owner": 3,
@@ -295,10 +295,11 @@ NATIVE_CASE_WORK = {
         "original": "struct micros_privilege_profile profiles[2]; struct micros_endpoint_registry before;",
         "outlined": "struct endpoint_rejected_profile_case work;",
         "phases": (
-            "rejected_profiles_setup", "rejected_duplicate_profiles", "rejected_profile_shapes",
-            "rejected_profile_targets", "rejected_profile_capacities",
+            "endpoint_test_rejected_profiles_setup", "endpoint_test_rejected_duplicate_profiles",
+            "endpoint_test_rejected_profile_shapes", "endpoint_test_rejected_profile_targets",
+            "endpoint_test_rejected_profile_capacities",
         ),
-        "work_only": ("rejected_profiles_setup",),
+        "work_only": ("endpoint_test_rejected_profiles_setup",),
         "macro_before": 1,
         "undef_before": 4,
     },
@@ -316,8 +317,8 @@ NATIVE_CASE_WORK = {
         ),
         "outlined": "struct endpoint_source_only_case work; work.record = NULL;",
         "phases": (
-            "source_only_prepare_acknowledgment", "source_only_seal_and_validate_source",
-            "source_only_reject_new_authority", "source_only_drain_and_close",
+            "endpoint_test_source_only_prepare_acknowledgment", "endpoint_test_source_only_seal_and_validate_source",
+            "endpoint_test_source_only_reject_new_authority", "endpoint_test_source_only_drain_and_close",
         ),
     },
     "test_endpoint_lifecycle_and_authorization": {
@@ -336,10 +337,11 @@ NATIVE_CASE_WORK = {
             "struct endpoint_lifecycle_case work; work.endpoints[0] = 0; work.endpoints[1] = 0; work.record = NULL;"
         ),
         "phases": (
-            "lifecycle_hidden_reservation", "lifecycle_profile_publication", "lifecycle_asymmetric_authority",
-            "lifecycle_stale_and_operation_precedence", "lifecycle_final_relationship",
+            "endpoint_test_lifecycle_hidden_reservation", "endpoint_test_lifecycle_profile_publication",
+            "endpoint_test_lifecycle_asymmetric_authority", "endpoint_test_lifecycle_stale_and_operation_precedence",
+            "endpoint_test_lifecycle_final_relationship",
         ),
-        "fixture_only": ("lifecycle_final_relationship",),
+        "fixture_only": ("endpoint_test_lifecycle_final_relationship",),
     },
     "test_profile_install_and_close_require_held_threads": {
         "owner": 5,
@@ -353,7 +355,10 @@ NATIVE_CASE_WORK = {
         "outlined": (
             "struct endpoint_held_case work; work.context = endpoint_test_context_pattern(UINT64_C(0x1000));"
         ),
-        "phases": ("held_installation_denied", "held_profile_publication", "held_close_and_cleanup"),
+        "phases": (
+            "endpoint_test_held_installation_denied", "endpoint_test_held_profile_publication",
+            "endpoint_test_held_close_and_cleanup",
+        ),
     },
 }
 CORE_DAG = {
@@ -905,11 +910,11 @@ def model_projection_body_tokens(caller, live, endpoint):
     caller = list(tokens(caller))
     calls = (
         (
-            "live_process_and_thread_match(fixture, expected, process, step, operation, value)",
+            "endpoint_model_live_process_and_thread_match(fixture, expected, process, step, operation, value)",
             live, False,
         ),
         (
-            "endpoint_phase_matches(fixture, expected, process, endpoint, step, operation, value)",
+            "endpoint_model_phase_matches(fixture, expected, process, endpoint, step, operation, value)",
             endpoint, True,
         ),
     )
@@ -1338,6 +1343,22 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             self.assertEqual(len(flattened), len(set(flattened)))
             self.assertEqual(set(BASELINE_BODIES[family]), set(flattened))
 
+    def test_completed_migrations_are_literal_empty_and_evidence_namespaces_are_exact(self):
+        tree = ast.parse(source(STRUCTURAL_TEST_PATH))
+        for name in ("SYMBOL_OWNER_MIGRATION", "LONG_FUNCTION_MIGRATION"):
+            assignments = [
+                node.value for node in tree.body if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+            ]
+            self.assertEqual(1, len(assignments))
+            self.assertIsInstance(assignments[0], ast.Tuple)
+            self.assertEqual([], assignments[0].elts)
+        entries = {"main", "micros_endpoint_model_test_run", "micros_endpoint_runtime_run_self_test"}
+        for family, prefix in ((1, "endpoint_test_"), (2, "endpoint_model_"), (3, "endpoint_qemu_")):
+            for _, name in owned_definitions(family):
+                with self.subTest(family=family, name=name):
+                    self.assertTrue(name in entries or name.startswith(prefix))
+
     def test_every_original_definition_has_its_exact_current_and_final_owner(self):
         for family, groups in ORIGINAL_FUNCTIONS.items():
             locations = original_locations(family)
@@ -1574,10 +1595,11 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         self.assertEqual(tokens(expected), native_case_body_tokens(caller, specification, bodies))
         for changed in (
             caller.replace("struct endpoint_held_case work", "static struct endpoint_held_case work"),
-            caller.replace("held_profile_publication(fixture, &work)", "held_profile_publication(fixture, &copy)"),
-            caller.replace("&& held_close", "|| held_close"),
-            caller.replace("return held_installation", "memset(&work, 0, sizeof(work)); return held_installation"),
+            caller.replace("endpoint_test_held_profile_publication(fixture, &work)", "endpoint_test_held_profile_publication(fixture, &copy)"),
+            caller.replace("&& endpoint_test_held_close", "|| endpoint_test_held_close"),
+            caller.replace("return endpoint_test_held_installation", "memset(&work, 0, sizeof(work)); return endpoint_test_held_installation"),
         ):
+            self.assertNotEqual(caller, changed)
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
                 native_case_body_tokens(changed, specification, bodies)
         for changed in (
@@ -1991,8 +2013,8 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         self.assertLessEqual(definitions["endpoint_model_validate_model"], 120)
 
     def test_model_projection_expands_only_the_two_original_slot_continues(self):
-        live_call = "if (!live_process_and_thread_match(fixture, expected, process, step, operation, value)) { return false; }"
-        endpoint_call = "if (!endpoint_phase_matches(fixture, expected, process, endpoint, step, operation, value)) { return false; }"
+        live_call = "if (!endpoint_model_live_process_and_thread_match(fixture, expected, process, step, operation, value)) { return false; }"
+        endpoint_call = "if (!endpoint_model_phase_matches(fixture, expected, process, endpoint, step, operation, value)) { return false; }"
         caller = (
             "{ validate_header(); for (index = 0; index < SLOTS; ++index) { bind_original_objects(); "
             "++expected_processes; ++expected_threads; " + live_call + endpoint_call

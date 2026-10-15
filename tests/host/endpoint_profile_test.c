@@ -137,7 +137,7 @@ bool endpoint_test_profile_table_is_immutable_and_specific(void)
         EXPECT_TRUE(memcmp(&fixture->registry, &work->before, sizeof(fixture->registry)) == 0); \
     } while (false)
 
-static bool rejected_profiles_setup(
+static bool endpoint_test_rejected_profiles_setup(
     struct endpoint_rejected_profile_case *work
 )
 {
@@ -162,7 +162,7 @@ static bool rejected_profiles_setup(
     return true;
 }
 
-static bool rejected_duplicate_profiles(
+static bool endpoint_test_rejected_duplicate_profiles(
     struct endpoint_test_fixture *fixture,
     struct endpoint_rejected_profile_case *work
 )
@@ -184,7 +184,7 @@ static bool rejected_duplicate_profiles(
     return true;
 }
 
-static bool rejected_profile_shapes(
+static bool endpoint_test_rejected_profile_shapes(
     struct endpoint_test_fixture *fixture,
     struct endpoint_rejected_profile_case *work
 )
@@ -228,7 +228,7 @@ static bool rejected_profile_shapes(
     return true;
 }
 
-static bool rejected_profile_targets(
+static bool endpoint_test_rejected_profile_targets(
     struct endpoint_test_fixture *fixture,
     struct endpoint_rejected_profile_case *work
 )
@@ -256,7 +256,7 @@ static bool rejected_profile_targets(
     return true;
 }
 
-static bool rejected_profile_capacities(
+static bool endpoint_test_rejected_profile_capacities(
     struct endpoint_test_fixture *fixture,
     struct endpoint_rejected_profile_case *work
 )
@@ -291,9 +291,9 @@ bool endpoint_test_invalid_profile_tables_preserve_storage(void)
     struct endpoint_test_fixture *fixture = endpoint_test_context();
     struct endpoint_rejected_profile_case work;
 
-    return rejected_profiles_setup(&work)
-        && rejected_duplicate_profiles(fixture, &work)
-        && rejected_profile_shapes(fixture, &work)
-        && rejected_profile_targets(fixture, &work)
-        && rejected_profile_capacities(fixture, &work);
+    return endpoint_test_rejected_profiles_setup(&work)
+        && endpoint_test_rejected_duplicate_profiles(fixture, &work)
+        && endpoint_test_rejected_profile_shapes(fixture, &work)
+        && endpoint_test_rejected_profile_targets(fixture, &work)
+        && endpoint_test_rejected_profile_capacities(fixture, &work);
 }

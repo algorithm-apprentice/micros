@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static bool live_process_and_thread_match(
+static bool endpoint_model_live_process_and_thread_match(
     const struct endpoint_model_fixture *fixture,
     const struct model_slot *expected,
     const struct micros_process *process,
@@ -50,7 +50,7 @@ static bool live_process_and_thread_match(
     return true;
 }
 
-static bool endpoint_phase_matches(
+static bool endpoint_model_phase_matches(
     const struct endpoint_model_fixture *fixture,
     const struct model_slot *expected,
     const struct micros_process *process,
@@ -180,10 +180,10 @@ bool endpoint_model_validate_model(
         }
         ++expected_processes;
         ++expected_threads;
-        if (!live_process_and_thread_match(fixture, expected, process, step, operation, value)) {
+        if (!endpoint_model_live_process_and_thread_match(fixture, expected, process, step, operation, value)) {
             return false;
         }
-        if (!endpoint_phase_matches(fixture, expected, process, endpoint, step, operation, value)) {
+        if (!endpoint_model_phase_matches(fixture, expected, process, endpoint, step, operation, value)) {
             return false;
         }
     }
