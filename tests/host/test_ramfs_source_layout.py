@@ -431,6 +431,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (0, "handle_create_or_mkdir"),
         (0, "handle_lookup"),
         (4, "vfs_run_filesystem_scenario"),
+        (5, "micros_ramfs_service_test_handle_trap"),
     )
 )
 
@@ -1221,6 +1222,40 @@ def production_lookup_body_tokens(caller, walk):
     return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
 
 
+def kernel_report_body_tokens(caller, pre_ready, final_state):
+    caller = list(body_tokens(caller))
+    pre_ready = list(body_tokens(pre_ready))
+    final_state = list(body_tokens(final_state))
+    calls = (
+        list(body_tokens("return observe_pre_ready_report(hart, frame, bootstrap, grants);")),
+        list(body_tokens(
+            "validate_reported_runtime(hart, frame, bootstrap, vm, tty, registry, grants, objects);"
+        )),
+    )
+    declaration = list(body_tokens("size_t index;"))
+    if pre_ready[:1] != ["{"] or pre_ready[1:1 + len(declaration)] != declaration or pre_ready[-1:] != ["}"]:
+        raise AssertionError("pre-ready proof must retain only its original automatic loop counter")
+    pre_ready = pre_ready[1 + len(declaration):-1]
+    loop = list(body_tokens("for (index = 0; index < bootstrap->entry_count; ++index) {"))
+    if "for" not in pre_ready:
+        raise AssertionError("pre-ready proof must search the actual bindings")
+    at = pre_ready.index("for")
+    if pre_ready[at:at + len(loop)] != loop or pre_ready.index("index") != at + 2:
+        raise AssertionError("pre-ready counter must be initialized before use")
+    if final_state[:1] != ["{"] or final_state[-1:] != ["}"] or "return" in final_state:
+        raise AssertionError("final-state validation must not convert caller failure into continuation")
+    for call, statements in ((calls[0], pre_ready), (calls[1], final_state[1:-1])):
+        positions = [
+            index for index in range(len(caller))
+            if caller[index:index + len(call)] == call
+        ]
+        if len(positions) != 1:
+            raise AssertionError("report phases must preserve exact authenticated caller bindings and return scope")
+        position = positions[0]
+        caller[position:position + len(call)] = statements
+    return tuple(caller)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1275,6 +1310,12 @@ def original_body_digest(family, name, text):
             for phase in PEER_CASE_WORK["phases"]
         ]
         tokens = work_record_tokens(bool_case_body_tokens(text, phases), PEER_CASE_WORK)
+    if family == 5 and name == "micros_ramfs_service_test_handle_trap" and (5, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(5)[2])
+        tokens = kernel_report_body_tokens(
+            text, c_function_body(owner, "observe_pre_ready_report"),
+            c_function_body(owner, "validate_reported_runtime"),
+        )
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1815,7 +1856,8 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual((), file_scope_objects(source(paths[0])))
         self.assertEqual((), file_scope_objects(source(paths[2])))
-        self.assertEqual(4, len(owned_definitions(5)))
+        completed_report = (5, "micros_ramfs_service_test_handle_trap") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(4 + 2 * completed_report, len(owned_definitions(5)))
 
     def test_kernel_configuration_preserves_raw_literals_not_only_masked_shape(self):
         fixture = source(family_paths(5)[1])
@@ -2074,6 +2116,32 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 f"static bool {name}(struct vfs_service_fixture *fixture, struct ramfs_filesystem_case *work) {{"
             ), body_tokens(signatures[0]))
         self.assertEqual("", macro_definition_text(text))
+
+    def test_kernel_report_exposes_authenticated_pre_ready_and_final_state_tasks(self):
+        text = source(family_paths(5)[2])
+        definitions = c_function_definitions(text)
+        expected = {
+            "observe_pre_ready_report": (
+                "static enum micros_ramfs_service_test_trap_result observe_pre_ready_report("
+                "struct micros_hart *hart, struct micros_trap_frame *frame, "
+                "const struct micros_bootstrap_control_state *bootstrap, const struct micros_grant_registry *grants) {"
+            ),
+            "validate_reported_runtime": (
+                "static void validate_reported_runtime(struct micros_hart *hart, struct micros_trap_frame *frame, "
+                "const struct micros_bootstrap_control_state *bootstrap, const struct micros_vm_handoff_state *vm, "
+                "const struct micros_tty_handoff_runtime_state *tty, const struct micros_endpoint_registry *registry, "
+                "const struct micros_grant_registry *grants, const struct micros_kernel_objects *objects) {"
+            ),
+        }
+        for name, signature in expected.items():
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            actual = re.findall(
+                rf"(?m)^static (?:enum micros_ramfs_service_test_trap_result|void)\s+{name}\([^;{{}}]*\)\s*\{{", text,
+            )
+            self.assertEqual(1, len(actual))
+            self.assertEqual(body_tokens(signature), body_tokens(actual[0]))
+        self.assertLessEqual(definitions["micros_ramfs_service_test_handle_trap"], 120)
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -2578,6 +2646,46 @@ def render_fixture(image, limit):
         ):
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
                 peer_readonly_data(changed)
+
+    def test_kernel_report_projection_preserves_authenticated_return_and_final_failure_scope(self):
+        caller = (
+            "{ snapshot(); authenticate(); switch (frame->a0) { case PRE_READY: "
+            "return observe_pre_ready_report(hart, frame, bootstrap, grants); case FINAL: break; } "
+            "validate_reported_runtime(hart, frame, bootstrap, vm, tty, registry, grants, objects); "
+            "all_ready(); physical_drain(); shutdown(); }"
+        )
+        pre = (
+            "{ size_t index; if (bad_grants()) { panic(); } "
+            "for (index = 0; index < bootstrap->entry_count; ++index) { "
+            "if (binding()) { frame->sepc += 4; return USER_RETURN; } } panic_missing(); }"
+        )
+        final = "{ if (bad_state()) { panic_state(); } }"
+        expected = (
+            "{ snapshot(); authenticate(); switch (frame->a0) { case PRE_READY: "
+            + pre[pre.index("if ("):-1]
+            + "case FINAL: break; } if (bad_state()) { panic_state(); } "
+            "all_ready(); physical_drain(); shutdown(); }"
+        )
+        self.assertEqual(body_tokens(expected), kernel_report_body_tokens(caller, pre, final))
+        for changed in (
+            caller.replace("return observe_pre_ready_report", "observe_pre_ready_report"),
+            caller.replace("bootstrap, grants", "bootstrap, registry"),
+            caller.replace("tty, registry, grants, objects", "tty, registry, objects, grants"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                kernel_report_body_tokens(changed, pre, final)
+        for changed in (
+            pre.replace("size_t index;", "static size_t index;"),
+            pre.replace("index = 0", "index = 1"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                kernel_report_body_tokens(caller, changed, final)
+        with self.assertRaises(AssertionError):
+            kernel_report_body_tokens(caller, pre, "{ if (bad_state()) { return; } }")
+        self.assertNotEqual(
+            body_tokens(expected),
+            kernel_report_body_tokens(caller, pre.replace("sepc += 4", "sepc += 2"), final),
+        )
 
     def test_reference_walk_projection_keeps_preflight_error_precedence_and_direct_publication(self):
         current = (

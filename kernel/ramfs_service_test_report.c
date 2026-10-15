@@ -71,6 +71,104 @@ static bool ramfs_test_uart_is_physically_drained(void)
     return false;
 }
 
+static enum micros_ramfs_service_test_trap_result
+observe_pre_ready_report(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_grant_registry *grants
+)
+{
+    size_t index;
+
+    if (
+        grants == NULL
+        || bootstrap->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
+        || grants->active_count != 0
+    ) {
+        ramfs_test_failure(
+            hart,
+            frame,
+            "ramfs-service-test-pre-ready"
+        );
+    }
+    for (index = 0; index < bootstrap->entry_count; ++index) {
+        if (
+            bootstrap->bindings[index].service_id
+                == MICROS_RAMFS_TEST_VFS_SERVICE_ID
+        ) {
+            if (
+                bootstrap->transitions.entries[index].state
+                    != MICROS_BOOTSTRAP_SERVICE_STARTING
+            ) {
+                ramfs_test_failure(
+                    hart,
+                    frame,
+                    "ramfs-service-test-pre-ready-state"
+                );
+            }
+            frame->sepc += 4;
+            return MICROS_RAMFS_SERVICE_TEST_TRAP_USER_RETURN;
+        }
+    }
+    ramfs_test_failure(
+        hart,
+        frame,
+        "ramfs-service-test-pre-ready-binding"
+    );
+}
+
+static void validate_reported_runtime(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_vm_handoff_state *vm,
+    const struct micros_tty_handoff_runtime_state *tty,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_grant_registry *grants,
+    const struct micros_kernel_objects *objects
+)
+{
+    if (
+        bootstrap == NULL
+        || vm == NULL
+        || tty == NULL
+        || registry == NULL
+        || grants == NULL
+        || objects == NULL
+        || bootstrap->phase != MICROS_BOOTSTRAP_PHASE_SEALED
+        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        || tty->handoff.console_phase != MICROS_TTY_CONSOLE_OWNED
+        || tty->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
+        || tty->handoff.claimed_source != 0
+        || tty->handoff.deadline_armed
+        || tty->service_id != MICROS_RAMFS_TEST_TTY_SERVICE_ID
+        || !uart_console_handoff_is_active()
+        || !riscv_external_interrupt_is_enabled()
+        || !micros_plic_validate(MICROS_PLIC_ENABLED)
+        || grants->active_count != 0
+        || micros_bootstrap_runtime_validate()
+            != MICROS_BOOTSTRAP_OK
+        || micros_vm_handoff_runtime_validate(
+            bootstrap,
+            registry,
+            objects
+        ) != MICROS_VM_HANDOFF_OK
+        || micros_tty_handoff_runtime_validate(
+            bootstrap,
+            registry,
+            objects
+        ) != MICROS_TTY_HANDOFF_OK
+        || micros_user_address_space_validate_tty_uart_mapping(
+            tty->process,
+            tty->root_physical_address
+        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_grant_runtime_validate() != MICROS_GRANT_OK
+    ) {
+        ramfs_test_failure(hart, frame, "ramfs-service-test-state");
+    }
+}
+
 enum micros_ramfs_service_test_trap_result
 micros_ramfs_service_test_handle_trap(
     struct micros_hart *hart,
@@ -122,40 +220,11 @@ micros_ramfs_service_test_handle_trap(
     }
     switch (frame->a0) {
     case MICROS_RAMFS_TEST_REPORT_PRE_READY:
-        if (
-            grants == NULL
-            || bootstrap->phase != MICROS_BOOTSTRAP_PHASE_RUNNING
-            || grants->active_count != 0
-        ) {
-            ramfs_test_failure(
-                hart,
-                frame,
-                "ramfs-service-test-pre-ready"
-            );
-        }
-        for (index = 0; index < bootstrap->entry_count; ++index) {
-            if (
-                bootstrap->bindings[index].service_id
-                    == MICROS_RAMFS_TEST_VFS_SERVICE_ID
-            ) {
-                if (
-                    bootstrap->transitions.entries[index].state
-                        != MICROS_BOOTSTRAP_SERVICE_STARTING
-                ) {
-                    ramfs_test_failure(
-                        hart,
-                        frame,
-                        "ramfs-service-test-pre-ready-state"
-                    );
-                }
-                frame->sepc += 4;
-                return MICROS_RAMFS_SERVICE_TEST_TRAP_USER_RETURN;
-            }
-        }
-        ramfs_test_failure(
+        return observe_pre_ready_report(
             hart,
             frame,
-            "ramfs-service-test-pre-ready-binding"
+            bootstrap,
+            grants
         );
     case MICROS_RAMFS_TEST_FAILURE_CONFIGURATION:
         ramfs_test_failure(
@@ -178,44 +247,7 @@ micros_ramfs_service_test_handle_trap(
     default:
         ramfs_test_failure(hart, frame, "ramfs-service-test-report");
     }
-    if (
-        bootstrap == NULL
-        || vm == NULL
-        || tty == NULL
-        || registry == NULL
-        || grants == NULL
-        || objects == NULL
-        || bootstrap->phase != MICROS_BOOTSTRAP_PHASE_SEALED
-        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
-        || tty->handoff.console_phase != MICROS_TTY_CONSOLE_OWNED
-        || tty->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
-        || tty->handoff.claimed_source != 0
-        || tty->handoff.deadline_armed
-        || tty->service_id != MICROS_RAMFS_TEST_TTY_SERVICE_ID
-        || !uart_console_handoff_is_active()
-        || !riscv_external_interrupt_is_enabled()
-        || !micros_plic_validate(MICROS_PLIC_ENABLED)
-        || grants->active_count != 0
-        || micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
-        || micros_vm_handoff_runtime_validate(
-            bootstrap,
-            registry,
-            objects
-        ) != MICROS_VM_HANDOFF_OK
-        || micros_tty_handoff_runtime_validate(
-            bootstrap,
-            registry,
-            objects
-        ) != MICROS_TTY_HANDOFF_OK
-        || micros_user_address_space_validate_tty_uart_mapping(
-            tty->process,
-            tty->root_physical_address
-        ) != MICROS_USER_ADDRESS_SPACE_OK
-        || micros_grant_runtime_validate() != MICROS_GRANT_OK
-    ) {
-        ramfs_test_failure(hart, frame, "ramfs-service-test-state");
-    }
+    validate_reported_runtime(hart, frame, bootstrap, vm, tty, registry, grants, objects);
     for (index = 0; index < bootstrap->entry_count; ++index) {
         if (
             bootstrap->transitions.entries[index].state

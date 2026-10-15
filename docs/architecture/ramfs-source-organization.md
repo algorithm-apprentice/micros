@@ -547,7 +547,13 @@ stale/directory, file-reference, and sparse/enumeration/release tasks with a
 uninitialized automatic work record. The six unique readonly arrays retain
 static duration in the same owner; actual raw literals and const/static
 declarations are checked before reconstructing their original local prefix.
-Four C semantic migrations remain pending, alongside the specified
+The authenticated kernel report now has a 106-line observation/authentication/
+dispatch/readiness/drain/shutdown outline, a 46-line resumable pre-ready
+proof, and 50-line final-runtime validation. Exact projection preserves all
+original getter order, PC/current-generation checks, failure codes,
+STARTING versus all-ready states, `sepc += 4`, non-returning panics and
+successful shutdown; all borrowed state pointers and counters stay automatic.
+Three C semantic migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 
