@@ -25,6 +25,7 @@ RECIPE_DIGESTS = {
     "CMakeLists.txt": "afb07b0e891e11c677782570ac5a5310dd3cd3d2418c5b741555fe0263a04877",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
+QEMU_RUNNER_DIGEST = "9e54f744074d077d05b52880495b73f7c74ae1db0a6ad751f8b7024688bf79e3"
 SYSTEM_ROOTS = (Path("/usr/bin"), Path("/usr/lib"), Path("/System/Library"))
 STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))
 VENDOR_STARTUP = {
@@ -116,6 +117,8 @@ def environment_digest(environment):
 def validate_environment(environment, *, target):
     if environment.get("PYTHONNOUSERSITE") != "1":
         raise UnsupportedContext("profile requires PYTHONNOUSERSITE=1")
+    if environment.get("CLANG_NO_DEFAULT_CONFIG") != "1":
+        raise UnsupportedContext("profile requires CLANG_NO_DEFAULT_CONFIG=1")
     forbidden = {
         "LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP",
         "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "OBJC_INCLUDE_PATH",
@@ -127,6 +130,7 @@ def validate_environment(environment, *, target):
         "CC", "CXX", "AS", "LD", "AR", "RANLIB", "NM",
         "BASH_ENV", "ENV", "SHELLOPTS", "IFS", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR",
         "_PYTHON_SYSCONFIGDATA_NAME",
+        "CCC_OVERRIDE_OPTIONS", "CCC_ADD_ARGS",
     }
     rejected = [
         name for name, value in environment.items()
@@ -353,6 +357,10 @@ def command_tools(content, root, allowed):
         blocks = [[]]
         try:
             for token in lexer:
+                if any(
+                    part.startswith(("@", "--config")) for part in token.split(",")
+                ):
+                    raise UnsupportedContext("explicit configuration/response input is unsupported")
                 if token == "&&":
                     blocks.append([])
                 elif token and all(character in ";&|<>" for character in token):
@@ -422,6 +430,50 @@ class Candidate:
     clean: bool
 
 
+def _index_entries(tracked, root):
+    entries = []
+    regular = set()
+    for entry in tracked.split(b"\0"):
+        if not entry:
+            continue
+        metadata, separator, filename = entry.partition(b"\t")
+        fields = metadata.split()
+        if (
+            not separator or len(fields) != 3 or fields[2] != b"0"
+            or fields[0] not in (b"100644", b"100755", b"120000")
+        ):
+            raise UnsupportedContext("unmerged or unsupported index entry")
+        relative = os.fsdecode(filename)
+        path = root / relative
+        mode = path.lstat().st_mode
+        resolved = path.resolve(strict=True)
+        if not _inside(resolved, (root,)):
+            raise UnsupportedContext("source link escapes the repository")
+        if stat.S_ISREG(mode):
+            regular.add(resolved)
+        entries.append((fields, relative, path, mode, resolved))
+    for fields, _, _, mode, resolved in entries:
+        if fields[0] == b"120000":
+            if not stat.S_ISLNK(mode) or resolved not in regular:
+                raise UnsupportedContext("source link target is not a reviewed regular input")
+        elif not stat.S_ISREG(mode):
+            raise UnsupportedContext("tracked source kind differs from the index")
+    return entries
+
+
+def _matches_index(path, fields, mode):
+    linked = fields[0] == b"120000"
+    data = os.fsencode(os.readlink(path)) if linked else path.read_bytes()
+    algorithm = {40: "sha1", 64: "sha256"}.get(len(fields[1]))
+    if algorithm is None:
+        raise UnsupportedContext("unsupported index object format")
+    digest = hashlib.new(algorithm, b"blob " + str(len(data)).encode() + b"\0" + data)
+    expected_executable = fields[0] == b"100755"
+    return digest.hexdigest().encode() == fields[1] and (
+        linked or bool(mode & 0o111) == expected_executable
+    )
+
+
 def capture_candidate(root):
     root = Path(root).resolve()
     actual = Path(_run(("git", "rev-parse", "--show-toplevel"), cwd=root).decode().strip()).resolve()
@@ -442,20 +494,12 @@ def capture_candidate(root):
         raise UnsupportedContext("unsupported candidate object identity")
     tracked = _run(("git", "ls-files", "--stage", "-z"), cwd=root)
     digest = hashlib.sha256()
-    for entry in tracked.split(b"\0"):
-        if not entry:
-            continue
-        metadata, separator, filename = entry.partition(b"\t")
-        fields = metadata.split()
-        if not separator or len(fields) != 3 or fields[2] != b"0":
-            raise UnsupportedContext("unmerged or unsupported index entry")
-        relative = os.fsdecode(filename)
-        path = root / relative
-        if not _inside(path.resolve(strict=True), (root,)):
-            raise UnsupportedContext("source link escapes the repository")
+    exact = True
+    for fields, relative, path, mode, _ in _index_entries(tracked, root):
+        exact = _matches_index(path, fields, mode) and exact
         digest.update(json.dumps([relative, fields[0].decode()]).encode())
         digest.update(fingerprint_tree(path, (root,)).encode())
-    clean = not _run(("git", "diff", "--name-only", "-z"), cwd=root)
+    clean = not _run(("git", "diff", "--name-only", "-z"), cwd=root) and exact
     return Candidate(repository, {
         "head": head, "tree": tree, "source_sha256": digest.hexdigest(),
     }, clean)
@@ -522,6 +566,59 @@ def _system(path):
     return _inside(path, SYSTEM_ROOTS)
 
 
+def compiler_version(text, *, target):
+    pattern = r"(?m)^(?:Homebrew )?clang version (23)\." if target else r"(?m)^Apple clang version (21)\."
+    match = re.search(pattern, text)
+    if match is None:
+        raise UnsupportedContext("compiler family/major has no reviewed configuration policy")
+    return {"family": "LLVMClang" if target else "AppleClang", "major": int(match[1])}
+
+
+def compiler_configuration(installation):
+    alias = installation / "etc/clang"
+    metadata = {"policy": "automatic-disabled", "alias": {"path": str(alias)}}
+    try:
+        information = alias.lstat()
+    except FileNotFoundError:
+        metadata["alias"]["kind"] = "absent"
+        return metadata, ()
+    if stat.S_ISDIR(information.st_mode) and alias.resolve() == alias:
+        metadata["alias"].update(kind="directory", mode=stat.S_IMODE(information.st_mode))
+        return metadata, ()
+    if not stat.S_ISLNK(information.st_mode) or installation.parent.parent.name != "Cellar":
+        raise UnsupportedContext("unrecognized compiler configuration alias")
+    expected = installation.parents[2] / "etc/clang"
+    try:
+        resolved = alias.resolve(strict=True)
+        target = expected.lstat()
+    except (OSError, RuntimeError) as error:
+        raise UnsupportedContext("unresolved compiler configuration alias") from error
+    if resolved != expected or not stat.S_ISDIR(target.st_mode):
+        raise UnsupportedContext("compiler configuration alias leaves the declared same-prefix root")
+    metadata["alias"].update(
+        kind="link", mode=stat.S_IMODE(information.st_mode),
+        spelling=os.readlink(alias), resolved=str(resolved),
+    )
+    return metadata, (expected,)
+
+
+def qemu_configuration(executable, installation):
+    if installation.parent.parent.name != "Cellar" or not re.fullmatch(r"11\.[0-9A-Za-z._+-]+", installation.name):
+        raise UnsupportedContext("QEMU installation has no reviewed configuration layout")
+    expected = installation / "etc/qemu/qemu.conf"
+    data = executable.read_bytes()
+    spellings = set(re.findall(
+        rb"(/[A-Za-z0-9_./@+-]+/etc/qemu/qemu[.]conf)\x00", data,
+    ))
+    if spellings != {str(expected).encode()}:
+        raise UnsupportedContext("QEMU compiled default-config layout is unrecognized")
+    absent = _absent_paths((
+        expected, installation.parents[2] / "etc/qemu/qemu.conf",
+        executable.parent / "qemu-bundle",
+    ))
+    return {"compiled_default": str(expected), "absent": absent}
+
+
 class DarwinTools:
     def __init__(self, root, profile, cache, environment):
         self.root = root
@@ -540,6 +637,12 @@ class DarwinTools:
         validate_sdk_environment(environment, self.sdk, self.toolchain)
         self._python()
         self._selected_tools()
+        self.configuration = {"policy": "automatic-disabled", "alias": None}
+        if profile.target_build:
+            self.configuration, additional = compiler_configuration(
+                _cellar_root(Path(self.executables["compiler"]["resolved"]))
+            )
+            self.roots.update(additional)
 
     def _admit(self, path, *, single=False):
         path = Path(path).resolve(strict=True)
@@ -559,7 +662,16 @@ class DarwinTools:
         if not path.is_file() or not os.access(path, os.X_OK):
             raise UnsupportedContext("required tool is not executable")
         self.executables[role] = {"path": str(requested), "resolved": str(path)}
-        self.versions[role] = hashlib.sha256(_run((requested, "--version"))).hexdigest()
+        version = _run((requested, "--version"))
+        self.versions[role] = {"sha256": hashlib.sha256(version).hexdigest()}
+        if role in ("compiler", "assembler", "native-compiler"):
+            self.versions[role].update(compiler_version(
+                version.decode(), target=self.profile.target_build and role != "native-compiler",
+            ))
+        if role == "qemu":
+            if re.search(r"(?m)^QEMU emulator version 11\.", version.decode()) is None:
+                raise UnsupportedContext("QEMU family/major has no reviewed configuration layout")
+            self.versions[role]["major"] = 11
         return path
 
     def _python(self):
@@ -700,8 +812,13 @@ class DarwinTools:
             self.libraries(self.python, loader=extension.resolve(), inherited=inherited)
 
     def qemu(self):
-        path = self._tool("qemu", self.cache.get("MICROS_QEMU"))
+        requested = self.cache.get("MICROS_QEMU")
+        if not requested:
+            raise UnsupportedContext("configured QEMU is missing")
+        path = Path(requested).resolve(strict=True)
         installation = _cellar_root(path)
+        configuration = qemu_configuration(path, installation)
+        self._tool("qemu", requested)
         roots = [
             Path(line).resolve()
             for line in _run((path, "-L", "help")).decode().splitlines()
@@ -717,6 +834,7 @@ class DarwinTools:
         return {
             "data_roots": [{"path": str(root), "exists": root.exists()} for root in roots],
             "firmware": {"path": str(firmware.resolve()), **_file_identity(firmware.resolve())},
+            "configuration": configuration,
         }
 
 
@@ -834,6 +952,8 @@ def collect(root, workflow):
         for name, expected in RECIPE_DIGESTS.items():
             if _file_digest(root / name) != expected:
                 raise UnsupportedContext("build recipe is outside the initial reviewed closure")
+        if workflow == "test-qemu-smoke" and _file_digest(root / "tools/run_qemu_smoke.py") != QEMU_RUNNER_DIGEST:
+            raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
         if list(root.glob("test_*.py")):
             raise UnsupportedContext("repository-root files would expand the native discovery pattern")
         cache = _cache(root, profile)
@@ -841,6 +961,7 @@ def collect(root, workflow):
         qemu = tools.qemu() if workflow == "test-qemu-smoke" else None
         inputs, paths = _build_manifest(root, profile, tools)
         inputs["standard_search_roots"] = _absent_paths(STANDARD_SEARCH_ROOTS)
+        inputs["compiler_configuration"] = tools.configuration
         native = native_runtime_executables(inputs["ctest"]) if not profile.target_build else ()
         tools.close_libraries(native)
         roots = tuple(sorted(tools.roots))

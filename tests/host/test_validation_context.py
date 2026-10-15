@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -84,12 +85,17 @@ class ValidationContextTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 with self.assertRaises(validation_context.UnsupportedContext):
                     validation_context.validate_environment(
-                        {"PYTHONNOUSERSITE": "1", variable: "injected"}, target=False
+                        {
+                            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1",
+                            variable: "injected",
+                        }, target=False
                     )
         with self.assertRaisesRegex(validation_context.UnsupportedContext, "PYTHONNOUSERSITE"):
             validation_context.validate_environment({}, target=False)
         with self.assertRaisesRegex(validation_context.UnsupportedContext, "MICROS_CLANG"):
-            validation_context.validate_environment({"PYTHONNOUSERSITE": "1"}, target=True)
+            validation_context.validate_environment(
+                {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}, target=True
+            )
 
     def test_only_active_sdk_derived_shim_paths_are_admitted(self):
         sdk = self.root / "sdk"
@@ -97,7 +103,7 @@ class ValidationContextTests(unittest.TestCase):
         for path in (sdk / "usr/include", sdk / "usr/lib", toolchain):
             path.mkdir(parents=True)
         environment = {
-            "PYTHONNOUSERSITE": "1", "SDKROOT": str(sdk),
+            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1", "SDKROOT": str(sdk),
             "CPATH": str(sdk / "usr/include"), "LIBRARY_PATH": str(sdk / "usr/lib"),
         }
         validation_context.validate_environment(environment, target=False)
@@ -314,6 +320,201 @@ class ValidationContextTests(unittest.TestCase):
         with mock.patch("tools.validation_context._run", return_value=b"/usr/bin/make\n"):
             tools._selected_tools()
         self.assertIn(mock.call("linker", driver), tools._tool.call_args_list)
+
+    def test_automatic_compiler_configuration_must_be_explicitly_disabled(self):
+        for value in (None, "", "0", "true"):
+            environment = {"PYTHONNOUSERSITE": "1"}
+            if value is not None:
+                environment["CLANG_NO_DEFAULT_CONFIG"] = value
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(validation_context.UnsupportedContext, "CLANG_NO_DEFAULT_CONFIG"):
+                    validation_context.validate_environment(environment, target=False)
+        environment = {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}
+        validation_context.validate_environment(environment, target=False)
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_context.validate_environment(
+                {**environment, "CCC_OVERRIDE_OPTIONS": "^--config=external.cfg"}, target=False
+            )
+
+    def test_only_reviewed_native_and_target_compiler_families_are_supported(self):
+        self.assertEqual(
+            {"family": "AppleClang", "major": 21},
+            validation_context.compiler_version("Apple clang version 21.0.0\n", target=False),
+        )
+        self.assertEqual(
+            {"family": "LLVMClang", "major": 23},
+            validation_context.compiler_version("Homebrew clang version 23.1.3\n", target=True),
+        )
+        for value, target in (
+            ("clang version 22.0.0\n", True),
+            ("Apple clang version 20.0.0\n", False),
+            ("gcc version 23.0\n", True),
+            ("Apple clang version 23.0\n", True),
+        ):
+            with self.subTest(value=value, target=target):
+                with self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context.compiler_version(value, target=target)
+
+    def compiler_fixture(self):
+        installation = self.root / "Cellar/llvm/23.1.3"
+        (installation / "etc").mkdir(parents=True)
+        target = self.root / "etc/clang"
+        target.mkdir(parents=True)
+        return installation, target
+
+    def test_only_the_selected_same_prefix_compiler_configuration_alias_is_admitted(self):
+        installation, target = self.compiler_fixture()
+        alias = installation / "etc/clang"
+        alias.symlink_to(target, target_is_directory=True)
+        (target / "native.cfg").write_bytes(b"opaque fixture data, never executed")
+        metadata, roots = validation_context.compiler_configuration(installation)
+        self.assertEqual((target,), roots)
+        self.assertEqual("automatic-disabled", metadata["policy"])
+        self.assertEqual(str(target), metadata["alias"]["resolved"])
+        self.assertTrue(
+            validation_context.fingerprint_tree(installation, (installation, target))
+        )
+        alias.unlink()
+        unknown = self.root / "unreviewed"
+        unknown.mkdir()
+        alias.symlink_to(unknown, target_is_directory=True)
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_context.compiler_configuration(installation)
+
+    def test_compiler_alias_absence_and_dangling_target_have_distinct_outcomes(self):
+        installation, target = self.compiler_fixture()
+        metadata, roots = validation_context.compiler_configuration(installation)
+        self.assertEqual((), roots)
+        self.assertEqual("absent", metadata["alias"]["kind"])
+        (installation / "etc/clang").symlink_to(target / "missing", target_is_directory=True)
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_context.compiler_configuration(installation)
+
+    def test_explicit_configuration_and_response_inputs_are_not_reusable(self):
+        for argument in (
+            "--config=external.cfg", "--config external.cfg",
+            "--config-system-dir=/external", "--config-user-dir=/external",
+            "@response.rsp", "-Wl,@response.rsp",
+        ):
+            with self.subTest(argument=argument):
+                with self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context.command_tools(
+                        "/tool/compiler " + argument, self.root, {"/tool/compiler"}
+                    )
+
+    def qemu_fixture(self):
+        installation = self.root / "Cellar/qemu/11.1.2"
+        executable = installation / "bin/qemu-system-riscv64"
+        executable.parent.mkdir(parents=True)
+        config = installation / "etc/qemu/qemu.conf"
+        executable.write_bytes(b"image fixture\0" + str(config).encode() + b"\0")
+        return installation, executable
+
+    def test_qemu_declares_both_configs_and_bundle_absent_without_execution(self):
+        installation, executable = self.qemu_fixture()
+        identity = validation_context.qemu_configuration(executable, installation)
+        self.assertEqual(
+            {
+                str(installation / "etc/qemu/qemu.conf"),
+                str(self.root / "etc/qemu/qemu.conf"),
+                str(executable.parent / "qemu-bundle"),
+            },
+            set(identity["absent"]),
+        )
+        self.assertTrue(all(value == "absent" for value in identity["absent"].values()))
+        executable.write_bytes(b"unknown layout\0")
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_context.qemu_configuration(executable, installation)
+
+    def test_qemu_present_config_bundle_and_symlink_are_refused_before_metadata(self):
+        installation, executable = self.qemu_fixture()
+        tools = validation_context.DarwinTools.__new__(validation_context.DarwinTools)
+        tools.cache = {"MICROS_QEMU": str(executable)}
+        tools._tool = mock.Mock(side_effect=AssertionError("metadata executed before absence checks"))
+        bundle = executable.parent / "qemu-bundle"
+        for location in (
+            installation / "etc/qemu/qemu.conf",
+            self.root / "etc/qemu/qemu.conf",
+            bundle,
+        ):
+            location.parent.mkdir(parents=True, exist_ok=True)
+            location.write_bytes(b"must not be interpreted")
+            with self.subTest(location=location):
+                with mock.patch("tools.validation_context._cellar_root", return_value=installation):
+                    with self.assertRaises(validation_context.UnsupportedContext):
+                        tools.qemu()
+            location.unlink()
+        bundle.symlink_to(self.root, target_is_directory=True)
+        with mock.patch("tools.validation_context._cellar_root", return_value=installation):
+            with self.assertRaises(validation_context.UnsupportedContext):
+                tools.qemu()
+        tools._tool.assert_not_called()
+
+    def candidate_fixture(self, *, dirty=False):
+        (self.root / ".git").mkdir()
+        source = self.root / "source.c"
+        source.write_bytes(b"reviewed source bytes\n")
+        data = source.read_bytes()
+        blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        responses = {
+            ("rev-parse", "--show-toplevel"): str(self.root).encode() + b"\n",
+            ("ls-files", "--others", "--exclude-standard", "-z"): b"",
+            ("rev-parse", "--git-common-dir"): b".git\n",
+            ("rev-parse", "--verify", "HEAD"): b"a" * 40 + b"\n",
+            ("write-tree",): b"b" * 40 + b"\n",
+            ("ls-files", "--stage", "-z"): f"100644 {blob} 0\tsource.c\0".encode(),
+            ("diff", "--name-only", "-z"): b"source.c\0" if dirty else b"",
+        }
+
+        def query(command, *, cwd=None):
+            self.assertEqual(self.root, cwd)
+            self.assertEqual("git", command[0])
+            return responses[tuple(command[1:])]
+
+        return source, responses, query
+
+    def test_candidate_binds_head_staged_tree_repository_and_actual_source(self):
+        _, _, query = self.candidate_fixture()
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            candidate = validation_context.capture_candidate(self.root)
+        self.assertTrue(candidate.clean)
+        self.assertEqual("a" * 40, candidate.source["head"])
+        self.assertEqual("b" * 40, candidate.source["tree"])
+        self.assertEqual(str(self.root), candidate.repository["root"])
+        self.assertEqual(str(self.root / ".git"), candidate.repository["git_common"])
+        self.assertEqual(64, len(candidate.source["source_sha256"]))
+
+    def test_git_clean_flags_cannot_hide_source_bytes_outside_the_staged_tree(self):
+        source, _, query = self.candidate_fixture()
+        source.write_bytes(b"unreviewed source now\n")
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            candidate = validation_context.capture_candidate(self.root)
+        self.assertFalse(candidate.clean)
+
+    def test_dirty_iteration_remains_representable_without_reusable_evidence(self):
+        _, _, query = self.candidate_fixture(dirty=True)
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            self.assertFalse(validation_context.capture_candidate(self.root).clean)
+
+    def test_untracked_source_blocks_candidate_evidence(self):
+        _, responses, query = self.candidate_fixture()
+        responses[("ls-files", "--others", "--exclude-standard", "-z")] = b"new.c\0"
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            with self.assertRaisesRegex(validation_context.UnsupportedContext, "untracked"):
+                validation_context.capture_candidate(self.root)
+
+    def test_tracked_link_cannot_claim_untracked_ignored_target_bytes(self):
+        source, responses, query = self.candidate_fixture()
+        source.unlink()
+        target = self.root / "ignored.c"
+        target.write_bytes(b"not in the reviewed index")
+        source.symlink_to(target)
+        data = os.fsencode(os.readlink(source))
+        blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        responses[("ls-files", "--stage", "-z")] = f"120000 {blob} 0\tsource.c\0".encode()
+        with mock.patch("tools.validation_context._run", side_effect=query):
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context.capture_candidate(self.root)
 
 
 if __name__ == "__main__":
