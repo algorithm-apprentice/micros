@@ -267,10 +267,11 @@ the design outcome is on `main`.
 
 The Accepted
 [validation-evidence design](../architecture/validation-evidence.md) preserves
-this rule while distinguishing a future actual command execution from an
-explicitly attributed reuse of that exact current-candidate evidence.
-It is not implemented. Authors and reviewers continue following the existing
-fresh-command contract until the separate implementation merges.
+this rule while distinguishing actual command execution from explicitly
+attributed reuse of exact current-candidate evidence. Separate implementation
+#132 is merged. Default and full execution remain fresh; opt-in reuse follows
+the closed-profile contract and never narrows the required plan or substitutes
+for independent review.
 
 ## Evolution
 

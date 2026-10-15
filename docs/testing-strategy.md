@@ -207,16 +207,28 @@ standalone RAMFS image, authenticated six-service QEMU scenario, and
 downstream VFS/ELF-spawn consumers. The
 [canonical source contract](architecture/ramfs-source-organization.md)
 defines 32 C sources, six private headers/sets, 180 original-definition
-moves, sixteen long C splits, and one Python renderer split. Its separate
-implementation starts only after the separately reviewed design merges.
-Structural Red freezes immutable owner/body/storage/case/trace/output
-inventories and exact CMake reconstruction; full-tier, QEMU, slow-model, and
+moves, sixteen long C splits, and one Python renderer split. Its separately
+reviewed design merged as #133; implementation #134 is also merged with
+empty owner/function migrations. Structural Red froze immutable
+owner/body/storage/case/trace/output inventories and exact CMake
+reconstruction; full-tier, QEMU, slow-model, and
 image classifications remain independently unchanged. Native/model,
 image/QEMU, and current-candidate validation-profile evidence supplement
-structural checks. Narrow green slices precede one authoritative complete
-author plan and bounded real reuse acceptance; independent reviewers inspect
-the evidence without routinely rerunning it. No implementation is claimed
-by the documentation-only design.
+structural checks. Narrow green slices preceded the complete fresh author
+plan, bounded real reuse acceptance and clean independent review.
+
+The endpoint correction defined by Accepted ADR-0067 preserves `endpoint_test` /
+`endpoint-profile`, `ipc_model_test` / `ipc-model`, both existing model link
+consumers, all 25 deterministic runner entries, the four-slot 4,096-step model,
+and `test-qemu-endpoint` with its existing grant lifecycle proof. The
+[exact source contract](architecture/kernel-endpoint-source-organization.md)
+defines 25 C sources, four private headers/sets, 90 original-definition moves,
+ten long-function dispositions, typed storage/exit proof, and complete
+recipe maintenance. Implementation starts only after the separately reviewed
+design merges. Narrow green extraction precedes one complete current author
+plan and bounded real native/smoke/TTY-image reuse acceptance; reviewers
+inspect rather than routinely rerun it. This Accepted design adds no test,
+model, build target, execution, or endpoint behavior.
 
 ## Test layers
 
@@ -692,12 +704,12 @@ branch-range diff checks.
 Accepted [ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
 [exact contract](architecture/validation-evidence.md) define an opt-in local
 execution ledger and a bounded existing-workflow CMake exception. They are
-design only: no command reuse or narrower CMake classification is implemented
-before the separate implementation merges. Default and full execution remain
-fresh.
+separately implemented in merged #132. Default and full execution remain
+fresh; reuse does not remove a required command or authorize cross-candidate
+evidence.
 The initial-profile implementation follows Accepted
 [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md);
-its fresh implementation follows merged corrective design #131.
+its fresh implementation followed merged corrective design #131.
 The correction does not reduce any validation gate.
 The explicit fresh/reuse/gate-only interfaces and bounded supported
 environment are documented in [the build guide](development/building.md).

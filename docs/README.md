@@ -36,6 +36,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.
+- [Kernel endpoint source organization](architecture/kernel-endpoint-source-organization.md)
+  defines exact representation, profile, complete-validation, publication,
+  close, native/model, and target ownership without changing authority.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
@@ -74,6 +77,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
   traces endpoint validation, privilege checks, send/receive queues,
   request/reply blocking, notifications, deadlock detection, and exit cleanup.
+- [MINIX kernel endpoint source-organization baseline](research/minix-kernel-endpoint-source-organization.md)
+  traces fixed representation, privilege installation, inhibited publication,
+  and teardown owners before the behavior-preserving endpoint correction.
 - [MINIX kernel IPC source-organization baseline](research/minix-kernel-ipc-source-organization.md)
   traces those responsibilities against the fixed local reference before the
   behavior-preserving shared IPC correction.
