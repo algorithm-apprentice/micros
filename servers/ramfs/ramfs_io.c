@@ -28,6 +28,51 @@ static void stage_read(
     }
 }
 
+static enum micros_ramfs_core_error publish_read(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_node *node,
+    const struct micros_ramfs_request *request,
+    const struct micros_ramfs_io *io,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result,
+    uint32_t transferred
+)
+{
+    enum micros_ramfs_copy_result copy_result;
+
+    if (transferred != 0) {
+        stage_read(
+            state,
+            node,
+            request->file_offset,
+            transferred,
+            state->scratch
+        );
+        copy_result = ramfs_copy_grant(
+            state,
+            io,
+            MICROS_RAMFS_COPY_TO_VFS,
+            request->grant,
+            request->grant_offset,
+            state->scratch,
+            transferred
+        );
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        if (copy_result == MICROS_RAMFS_COPY_INVARIANT) {
+            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
+        }
+        if (copy_result == MICROS_RAMFS_COPY_REJECTED) {
+            *result = MICROS_RAMFS_RESULT_GRANT;
+            return MICROS_RAMFS_CORE_OK;
+        }
+    }
+    fields->file_size = node->size;
+    fields->position = request->file_offset + transferred;
+    fields->count = transferred;
+    *result = MICROS_RAMFS_RESULT_OK;
+    return MICROS_RAMFS_CORE_OK;
+}
+
 enum micros_ramfs_core_error ramfs_handle_read(
     struct micros_ramfs_state *state,
     const struct micros_ramfs_request *request,
@@ -40,7 +85,6 @@ enum micros_ramfs_core_error ramfs_handle_read(
     uint16_t slot;
     uint64_t available;
     uint32_t transferred;
-    enum micros_ramfs_copy_result copy_result;
 
     *result = ramfs_resolve_referenced_node(
         state,
@@ -74,37 +118,7 @@ enum micros_ramfs_core_error ramfs_handle_read(
             ? (uint32_t)available
             : request->count
     );
-    if (transferred != 0) {
-        stage_read(
-            state,
-            node,
-            request->file_offset,
-            transferred,
-            state->scratch
-        );
-        copy_result = ramfs_copy_grant(
-            state,
-            io,
-            MICROS_RAMFS_COPY_TO_VFS,
-            request->grant,
-            request->grant_offset,
-            state->scratch,
-            transferred
-        );
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        if (copy_result == MICROS_RAMFS_COPY_INVARIANT) {
-            return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-        }
-        if (copy_result == MICROS_RAMFS_COPY_REJECTED) {
-            *result = MICROS_RAMFS_RESULT_GRANT;
-            return MICROS_RAMFS_CORE_OK;
-        }
-    }
-    fields->file_size = node->size;
-    fields->position = request->file_offset + transferred;
-    fields->count = transferred;
-    *result = MICROS_RAMFS_RESULT_OK;
-    return MICROS_RAMFS_CORE_OK;
+    return publish_read(state, node, request, io, fields, result, transferred);
 }
 
 static enum micros_ramfs_core_error commit_write(

@@ -72,6 +72,52 @@ static bool directory_entry_for_cursor(
     return false;
 }
 
+static void build_directory_records(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    uint16_t directory_slot,
+    uint64_t *cursor,
+    uint32_t *output_count
+)
+{
+    while (*cursor < MICROS_RAMFS_DIRECTORY_CURSOR_END) {
+        uint64_t handle;
+        uint32_t mode;
+        const uint8_t *name;
+        uint32_t name_length;
+
+        if (
+            !directory_entry_for_cursor(
+                state,
+                directory_slot,
+                *cursor,
+                &handle,
+                &mode,
+                &name,
+                &name_length
+            )
+        ) {
+            ++*cursor;
+            continue;
+        }
+        if (
+            *output_count + MICROS_RAMFS_DIRECTORY_RECORD_SIZE
+            > request->count
+        ) {
+            break;
+        }
+        write_directory_record(
+            &state->scratch[*output_count],
+            handle,
+            mode,
+            name,
+            name_length
+        );
+        *output_count += MICROS_RAMFS_DIRECTORY_RECORD_SIZE;
+        ++*cursor;
+    }
+}
+
 enum micros_ramfs_core_error ramfs_handle_getdents(
     struct micros_ramfs_state *state,
     const struct micros_ramfs_request *request,
@@ -118,42 +164,7 @@ enum micros_ramfs_core_error ramfs_handle_getdents(
     }
 
     cursor = request->cursor;
-    while (cursor < MICROS_RAMFS_DIRECTORY_CURSOR_END) {
-        uint64_t handle;
-        uint32_t mode;
-        const uint8_t *name;
-        uint32_t name_length;
-
-        if (
-            !directory_entry_for_cursor(
-                state,
-                directory_slot,
-                cursor,
-                &handle,
-                &mode,
-                &name,
-                &name_length
-            )
-        ) {
-            ++cursor;
-            continue;
-        }
-        if (
-            output_count + MICROS_RAMFS_DIRECTORY_RECORD_SIZE
-            > request->count
-        ) {
-            break;
-        }
-        write_directory_record(
-            &state->scratch[output_count],
-            handle,
-            mode,
-            name,
-            name_length
-        );
-        output_count += MICROS_RAMFS_DIRECTORY_RECORD_SIZE;
-        ++cursor;
-    }
+    build_directory_records(state, request, directory_slot, &cursor, &output_count);
     if (output_count != 0) {
         copy_result = ramfs_copy_grant(
             state,

@@ -3,14 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
-bool ramfs_model_compare_state(struct ramfs_model *selected)
+static bool compare_header_and_scratch(
+    struct ramfs_model *selected,
+    const struct micros_ramfs_state *production,
+    const struct reference_state *reference
+)
 {
-    const struct micros_ramfs_state *production =
-        &selected->production;
-    const struct reference_state *reference =
-        &selected->reference;
-    size_t index;
-
     MODEL_EXPECT(
         selected,
         micros_ramfs_state_validate(production)
@@ -39,6 +37,17 @@ bool ramfs_model_compare_state(struct ramfs_model *selected)
             MICROS_RAMFS_TRANSFER_MAX
         ) == 0
     );
+    return true;
+}
+
+static bool compare_nodes(
+    struct ramfs_model *selected,
+    const struct micros_ramfs_state *production,
+    const struct reference_state *reference
+)
+{
+    size_t index;
+
     for (index = 0; index < MICROS_RAMFS_NODE_CAPACITY; ++index) {
         const struct micros_ramfs_node *actual =
             &production->nodes[index];
@@ -96,6 +105,17 @@ bool ramfs_model_compare_state(struct ramfs_model *selected)
             );
         }
     }
+    return true;
+}
+
+static bool compare_blocks(
+    struct ramfs_model *selected,
+    const struct micros_ramfs_state *production,
+    const struct reference_state *reference
+)
+{
+    size_t index;
+
     for (index = 0; index < MICROS_RAMFS_BLOCK_CAPACITY; ++index) {
         MODEL_EXPECT(
             selected,
@@ -117,4 +137,16 @@ bool ramfs_model_compare_state(struct ramfs_model *selected)
         );
     }
     return true;
+}
+
+bool ramfs_model_compare_state(struct ramfs_model *selected)
+{
+    const struct micros_ramfs_state *production =
+        &selected->production;
+    const struct reference_state *reference =
+        &selected->reference;
+
+    return compare_header_and_scratch(selected, production, reference)
+        && compare_nodes(selected, production, reference)
+        && compare_blocks(selected, production, reference);
 }

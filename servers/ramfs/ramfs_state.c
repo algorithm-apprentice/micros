@@ -353,39 +353,21 @@ enum micros_ramfs_core_error micros_ramfs_state_validate(
     return ramfs_validate_state(state, true);
 }
 
-enum micros_ramfs_core_error micros_ramfs_state_initialize(
+static void initialize_from_seed_plan(
     struct micros_ramfs_state *state,
     micros_endpoint_t vfs_endpoint,
     const uint8_t *seed_image,
-    size_t seed_image_size
+    const struct micros_ramfs_seed_plan *plan
 )
 {
-    struct micros_ramfs_seed_plan plan;
-    enum micros_ramfs_seed_error seed_error;
     size_t index;
-
-    if (
-        state == NULL
-        || !ramfs_endpoint_is_valid(vfs_endpoint)
-        || seed_image == NULL
-    ) {
-        return MICROS_RAMFS_CORE_ERROR_ARGUMENT;
-    }
-    seed_error = micros_ramfs_seed_validate(
-        seed_image,
-        seed_image_size,
-        &plan
-    );
-    if (seed_error != MICROS_RAMFS_SEED_OK) {
-        return MICROS_RAMFS_CORE_ERROR_SEED;
-    }
 
     ramfs_zero_bytes(state, sizeof(*state));
     state->initialization_magic = MICROS_RAMFS_INITIALIZATION_MAGIC;
     state->vfs_endpoint = vfs_endpoint;
     state->phase = MICROS_RAMFS_PHASE_READY_UNMOUNTED;
-    state->node_count = plan.entry_count;
-    state->allocated_block_count = plan.allocated_block_count;
+    state->node_count = plan->entry_count;
+    state->allocated_block_count = plan->allocated_block_count;
     for (index = 0; index < MICROS_RAMFS_NODE_CAPACITY; ++index) {
         ramfs_initialize_empty_node(&state->nodes[index]);
     }
@@ -394,7 +376,7 @@ enum micros_ramfs_core_error micros_ramfs_state_initialize(
         state->block_logical[index] = MICROS_RAMFS_BLOCK_NONE;
     }
 
-    for (index = 0; index < plan.entry_count; ++index) {
+    for (index = 0; index < plan->entry_count; ++index) {
         const uint8_t *entry = &seed_image[
             MICROS_RAMFS_SEED_HEADER_SIZE
             + index * MICROS_RAMFS_SEED_ENTRY_SIZE
@@ -417,11 +399,11 @@ enum micros_ramfs_core_error micros_ramfs_state_initialize(
         }
         for (
             logical = 0;
-            logical < plan.block_count[index];
+            logical < plan->block_count[index];
             ++logical
         ) {
             uint16_t block = (uint16_t)(
-                plan.first_block[index] + logical
+                plan->first_block[index] + logical
             );
             uint32_t copied = (uint32_t)(
                 logical * MICROS_RAMFS_BLOCK_SIZE
@@ -445,13 +427,42 @@ enum micros_ramfs_core_error micros_ramfs_state_initialize(
             }
         }
     }
-    for (index = 1; index < plan.entry_count; ++index) {
+    for (index = 1; index < plan->entry_count; ++index) {
         if (ramfs_node_is_directory(&state->nodes[index])) {
             uint16_t parent = (uint16_t)state->nodes[index].parent;
 
             ++state->nodes[parent].link_count;
         }
     }
+}
+
+enum micros_ramfs_core_error micros_ramfs_state_initialize(
+    struct micros_ramfs_state *state,
+    micros_endpoint_t vfs_endpoint,
+    const uint8_t *seed_image,
+    size_t seed_image_size
+)
+{
+    struct micros_ramfs_seed_plan plan;
+    enum micros_ramfs_seed_error seed_error;
+
+    if (
+        state == NULL
+        || !ramfs_endpoint_is_valid(vfs_endpoint)
+        || seed_image == NULL
+    ) {
+        return MICROS_RAMFS_CORE_ERROR_ARGUMENT;
+    }
+    seed_error = micros_ramfs_seed_validate(
+        seed_image,
+        seed_image_size,
+        &plan
+    );
+    if (seed_error != MICROS_RAMFS_SEED_OK) {
+        return MICROS_RAMFS_CORE_ERROR_SEED;
+    }
+
+    initialize_from_seed_plan(state, vfs_endpoint, seed_image, &plan);
     if (
         micros_ramfs_state_validate(state) != MICROS_RAMFS_CORE_OK
     ) {

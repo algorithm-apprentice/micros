@@ -138,6 +138,7 @@ MODEL_STATE_FIELDS = (
 MODEL_TYPE_DIGEST = "93a26c70d7060c60dc9de8fd965111b93d4057895f39e4ee0f4d7ebe65dce702"
 MODEL_MACRO_DIGEST = "f986d01714b3d8caf017f82eebd4e2d8de6de768d0878a543d7ad316c348de18"
 MODEL_SCRIPT_PHASES = ("scripted_setup", "scripted_proofs")
+MODEL_PROJECTION_PHASES = ("compare_header_and_scratch", "compare_nodes", "compare_blocks")
 MODEL_SCRIPT_ROOT = (
     "{ uint64_t root = ramfs_model_reference_handle(&selected->reference, 0); "
     "if (selected->step <= 5) { return scripted_setup(selected, root); } "
@@ -1396,6 +1397,102 @@ def validator_body_tokens(caller, phases):
     return tuple(caller)
 
 
+def seed_initialization_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    prefix = list(body_tokens(
+        "{ struct micros_ramfs_seed_plan plan; enum micros_ramfs_seed_error seed_error;"
+    ))
+    local = list(body_tokens("size_t index;"))
+    if caller[:len(prefix)] != prefix or phase[:1 + len(local)] != ["{"] + local or phase[-1:] != ["}"]:
+        raise AssertionError("seed import retains its caller-owned plan and one automatic loop counter")
+    inner = phase[1 + len(local):-1]
+    first = inner.index("index") if "index" in inner else None
+    if first is None or inner[first - 2:first + 3] != ["for", "(", "index", "=", "0"] or "return" in inner:
+        raise AssertionError("validated seed import is non-failing and resets its counter before use")
+    expanded = []
+    index = 0
+    while index < len(inner):
+        if inner[index:index + 3] == ["plan", "-", ">"]:
+            expanded.extend(("plan", "."))
+            index += 3
+        else:
+            expanded.append(inner[index])
+            index += 1
+    call = list(body_tokens("initialize_from_seed_plan(state, vfs_endpoint, seed_image, &plan);"))
+    positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+    if len(positions) != 1 or caller.count("initialize_from_seed_plan") != 1:
+        raise AssertionError("seed import must use the exact validated plan and caller-owned state")
+    position = positions[0]
+    caller[position:position + len(call)] = expanded
+    caller[len(prefix):len(prefix)] = local
+    return tuple(caller)
+
+
+def read_publication_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    prefix = list(body_tokens(
+        "{ const struct micros_ramfs_node *node; uint16_t slot; uint64_t available; uint32_t transferred;"
+    ))
+    local = list(body_tokens("enum micros_ramfs_copy_result copy_result;"))
+    call = list(body_tokens("return publish_read(state, node, request, io, fields, result, transferred);"))
+    if caller[:len(prefix)] != prefix or caller[-len(call) - 1:-1] != call or caller.count("publish_read") != 1:
+        raise AssertionError("read must return its exact checked publication result without continuation")
+    if phase[:1 + len(local)] != ["{"] + local or phase[-1:] != ["}"]:
+        raise AssertionError("read publication retains only its original automatic copy result")
+    inner = phase[1 + len(local):-1]
+    caller[-len(call) - 1:-1] = inner
+    caller[len(prefix):len(prefix)] = local
+    return tuple(caller)
+
+
+def directory_build_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    call = list(body_tokens("build_directory_records(state, request, directory_slot, &cursor, &output_count);"))
+    positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+    if len(positions) != 1 or caller.count("build_directory_records") != 1:
+        raise AssertionError("directory builder must advance the exact caller-owned cursor and count")
+    if phase[:1] != ["{"] or phase[-1:] != ["}"] or "return" in phase:
+        raise AssertionError("directory building must not invent a caller exit or publication")
+    inner = phase[1:-1]
+    expanded = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "*" and inner[index + 1:index + 2] in (["cursor"], ["output_count"]):
+            index += 1
+        expanded.append(inner[index])
+        index += 1
+    position = positions[0]
+    caller[position:position + len(call)] = expanded
+    return tuple(caller)
+
+
+def model_projection_body_tokens(caller, bodies):
+    prefix = list(body_tokens(
+        "{ const struct micros_ramfs_state *production = &selected->production; "
+        "const struct reference_state *reference = &selected->reference;"
+    ))
+    if list(body_tokens(caller))[:len(prefix)] != prefix or len(bodies) != 3:
+        raise AssertionError("projection retains its exact borrowed production/reference observations")
+    phases = []
+    local = list(body_tokens("size_t index;"))
+    for index, (name, body) in enumerate(zip(MODEL_PROJECTION_PHASES, bodies)):
+        tokens = list(body_tokens(body))
+        if index != 0:
+            if tokens[:1 + len(local)] != ["{"] + local:
+                raise AssertionError("node/block projection must keep automatic counters")
+            tokens[1:1 + len(local)] = []
+            first = tokens.index("index") if "index" in tokens else None
+            if first is None or tokens[first - 2:first + 3] != ["for", "(", "index", "=", "0"]:
+                raise AssertionError("node/block projection counters must be reset before use")
+        phases.append(((name, ("selected", "production", "reference")), " ".join(tokens)))
+    expanded = list(bool_case_body_tokens(caller, phases))
+    expanded[len(prefix):len(prefix)] = local
+    return tuple(expanded)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1425,6 +1522,15 @@ def original_body_digest(family, name, text):
             for specification in VALIDATOR_PHASES
         ]
         tokens = validator_body_tokens(text, phases)
+    if family == 0 and name == "micros_ramfs_state_initialize":
+        phase = c_function_body(source(family_paths(0)[3]), "initialize_from_seed_plan")
+        tokens = seed_initialization_body_tokens(text, phase)
+    if family == 0 and name == "handle_read":
+        phase = c_function_body(source(family_paths(0)[6]), "publish_read")
+        tokens = read_publication_body_tokens(text, phase)
+    if family == 0 and name == "handle_getdents":
+        phase = c_function_body(source(family_paths(0)[7]), "build_directory_records")
+        tokens = directory_build_body_tokens(text, phase)
     if family == 2 and name in SEED_CASE_PHASES and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
         phases = [
@@ -1450,6 +1556,11 @@ def original_body_digest(family, name, text):
     if family == 3 and name == "reference_lookup" and (3, name) not in LONG_FUNCTION_MIGRATION:
         phase = c_function_body(source(family_paths(3)[2]), "reference_walk_lookup")
         tokens = reference_lookup_body_tokens(text, phase)
+    if family == 3 and name == "compare_state":
+        owner = source(family_paths(3)[3])
+        tokens = model_projection_body_tokens(
+            text, [c_function_body(owner, name) for name in MODEL_PROJECTION_PHASES],
+        )
     if family == 4 and name == "vfs_run_filesystem_scenario" and (4, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(4)[3])
         peer_readonly_data(owner)
@@ -1902,7 +2013,10 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             )
         completed_script = (3, "execute_scripted_operation") not in LONG_FUNCTION_MIGRATION
         completed_lookup = (3, "reference_lookup") not in LONG_FUNCTION_MIGRATION
-        self.assertEqual(56 + 2 * completed_script + completed_lookup, len(owned_definitions(3)))
+        self.assertEqual(
+            56 + 2 * completed_script + completed_lookup + len(MODEL_PROJECTION_PHASES),
+            len(owned_definitions(3)),
+        )
         self.assertEqual({}, c_function_definitions(header))
         self.assertEqual((), file_scope_objects(header))
         self.assertIn("const struct ramfs_model_seed *ramfs_model_seed_context(void);", header)
@@ -2324,6 +2438,48 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, len(actual))
             self.assertEqual(body_tokens(f"static bool {name}({parameters}) {{"), body_tokens(actual[0]))
         self.assertLessEqual(definitions["ramfs_validate_state"], 120)
+
+    def test_short_operations_expose_seed_import_copy_publication_record_build_and_complete_projection(self):
+        state = family_paths(0)[3]
+        io = family_paths(0)[6]
+        directory = family_paths(0)[7]
+        projection = family_paths(3)[3]
+        model_parameters = (
+            "struct ramfs_model *selected, const struct micros_ramfs_state *production, "
+            "const struct reference_state *reference"
+        )
+        expected = (
+            (state, "initialize_from_seed_plan", "void", (
+                "struct micros_ramfs_state *state, micros_endpoint_t vfs_endpoint, "
+                "const uint8_t *seed_image, const struct micros_ramfs_seed_plan *plan"
+            )),
+            (io, "publish_read", "enum micros_ramfs_core_error", (
+                "struct micros_ramfs_state *state, const struct micros_ramfs_node *node, "
+                "const struct micros_ramfs_request *request, const struct micros_ramfs_io *io, "
+                "struct ramfs_result_fields *fields, enum micros_ramfs_result *result, uint32_t transferred"
+            )),
+            (directory, "build_directory_records", "void", (
+                "struct micros_ramfs_state *state, const struct micros_ramfs_request *request, "
+                "uint16_t directory_slot, uint64_t *cursor, uint32_t *output_count"
+            )),
+            (projection, "compare_header_and_scratch", "bool", model_parameters),
+            (projection, "compare_nodes", "bool", model_parameters),
+            (projection, "compare_blocks", "bool", model_parameters),
+        )
+        for path, name, result, parameters in expected:
+            with self.subTest(path=path, name=name):
+                text = source(path)
+                definitions = c_function_definitions(text)
+                self.assertIn(name, definitions)
+                self.assertLessEqual(definitions[name], 120)
+                signatures = re.findall(
+                    rf"(?m)^static {result}\s+{name}\([^;{{}}]*\)\s*\{{", text,
+                )
+                self.assertEqual(1, len(signatures))
+                self.assertEqual(
+                    body_tokens(f"static {result} {name}({parameters}) {{"),
+                    body_tokens(signatures[0]),
+                )
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -2917,6 +3073,110 @@ def render_fixture(image, limit):
         changed[2] = changed[2].replace("= true", "= false")
         self.assertNotEqual(
             body_tokens(expected), validator_body_tokens(caller, tuple(zip(VALIDATOR_PHASES, changed))),
+        )
+
+    def test_seed_import_projection_preserves_preflight_nonfailure_and_postvalidation_clear(self):
+        prefix = "{ struct micros_ramfs_seed_plan plan; enum micros_ramfs_seed_error seed_error;"
+        inner = "clear_state(); state->node_count = plan.entry_count; for (index = 0; index < N; ++index) { copy_seed(); }"
+        before = "if (bad_seed()) { return SEED_ERROR; }"
+        after = "if (invalid_state()) { clear_state(); return INVARIANT; } return OK; }"
+        caller = prefix + before + "initialize_from_seed_plan(state, vfs_endpoint, seed_image, &plan);" + after
+        phase = "{ size_t index;" + inner.replace("plan.", "plan->") + "}"
+        expected = prefix + "size_t index;" + before + inner + after
+        self.assertEqual(body_tokens(expected), seed_initialization_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("seed_image, &plan", "seed_image, &other_plan"),
+            caller.replace("initialize_from_seed_plan(", "return initialize_from_seed_plan("),
+        ):
+            with self.subTest(changed=changed):
+                if "return initialize" in changed:
+                    self.assertNotEqual(body_tokens(expected), seed_initialization_body_tokens(changed, phase))
+                else:
+                    with self.assertRaises(AssertionError):
+                        seed_initialization_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("size_t index", "static size_t index"),
+            phase.replace("index = 0", "index = 1"),
+            phase.replace("copy_seed();", "return;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                seed_initialization_body_tokens(caller, changed)
+        self.assertNotEqual(
+            body_tokens(expected), seed_initialization_body_tokens(caller.replace("clear_state();", ""), phase),
+        )
+
+    def test_read_projection_keeps_exact_copy_clear_reply_and_direct_failure_scope(self):
+        prefix = (
+            "{ const struct micros_ramfs_node *node; uint16_t slot; uint64_t available; uint32_t transferred;"
+        )
+        inner = (
+            "if (transferred != 0) { copy_result = copy(); clear(); "
+            "if (copy_result == BAD) { return INVARIANT; } } publish_fields(); return OK;"
+        )
+        caller = prefix + "preflight(); return publish_read(state, node, request, io, fields, result, transferred); }"
+        phase = "{ enum micros_ramfs_copy_result copy_result;" + inner + "}"
+        expected = prefix + "enum micros_ramfs_copy_result copy_result; preflight();" + inner + "}"
+        self.assertEqual(body_tokens(expected), read_publication_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("return publish_read", "publish_read"),
+            caller.replace("result, transferred", "result, request->count"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                read_publication_body_tokens(changed, phase)
+        with self.assertRaises(AssertionError):
+            read_publication_body_tokens(caller, phase.replace("enum micros", "static enum micros"))
+        for changed in (phase.replace("clear();", ""), phase.replace("return INVARIANT;", "return OK;")):
+            self.assertNotEqual(body_tokens(expected), read_publication_body_tokens(caller, changed))
+
+    def test_directory_build_projection_keeps_single_cursor_count_and_checked_publication(self):
+        prefix = "{ uint64_t cursor; uint32_t output_count = 0; cursor = request->cursor;"
+        inner = "while (cursor < END) { record(output_count); output_count += RECORD; ++cursor; }"
+        caller = prefix + "build_directory_records(state, request, directory_slot, &cursor, &output_count); copy_clear_reply(); }"
+        phase = "{ while (*cursor < END) { record(*output_count); *output_count += RECORD; ++*cursor; } }"
+        expected = prefix + inner + "copy_clear_reply(); }"
+        self.assertEqual(body_tokens(expected), directory_build_body_tokens(caller, phase))
+        with self.assertRaises(AssertionError):
+            directory_build_body_tokens(caller.replace("&cursor, &output_count", "&other, &output_count"), phase)
+        with self.assertRaises(AssertionError):
+            directory_build_body_tokens(caller, phase.replace("record(*output_count);", "return;"))
+        self.assertNotEqual(
+            body_tokens(expected), directory_build_body_tokens(caller, phase.replace("++*cursor", "--*cursor")),
+        )
+
+    def test_model_projection_preserves_complete_observations_and_first_failure_order(self):
+        prefix = (
+            "{ const struct micros_ramfs_state *production = &selected->production; "
+            "const struct reference_state *reference = &selected->reference;"
+        )
+        header = "MODEL_EXPECT(selected, header_and_scratch(production, reference));"
+        nodes = "for (index = 0; index < NODES; ++index) { MODEL_EXPECT(selected, node_equal(index)); }"
+        blocks = "for (index = 0; index < BLOCKS; ++index) { MODEL_EXPECT(selected, bytes_equal(index)); }"
+        caller = prefix + "return " + " && ".join(
+            name + "(selected, production, reference)" for name in MODEL_PROJECTION_PHASES
+        ) + "; }"
+        bodies = (
+            "{" + header + "return true; }",
+            "{ size_t index;" + nodes + "return true; }",
+            "{ size_t index;" + blocks + "return true; }",
+        )
+        expected = prefix + "size_t index;" + header + nodes + blocks + "return true; }"
+        self.assertEqual(body_tokens(expected), model_projection_body_tokens(caller, bodies))
+        for changed in (
+            caller.replace("compare_nodes(selected", "compare_nodes(other"),
+            caller.replace("&& compare_blocks", "|| compare_blocks"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(changed, bodies)
+        for changed in (
+            bodies[1].replace("size_t index", "static size_t index"),
+            bodies[1].replace("index = 0", "index = 1"),
+            bodies[1].replace("return true;", "return false;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(caller, (bodies[0], changed, bodies[2]))
+        self.assertNotEqual(
+            body_tokens(expected),
+            model_projection_body_tokens(caller, (*bodies[:2], bodies[2].replace("bytes_equal", "owners_only"))),
         )
 
     def test_reference_walk_projection_keeps_preflight_error_precedence_and_direct_publication(self):

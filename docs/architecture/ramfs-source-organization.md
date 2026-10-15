@@ -573,9 +573,16 @@ helper counters are automatic and reset before use. Exact projection
 preserves null-argument precedence, true/false scratch policy, strict
 parent-before-child ordering, every invariant and whole-state closure.
 Both active migration collections are now literal empty tuples; the frozen
-180-owner and sixteen-C/one-Python inventories remain unchanged. Specified
-shorter-operation outlines, complete current author/profile-reuse evidence,
-and independent implementation review still govern completion.
+180-owner and sixteen-C/one-Python inventories remain unchanged. The specified
+shorter operations also have named boundaries: initialization validates its
+caller-owned seed plan, imports without a new failure path, then retains
+post-validation and zero-on-invariant-failure; read returns exact staged
+copy/clear/result publication; getdents builds records using its original
+caller-owned cursor/count before checked copy and reply; model projection
+short-circuits header/scratch, every node, and every physical block without
+duplicate failure reporting. Complete original-body projection retains all
+four contracts and their automatic lifetimes. Complete current author/profile
+reuse evidence and independent implementation review still govern completion.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;
