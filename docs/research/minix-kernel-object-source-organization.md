@@ -97,6 +97,7 @@ not authorize optimizing validation or extending a boot deadline.
 6. Whole-registry snapshot/reset macros keep evaluation order, and target
    failure returns through the original single IRQ restoration.
 
-The exact proposed outcome is the
+The exact design outcome is the
 [kernel-object source contract](../architecture/kernel-object-source-organization.md).
-Acceptance follows independent design review and a separate merge.
+Independent design review is clean; the separate Accepted design merge
+still precedes implementation.

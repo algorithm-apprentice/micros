@@ -1,6 +1,6 @@
 # ADR-0068: Kernel Object Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
 - Refines: ADR-0011, ADR-0019, ADR-0021, ADR-0022, ADR-0023, ADR-0025,
   ADR-0026, ADR-0029, ADR-0030, ADR-0033, ADR-0034, ADR-0051, ADR-0062,
@@ -157,3 +157,16 @@ acceptance succeeds. Shared CMake ownership currently selects all 47 author
 commands. Review inspects exact author evidence rather than routinely
 rerunning it. Exact reviewed-head squash/tree equality and obsolete branch
 cleanup follow the agent contract.
+
+## Design review disposition
+
+Independent read-only review inspected the complete ten-document proposal,
+relevant Accepted authority, current 76-definition source family, fixed
+MINIX evidence, storage and exit contracts, retained-source inverse and
+shared-inspection feasibility, and exact current author evidence.
+It found no substantive issue remaining; no targeted reproduction was
+reported.
+
+Acceptance records that design result, not implementation completion.
+The paired implementation remains pending until this separate design PR
+merges.

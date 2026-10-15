@@ -40,7 +40,7 @@ This directory contains the design baseline for `micros`.
   defines exact representation, profile, complete-validation, publication,
   close, native/model, and target ownership without changing authority.
 - [Kernel object source organization](architecture/kernel-object-source-organization.md)
-  proposes exact representation/identity, process/thread/context/hart,
+  defines Accepted representation/identity, process/thread/context/hart,
   base-validation, native/reference-model and target ownership, including
   retained byte-source oracles and closed-profile coupling.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)

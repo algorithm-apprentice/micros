@@ -602,12 +602,12 @@ no substantive issue remaining. Squash
 both obsolete feature branches removed. This closes the endpoint correction,
 not production init/shell/commands or later maintenance.
 
-Proposed [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) defines
+Accepted [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) defines
 a future bounded object-source inverse for this contract's retained
 `kernel/kernel_objects.c` hash. It must keep the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
 expected value and all other artifacts unchanged. It is not usable until
-the separate object design is Accepted and merged.
+the separate object design PR #137 merges.
 
 ### Reviewed sequence
 

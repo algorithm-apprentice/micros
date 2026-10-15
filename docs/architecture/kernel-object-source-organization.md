@@ -2,11 +2,11 @@
 
 ## Status, base, and goal
 
-This is the exact proposed contract for the three kernel-object signal files
+This is the exact design contract for the three kernel-object signal files
 in the [source-module audit](source-module-audit.md).
-[ADR-0068](../adr/0068-kernel-object-source-decomposition.md) is Proposed.
-Implementation remains pending until independent design review is clean,
-the ADR is Accepted, and the separate design PR merges.
+[ADR-0068](../adr/0068-kernel-object-source-decomposition.md) is Accepted
+after a clean independent read-only design review. Implementation remains
+pending until the separate design PR #137 merges.
 
 ```text
 reviewed micros base: 4eb1c4d68de3830b888a0d239a2874bd79792244
