@@ -347,15 +347,15 @@ Implementation #126 passed full author validation and clean independent
 implementation review and is merged. Application
 startup is not part of this source-only outcome.
 
-The selected RAMFS maintenance correction is Proposed
+The selected RAMFS maintenance correction is Accepted
 [ADR-0066](adr/0066-ramfs-source-decomposition.md), with the exact
 [RAMFS source contract](architecture/ramfs-source-organization.md).
 It exposes portable state/codec/ownership/namespace/I/O/directory work,
 native and independent-model evidence, target peer/report, and generator
 phases without changing Step 12 behavior. Design is documentation-only;
-implementation remains pending until independent review, Acceptance, and
-separate design merge. This correction adds no production init, shell,
-command, or runtime-DAG node.
+independent design and bounded correction review are clean. Implementation
+remains pending the separate design merge. This correction adds no production
+init, shell, command, or runtime-DAG node.
 
 ## v0.1 completion goal
 

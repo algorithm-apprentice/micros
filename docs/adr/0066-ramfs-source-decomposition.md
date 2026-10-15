@@ -1,6 +1,6 @@
 # ADR-0066: RAMFS Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
 - Refines: ADR-0025, ADR-0032, ADR-0033, ADR-0034, ADR-0048, ADR-0051,
   ADR-0064, and ADR-0065
@@ -118,3 +118,16 @@ Reviewers inspect the author's exact candidate and evidence rather than
 routinely rerunning those gates. Acceptance, correction, staged-tree
 verification, squash-tree equality, and exact obsolete-branch cleanup follow
 the agent contract and ADR-0034.
+
+## Design review disposition
+
+Independent read-only design review identified one model dependency cycle:
+the reference record writer and protocol request builders share two existing
+LE writers. Assigning those writers to the protocol owner would create a
+back-edge. The corrected contract places both in the existing fixture leaf
+and retains reply readers in protocol. Original bodies, counts, and evidence
+identities are unchanged. Independent bounded correction review found no
+substantive issue remaining; no runtime reproduction was needed.
+
+Acceptance records that clean design result, not implementation completion.
+The dependent implementation starts only after this separate design merges.

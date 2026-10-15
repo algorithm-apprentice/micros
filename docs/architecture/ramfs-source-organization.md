@@ -2,8 +2,9 @@
 
 This is the implementation-ready contract for the seven RAMFS signal files
 in [the source-module audit](source-module-audit.md).
-[ADR-0066](../adr/0066-ramfs-source-decomposition.md) is Proposed; implementation
-has not started. Design and implementation are separate sequential outcomes.
+[ADR-0066](../adr/0066-ramfs-source-decomposition.md) is Accepted after clean
+independent design and bounded correction review. Implementation has not
+started and remains dependent on the separate design merge in PR #133.
 
 ## Base, goal, and authority
 
