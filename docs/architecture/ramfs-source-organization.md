@@ -553,7 +553,13 @@ proof, and 50-line final-runtime validation. Exact projection preserves all
 original getter order, PC/current-generation checks, failure codes,
 STARTING versus all-ready states, `sepc += 4`, non-returning panics and
 successful shutdown; all borrowed state pointers and counters stay automatic.
-Three C semantic migrations remain pending, alongside the specified
+Creation functional evidence now has five file/duplicate, mkdir/parent,
+mode/range, name/copy and capacity tasks with a 17-line root. Its four
+original malformed-name bytes are explicitly initialized in the same
+automatic work record, before the unchanged root initializer; no blanket
+initialization, duplicate buffer or lost `sizeof` extent is introduced.
+Full typed projection retains original resets, the 61-node fill and no-copy
+exhaustion proof. Two C semantic migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 

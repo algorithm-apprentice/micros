@@ -2,6 +2,313 @@
 
 #include <string.h>
 
+struct ramfs_creation_case {
+    struct micros_ramfs_reply_action action;
+    struct micros_ipc_message message;
+    uint8_t malformed_name[4];
+    uint64_t root;
+    uint64_t created;
+    size_t index;
+};
+
+static bool creation_file_and_duplicate(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_creation_case *work
+)
+{
+EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
+    EXPECT_TRUE(
+        ramfs_test_create_node(
+            fixture,
+            MICROS_RAMFS_MESSAGE_CREATE,
+            work->root,
+            MICROS_RAMFS_MODE_REGULAR | UINT32_C(0640),
+            "file",
+            &work->action
+        )
+    );
+    work->created = ramfs_test_read_u64_le(&work->action.message.payload[16]);
+    EXPECT_TRUE(work->created == micros_ramfs_handle(3, 1));
+    EXPECT_TRUE(fixture->state.nodes[3].reference_count == 1);
+    EXPECT_TRUE(fixture->state.nodes[3].link_count == 1);
+    EXPECT_TRUE(
+        ramfs_test_read_u32_le(&work->action.message.payload[44])
+            == (MICROS_RAMFS_MODE_REGULAR | UINT32_C(0640))
+    );
+
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "file", 5);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        5,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_EXISTS
+        )
+    );
+    return true;
+}
+
+static bool creation_mkdir_and_parent_authority(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_creation_case *work
+)
+{
+    EXPECT_TRUE(
+        ramfs_test_create_node(
+            fixture,
+            MICROS_RAMFS_MESSAGE_MKDIR,
+            work->root,
+            MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0750),
+            "dir",
+            &work->action
+        )
+    );
+    EXPECT_TRUE(ramfs_test_read_u64_le(&work->action.message.payload[16]) == 0);
+    EXPECT_TRUE(fixture->state.nodes[4].reference_count == 0);
+    EXPECT_TRUE(fixture->state.nodes[4].link_count == 2);
+    EXPECT_TRUE(fixture->state.nodes[0].link_count == 4);
+
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "child", 6);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->created,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        6,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_NOT_DIRECTORY
+        )
+    );
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        micros_ramfs_handle(1, 1),
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        6,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_REFERENCE
+        )
+    );
+    return true;
+}
+
+static bool creation_mode_and_range_rejections(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_creation_case *work
+)
+{
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0755),
+        2,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_MKDIR,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        2,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+
+    ramfs_test_reset_bus(fixture);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        1,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        MICROS_RAMFS_NAME_MAX + 2,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_RANGE
+        )
+    );
+    return true;
+}
+
+static bool creation_name_and_copy_rejections(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_creation_case *work
+)
+{
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, work->malformed_name, sizeof(work->malformed_name));
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        sizeof(work->malformed_name),
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "bad/name", 9);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        9,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, ".\0", 2);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        2,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "..\0", 3);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        3,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_MALFORMED
+        )
+    );
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "x\0", 2);
+    fixture->bus.reject = true;
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        2,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_GRANT
+        )
+    );
+    return true;
+}
+
+static bool creation_node_capacity(
+    struct ramfs_test_fixture *fixture,
+    struct ramfs_creation_case *work
+)
+{
+    EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
+    for (work->index = 0; work->index < 61; ++work->index) {
+        char name[4];
+
+        name[0] = 'd';
+        name[1] = (char)('0' + (work->index / 10) % 10);
+        name[2] = (char)('0' + work->index % 10);
+        name[3] = '\0';
+        EXPECT_TRUE(
+            ramfs_test_create_node(
+                fixture,
+                MICROS_RAMFS_MESSAGE_MKDIR,
+                work->root,
+                MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0755),
+                name,
+                &work->action
+            )
+        );
+    }
+    EXPECT_TRUE(fixture->state.node_count == MICROS_RAMFS_NODE_CAPACITY);
+    EXPECT_TRUE(fixture->state.nodes[0].link_count == 64);
+    ramfs_test_reset_bus(fixture);
+    memcpy(fixture->bus.storage, "full\0", 5);
+    work->message = ramfs_test_create_request(
+        MICROS_RAMFS_MESSAGE_CREATE,
+        work->root,
+        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
+        5,
+        0
+    );
+    EXPECT_TRUE(
+        ramfs_test_failure_preserves_state(
+            fixture,
+            &work->message,
+            MICROS_RAMFS_RESULT_NO_SPACE
+        )
+    );
+    EXPECT_TRUE(fixture->bus.calls == 0);
+    return true;
+}
+
 bool ramfs_test_lookup_semantics_and_reference_limits_are_exact(
     struct ramfs_test_fixture *fixture
 )
@@ -326,276 +633,18 @@ bool ramfs_test_handles_create_mkdir_and_capacity_are_exact(
     struct ramfs_test_fixture *fixture
 )
 {
-    struct micros_ramfs_reply_action action;
-    struct micros_ipc_message message;
-    uint8_t malformed_name[] = {'b', '\0', 'd', '\0'};
-    uint64_t root = micros_ramfs_handle(0, 1);
-    uint64_t created;
-    size_t index;
+    struct ramfs_creation_case work;
+    work.malformed_name[0] = 'b';
+    work.malformed_name[1] = '\0';
+    work.malformed_name[2] = 'd';
+    work.malformed_name[3] = '\0';
+    work.root = micros_ramfs_handle(0, 1);
 
-    EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
-    EXPECT_TRUE(
-        ramfs_test_create_node(
-            fixture,
-            MICROS_RAMFS_MESSAGE_CREATE,
-            root,
-            MICROS_RAMFS_MODE_REGULAR | UINT32_C(0640),
-            "file",
-            &action
-        )
-    );
-    created = ramfs_test_read_u64_le(&action.message.payload[16]);
-    EXPECT_TRUE(created == micros_ramfs_handle(3, 1));
-    EXPECT_TRUE(fixture->state.nodes[3].reference_count == 1);
-    EXPECT_TRUE(fixture->state.nodes[3].link_count == 1);
-    EXPECT_TRUE(
-        ramfs_test_read_u32_le(&action.message.payload[44])
-            == (MICROS_RAMFS_MODE_REGULAR | UINT32_C(0640))
-    );
-
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "file", 5);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        5,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_EXISTS
-        )
-    );
-
-    EXPECT_TRUE(
-        ramfs_test_create_node(
-            fixture,
-            MICROS_RAMFS_MESSAGE_MKDIR,
-            root,
-            MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0750),
-            "dir",
-            &action
-        )
-    );
-    EXPECT_TRUE(ramfs_test_read_u64_le(&action.message.payload[16]) == 0);
-    EXPECT_TRUE(fixture->state.nodes[4].reference_count == 0);
-    EXPECT_TRUE(fixture->state.nodes[4].link_count == 2);
-    EXPECT_TRUE(fixture->state.nodes[0].link_count == 4);
-
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "child", 6);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        created,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        6,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_NOT_DIRECTORY
-        )
-    );
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        micros_ramfs_handle(1, 1),
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        6,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_REFERENCE
-        )
-    );
-
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0755),
-        2,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_MKDIR,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        2,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-
-    ramfs_test_reset_bus(fixture);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        1,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        MICROS_RAMFS_NAME_MAX + 2,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_RANGE
-        )
-    );
-
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, malformed_name, sizeof(malformed_name));
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        sizeof(malformed_name),
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "bad/name", 9);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        9,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, ".\0", 2);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        2,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "..\0", 3);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        3,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_MALFORMED
-        )
-    );
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "x\0", 2);
-    fixture->bus.reject = true;
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        2,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_GRANT
-        )
-    );
-
-    EXPECT_TRUE(ramfs_test_initialize_mounted(fixture));
-    for (index = 0; index < 61; ++index) {
-        char name[4];
-
-        name[0] = 'd';
-        name[1] = (char)('0' + (index / 10) % 10);
-        name[2] = (char)('0' + index % 10);
-        name[3] = '\0';
-        EXPECT_TRUE(
-            ramfs_test_create_node(
-                fixture,
-                MICROS_RAMFS_MESSAGE_MKDIR,
-                root,
-                MICROS_RAMFS_MODE_DIRECTORY | UINT32_C(0755),
-                name,
-                &action
-            )
-        );
-    }
-    EXPECT_TRUE(fixture->state.node_count == MICROS_RAMFS_NODE_CAPACITY);
-    EXPECT_TRUE(fixture->state.nodes[0].link_count == 64);
-    ramfs_test_reset_bus(fixture);
-    memcpy(fixture->bus.storage, "full\0", 5);
-    message = ramfs_test_create_request(
-        MICROS_RAMFS_MESSAGE_CREATE,
-        root,
-        MICROS_RAMFS_MODE_REGULAR | UINT32_C(0644),
-        5,
-        0
-    );
-    EXPECT_TRUE(
-        ramfs_test_failure_preserves_state(
-            fixture,
-            &message,
-            MICROS_RAMFS_RESULT_NO_SPACE
-        )
-    );
-    EXPECT_TRUE(fixture->bus.calls == 0);
-    return true;
+    return creation_file_and_duplicate(fixture, &work)
+        && creation_mkdir_and_parent_authority(fixture, &work)
+        && creation_mode_and_range_rejections(fixture, &work)
+        && creation_name_and_copy_rejections(fixture, &work)
+        && creation_node_capacity(fixture, &work);
 }
 
 bool ramfs_test_putnode_and_handle_validation_are_exact(

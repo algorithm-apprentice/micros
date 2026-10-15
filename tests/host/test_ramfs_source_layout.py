@@ -181,6 +181,32 @@ SEED_CASE_PHASES = {
     ),
 }
 FUNCTIONAL_CASE_WORK = {
+    "handles_create_mkdir_and_capacity_are_exact": {
+        "owner": 3,
+        "tag": "ramfs_creation_case",
+        "fields": ("action", "message", "malformed_name", "root", "created", "index"),
+        "schema": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint8_t malformed_name[4]; uint64_t root; uint64_t created; size_t index;"
+        ),
+        "original": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            r"uint8_t malformed_name[] = {'b', '\0', 'd', '\0'}; "
+            "uint64_t root = micros_ramfs_handle(0, 1); uint64_t created; size_t index;"
+        ),
+        "outlined": (
+            "struct ramfs_creation_case work; work.malformed_name[0] = 'b'; "
+            r"work.malformed_name[1] = '\0'; work.malformed_name[2] = 'd'; "
+            r"work.malformed_name[3] = '\0'; work.root = micros_ramfs_handle(0, 1);"
+        ),
+        "phases": (
+            ("creation_file_and_duplicate", ("fixture", "&work")),
+            ("creation_mkdir_and_parent_authority", ("fixture", "&work")),
+            ("creation_mode_and_range_rejections", ("fixture", "&work")),
+            ("creation_name_and_copy_rejections", ("fixture", "&work")),
+            ("creation_node_capacity", ("fixture", "&work")),
+        ),
+    },
     "protocol_mount_and_result_layout_are_exact": {
         "owner": 2,
         "tag": "ramfs_protocol_case",
@@ -432,6 +458,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (0, "handle_lookup"),
         (4, "vfs_run_filesystem_scenario"),
         (5, "micros_ramfs_service_test_handle_trap"),
+        (1, "handles_create_mkdir_and_capacity_are_exact"),
     )
 )
 
@@ -2008,6 +2035,9 @@ class RamfsSourceLayoutTest(unittest.TestCase):
     def test_protocol_and_io_cases_expose_checked_work_and_first_failure_tasks(self):
         self.check_functional_work_case("protocol_mount_and_result_layout_are_exact")
         self.check_functional_work_case("read_write_sparse_and_block_capacity_are_exact")
+
+    def test_creation_case_keeps_name_bytes_automatic_and_exact_initialization(self):
+        self.check_functional_work_case("handles_create_mkdir_and_capacity_are_exact")
 
     def test_scripted_model_exposes_exact_setup_and_proof_tasks(self):
         text = source(family_paths(3)[5])
