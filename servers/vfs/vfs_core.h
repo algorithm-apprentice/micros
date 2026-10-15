@@ -22,7 +22,7 @@ enum {
     MICROS_VFS_BACKEND_REFERENCE_THRESHOLD = 256,
     MICROS_VFS_PENDING_OPERATION_CAPACITY = 1,
 };
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
 #define MICROS_VFS_TEST_MESSAGE_DRAIN UINT32_C(0x0004ff01)
 #endif
 
@@ -66,7 +66,7 @@ enum micros_vfs_pending_state {
     MICROS_VFS_PENDING_TTY_WRITE_WAIT_COMPLETION,
     MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT,
     MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT,
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE,
 #endif
 };
@@ -446,7 +446,7 @@ enum micros_vfs_core_error micros_vfs_handle_tty_notification(
     struct micros_vfs_result_action *action
 );
 
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
 enum micros_vfs_core_error micros_vfs_begin_test_drain(
     struct micros_vfs_state *state,
     micros_endpoint_t endpoint,

@@ -507,7 +507,8 @@ QEMU_WORKFLOWS = (
     "test-qemu-mmu", "test-qemu-object-model", "test-qemu-endpoint", "test-qemu-grant",
     "test-qemu-grant-syscall", "test-qemu-user-runtime", "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff", "test-qemu-pm-service", "test-qemu-vm-scratch-preemption",
-    "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs", "test-qemu-vm-ready-early",
+    "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs", "test-qemu-elf-spawn",
+    "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault", "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout", "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc", "test-qemu-ipc-ecall-core", "test-qemu-ipc-syscall",
@@ -520,6 +521,7 @@ SYSCALL_WORKFLOWS = tuple(name for name in QEMU_WORKFLOWS if name in {
     "test-qemu-uart-console", "test-qemu-grant-syscall", "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher", "test-qemu-vm-handoff", "test-qemu-pm-service",
     "test-qemu-vm-scratch-preemption", "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs",
+    "test-qemu-elf-spawn",
     "test-qemu-vm-ready-early", "test-qemu-vm-self-fault", "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout", "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc-ecall-core", "test-qemu-ipc-syscall", "test-qemu-ipc-syscall-panic",
@@ -1525,7 +1527,7 @@ FLOW_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
         "10cf4d87fdfe994d381602ebd62571fc55bf6f342242644195d9e28d73454436",
     ("kernel/trap.c", "micros_trap_dispatch"):
-        "e857330fcf6bd58411890e3b3fe1d6c73e108141380b9fef4235fa7f27c87da3",
+        "7a0f3d64d7e06b4377ebc265ddc97384f2ff941a7b3d1931eca878d4e5feabe4",
     ("kernel/syscall.c", "micros_syscall_handle_user_ecall"):
         "77b73b4ead6b26f742cf9f6c63525d25a7353232e070fa3d0964ae969308c988",
     ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"):
@@ -1559,7 +1561,7 @@ CALL_ARGUMENT_HASHES = {
     ("kernel/trap.c", "handle_vm_self_fault"):
         "275b1a8752330c14b663bf2358b6af38b71b47225cbd76bb5280757252cb8ebd",
     ("kernel/trap.c", "micros_trap_dispatch"):
-        "4380b7d4047b8e1bdb244789306380cc0e04ca6cd4218abc0f2f60f4ac9bd6fc",
+        "065409dacc924df45b82d4e0094c54e05e1548289244025da77741ab680aef0d",
     ("kernel/syscall.c", "micros_syscall_handle_user_ecall"):
         "427f59ffd7cc8bf23df261b7d10add022f6a45220b63ee7b8c4dca2ad038c7cc",
     ("kernel/user_runtime_test.c", "micros_user_runtime_runtime_run_self_test"):
@@ -1872,7 +1874,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         cmake = read_source("CMakeLists.txt")
         restored = restored_cmake(cmake)
         self.assertEqual(
-            "50b551ed8c6d5d49ae9bcdc1a81a52f1e549e8e6ce129204117847d5306fc916",
+            "59bb9f516b321d4d33ed55919eaedeb81a2042f269d3c4b9c58394a3a6a2ef34",
             compact_hash(restored),
             "trap sets and call sites remain exact alongside the Accepted scheduler wiring",
         )
@@ -2323,12 +2325,12 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
             else:
                 self.assertIn(RUNTIME_MARKER.rstrip(), block)
         self.assertEqual(
-            "680591f0bec9c2a413790cfb38f4835528ff8771d8263ab6f98a63c414000867",
+            "eae6c86ce5ac8f0e1b39605ebbd6816135558f0b4f8ea293b3680d7ecb79df86",
             hashlib.sha256(read_source("CMakePresets.json").encode()).hexdigest(),
         )
 
     def test_original_six_path_metadata_remains_exact(self) -> None:
-        self.assertEqual((37, 20), (len(QEMU_WORKFLOWS), len(SYSCALL_WORKFLOWS)))
+        self.assertEqual((38, 21), (len(QEMU_WORKFLOWS), len(SYSCALL_WORKFLOWS)))
         self.assertEqual(QEMU_WORKFLOWS, tuple(validation_plan.QEMU_WORKFLOWS))
         baselines = {
             "kernel/trap.c": (True, QEMU_WORKFLOWS, ()),
@@ -2477,7 +2479,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                     )
 
 
-BASE_PLANNER_AST_HASH = "a2ff83a83c69be2afec917543910ad7dda5a9e372709ed2553d62a686ee1de2d"
+BASE_PLANNER_AST_HASH = "4e402e7be4bebd08665e5023497d2f69d95fa8ba5842ea975c36f3d7f2e1670b"
 EXPECT_TRUE_HASH = "3ef0a1204f1dfeb937f4dc99626fcbda4e9a8e1c387b703679c34a798e91c31c"
 
 

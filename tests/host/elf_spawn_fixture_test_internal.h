@@ -6,5 +6,6 @@
 bool test_elf_spawn_kernel_resource_oracle(void);
 bool test_elf_spawn_service_resource_oracle(void);
 bool test_elf_spawn_resource_counter_and_inactive_byte_policy(void);
+bool test_elf_spawn_client_protocol(void);
 
 #endif

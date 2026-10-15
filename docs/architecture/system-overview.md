@@ -301,8 +301,11 @@ exit, and wait through checked service protocols. Its
 lifecycle proof and real runtime adapters. The separately reviewed
 [application runtime](application-runtime.md) now supplies argv/env startup,
 checked images, and normal-return PM exit. The final
-[PID-1 integration](elf-spawn-integration.md) remains the dependency-ready
-Step 14 outcome.
+[PID-1 integration](elf-spawn-integration.md) now composes all six production
+services with dynamic parent/child applications, post-freeze rollback,
+inherited I/O, normal exit/wait, and complete post-init resource equality.
+Implementation #128 records the current author and independent-review gate;
+production init and shell remain node Q.
 
 The PM model contract is
 [ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md), and the

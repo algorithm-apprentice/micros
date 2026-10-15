@@ -123,8 +123,10 @@ The selected ELF tooling correction precedes the application host checker
 within `elf-spawn-app-runtime`. It exposes existing representation and
 structural owners before that consumer expands the family, rather than
 duplicating service-checker logic. It does not add a runtime-DAG node or block
-unrelated Step 14 work. Independent design review and Acceptance are complete;
-implementation remains pending this separate design's merge.
+unrelated Step 14 work. Design #125 and implementation #126 are independently
+reviewed and merged. The application-runtime consumer #127 is also merged;
+the final [ELF spawn integration](elf-spawn-integration.md) composes those
+checked owners rather than reopening the source-only correction.
 
 The independent validation-plan deduplication task is not part of this source
 decomposition. The

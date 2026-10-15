@@ -129,7 +129,7 @@ CHECKER_QEMU = (
     "test-qemu-user-runtime", "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff", "test-qemu-pm-service",
     "test-qemu-vm-scratch-preemption", "test-qemu-tty", "test-qemu-ramfs",
-    "test-qemu-vfs", "test-qemu-vm-ready-early", "test-qemu-vm-self-fault",
+    "test-qemu-vfs", "test-qemu-elf-spawn", "test-qemu-vm-ready-early", "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed", "test-qemu-bootstrap-ready-timeout",
     "test-qemu-bootstrap-manifest-panic",
 )

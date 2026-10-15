@@ -1,5 +1,8 @@
 #include "kernel/trap_internal.h"
 
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+#include "kernel/elf_spawn_test.h"
+#endif
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/address_space_handoff_test.h"
 #endif
@@ -192,6 +195,20 @@ bool trap_test_hooks_user_faults(
     uint64_t cause_code
 )
 {
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+    if (
+        !user_timer && cause_code != MICROS_EXCEPTION_USER_ECALL
+        && micros_elf_spawn_test_handle_trap(hart, frame)
+    ) {
+        if (
+            micros_scheduler_select_user_return(hart, frame)
+                != MICROS_SCHEDULER_OK
+        ) {
+            MICROS_TRAP_PANIC(hart->hardware_id, "elf-spawn-test-return", frame);
+        }
+        return true;
+    }
+#endif
 #ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
     if (
         !user_timer

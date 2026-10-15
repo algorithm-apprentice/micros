@@ -5,6 +5,17 @@
         &(a)->member, &(b)->member, sizeof((a)->member) \
     )
 
+void micros_elf_spawn_resource_copy(void *destination, const void *source, size_t size)
+{
+    uint8_t *to = destination;
+    const uint8_t *from = source;
+    size_t index;
+
+    for (index = 0; index < size; ++index) {
+        to[index] = from[index];
+    }
+}
+
 bool micros_elf_spawn_resource_bytes_equal(
     const void *left, const void *right, size_t size
 )
@@ -147,7 +158,9 @@ static bool same_grants(
         return false;
     }
     for (index = 0; index < MICROS_GRANT_CAPACITY; ++index) {
-        struct micros_grant_record current = b->grants[index];
+        struct micros_grant_record current;
+
+        micros_elf_spawn_resource_copy(&current, &b->grants[index], sizeof(current));
 
         if (
             a->grants[index].state != current.state

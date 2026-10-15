@@ -34,7 +34,9 @@ static bool same_pm(
         return false;
     }
     for (index = 0; index < MICROS_PM_PROCESS_CAPACITY; ++index) {
-        struct micros_pm_process_record current = b->records[index];
+        struct micros_pm_process_record current;
+
+        micros_elf_spawn_resource_copy(&current, &b->records[index], sizeof(current));
 
         if (current.state == MICROS_PM_PROCESS_FREE) {
             current.generation = a->records[index].generation;

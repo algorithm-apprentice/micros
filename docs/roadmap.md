@@ -190,8 +190,8 @@ composition, exact rollback, immediate PM publication commits, and ordered
 exit/wait completion with a separate mixed native reference model. Its
 [implementation map](architecture/pm-spawn-coordinator.md) records ownership
 and validation. The checked application runtime is merged as #127;
-the final dynamic PID-1 spawn/wait fixture remains the dependency-ready
-Step 14 integration.
+the final dynamic PID-1 spawn/wait fixture now composes the dependency-ready
+Step 14 production mechanisms.
 
 The application-runtime slice is merged after the separately
 reviewed ELF-checker correction #126. Its
@@ -202,7 +202,11 @@ return through the existing PM component, plus standalone image/seed parity.
 Implementation #127 passed the complete author gate and independent review
 and merged with the identical reviewed tree. The
 [final ELF spawn integration map](architecture/elf-spawn-integration.md)
-records the remaining six-production-service dynamic PID-1 gate.
+records the implemented six-production-service dynamic PID-1 gate.
+Implementation #128 runs real post-freeze descriptor rollback, inherited
+I/O, child normal exit and one-shot wait, complete post-init resource
+equality and physical UART drain. Its merge requires the current complete
+author gate and clean independent review; production init/shell remain later.
 
 ADR-0047's static TTY boundary is now implemented. VM installs one exact
 post-handoff UART device leaf before TTY release; TTY then initializes the

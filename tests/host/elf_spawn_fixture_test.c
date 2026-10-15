@@ -132,6 +132,7 @@ int main(void)
         {"kernel-resource-oracle", test_elf_spawn_kernel_resource_oracle},
         {"service-resource-oracle", test_elf_spawn_service_resource_oracle},
         {"resource-counter-policy", test_elf_spawn_resource_counter_and_inactive_byte_policy},
+        {"fixture-client-protocol", test_elf_spawn_client_protocol},
     };
     size_t index;
 

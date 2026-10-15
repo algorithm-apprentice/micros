@@ -244,7 +244,6 @@ static enum micros_vfs_core_error read_spawn_executable(
         request.count = remaining > MICROS_VFS_TRANSFER_MAX
             ? MICROS_VFS_TRANSFER_MAX
             : (uint32_t)remaining;
-        request.length = request.count;
         error = create_spawn_grant(
             io,
             state->ramfs_endpoint,

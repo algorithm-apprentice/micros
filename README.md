@@ -122,6 +122,8 @@ cmake --workflow --preset test-qemu-vm-handoff
 cmake --workflow --preset test-qemu-pm-service
 cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-ramfs
+cmake --workflow --preset test-qemu-vfs
+cmake --workflow --preset test-qemu-elf-spawn
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed

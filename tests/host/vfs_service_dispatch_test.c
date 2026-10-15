@@ -93,6 +93,20 @@ struct pm_control_dispatch_scenario {
     uint64_t descriptor_token;
 };
 
+static enum micros_vfs_backend_status codec_checked_ramfs_call(
+    void *opaque,
+    const struct micros_vfs_ramfs_request *request,
+    struct micros_vfs_ramfs_response *response
+) {
+    struct vfs_test_fixture *fixture = opaque;
+    struct micros_ipc_message message;
+
+    if (micros_vfs_service_build_ramfs_call(request, &message) != MICROS_VFS_SERVICE_OK) {
+        return MICROS_VFS_BACKEND_INVARIANT;
+    }
+    return fixture->io.ramfs_call(opaque, request, response);
+}
+
 static bool prepare_pm_control_image(struct vfs_service_test_context *context,
                                      struct pm_control_dispatch_scenario *scenario) {
     uint8_t spawn_request[MICROS_SPAWN_REQUEST_SIZE_MAX];
@@ -102,8 +116,11 @@ static bool prepare_pm_control_image(struct vfs_service_test_context *context,
     micros_grant_t grant;
     size_t request_size;
     size_t index;
+    struct micros_vfs_io checked_io;
 
     EXPECT_TRUE(vfs_service_test_initialize_fixture(context));
+    checked_io = context->fixture.io;
+    checked_io.ramfs_call = codec_checked_ramfs_call;
     for (index = 0; index < sizeof(executable); ++index) {
         executable[index] = (uint8_t)(index * 29 + 7);
     }
@@ -121,7 +138,7 @@ static bool prepare_pm_control_image(struct vfs_service_test_context *context,
     vfs_service_test_write_u32_le(&message.payload[32], grant);
     vfs_service_test_write_u32_le(&message.payload[36], (uint32_t)request_size);
     EXPECT_TRUE(grant != MICROS_GRANT_NONE &&
-                micros_vfs_service_handle_message(&context->state, &message, &context->fixture.io,
+                micros_vfs_service_handle_message(&context->state, &message, &checked_io,
                                                   &action) == MICROS_VFS_SERVICE_OK &&
                 action.active && action.reply_token == UINT64_C(0x66) &&
                 action.message.type == MICROS_VFS_MESSAGE_PM_CONTROL_RESULT &&

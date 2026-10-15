@@ -12,10 +12,11 @@ map of that design, not a new lifecycle, authority, wire, or failure contract.
 The outcome is one `test-qemu-elf-spawn` scenario using exactly the six
 production static services and two RAMFS-seeded dynamic applications.
 Its PID-1 reaper is a test program, not production init.
-The canonical requests, immutable seed, checked six-service catalog, and
-portable resource oracle are implemented and native/host tested. Target
-snapshot capture, the workflow, and the dynamic scenario remain planned
-until their green implementation lands.
+The canonical requests, immutable seed, checked catalog, portable oracle,
+target snapshot capture, workflow, and complete dynamic scenario are
+implemented. The real QEMU gate passes all checkpoints and clean shutdown.
+Implementation #128 records current author evidence; merge still requires
+the complete current author plan and clean independent implementation review.
 
 Production init, shell policy, commands, fault-to-exit, signals, fork,
 recovery, and generalized test or snapshot frameworks are non-goals.
@@ -92,7 +93,7 @@ disagreement is an explicit fatal result.
 | `tests/qemu/elf_spawn_pm.c` | One post-seal call to the existing trusted-init coordinator |
 | `tests/qemu/elf_spawn_init.c` | Parent rollback, spawn, wait, and drain scenario |
 | `tests/qemu/elf_spawn_child.c` | Actual startup, inherited I/O, seeded-file read, and normal return |
-| `tests/qemu/elf_spawn_client.c` and its private header | Checked PM/VFS reply decoding, direct grants, and bounded application I/O |
+| `tests/qemu/elf_spawn_client.c`, its VFS owner and private header | Checked PM/VFS reply decoding, direct grants, and bounded application I/O |
 | `tests/qemu/elf_spawn_report.S` | Unrelaxed breakpoint/report continuation for fixture applications |
 | `kernel/elf_spawn_test.c` and its private evidence owners | Launch, checkpoint authentication, staged assertions, and clean shutdown |
 | `kernel/elf_spawn_test_fixture.c` | Immutable six-service configuration and the sole mutable scenario context |

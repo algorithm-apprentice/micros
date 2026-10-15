@@ -58,6 +58,7 @@ struct micros_elf_spawn_resources {
 bool micros_elf_spawn_resource_bytes_equal(
     const void *left, const void *right, size_t size
 );
+void micros_elf_spawn_resource_copy(void *destination, const void *source, size_t size);
 bool micros_elf_spawn_same_kernel_resources(
     const struct micros_elf_spawn_kernel_resources *baseline,
     const struct micros_elf_spawn_kernel_resources *current

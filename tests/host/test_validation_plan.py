@@ -79,6 +79,7 @@ class ValidationPlanTests(unittest.TestCase):
             "tests/host/elf_spawn_resource_test.c",
             "tests/host/elf_spawn_fixture_test_internal.h",
             "tests/host/test_generate_elf_spawn_fixture.py",
+            "tests/host/elf_spawn_client_test.c",
         ):
             with self.subTest(path=path):
                 self.assertEqual(
@@ -87,6 +88,35 @@ class ValidationPlanTests(unittest.TestCase):
                 )
                 self.assertEqual([], validation_plan.affected_workflows([path]))
                 self.assertEqual([], validation_plan.affected_image_workflows([path]))
+
+    def test_dynamic_elf_spawn_fixture_inputs_have_precise_gate_and_image_owners(self):
+        for path, image in (
+            ("kernel/elf_spawn_test.c", False),
+            ("kernel/elf_spawn_test_runtime.c", False),
+            ("kernel/elf_spawn_test_capture.c", False),
+            ("kernel/elf_spawn_test_services.c", False),
+            ("kernel/elf_spawn_test_report.c", False),
+            ("tests/qemu/elf_spawn_init.c", True),
+            ("tests/qemu/elf_spawn_child.c", True),
+            ("tests/qemu/elf_spawn_client.c", True),
+            ("tests/qemu/elf_spawn_client_vfs.c", True),
+            ("tests/qemu/elf_spawn_request.c", True),
+            ("tools/generate_elf_spawn_fixture.py", False),
+            ("tools/generate_elf_spawn_seed.py", True),
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    ["test-qemu-elf-spawn"], validation_plan.affected_workflows([path]),
+                )
+                self.assertEqual(
+                    ["build-application-images"] if image else [],
+                    validation_plan.affected_image_workflows([path]),
+                )
+        for path in (
+            "servers/vfs/vfs_spawn.c", "servers/pm/pm_service.c",
+            "tests/qemu/vm_server.c", "servers/ramfs/ramfs_core.c", "servers/tty/tty_core.c",
+        ):
+            self.assert_workflow_selected(path, "test-qemu-elf-spawn")
 
     def test_docs_only_avoids_builds_in_both_tiers(self):
         expected = [
@@ -270,6 +300,12 @@ class ValidationPlanTests(unittest.TestCase):
             )
 
     def test_application_runtime_component_inputs_do_not_leak_into_inherited_gates(self):
+        shared_application_inputs = {
+            "lib/runtime/application.c", "lib/runtime/application_stack.c",
+            "lib/runtime/application_start.S", "lib/runtime/application.ld",
+            "lib/runtime/application_internal.h", "tools/check_application_elf.py",
+            "tools/application_elf_policy.py",
+        }
         for path in (
             "lib/runtime/application.c",
             "lib/runtime/application_stack.c",
@@ -286,7 +322,9 @@ class ValidationPlanTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse(validation_plan.requires_full_tier([path]))
                 self.assertEqual(
-                    ["test-qemu-pm-service"], validation_plan.affected_workflows([path]),
+                    ["test-qemu-pm-service", "test-qemu-elf-spawn"]
+                    if path in shared_application_inputs else ["test-qemu-pm-service"],
+                    validation_plan.affected_workflows([path]),
                 )
                 self.assertEqual([], validation_plan.affected_slow_models([path]))
         self.assertEqual(
@@ -1014,6 +1052,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-tty": "kernel/tty_service_test.c",
             "test-qemu-ramfs": "kernel/ramfs_service_test.c",
             "test-qemu-vfs": "kernel/vfs_service_test.c",
+            "test-qemu-elf-spawn": "kernel/elf_spawn_test.c",
             "test-qemu-vm-ready-early": "tests/qemu/vm_server.c",
             "test-qemu-vm-self-fault": "tests/qemu/vm_self_fault.S",
             "test-qemu-vm-self-fault-sealed": "tests/qemu/vm_self_fault.S",

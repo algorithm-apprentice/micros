@@ -358,8 +358,9 @@ VFS pass marker.
 The [application runtime implementation map](architecture/application-runtime.md)
 separates the native `application-runtime` decoder/frontend checks from
 the existing PM component's checked application entry and return-exit proof.
-The full production PID-1 integration remains a later dependent gate;
-neither native startup decoding nor the PM component alone claims it.
+The separate [full PID-1 integration](architecture/elf-spawn-integration.md)
+now composes all six production services. Neither native startup decoding
+nor the PM component alone claims that proof.
 
 Before the host application checker reuses the existing image tooling,
 the separate [user ELF checker source correction](architecture/user-elf-checker-source-organization.md)
@@ -465,7 +466,7 @@ The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 `test-elf-spawn-model`, and the complete
 `test-unit` gate. The standalone image workflows are
 `build-tty-service-image`, `build-ramfs-service-image`, and
-`build-vfs-service-image`. The implemented
+`build-vfs-service-image`, plus `build-application-images`. The implemented
 QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
@@ -479,6 +480,7 @@ QEMU targets are `test-qemu-smoke`,
 `test-qemu-tty`,
 `test-qemu-ramfs`,
 `test-qemu-vfs`,
+`test-qemu-elf-spawn`,
 `test-qemu-vm-ready-early`,
 `test-qemu-vm-self-fault`,
 `test-qemu-vm-self-fault-sealed`,
@@ -505,6 +507,7 @@ cmake --workflow --preset test-unit
 cmake --workflow --preset build-tty-service-image
 cmake --workflow --preset build-ramfs-service-image
 cmake --workflow --preset build-vfs-service-image
+cmake --workflow --preset build-application-images
 cmake --workflow --preset test-qemu-smoke
 cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
@@ -525,6 +528,7 @@ cmake --workflow --preset test-qemu-vm-scratch-preemption
 cmake --workflow --preset test-qemu-tty
 cmake --workflow --preset test-qemu-ramfs
 cmake --workflow --preset test-qemu-vfs
+cmake --workflow --preset test-qemu-elf-spawn
 cmake --workflow --preset test-qemu-vm-ready-early
 cmake --workflow --preset test-qemu-vm-self-fault
 cmake --workflow --preset test-qemu-vm-self-fault-sealed

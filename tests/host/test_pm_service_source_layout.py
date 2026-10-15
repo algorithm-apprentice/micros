@@ -744,12 +744,12 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(int(name in required), block.count(f"${{{name}}}"))
             for source in all_sources():
                 self.assertNotIn(source, block)
-        self.assertEqual(5, cmake.count("${MICROS_PM_SERVICE_SOURCES}"))
-        self.assertEqual(8, cmake.count("${MICROS_PM_CORE_SOURCES}"))
-        self.assertEqual(7, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
+        self.assertEqual(6, cmake.count("${MICROS_PM_SERVICE_SOURCES}"))
+        self.assertEqual(9, cmake.count("${MICROS_PM_CORE_SOURCES}"))
+        self.assertEqual(8, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
-        self.assertEqual(6, cmake.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
-        self.assertEqual(16, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(7, cmake.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
+        self.assertEqual(17, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         application = cmake_command(cmake, "add_executable", "application_runtime_test")
         self.assertEqual(1, application.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, application.count("tests/host/spawn_abi_test_fixture.c"))
@@ -759,7 +759,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             block = cmake_command(cmake, "micros_add_bootstrap_user", target)
             self.assertEqual(1, block.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         pm_consumers = cmake_commands(cmake, "micros_add_bootstrap_user", "micros_pm_service")
-        self.assertEqual(5, len(pm_consumers))
+        self.assertEqual(6, len(pm_consumers))
         for block in pm_consumers:
             self.assertEqual(1, block.count("${MICROS_PM_CORE_SOURCES}"))
             self.assertEqual(1, block.count("${MICROS_PM_SERVICE_SOURCES}"))
@@ -774,7 +774,8 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             [
                 "MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST", "MICROS_BUILD_PM_SERVICE_TEST",
-                "MICROS_BUILD_TTY_SERVICE_TEST", "MICROS_BUILD_VFS_SERVICE_TEST",
+                "MICROS_BUILD_TTY_SERVICE_TEST", "MICROS_BUILD_ELF_SPAWN_TEST",
+                "MICROS_BUILD_VFS_SERVICE_TEST",
                 "MICROS_BUILD_RAMFS_SERVICE_TEST",
             ],
             branches,
@@ -839,6 +840,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 *HELPER_OWNER_GROUPS[SERVICE_FIXTURE_OWNER],
                 "pm_service_send_ready", "pm_service_serve_request",
                 "pm_service_backend_get",
+                "pm_service_start_elf_spawn_init",
                 "pm_service_run_self_test", "pm_service_run_scratch_preemption_test",
                 "micros_pm_service_report", "micros_vm_scratch_preemption_peer_hold",
                 "micros_vm_scratch_preemption_peer_run",

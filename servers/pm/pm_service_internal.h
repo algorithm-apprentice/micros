@@ -47,6 +47,9 @@ uint32_t pm_service_read_u32_le(const uint8_t *bytes);
 bool pm_service_validate_configuration(void);
 void pm_service_configure_coordinator(struct pm_service_context *context);
 const struct micros_pm_coordinator_backend *pm_service_backend_get(void);
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+void pm_service_start_elf_spawn_init(struct pm_service_context *context);
+#endif
 bool pm_service_send_ready(void);
 #if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST) \
     || defined(MICROS_PM_SERVICE_TEST)
