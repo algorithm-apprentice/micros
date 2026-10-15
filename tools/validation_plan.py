@@ -150,6 +150,68 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        "servers/ramfs/ramfs_core.c",
+        (
+            "servers/ramfs/ramfs_codec.c",
+            "servers/ramfs/ramfs_ownership.c",
+            "servers/ramfs/ramfs_state.c",
+            "servers/ramfs/ramfs_transfer.c",
+            "servers/ramfs/ramfs_namespace.c",
+            "servers/ramfs/ramfs_io.c",
+            "servers/ramfs/ramfs_directory.c",
+            "servers/ramfs/ramfs_internal.h",
+        ),
+    ),
+    (
+        "tests/host/ramfs_test.c",
+        (
+            "tests/host/ramfs_test_fixture.c",
+            "tests/host/ramfs_protocol_test.c",
+            "tests/host/ramfs_namespace_test.c",
+            "tests/host/ramfs_io_test.c",
+            "tests/host/ramfs_directory_test.c",
+            "tests/host/ramfs_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/ramfs_seed_test.c",
+        (
+            "tests/host/ramfs_seed_test_fixture.c",
+            "tests/host/ramfs_seed_boundary_test.c",
+            "tests/host/ramfs_seed_corruption_test.c",
+            "tests/host/ramfs_seed_test_internal.h",
+        ),
+    ),
+    (
+        "tests/host/ramfs_model_test.c",
+        (
+            "tests/host/ramfs_model_fixture.c",
+            "tests/host/ramfs_model_reference.c",
+            "tests/host/ramfs_model_projection.c",
+            "tests/host/ramfs_model_protocol.c",
+            "tests/host/ramfs_model_operations.c",
+            "tests/host/ramfs_model_internal.h",
+        ),
+    ),
+    (
+        "tests/qemu/ramfs_service_vfs.c",
+        (
+            "tests/qemu/ramfs_service_vfs_fixture.c",
+            "tests/qemu/ramfs_service_vfs_ramfs.c",
+            "tests/qemu/ramfs_service_vfs_scenario.c",
+            "tests/qemu/ramfs_service_vfs_tty.c",
+            "tests/qemu/ramfs_service_vfs_internal.h",
+        ),
+    ),
+    (
+        "kernel/ramfs_service_test.c",
+        (
+            "kernel/ramfs_service_test_fixture.c",
+            "kernel/ramfs_service_test_report.c",
+            "kernel/ramfs_service_test_internal.h",
+        ),
+    ),
+    (
         "tools/check_user_elf.py",
         (
             "tools/user_elf_format.py",
@@ -889,6 +951,7 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_user_elf_source_layout.py",
     "tests/host/test_scheduler_source_layout.py",
     "tests/host/test_trap_syscall_source_layout.py",
+    "tests/host/test_ramfs_source_layout.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",

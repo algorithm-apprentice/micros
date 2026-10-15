@@ -3,8 +3,10 @@
 This is the implementation-ready contract for the seven RAMFS signal files
 in [the source-module audit](source-module-audit.md).
 [ADR-0066](../adr/0066-ramfs-source-decomposition.md) is Accepted after clean
-independent design and bounded correction review. Implementation has not
-started and remains dependent on the separate design merge in PR #133.
+independent design and bounded correction review. The separate design merged
+as PR #133, commit `cac6282edbf303fc81bcffdb3387b23e70e6da17`.
+Implementation follows the required final source map below; explicit owner
+and semantic migrations distinguish pending extraction from completed work.
 
 ## Base, goal, and authority
 
@@ -358,9 +360,10 @@ All thirteen coverage fields retain their check order: mount at least two;
 absolute lookup, relative lookup, create, mkdir, read, write, getdents,
 putnode, stale, malformed, grant failure, and no-space all nonzero.
 Keep every reply field, whole-bus, node/block/data, scratch, and reference
-comparison and the complete failure operation trace. Record the reviewed
-base's actual successful trace before implementation and require the same
-trace afterward; do not derive its expected value from rewritten code.
+comparison and the complete failure operation trace. The reviewed base's
+actual successful trace, recorded before extraction, is `0x79bfaa8d631a40bf`.
+Require the same trace afterward; do not derive its expected value from
+rewritten code.
 
 The peer entry retains configuration, pre-ready report, filesystem scenario,
 ready acknowledgment, TTY pass marker/collect/drain, and final report in that
