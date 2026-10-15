@@ -354,10 +354,21 @@ It exposes portable state/codec/ownership/namespace/I/O/directory work,
 native and independent-model evidence, target peer/report, and generator
 phases without changing Step 12 behavior. Its documentation-only design and
 clean bounded correction review merged as #133. Implementation now exposes
-all specified source owners, with an empty owner migration and retained
-native/model and real QEMU evidence. Semantic function migrations, complete
-current author evidence and independent implementation review remain pending.
+all specified source owners and semantic outlines, with both active
+migrations empty and retained native/model and real QEMU evidence.
+Implementation #134 passed the complete 47-command fresh author gate,
+bounded actual three-profile reuse acceptance and independent read-only
+review, then merged with the identical validated/reviewed squash tree.
 This correction adds no production init, shell, command, or runtime-DAG node.
+
+The next selected maintenance correction is Proposed
+[ADR-0067](adr/0067-kernel-endpoint-source-decomposition.md) and its exact
+[endpoint source contract](architecture/kernel-endpoint-source-organization.md).
+It defines representation, profile, complete validation, publication,
+source-only/close, and native/model/target owners over the existing Step 6/7
+mechanisms. Only the design task is active; implementation remains pending
+until independent design acceptance and separate merge. No endpoint behavior
+or runtime dependency is added.
 
 ## v0.1 completion goal
 
@@ -367,10 +378,12 @@ The independent validation-efficiency task follows Accepted
 Original design #129 is merged. Implementation #130 was abandoned after a
 concrete default-configuration closure omission. Corrective design #131 and
 Accepted [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md)
-are merged; the fresh implementation follows both contracts and the canonical
-source/evidence map.
-It does not alter the runtime DAG, reduce mandatory coverage or authorize
-receipt reuse before the separate implementation merges.
+are merged. Implementation #132 is separately merged and follows both
+contracts and the canonical source/evidence map. Default and full validation
+remain fresh; opt-in reuse requires exact current-candidate/current-context
+evidence and never reduces mandatory coverage. RAMFS #134 subsequently
+demonstrated real native, smoke and TTY-image reuse after its bounded source
+recipe maintenance. This does not alter the runtime DAG.
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
 LLVM/LLD/CMake/Ninja toolchain, boots under RISC-V64 QEMU `virt` through
