@@ -72,6 +72,19 @@ class ValidationPlanTests(unittest.TestCase):
         commands = validation_plan.plan([path], "pr")
         self.assertIn(validation_plan.workflow(expected), commands)
 
+    def test_elf_spawn_fixture_native_and_host_tests_are_host_only(self):
+        for path in (
+            "tests/host/elf_spawn_fixture_test.c",
+            "tests/host/test_generate_elf_spawn_seed.py",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
+                    validation_plan.plan([path], "fast", "main"),
+                )
+                self.assertEqual([], validation_plan.affected_workflows([path]))
+                self.assertEqual([], validation_plan.affected_image_workflows([path]))
+
     def test_docs_only_avoids_builds_in_both_tiers(self):
         expected = [
             validation_plan.DOCS,

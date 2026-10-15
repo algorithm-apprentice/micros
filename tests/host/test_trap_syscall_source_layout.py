@@ -1872,7 +1872,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         cmake = read_source("CMakeLists.txt")
         restored = restored_cmake(cmake)
         self.assertEqual(
-            "aa876467ef08e8d5de3ff65482c05e9619f322f0b43ef111d7ac58acb7e21cde",
+            "2f82fe80d507b6aa8e06eafacaee436fd7ec7b47279a6010b76bda4ef0ac6571",
             compact_hash(restored),
             "trap sets and call sites remain exact alongside the Accepted scheduler wiring",
         )
@@ -2477,7 +2477,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                     )
 
 
-BASE_PLANNER_AST_HASH = "acfeed03002fe6b790f88b40c7be4ecefeb6dde35638159c40f4198bc505bdac"
+BASE_PLANNER_AST_HASH = "432db52b7df9bf85042e94eff08c7590bdf2b62f7cafd864dcf7d6b2c12d38de"
 EXPECT_TRUE_HASH = "3ef0a1204f1dfeb937f4dc99626fcbda4e9a8e1c387b703679c34a798e91c31c"
 
 

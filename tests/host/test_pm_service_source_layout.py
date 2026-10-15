@@ -729,6 +729,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "spawn_abi_test": (
                 "MICROS_SPAWN_REQUEST_SOURCES", "MICROS_SPAWN_ABI_HOST_TEST_SOURCES",
             ),
+            "elf_spawn_fixture_test": ("MICROS_SPAWN_REQUEST_SOURCES",),
             "vm_core_test": ("MICROS_SPAWN_REQUEST_SOURCES",),
             "elf_spawn_model_test": (
                 "MICROS_PM_CORE_SOURCES", "MICROS_PM_COORDINATOR_SOURCES",
@@ -748,7 +749,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(7, cmake.count("${MICROS_PM_COORDINATOR_SOURCES}"))
         self.assertEqual(1, cmake.count("${MICROS_PM_COORDINATOR_HOST_TEST_SOURCES}"))
         self.assertEqual(6, cmake.count("${MICROS_PM_RUNTIME_BACKEND_SOURCES}"))
-        self.assertEqual(15, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
+        self.assertEqual(16, cmake.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         application = cmake_command(cmake, "add_executable", "application_runtime_test")
         self.assertEqual(1, application.count("${MICROS_SPAWN_REQUEST_SOURCES}"))
         self.assertEqual(1, application.count("tests/host/spawn_abi_test_fixture.c"))

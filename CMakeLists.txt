@@ -1271,6 +1271,42 @@ if(MICROS_BUILD_HOST_TESTS)
         )
     endif()
     add_executable(
+        elf_spawn_fixture_test
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        tests/qemu/elf_spawn_request.c
+        tests/host/elf_spawn_fixture_test.c
+    )
+    target_include_directories(
+        elf_spawn_fixture_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(elf_spawn_fixture_test PRIVATE c_std_17)
+    target_compile_options(
+        elf_spawn_fixture_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(
+            elf_spawn_fixture_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            elf_spawn_fixture_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+    endif()
+    add_executable(
         vm_core_test
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
@@ -2320,6 +2356,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
     add_test(NAME application-runtime COMMAND application_runtime_test)
+    add_test(NAME elf-spawn-fixture COMMAND elf_spawn_fixture_test)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
@@ -2391,6 +2428,7 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             runtime_test
             application_runtime_test
+            elf_spawn_fixture_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
@@ -2513,6 +2551,7 @@ if(MICROS_BUILD_HOST_TESTS)
             ipc_model_test
             runtime_test
             application_runtime_test
+            elf_spawn_fixture_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test

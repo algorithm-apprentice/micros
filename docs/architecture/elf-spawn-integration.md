@@ -12,8 +12,10 @@ map of that design, not a new lifecycle, authority, wire, or failure contract.
 The outcome is one `test-qemu-elf-spawn` scenario using exactly the six
 production static services and two RAMFS-seeded dynamic applications.
 Its PID-1 reaper is a test program, not production init.
-The workflow and new sources below are planned until their green
-implementation lands.
+The canonical fixture requests and immutable two-application seed generator
+are implemented and native/host tested. The target workflow, application
+scenario, catalog, and resource evidence below remain planned until their
+green implementation lands.
 
 Production init, shell policy, commands, fault-to-exit, signals, fork,
 recovery, and generalized test or snapshot frameworks are non-goals.
@@ -147,6 +149,22 @@ It adds no user-visible inspection operation, service query, writable alias,
 grant forwarding, or production state mutation.
 
 ## Green sequence and acceptance
+
+The first helper slice has these focused commands:
+
+```text
+cmake --preset host-debug
+cmake --build build/host-debug --target elf_spawn_fixture_test
+ctest --test-dir build/host-debug --output-on-failure -R '^elf-spawn-fixture$'
+python3 -B -m unittest tests.host.test_generate_elf_spawn_seed
+```
+
+The separate seed tool consumes full checked application ELFs and publishes
+only the existing RAMFS format:
+
+```text
+python3 tools/generate_elf_spawn_seed.py --init-elf INIT_ELF --child-elf CHILD_ELF --output SEED
+```
 
 1. Publish this map and the merged predecessor/baseline references.
 2. Add failing native/host cases for canonical fixture requests, immutable

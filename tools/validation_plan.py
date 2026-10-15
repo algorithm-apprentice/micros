@@ -842,6 +842,8 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/elf_spawn_fixture_test.c",
+    "tests/host/test_generate_elf_spawn_seed.py",
     "tests/host/application_runtime_test.c",
     "tests/host/application_runtime_test_fixture.c",
     "tests/host/application_runtime_frontend_test.c",
