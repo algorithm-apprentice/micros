@@ -505,7 +505,13 @@ module, including CLI/error behavior, exact bindings, evaluation/output
 order, and the single manifest tuple publication. Pure tuple helpers cannot
 hide effects, defaults, decorators, suspension, or caller exits; independent
 fixtures enforce those boundaries across supported Python AST versions.
-Fourteen C semantic migrations remain pending, alongside the specified
+The two long seed corruption cases now expose eight ordered layout,
+metadata, extent/digest, reserved-byte, length, byte, and special-name tasks.
+Their 9/13-line roots preserve exact first-failure short-circuit; original
+offsets remain automatic and only the needed const scalars are borrowed by
+value. Bounded chain projection restores every original statement and
+rejects early successful exits, wrong bindings/order, or caller continuation.
+Twelve C semantic migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 

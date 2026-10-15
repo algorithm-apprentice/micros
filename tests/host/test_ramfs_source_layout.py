@@ -160,6 +160,20 @@ GENERATOR_HELPERS = {
     "_render_vm_entry": ("tuple", ("vm_limit",)),
     "_render_report": ("tuple", ("vfs",)),
 }
+SEED_CASE_PHASES = {
+    "header_corruption_is_rejected": (
+        ("seed_header_size_layout_rejections", ("fixture",)),
+        ("seed_header_entry_metadata_rejections", ("fixture",)),
+        ("seed_header_data_extent_rejections", ("fixture",)),
+        ("seed_header_digest_rejection", ("fixture",)),
+    ),
+    "record_name_and_reserved_corruption_is_rejected": (
+        ("seed_record_reserved_rejections", ("fixture", "motd")),
+        ("seed_record_name_length_rejections", ("fixture", "root", "etc")),
+        ("seed_record_name_byte_rejections", ("fixture", "etc")),
+        ("seed_record_special_name_rejections", ("fixture", "etc", "motd")),
+    ),
+}
 DATA_RENAMES = {
     1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
     3: {"ramfs_model_io": "model_io"},
@@ -302,7 +316,11 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = tuple(
     entry for entry in LONG_FUNCTIONS
-    if entry not in ((0, "micros_ramfs_handle_call"), (0, "handle_write"), (6, "render_fixture"))
+    if entry not in (
+        (0, "micros_ramfs_handle_call"), (0, "handle_write"), (6, "render_fixture"),
+        (2, "header_corruption_is_rejected"),
+        (2, "record_name_and_reserved_corruption_is_rejected"),
+    )
 )
 
 # BEGIN IMMUTABLE BASELINE DATA
@@ -814,6 +832,30 @@ def write_body_tokens(caller, phase):
     return tuple(expanded)
 
 
+def bool_case_body_tokens(caller, phases):
+    caller = list(body_tokens(caller))
+    chain = "return " + " && ".join(
+        name + "(" + ", ".join(arguments) + ")" for (name, arguments), _ in phases
+    ) + ";"
+    tail = list(body_tokens(chain))
+    if caller[-len(tail) - 1:-1] != tail or caller.count("return") != 1:
+        raise AssertionError("case must short-circuit in exact phase order and return its first failure")
+    expanded = caller[:-len(tail) - 1]
+    terminal = list(body_tokens("return true;"))
+    for (name, _), body in phases:
+        tokens = list(body_tokens(body))
+        if tokens[:1] != ["{"] or tokens[-1:] != ["}"] or tokens[-1 - len(terminal):-1] != terminal:
+            raise AssertionError(f"case phase must have one terminal success: {name}")
+        statements = tokens[1:-1 - len(terminal)]
+        for index, token in enumerate(statements):
+            if token == "return" and statements[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError(f"case phase cannot convert a caller exit into continuation: {name}")
+        if "goto" in statements:
+            raise AssertionError("case phases cannot borrow caller labels")
+        expanded.extend(statements)
+    return tuple(expanded + terminal + ["}"])
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -822,6 +864,13 @@ def original_body_digest(family, name, text):
     if family == 0 and name == "handle_write" and (0, name) not in LONG_FUNCTION_MIGRATION:
         phase = c_function_body(source(family_paths(0)[6]), "commit_write")
         tokens = write_body_tokens(text, phase)
+    if family == 2 and name in SEED_CASE_PHASES and (2, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(2)[3])
+        phases = [
+            (specification, c_function_body(owner, specification[0]))
+            for specification in SEED_CASE_PHASES[name]
+        ]
+        tokens = bool_case_body_tokens(text, phases)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1204,7 +1253,11 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             body_tokens("{ return &seed_fixture; }"),
             body_tokens(c_function_body(source(paths[1]), "ramfs_seed_test_context")),
         )
-        self.assertEqual(21, len(owned_definitions(2)))
+        completed_phases = sum(
+            len(phases) for name, phases in SEED_CASE_PHASES.items()
+            if (2, name) not in LONG_FUNCTION_MIGRATION
+        )
+        self.assertEqual(21 + completed_phases, len(owned_definitions(2)))
         self.assertEqual(9, len(fixture_parameter_matches(2)))
         for spelling, count in fixture_parameter_matches(2):
             self.assertEqual(1, count, spelling)
@@ -1448,6 +1501,22 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             "uint16_t slot, uint64_t write_end, size_t first_logical, size_t last_logical) {"
         )
         self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+
+    def test_seed_corruption_cases_expose_ordered_typed_subtests(self):
+        text = source(family_paths(2)[3])
+        self.assertEqual("", macro_definition_text(text))
+        definitions = c_function_definitions(text)
+        for original, phases in SEED_CASE_PHASES.items():
+            self.assertLessEqual(definitions["ramfs_seed_test_" + original], 120)
+            for name, arguments in phases:
+                self.assertIn(name, definitions)
+                self.assertLessEqual(definitions[name], 120)
+                signature = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signature))
+                parameters = ["struct ramfs_seed_test_fixture *fixture"]
+                parameters.extend("const size_t " + argument for argument in arguments[1:])
+                expected = f"static bool {name}({', '.join(parameters)}) {{"
+                self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -1789,6 +1858,34 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         ):
             with self.subTest(changed=changed):
                 self.assertNotEqual(body_tokens(expected), write_body_tokens(caller, changed))
+
+    def test_case_chain_projection_retains_order_false_exit_and_scalar_bindings(self):
+        caller = "{ const size_t offset = 64; return _one(fixture, offset) && _two(fixture); }"
+        phases = (
+            (("_one", ("fixture", "offset")), "{ mutate(offset); EXPECT_TRUE(valid()); return true; }"),
+            (("_two", ("fixture",)), "{ if (!valid()) { return false; } publish(); return true; }"),
+        )
+        expected = (
+            "{ const size_t offset = 64; mutate(offset); EXPECT_TRUE(valid()); "
+            "if (!valid()) { return false; } publish(); return true; }"
+        )
+        self.assertEqual(body_tokens(expected), bool_case_body_tokens(caller, phases))
+        for changed in (
+            caller.replace("&&", "||"),
+            caller.replace("_one(fixture, offset)", "_one(fixture, other)"),
+            caller.replace("_one(fixture, offset) && _two(fixture)", "_two(fixture) && _one(fixture, offset)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                bool_case_body_tokens(changed, phases)
+        for body in (
+            "{ if (skip()) { return true; } mutate(); return true; }",
+            "{ goto caller_label; return true; }",
+            "{ mutate(); return false; }",
+        ):
+            with self.subTest(body=body), self.assertRaises(AssertionError):
+                bool_case_body_tokens(caller, ((phases[0][0], body), phases[1]))
+        changed = ((phases[0][0], phases[0][1].replace("mutate(offset);", "")), phases[1])
+        self.assertNotEqual(body_tokens(expected), bool_case_body_tokens(caller, changed))
 
     def test_renderer_projection_preserves_order_bindings_single_publication_and_exits(self):
         specifications = {

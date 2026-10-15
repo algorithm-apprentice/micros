@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-bool ramfs_seed_test_header_corruption_is_rejected(
+static bool seed_header_size_layout_rejections(
     struct ramfs_seed_test_fixture *fixture
 )
 {
@@ -71,7 +71,13 @@ bool ramfs_seed_test_header_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_LAYOUT
         )
     );
+    return true;
+}
 
+static bool seed_header_entry_metadata_rejections(
+    struct ramfs_seed_test_fixture *fixture
+)
+{
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     ramfs_seed_test_write_u16_le(&fixture->mutated_image[12], 0);
     EXPECT_TRUE(
@@ -114,7 +120,13 @@ bool ramfs_seed_test_header_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_RESERVED
         )
     );
+    return true;
+}
 
+static bool seed_header_data_extent_rejections(
+    struct ramfs_seed_test_fixture *fixture
+)
+{
     ramfs_seed_test_build_maximum_data_seed(fixture->mutated_image);
     ramfs_seed_test_write_u32_le(
         &fixture->mutated_image[16],
@@ -157,7 +169,13 @@ bool ramfs_seed_test_header_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_SIZE
         )
     );
+    return true;
+}
 
+static bool seed_header_digest_rejection(
+    struct ramfs_seed_test_fixture *fixture
+)
+{
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     fixture->mutated_image[fixture->seed_image_size - 1] ^= UINT8_C(0x01);
     EXPECT_TRUE(
@@ -170,14 +188,11 @@ bool ramfs_seed_test_header_corruption_is_rejected(
     return true;
 }
 
-bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
-    struct ramfs_seed_test_fixture *fixture
+static bool seed_record_reserved_rejections(
+    struct ramfs_seed_test_fixture *fixture,
+    const size_t motd
 )
 {
-    const size_t root = MICROS_RAMFS_SEED_HEADER_SIZE;
-    const size_t etc = root + MICROS_RAMFS_SEED_ENTRY_SIZE;
-    const size_t motd = etc + MICROS_RAMFS_SEED_ENTRY_SIZE;
-
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     fixture->mutated_image[motd + 80] = 1;
     ramfs_seed_test_refresh_digest(fixture->mutated_image, fixture->seed_image_size);
@@ -199,7 +214,15 @@ bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_RESERVED
         )
     );
+    return true;
+}
 
+static bool seed_record_name_length_rejections(
+    struct ramfs_seed_test_fixture *fixture,
+    const size_t root,
+    const size_t etc
+)
+{
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     ramfs_seed_test_write_u16_le(&fixture->mutated_image[root + 2], 1);
     fixture->mutated_image[root + 16] = 'r';
@@ -237,7 +260,14 @@ bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_NAME
         )
     );
+    return true;
+}
 
+static bool seed_record_name_byte_rejections(
+    struct ramfs_seed_test_fixture *fixture,
+    const size_t etc
+)
+{
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     fixture->mutated_image[etc + 16] = 0;
     ramfs_seed_test_refresh_digest(fixture->mutated_image, fixture->seed_image_size);
@@ -270,7 +300,15 @@ bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
             MICROS_RAMFS_SEED_ERROR_NAME
         )
     );
+    return true;
+}
 
+static bool seed_record_special_name_rejections(
+    struct ramfs_seed_test_fixture *fixture,
+    const size_t etc,
+    const size_t motd
+)
+{
     memcpy(fixture->mutated_image, fixture->seed_image, fixture->seed_image_size);
     ramfs_seed_test_write_u16_le(&fixture->mutated_image[etc + 2], 1);
     memset(&fixture->mutated_image[etc + 16], 0, 64);
@@ -311,6 +349,30 @@ bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
         )
     );
     return true;
+}
+
+bool ramfs_seed_test_header_corruption_is_rejected(
+    struct ramfs_seed_test_fixture *fixture
+)
+{
+    return seed_header_size_layout_rejections(fixture)
+        && seed_header_entry_metadata_rejections(fixture)
+        && seed_header_data_extent_rejections(fixture)
+        && seed_header_digest_rejection(fixture);
+}
+
+bool ramfs_seed_test_record_name_and_reserved_corruption_is_rejected(
+    struct ramfs_seed_test_fixture *fixture
+)
+{
+    const size_t root = MICROS_RAMFS_SEED_HEADER_SIZE;
+    const size_t etc = root + MICROS_RAMFS_SEED_ENTRY_SIZE;
+    const size_t motd = etc + MICROS_RAMFS_SEED_ENTRY_SIZE;
+
+    return seed_record_reserved_rejections(fixture, motd)
+        && seed_record_name_length_rejections(fixture, root, etc)
+        && seed_record_name_byte_rejections(fixture, etc)
+        && seed_record_special_name_rejections(fixture, etc, motd);
 }
 
 bool ramfs_seed_test_parent_and_mode_corruption_is_rejected(
