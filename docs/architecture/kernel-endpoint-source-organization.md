@@ -555,8 +555,14 @@ hidden-reservation, profile-publication, asymmetric-authority,
 stale/operation-precedence and final-relationship tasks with a 14-line root.
 Its only initializers remain the original zero endpoint pair and NULL record;
 raw original-body proof preserves all authority, output-sentinel and
-bound-release checks. Four original long-function migrations remain pending,
-including the target entry.
+bound-release checks. Source-only evidence now has four 58/39/48/22-line
+prepare-acknowledgment, seal/validate, new-authority denial and drain/close
+tasks with an eleven-line root. The original endpoint pair, record,
+receiver and loop index remain automatic; only the original NULL-record
+initializer runs. Complete body proof retains the canonical ACK mutation/
+restoration, closing-output sentinel, staged-source close refusal and final
+clear-before-close order. Three original long-function migrations remain
+pending, including the target entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

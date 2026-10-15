@@ -181,7 +181,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = (
     (1, "test_invalid_profile_tables_preserve_storage"),
-    (1, "test_source_only_seal_preserves_staged_source"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
 )
@@ -213,6 +212,24 @@ INITIALIZER_HELPERS = (
 )
 MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
 NATIVE_CASE_WORK = {
+    "test_source_only_seal_preserves_staged_source": {
+        "owner": 6,
+        "tag": "endpoint_source_only_case",
+        "fields": ("endpoints", "record", "receiver", "index"),
+        "declarations": (
+            "micros_endpoint_t endpoints[2]; const struct micros_endpoint_record *record; "
+            "struct micros_thread *receiver; size_t index;"
+        ),
+        "original": (
+            "micros_endpoint_t endpoints[2]; const struct micros_endpoint_record *record = NULL; "
+            "struct micros_thread *receiver; size_t index;"
+        ),
+        "outlined": "struct endpoint_source_only_case work; work.record = NULL;",
+        "phases": (
+            "source_only_prepare_acknowledgment", "source_only_seal_and_validate_source",
+            "source_only_reject_new_authority", "source_only_drain_and_close",
+        ),
+    },
     "test_endpoint_lifecycle_and_authorization": {
         "owner": 5,
         "tag": "endpoint_lifecycle_case",
