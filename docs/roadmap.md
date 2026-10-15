@@ -361,14 +361,28 @@ bounded actual three-profile reuse acceptance and independent read-only
 review, then merged with the identical validated/reviewed squash tree.
 This correction adds no production init, shell, command, or runtime-DAG node.
 
-The next selected maintenance correction is Accepted
+The endpoint maintenance correction follows Accepted
 [ADR-0067](adr/0067-kernel-endpoint-source-decomposition.md) and its exact
 [endpoint source contract](architecture/kernel-endpoint-source-organization.md).
 It defines representation, profile, complete validation, publication,
 source-only/close, and native/model/target owners over the existing Step 6/7
-mechanisms. Independent design review is clean; implementation starts only
-after the separate design merges. No endpoint behavior or runtime dependency
-is added.
+mechanisms. Design #135 and implementation #136 are independently reviewed
+and merged. All 98 original definitions have their required owners, both
+migrations are empty, and 151 current C definitions satisfy the required
+task boundaries. The full 47-command fresh author plan and additional actual
+three-profile reuse passed before exact reviewed-tree squash and branch
+cleanup. No endpoint behavior or runtime dependency was added.
+
+The next selected maintenance design is Accepted
+[ADR-0068](adr/0068-kernel-object-source-decomposition.md), with the exact
+[object source contract](architecture/kernel-object-source-organization.md).
+It names 23 C owners, three private headers/sets, 72 moves, eight long and
+four shorter task dispositions over the existing 76-definition object
+family. Public layouts and the cohesive runtime remain unchanged; the
+scheduler/base-validator direction, original storage and full source/recipe
+oracles are explicit. Independent design review is clean. Implementation
+remains pending until separate design PR #137 merges. This is not a new
+runtime node, clock/deadline change, application startup or shell outcome.
 
 ## v0.1 completion goal
 
@@ -383,7 +397,9 @@ contracts and the canonical source/evidence map. Default and full validation
 remain fresh; opt-in reuse requires exact current-candidate/current-context
 evidence and never reduces mandatory coverage. RAMFS #134 subsequently
 demonstrated real native, smoke and TTY-image reuse after its bounded source
-recipe maintenance. This does not alter the runtime DAG.
+recipe maintenance. Endpoint #136 also preserves that real eligibility
+after its separately reviewed bounded recipe update. This does not alter the
+runtime DAG.
 
 `micros` v0.1 is complete when a clean checkout builds with the documented
 LLVM/LLD/CMake/Ninja toolchain, boots under RISC-V64 QEMU `virt` through

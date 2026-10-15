@@ -83,3 +83,4 @@ to make the project appear more consistent than it was.
 | [0065](0065-closed-tool-default-configuration-for-validation.md) | Closed tool default configuration for validation | Accepted |
 | [0066](0066-ramfs-source-decomposition.md) | RAMFS source decomposition | Accepted |
 | [0067](0067-kernel-endpoint-source-decomposition.md) | Kernel endpoint source decomposition | Accepted |
+| [0068](0068-kernel-object-source-decomposition.md) | Kernel object source decomposition | Accepted |

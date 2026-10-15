@@ -230,6 +230,21 @@ plan and bounded real native/smoke/TTY-image reuse acceptance; reviewers
 inspect rather than routinely rerun it. This Accepted design adds no test,
 model, build target, execution, or endpoint behavior.
 
+The kernel-object correction defined by Accepted ADR-0068 preserves
+`kernel_objects_test` / `kernel-objects`, its fifteen cases and existing
+4,096-step xorshift model, all real core consumers, and
+`test-qemu-object-model` with its exact marker and eight-second budget. The
+[object source contract](architecture/kernel-object-source-organization.md)
+defines 23 C owners, three private headers/sets, 72 moves, eight long and four
+shorter semantic dispositions, original storage/exit/IRQ scopes and complete
+byte-source/recipe inverses. Shared inspection moves unchanged into one
+host-only owner with reviewed ASTs frozen; old scheduler/endpoint object
+hashes are not rebaselined. Implementation follows a separate reviewed design
+merge. Narrow native/source-layout or real target checks precede one current
+complete PR plan and additional actual same-producer native/smoke/TTY-image
+reuse acceptance. Its design authors no executable test or model and
+changes no existing execution, timeout or policy.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

@@ -39,6 +39,10 @@ This directory contains the design baseline for `micros`.
 - [Kernel endpoint source organization](architecture/kernel-endpoint-source-organization.md)
   defines exact representation, profile, complete-validation, publication,
   close, native/model, and target ownership without changing authority.
+- [Kernel object source organization](architecture/kernel-object-source-organization.md)
+  defines Accepted representation/identity, process/thread/context/hart,
+  base-validation, native/reference-model and target ownership, including
+  retained byte-source oracles and closed-profile coupling.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
@@ -80,6 +84,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX kernel endpoint source-organization baseline](research/minix-kernel-endpoint-source-organization.md)
   traces fixed representation, privilege installation, inhibited publication,
   and teardown owners before the behavior-preserving endpoint correction.
+- [MINIX kernel object source-organization baseline](research/minix-kernel-object-source-organization.md)
+  traces exact-slot/generation, cleanup, CPU-local and execution-state
+  responsibilities before the source-only object correction.
 - [MINIX kernel IPC source-organization baseline](research/minix-kernel-ipc-source-organization.md)
   traces those responsibilities against the fixed local reference before the
   behavior-preserving shared IPC correction.
