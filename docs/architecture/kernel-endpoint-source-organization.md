@@ -2,11 +2,11 @@
 
 ## Status, base, and goal
 
-This is the Proposed design contract for
+This is the Accepted design contract for
 [ADR-0067](../adr/0067-kernel-endpoint-source-decomposition.md).
-`kernel-endpoint-decomposition-design` is the sole active task; the paired
-implementation remains pending until the independently reviewed design
-merges.
+Independent read-only design review is clean. The paired
+`kernel-endpoint-decomposition-implementation` starts only after this
+separate design merges.
 
 ```text
 reviewed micros base: 7e107f5189cbf6f3aa44dfc05652d041e803c60c

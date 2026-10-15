@@ -217,7 +217,7 @@ image/QEMU, and current-candidate validation-profile evidence supplement
 structural checks. Narrow green slices preceded the complete fresh author
 plan, bounded real reuse acceptance and clean independent review.
 
-The endpoint correction proposed by ADR-0067 preserves `endpoint_test` /
+The endpoint correction defined by Accepted ADR-0067 preserves `endpoint_test` /
 `endpoint-profile`, `ipc_model_test` / `ipc-model`, both existing model link
 consumers, all 25 deterministic runner entries, the four-slot 4,096-step model,
 and `test-qemu-endpoint` with its existing grant lifecycle proof. The
@@ -227,7 +227,7 @@ ten long-function dispositions, typed storage/exit proof, and complete
 recipe maintenance. Implementation starts only after the separately reviewed
 design merges. Narrow green extraction precedes one complete current author
 plan and bounded real native/smoke/TTY-image reuse acceptance; reviewers
-inspect rather than routinely rerun it. This Proposed design adds no test,
+inspect rather than routinely rerun it. This Accepted design adds no test,
 model, build target, execution, or endpoint behavior.
 
 ## Test layers

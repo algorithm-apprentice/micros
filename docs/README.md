@@ -37,7 +37,7 @@ This directory contains the design baseline for `micros`.
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.
 - [Kernel endpoint source organization](architecture/kernel-endpoint-source-organization.md)
-  proposes exact representation, profile, complete-validation, publication,
+  defines exact representation, profile, complete-validation, publication,
   close, native/model, and target ownership without changing authority.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,

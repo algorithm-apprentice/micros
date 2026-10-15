@@ -361,14 +361,14 @@ bounded actual three-profile reuse acceptance and independent read-only
 review, then merged with the identical validated/reviewed squash tree.
 This correction adds no production init, shell, command, or runtime-DAG node.
 
-The next selected maintenance correction is Proposed
+The next selected maintenance correction is Accepted
 [ADR-0067](adr/0067-kernel-endpoint-source-decomposition.md) and its exact
 [endpoint source contract](architecture/kernel-endpoint-source-organization.md).
 It defines representation, profile, complete validation, publication,
 source-only/close, and native/model/target owners over the existing Step 6/7
-mechanisms. Only the design task is active; implementation remains pending
-until independent design acceptance and separate merge. No endpoint behavior
-or runtime dependency is added.
+mechanisms. Independent design review is clean; implementation starts only
+after the separate design merges. No endpoint behavior or runtime dependency
+is added.
 
 ## v0.1 completion goal
 

@@ -1,6 +1,6 @@
 # ADR-0067: Kernel Endpoint Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
 - Refines: ADR-0025, ADR-0029, ADR-0030, ADR-0032, ADR-0033, ADR-0034,
   ADR-0038, ADR-0043, ADR-0050, ADR-0051, ADR-0064, ADR-0065, and ADR-0066
@@ -143,3 +143,13 @@ acceptance. Shared CMake ownership currently selects all 47 author commands.
 Reviewers inspect the author's exact evidence rather than routinely rerunning
 it. Exact reviewed-head squash, identical tree verification, and obsolete
 local/remote branch cleanup follow the agent contract.
+
+## Design review disposition
+
+Independent read-only review inspected the complete nine-document change,
+canonical authority, source feasibility, fixed MINIX ranges, and exact
+current author evidence. It found no substantive issue remaining; no
+targeted reproduction or routine gate rerun was necessary.
+
+Acceptance records that design result, not implementation completion.
+The paired implementation starts only after this separate design merges.

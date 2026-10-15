@@ -81,5 +81,5 @@ behavior change in this task.
 
 The exact source, storage, phase, build, and evidence map is the
 [kernel endpoint source contract](../architecture/kernel-endpoint-source-organization.md).
-Design acceptance still requires independent review; this study does not
-implement the proposed split.
+Design acceptance follows independent review; this study does not
+implement the split.
