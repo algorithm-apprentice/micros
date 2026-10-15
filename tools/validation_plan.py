@@ -137,6 +137,8 @@ PLANNER_INPUTS = (
     "tests/host/test_validation_build_impact.py",
     "tools/validation_evidence.py",
     "tests/host/test_validation_evidence.py",
+    "tools/validation_context.py",
+    "tests/host/test_validation_context.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
     "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
 )
