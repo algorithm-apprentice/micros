@@ -79,7 +79,11 @@ prove transitive config inputs are closed.
 The installed QEMU reports a prefix-contained default `etc/qemu/qemu.conf`
 location; neither it nor the same-prefix global location exists in the
 observed reference configuration. Its fixed upstream loader accepts absence.
-Both absences must remain checked, not assumed. Existing read-only Ninja
+The `qemu-bundle` location beside the resolved executable is also absent.
+Upstream relocation can redirect config and firmware beneath such a bundle,
+so all three absence checks must precede any QEMU metadata invocation.
+Checking only the two config paths and data-root containment is insufficient.
+Existing read-only Ninja
 command inventories contain166 smoke and11 TTY-image commands, with no
 explicit configuration or response inputs. These are metadata observations,
 not executable design prototypes or successful workflow receipts.

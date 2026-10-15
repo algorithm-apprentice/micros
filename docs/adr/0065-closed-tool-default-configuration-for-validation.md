@@ -84,10 +84,21 @@ a present file can add otherwise undeclared guest inputs.
 
 The initial Homebrew profile therefore requires explicit absent identities
 for both the selected versioned QEMU installation's `etc/qemu/qemu.conf`
-and the same Homebrew prefix's `etc/qemu/qemu.conf`. The installed layout,
+and the same Homebrew prefix's `etc/qemu/qemu.conf`, plus `qemu-bundle`
+beside the resolved executable. The
+[fixed relocation function](https://github.com/qemu/qemu/blob/8ee6c77176cfee03be0ec7665b6652b2f31f1531/util/cutils.c#L1144-L1168)
+can redirect configuration and firmware below that bundle while both reported
+data roots still remain inside the installation. Mere containment is not
+proof that the two config paths are authoritative.
+
+Resolve the executable and inspect its compiled path bytes without launching
+QEMU, then check all three absences before any QEMU metadata invocation.
+This includes `-L help`: default configuration loading precedes its handling.
+Any present file, directory or link, or an unreadable/ambiguous state at any
+of the three locations, is ineligible before introspection.
+The installed layout,
 relocated data roots and compiled default-config location must match this
-reviewed layout. Unknown layouts or any file, directory, symlink or unreadable
-state at either location are ineligible. No user configuration is opened,
+reviewed layout. Unknown layouts are ineligible. No user configuration is opened,
 interpreted, copied or silently disabled.
 The bounded resolver requires the selected QEMU major11 image to contain
 the expected NUL-terminated absolute versioned default-config path, after
@@ -122,6 +133,8 @@ Only then may `validation-plan-dedup-implementation` restart from current
 `main`, referencing this design and #129. It must test alias mutation,
 wrong/dangling/unreadable targets, new config members, missing disable flags,
 explicit/response/injected arguments and QEMU default-file presence.
+The QEMU bundle-presence cases must prove refusal occurs before any QEMU
+metadata subprocess, including when the bundle is a symlink or unreadable.
 Every unsupported case stays fresh without a reusable receipt.
 Actual native, smoke and image producer/reuse demonstrations and a fresh full
 milestone gate remain mandatory before independent implementation review.

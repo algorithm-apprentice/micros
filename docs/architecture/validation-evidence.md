@@ -243,8 +243,11 @@ disabled automatic loading is not inferred merely from a successful marker.
 
 The QEMU profile additionally requires both its versioned-installation and
 same-prefix `etc/qemu/qemu.conf` locations to remain absent, with explicit
-checked absence identities. An unknown layout, config option or present
-file/directory/link makes the workflow ineligible, not silently reconfigured.
+checked absence identities, and likewise requires `qemu-bundle` beside the
+resolved executable to be absent. All three checks precede any QEMU metadata
+query, including `-L help`, which may otherwise load default configuration.
+An unknown layout, config option or present/unreadable file/directory/link
+makes the workflow ineligible, not silently reconfigured.
 The guest command and all required gates remain unchanged.
 
 The already required native shim/import closure also distinguishes declared
