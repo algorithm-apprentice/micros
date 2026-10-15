@@ -46,6 +46,8 @@ The complete contract is
 It defines receipt identity, artifact and execution-context closure,
 publication, invalidation, command provenance, Git-layer classification,
 bounded CMake syntax, failure handling, interfaces and acceptance cases.
+Its initial reusable profile names complete native, smoke and the standalone
+TTY image on Darwin arm64/Ninja, with bounded tool/runtime/firmware resolution.
 Implementation may not invent a weaker receipt or classifier.
 
 ### Coverage and reuse are different decisions
@@ -71,6 +73,8 @@ HEAD equality alone is insufficient. A changed index, dirty tracked input,
 untracked task file, different command recipe, toolchain, inherited
 environment, generated-input state, artifact or validation implementation
 invalidates reuse.
+Legacy fresh iteration still accepts unstaged tracked edits; such executions
+cannot publish reusable or final author evidence.
 
 The ledger never stores environment values, credentials or arbitrary command
 lines supplied by a caller. Only fixed canonical workflows are executable
@@ -84,11 +88,13 @@ leave an older receipt available as current success.
 
 ### Narrow CMake classification
 
-Only a recognized command-body edit to an existing, reviewed
+Only a recognized timeout-token edit to an existing, reviewed
 `add_custom_target` workflow may receive narrower ownership. The target
 identity, enclosing guard, command grammar and all outside bytes must remain
 unchanged. Its owners come from reviewed metadata, never inferred from source
-membership or arbitrary target spelling.
+membership or arbitrary target spelling. The v1 table names smoke, panic and
+the shared scheduler-invalid target; the latter owns both invalid-context
+workflows. Every other body byte, marker, variable and expression is immutable.
 
 Added or removed targets, changed factories, source sets, compiler/linker
 options, include chains, guards, presets, shared commands, unsupported syntax

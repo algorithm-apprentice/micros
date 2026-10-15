@@ -77,11 +77,20 @@ A successful receipt identifies:
 | Result | Actual subprocess exit zero and completed postflight |
 | Record | Complete stdout/stderr log path, size and SHA-256 |
 
-HEAD equality alone never qualifies. Execute/record preflight requires a
-clean tracked worktree relative to the index and no untracked task input.
+HEAD equality alone never qualifies. Reuse and gate-only recording require
+a clean tracked worktree relative to the index and no untracked task input.
 Staged changes are allowed only because their exact tree is recorded.
-Preflight and postflight must agree on HEAD, staged tree, tracked cleanliness,
-tool/context fingerprints and absence of untracked task inputs.
+Eligible producer preflight and postflight must agree on HEAD, staged tree,
+tracked cleanliness, tool/context fingerprints and absence of untracked
+task inputs.
+
+Legacy fresh iteration, including `--tier fast --execute`, continues to
+allow unstaged tracked edits. It retains the existing untracked-file refusal.
+A dirty fresh execution cannot publish reusable evidence or become final
+author evidence, but receipt eligibility does not make that iteration fail.
+Fresh execution still invalidates any previous success before attempting a
+canonical command. Clean fresh executions may publish eligible receipts;
+`--reuse` never weakens the final author-evidence cleanliness requirement.
 
 A changed candidate invalidates the whole receipt, even when the edit seems
 unrelated. Branch-range diff checks still execute against the current
@@ -128,6 +137,92 @@ closure it can enumerate using repository/CMake metadata and installed tool
 introspection. It adds no dependency installation or general package
 resolver. Unsupported platforms/configurations retain fresh validation.
 
+### Initial supported profile: Darwin arm64 with Ninja
+
+The v1 reusable inventory is exactly the following three rows. Other
+canonical workflows may still be recorded as fresh, ineligible executions;
+they cannot publish reusable receipts. Expanding eligibility requires a
+separately reviewed declaration and matching independent closure tests.
+
+| Workflow | Configure/build identity | Required output closure |
+| --- | --- | --- |
+| `test-unit` | `host-debug`, `build/host-debug`, build target `test-unit` | Every executable and file argument in the complete CTest inventory, including all slow labels; generated seed payloads; native dependent dylibs; the actual Python discovery command and complete success log |
+| `test-qemu-smoke` | `riscv64-debug`, `build/riscv64-debug`, target `test-qemu-smoke` | `kernel/micros.elf`, `kernel/micros.map`, checked link artifacts and actual successful guest log |
+| `build-tty-service-image` | `riscv64-tty-service-image`, `build/riscv64-tty-service-image`, target `micros_tty_service` | `bootstrap/micros-tty-service.elf`, `bootstrap/micros-tty-service.map` and checked link artifacts |
+
+The resolved committed preset must contain exactly configure-then-build
+steps, Ninja, Debug and the row's configured directory/target. The native row
+has host tests enabled; the target rows use
+`cmake/toolchains/riscv64-clang.cmake`, the RV64 triple and only their
+documented image option. User presets, injected launchers, extra project
+includes, external source/include directories, custom Python import roots
+and unlisted workflow steps are ineligible, never guessed equivalent.
+
+The supported host is Darwin arm64 with authenticated root enabled.
+Fingerprint the OS version/build including supplemental response identity,
+kernel identity, mounted root's sealed APFS snapshot UUID and the active
+dyld shared-cache UUID returned by `_dyld_get_shared_cache_uuid`.
+System tools/frameworks within `/usr/bin`, `/usr/lib` and `/System/Library`
+belong to that sealed runtime tuple; an unavailable, unsealed or unresolved
+identity makes reuse ineligible. Non-system tool/library bytes are never
+covered by an OS version string alone.
+
+For this profile, these are the authoritative resolution rules:
+
+- CMake/CTest and Ninja are resolved executables; hash their versioned
+  installation trees, including CMake modules. Only resolved Homebrew Cellar
+  installations are supported for these tools and the target LLVM/LLD/QEMU.
+  Resolve native Clang, the active developer directory and SDK using `xcrun`;
+  hash the actual selected toolchain `usr` tree, SDK tree and Xcode Python
+  framework tree. Hash Python's resolved executable, standard-library tree,
+  extension modules and import-search directory identities. Nonstandard
+  site/import customization is ineligible.
+- Target execution requires explicit `MICROS_CLANG` and `MICROS_LD_LLD`
+  selections, matching the CMake cache. This closes the toolchain's existing
+  selection path without executing Homebrew discovery during the workflow.
+  Hash the selected LLVM/LLD installation trees, including compiler resources
+  and subsidiary tools. Native cache compiler/shim resolution must agree
+  with the active `xcrun` toolchain. Unknown compiler, linker, launcher,
+  archiver or post-link executable resolution is ineligible.
+- Recursively resolve non-system Mach-O dylibs for tools and native test
+  executables with `otool -L` and load-command/rpath metadata. Hash each
+  resolved dependency's versioned installation tree or the declared Xcode
+  toolchain/Python tree. System dependencies use the sealed runtime above.
+  Unresolved `@rpath`, missing files or an external dependency outside these
+  admitted roots make the workflow ineligible. This is a bounded Mach-O
+  resolver, not a general package manager.
+- QEMU's ordered data roots come from its actual `-L help` output. Hash their
+  complete trees and resolve `opensbi-riscv64-generic-fw_dynamic.bin` by that
+  order, including the first existing file's link target and bytes. Thus
+  `-bios default` is not treated as an unknown or version-only firmware.
+  An override, unresolved default, unrecognized data root or firmware outside
+  the admitted QEMU installation is ineligible.
+- Hash `CMakeCache.txt`, `build.ninja`, included generator/CMake inputs and
+  configured compiler metadata. Enumerate every selected target's regular
+  outputs and generated inputs using Ninja/CMake metadata, including
+  dependency records; missing or unrecognized metadata is ineligible.
+  CTest JSON discovery supplies the native executable/file-argument set and
+  labels, checked against the complete native target and committed tests.
+  Repository inputs bind to HEAD/tree; ignored generated inputs are hashed
+  explicitly. Temporary test-result/timing logs and Ninja execution counters
+  are not inputs, but the producer's complete log remains a required output.
+- The inherited environment is hashed, never stored as plaintext. Tool
+  selection, import, compiler, loader and CMake override variables must
+  resolve within the rules above; injection/preload, nonempty compiler flag
+  overrides, nonstandard package/import paths and user-site loading are
+  ineligible. The profile requires `PYTHONNOUSERSITE=1`; absent ordinary
+  standard-library zip/search locations have explicit absent identities.
+  Native Python test subprocesses are the current reviewed
+  Python CLI and CMake configuration probes; their runtime/tool closure is
+  included, not omitted because they are children of unittest.
+
+Tree fingerprints include relative names, kinds, modes, regular-file bytes,
+link spelling/target and directory membership. Deduplicating resolved files
+within one fingerprint is allowed; metadata-only persistent digest caches
+are not. An unreadable tree, escaping/unknown link or dependency makes reuse
+ineligible. Runtime-discovered installation paths/digests are data, not an
+opportunity to extend these admitted input classes.
+
 ## Receipt lifecycle
 
 One OS-backed exclusive lock protects the resolved repository-local store.
@@ -167,11 +262,29 @@ The exception applies only to content discovered for the exact repository
 `CMakeLists.txt`. It never applies to a caller-supplied impact override.
 An explicit CMake path without a verified before/after change stays shared.
 
-The first implementation recognizes only existing terminal intent commands:
-reviewed `add_custom_target` definitions for known native/model, QEMU and
-image workflows. The reviewed owner table explicitly binds each recognized
-definition to workflow/model/image ownership. It does not derive ownership
-from target names, source lists or dependency reachability.
+The v1 exception recognizes exactly three existing terminal QEMU commands:
+
+| Target | Exact enclosing guard | Complete workflow owners |
+| --- | --- | --- |
+| `test-qemu-smoke` | None | `test-qemu-smoke` |
+| `test-qemu-panic` | `MICROS_BUILD_PANIC_TEST` | `test-qemu-panic` |
+| `test-qemu-scheduler-invalid-context` | `MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST OR MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST` | Both `test-qemu-scheduler-invalid-outgoing` and `test-qemu-scheduler-invalid-next` |
+
+These rows own no model or image workflows: they edit a terminal runner
+timeout, not a product build. PR-tier complete native and smoke remain
+mandatory. In particular, the shared scheduler-invalid target does not
+authorize selecting only one of its two configured workflows.
+All other native/model/image/QEMU definitions remain shared in v1.
+Ownership is never inferred from target names or dependency reachability.
+
+The fixed template for each row is its complete target command in
+`CMakeLists.txt` at `ee6be77c1d786eea0cae96b175a9923eba3e0b55`.
+The sole mutable token is the one decimal argument immediately following its
+unique `--timeout`: an unquoted integer from 1 through 600, without leading
+zeroes. Both snapshots must match every other byte of that reviewed target
+template. Reindentation, marker edits, new comments or any additional token
+are not exceptions. The implementation retains independent literal owner
+and template expectations in tests, not imports of production tables.
 
 Every discovery layer is checked separately: selected-base range, HEAD to
 index and index to tracked worktree. Each changed CMake snapshot must satisfy
@@ -191,11 +304,15 @@ unknown variable references, macros, includes, function calls, global
 setters, control-flow changes, malformed tokens or ambiguous boundaries
 escalate to full validation. Merely adding region comments is not proof.
 
-The command grammar permits only the known workflow target's fixed runner,
-its canonical arguments, literal markers/timeouts and declared dependencies.
-It cannot introduce arbitrary commands, mutate another target, change a
-runner path, add an include or execute a new tool under narrower ownership.
-Changing such structure remains full.
+The immutable template permits only its existing
+`"${MICROS_PYTHON}" -B` runner,
+`"${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"`,
+`"${MICROS_QEMU}"`, `"$<TARGET_FILE:micros>"`, existing literal arguments,
+`${PROJECT_VERSION}` and, only in the scheduler row,
+`${MICROS_SCHEDULER_INVALID_STATE}`. Its sole `DEPENDS micros`,
+`WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"` and `USES_TERMINAL` are
+immutable. The existing scheduler state selector also remains outside the
+mutable body and byte-identical. No other variable/expression is admitted.
 
 Added/removed targets, new workflows, renamed targets, changed enclosing
 guards, factories, source bundles, compile/link options, generated rules,
@@ -240,8 +357,9 @@ planner tests. Required deterministic cases include:
   that cannot report final author success;
 - exact required-sequence equality between fresh execution and
   fresh-plus-verified-reuse, with every unsatisfied requirement blocking;
-- one valid existing-workflow CMake marker/timeout edit selecting only its
-  explicit owners plus required native/smoke;
+- one valid panic timeout edit selecting exactly complete native, smoke and
+  panic plus the three diffs; one scheduler-invalid timeout edit selecting
+  both invalid-context workflows plus native/smoke and the three diffs;
 - multiple owned edits unioning owners; unknown syntax, changed guards,
   factories, source sets, presets, added/removed commands and mixed layers
   selecting full;
