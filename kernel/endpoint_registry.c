@@ -98,7 +98,7 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
     return MICROS_ENDPOINT_OK;
 }
 
-enum micros_endpoint_error micros_endpoint_registry_validate(
+static bool profile_table_is_canonical(
     const struct micros_endpoint_registry *registry
 )
 {
@@ -106,20 +106,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
     size_t observed_count = 0;
     size_t index;
     size_t other_index;
-    enum micros_endpoint_error error;
 
-    error = endpoint_require_initialized(registry);
-    if (error != MICROS_ENDPOINT_OK) {
-        return error;
-    }
-    if (
-        registry->profile_count == 0
-        || registry->profile_count
-            >= MICROS_PRIVILEGE_PROFILE_CAPACITY
-        || !endpoint_profile_is_zero(&registry->profiles[0])
-    ) {
-        return MICROS_ENDPOINT_ERROR_INVARIANT;
-    }
     for (index = 1; index < MICROS_PRIVILEGE_PROFILE_CAPACITY; ++index) {
         const struct micros_privilege_profile *profile =
             &registry->profiles[index];
@@ -127,7 +114,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
 
         if (profile->id == 0) {
             if (!endpoint_profile_is_zero(profile)) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
             continue;
         }
@@ -137,7 +124,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
                 != MICROS_ENDPOINT_OK
             || !endpoint_bytes_equal(profile, &canonical, sizeof(canonical))
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         for (other_index = 1; other_index < index; ++other_index) {
             const struct micros_privilege_profile *other =
@@ -147,14 +134,14 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
                 other->id != 0
                 && endpoint_names_equal(profile->name, other->name)
             ) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
         }
         installed |= UINT32_C(1) << profile->id;
         ++observed_count;
     }
     if (observed_count != registry->profile_count) {
-        return MICROS_ENDPOINT_ERROR_INVARIANT;
+        return false;
     }
     for (index = 1; index < MICROS_PRIVILEGE_PROFILE_CAPACITY; ++index) {
         const struct micros_privilege_profile *profile =
@@ -172,9 +159,18 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
             (targets & UINT32_C(1)) != 0
             || (targets & ~installed) != 0
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
     }
+    return true;
+}
+
+static bool endpoint_records_are_canonical(
+    const struct micros_endpoint_registry *registry
+)
+{
+    size_t index;
+
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_endpoint_record *endpoint =
             &registry->endpoints[index];
@@ -182,7 +178,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
 
         if (endpoint->state == MICROS_ENDPOINT_STATE_FREE) {
             if (!endpoint_record_is_zero(endpoint)) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
             continue;
         }
@@ -191,13 +187,13 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
             && endpoint->state != MICROS_ENDPOINT_STATE_ACTIVE
             && endpoint->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (
             endpoint->state == MICROS_ENDPOINT_STATE_RESERVED
             && !endpoint_ipc_state_is_zero(endpoint)
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (
             (
@@ -219,18 +215,45 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
                 )
             )
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (endpoint->owner.slot != index) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (
             micros_endpoint_pack(endpoint->owner, &expected_value)
                 != MICROS_ENDPOINT_OK
             || endpoint->value != expected_value
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
+    }
+    return true;
+}
+
+enum micros_endpoint_error micros_endpoint_registry_validate(
+    const struct micros_endpoint_registry *registry
+)
+{
+    enum micros_endpoint_error error;
+
+    error = endpoint_require_initialized(registry);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (
+        registry->profile_count == 0
+        || registry->profile_count
+            >= MICROS_PRIVILEGE_PROFILE_CAPACITY
+        || !endpoint_profile_is_zero(&registry->profiles[0])
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    if (!profile_table_is_canonical(registry)) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    if (!endpoint_records_are_canonical(registry)) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
     }
     return MICROS_ENDPOINT_OK;
 }

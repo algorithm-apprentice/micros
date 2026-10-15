@@ -10,31 +10,13 @@ static bool thread_has_no_ipc_flags(
     ) == 0;
 }
 
-enum micros_endpoint_error micros_endpoint_registry_validate_objects(
+static bool process_relationships_are_canonical(
     const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects
+    const struct micros_kernel_objects *objects,
+    bool queued_threads[MICROS_THREAD_CAPACITY]
 )
 {
-    enum micros_endpoint_error endpoint_error;
-    bool queued_threads[MICROS_THREAD_CAPACITY];
     size_t index;
-
-    if (registry == NULL || objects == NULL) {
-        return MICROS_ENDPOINT_ERROR_ARGUMENT;
-    }
-    endpoint_error = micros_endpoint_registry_validate(registry);
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return endpoint_error;
-    }
-    if (
-        micros_kernel_objects_validate(objects)
-            != MICROS_KERNEL_OBJECT_OK
-    ) {
-        return MICROS_ENDPOINT_ERROR_INVARIANT;
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        queued_threads[index] = false;
-    }
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_endpoint_record *endpoint =
@@ -53,7 +35,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                     || process->privilege_profile != 0
                 )
             ) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
             continue;
         }
@@ -63,7 +45,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
             || process->primary_endpoint != endpoint->value
             || !process->endpoint_lifecycle_consumed
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (process->privilege_profile != 0) {
             if (
@@ -75,14 +57,14 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                     &unused_profile
                 ) != MICROS_ENDPOINT_OK
             ) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
         } else if (
             endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
             || endpoint->state
                 == MICROS_ENDPOINT_STATE_SOURCE_ONLY
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (
             endpoint->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
@@ -92,7 +74,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                 endpoint->owner
             )
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (
             (
@@ -131,9 +113,20 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                 )
             )
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
     }
+    return true;
+}
+
+static bool thread_relationships_are_canonical(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const bool queued_threads[MICROS_THREAD_CAPACITY]
+)
+{
+    size_t index;
+
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *thread = &objects->threads[index];
         size_t other_index;
@@ -168,7 +161,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                         )
                 )
             ) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
         } else if (
             (
@@ -178,7 +171,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
             )
             || !queued_threads[index]
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         if (thread->ipc_reply_token == 0) {
             continue;
@@ -188,7 +181,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
             || thread->ipc_reply_token
                 > registry->last_reply_token
         ) {
-            return MICROS_ENDPOINT_ERROR_INVARIANT;
+            return false;
         }
         for (other_index = 0; other_index < index; ++other_index) {
             const struct micros_thread *other =
@@ -200,9 +193,44 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
                 && other->ipc_reply_token
                     == thread->ipc_reply_token
             ) {
-                return MICROS_ENDPOINT_ERROR_INVARIANT;
+                return false;
             }
         }
+    }
+    return true;
+}
+
+enum micros_endpoint_error micros_endpoint_registry_validate_objects(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    enum micros_endpoint_error endpoint_error;
+    bool queued_threads[MICROS_THREAD_CAPACITY];
+    size_t index;
+
+    if (registry == NULL || objects == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    endpoint_error = micros_endpoint_registry_validate(registry);
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return endpoint_error;
+    }
+    if (
+        micros_kernel_objects_validate(objects)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        queued_threads[index] = false;
+    }
+
+    if (!process_relationships_are_canonical(registry, objects, queued_threads)) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    if (!thread_relationships_are_canonical(registry, objects, queued_threads)) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
     }
     return MICROS_ENDPOINT_OK;
 }

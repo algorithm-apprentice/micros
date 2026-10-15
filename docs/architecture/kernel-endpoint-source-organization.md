@@ -527,9 +527,13 @@ borrows the fixture; setup/trace mutation and readonly failure/projection
 helpers receive exact typed pointers. Raw operation-name bytes, model types,
 all fifteen original model bodies, draw/trace/comparison order and resets
 remain exact. The active 90-owner migration is now a literal empty tuple.
-All ten original long-function migrations remain pending, including the
-target entry; the specified shorter initialization outline also remains
-required.
+The public validators now have 26/34-line outlines and four 66/65/108/80-line
+profile, record, process and thread passes. Exact whole-body projection
+preserves original counter bounds, header/error precedence, every invariant,
+and one caller-owned queued-thread witness shared across process and thread
+closure; helpers do not introduce early success or another witness.
+Eight original long-function migrations remain pending, including the target
+entry; the specified shorter initialization outline also remains required.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

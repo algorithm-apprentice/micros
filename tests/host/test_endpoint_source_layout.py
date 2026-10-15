@@ -178,7 +178,39 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
+LONG_FUNCTION_MIGRATION = (
+    (1, "test_invalid_profile_tables_preserve_storage"),
+    (1, "test_endpoint_lifecycle_and_authorization"),
+    (1, "test_profile_install_and_close_require_held_threads"),
+    (1, "test_source_only_seal_preserves_staged_source"),
+    (1, "main"),
+    (2, "validate_model"),
+    (2, "micros_endpoint_model_test_run"),
+    (3, "micros_endpoint_runtime_run_self_test"),
+)
+REGISTRY_VALIDATION_DECLARATIONS = (
+    "uint32_t installed = 0; size_t observed_count = 0; size_t index; size_t other_index;"
+)
+VALIDATOR_PHASES = {
+    "micros_endpoint_registry_validate": (
+        3,
+        (
+            ("profile_table_is_canonical", ("registry",), REGISTRY_VALIDATION_DECLARATIONS, 1),
+            ("endpoint_records_are_canonical", ("registry",), "size_t index;", 0),
+        ),
+    ),
+    "micros_endpoint_registry_validate_objects": (
+        7,
+        (
+            ("process_relationships_are_canonical", ("registry", "objects", "queued_threads"), "size_t index;", 0),
+            ("thread_relationships_are_canonical", ("registry", "objects", "queued_threads"), "size_t index;", 0),
+        ),
+    ),
+}
+VALIDATOR_HELPER_OWNERS = {
+    specification[0]: family_paths_index
+    for family_paths_index, specifications in VALIDATOR_PHASES.values() for specification in specifications
+}
 CORE_DAG = {
     0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
     5: {1, 2}, 6: {1, 2, 5}, 7: {3, 4, 5, 6},
@@ -376,6 +408,10 @@ def original_locations(family):
     renames = normal_names(family)
     locations = {}
     for path, spelling in owned_definitions(family):
+        if family == 0 and spelling in VALIDATOR_HELPER_OWNERS:
+            if path != family_paths(0)[VALIDATOR_HELPER_OWNERS[spelling]]:
+                raise AssertionError("validation phases retain their exact file-local owners")
+            continue
         if family == 1 and spelling == "endpoint_test_context":
             if path != family_paths(1)[1]:
                 raise AssertionError("native fixture getter has one exact owner")
@@ -459,9 +495,56 @@ def model_fixture_body_tokens(name, body):
     return fixture_field_tokens(result, MODEL_CONTEXT_FIELDS)
 
 
+def validation_phase_body_tokens(name, caller, phases):
+    caller = list(tokens(caller))
+    if name == "micros_endpoint_registry_validate":
+        current = list(tokens("enum micros_endpoint_error error;"))
+        if caller[:1 + len(current)] != ["{"] + current:
+            raise AssertionError("shallow validation retains only its original caller error temporary")
+        caller[1:1] = tokens(REGISTRY_VALIDATION_DECLARATIONS)
+    for (phase, arguments, declarations, first_index), body in phases:
+        call = list(tokens(
+            "if (!" + phase + "(" + ", ".join(arguments) + ")) { return MICROS_ENDPOINT_ERROR_INVARIANT; }"
+        ))
+        positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+        if len(positions) != 1:
+            raise AssertionError("validation phases retain exact caller error and witness bindings")
+        body = list(tokens(body))
+        locals_ = list(tokens(declarations))
+        success = list(tokens("return true;"))
+        if body[:1 + len(locals_)] != ["{"] + locals_ or body[-len(success) - 1:] != success + ["}"]:
+            raise AssertionError("validation phases own only original automatic counters and terminal success")
+        inner = body[1 + len(locals_):-len(success) - 1]
+        first = inner.index("index") if "index" in inner else None
+        if first is None or inner[first - 2:first + 3] != ["for", "(", "index", "=", str(first_index)]:
+            raise AssertionError("validation counter must reset to its original first bound before use")
+        expanded = []
+        index = 0
+        while index < len(inner):
+            if inner[index] == "return":
+                if inner[index:index + 3] != ["return", "false", ";"]:
+                    raise AssertionError("helper-local success must never bypass caller validation")
+                expanded.extend(tokens("return MICROS_ENDPOINT_ERROR_INVARIANT;"))
+                index += 3
+            else:
+                expanded.append(inner[index])
+                index += 1
+        position = positions[0]
+        caller[position:position + len(call)] = expanded
+    return tuple(caller)
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
-    body = tuple(names.get(token, token) for token in tokens(text))
+    body = tokens(text)
+    if family == 0 and name in VALIDATOR_PHASES and (0, name) not in LONG_FUNCTION_MIGRATION:
+        owner, specifications = VALIDATOR_PHASES[name]
+        phases = [
+            (specification, c_function_body(source(family_paths(0)[owner]), specification[0]))
+            for specification in specifications
+        ]
+        body = validation_phase_body_tokens(name, text, phases)
+    body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
     ):
@@ -608,22 +691,26 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         current_edges = set()
         final_edges = set()
         actual_exports = set()
-        for name, (path, spelling) in locations.items():
+        actual = {spelling: path for path, spelling in owned_definitions(0)}
+        for spelling, path in actual.items():
+            name = names.get(spelling, spelling)
             calls = set(re.findall(r"\b([A-Za-z_]\w*)\s*\(", c_lexical_text(c_function_body(source(path), spelling))))
             for call in calls:
                 callee = names.get(call, call)
-                if callee not in locations:
+                if call not in actual:
                     continue
-                dependency = locations[callee][0]
+                dependency = actual[call]
                 if dependency != path:
                     current_edges.add((dependency, path))
                     if not call.startswith("micros_"):
                         actual_exports.add(call)
-                source_owner = family_paths(0).index(final[name])
-                dependency_owner = family_paths(0).index(final[callee])
+                source_path = final[name] if name in final else path
+                dependency_path = final[callee] if callee in final else dependency
+                source_owner = family_paths(0).index(source_path)
+                dependency_owner = family_paths(0).index(dependency_path)
                 if source_owner != dependency_owner:
                     self.assertIn(dependency_owner, CORE_DAG[source_owner], (name, callee))
-                    final_edges.add((final[callee], final[name]))
+                    final_edges.add((dependency_path, source_path))
         paths = set(family_paths(0))
         self.assertEqual(paths, set(topological_order(paths, current_edges)))
         self.assertEqual(paths, set(topological_order(paths, final_edges)))
@@ -774,6 +861,91 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             tokens(expected),
             model_fixture_body_tokens("micros_endpoint_model_test_run", tokens(current.replace("return false;", "return true;", 1))),
         )
+
+    def test_validators_expose_exact_profile_record_process_and_thread_passes(self):
+        parameters = {
+            "profile_table_is_canonical": "const struct micros_endpoint_registry *registry",
+            "endpoint_records_are_canonical": "const struct micros_endpoint_registry *registry",
+            "process_relationships_are_canonical": (
+                "const struct micros_endpoint_registry *registry, const struct micros_kernel_objects *objects, "
+                "bool queued_threads[MICROS_THREAD_CAPACITY]"
+            ),
+            "thread_relationships_are_canonical": (
+                "const struct micros_endpoint_registry *registry, const struct micros_kernel_objects *objects, "
+                "const bool queued_threads[MICROS_THREAD_CAPACITY]"
+            ),
+        }
+        for name, owner in VALIDATOR_HELPER_OWNERS.items():
+            with self.subTest(name=name):
+                text = source(family_paths(0)[owner])
+                definitions = c_function_definitions(text)
+                self.assertIn(name, definitions)
+                self.assertLessEqual(definitions[name], 120)
+                signatures = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures))
+                self.assertEqual(
+                    tokens(f"static bool {name}({parameters[name]}) {{"), tokens(signatures[0]),
+                )
+
+    def test_validation_projection_preserves_original_counters_witness_and_caller_failures(self):
+        name = "micros_endpoint_registry_validate"
+        specifications = VALIDATOR_PHASES[name][1]
+        guards = [
+            "if (!" + phase + "(" + ", ".join(arguments) + ")) { return MICROS_ENDPOINT_ERROR_INVARIANT; }"
+            for phase, arguments, _, _ in specifications
+        ]
+        caller = "{ enum micros_endpoint_error error; preflight();" + "".join(guards) + "return OK; }"
+        bodies = (
+            "{ " + REGISTRY_VALIDATION_DECLARATIONS
+            + "for (index = 1; index < PROFILES; ++index) { if (bad()) { return false; } ++observed_count; } return true; }",
+            "{ size_t index; for (index = 0; index < RECORDS; ++index) { if (bad_record()) { return false; } } return true; }",
+        )
+        expected = (
+            "{ " + REGISTRY_VALIDATION_DECLARATIONS + "enum micros_endpoint_error error; preflight();"
+            "for (index = 1; index < PROFILES; ++index) { if (bad()) { return MICROS_ENDPOINT_ERROR_INVARIANT; } ++observed_count; } "
+            "for (index = 0; index < RECORDS; ++index) { if (bad_record()) { return MICROS_ENDPOINT_ERROR_INVARIANT; } } return OK; }"
+        )
+        phases = tuple(zip(specifications, bodies))
+        self.assertEqual(tokens(expected), validation_phase_body_tokens(name, caller, phases))
+        for changed in (
+            caller.replace("return MICROS_ENDPOINT_ERROR_INVARIANT;", "return OK;", 1),
+            caller.replace("endpoint_records_are_canonical(registry)", "endpoint_records_are_canonical(other)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                validation_phase_body_tokens(name, changed, phases)
+        for changed in (
+            bodies[0].replace("size_t index;", "static size_t index;"),
+            bodies[0].replace("index = 1", "index = 0"),
+            bodies[0].replace("return false;", "return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                validation_phase_body_tokens(name, caller, ((specifications[0], changed), phases[1]))
+        self.assertNotEqual(
+            tokens(expected),
+            validation_phase_body_tokens(name, caller, ((specifications[0], bodies[0].replace("++observed_count;", "")), phases[1])),
+        )
+        object_name = "micros_endpoint_registry_validate_objects"
+        object_specs = VALIDATOR_PHASES[object_name][1]
+        object_guards = [
+            "if (!" + phase + "(" + ", ".join(arguments) + ")) { return MICROS_ENDPOINT_ERROR_INVARIANT; }"
+            for phase, arguments, _, _ in object_specs
+        ]
+        object_caller = "{ bool queued_threads[CAP]; clear_witness();" + "".join(object_guards) + "return OK; }"
+        object_bodies = (
+            "{ size_t index; for (index = 0; index < PROCESSES; ++index) { queued_threads[index] = true; } return true; }",
+            "{ size_t index; for (index = 0; index < THREADS; ++index) { if (!queued_threads[index]) { return false; } } return true; }",
+        )
+        object_phases = tuple(zip(object_specs, object_bodies))
+        object_expected = (
+            "{ bool queued_threads[CAP]; clear_witness();"
+            "for (index = 0; index < PROCESSES; ++index) { queued_threads[index] = true; } "
+            "for (index = 0; index < THREADS; ++index) { if (!queued_threads[index]) { return MICROS_ENDPOINT_ERROR_INVARIANT; } } return OK; }"
+        )
+        self.assertEqual(tokens(object_expected), validation_phase_body_tokens(object_name, object_caller, object_phases))
+        with self.assertRaises(AssertionError):
+            validation_phase_body_tokens(
+                object_name, object_caller.replace("objects, queued_threads", "objects, copied_witness", 1), object_phases,
+            )
 
     def test_all_four_classification_dimensions_and_host_gate_are_unchanged(self):
         qemu = [
