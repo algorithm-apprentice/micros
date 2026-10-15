@@ -498,9 +498,16 @@ caller error propagation, final validation, and reply order. Write now has a
 tail-call projection preserves the original allocation/data/size/result
 order, scratch clearing, and invariant-only failure after possible mutation;
 the node pointer and independently reset loop counter remain automatic.
-Fourteen C plus one Python semantic migrations remain pending, alongside
-the specified shorter-operation outlines. Completing source ownership alone
-does not complete this implementation.
+The Python renderer now exposes descriptor, topology, budget, image, explicit
+service-entry, manifest and report tasks; its largest function is 56 lines.
+Known-helper AST projection reconstructs the complete immutable original
+module, including CLI/error behavior, exact bindings, evaluation/output
+order, and the single manifest tuple publication. Pure tuple helpers cannot
+hide effects, defaults, decorators, suspension, or caller exits; independent
+fixtures enforce those boundaries across supported Python AST versions.
+Fourteen C semantic migrations remain pending, alongside the specified
+shorter-operation outlines. Completing source ownership alone does not
+complete this implementation.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;

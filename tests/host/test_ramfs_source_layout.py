@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +16,7 @@ from tests.host.test_kernel_bootstrap_source_layout import c_function_body, loca
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
+from tests.host.test_user_elf_source_layout import ast_digest
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
 
@@ -139,6 +141,25 @@ PEER_RESULT_TYPE_DIGEST = "8e7637dec192ddb613c8fc031ffc39791653e1b0f4b8d8f043d4e
 KERNEL_CONST_OBJECT_DIGEST = "49d4895ed14632490d6f1dfddfb0c18a52acd9ae7787eeaff0dea63b63f15cab"
 KERNEL_RAW_OBJECT_DIGEST = "fed126e702cae04edc462115554a1f1dc14fa3a17d26415691f3275c5736df6b"
 KERNEL_REPORT_MACRO_DIGEST = "9107b9699d4b7b3926278a41aec3ba3c8bc2f3e3f9a79fba685ef7359a5ef57b"
+BASELINE_GENERATOR_AST = "6eee0f28e03540884d954d22bdc611c430f5337fe482ce51c00ce39ad067ff85"
+GENERATOR_HELPERS = {
+    "_validated_descriptors": ("bind", (
+        "launcher_image", "vm_image", "pm_image", "tty_image", "ramfs_image", "vfs_image",
+    )),
+    "_validate_topology": ("void", ("launcher", "vm", "pm", "tty", "ramfs", "vfs")),
+    "_page_limits": ("bind", ("launcher", "vm", "pm", "tty", "ramfs", "vfs")),
+    "_render_images": ("void", ("output", "launcher", "vm", "pm", "tty", "ramfs", "vfs")),
+    "_render_manifest": ("tuple", (
+        "launcher_limit", "vm_limit", "pm_limit", "tty_limit", "vfs_limit", "total_limit", "vfs",
+    )),
+    "_render_vfs_entry": ("tuple", ("vfs_limit",)),
+    "_render_launcher_entry": ("tuple", ("launcher_limit",)),
+    "_render_ramfs_entry": ("tuple", ()),
+    "_render_tty_entry": ("tuple", ("tty_limit",)),
+    "_render_pm_entry": ("tuple", ("pm_limit",)),
+    "_render_vm_entry": ("tuple", ("vm_limit",)),
+    "_render_report": ("tuple", ("vfs",)),
+}
 DATA_RENAMES = {
     1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
     3: {"ramfs_model_io": "model_io"},
@@ -281,7 +302,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = tuple(
     entry for entry in LONG_FUNCTIONS
-    if entry not in ((0, "micros_ramfs_handle_call"), (0, "handle_write"))
+    if entry not in ((0, "micros_ramfs_handle_call"), (0, "handle_write"), (6, "render_fixture"))
 )
 
 # BEGIN IMMUTABLE BASELINE DATA
@@ -858,6 +879,142 @@ def restored_cmake(text):
     return text
 
 
+def renderer_helper_nodes(module, specifications):
+    definitions = [
+        node for node in module.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    if len(definitions) != len({node.name for node in definitions}):
+        raise AssertionError("renderer definitions must have unique original/helper owners")
+    functions = {node.name: node for node in definitions}
+    helpers = {}
+    for name, (kind, parameters) in specifications.items():
+        node = functions.get(name)
+        if not isinstance(node, ast.FunctionDef):
+            raise AssertionError(f"missing plain renderer helper: {name}")
+        if (
+            node.decorator_list or node.returns is not None
+            or getattr(node, "type_params", ())
+            or node.args.defaults or node.args.kw_defaults or node.args.kwonlyargs
+            or node.args.vararg or node.args.kwarg or node.args.posonlyargs
+            or any(argument.annotation is not None for argument in node.args.args)
+            or tuple(argument.arg for argument in node.args.args) != parameters
+        ):
+            raise AssertionError(f"renderer helper has effects or unreviewed bindings: {name}")
+        if any(isinstance(child, (ast.Yield, ast.YieldFrom, ast.Await)) for child in ast.walk(node)):
+            raise AssertionError(f"renderer task cannot suspend execution: {name}")
+        returns = [child for child in ast.walk(node) if isinstance(child, ast.Return)]
+        if kind == "void":
+            if returns:
+                raise AssertionError(f"void renderer phase cannot exit its caller: {name}")
+        elif (
+            not node.body or len(returns) != 1 or node.body[-1] is not returns[0]
+            or not isinstance(returns[0].value, ast.Tuple)
+            or kind == "tuple" and len(node.body) != 1
+        ):
+            raise AssertionError(f"renderer return transport is not exact: {name}")
+        helpers[name] = node
+    return helpers
+
+
+def renderer_call_binding(call, specifications):
+    name = call.func.id
+    _, parameters = specifications[name]
+    if call.keywords or any(not isinstance(argument, ast.Name) for argument in call.args):
+        raise AssertionError(f"renderer arguments must transport existing named values: {name}")
+    if tuple(argument.id for argument in call.args) != parameters:
+        raise AssertionError(f"renderer argument binding differs: {name}")
+
+
+class RendererTupleProjection(ast.NodeTransformer):
+    def __init__(self, helpers, specifications):
+        self.helpers = helpers
+        self.specifications = specifications
+        self.active = set()
+
+    def visit_Call(self, node):
+        if not isinstance(node.func, ast.Name) or node.func.id not in self.helpers:
+            return self.generic_visit(node)
+        name = node.func.id
+        if self.specifications[name][0] != "tuple" or name in self.active:
+            raise AssertionError(f"unexpected/cyclic renderer expression helper: {name}")
+        renderer_call_binding(node, self.specifications)
+        self.active.add(name)
+        try:
+            return self.visit(copy.deepcopy(self.helpers[name].body[0].value))
+        finally:
+            self.active.remove(name)
+
+    def visit_Tuple(self, node):
+        elements = []
+        for element in node.elts:
+            if isinstance(element, ast.Starred):
+                if (
+                    not isinstance(element.value, ast.Call)
+                    or not isinstance(element.value.func, ast.Name)
+                    or element.value.func.id not in self.helpers
+                ):
+                    raise AssertionError("tuple expansion requires one reviewed pure renderer role")
+                expanded = self.visit(element.value)
+                if not isinstance(expanded, ast.Tuple):
+                    raise AssertionError("renderer role did not return its exact tuple")
+                elements.extend(expanded.elts)
+            else:
+                elements.append(self.visit(element))
+        node.elts = elements
+        return node
+
+
+def renderer_statements(statements, helpers, specifications, expressions):
+    expanded = []
+    for statement in statements:
+        value = statement.value if isinstance(statement, (ast.Expr, ast.Assign)) else None
+        if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id in helpers:
+            name = value.func.id
+            kind = specifications[name][0]
+            renderer_call_binding(value, specifications)
+            body = helpers[name].body
+            if kind == "void" and isinstance(statement, ast.Expr):
+                expanded.extend(renderer_statements(body, helpers, specifications, expressions))
+                continue
+            if kind == "bind" and isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+                target = statement.targets[0]
+                returned = body[-1].value
+                if (
+                    not isinstance(target, ast.Tuple)
+                    or any(not isinstance(node, ast.Name) for node in (*target.elts, *returned.elts))
+                    or tuple(node.id for node in target.elts) != tuple(node.id for node in returned.elts)
+                ):
+                    raise AssertionError("renderer tuple result must bind the exact original locals")
+                expanded.extend(renderer_statements(body[:-1], helpers, specifications, expressions))
+                continue
+            if kind != "tuple":
+                raise AssertionError(f"renderer phase is in the wrong caller scope: {name}")
+        expanded.append(expressions.visit(copy.deepcopy(statement)))
+    return expanded
+
+
+def restored_generator(text, specifications=None, root_name="render_fixture"):
+    specifications = GENERATOR_HELPERS if specifications is None else specifications
+    module = ast.parse(text)
+    helpers = renderer_helper_nodes(module, specifications)
+    roots = [
+        node for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == root_name
+    ]
+    if len(roots) != 1:
+        raise AssertionError("renderer needs one original entry owner")
+    root = roots[0]
+    root.body = renderer_statements(
+        root.body, helpers, specifications, RendererTupleProjection(helpers, specifications),
+    )
+    module.body = [
+        node for node in module.body
+        if not isinstance(node, ast.FunctionDef) or node.name not in specifications
+    ]
+    return module
+
+
 class RamfsSourceLayoutTest(unittest.TestCase):
     maxDiff = None
 
@@ -1316,7 +1473,20 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertFalse(any(path.is_symlink() for path in (ROOT / "servers/ramfs/seed").rglob("*")))
 
     def test_generator_is_frozen_before_its_semantic_split(self):
-        self.assertEqual(BASELINE_GENERATOR, digest_bytes(source(GENERATOR_PATH).encode()))
+        text = source(GENERATOR_PATH)
+        if (6, "render_fixture") in LONG_FUNCTION_MIGRATION:
+            self.assertEqual(BASELINE_GENERATOR, digest_bytes(text.encode()))
+        else:
+            self.assertEqual(BASELINE_GENERATOR_AST, ast_digest(restored_generator(text)))
+
+    def test_generator_exposes_descriptor_budget_image_and_explicit_role_tasks(self):
+        functions = {
+            node.name: node for node in ast.parse(source(GENERATOR_PATH)).body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.assertEqual({"render_fixture", "parse_arguments", "main", *GENERATOR_HELPERS}, set(functions))
+        for name, node in functions.items():
+            self.assertLessEqual(node.end_lineno - node.lineno + 1, 120, name)
 
     def test_fixture_output_matches_the_independent_reviewed_base_record(self):
         from tests.host.test_generate_bootstrap_fixture import bootstrap_image
@@ -1619,6 +1789,63 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         ):
             with self.subTest(changed=changed):
                 self.assertNotEqual(body_tokens(expected), write_body_tokens(caller, changed))
+
+    def test_renderer_projection_preserves_order_bindings_single_publication_and_exits(self):
+        specifications = {
+            "_bind": ("bind", ("image",)),
+            "_check": ("void", ("descriptor",)),
+            "_entry": ("tuple", ("limit",)),
+            "_manifest": ("tuple", ("limit",)),
+        }
+        outlined = '''
+def _bind(image):
+    descriptor = validate(image)
+    return (descriptor,)
+def _check(descriptor):
+    if descriptor is None:
+        raise Error("bad")
+def _entry(limit):
+    return ("role", f"{limit}")
+def _manifest(limit):
+    return ("header", *_entry(limit), "footer")
+def render_fixture(image, limit):
+    (descriptor,) = _bind(image)
+    _check(descriptor)
+    output = []
+    output.extend(_manifest(limit))
+    return "\\n".join(output)
+'''
+        original = '''
+def render_fixture(image, limit):
+    descriptor = validate(image)
+    if descriptor is None:
+        raise Error("bad")
+    output = []
+    output.extend(("header", "role", f"{limit}", "footer"))
+    return "\\n".join(output)
+'''
+        expected = ast_digest(ast.parse(original))
+        self.assertEqual(expected, ast_digest(restored_generator(outlined, specifications)))
+        for changed in (
+            outlined.replace("_check(descriptor)\n    output", "_check(image)\n    output"),
+            outlined.replace("return (descriptor,)", "return (image,)"),
+            outlined.replace('raise Error("bad")', "return"),
+            outlined.replace('return ("role",', 'effect()\n    return ("role",'),
+            outlined.replace("def _entry(limit):", "def _entry(limit=effect()):"),
+            outlined.replace("def _entry(limit):", "@effect()\ndef _entry(limit):"),
+            outlined.replace("*_entry(limit)", "*_manifest(limit)"),
+            outlined + "\ndef _entry(limit):\n    return ()\n",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restored_generator(changed, specifications)
+        for changed in (
+            outlined.replace('"header", *_entry(limit)', '*_entry(limit), "header"'),
+            outlined.replace('f"{limit}"', 'f"{limit + 1}"'),
+            outlined.replace('raise Error("bad")', 'raise Error("other")'),
+            outlined.replace("output.extend(_manifest(limit))", "output.extend(_entry(limit))"),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(expected, ast_digest(restored_generator(changed, specifications)))
 
 
 if __name__ == "__main__":

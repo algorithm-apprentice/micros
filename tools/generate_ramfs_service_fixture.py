@@ -18,7 +18,7 @@ BOOTSTRAP_TOTAL_USER_PAGE_LIMIT = 4096
 TTY_UART_VIRTUAL_BASE = 0x000000007FFFE000
 
 
-def render_fixture(
+def _validated_descriptors(
     launcher_image,
     vm_image,
     pm_image,
@@ -50,6 +50,23 @@ def render_fixture(
         vfs_image,
         "vfs",
     )
+    return (
+        launcher,
+        vm,
+        pm,
+        tty,
+        ramfs,
+        vfs,
+    )
+
+def _validate_topology(
+    launcher,
+    vm,
+    pm,
+    tty,
+    ramfs,
+    vfs,
+):
     if vm["vm_boot_info_address"] == 0:
         raise check_user_elf.ElfFormatError(
             "VM image has no boot-information object"
@@ -74,6 +91,14 @@ def render_fixture(
             "RAMFS resident page limit exceeded"
         )
 
+def _page_limits(
+    launcher,
+    vm,
+    pm,
+    tty,
+    ramfs,
+    vfs,
+):
     launcher_limit = launcher["page_count"] + 2
     vm_limit = vm["page_count"] + 1
     pm_limit = pm["page_count"] + 1
@@ -91,11 +116,24 @@ def render_fixture(
         raise check_user_elf.ElfFormatError(
             "aggregate user page limit exceeds 4096 pages"
         )
+    return (
+        launcher_limit,
+        vm_limit,
+        pm_limit,
+        tty_limit,
+        vfs_limit,
+        total_limit,
+    )
 
-    output = [
-        '#include "kernel/ramfs_service_test_fixture.h"',
-        "",
-    ]
+def _render_images(
+    output,
+    launcher,
+    vm,
+    pm,
+    tty,
+    ramfs,
+    vfs,
+):
     for descriptor in (launcher, vm, pm, tty, ramfs, vfs):
         output.extend(
             generate_bootstrap_fixture._render_segment_bytes(descriptor)
@@ -114,134 +152,233 @@ def render_fixture(
     output.extend(generate_bootstrap_fixture._render_image(tty, 104))
     output.extend(generate_bootstrap_fixture._render_image(ramfs, 105))
     output.extend(generate_bootstrap_fixture._render_image(vfs, 106))
+
+def _render_vfs_entry(vfs_limit):
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_VFS_SERVICE_ID,",
+        "                .image_id = 106,",
+        "                .process_slot = 5,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_VFS,",
+        '                .service_name = "ramfs-test-vfs",',
+        '                .profile_name = "VFS",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_RAMFS_TEST_RAMFS_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_RAMFS_TEST_READY_TIMEOUT,",
+        f"                .user_page_limit = {vfs_limit},",
+        "            },",
+    )
+
+def _render_launcher_entry(launcher_limit):
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_LAUNCHER_SERVICE_ID,",
+        "                .image_id = 101,",
+        "                .process_slot = 0,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = "
+        "MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,",
+        '                .service_name = "bootstrap-launcher",',
+        '                .profile_name = "BOOTSTRAP_LAUNCHER",',
+        f"                .user_page_limit = {launcher_limit},",
+        "                .role_flags = "
+        "MICROS_BOOTSTRAP_ROLE_CONTROLLER,",
+        "            },",
+    )
+
+def _render_ramfs_entry():
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_RAMFS_SERVICE_ID,",
+        "                .image_id = 105,",
+        "                .process_slot = 4,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_RAMFS,",
+        '                .service_name = "ramfs",',
+        '                .profile_name = "RAMFS",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_RAMFS_TEST_TTY_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_RAMFS_TEST_READY_TIMEOUT,",
+        "                .user_page_limit = "
+        "MICROS_RAMFS_RESIDENT_PAGE_LIMIT,",
+        "            },",
+    )
+
+def _render_tty_entry(tty_limit):
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_TTY_SERVICE_ID,",
+        "                .image_id = 104,",
+        "                .process_slot = 3,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_TTY,",
+        '                .service_name = "tty",',
+        '                .profile_name = "TTY",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_RAMFS_TEST_PM_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_RAMFS_TEST_READY_TIMEOUT,",
+        f"                .user_page_limit = {tty_limit},",
+        "                .role_flags = "
+        "MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER,",
+        "                .irq_source = "
+        "MICROS_TTY_UART_IRQ_SOURCE,",
+        "                .device_base = "
+        "MICROS_TTY_UART_PHYSICAL_BASE,",
+        "                .device_length = "
+        "MICROS_TTY_UART_MAPPED_LENGTH,",
+        "            },",
+    )
+
+def _render_pm_entry(pm_limit):
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_PM_SERVICE_ID,",
+        "                .image_id = 103,",
+        "                .process_slot = 2,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_PM,",
+        '                .service_name = "pm",',
+        '                .profile_name = "PM",',
+        "                .prerequisites = "
+        "UINT64_C(1) << "
+        "(MICROS_RAMFS_TEST_VM_SERVICE_ID - 1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_RAMFS_TEST_READY_TIMEOUT,",
+        f"                .user_page_limit = {pm_limit},",
+        "                .role_flags = MICROS_BOOTSTRAP_ROLE_PM,",
+        "            },",
+    )
+
+def _render_vm_entry(vm_limit):
+    return (
+        "            {",
+        "                .service_id = "
+        "MICROS_RAMFS_TEST_VM_SERVICE_ID,",
+        "                .image_id = 102,",
+        "                .process_slot = 1,",
+        "                .stack_page_count = 1,",
+        "                .profile_id = MICROS_PRIVILEGE_PROFILE_VM,",
+        '                .service_name = "vm",',
+        '                .profile_name = "VM",',
+        "                .prerequisites = UINT64_C(1),",
+        "                .ready_timeout_counter_ticks = "
+        "MICROS_RAMFS_TEST_READY_TIMEOUT,",
+        f"                .user_page_limit = {vm_limit},",
+        "                .role_flags = MICROS_BOOTSTRAP_ROLE_VM,",
+        "            },",
+    )
+
+def _render_report(vfs):
+    return (
+        "const uint64_t micros_ramfs_service_test_report_address =",
+        "    UINT64_C("
+        f"0x{vfs['symbols'][REPORT_SYMBOL].value:016x}"
+        ");",
+        "",
+    )
+
+def _render_manifest(
+    launcher_limit,
+    vm_limit,
+    pm_limit,
+    tty_limit,
+    vfs_limit,
+    total_limit,
+    vfs,
+):
+    return (
+        "};",
+        "",
+        "const struct micros_bootstrap_manifest",
+        "    micros_ramfs_service_test_manifest = {",
+        "        .header = {",
+        "            .magic = MICROS_BOOTSTRAP_MANIFEST_MAGIC,",
+        "            .version = MICROS_BOOTSTRAP_MANIFEST_VERSION,",
+        "            .header_size = MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE,",
+        "            .entry_size = MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE,",
+        "            .entry_capacity = MICROS_BOOTSTRAP_SERVICE_CAPACITY,",
+        "            .entry_count = MICROS_RAMFS_TEST_SERVICE_COUNT,",
+        f"            .total_user_page_limit = {total_limit},",
+        "            .manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE,",
+        "        },",
+        "        .entries = {",
+        *_render_vfs_entry(vfs_limit),
+        *_render_launcher_entry(launcher_limit),
+        *_render_ramfs_entry(),
+        *_render_tty_entry(tty_limit),
+        *_render_pm_entry(pm_limit),
+        *_render_vm_entry(vm_limit),
+        "        },",
+        "    };",
+        "",
+        *_render_report(vfs),
+    )
+
+def render_fixture(
+    launcher_image,
+    vm_image,
+    pm_image,
+    tty_image,
+    ramfs_image,
+    vfs_image,
+):
+    (
+        launcher,
+        vm,
+        pm,
+        tty,
+        ramfs,
+        vfs,
+    ) = _validated_descriptors(
+        launcher_image,
+        vm_image,
+        pm_image,
+        tty_image,
+        ramfs_image,
+        vfs_image,
+    )
+    _validate_topology(launcher, vm, pm, tty, ramfs, vfs)
+    (
+        launcher_limit,
+        vm_limit,
+        pm_limit,
+        tty_limit,
+        vfs_limit,
+        total_limit,
+    ) = _page_limits(
+        launcher,
+        vm,
+        pm,
+        tty,
+        ramfs,
+        vfs,
+    )
+    output = [
+        '#include "kernel/ramfs_service_test_fixture.h"',
+        "",
+    ]
+    _render_images(output, launcher, vm, pm, tty, ramfs, vfs)
     output.extend(
-        (
-            "};",
-            "",
-            "const struct micros_bootstrap_manifest",
-            "    micros_ramfs_service_test_manifest = {",
-            "        .header = {",
-            "            .magic = MICROS_BOOTSTRAP_MANIFEST_MAGIC,",
-            "            .version = MICROS_BOOTSTRAP_MANIFEST_VERSION,",
-            "            .header_size = MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE,",
-            "            .entry_size = MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE,",
-            "            .entry_capacity = MICROS_BOOTSTRAP_SERVICE_CAPACITY,",
-            "            .entry_count = MICROS_RAMFS_TEST_SERVICE_COUNT,",
-            f"            .total_user_page_limit = {total_limit},",
-            "            .manifest_size = MICROS_BOOTSTRAP_MANIFEST_SIZE,",
-            "        },",
-            "        .entries = {",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_VFS_SERVICE_ID,",
-            "                .image_id = 106,",
-            "                .process_slot = 5,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_VFS,",
-            '                .service_name = "ramfs-test-vfs",',
-            '                .profile_name = "VFS",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_RAMFS_TEST_RAMFS_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_RAMFS_TEST_READY_TIMEOUT,",
-            f"                .user_page_limit = {vfs_limit},",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_LAUNCHER_SERVICE_ID,",
-            "                .image_id = 101,",
-            "                .process_slot = 0,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = "
-            "MICROS_PRIVILEGE_PROFILE_BOOTSTRAP_LAUNCHER,",
-            '                .service_name = "bootstrap-launcher",',
-            '                .profile_name = "BOOTSTRAP_LAUNCHER",',
-            f"                .user_page_limit = {launcher_limit},",
-            "                .role_flags = "
-            "MICROS_BOOTSTRAP_ROLE_CONTROLLER,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_RAMFS_SERVICE_ID,",
-            "                .image_id = 105,",
-            "                .process_slot = 4,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_RAMFS,",
-            '                .service_name = "ramfs",',
-            '                .profile_name = "RAMFS",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_RAMFS_TEST_TTY_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_RAMFS_TEST_READY_TIMEOUT,",
-            "                .user_page_limit = "
-            "MICROS_RAMFS_RESIDENT_PAGE_LIMIT,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_TTY_SERVICE_ID,",
-            "                .image_id = 104,",
-            "                .process_slot = 3,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_TTY,",
-            '                .service_name = "tty",',
-            '                .profile_name = "TTY",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_RAMFS_TEST_PM_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_RAMFS_TEST_READY_TIMEOUT,",
-            f"                .user_page_limit = {tty_limit},",
-            "                .role_flags = "
-            "MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER,",
-            "                .irq_source = "
-            "MICROS_TTY_UART_IRQ_SOURCE,",
-            "                .device_base = "
-            "MICROS_TTY_UART_PHYSICAL_BASE,",
-            "                .device_length = "
-            "MICROS_TTY_UART_MAPPED_LENGTH,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_PM_SERVICE_ID,",
-            "                .image_id = 103,",
-            "                .process_slot = 2,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_PM,",
-            '                .service_name = "pm",',
-            '                .profile_name = "PM",',
-            "                .prerequisites = "
-            "UINT64_C(1) << "
-            "(MICROS_RAMFS_TEST_VM_SERVICE_ID - 1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_RAMFS_TEST_READY_TIMEOUT,",
-            f"                .user_page_limit = {pm_limit},",
-            "                .role_flags = MICROS_BOOTSTRAP_ROLE_PM,",
-            "            },",
-            "            {",
-            "                .service_id = "
-            "MICROS_RAMFS_TEST_VM_SERVICE_ID,",
-            "                .image_id = 102,",
-            "                .process_slot = 1,",
-            "                .stack_page_count = 1,",
-            "                .profile_id = MICROS_PRIVILEGE_PROFILE_VM,",
-            '                .service_name = "vm",',
-            '                .profile_name = "VM",',
-            "                .prerequisites = UINT64_C(1),",
-            "                .ready_timeout_counter_ticks = "
-            "MICROS_RAMFS_TEST_READY_TIMEOUT,",
-            f"                .user_page_limit = {vm_limit},",
-            "                .role_flags = MICROS_BOOTSTRAP_ROLE_VM,",
-            "            },",
-            "        },",
-            "    };",
-            "",
-            "const uint64_t micros_ramfs_service_test_report_address =",
-            "    UINT64_C("
-            f"0x{vfs['symbols'][REPORT_SYMBOL].value:016x}"
-            ");",
-            "",
+        _render_manifest(
+            launcher_limit,
+            vm_limit,
+            pm_limit,
+            tty_limit,
+            vfs_limit,
+            total_limit,
+            vfs,
         )
     )
     return "\n".join(output)
