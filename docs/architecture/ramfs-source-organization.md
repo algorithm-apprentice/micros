@@ -493,10 +493,14 @@ private contracts; the active owner collection is a literal empty tuple.
 The facade now exposes a 68-line typed operation dispatcher and 78-line
 public orchestration root. Its bounded phase projection reconstructs the
 complete immutable original body, including default failure, result bindings,
-caller error propagation, final validation, and reply order. Fifteen C plus
-one Python semantic migrations remain pending, alongside the specified
-shorter-operation outlines. Completing source ownership alone does not
-complete this implementation.
+caller error propagation, final validation, and reply order. Write now has a
+102-line checked staging root and 55-line atomic commit task. Its exact
+tail-call projection preserves the original allocation/data/size/result
+order, scratch clearing, and invariant-only failure after possible mutation;
+the node pointer and independently reset loop counter remain automatic.
+Fourteen C plus one Python semantic migrations remain pending, alongside
+the specified shorter-operation outlines. Completing source ownership alone
+does not complete this implementation.
 
 Use immutable base-derived body/condition/call/effect records. Private
 renaming and verified typed transport of existing locals may be normalized;

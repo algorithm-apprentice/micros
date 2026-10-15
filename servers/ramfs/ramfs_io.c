@@ -107,6 +107,62 @@ enum micros_ramfs_core_error ramfs_handle_read(
     return MICROS_RAMFS_CORE_OK;
 }
 
+static enum micros_ramfs_core_error commit_write(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result,
+    uint16_t slot,
+    uint64_t write_end,
+    size_t first_logical,
+    size_t last_logical
+)
+{
+    struct micros_ramfs_node *node;
+    size_t logical;
+
+    node = &state->nodes[slot];
+    for (logical = first_logical; logical <= last_logical; ++logical) {
+        if (node->blocks[logical] == MICROS_RAMFS_BLOCK_NONE) {
+            uint16_t block;
+
+            if (!ramfs_find_free_block(state, &block)) {
+                ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
+            }
+            ramfs_zero_bytes(
+                state->data[block],
+                MICROS_RAMFS_BLOCK_SIZE
+            );
+            node->blocks[logical] = block;
+            state->block_owner[block] = slot;
+            state->block_logical[block] = (uint16_t)logical;
+            ++state->allocated_block_count;
+        }
+    }
+    for (logical = 0; logical < request->count; ++logical) {
+        uint64_t file_position = request->file_offset + logical;
+        size_t logical_block = (size_t)(
+            file_position / MICROS_RAMFS_BLOCK_SIZE
+        );
+        size_t block_offset = (size_t)(
+            file_position % MICROS_RAMFS_BLOCK_SIZE
+        );
+        uint16_t block = node->blocks[logical_block];
+
+        state->data[block][block_offset] = state->scratch[logical];
+    }
+    if (write_end > node->size) {
+        node->size = write_end;
+    }
+    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+    fields->file_size = node->size;
+    fields->position = write_end;
+    fields->count = request->count;
+    *result = MICROS_RAMFS_RESULT_OK;
+    return MICROS_RAMFS_CORE_OK;
+}
+
 enum micros_ramfs_core_error ramfs_handle_write(
     struct micros_ramfs_state *state,
     const struct micros_ramfs_request *request,
@@ -116,7 +172,6 @@ enum micros_ramfs_core_error ramfs_handle_write(
 )
 {
     const struct micros_ramfs_node *resolved_node;
-    struct micros_ramfs_node *node;
     uint16_t slot;
     uint64_t write_end;
     size_t first_logical;
@@ -199,44 +254,14 @@ enum micros_ramfs_core_error ramfs_handle_write(
         return MICROS_RAMFS_CORE_ERROR_INVARIANT;
     }
 
-    node = &state->nodes[slot];
-    for (logical = first_logical; logical <= last_logical; ++logical) {
-        if (node->blocks[logical] == MICROS_RAMFS_BLOCK_NONE) {
-            uint16_t block;
-
-            if (!ramfs_find_free_block(state, &block)) {
-                ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-                return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-            }
-            ramfs_zero_bytes(
-                state->data[block],
-                MICROS_RAMFS_BLOCK_SIZE
-            );
-            node->blocks[logical] = block;
-            state->block_owner[block] = slot;
-            state->block_logical[block] = (uint16_t)logical;
-            ++state->allocated_block_count;
-        }
-    }
-    for (logical = 0; logical < request->count; ++logical) {
-        uint64_t file_position = request->file_offset + logical;
-        size_t logical_block = (size_t)(
-            file_position / MICROS_RAMFS_BLOCK_SIZE
-        );
-        size_t block_offset = (size_t)(
-            file_position % MICROS_RAMFS_BLOCK_SIZE
-        );
-        uint16_t block = node->blocks[logical_block];
-
-        state->data[block][block_offset] = state->scratch[logical];
-    }
-    if (write_end > node->size) {
-        node->size = write_end;
-    }
-    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-    fields->file_size = node->size;
-    fields->position = write_end;
-    fields->count = request->count;
-    *result = MICROS_RAMFS_RESULT_OK;
-    return MICROS_RAMFS_CORE_OK;
+    return commit_write(
+        state,
+        request,
+        fields,
+        result,
+        slot,
+        write_end,
+        first_logical,
+        last_logical
+    );
 }

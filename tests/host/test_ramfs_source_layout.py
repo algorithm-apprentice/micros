@@ -280,7 +280,8 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = tuple(
-    entry for entry in LONG_FUNCTIONS if entry != (0, "micros_ramfs_handle_call")
+    entry for entry in LONG_FUNCTIONS
+    if entry not in ((0, "micros_ramfs_handle_call"), (0, "handle_write"))
 )
 
 # BEGIN IMMUTABLE BASELINE DATA
@@ -748,11 +749,58 @@ def dispatcher_body_tokens(caller, phase):
     return tuple(caller[:position] + expanded + caller[position + len(call):])
 
 
+def write_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    call = list(body_tokens(
+        "return commit_write(state, request, fields, result, slot, write_end, first_logical, last_logical);"
+    ))
+    if caller[-len(call) - 1:-1] != call or caller.count("commit_write") != 1:
+        raise AssertionError("write must return the exact atomic commit outcome without continuation")
+    declarations = list(body_tokens("struct micros_ramfs_node *node; size_t logical;"))
+    if phase[:1] != ["{"] or phase[-1:] != ["}"] or phase[1:1 + len(declarations)] != declarations:
+        raise AssertionError("write commit must own only the existing typed automatic node/counter")
+    inner = phase[1 + len(declarations):-1]
+    first_assignment = list(body_tokens(
+        "node = &state->nodes[slot]; for (logical = first_logical; logical <= last_logical; ++logical) {"
+    ))
+    if inner[:len(first_assignment)] != first_assignment:
+        raise AssertionError("commit must bind the resolved node and reset its own counter before use")
+    if any(
+        token == "node" and caller[index - 1:index] != ["."]
+        and caller[max(0, index - 2):index] != ["-", ">"]
+        for index, token in enumerate(caller)
+    ):
+        raise AssertionError("caller must not retain a second commit-node temporary")
+    loop_declaration = list(body_tokens("size_t logical;"))
+    counters = [
+        index for index in range(len(caller))
+        if caller[index:index + len(loop_declaration)] == loop_declaration
+    ]
+    if len(counters) != 1 or caller[counters[0] - 1:counters[0]] != [";"]:
+        raise AssertionError("preflight retains its one original automatic counter")
+    anchor = list(body_tokens("const struct micros_ramfs_node *resolved_node;"))
+    positions = [
+        index for index in range(len(caller))
+        if caller[index:index + len(anchor)] == anchor
+    ]
+    if positions != [1]:
+        raise AssertionError("original referenced-node preflight declaration must remain first")
+    expanded = caller[:-len(call) - 1] + inner + ["}"]
+    insertion = positions[0] + len(anchor)
+    node_declaration = list(body_tokens("struct micros_ramfs_node *node;"))
+    expanded[insertion:insertion] = node_declaration
+    return tuple(expanded)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
         phase = c_function_body(source(family_paths(0)[0]), "dispatch_request")
         tokens = dispatcher_body_tokens(text, phase)
+    if family == 0 and name == "handle_write" and (0, name) not in LONG_FUNCTION_MIGRATION:
+        phase = c_function_body(source(family_paths(0)[6]), "commit_write")
+        tokens = write_body_tokens(text, phase)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1226,6 +1274,24 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
 
+    def test_write_exposes_a_typed_atomic_commit_after_checked_staging(self):
+        text = source(family_paths(0)[6])
+        definitions = c_function_definitions(text)
+        self.assertIn("commit_write", definitions)
+        self.assertLessEqual(definitions["commit_write"], 120)
+        self.assertLessEqual(definitions["ramfs_handle_write"], 120)
+        signature = re.findall(
+            r"(?m)^static enum micros_ramfs_core_error commit_write\([^;{}]*\)\s*\{", text,
+        )
+        self.assertEqual(1, len(signature))
+        expected = (
+            "static enum micros_ramfs_core_error commit_write("
+            "struct micros_ramfs_state *state, const struct micros_ramfs_request *request, "
+            "struct ramfs_result_fields *fields, enum micros_ramfs_result *result, "
+            "uint16_t slot, uint64_t write_end, size_t first_logical, size_t last_logical) {"
+        )
+        self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
         for family in range(6):
@@ -1512,6 +1578,47 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             body_tokens(expected),
             dispatcher_body_tokens(caller.replace("return error;", "return CORE_OK;"), phase),
         )
+
+    def test_write_projection_preserves_partial_commit_failure_and_immediate_caller_return(self):
+        caller = (
+            "{ const struct micros_ramfs_node *resolved_node; size_t logical; preflight(); "
+            "return commit_write(state, request, fields, result, slot, write_end, first_logical, last_logical); }"
+        )
+        phase = (
+            "{ struct micros_ramfs_node *node; size_t logical; "
+            "node = &state->nodes[slot]; "
+            "for (logical = first_logical; logical <= last_logical; ++logical) { "
+            "reserve(); if (!free_block()) { clear(); return INVARIANT; } } "
+            "publish(); return CORE_OK; }"
+        )
+        expected = (
+            "{ const struct micros_ramfs_node *resolved_node; struct micros_ramfs_node *node; "
+            "size_t logical; preflight(); node = &state->nodes[slot]; "
+            "for (logical = first_logical; logical <= last_logical; ++logical) { "
+            "reserve(); if (!free_block()) { clear(); return INVARIANT; } } "
+            "publish(); return CORE_OK; }"
+        )
+        self.assertEqual(body_tokens(expected), write_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("return commit_write", "commit_write"),
+            caller.replace("slot, write_end", "other, write_end"),
+            caller.replace("size_t logical", "static size_t logical"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                write_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("size_t logical", "static size_t logical"),
+            phase.replace("logical = first_logical", "logical += first_logical"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                write_body_tokens(caller, changed)
+        for changed in (
+            phase.replace("return INVARIANT", "return CORE_OK"),
+            phase.replace("clear(); return INVARIANT", "return INVARIANT"),
+            phase.replace("reserve(); if", "if"),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(body_tokens(expected), write_body_tokens(caller, changed))
 
 
 if __name__ == "__main__":
