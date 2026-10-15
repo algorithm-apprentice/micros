@@ -24,6 +24,11 @@ REVIEWED_BASE = "7e107f5189cbf6f3aa44dfc05652d041e803c60c"
 BASE_CMAKE_DIGEST = "cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da28dd6"
 BASE_CTOKENS_AST = "3e378fcb1e32c96d05240c3d80401d159715196d92de372d8ca92cdddd9a3cd8"
 MODEL_TYPES_DIGEST = "d6da66f1eb42b10fd121f8316a01b5cedbf6c80bb31696a5b3693779f349fb2e"
+MODEL_OPERATION_NAMES_DIGEST = "7978fb4c6b345f5f3a67f77f681acedd35a62e5b97bd49c5b62899e8b96a8083"
+MODEL_CONTEXT_FIELDS = ("registry", "objects", "hart", "trace", "trace_count")
+MODEL_CONTEXT_HELPERS = {
+    "record_transition": False, "model_fail": False, "setup_fixture": True, "validate_model": False,
+}
 NATIVE_ASSERTION_DIGEST = "a6a8819676540e04acd7f9d209aacfca43a90794c5f37f5462f32b2b91d205a1"
 NATIVE_CONTEXT_FIELDS = ("registry", "objects", "processes", "threads", "hart")
 NATIVE_CONTEXT_CASES = (
@@ -172,9 +177,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     (family, name) for family, owners in ORIGINAL_FUNCTIONS.items()
     for owner, names in owners.items() if owner != 0 for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    pair for pair in INITIAL_SYMBOL_OWNER_MIGRATION if pair[0] == 2
-)
+SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 CORE_DAG = {
     0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
@@ -346,6 +349,11 @@ def normal_names(family):
         return {private_name(name): name for name in CORE_PRIVATE_EXPORTS}
     if family == 1:
         return {native_name(name): name for names in ORIGINAL_FUNCTIONS[1].values() for name in names}
+    if family == 2:
+        return {
+            "endpoint_model_" + name: name for names in ORIGINAL_FUNCTIONS[2].values() for name in names
+            if name != "micros_endpoint_model_test_run"
+        }
     return {}
 
 
@@ -372,6 +380,10 @@ def original_locations(family):
             if path != family_paths(1)[1]:
                 raise AssertionError("native fixture getter has one exact owner")
             continue
+        if family == 2 and spelling == "endpoint_model_context":
+            if path != family_paths(2)[1]:
+                raise AssertionError("model fixture getter has one separate exact owner")
+            continue
         name = renames.get(spelling, spelling)
         if name not in expected or name in locations:
             raise AssertionError(f"unknown/duplicate original or unreviewed phase: {family}/{spelling}")
@@ -379,6 +391,27 @@ def original_locations(family):
     if set(locations) != expected:
         raise AssertionError("missing original definitions")
     return locations
+
+
+def fixture_field_tokens(body, fields):
+    body = list(body)
+    result = []
+    index = 0
+    while index < len(body):
+        if body[index:index + 2] == ["fixture", "->"]:
+            if index != 0 and body[index - 1] in (".", "->"):
+                raise AssertionError("fixture transport cannot qualify a structure member as a global root")
+            field = body[index + 2:index + 3]
+            if not field or field[0] not in fields:
+                raise AssertionError("fixture may transport only its five original fields")
+            result.extend(field)
+            index += 3
+        else:
+            if body[index] == "fixture":
+                raise AssertionError("fixture cannot be copied, blanket-cleared, published or retained")
+            result.append(body[index])
+            index += 1
+    return tuple(result)
 
 
 def native_fixture_body_tokens(name, body):
@@ -395,22 +428,35 @@ def native_fixture_body_tokens(name, body):
         if body[index:index + len(call)] == call:
             result.extend(tokens("setup_lifecycle_fixture()"))
             index += len(call)
-        elif body[index:index + 2] == ["setup_lifecycle_fixture", "("]:
-            raise AssertionError("native setup must receive the exact borrowed fixture")
-        elif body[index:index + 2] == ["fixture", "->"]:
-            if index != 0 and body[index - 1] in (".", "->"):
-                raise AssertionError("fixture transport cannot qualify a structure member as a global root")
-            field = body[index + 2:index + 3]
-            if not field or field[0] not in NATIVE_CONTEXT_FIELDS:
-                raise AssertionError("native fixture may transport only the five original fields")
-            result.extend(field)
-            index += 3
         else:
-            if body[index] == "fixture":
-                raise AssertionError("native fixture cannot be copied, blanket-cleared, published or retained")
+            if body[index:index + 2] == ["setup_lifecycle_fixture", "("]:
+                raise AssertionError("native setup must receive the exact borrowed fixture")
             result.append(body[index])
             index += 1
-    return tuple(result)
+    return fixture_field_tokens(result, NATIVE_CONTEXT_FIELDS)
+
+
+def model_fixture_body_tokens(name, body):
+    body = list(body)
+    borrow = list(tokens("struct endpoint_model_fixture *fixture = endpoint_model_context();"))
+    if name == "micros_endpoint_model_test_run":
+        if body[:1 + len(borrow)] != ["{"] + borrow:
+            raise AssertionError("model entry borrows only its separate existing production/trace fixture")
+        del body[1:1 + len(borrow)]
+    result = []
+    index = 0
+    while index < len(body):
+        token = body[index]
+        if token in MODEL_CONTEXT_HELPERS and body[index + 1:index + 2] == ["("]:
+            delimiter = ")" if MODEL_CONTEXT_HELPERS[token] else ","
+            if body[index + 2:index + 4] != ["fixture", delimiter]:
+                raise AssertionError("model helper must receive the exact fixture as first argument")
+            result.extend((token, "("))
+            index += 3 if delimiter == ")" else 4
+        else:
+            result.append(token)
+            index += 1
+    return fixture_field_tokens(result, MODEL_CONTEXT_FIELDS)
 
 
 def original_body_digest(family, name, text):
@@ -420,6 +466,10 @@ def original_body_digest(family, name, text):
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
     ):
         body = native_fixture_body_tokens(name, body)
+    if family == 2 and any(
+        spelling == "endpoint_model_context" for _, spelling in owned_definitions(2)
+    ):
+        body = model_fixture_body_tokens(name, body)
     return digest_bytes(json.dumps(body, separators=(",", ":")).encode())
 
 
@@ -619,7 +669,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 self.assertNotIn("endpoint_test_context(", c_function_body(text, spelling), name)
         setup = c_function_body(fixture, native_name("setup_lifecycle_fixture"))
         self.assertNotIn("sizeof(*fixture)", setup)
-        self.assertNotIn("memset(fixture", setup)
+        self.assertNotRegex(setup, r"\bmemset\s*\(\s*fixture\s*,")
         self.assertEqual({}, c_function_definitions(header))
         self.assertNotIn('"kernel/endpoint_private.h"', header)
 
@@ -647,6 +697,83 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 native_fixture_body_tokens(name, tokens(changed))
         changed = current.replace("return false;", "return true;")
         self.assertNotEqual(tokens(expected), native_fixture_body_tokens(name, tokens(changed)))
+
+    def test_model_fixture_preserves_types_separate_storage_trace_data_and_exact_resets(self):
+        header = source(PRIVATE_HEADERS[2])
+        fields = re.findall(r"struct endpoint_model_fixture\s*\{([^{}]*)\}", header)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(tokens(
+            "struct micros_endpoint_registry registry; struct micros_kernel_objects objects; "
+            "struct micros_hart_handle hart; struct model_trace_entry trace[MODEL_TRACE_COUNT]; size_t trace_count;"
+        ), tokens(fields[0]))
+        type_block = header[header.index("enum {"):header.index("struct endpoint_model_fixture {")]
+        self.assertEqual(MODEL_TYPES_DIGEST, body_digest(type_block))
+        fixture = source(family_paths(2)[1])
+        self.assertEqual(
+            tokens("{ return &model_fixture_state; }"),
+            tokens(c_function_body(fixture, "endpoint_model_context")),
+        )
+        start = fixture.index("static const char *const operation_names[")
+        raw_names = fixture[start:fixture.index("};", start) + 2]
+        self.assertEqual(MODEL_OPERATION_NAMES_DIGEST, body_digest(raw_names))
+        for path in family_paths(2):
+            objects = list(file_scope_objects(source(path)))
+            if path == family_paths(2)[1]:
+                prefix = tokens("static const char *const operation_names[")
+                names = [declaration for declaration in objects if tokens(declaration)[:len(prefix)] == prefix]
+                self.assertEqual(1, len(names))
+                objects.remove(names[0])
+            expected = ("static struct endpoint_model_fixture model_fixture_state;",) if path == family_paths(2)[1] else ()
+            self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, objects)))
+            self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
+        self.assertEqual(16, len(owned_definitions(2)))
+        for name, (path, spelling) in original_locations(2).items():
+            body = c_function_body(source(path), spelling)
+            if name == "micros_endpoint_model_test_run":
+                self.assertEqual(1, body.count("endpoint_model_context()"))
+                self.assertIn("struct model_slot model[MODEL_SLOT_COUNT];", body)
+                self.assertIn("struct model_coverage coverage;", body)
+            else:
+                self.assertNotIn("endpoint_model_context(", body)
+        setup = c_function_body(fixture, "endpoint_model_setup_fixture")
+        self.assertNotRegex(setup, r"\bmemset\s*\(\s*fixture\s*,")
+        self.assertNotIn("sizeof(*fixture)", setup)
+        self.assertNotIn("memset(&fixture->hart", setup)
+        self.assertEqual({}, c_function_definitions(header))
+
+    def test_model_transport_retains_caller_bindings_trace_and_reference_lifetime(self):
+        current = (
+            "{ struct endpoint_model_fixture *fixture = endpoint_model_context(); "
+            "struct model_slot model[SLOTS]; memset(model, 0, sizeof(model)); "
+            "if (!setup_fixture(fixture)) { return false; } "
+            "record_transition(fixture, step, operation, slot, value); "
+            "if (!validate_model(fixture, model, step, operation, value)) { return false; } "
+            "if (bad()) { return model_fail(fixture, step, operation, value, \"failed\"); } "
+            "check(fixture->objects.threads[index], fixture->trace_count); return true; }"
+        )
+        expected = (
+            "{ struct model_slot model[SLOTS]; memset(model, 0, sizeof(model)); "
+            "if (!setup_fixture()) { return false; } record_transition(step, operation, slot, value); "
+            "if (!validate_model(model, step, operation, value)) { return false; } "
+            "if (bad()) { return model_fail(step, operation, value, \"failed\"); } "
+            "check(objects.threads[index], trace_count); return true; }"
+        )
+        self.assertEqual(
+            tokens(expected), model_fixture_body_tokens("micros_endpoint_model_test_run", tokens(current)),
+        )
+        for changed in (
+            current.replace("record_transition(fixture,", "record_transition(other,"),
+            current.replace("setup_fixture(fixture)", "setup_fixture(fixture, model)"),
+            current.replace("fixture->trace_count", "fixture->unknown"),
+            current.replace("fixture->objects.threads", "fixture->objects.fixture->trace"),
+            current.replace("return true;", "save(fixture); return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_fixture_body_tokens("micros_endpoint_model_test_run", tokens(changed))
+        self.assertNotEqual(
+            tokens(expected),
+            model_fixture_body_tokens("micros_endpoint_model_test_run", tokens(current.replace("return false;", "return true;", 1))),
+        )
 
     def test_all_four_classification_dimensions_and_host_gate_are_unchanged(self):
         qemu = [

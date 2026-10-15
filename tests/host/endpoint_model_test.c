@@ -1,487 +1,11 @@
-#include "micros/endpoint.h"
+#include "endpoint_model_internal.h"
 
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-enum {
-    MODEL_SLOT_COUNT = 4,
-    MODEL_STEPS = 4096,
-    MODEL_TRACE_COUNT = 32,
-};
-
-enum model_endpoint_phase {
-    MODEL_ENDPOINT_UNUSED = 0,
-    MODEL_ENDPOINT_RESERVED,
-    MODEL_ENDPOINT_PROFILED,
-    MODEL_ENDPOINT_ACTIVE,
-    MODEL_ENDPOINT_CLOSED,
-};
-
-enum model_operation {
-    MODEL_OPERATION_CREATE = 0,
-    MODEL_OPERATION_RESERVE,
-    MODEL_OPERATION_INSTALL,
-    MODEL_OPERATION_ACTIVATE,
-    MODEL_OPERATION_AUTHORIZE,
-    MODEL_OPERATION_CLOSE,
-    MODEL_OPERATION_RELEASE,
-    MODEL_OPERATION_STALE,
-    MODEL_OPERATION_COUNT,
-};
-
-struct model_slot {
-    bool process_live;
-    bool thread_live;
-    uint32_t generation;
-    struct micros_process_handle process;
-    struct micros_thread_handle thread;
-    enum model_endpoint_phase endpoint_phase;
-    micros_endpoint_t endpoint;
-    micros_endpoint_t stale_endpoint;
-    uint8_t profile;
-};
-
-struct model_coverage {
-    size_t create;
-    size_t release;
-    size_t reserve;
-    size_t reserve_rejected;
-    size_t install_client;
-    size_t install_server;
-    size_t install_invalid;
-    size_t activate;
-    size_t close;
-    size_t authorize_allowed;
-    size_t authorize_denied;
-    size_t authorize_state;
-    size_t notify_allowed;
-    size_t notify_denied;
-    size_t reply_allowed;
-    size_t reply_denied;
-    size_t reply_receive_allowed;
-    size_t reply_receive_denied;
-    size_t stale;
-};
-
-struct model_trace_entry {
-    size_t step;
-    enum model_operation operation;
-    size_t slot;
-    uint32_t value;
-};
-
-static const char *const operation_names[MODEL_OPERATION_COUNT] = {
-    "create",
-    "reserve",
-    "install",
-    "activate",
-    "authorize",
-    "close",
-    "release",
-    "stale",
-};
-
-static struct micros_endpoint_registry registry;
-static struct micros_kernel_objects objects;
-static struct micros_hart_handle hart;
-static struct model_trace_entry trace[MODEL_TRACE_COUNT];
-static size_t trace_count;
-
-bool micros_endpoint_model_test_run(void);
-
-static uint32_t next_random(uint32_t *state)
-{
-    *state = *state * UINT32_C(1664525) + UINT32_C(1013904223);
-    return *state;
-}
-
-static void record_transition(
-    size_t step,
-    enum model_operation operation,
-    size_t slot,
-    uint32_t value
-)
-{
-    size_t index = trace_count % MODEL_TRACE_COUNT;
-
-    trace[index].step = step;
-    trace[index].operation = operation;
-    trace[index].slot = slot;
-    trace[index].value = value;
-    ++trace_count;
-}
-
-static bool model_fail(
-    size_t step,
-    enum model_operation operation,
-    uint32_t value,
-    const char *message
-)
-{
-    size_t available = trace_count < MODEL_TRACE_COUNT
-        ? trace_count
-        : MODEL_TRACE_COUNT;
-    size_t first = trace_count - available;
-    size_t offset;
-
-    fprintf(
-        stderr,
-        "endpoint model seed=0xe029cafe step=%zu "
-        "operation=%s value=0x%08x: %s\n",
-        step,
-        operation_names[operation],
-        (unsigned)value,
-        message
-    );
-    for (offset = 0; offset < available; ++offset) {
-        const struct model_trace_entry *entry =
-            &trace[(first + offset) % MODEL_TRACE_COUNT];
-
-        fprintf(
-            stderr,
-            "  trace step=%zu operation=%s slot=%zu value=0x%08x\n",
-            entry->step,
-            operation_names[entry->operation],
-            entry->slot,
-            (unsigned)entry->value
-        );
-    }
-    return false;
-}
-
-static bool setup_fixture(void)
-{
-    static const struct micros_privilege_profile profiles[2] = {
-        {
-            .id = 1,
-            .name = "CLIENT",
-            .operations =
-                MICROS_PRIVILEGE_OPERATION_RECEIVE
-                | MICROS_PRIVILEGE_OPERATION_CALL
-                | MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            .call_targets = UINT32_C(1) << 2,
-            .notify_targets = UINT32_C(1) << 1,
-        },
-        {
-            .id = 2,
-            .name = "SERVER",
-            .operations =
-                MICROS_PRIVILEGE_OPERATION_RECEIVE
-                | MICROS_PRIVILEGE_OPERATION_SEND
-                | MICROS_PRIVILEGE_OPERATION_REPLY
-                | MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE
-                | MICROS_PRIVILEGE_OPERATION_NOTIFY,
-            .send_targets = UINT32_C(1) << 1,
-            .notify_targets = UINT32_C(1) << 2,
-        },
-    };
-
-    memset(&registry, 0, sizeof(registry));
-    memset(&objects, 0, sizeof(objects));
-    memset(trace, 0, sizeof(trace));
-    trace_count = 0;
-    return (
-        micros_endpoint_registry_initialize(
-            &registry,
-            profiles,
-            sizeof(profiles) / sizeof(profiles[0])
-        ) == MICROS_ENDPOINT_OK
-        && micros_kernel_objects_initialize(&objects, 1, 1)
-            == MICROS_KERNEL_OBJECT_OK
-        && micros_hart_register(&objects, 0, &hart)
-            == MICROS_KERNEL_OBJECT_OK
-        && micros_hart_install_trap_stacks(
-            &objects,
-            hart,
-            UINT64_C(0x01000000),
-            UINT64_C(0x01004000),
-            UINT64_C(0x02000000),
-            UINT64_C(0x02001000)
-        ) == MICROS_KERNEL_OBJECT_OK
-    );
-}
-
-static bool phase_has_endpoint(enum model_endpoint_phase phase)
-{
-    return (
-        phase == MODEL_ENDPOINT_RESERVED
-        || phase == MODEL_ENDPOINT_PROFILED
-        || phase == MODEL_ENDPOINT_ACTIVE
-    );
-}
-
-static size_t find_slot(
-    const struct model_slot model[MODEL_SLOT_COUNT],
-    uint32_t random,
-    bool (*matches)(const struct model_slot *slot)
-)
-{
-    size_t start = (random >> 16) % MODEL_SLOT_COUNT;
-    size_t offset;
-
-    for (offset = 0; offset < MODEL_SLOT_COUNT; ++offset) {
-        size_t index = (start + offset) % MODEL_SLOT_COUNT;
-
-        if (matches(&model[index])) {
-            return index;
-        }
-    }
-    return MODEL_SLOT_COUNT;
-}
-
-static bool slot_is_live(const struct model_slot *slot)
-{
-    return slot->process_live;
-}
-
-static bool slot_has_endpoint(const struct model_slot *slot)
-{
-    return slot->process_live
-        && phase_has_endpoint(slot->endpoint_phase);
-}
-
-static bool slot_has_nonactive_endpoint(const struct model_slot *slot)
-{
-    return slot->process_live
-        && (
-            slot->endpoint_phase == MODEL_ENDPOINT_RESERVED
-            || slot->endpoint_phase == MODEL_ENDPOINT_PROFILED
-        );
-}
-
-static bool slot_is_releasable(const struct model_slot *slot)
-{
-    return slot->process_live
-        && !phase_has_endpoint(slot->endpoint_phase);
-}
-
-static bool slot_has_stale_endpoint(const struct model_slot *slot)
-{
-    return slot->stale_endpoint != 0;
-}
-
-static size_t find_active_profile(
-    const struct model_slot model[MODEL_SLOT_COUNT],
-    uint32_t random,
-    uint8_t profile
-)
-{
-    size_t start = (random >> 16) % MODEL_SLOT_COUNT;
-    size_t offset;
-
-    for (offset = 0; offset < MODEL_SLOT_COUNT; ++offset) {
-        size_t index = (start + offset) % MODEL_SLOT_COUNT;
-
-        if (
-            model[index].process_live
-            && model[index].endpoint_phase == MODEL_ENDPOINT_ACTIVE
-            && model[index].profile == profile
-        ) {
-            return index;
-        }
-    }
-    return MODEL_SLOT_COUNT;
-}
-
-static bool target_is_allowed(
-    uint8_t source_profile,
-    uint32_t operation,
-    uint8_t target_profile
-)
-{
-    if (
-        source_profile == 1
-        && (
-            (
-                target_profile == 2
-                && operation == MICROS_PRIVILEGE_OPERATION_CALL
-            )
-            || (
-                target_profile == 1
-                && operation == MICROS_PRIVILEGE_OPERATION_NOTIFY
-            )
-        )
-    ) {
-        return true;
-    }
-    return (
-        source_profile == 2
-        && (
-            (
-                target_profile == 1
-                && operation == MICROS_PRIVILEGE_OPERATION_SEND
-            )
-            || (
-                target_profile == 2
-                && operation == MICROS_PRIVILEGE_OPERATION_NOTIFY
-            )
-        )
-    );
-}
-
-static bool validate_model(
-    const struct model_slot model[MODEL_SLOT_COUNT],
-    size_t step,
-    enum model_operation operation,
-    uint32_t value
-)
-{
-    size_t expected_processes = 0;
-    size_t expected_threads = 0;
-    size_t index;
-
-    if (
-        micros_endpoint_registry_validate_objects(&registry, &objects)
-            != MICROS_ENDPOINT_OK
-        || registry.last_reply_token != 0
-    ) {
-        return model_fail(
-            step,
-            operation,
-            value,
-            "combined validation or token state failed"
-        );
-    }
-    for (index = 0; index < MODEL_SLOT_COUNT; ++index) {
-        const struct model_slot *expected = &model[index];
-        const struct micros_process *process =
-            &objects.processes[index];
-        const struct micros_endpoint_record *endpoint =
-            &registry.endpoints[index];
-
-        if (!expected->process_live) {
-            if (
-                process->slot_state
-                    != MICROS_KERNEL_OBJECT_SLOT_FREE
-                || process->generation != expected->generation
-                || endpoint->state != MICROS_ENDPOINT_STATE_FREE
-            ) {
-                return model_fail(
-                    step,
-                    operation,
-                    value,
-                    "free slot diverged"
-                );
-            }
-            continue;
-        }
-        ++expected_processes;
-        ++expected_threads;
-        if (
-            process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || process->generation != expected->generation
-            || process->live_thread_count != 1
-            || !expected->thread_live
-        ) {
-            return model_fail(
-                step,
-                operation,
-                value,
-                "live process diverged"
-            );
-        }
-        if (
-            objects.threads[expected->thread.slot].slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || objects.threads[expected->thread.slot].generation
-                != expected->thread.generation
-            || objects.threads[expected->thread.slot].owner.slot
-                != expected->process.slot
-            || objects.threads[expected->thread.slot].owner.generation
-                != expected->process.generation
-            || objects.threads[expected->thread.slot].runtime_flags
-                != MICROS_THREAD_RTS_INACTIVE
-            || objects.threads[expected->thread.slot].scheduler_assigned
-        ) {
-            return model_fail(
-                step,
-                operation,
-                value,
-                "thread state diverged"
-            );
-        }
-
-        if (expected->endpoint_phase == MODEL_ENDPOINT_UNUSED) {
-            if (
-                endpoint->state != MICROS_ENDPOINT_STATE_FREE
-                || process->primary_endpoint
-                    != MICROS_PROCESS_ENDPOINT_NONE
-                || process->privilege_profile != 0
-                || process->endpoint_lifecycle_consumed
-            ) {
-                return model_fail(
-                    step,
-                    operation,
-                    value,
-                    "unused endpoint state diverged"
-                );
-            }
-            continue;
-        }
-        if (expected->endpoint_phase == MODEL_ENDPOINT_CLOSED) {
-            if (
-                endpoint->state != MICROS_ENDPOINT_STATE_FREE
-                || process->primary_endpoint
-                    != MICROS_PROCESS_ENDPOINT_NONE
-                || process->privilege_profile != 0
-                || !process->endpoint_lifecycle_consumed
-            ) {
-                return model_fail(
-                    step,
-                    operation,
-                    value,
-                    "closed endpoint state diverged"
-                );
-            }
-            continue;
-        }
-        if (
-            endpoint->owner.slot != expected->process.slot
-            || endpoint->owner.generation
-                != expected->process.generation
-            || endpoint->value != expected->endpoint
-            || process->primary_endpoint != expected->endpoint
-            || !process->endpoint_lifecycle_consumed
-            || process->privilege_profile != expected->profile
-        ) {
-            return model_fail(
-                step,
-                operation,
-                value,
-                "bound endpoint state diverged"
-            );
-        }
-        if (
-            expected->endpoint_phase == MODEL_ENDPOINT_ACTIVE
-                ? endpoint->state != MICROS_ENDPOINT_STATE_ACTIVE
-                : endpoint->state != MICROS_ENDPOINT_STATE_RESERVED
-        ) {
-            return model_fail(
-                step,
-                operation,
-                value,
-                "endpoint phase diverged"
-            );
-        }
-    }
-    if (
-        objects.live_process_count != expected_processes
-        || objects.live_thread_count != expected_threads
-    ) {
-        return model_fail(
-            step,
-            operation,
-            value,
-            "object counts diverged"
-        );
-    }
-    return true;
-}
-
 bool micros_endpoint_model_test_run(void)
 {
+    struct endpoint_model_fixture *fixture = endpoint_model_context();
     const uint32_t seed = UINT32_C(0xe029cafe);
     static const enum model_operation scripted_operations[] = {
         MODEL_OPERATION_CREATE,
@@ -528,19 +52,19 @@ bool micros_endpoint_model_test_run(void)
 
     memset(model, 0, sizeof(model));
     memset(&coverage, 0, sizeof(coverage));
-    if (!setup_fixture()) {
+    if (!endpoint_model_setup_fixture(fixture)) {
         fprintf(stderr, "endpoint model fixture failed\n");
         return false;
     }
 
     for (step = 0; step < MODEL_STEPS; ++step) {
-        uint32_t random = next_random(&random_state);
+        uint32_t random = endpoint_model_next_random(&random_state);
         enum model_operation operation =
             (enum model_operation)(
                 (random >> 24) % MODEL_OPERATION_COUNT
             );
         size_t slot = MODEL_SLOT_COUNT;
-        uint32_t value = next_random(&random_state);
+        uint32_t value = endpoint_model_next_random(&random_state);
 
         if (
             step
@@ -562,18 +86,19 @@ bool micros_endpoint_model_test_run(void)
                 struct micros_thread_handle thread;
 
                 if (
-                    micros_process_create(&objects, &process)
+                    micros_process_create(&fixture->objects, &process)
                         != MICROS_KERNEL_OBJECT_OK
                     || process.slot != slot
                     || process.generation
                         != model[slot].generation + 1
                     || micros_thread_create(
-                        &objects,
+                        &fixture->objects,
                         process,
                         &thread
                     ) != MICROS_KERNEL_OBJECT_OK
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -593,7 +118,7 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         case MODEL_OPERATION_RESERVE:
-            slot = find_slot(model, value, slot_is_live);
+            slot = endpoint_model_find_slot(model, value, endpoint_model_slot_is_live);
             if (slot != MODEL_SLOT_COUNT) {
                 micros_endpoint_t endpoint = MICROS_ENDPOINT_ANY;
                 bool allowed =
@@ -601,8 +126,8 @@ bool micros_endpoint_model_test_run(void)
                         == MODEL_ENDPOINT_UNUSED;
                 enum micros_endpoint_error error =
                     micros_endpoint_reserve(
-                        &registry,
-                        &objects,
+                        &fixture->registry,
+                        &fixture->objects,
                         model[slot].process,
                         &endpoint
                     );
@@ -616,7 +141,8 @@ bool micros_endpoint_model_test_run(void)
                         )
                     || (!allowed && endpoint != MICROS_ENDPOINT_ANY)
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -635,7 +161,7 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         case MODEL_OPERATION_INSTALL:
-            slot = find_slot(model, value, slot_has_endpoint);
+            slot = endpoint_model_find_slot(model, value, endpoint_model_slot_has_endpoint);
             if (slot != MODEL_SLOT_COUNT) {
                 uint8_t profile = (value & 3) == 3
                     ? 3
@@ -653,15 +179,16 @@ bool micros_endpoint_model_test_run(void)
                         : MICROS_ENDPOINT_ERROR_STATE;
                 enum micros_endpoint_error error =
                     micros_endpoint_install_profile(
-                        &registry,
-                        &objects,
+                        &fixture->registry,
+                        &fixture->objects,
                         model[slot].process,
                         profile
                     );
 
                 value = profile;
                 if (error != expected) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -685,15 +212,15 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         case MODEL_OPERATION_ACTIVATE:
-            slot = find_slot(model, value, slot_has_endpoint);
+            slot = endpoint_model_find_slot(model, value, endpoint_model_slot_has_endpoint);
             if (slot != MODEL_SLOT_COUNT) {
                 bool allowed =
                     model[slot].endpoint_phase
                         == MODEL_ENDPOINT_PROFILED;
                 enum micros_endpoint_error error =
                     micros_endpoint_activate(
-                        &registry,
-                        &objects,
+                        &fixture->registry,
+                        &fixture->objects,
                         model[slot].endpoint
                     );
 
@@ -705,7 +232,8 @@ bool micros_endpoint_model_test_run(void)
                                 : MICROS_ENDPOINT_ERROR_STATE
                         )
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -727,15 +255,15 @@ bool micros_endpoint_model_test_run(void)
                 MICROS_PRIVILEGE_OPERATION_NOTIFY,
             };
             size_t target;
-            uint32_t target_random = next_random(&random_state);
+            uint32_t target_random = endpoint_model_next_random(&random_state);
             uint32_t authorization_operation =
                 operations[
-                    (next_random(&random_state) >> 16) % 3
+                    (endpoint_model_next_random(&random_state) >> 16) % 3
                 ];
             enum micros_endpoint_error expected;
             enum micros_endpoint_error error;
 
-            slot = find_slot(model, value, slot_has_endpoint);
+            slot = endpoint_model_find_slot(model, value, endpoint_model_slot_has_endpoint);
             if ((value & 8) != 0) {
                 authorization_operation =
                     MICROS_PRIVILEGE_OPERATION_REPLY_RECEIVE;
@@ -754,14 +282,15 @@ bool micros_endpoint_model_test_run(void)
                     break;
                 }
                 error = micros_endpoint_authorize_operation(
-                    &registry,
-                    &objects,
+                    &fixture->registry,
+                    &fixture->objects,
                     model[slot].endpoint,
                     authorization_operation
                 );
                 value = authorization_operation;
                 if (error != expected) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -797,14 +326,15 @@ bool micros_endpoint_model_test_run(void)
                     break;
                 }
                 error = micros_endpoint_authorize_operation(
-                    &registry,
-                    &objects,
+                    &fixture->registry,
+                    &fixture->objects,
                     model[slot].endpoint,
                     authorization_operation
                 );
                 value = authorization_operation;
                 if (error != expected) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -843,7 +373,7 @@ bool micros_endpoint_model_test_run(void)
                 uint8_t target_profile =
                     model[slot].profile == 1 ? 2 : 1;
 
-                target = find_active_profile(
+                target = endpoint_model_find_active_profile(
                     model,
                     target_random,
                     target_profile
@@ -861,10 +391,10 @@ bool micros_endpoint_model_test_run(void)
                 }
             }
             if (target == MODEL_SLOT_COUNT) {
-                target = find_slot(
+                target = endpoint_model_find_slot(
                     model,
                     target_random,
-                    slot_has_endpoint
+                    endpoint_model_slot_has_endpoint
                 );
             }
             if (
@@ -881,7 +411,7 @@ bool micros_endpoint_model_test_run(void)
             ) {
                 expected = MICROS_ENDPOINT_ERROR_STATE;
             } else if (
-                target_is_allowed(
+                endpoint_model_target_is_allowed(
                     model[slot].profile,
                     authorization_operation,
                     model[target].profile
@@ -892,15 +422,16 @@ bool micros_endpoint_model_test_run(void)
                 expected = MICROS_ENDPOINT_ERROR_UNAUTHORIZED;
             }
             error = micros_endpoint_authorize_target(
-                &registry,
-                &objects,
+                &fixture->registry,
+                &fixture->objects,
                 model[slot].endpoint,
                 authorization_operation,
                 model[target].endpoint
             );
             value = authorization_operation;
             if (error != expected) {
-                return model_fail(
+                return endpoint_model_model_fail(
+                    fixture,
                     step,
                     operation,
                     value,
@@ -929,23 +460,24 @@ bool micros_endpoint_model_test_run(void)
             break;
         }
         case MODEL_OPERATION_CLOSE:
-            slot = find_slot(
+            slot = endpoint_model_find_slot(
                 model,
                 value,
-                slot_has_nonactive_endpoint
+                endpoint_model_slot_has_nonactive_endpoint
             );
             if (slot == MODEL_SLOT_COUNT) {
-                slot = find_slot(model, value, slot_has_endpoint);
+                slot = endpoint_model_find_slot(model, value, endpoint_model_slot_has_endpoint);
             }
             if (slot != MODEL_SLOT_COUNT) {
                 if (
                     micros_endpoint_close(
-                        &registry,
-                        &objects,
+                        &fixture->registry,
+                        &fixture->objects,
                         model[slot].endpoint
                     ) != MICROS_ENDPOINT_OK
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -960,19 +492,20 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         case MODEL_OPERATION_RELEASE:
-            slot = find_slot(model, value, slot_is_releasable);
+            slot = endpoint_model_find_slot(model, value, endpoint_model_slot_is_releasable);
             if (slot != MODEL_SLOT_COUNT) {
                 if (
                     micros_thread_release(
-                        &objects,
+                        &fixture->objects,
                         model[slot].thread
                     ) != MICROS_KERNEL_OBJECT_OK
                     || micros_process_release(
-                        &objects,
+                        &fixture->objects,
                         model[slot].process
                     ) != MICROS_KERNEL_OBJECT_OK
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -989,10 +522,10 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         case MODEL_OPERATION_STALE:
-            slot = find_slot(
+            slot = endpoint_model_find_slot(
                 model,
                 value,
-                slot_has_stale_endpoint
+                endpoint_model_slot_has_stale_endpoint
             );
             if (slot != MODEL_SLOT_COUNT) {
                 const struct micros_endpoint_record *record =
@@ -1000,8 +533,8 @@ bool micros_endpoint_model_test_run(void)
 
                 if (
                     micros_endpoint_resolve_internal(
-                        &registry,
-                        &objects,
+                        &fixture->registry,
+                        &fixture->objects,
                         model[slot].stale_endpoint,
                         &record
                     ) != MICROS_ENDPOINT_ERROR_STALE
@@ -1010,7 +543,8 @@ bool micros_endpoint_model_test_run(void)
                             const struct micros_endpoint_record *
                         )(uintptr_t)1
                 ) {
-                    return model_fail(
+                    return endpoint_model_model_fail(
+                        fixture,
                         step,
                         operation,
                         value,
@@ -1021,15 +555,16 @@ bool micros_endpoint_model_test_run(void)
             }
             break;
         default:
-            return model_fail(
+            return endpoint_model_model_fail(
+                fixture,
                 step,
                 operation,
                 value,
                 "unknown model operation"
             );
         }
-        record_transition(step, operation, slot, value);
-        if (!validate_model(model, step, operation, value)) {
+        endpoint_model_record_transition(fixture, step, operation, slot, value);
+        if (!endpoint_model_validate_model(fixture, model, step, operation, value)) {
             return false;
         }
     }
@@ -1038,15 +573,16 @@ bool micros_endpoint_model_test_run(void)
         if (!model[step].process_live) {
             continue;
         }
-        if (phase_has_endpoint(model[step].endpoint_phase)) {
+        if (endpoint_model_phase_has_endpoint(model[step].endpoint_phase)) {
             if (
                 micros_endpoint_close(
-                    &registry,
-                    &objects,
+                    &fixture->registry,
+                    &fixture->objects,
                     model[step].endpoint
                 ) != MICROS_ENDPOINT_OK
             ) {
-                return model_fail(
+                return endpoint_model_model_fail(
+                    fixture,
                     MODEL_STEPS,
                     MODEL_OPERATION_CLOSE,
                     (uint32_t)step,
@@ -1055,14 +591,15 @@ bool micros_endpoint_model_test_run(void)
             }
         }
         if (
-            micros_thread_release(&objects, model[step].thread)
+            micros_thread_release(&fixture->objects, model[step].thread)
                 != MICROS_KERNEL_OBJECT_OK
             || micros_process_release(
-                &objects,
+                &fixture->objects,
                 model[step].process
             ) != MICROS_KERNEL_OBJECT_OK
         ) {
-            return model_fail(
+            return endpoint_model_model_fail(
+                fixture,
                 MODEL_STEPS,
                 MODEL_OPERATION_RELEASE,
                 (uint32_t)step,
@@ -1071,13 +608,14 @@ bool micros_endpoint_model_test_run(void)
         }
     }
     if (
-        micros_endpoint_registry_validate_objects(&registry, &objects)
+        micros_endpoint_registry_validate_objects(&fixture->registry, &fixture->objects)
             != MICROS_ENDPOINT_OK
-        || objects.live_process_count != 0
-        || objects.live_thread_count != 0
-        || objects.registered_hart_count != 1
+        || fixture->objects.live_process_count != 0
+        || fixture->objects.live_thread_count != 0
+        || fixture->objects.registered_hart_count != 1
     ) {
-        return model_fail(
+        return endpoint_model_model_fail(
+            fixture,
             MODEL_STEPS,
             MODEL_OPERATION_RELEASE,
             0,

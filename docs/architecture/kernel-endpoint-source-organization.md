@@ -520,8 +520,17 @@ one exact five-field static fixture. Its nine stateful case roots borrow the
 same fixture once; setup receives that pointer, pure helpers and encoding
 do not gain ambient context, and original resets/snapshots/macros/25-case
 runner remain exact under typed reconstruction.
-Fourteen original model owner moves and all ten original long-function
-migrations remain pending. Complete current final-author/profile-reuse
+The independent model now also exposes its five owners and separate
+five-field production/trace fixture. Expected slots, coverage, random state
+and loop work retain their original automatic lifetime. Only the entry
+borrows the fixture; setup/trace mutation and readonly failure/projection
+helpers receive exact typed pointers. Raw operation-name bytes, model types,
+all fifteen original model bodies, draw/trace/comparison order and resets
+remain exact. The active 90-owner migration is now a literal empty tuple.
+All ten original long-function migrations remain pending, including the
+target entry; the specified shorter initialization outline also remains
+required.
+Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
 
