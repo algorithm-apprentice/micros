@@ -3,11 +3,14 @@
 from dataclasses import dataclass
 import fcntl
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import stat
+from typing import BinaryIO, Optional
 import uuid
 
 
@@ -28,7 +31,8 @@ class Attempt:
     workflow: str
     identifier: str
     temporary: str
-    log: object
+    log: BinaryIO
+    recorded_log: Optional[dict] = None
 
 
 def _encoded(value):
@@ -229,6 +233,14 @@ class EvidenceStore:
         finally:
             os.close(descriptor)
 
+    def replay_log(self, expected, destination):
+        self._assert_location()
+        self._verify_log(expected)
+        descriptor = _regular_open(self.logs, expected["path"][5:])
+        with os.fdopen(descriptor, "rb") as source:
+            with io.TextIOWrapper(source, encoding="utf-8", errors="replace") as text:
+                shutil.copyfileobj(text, destination)
+
     def start(self, workflow):
         self._workflow(workflow)
         if any(attempt.workflow == workflow for attempt in self._active.values()):
@@ -295,6 +307,7 @@ class EvidenceStore:
         if self._active.get(attempt.identifier) is not attempt:
             raise EvidenceError("attempt is not owned by this publisher")
         log = self._finish_log(attempt)
+        attempt.recorded_log = log
         del self._active[attempt.identifier]
         if not postflight:
             raise EvidenceError("execution postflight failed")

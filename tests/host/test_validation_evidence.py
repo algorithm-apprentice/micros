@@ -113,6 +113,9 @@ class ValidationEvidenceTests(unittest.TestCase):
             self.assertIsNone(store.complete(attempt, None, 0))
             self.assertFalse(self.receipt_path().exists())
             self.assertEqual(1, len(list((self.directory / "logs").glob("*.log"))))
+            self.assertEqual(
+                "logs/" + attempt.identifier + ".log", attempt.recorded_log["path"]
+            )
 
     def test_competing_publisher_is_rejected_without_waiting(self):
         with self.store():

@@ -4,13 +4,15 @@
 
 This is the design contract for Accepted
 [ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md).
-It is not implemented. Existing fresh planner behavior remains authoritative
-until the separately reviewed implementation merges.
+The implementation source owners and command interfaces are listed below.
+Fresh planner execution remains the default; opt-in receipts do not approve
+review or merge.
 
 The paired tasks are `validation-plan-dedup-design` and
-`validation-plan-dedup-implementation`. Independent design review is clean;
-implementation may start only after design merge. No executable prototype or
-build change belongs to design.
+`validation-plan-dedup-implementation`. Original design #129 and corrective
+design #131 are merged; their independent reviews are clean. The fresh
+implementation follows both contracts. No executable prototype or build
+change belonged to either design.
 
 The goal is to avoid re-executing an already successful exact current-context
 command, and avoid unrelated guests for a strictly recognizable existing
@@ -378,7 +380,8 @@ remains exact. Full remains coverage-equivalent to the documented matrix.
 ## Responsibility owners
 
 Implementation follows merged design #129 at
-`0f61a2b2ff2b80aa34f55c51352407090f96b5d0`, in these green slices:
+`0f61a2b2ff2b80aa34f55c51352407090f96b5d0` and correction #131 at
+`b3f042c00c660c8ad69156e83f1a23c692582a30`, in these green slices:
 bounded CMake/Git-layer classification; receipt identity/publication and
 failure tests; supported context/artifact closure; canonical CLI execution
 and provenance; then actual recording/reuse and the fresh full milestone
@@ -387,7 +390,9 @@ gate. No slice may relax the Accepted contract or its independent oracles.
 | Planned owner | Responsibility |
 | --- | --- |
 | `tools/validation_plan.py` | Existing root/discovery/inventory/selection facade and CLI |
-| `tools/validation_evidence.py` | Canonical execution, candidate/context manifests, ledger lifecycle and provenance |
+| `tools/validation_evidence.py` | Ledger ownership, strict receipts, complete logs and atomic invalidation/publication |
+| `tools/validation_context.py` | Exact staged/source identity and the fixed closed tool/runtime/build/artifact manifests |
+| `tools/validation_execution.py` | Canonical execution, source/context postflight, receipt consumption and attributed outcomes |
 | `tools/validation_build_impact.py` | Bounded before/after CMake recognition and explicit impact result |
 | Corresponding focused host tests | Independent receipt/classifier negative cases and fake subprocess counts |
 | Existing planner/source-layout tests | Preserve fail-closed path coverage and independent expected-value oracles |

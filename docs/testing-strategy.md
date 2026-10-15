@@ -680,8 +680,10 @@ before the separate implementation merges. Default and full execution remain
 fresh.
 The initial-profile implementation follows Accepted
 [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md);
-it restarts after corrective design merge. The correction does not reduce
-any validation gate.
+its fresh implementation follows merged corrective design #131.
+The correction does not reduce any validation gate.
+The explicit fresh/reuse/gate-only interfaces and bounded supported
+environment are documented in [the build guide](development/building.md).
 RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
 changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
 generated seed source and catalog, seed embedding/generation, and the

@@ -12,7 +12,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tools import validation_build_impact
+from tools import validation_build_impact, validation_execution
 
 
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
@@ -139,6 +139,8 @@ PLANNER_INPUTS = (
     "tests/host/test_validation_evidence.py",
     "tools/validation_context.py",
     "tests/host/test_validation_context.py",
+    "tools/validation_execution.py",
+    "tests/host/test_validation_execution.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
     "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
 )
@@ -2098,13 +2100,36 @@ def validate_inventory(root):
             raise ValueError("slow-model tier membership is out of sync")
 
 
+def canonical_workflows():
+    return (
+        UNIT_FAST[-1], UNIT_FULL[-1],
+        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS,
+    )
+
+
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--tier", choices=("fast", "pr", "full"), default="fast")
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--execute", action="store_true")
-    return parser.parse_args(argv)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--reuse", action="store_true")
+    mode.add_argument("--fresh", action="store_true")
+    parser.add_argument("--record-workflow", choices=canonical_workflows())
+    arguments = parser.parse_args(argv)
+    if (arguments.reuse or arguments.fresh) and not arguments.execute:
+        parser.error("--reuse/--fresh requires authoritative --execute")
+    if arguments.reuse and arguments.tier == "full":
+        parser.error("explicit full validation always executes fresh")
+    if arguments.record_workflow and (
+        arguments.execute or arguments.path or arguments.tier != "fast"
+        or arguments.base != "origin/main"
+    ):
+        parser.error("gate-only recording cannot select a plan, paths, base or nondefault tier")
+    if arguments.base.startswith("-"):
+        parser.error("--base must identify a Git revision, not an option")
+    return arguments
 
 
 def main(argv=None):
@@ -2112,6 +2137,12 @@ def main(argv=None):
     root = planner_root()
     try:
         validate_inventory(root)
+        if arguments.record_workflow:
+            ensure_execution_ready(root)
+            return validation_execution.execute_plan(
+                root, [workflow(arguments.record_workflow)],
+                canonical_workflows(), gate_only=True,
+            )
         discovered = changed_paths(arguments.base, root)
         explicit = [
             normalize_explicit_path(path, root, os.getcwd())
@@ -2127,10 +2158,11 @@ def main(argv=None):
             ensure_execution_ready(root)
         except ValueError as error:
             raise SystemExit(str(error)) from error
+        return validation_execution.execute_plan(
+            root, commands, canonical_workflows(), reuse=arguments.reuse,
+        )
     for command in commands:
         print(shlex.join(command), flush=True)
-        if arguments.execute:
-            subprocess.run(command, check=True, cwd=root)
     return 0
 
 

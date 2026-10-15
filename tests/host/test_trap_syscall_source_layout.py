@@ -1825,6 +1825,8 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
                 "tests/host/test_validation_evidence.py",
                 "tools/validation_context.py",
                 "tests/host/test_validation_context.py",
+                "tools/validation_execution.py",
+                "tests/host/test_validation_execution.py",
                 "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
             }
             value = ast.literal_eval(node.value)
@@ -1844,7 +1846,7 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
         if not isinstance(node, (ast.Import, ast.ImportFrom))
         and not (
             isinstance(node, ast.FunctionDef)
-            and node.name in ("main", "parse_arguments", "repository_plan")
+            and node.name in ("main", "parse_arguments", "repository_plan", "canonical_workflows")
         )
         and ast.dump(node, include_attributes=False) != ast.dump(bootstrap, include_attributes=False)
     ]

@@ -353,9 +353,9 @@ The independent validation-efficiency task follows Accepted
 [ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
 [exact evidence contract](architecture/validation-evidence.md).
 Original design #129 is merged. Implementation #130 was abandoned after a
-concrete default-configuration closure omission; implementation is blocked by
-Accepted [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md).
-It restarts from current `main` only after the corrective design merges.
+concrete default-configuration closure omission. Corrective design #131 and
+Accepted [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md)
+are merged; the fresh implementation is in progress under both contracts.
 It does not alter the runtime DAG, reduce mandatory coverage or authorize
 receipt reuse before the separate implementation merges.
 

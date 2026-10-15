@@ -321,6 +321,59 @@ matrix. The PR tier always runs complete `test-unit`; fast is an iteration
 tier. Explicit paths are unioned with repository changes, and execution
 requires every untracked file to be staged first.
 
+Fresh execution is still the default. These explicit forms never reuse prior
+command results:
+
+```bash
+python3 tools/validation_plan.py --tier pr --execute --fresh
+python3 tools/validation_plan.py --tier full --execute --fresh
+```
+
+The opt-in local ledger follows
+[ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md),
+[ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
+and the [closed-profile contract](../architecture/validation-evidence.md).
+The initial reusable workflows are complete `test-unit`, `test-qemu-smoke`
+and `build-tty-service-image` on the declared Darwin arm64/Ninja profile.
+Other workflows still execute fresh; a receipt never removes a required gate.
+Explicit full tier rejects `--reuse`. Documentation and all three diff
+checks always execute fresh.
+
+For the supported Homebrew/Xcode configuration, use the same explicit
+environment for the producer and consumer. Compiler paths must match the
+configured cache, not merely resolve to the same multicall executable:
+
+```bash
+PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
+MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
+MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+python3 tools/validation_plan.py --tier pr --execute --reuse
+```
+
+Missing, stale, unsupported or corrupt evidence prints a `MISS` reason and
+runs the command fresh. A valid `REUSED` result names its original producer,
+HEAD/tree and complete-log digest; it is not a new execution. No environment
+normalization, dependency installation or cross-tree reuse occurs.
+The ignored ledger and complete logs live in `build/validation-evidence/v1/`.
+`VALIDATION_REPORT` binds the required command sequence and outcomes to the
+current candidate.
+
+One exact canonical workflow can also be executed and recorded fresh:
+
+```bash
+PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
+MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
+MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+python3 tools/validation_plan.py --record-workflow test-unit
+```
+
+This is **gate-only, not final author validation**; it cannot select paths,
+lower a required plan or authorize review. Reuse and gate-only recording
+require the exact clean staged candidate. Ordinary dirty tracked fresh
+iteration remains supported, but cannot publish reusable or final evidence.
+The final author still supplies the complete plan, clean tracked/index state,
+no untracked task files and independent review.
+
 The host graph is separate from the freestanding target graph. It compiles the
 same FDT parser, frame allocator, typed frame-ownership ledger, Sv39 encoding,
 and kernel-object implementations with warnings as errors, ASan, and UBSan.
