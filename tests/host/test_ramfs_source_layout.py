@@ -174,6 +174,30 @@ SEED_CASE_PHASES = {
         ("seed_record_special_name_rejections", ("fixture", "etc", "motd")),
     ),
 }
+FUNCTIONAL_CASE_WORK = {
+    "getdents_cursor_and_records_are_exact": {
+        "owner": 5,
+        "tag": "ramfs_directory_case",
+        "fields": ("action", "message", "root", "file"),
+        "schema": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint64_t root; uint64_t file;"
+        ),
+        "original": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint64_t root = micros_ramfs_handle(0, 1); uint64_t file;"
+        ),
+        "outlined": (
+            "struct ramfs_directory_case work; work.root = micros_ramfs_handle(0, 1);"
+        ),
+        "phases": (
+            ("directory_seed_records", ("fixture", "&work")),
+            ("directory_cursor_steps", ("fixture", "&work")),
+            ("directory_namespace_continuation", ("fixture", "&work")),
+            ("directory_eof_and_errors", ("fixture", "&work")),
+        ),
+    },
+}
 DATA_RENAMES = {
     1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
     3: {"ramfs_model_io": "model_io"},
@@ -320,6 +344,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (0, "micros_ramfs_handle_call"), (0, "handle_write"), (6, "render_fixture"),
         (2, "header_corruption_is_rejected"),
         (2, "record_name_and_reserved_corruption_is_rejected"),
+        (1, "getdents_cursor_and_records_are_exact"),
     )
 )
 
@@ -856,6 +881,33 @@ def bool_case_body_tokens(caller, phases):
     return tuple(expanded + terminal + ["}"])
 
 
+def work_record_tokens(tokens, specification):
+    tokens = list(tokens)
+    outlined = list(body_tokens(specification["outlined"]))
+    if tokens[1:1 + len(outlined)] != outlined:
+        raise AssertionError("case work must retain exact automatic declaration and original initialization")
+    tokens[1:1 + len(outlined)] = body_tokens(specification["original"])
+    expanded = []
+    index = 0
+    while index < len(tokens):
+        if tokens[index:index + 3] == ["work", "-", ">"]:
+            prefix = 3
+        elif tokens[index:index + 2] == ["work", "."]:
+            prefix = 2
+        else:
+            if tokens[index] == "work":
+                raise AssertionError("case work cannot be copied, cleared, published or retained")
+            expanded.append(tokens[index])
+            index += 1
+            continue
+        field = index + prefix
+        if field >= len(tokens) or tokens[field] not in specification["fields"]:
+            raise AssertionError("case work contains a new or wrongly bound authority/value")
+        expanded.append(tokens[field])
+        index = field + 1
+    return tuple(expanded)
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -871,6 +923,14 @@ def original_body_digest(family, name, text):
             for specification in SEED_CASE_PHASES[name]
         ]
         tokens = bool_case_body_tokens(text, phases)
+    if family == 1 and name in FUNCTIONAL_CASE_WORK and (1, name) not in LONG_FUNCTION_MIGRATION:
+        specification = FUNCTIONAL_CASE_WORK[name]
+        owner = source(family_paths(1)[specification["owner"]])
+        phases = [
+            (phase, c_function_body(owner, phase[0]))
+            for phase in specification["phases"]
+        ]
+        tokens = work_record_tokens(bool_case_body_tokens(text, phases), specification)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1210,7 +1270,11 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             body_tokens(c_function_body(source(paths[1]), "ramfs_test_context")),
         )
         definitions = owned_definitions(1)
-        self.assertEqual(31, len(definitions))
+        completed_phases = sum(
+            len(specification["phases"]) for name, specification in FUNCTIONAL_CASE_WORK.items()
+            if (1, name) not in LONG_FUNCTION_MIGRATION
+        )
+        self.assertEqual(31 + completed_phases, len(definitions))
         self.assertEqual(16, len(fixture_parameter_matches(1)))
         for spelling, count in fixture_parameter_matches(1):
             self.assertEqual(1, count, spelling)
@@ -1517,6 +1581,25 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 parameters.extend("const size_t " + argument for argument in arguments[1:])
                 expected = f"static bool {name}({', '.join(parameters)}) {{"
                 self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+
+    def test_directory_case_exposes_only_original_automatic_work_and_ordered_phases(self):
+        specification = FUNCTIONAL_CASE_WORK["getdents_cursor_and_records_are_exact"]
+        text = source(family_paths(1)[specification["owner"]])
+        tag = specification["tag"]
+        fields = re.findall(rf"struct {tag}\s*\{{([^{{}}]*)\}}", text)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(body_tokens(specification["schema"]), body_tokens(fields[0]))
+        definitions = c_function_definitions(text)
+        self.assertLessEqual(definitions["ramfs_test_getdents_cursor_and_records_are_exact"], 120)
+        for name, _ in specification["phases"]:
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            signature = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+            self.assertEqual(1, len(signature))
+            expected = f"static bool {name}(struct ramfs_test_fixture *fixture, struct {tag} *work) {{"
+            self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+        self.assertEqual((), file_scope_objects(text))
+        self.assertEqual("", macro_definition_text(text))
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -1886,6 +1969,34 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 bool_case_body_tokens(caller, ((phases[0][0], body), phases[1]))
         changed = ((phases[0][0], phases[0][1].replace("mutate(offset);", "")), phases[1])
         self.assertNotEqual(body_tokens(expected), bool_case_body_tokens(caller, changed))
+
+    def test_automatic_work_projection_preserves_initialization_and_rejects_copy_or_new_fields(self):
+        specification = {
+            "fields": ("value",),
+            "original": "uint64_t value = create();",
+            "outlined": "struct record work; work.value = create();",
+        }
+        outlined = (
+            "{ struct record work; work.value = create(); "
+            "if (work->value != 1) { return false; } inspect(&work->value, sizeof(work->value)); return true; }"
+        )
+        expected = (
+            "{ uint64_t value = create(); if (value != 1) { return false; } "
+            "inspect(&value, sizeof(value)); return true; }"
+        )
+        self.assertEqual(body_tokens(expected), work_record_tokens(body_tokens(outlined), specification))
+        for changed in (
+            outlined.replace("struct record work;", "static struct record work;"),
+            outlined.replace("struct record work;", "struct record work = {0};"),
+            outlined.replace("work->value", "work->new_state"),
+            outlined.replace("inspect(&work->value, sizeof(work->value));", "memset(&work, 0, sizeof(work));"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                work_record_tokens(body_tokens(changed), specification)
+        self.assertNotEqual(
+            body_tokens(expected),
+            work_record_tokens(body_tokens(outlined.replace("return false", "return true")), specification),
+        )
 
     def test_renderer_projection_preserves_order_bindings_single_publication_and_exits(self):
         specifications = {

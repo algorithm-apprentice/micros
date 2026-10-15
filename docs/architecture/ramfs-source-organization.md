@@ -511,7 +511,13 @@ Their 9/13-line roots preserve exact first-failure short-circuit; original
 offsets remain automatic and only the needed const scalars are borrowed by
 value. Bounded chain projection restores every original statement and
 rejects early successful exits, wrong bindings/order, or caller continuation.
-Twelve C semantic migrations remain pending, alongside the specified
+Directory functional evidence now exposes seed records, cursor steps,
+namespace continuation, and EOF/error tasks with a 12-line root. One
+automatic work record contains only its original action, message, root, and
+file locals, with only the original root initializer applied. Typed work
+projection restores the exact original declarations and body; it rejects
+whole-work zeroing/copy/publication or additional fields. Eleven C semantic
+migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 
