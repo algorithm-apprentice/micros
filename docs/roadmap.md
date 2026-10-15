@@ -355,7 +355,8 @@ The independent validation-efficiency task follows Accepted
 Original design #129 is merged. Implementation #130 was abandoned after a
 concrete default-configuration closure omission. Corrective design #131 and
 Accepted [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md)
-are merged; the fresh implementation is in progress under both contracts.
+are merged; the fresh implementation follows both contracts and the canonical
+source/evidence map.
 It does not alter the runtime DAG, reduce mandatory coverage or authorize
 receipt reuse before the separate implementation merges.
 

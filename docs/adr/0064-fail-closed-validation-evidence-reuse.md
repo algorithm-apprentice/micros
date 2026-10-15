@@ -148,3 +148,10 @@ and must pass its separate implementation review. No executable implementation,
 tests, models, harnesses, build scaffolding or prototype belongs to this
 design pull request. Receipt reuse and narrower classification are not yet
 implemented.
+
+## Separate implementation disposition
+
+The design-only status above records #129's Acceptance point. Separate
+implementation #132 follows both this decision and corrective ADR-0065.
+Its [source map and acceptance evidence](../architecture/validation-evidence.md)
+retain fresh defaults, the complete required plan and independent review.
