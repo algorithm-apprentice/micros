@@ -542,8 +542,12 @@ drift. The native runner now has an 18-line ordered control loop and its
 single exact 25-case file-static readonly table. Raw literal, callback, type
 and scope checks precede reconstruction of the entire original main body;
 case order, output and first failure remain unchanged.
-Seven original long-function migrations remain pending, including the target
-entry.
+Independent model comparison now has a 72-line header/free-slot/count outline
+and 46/78-line live-identity and endpoint-phase tasks. Exact scope-aware
+projection restores only the original unused/closed slot `continue` exits;
+helper-local success cannot skip remaining slots, trace diagnostics or
+aggregate counts. Six original long-function migrations remain pending,
+including the target entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

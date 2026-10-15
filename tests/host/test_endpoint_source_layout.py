@@ -184,7 +184,6 @@ LONG_FUNCTION_MIGRATION = (
     (1, "test_endpoint_lifecycle_and_authorization"),
     (1, "test_profile_install_and_close_require_held_threads"),
     (1, "test_source_only_seal_preserves_staged_source"),
-    (2, "validate_model"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
 )
@@ -214,6 +213,7 @@ VALIDATOR_HELPER_OWNERS = {
 INITIALIZER_HELPERS = (
     "prepare_profile_candidates", "candidate_targets_are_closed", "publish_profile_table",
 )
+MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
 CORE_DAG = {
     0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
     5: {1, 2}, 6: {1, 2, 5}, 7: {3, 4, 5, 6},
@@ -426,6 +426,10 @@ def original_locations(family):
         if family == 2 and spelling == "endpoint_model_context":
             if path != family_paths(2)[1]:
                 raise AssertionError("model fixture getter has one separate exact owner")
+            continue
+        if family == 2 and spelling in MODEL_PROJECTION_HELPERS:
+            if path != family_paths(2)[3]:
+                raise AssertionError("complete model projection tasks retain their exact owner")
             continue
         name = renames.get(spelling, spelling)
         if name not in expected or name in locations:
@@ -643,6 +647,53 @@ def native_runner_table(text):
     return raw
 
 
+def model_projection_body_tokens(caller, live, endpoint):
+    caller = list(tokens(caller))
+    calls = (
+        (
+            "live_process_and_thread_match(fixture, expected, process, step, operation, value)",
+            live, False,
+        ),
+        (
+            "endpoint_phase_matches(fixture, expected, process, endpoint, step, operation, value)",
+            endpoint, True,
+        ),
+    )
+    success = list(tokens("return true;"))
+    for call_text, body, phase_exits in calls:
+        call = list(tokens("if (!" + call_text + ") { return false; }"))
+        positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+        if len(positions) != 1:
+            raise AssertionError("model projection preserves exact borrowed objects and caller first failure")
+        body = list(tokens(body))
+        if body[:1] != ["{"] or body[-len(success) - 1:] != success + ["}"]:
+            raise AssertionError("model projection task retains one terminal success")
+        inner = body[1:-len(success) - 1]
+        if "continue" in inner or "goto" in inner:
+            raise AssertionError("model helpers cannot borrow caller loop or label scope")
+        if phase_exits:
+            for phase in ("MODEL_ENDPOINT_UNUSED", "MODEL_ENDPOINT_CLOSED"):
+                head = list(tokens("if (expected->endpoint_phase == " + phase + ") {"))
+                starts = [index for index in range(len(inner)) if inner[index:index + len(head)] == head]
+                if len(starts) != 1:
+                    raise AssertionError("model phase early success has one exact caller-continue context")
+                opening = starts[0] + len(head) - 1
+                depth = 0
+                end = None
+                for index in range(opening, len(inner)):
+                    depth += int(inner[index] == "{") - int(inner[index] == "}")
+                    if depth == 0:
+                        end = index
+                        break
+                if end is None or inner[end - len(success):end] != success:
+                    raise AssertionError("unused/closed success must terminate only its original slot phase")
+                inner[end - len(success):end] = tokens("continue;")
+        if any(inner[index:index + len(success)] == success for index in range(len(inner))):
+            raise AssertionError("helper success cannot bypass remaining slots or aggregate comparison")
+        caller[positions[0]:positions[0] + len(call)] = inner
+    return tuple(caller)
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
     body = tokens(text)
@@ -661,6 +712,11 @@ def original_body_digest(family, name, text):
     if family == 1 and name == "main" and (1, "main") not in LONG_FUNCTION_MIGRATION:
         raw = native_runner_table(source(family_paths(1)[0]))
         body = ("{", *tokens(raw), *body[1:])
+    if family == 2 and name == "validate_model" and (2, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(2)[3])
+        body = model_projection_body_tokens(
+            text, *(c_function_body(owner, helper) for helper in MODEL_PROJECTION_HELPERS),
+        )
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
@@ -961,7 +1017,8 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             expected = ("static struct endpoint_model_fixture model_fixture_state;",) if path == family_paths(2)[1] else ()
             self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, objects)))
             self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
-        self.assertEqual(16, len(owned_definitions(2)))
+        completed_projection = (2, "validate_model") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(16 + len(MODEL_PROJECTION_HELPERS) * completed_projection, len(owned_definitions(2)))
         for name, (path, spelling) in original_locations(2).items():
             body = c_function_body(source(path), spelling)
             if name == "micros_endpoint_model_test_run":
@@ -1009,6 +1066,92 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             tokens(expected),
             model_fixture_body_tokens("micros_endpoint_model_test_run", tokens(current.replace("return false;", "return true;", 1))),
         )
+
+    def test_model_projection_exposes_live_identity_and_endpoint_phase_tasks(self):
+        text = source(family_paths(2)[3])
+        definitions = c_function_definitions(text)
+        base = (
+            "const struct endpoint_model_fixture *fixture, const struct model_slot *expected, "
+            "const struct micros_process *process, "
+        )
+        tail = "size_t step, enum model_operation operation, uint32_t value"
+        expected = {
+            MODEL_PROJECTION_HELPERS[0]: base + tail,
+            MODEL_PROJECTION_HELPERS[1]: base + "const struct micros_endpoint_record *endpoint, " + tail,
+        }
+        for name, parameters in expected.items():
+            with self.subTest(name=name):
+                self.assertIn(name, definitions)
+                self.assertLessEqual(definitions[name], 120)
+                signatures = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures))
+                self.assertEqual(tokens(f"static bool {name}({parameters}) {{"), tokens(signatures[0]))
+        self.assertLessEqual(definitions["endpoint_model_validate_model"], 120)
+
+    def test_model_projection_expands_only_the_two_original_slot_continues(self):
+        live_call = "if (!live_process_and_thread_match(fixture, expected, process, step, operation, value)) { return false; }"
+        endpoint_call = "if (!endpoint_phase_matches(fixture, expected, process, endpoint, step, operation, value)) { return false; }"
+        caller = (
+            "{ validate_header(); for (index = 0; index < SLOTS; ++index) { bind_original_objects(); "
+            "++expected_processes; ++expected_threads; " + live_call + endpoint_call
+            + " } compare_aggregate_counts(); return true; }"
+        )
+        live = "{ if (bad_process()) { return model_fail(); } if (bad_thread()) { return model_fail(); } return true; }"
+        endpoint = (
+            "{ if (expected->endpoint_phase == MODEL_ENDPOINT_UNUSED) { if (bad_unused()) { return model_fail(); } return true; } "
+            "if (expected->endpoint_phase == MODEL_ENDPOINT_CLOSED) { if (bad_closed()) { return model_fail(); } return true; } "
+            "if (bad_binding()) { return model_fail(); } return true; }"
+        )
+        expected = (
+            "{ validate_header(); for (index = 0; index < SLOTS; ++index) { bind_original_objects(); "
+            "++expected_processes; ++expected_threads; "
+            "if (bad_process()) { return model_fail(); } if (bad_thread()) { return model_fail(); } "
+            "if (expected->endpoint_phase == MODEL_ENDPOINT_UNUSED) { if (bad_unused()) { return model_fail(); } continue; } "
+            "if (expected->endpoint_phase == MODEL_ENDPOINT_CLOSED) { if (bad_closed()) { return model_fail(); } continue; } "
+            "if (bad_binding()) { return model_fail(); } } compare_aggregate_counts(); return true; }"
+        )
+        self.assertEqual(tokens(expected), model_projection_body_tokens(caller, live, endpoint))
+        for changed in (
+            caller.replace("expected, process, step", "expected, other, step"),
+            caller.replace("return false;", "return true;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(changed, live, endpoint)
+        for changed in (
+            live.replace("return model_fail();", "return true;", 1),
+            live.replace("return model_fail();", "continue;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(caller, changed, endpoint)
+        with self.assertRaises(AssertionError):
+            model_projection_body_tokens(caller, live, endpoint.replace("MODEL_ENDPOINT_UNUSED", "MODEL_ENDPOINT_ACTIVE"))
+        self.assertNotEqual(
+            tokens(expected), model_projection_body_tokens(caller, live, endpoint.replace("bad_binding", "weakened_binding")),
+        )
+
+    def test_model_private_edges_keep_reference_independent_and_include_address_taken_predicates(self):
+        paths = family_paths(2)
+        definitions = owned_definitions(2)
+        owners = {name: path for path, name in definitions}
+        self.assertEqual(len(definitions), len(owners))
+        allowed = {0: {1, 2, 3, 4}, 1: set(), 2: set(), 3: {1, 2}, 4: {1, 2}}
+        edges = set()
+        exports = set()
+        for name, path in owners.items():
+            referenced = set(re.findall(r"[A-Za-z_]\w*", c_lexical_text(c_function_body(source(path), name))))
+            for callee in referenced & set(owners):
+                dependency = owners[callee]
+                if dependency == path:
+                    continue
+                self.assertIn(paths.index(dependency), allowed[paths.index(path)], (name, callee))
+                edges.add((dependency, path))
+                exports.add(callee)
+        self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
+        declarations = re.findall(
+            r"\b(endpoint_model_\w*)\s*\([^;{}]*\)\s*;", c_lexical_text(source(PRIVATE_HEADERS[2])),
+        )
+        self.assertEqual(len(declarations), len(set(declarations)))
+        self.assertEqual(exports, set(declarations))
 
     def test_validators_expose_exact_profile_record_process_and_thread_passes(self):
         parameters = {
