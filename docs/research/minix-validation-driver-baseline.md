@@ -25,7 +25,7 @@ selection and missing-test skipping belong to that hosted suite, not the
 | Stable named tests with explicit dependencies and per-test outcomes | Baseline parity | Retain every native, model, QEMU and image identity and exact outcome. |
 | Native and OpenSBI/RV64 QEMU workflows instead of a hosted POSIX runner | Required adaptation | Keep existing CMake workflows and deterministic machine-readable results. |
 | Repository-authoritative Git discovery and unknown-input escalation | Compatible extension | ADR-0032 remains authoritative; a caller cannot hide other changes. |
-| Current-candidate command receipts with explicit reused provenance | Compatible extension | Proposed ADR-0064 adds development evidence only, not operating-system behavior. |
+| Current-candidate command receipts with explicit reused provenance | Compatible extension | Accepted ADR-0064 adds development evidence only, not operating-system behavior. |
 | Missing or unsupported gate treated as success or silently skipped | Divergence requiring correction | Such behavior is forbidden; unsatisfied evidence blocks review. |
 
 The MINIX driver is not evidence for a cross-invocation cache. The reuse and
@@ -56,5 +56,5 @@ selected command anew and stores no receipt. Consequently this task concerns
 cross-invocation evidence and narrowly provable ownership, not a missing
 within-plan duplicate check.
 
-See [the proposed decision](../adr/0064-fail-closed-validation-evidence-reuse.md)
+See [the Accepted decision](../adr/0064-fail-closed-validation-evidence-reuse.md)
 and [the exact contract](../architecture/validation-evidence.md).

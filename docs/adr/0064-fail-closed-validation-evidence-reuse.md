@@ -1,9 +1,9 @@
 # ADR-0064: Fail-Closed Validation Evidence Reuse
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
 - Refines: ADR-0031, ADR-0032, ADR-0034
-- Supersedes in part, only after Acceptance:
+- Supersedes in part:
   - ADR-0032's unconditional full-matrix treatment of `CMakeLists.txt`, only
     for the bounded existing-workflow command edits specified below;
   - ADR-0034's requirement to execute a required command again when an exact
@@ -142,8 +142,9 @@ rerun the matrix.
 
 ## Status and phase barrier
 
-This is design only. `validation-plan-dedup-design` is active;
-`validation-plan-dedup-implementation` remains pending until this design is
-independently reviewed, Accepted and merged. No executable implementation,
-tests, models, harnesses, build scaffolding or prototype is authorized before
-that barrier.
+This is Accepted design only, after clean independent review.
+`validation-plan-dedup-implementation` may start only after this design merges
+and must pass its separate implementation review. No executable implementation,
+tests, models, harnesses, build scaffolding or prototype belongs to this
+design pull request. Receipt reuse and narrower classification are not yet
+implemented.

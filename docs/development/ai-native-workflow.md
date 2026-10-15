@@ -265,12 +265,12 @@ the design outcome is on `main`.
 - Prefer one stable verification command per intent over agent-specific command
   sequences.
 
-The Proposed
+The Accepted
 [validation-evidence design](../architecture/validation-evidence.md) preserves
 this rule while distinguishing a future actual command execution from an
 explicitly attributed reuse of that exact current-candidate evidence.
 It is not implemented. Authors and reviewers continue following the existing
-fresh-command contract until the separate design is Accepted and merged.
+fresh-command contract until the separate implementation merges.
 
 ## Evolution
 

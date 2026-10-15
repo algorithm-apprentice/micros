@@ -2,14 +2,15 @@
 
 ## Status and outcome
 
-This is the design contract for Proposed
+This is the design contract for Accepted
 [ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md).
 It is not implemented. Existing fresh planner behavior remains authoritative
-until the separately reviewed design is Accepted and merged.
+until the separately reviewed implementation merges.
 
 The paired tasks are `validation-plan-dedup-design` and
-`validation-plan-dedup-implementation`. The design is active; implementation
-is pending. No executable prototype or build change belongs to design.
+`validation-plan-dedup-implementation`. Independent design review is clean;
+implementation may start only after design merge. No executable prototype or
+build change belongs to design.
 
 The goal is to avoid re-executing an already successful exact current-context
 command, and avoid unrelated guests for a strictly recognizable existing

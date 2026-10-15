@@ -79,4 +79,4 @@ to make the project appear more consistent than it was.
 | [0061](0061-trap-and-syscall-source-decomposition.md) | Trap and syscall source decomposition | Accepted |
 | [0062](0062-kernel-scheduler-source-decomposition.md) | Kernel scheduler source decomposition | Accepted |
 | [0063](0063-user-elf-checker-source-decomposition.md) | User ELF checker source decomposition | Accepted |
-| [0064](0064-fail-closed-validation-evidence-reuse.md) | Fail-closed validation evidence reuse | Proposed |
+| [0064](0064-fail-closed-validation-evidence-reuse.md) | Fail-closed validation evidence reuse | Accepted |

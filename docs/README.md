@@ -54,7 +54,7 @@ This directory contains the design baseline for `micros`.
 - [Development dependency DAG](architecture/development-dag.md) converts the
   cyclic runtime architecture into an acyclic implementation sequence.
 - [Validation evidence and owned build changes](architecture/validation-evidence.md)
-  records the Proposed exact-candidate command-reuse and bounded CMake
+  records the Accepted exact-candidate command-reuse and bounded CMake
   classification contract; existing fresh execution remains authoritative.
 
 ## Research

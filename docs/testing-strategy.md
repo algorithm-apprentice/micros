@@ -672,12 +672,12 @@ header, or QEMU-harness changes run the full tier. Explicit paths are unioned
 with Git discovery; rename discovery classifies both paths. Execution rejects
 remaining untracked files. Every plan ends with separate index, worktree, and
 branch-range diff checks.
-Proposed [ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
+Accepted [ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
 [exact contract](architecture/validation-evidence.md) define an opt-in local
 execution ledger and a bounded existing-workflow CMake exception. They are
 design only: no command reuse or narrower CMake classification is implemented
-or authorized before the separate design merges. Default and full execution
-remain fresh.
+before the separate implementation merges. Default and full execution remain
+fresh.
 RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
 changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
 generated seed source and catalog, seed embedding/generation, and the
