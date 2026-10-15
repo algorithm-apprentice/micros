@@ -208,64 +208,20 @@ enum micros_ramfs_result ramfs_model_reference_mount(
     return MICROS_RAMFS_RESULT_OK;
 }
 
-enum micros_ramfs_result ramfs_model_reference_lookup(
+static enum micros_ramfs_result reference_walk_lookup(
     struct reference_state *reference,
-    uint64_t start_handle,
-    uint64_t root_handle,
+    uint16_t start,
+    uint16_t root,
     const uint8_t *path,
-    size_t length,
+    size_t path_size,
     struct model_fields *fields
 )
 {
-    uint16_t start;
-    uint16_t root;
     uint16_t current;
-    size_t path_size;
     size_t position;
     bool absolute;
     bool trailing = false;
-    enum micros_ramfs_result result;
 
-    result = reference_resolve(
-        reference,
-        start_handle,
-        true,
-        &start
-    );
-    if (result != MICROS_RAMFS_RESULT_OK) {
-        return result;
-    }
-    result = reference_resolve(
-        reference,
-        root_handle,
-        true,
-        &root
-    );
-    if (result != MICROS_RAMFS_RESULT_OK) {
-        return result;
-    }
-    if (!reference_is_directory(&reference->nodes[root])) {
-        return MICROS_RAMFS_RESULT_NOT_DIRECTORY;
-    }
-    if (!reference_is_ancestor(reference, root, start)) {
-        return MICROS_RAMFS_RESULT_RANGE;
-    }
-    if (
-        length == 0
-        || length > MICROS_RAMFS_PATH_MAX
-        || path[length - 1] != 0
-    ) {
-        return MICROS_RAMFS_RESULT_RANGE;
-    }
-    path_size = length - 1;
-    for (position = 0; position < path_size; ++position) {
-        if (path[position] == 0) {
-            return MICROS_RAMFS_RESULT_MALFORMED;
-        }
-    }
-    if (!reference_path_components_are_bounded(path, path_size)) {
-        return MICROS_RAMFS_RESULT_RANGE;
-    }
     absolute = path_size != 0 && path[0] == '/';
     current = absolute ? root : start;
     position = 0;
@@ -343,6 +299,64 @@ enum micros_ramfs_result ramfs_model_reference_lookup(
     fields->file_size = reference->nodes[current].size;
     fields->mode = reference->nodes[current].mode;
     return MICROS_RAMFS_RESULT_OK;
+}
+
+enum micros_ramfs_result ramfs_model_reference_lookup(
+    struct reference_state *reference,
+    uint64_t start_handle,
+    uint64_t root_handle,
+    const uint8_t *path,
+    size_t length,
+    struct model_fields *fields
+)
+{
+    uint16_t start;
+    uint16_t root;
+    size_t path_size;
+    size_t position;
+    enum micros_ramfs_result result;
+
+    result = reference_resolve(
+        reference,
+        start_handle,
+        true,
+        &start
+    );
+    if (result != MICROS_RAMFS_RESULT_OK) {
+        return result;
+    }
+    result = reference_resolve(
+        reference,
+        root_handle,
+        true,
+        &root
+    );
+    if (result != MICROS_RAMFS_RESULT_OK) {
+        return result;
+    }
+    if (!reference_is_directory(&reference->nodes[root])) {
+        return MICROS_RAMFS_RESULT_NOT_DIRECTORY;
+    }
+    if (!reference_is_ancestor(reference, root, start)) {
+        return MICROS_RAMFS_RESULT_RANGE;
+    }
+    if (
+        length == 0
+        || length > MICROS_RAMFS_PATH_MAX
+        || path[length - 1] != 0
+    ) {
+        return MICROS_RAMFS_RESULT_RANGE;
+    }
+    path_size = length - 1;
+    for (position = 0; position < path_size; ++position) {
+        if (path[position] == 0) {
+            return MICROS_RAMFS_RESULT_MALFORMED;
+        }
+    }
+    if (!reference_path_components_are_bounded(path, path_size)) {
+        return MICROS_RAMFS_RESULT_RANGE;
+    }
+    return reference_walk_lookup(reference, start, root, path, path_size, fields);
 }
 
 static bool reference_find_free_node(

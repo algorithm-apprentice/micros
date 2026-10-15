@@ -398,6 +398,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (1, "protocol_mount_and_result_layout_are_exact"),
         (1, "read_write_sparse_and_block_capacity_are_exact"),
         (3, "execute_scripted_operation"),
+        (3, "reference_lookup"),
     )
 )
 
@@ -1020,6 +1021,35 @@ def model_script_body_tokens(caller, setup, proofs):
     )
 
 
+def reference_lookup_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase))
+    current = list(body_tokens(
+        "uint16_t start; uint16_t root; size_t path_size; size_t position; enum micros_ramfs_result result;"
+    ))
+    original = list(body_tokens(
+        "uint16_t start; uint16_t root; uint16_t current; size_t path_size; size_t position; "
+        "bool absolute; bool trailing = false; enum micros_ramfs_result result;"
+    ))
+    locals_ = list(body_tokens(
+        "uint16_t current; size_t position; bool absolute; bool trailing = false;"
+    ))
+    call = list(body_tokens(
+        "return reference_walk_lookup(reference, start, root, path, path_size, fields);"
+    ))
+    if caller[:1] != ["{"] or caller[1:1 + len(current)] != current or caller[-len(call) - 1:-1] != call:
+        raise AssertionError("reference preflight must retain its exact locals and tail-return binding")
+    if phase[:1] != ["{"] or phase[1:1 + len(locals_)] != locals_ or phase[-1:] != ["}"]:
+        raise AssertionError("reference walk must own only its original automatic traversal locals")
+    inner = phase[1 + len(locals_):-1]
+    reset = list(body_tokens(
+        "absolute = path_size != 0 && path[0] == '/'; current = absolute ? root : start; position = 0;"
+    ))
+    if inner[:len(reset)] != reset:
+        raise AssertionError("reference traversal must reset its independent position before use")
+    return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1049,6 +1079,9 @@ def original_body_digest(family, name, text):
             text, c_function_body(owner, MODEL_SCRIPT_PHASES[0]),
             c_function_body(owner, MODEL_SCRIPT_PHASES[1]),
         )
+    if family == 3 and name == "reference_lookup" and (3, name) not in LONG_FUNCTION_MIGRATION:
+        phase = c_function_body(source(family_paths(3)[2]), "reference_walk_lookup")
+        tokens = reference_lookup_body_tokens(text, phase)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1483,7 +1516,8 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 body_tokens(c_function_body(source(paths[1]), getter)),
             )
         completed_script = (3, "execute_scripted_operation") not in LONG_FUNCTION_MIGRATION
-        self.assertEqual(56 + 2 * completed_script, len(owned_definitions(3)))
+        completed_lookup = (3, "reference_lookup") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(56 + 2 * completed_script + completed_lookup, len(owned_definitions(3)))
         self.assertEqual({}, c_function_definitions(header))
         self.assertEqual((), file_scope_objects(header))
         self.assertIn("const struct ramfs_model_seed *ramfs_model_seed_context(void);", header)
@@ -1750,6 +1784,23 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             body_tokens(MODEL_SCRIPT_ROOT),
             body_tokens(c_function_body(text, "ramfs_model_execute_scripted_operation")),
         )
+
+    def test_reference_lookup_exposes_independent_checked_walk_and_publication(self):
+        text = source(family_paths(3)[2])
+        definitions = c_function_definitions(text)
+        self.assertIn("reference_walk_lookup", definitions)
+        self.assertLessEqual(definitions["reference_walk_lookup"], 120)
+        self.assertLessEqual(definitions["ramfs_model_reference_lookup"], 120)
+        signature = re.findall(
+            r"(?m)^static enum micros_ramfs_result reference_walk_lookup\([^;{}]*\)\s*\{", text,
+        )
+        self.assertEqual(1, len(signature))
+        expected = (
+            "static enum micros_ramfs_result reference_walk_lookup("
+            "struct reference_state *reference, uint16_t start, uint16_t root, "
+            "const uint8_t *path, size_t path_size, struct model_fields *fields) {"
+        )
+        self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -2241,6 +2292,42 @@ def render_fixture(image, limit):
         self.assertNotEqual(
             body_tokens(expected),
             model_script_body_tokens(MODEL_SCRIPT_ROOT, setup.replace("operation3", "operation4"), proofs),
+        )
+
+    def test_reference_walk_projection_keeps_preflight_error_precedence_and_direct_publication(self):
+        current = (
+            "uint16_t start; uint16_t root; size_t path_size; size_t position; enum micros_ramfs_result result;"
+        )
+        original = (
+            "uint16_t start; uint16_t root; uint16_t current; size_t path_size; size_t position; "
+            "bool absolute; bool trailing = false; enum micros_ramfs_result result;"
+        )
+        locals_ = "uint16_t current; size_t position; bool absolute; bool trailing = false;"
+        reset = "absolute = path_size != 0 && path[0] == '/'; current = absolute ? root : start; position = 0;"
+        tail = "if (bad_path()) { return NOT_FOUND; } publish(); return OK;"
+        caller = (
+            "{ " + current + " validate_all_components(); "
+            "return reference_walk_lookup(reference, start, root, path, path_size, fields); }"
+        )
+        phase = "{ " + locals_ + reset + tail + " }"
+        expected = "{ " + original + " validate_all_components(); " + reset + tail + " }"
+        self.assertEqual(body_tokens(expected), reference_lookup_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("return reference_walk_lookup", "reference_walk_lookup"),
+            caller.replace("start, root, path", "root, start, path"),
+            caller.replace("size_t position", "static size_t position"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                reference_lookup_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("bool trailing = false", "static bool trailing = false"),
+            phase.replace("position = 0", "position = 1"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                reference_lookup_body_tokens(caller, changed)
+        self.assertNotEqual(
+            body_tokens(expected),
+            reference_lookup_body_tokens(caller, phase.replace("return NOT_FOUND", "return OK")),
         )
 
 

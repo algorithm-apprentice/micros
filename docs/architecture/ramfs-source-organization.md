@@ -525,7 +525,12 @@ root handle and preserve the full first-failure order. The model script now
 has a 9-line selector and 73/81-line setup/proof tasks. Exact step partitions
 0-5 and 6-15, one common root query, direct returns, and both false defaults
 reconstruct the immutable sixteen-step switch. Its five readonly arrays
-retain distinct static duration and are not duplicated. Eight C semantic
+retain distinct static duration and are not duplicated. Independent reference
+lookup now has a 57-line complete preflight and 92-line confined walk/ref
+publication task. Its exact tail-call/local projection retains full path-byte
+and component validation before traversal, error precedence, confinement,
+automatic traversal storage and final reference mutation; expected logic
+still does not use production helpers. Seven C semantic
 migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
