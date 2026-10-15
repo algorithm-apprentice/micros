@@ -546,7 +546,11 @@ Independent model comparison now has a 72-line header/free-slot/count outline
 and 46/78-line live-identity and endpoint-phase tasks. Exact scope-aware
 projection restores only the original unused/closed slot `continue` exits;
 helper-local success cannot skip remaining slots, trace diagnostics or
-aggregate counts. Six original long-function migrations remain pending,
+aggregate counts. The held-thread native scenario now has three 47/51/41-line
+installation-denial, profile-publication and close/cleanup tasks with a
+ten-line root. Its only work fields are the original endpoint and context;
+only the original context-pattern initializer runs, without aggregate zeroing
+or a second context. Five original long-function migrations remain pending,
 including the target entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is

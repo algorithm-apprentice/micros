@@ -3,6 +3,11 @@
 
 #include <string.h>
 
+struct endpoint_held_case {
+    micros_endpoint_t endpoint;
+    struct micros_user_context context;
+};
+
 bool endpoint_test_lifecycle_and_authorization(void)
 {
     struct endpoint_test_fixture *fixture = endpoint_test_context();
@@ -226,13 +231,11 @@ bool endpoint_test_lifecycle_and_authorization(void)
     return true;
 }
 
-bool endpoint_test_profile_install_and_close_require_held_threads(void)
+static bool held_installation_denied(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_held_case *work
+)
 {
-    struct endpoint_test_fixture *fixture = endpoint_test_context();
-    micros_endpoint_t endpoint;
-    struct micros_user_context context =
-        endpoint_test_context_pattern(UINT64_C(0x1000));
-
     EXPECT_TRUE(endpoint_test_setup_lifecycle_fixture(fixture));
     EXPECT_ERROR(
         MICROS_ENDPOINT_OK,
@@ -240,7 +243,7 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
             &fixture->registry,
             &fixture->objects,
             fixture->processes[0],
-            &endpoint
+            &work->endpoint
         )
     );
     EXPECT_OBJECT_ERROR(
@@ -250,7 +253,7 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
             fixture->threads[0],
             UINT64_C(0x10000000),
             UINT64_C(0x10004000),
-            &context
+            &work->context
         )
     );
     EXPECT_OBJECT_ERROR(
@@ -273,6 +276,14 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
             1
         )
     );
+    return true;
+}
+
+static bool held_profile_publication(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_held_case *work
+)
+{
     EXPECT_OBJECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_thread_scheduler_hold(&fixture->objects, fixture->threads[0])
@@ -295,7 +306,7 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
         micros_endpoint_activate(
             &fixture->registry,
             &fixture->objects,
-            endpoint
+            work->endpoint
         )
     );
     EXPECT_OBJECT_ERROR(
@@ -314,9 +325,17 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
         micros_endpoint_close(
             &fixture->registry,
             &fixture->objects,
-            endpoint
+            work->endpoint
         )
     );
+    return true;
+}
+
+static bool held_close_and_cleanup(
+    struct endpoint_test_fixture *fixture,
+    struct endpoint_held_case *work
+)
+{
     EXPECT_OBJECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_thread_scheduler_hold(&fixture->objects, fixture->threads[0])
@@ -326,7 +345,7 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
         micros_endpoint_close(
             &fixture->registry,
             &fixture->objects,
-            endpoint
+            work->endpoint
         )
     );
     EXPECT_TRUE(
@@ -340,7 +359,7 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
             &fixture->registry,
             &fixture->objects,
             fixture->processes[0],
-            &endpoint
+            &work->endpoint
         )
     );
     EXPECT_OBJECT_ERROR(
@@ -352,6 +371,17 @@ bool endpoint_test_profile_install_and_close_require_held_threads(void)
         micros_thread_detach_execution_context(&fixture->objects, fixture->threads[0])
     );
     return true;
+}
+
+bool endpoint_test_profile_install_and_close_require_held_threads(void)
+{
+    struct endpoint_test_fixture *fixture = endpoint_test_context();
+    struct endpoint_held_case work;
+
+    work.context = endpoint_test_context_pattern(UINT64_C(0x1000));
+    return held_installation_denied(fixture, &work)
+        && held_profile_publication(fixture, &work)
+        && held_close_and_cleanup(fixture, &work);
 }
 
 bool endpoint_test_reuse_rejects_stale_generation(void)

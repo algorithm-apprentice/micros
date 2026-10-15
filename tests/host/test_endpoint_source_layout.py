@@ -182,7 +182,6 @@ SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = (
     (1, "test_invalid_profile_tables_preserve_storage"),
     (1, "test_endpoint_lifecycle_and_authorization"),
-    (1, "test_profile_install_and_close_require_held_threads"),
     (1, "test_source_only_seal_preserves_staged_source"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
@@ -214,6 +213,22 @@ INITIALIZER_HELPERS = (
     "prepare_profile_candidates", "candidate_targets_are_closed", "publish_profile_table",
 )
 MODEL_PROJECTION_HELPERS = ("live_process_and_thread_match", "endpoint_phase_matches")
+NATIVE_CASE_WORK = {
+    "test_profile_install_and_close_require_held_threads": {
+        "owner": 5,
+        "tag": "endpoint_held_case",
+        "fields": ("endpoint", "context"),
+        "declarations": "micros_endpoint_t endpoint; struct micros_user_context context;",
+        "original": (
+            "micros_endpoint_t endpoint; "
+            "struct micros_user_context context = endpoint_test_context_pattern(UINT64_C(0x1000));"
+        ),
+        "outlined": (
+            "struct endpoint_held_case work; work.context = endpoint_test_context_pattern(UINT64_C(0x1000));"
+        ),
+        "phases": ("held_installation_denied", "held_profile_publication", "held_close_and_cleanup"),
+    },
+}
 CORE_DAG = {
     0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
     5: {1, 2}, 6: {1, 2, 5}, 7: {3, 4, 5, 6},
@@ -411,6 +426,16 @@ def original_locations(family):
     renames = normal_names(family)
     locations = {}
     for path, spelling in owned_definitions(family):
+        if family == 1 and any(
+            spelling in specification["phases"] for specification in NATIVE_CASE_WORK.values()
+        ):
+            owners = [
+                family_paths(1)[specification["owner"]] for specification in NATIVE_CASE_WORK.values()
+                if spelling in specification["phases"]
+            ]
+            if owners != [path]:
+                raise AssertionError("native case phases retain their exact case owner")
+            continue
         if family == 0 and spelling in INITIALIZER_HELPERS:
             if path != family_paths(0)[3]:
                 raise AssertionError("profile initialization phases retain one exact owner")
@@ -647,6 +672,52 @@ def native_runner_table(text):
     return raw
 
 
+def native_case_body_tokens(caller, specification, bodies):
+    caller = list(tokens(caller))
+    borrow = list(tokens("struct endpoint_test_fixture *fixture = endpoint_test_context();"))
+    outlined = list(tokens(specification["outlined"]))
+    if caller[:1 + len(borrow) + len(outlined)] != ["{"] + borrow + outlined:
+        raise AssertionError("native work is automatic and initializes only its original declared values")
+    tail = list(tokens(
+        "return " + " && ".join(phase + "(fixture, &work)" for phase in specification["phases"]) + ";"
+    ))
+    if caller != ["{"] + borrow + outlined + tail + ["}"]:
+        raise AssertionError("native case phases preserve ordered first-failure AND and exact work binding")
+    result = ["{"] + borrow + list(tokens(specification["original"]))
+    success = list(tokens("return true;"))
+    if len(bodies) != len(specification["phases"]):
+        raise AssertionError("native case phase inventory is exact")
+    for body in bodies:
+        body = list(tokens(body))
+        if body[:1] != ["{"] or body[-len(success) - 1:] != success + ["}"]:
+            raise AssertionError("native phase retains one terminal success")
+        inner = body[1:-len(success) - 1]
+        for index, token in enumerate(inner):
+            if token == "return" and inner[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError("callee-local success cannot bypass later native case work")
+        if "goto" in inner:
+            raise AssertionError("native case phases cannot borrow caller labels")
+        result.extend(inner)
+    result.extend(success + ["}"])
+    restored = []
+    index = 0
+    while index < len(result):
+        if result[index:index + 2] in (["work", "->"], ["work", "."]):
+            if index != 0 and result[index - 1] in (".", "->"):
+                raise AssertionError("work transport cannot turn an existing structure member into a global root")
+            field = result[index + 2:index + 3]
+            if not field or field[0] not in specification["fields"]:
+                raise AssertionError("native work contains only the original typed automatic objects")
+            restored.extend(field)
+            index += 3
+        else:
+            if result[index] == "work":
+                raise AssertionError("native work cannot be copied, blanket-cleared, retained or published")
+            restored.append(result[index])
+            index += 1
+    return tuple(restored)
+
+
 def model_projection_body_tokens(caller, live, endpoint):
     caller = list(tokens(caller))
     calls = (
@@ -712,6 +783,12 @@ def original_body_digest(family, name, text):
     if family == 1 and name == "main" and (1, "main") not in LONG_FUNCTION_MIGRATION:
         raw = native_runner_table(source(family_paths(1)[0]))
         body = ("{", *tokens(raw), *body[1:])
+    if family == 1 and name in NATIVE_CASE_WORK and (1, name) not in LONG_FUNCTION_MIGRATION:
+        specification = NATIVE_CASE_WORK[name]
+        owner = source(family_paths(1)[specification["owner"]])
+        body = native_case_body_tokens(
+            text, specification, [c_function_body(owner, phase) for phase in specification["phases"]],
+        )
     if family == 2 and name == "validate_model" and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
         body = model_projection_body_tokens(
@@ -912,7 +989,11 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             tokens("{ return &fixture_state; }"), tokens(c_function_body(fixture, "endpoint_test_context")),
         )
         self.assertEqual(1, fixture.count("static struct endpoint_test_fixture fixture_state;"))
-        self.assertEqual(16, len(owned_definitions(1)))
+        completed_phases = sum(
+            len(specification["phases"]) for name, specification in NATIVE_CASE_WORK.items()
+            if (1, name) not in LONG_FUNCTION_MIGRATION
+        )
+        self.assertEqual(16 + completed_phases, len(owned_definitions(1)))
         for path in family_paths(1):
             expected = ("static struct endpoint_test_fixture fixture_state;",) if path == family_paths(1)[1] else ()
             if path == family_paths(1)[0] and (1, "main") not in LONG_FUNCTION_MIGRATION:
@@ -972,6 +1053,61 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         ):
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
                 native_runner_table(changed)
+
+    def test_native_case_work_exposes_exact_automatic_objects_and_named_tasks(self):
+        for original, specification in NATIVE_CASE_WORK.items():
+            text = source(family_paths(1)[specification["owner"]])
+            definitions = c_function_definitions(text)
+            fields = re.findall(r"struct " + specification["tag"] + r"\s*\{([^{}]*)\}", text)
+            self.assertEqual(1, len(fields))
+            self.assertEqual(tokens(specification["declarations"]), tokens(fields[0]))
+            self.assertLessEqual(definitions[native_name(original)], 120)
+            for phase in specification["phases"]:
+                self.assertIn(phase, definitions)
+                self.assertLessEqual(definitions[phase], 120)
+                signatures = re.findall(rf"(?m)^static bool {phase}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures))
+                self.assertEqual(tokens(
+                    "static bool " + phase + "(struct endpoint_test_fixture *fixture, struct "
+                    + specification["tag"] + " *work) {"
+                ), tokens(signatures[0]))
+
+    def test_native_work_projection_retains_initializer_lifetime_and_macro_failure_order(self):
+        specification = NATIVE_CASE_WORK["test_profile_install_and_close_require_held_threads"]
+        borrow = "struct endpoint_test_fixture *fixture = endpoint_test_context();"
+        caller = "{ " + borrow + specification["outlined"] + "return " + " && ".join(
+            phase + "(fixture, &work)" for phase in specification["phases"]
+        ) + "; }"
+        bodies = (
+            "{ reserve(&work->endpoint); attach(&work->context); return true; }",
+            "{ if (bad()) { return false; } publish(work->endpoint); return true; }",
+            "{ close_and_cleanup(work->endpoint); return true; }",
+        )
+        expected = (
+            "{ " + borrow + specification["original"]
+            + "reserve(&endpoint); attach(&context); if (bad()) { return false; } "
+            "publish(endpoint); close_and_cleanup(endpoint); return true; }"
+        )
+        self.assertEqual(tokens(expected), native_case_body_tokens(caller, specification, bodies))
+        for changed in (
+            caller.replace("struct endpoint_held_case work", "static struct endpoint_held_case work"),
+            caller.replace("held_profile_publication(fixture, &work)", "held_profile_publication(fixture, &copy)"),
+            caller.replace("&& held_close", "|| held_close"),
+            caller.replace("return held_installation", "memset(&work, 0, sizeof(work)); return held_installation"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_case_body_tokens(changed, specification, bodies)
+        for changed in (
+            bodies[1].replace("return false;", "return true;"),
+            bodies[1].replace("publish(work->endpoint);", "save(work);"),
+            bodies[1].replace("work->endpoint", "work->unknown"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_case_body_tokens(caller, specification, (bodies[0], changed, bodies[2]))
+        self.assertNotEqual(
+            tokens(expected),
+            native_case_body_tokens(caller, specification, (bodies[0], bodies[1].replace("publish", "changed_publish"), bodies[2])),
+        )
 
     def test_raw_runner_extraction_preserves_literals_callback_types_and_scope(self):
         raw = (
