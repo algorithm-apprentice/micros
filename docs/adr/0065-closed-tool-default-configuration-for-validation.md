@@ -89,10 +89,18 @@ relocated data roots and compiled default-config location must match this
 reviewed layout. Unknown layouts or any file, directory, symlink or unreadable
 state at either location are ineligible. No user configuration is opened,
 interpreted, copied or silently disabled.
+The bounded resolver requires the selected QEMU major11 image to contain
+the expected NUL-terminated absolute versioned default-config path, after
+deduplicating identical spellings across architecture slices. A different
+matching config spelling is unsupported. Its actual `-L help` roots must
+stay under that same selected installation.
 
 The current no-explicit-configuration guest command remains unchanged.
 An explicit config option or response input makes the profile ineligible.
 This is stricter receipt eligibility, not a change to guest invocation.
+The argument builder is bound to the reviewed `build_qemu_command` in
+`tools/run_qemu_smoke.py` at `0f61a2b2ff2b80aa34f55c51352407090f96b5d0`;
+another builder requires a separately reviewed closure declaration.
 
 ## Preserved invariants and non-goals
 
