@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tools import validation_context
+from tools import validation_build_manifest, validation_context
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -190,24 +190,24 @@ class ValidationContextTests(unittest.TestCase):
         )
         second = first.replace("0x1", "0xaa").replace("0x2", "0xbb").replace("0x3", "0xcc")
         self.assertEqual(
-            validation_context.graph_nodes(first), validation_context.graph_nodes(second)
+            validation_build_manifest.graph_nodes(first), validation_build_manifest.graph_nodes(second)
         )
-        self.assertEqual(("file.c", "file.o"), validation_context.graph_nodes(first)["files"])
+        self.assertEqual(("file.c", "file.o"), validation_build_manifest.graph_nodes(first)["files"])
         self.assertEqual(
             ("file.c", "file.o"),
-            validation_context.graph_nodes(
+            validation_build_manifest.graph_nodes(
                 first.replace("arrowhead=none", "arrowhead=none style=dotted")
             )["files"],
         )
         sibling = first.replace('}\n', '"0x2" -> "0xff"\n}\n')
         self.assertEqual(
             ("C_COMPILER__test_Debug",),
-            validation_context.graph_nodes(sibling)["unselected_outputs"],
+            validation_build_manifest.graph_nodes(sibling)["unselected_outputs"],
         )
         with self.assertRaises(validation_context.UnsupportedContext):
-            validation_context.graph_nodes(first.replace('}\n', '"0xff" -> "0x2"\n}\n'))
+            validation_build_manifest.graph_nodes(first.replace('}\n', '"0xff" -> "0x2"\n}\n'))
         with self.assertRaises(validation_context.UnsupportedContext):
-            validation_context.graph_nodes(first.replace("file.c", "unclosed\\q"))
+            validation_build_manifest.graph_nodes(first.replace("file.c", "unclosed\\q"))
 
     def test_command_manifest_rejects_new_shell_or_dynamic_resolution(self):
         for command in (
@@ -218,10 +218,10 @@ class ValidationContextTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 with self.assertRaises(validation_context.UnsupportedContext):
-                    validation_context.command_tools(command, self.root, {"/tool/compiler"})
+                    validation_build_manifest.command_tools(command, self.root, {"/tool/compiler"})
         self.assertEqual(
             {"/tool/compiler"},
-            validation_context.command_tools(
+            validation_build_manifest.command_tools(
                 f"cd {self.root} && /tool/compiler source.c && :",
                 self.root, {"/tool/compiler"},
             ),
@@ -249,14 +249,14 @@ class ValidationContextTests(unittest.TestCase):
 
     def test_native_outputs_include_every_case_and_slow_model_label(self):
         build, inventory = self.native_fixture()
-        files = validation_context.native_outputs(self.root, build, inventory)
+        files = validation_build_manifest.native_outputs(self.root, build, inventory)
         self.assertEqual({build / "fast_test", build / "model_test"}, set(files))
         seed = build / "seed.bin"
         seed.write_bytes(b"fixture data")
         inventory["tests"][0]["command"].append(str(seed))
         self.assertEqual(
             (build / "fast_test", build / "model_test"),
-            validation_context.native_runtime_executables(inventory),
+            validation_build_manifest.native_runtime_executables(inventory),
         )
         for changed in ("missing", "label", "command", "argument"):
             altered = copy.deepcopy(inventory)
@@ -270,7 +270,7 @@ class ValidationContextTests(unittest.TestCase):
                 altered["tests"][-1]["command"].append("/tmp/external")
             with self.subTest(changed=changed):
                 with self.assertRaises(validation_context.UnsupportedContext):
-                    validation_context.native_outputs(self.root, build, altered)
+                    validation_build_manifest.native_outputs(self.root, build, altered)
 
     def test_macho_install_id_is_not_an_unresolved_runtime_dependency(self):
         library = self.root / "Python3"
@@ -398,7 +398,7 @@ class ValidationContextTests(unittest.TestCase):
         ):
             with self.subTest(argument=argument):
                 with self.assertRaises(validation_context.UnsupportedContext):
-                    validation_context.command_tools(
+                    validation_build_manifest.command_tools(
                         "/tool/compiler " + argument, self.root, {"/tool/compiler"}
                     )
 

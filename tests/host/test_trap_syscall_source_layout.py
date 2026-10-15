@@ -1827,6 +1827,9 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
                 "tests/host/test_validation_context.py",
                 "tools/validation_execution.py",
                 "tests/host/test_validation_execution.py",
+                "tools/validation_inputs.py",
+                "tools/validation_build_manifest.py",
+                "tests/host/test_validation_context_layout.py",
                 "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
             }
             value = ast.literal_eval(node.value)

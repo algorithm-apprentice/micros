@@ -9,10 +9,14 @@ from pathlib import Path
 import platform
 import plistlib
 import re
-import shlex
 import shutil
 import stat
-import subprocess
+
+from tools.validation_build_manifest import _build_manifest, native_runtime_executables
+from tools.validation_inputs import (
+    SYSTEM_ROOTS, UnsupportedContext, _absent_paths, _file_digest, _file_identity,
+    _inside, _json_digest, _run, fingerprint_tree,
+)
 
 
 PROFILE_NAME = "darwin-arm64-ninja-v1"
@@ -26,16 +30,11 @@ RECIPE_DIGESTS = {
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
 QEMU_RUNNER_DIGEST = "9e54f744074d077d05b52880495b73f7c74ae1db0a6ad751f8b7024688bf79e3"
-SYSTEM_ROOTS = (Path("/usr/bin"), Path("/usr/lib"), Path("/System/Library"))
 STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))
 VENDOR_STARTUP = {
     "Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth":
         "7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373",
 }
-
-
-class UnsupportedContext(ValueError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -45,69 +44,6 @@ class Profile:
     target: str
     target_build: bool
     cache_variables: dict
-
-
-def _json_digest(value):
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
-
-
-def _inside(path, roots):
-    return any(path == root or root in path.parents for root in roots)
-
-
-def _file_digest(path):
-    before = path.stat()
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    after = path.stat()
-    if (
-        before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_mode,
-    ) != (
-        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_mode,
-    ):
-        raise UnsupportedContext("input changed while being fingerprinted")
-    return digest.hexdigest()
-
-
-def fingerprint_tree(path, admitted_roots):
-    path = Path(path)
-    roots = tuple(Path(root).resolve() for root in admitted_roots)
-    digest = hashlib.sha256()
-
-    def visit(selected, relative):
-        information = selected.lstat()
-        mode = information.st_mode
-        entry = [relative, stat.S_IMODE(mode)]
-        if stat.S_ISLNK(mode):
-            try:
-                resolved = selected.resolve(strict=True)
-            except (OSError, RuntimeError) as error:
-                raise UnsupportedContext("unresolved manifest link") from error
-            if not _inside(resolved, (*roots, *SYSTEM_ROOTS)):
-                raise UnsupportedContext("manifest link escapes admitted roots")
-            entry.extend(("link", os.readlink(selected), str(resolved)))
-        elif stat.S_ISREG(mode):
-            entry.extend(("file", information.st_size, _file_digest(selected)))
-        elif stat.S_ISDIR(mode):
-            entry.append("directory")
-        else:
-            raise UnsupportedContext("unsupported input kind")
-        digest.update(json.dumps(entry, ensure_ascii=True, separators=(",", ":")).encode())
-        digest.update(b"\n")
-        if stat.S_ISDIR(mode):
-            children = sorted(selected.iterdir(), key=lambda child: child.name)
-            for child in children:
-                visit(child, relative + "/" + child.name)
-            after = selected.stat()
-            if (information.st_ino, information.st_mtime_ns) != (after.st_ino, after.st_mtime_ns):
-                raise UnsupportedContext("directory changed while being fingerprinted")
-
-    visit(path, ".")
-    return digest.hexdigest()
 
 
 def environment_digest(environment):
@@ -164,18 +100,6 @@ def validate_sdk_environment(environment, sdk, toolchain):
                 raise UnsupportedContext(f"{name} escapes the declared SDK/toolchain roots")
 
 
-def _absent_paths(paths):
-    identities = {}
-    for path in paths:
-        try:
-            path.lstat()
-        except FileNotFoundError:
-            identities[str(path)] = "absent"
-        else:
-            raise UnsupportedContext("standard fallback search root exists outside the admitted closure")
-    return identities
-
-
 def validate_python_startup(framework, environment):
     if environment.get("SETUPTOOLS_USE_DISTUTILS", "stdlib") != "stdlib":
         raise UnsupportedContext("vendor distutils import redirection is unsupported")
@@ -185,19 +109,6 @@ def validate_python_startup(framework, environment):
         expected = VENDOR_STARTUP.get(str(path.relative_to(framework)))
         if path.is_symlink() or expected is None or _file_digest(path) != expected:
             raise UnsupportedContext("unreviewed Python startup declaration")
-
-
-def _run(command, *, cwd=None):
-    try:
-        completed = subprocess.run(
-            tuple(map(str, command)), cwd=cwd, check=False,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise UnsupportedContext(f"metadata query unavailable: {Path(command[0]).name}") from error
-    if completed.returncode != 0:
-        raise UnsupportedContext(f"metadata query failed: {Path(command[0]).name}")
-    return completed.stdout
 
 
 def platform_identity(*, system=None, machine=None):
@@ -292,135 +203,6 @@ def resolve_preset(root, workflow):
     ):
         raise UnsupportedContext("configure preset differs from the reviewed profile")
     return Profile(configure, root / "build" / configure, target, target_build, expected_variables)
-
-
-def graph_nodes(content):
-    nodes = {}
-    edges = []
-    identifier = r'"(0x[0-9a-fA-F]+)"'
-    for line in content.splitlines():
-        if line in (
-            "digraph ninja {", 'rankdir="LR"', "}",
-            "node [fontsize=10, shape=box, height=0.25]", "edge [fontsize=10]",
-        ):
-            continue
-        node = re.fullmatch(
-            identifier + r' \[label=("(?:[^"\\]|\\.)*")(, shape=ellipse)?\]', line,
-        )
-        if node:
-            if node[1] in nodes:
-                raise UnsupportedContext("duplicate Ninja graph identity")
-            try:
-                nodes[node[1]] = (json.loads(node[2]), bool(node[3]))
-            except ValueError as error:
-                raise UnsupportedContext("unsupported Ninja graph escape") from error
-            continue
-        edge = re.fullmatch(
-            identifier + " -> " + identifier
-            + r'(?: \[(arrowhead=none(?: style=dotted)?|style=dotted|label=" phony")\])?', line,
-        )
-        if not edge:
-            raise UnsupportedContext("unsupported Ninja graph grammar")
-        edges.append((edge[1], edge[2], edge[3]))
-    unselected = []
-    selected_edges = []
-    for first, last, attribute in edges:
-        if first not in nodes:
-            raise UnsupportedContext("incomplete Ninja input graph")
-        if last not in nodes:
-            if not nodes[first][1]:
-                raise UnsupportedContext("unrecognized incomplete Ninja edge")
-            unselected.append(nodes[first][0])
-        else:
-            selected_edges.append((first, last, attribute))
-    if not nodes:
-        raise UnsupportedContext("empty Ninja graph")
-    return {
-        "files": tuple(sorted(value for value, rule in nodes.values() if not rule)),
-        "rules": tuple(sorted({value for value, rule in nodes.values() if rule})),
-        "edges": tuple(sorted(
-            (nodes[first][0], nodes[last][0], attribute or "")
-            for first, last, attribute in selected_edges
-        )),
-        "unselected_outputs": tuple(sorted(unselected)),
-    }
-
-
-def command_tools(content, root, allowed):
-    tools = set()
-    for line in content.splitlines():
-        if any(marker in line for marker in ("$(", "${", "`")):
-            raise UnsupportedContext("dynamic command resolution is unsupported")
-        lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|<>")
-        lexer.whitespace_split = True
-        lexer.commenters = ""
-        blocks = [[]]
-        try:
-            for token in lexer:
-                if any(
-                    part.startswith(("@", "--config")) for part in token.split(",")
-                ):
-                    raise UnsupportedContext("explicit configuration/response input is unsupported")
-                if token == "&&":
-                    blocks.append([])
-                elif token and all(character in ";&|<>" for character in token):
-                    raise UnsupportedContext("unreviewed shell operator")
-                else:
-                    blocks[-1].append(token)
-        except ValueError as error:
-            raise UnsupportedContext("unsupported generated command quoting") from error
-        for block in blocks:
-            if not block:
-                raise UnsupportedContext("empty generated command")
-            if block == [":"]:
-                continue
-            if block[0] == "cd":
-                if len(block) != 2 or not _inside(Path(block[1]).resolve(), (Path(root),)):
-                    raise UnsupportedContext("generated command escapes the repository")
-                continue
-            if block[0] not in allowed:
-                raise UnsupportedContext("unreviewed generated command executable")
-            tools.add(block[0])
-    return tools
-
-
-def native_outputs(root, directory, inventory):
-    source = (Path(root) / "CMakeLists.txt").read_text(encoding="utf-8")
-    declared = re.findall(
-        r"add_test\(\s*NAME\s+([A-Za-z0-9_-]+)\s+COMMAND\s+([A-Za-z0-9_]+)", source,
-    )
-    expected = dict(declared)
-    slow = set(re.findall(
-        r"set_tests_properties\(\s*([A-Za-z0-9_-]+)\s+PROPERTIES\s+LABELS\s+slow\s*\)",
-        source,
-    ))
-    tests = inventory.get("tests", [])
-    names = [test.get("name") for test in tests]
-    if len(expected) != len(declared) or len(names) != len(set(names)) or set(names) != set(expected):
-        raise UnsupportedContext("complete native CTest inventory differs from committed tests")
-    outputs = set()
-    for test in tests:
-        name = test["name"]
-        command = test.get("command", [])
-        if not command or Path(command[0]) != directory / expected[name]:
-            raise UnsupportedContext("native executable inventory differs from committed tests")
-        properties = {item["name"]: item["value"] for item in test.get("properties", [])}
-        if set(properties) - {"WORKING_DIRECTORY", "LABELS"}:
-            raise UnsupportedContext("unreviewed CTest runtime properties")
-        if properties.get("WORKING_DIRECTORY", str(directory)) != str(directory):
-            raise UnsupportedContext("unreviewed CTest working directory")
-        if (name in slow) != ("slow" in properties.get("LABELS", [])):
-            raise UnsupportedContext("slow CTest model inclusion differs from committed tests")
-        for argument in command:
-            path = Path(argument)
-            if not path.is_absolute() or not _inside(path.resolve(), (directory,)) or not path.is_file():
-                raise UnsupportedContext("unclosed native executable or file argument")
-            outputs.add(path)
-    return tuple(sorted(outputs))
-
-
-def native_runtime_executables(inventory):
-    return tuple(sorted({Path(test["command"][0]) for test in inventory["tests"]}))
 
 
 @dataclass(frozen=True)
@@ -541,16 +323,6 @@ def _cache(root, profile):
         if key.endswith("_FLAGS_DEBUG") and value not in ("", "-g"):
             raise UnsupportedContext("unreviewed Debug flag override")
     return values
-
-
-def _file_identity(path):
-    information = path.lstat()
-    if not stat.S_ISREG(information.st_mode):
-        raise UnsupportedContext("artifact/input is not a regular file")
-    return {
-        "kind": "file", "mode": stat.S_IMODE(information.st_mode),
-        "size": information.st_size, "sha256": _file_digest(path),
-    }
 
 
 def _cellar_root(path):
@@ -836,109 +608,6 @@ class DarwinTools:
             "firmware": {"path": str(firmware.resolve()), **_file_identity(firmware.resolve())},
             "configuration": configuration,
         }
-
-
-def _generator_inputs(directory):
-    pending = [directory / "build.ninja", directory / "CMakeCache.txt"]
-    pending.extend(sorted(directory.glob("CMakeFiles/*/CMake*.cmake")))
-    if not any(path.name == "CMakeCCompiler.cmake" for path in pending):
-        raise UnsupportedContext("configured compiler metadata is missing")
-    result = {}
-    while pending:
-        path = pending.pop()
-        if not _inside(path.resolve(), (directory,)):
-            raise UnsupportedContext("external generator include is unsupported")
-        name = str(path.relative_to(directory))
-        if name in result:
-            continue
-        result[name] = _file_identity(path)
-        if path.suffix == ".ninja":
-            for spelling in re.findall(r"(?m)^(?:include|subninja) (.+)$", path.read_text()):
-                if "$" in spelling:
-                    raise UnsupportedContext("dynamic generator include is unsupported")
-                pending.append(directory / spelling)
-    return result
-
-
-def _dependency_inputs(tools, selected):
-    content = _run((tools.executables["ninja"]["path"], "-C", tools.profile.directory, "-t", "deps")).decode()
-    active = False
-    dependencies = set()
-    for line in content.splitlines():
-        header = re.fullmatch(r"(.+): #deps \d+, deps mtime \d+ \((VALID|STALE)\)", line)
-        if header:
-            active = header[1] in selected
-            if active and header[2] != "VALID":
-                raise UnsupportedContext("selected compiler dependency record is stale")
-        elif line.startswith("    ") and active:
-            spelling = line[4:]
-            path = Path(spelling)
-            if not path.is_absolute():
-                path = tools.profile.directory / path
-            dependencies.add(path)
-        elif line:
-            raise UnsupportedContext("unrecognized compiler dependency metadata")
-    return dependencies
-
-
-def _build_manifest(root, profile, tools):
-    ninja = tools.executables["ninja"]["path"]
-    graph = graph_nodes(_run((ninja, "-C", profile.directory, "-t", "graph", profile.target)).decode())
-    if any(
-        rule not in ("phony", "CUSTOM_COMMAND")
-        and not rule.startswith(("C_COMPILER__", "ASM_COMPILER__", "C_EXECUTABLE_LINKER__"))
-        for rule in graph["rules"]
-    ):
-        raise UnsupportedContext("unreviewed selected build rule")
-    commands = _run((ninja, "-C", profile.directory, "-t", "commands", profile.target)).decode()
-    allowed = {
-        value for tool in tools.executables.values() for value in tool.values()
-    }
-    command_tools(commands, root, allowed)
-    rules = {}
-    for line in _run((ninja, "-C", profile.directory, "-t", "targets", "all")).decode().splitlines():
-        name, separator, rule = line.rpartition(": ")
-        if not separator:
-            raise UnsupportedContext("unrecognized Ninja target metadata")
-        rules[name] = rule
-    outputs = set()
-    inputs = set()
-    for spelling in graph["files"]:
-        path = Path(spelling)
-        if not path.is_absolute():
-            path = profile.directory / path
-        if path.is_file():
-            (outputs if _inside(path.resolve(), (profile.directory,)) else inputs).add(path)
-        elif path in (root, profile.directory) and path.is_dir():
-            continue
-        elif rules.get(spelling) not in ("phony", "CUSTOM_COMMAND"):
-            raise UnsupportedContext("selected artifact/input is missing or unrecognized")
-    for spelling in rules:
-        path = profile.directory / spelling
-        if _inside(path.resolve(), (profile.directory,)) and path.is_file():
-            outputs.add(path)
-    selected = {str(path.relative_to(profile.directory)) for path in outputs}
-    inputs.update(_dependency_inputs(tools, selected))
-    inventory = None
-    if profile.target_build:
-        prefix = "kernel/micros" if profile.target == "test-qemu-smoke" else "bootstrap/micros-tty-service"
-        outputs.update(profile.directory / (prefix + suffix) for suffix in (".elf", ".map"))
-    else:
-        inventory = json.loads(_run((
-            tools.executables["ctest"]["path"], "--test-dir", profile.directory, "--show-only=json-v1",
-        )))
-        outputs.update(native_outputs(root, profile.directory, inventory))
-    regular_inputs = {}
-    for path in sorted(inputs):
-        resolved = path.resolve(strict=True)
-        if not _inside(resolved, (root,)):
-            tools._admit(resolved)
-        regular_inputs[str(path)] = _file_identity(resolved)
-    return {
-        "generator": _generator_inputs(profile.directory),
-        "graph": graph, "commands_sha256": hashlib.sha256(commands.encode()).hexdigest(),
-        "compiler_inputs": regular_inputs, "ctest": inventory,
-    }, outputs
 
 
 def collect(root, workflow):

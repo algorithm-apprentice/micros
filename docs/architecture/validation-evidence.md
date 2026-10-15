@@ -391,7 +391,9 @@ gate. No slice may relax the Accepted contract or its independent oracles.
 | --- | --- |
 | `tools/validation_plan.py` | Existing root/discovery/inventory/selection facade and CLI |
 | `tools/validation_evidence.py` | Ledger ownership, strict receipts, complete logs and atomic invalidation/publication |
-| `tools/validation_context.py` | Exact staged/source identity and the fixed closed tool/runtime/build/artifact manifests |
+| `tools/validation_context.py` | Exact staged/source identity, fixed tool/runtime profile and complete-manifest orchestration |
+| `tools/validation_inputs.py` | Shared content/mode/membership identities and bounded read-only metadata I/O |
+| `tools/validation_build_manifest.py` | Selected Ninja/CTest recipes, dependency records and complete artifact inventories |
 | `tools/validation_execution.py` | Canonical execution, source/context postflight, receipt consumption and attributed outcomes |
 | `tools/validation_build_impact.py` | Bounded before/after CMake recognition and explicit impact result |
 | Corresponding focused host tests | Independent receipt/classifier negative cases and fake subprocess counts |
@@ -401,6 +403,12 @@ No production or operating-system interface changes. No test success is
 inferred from an artifact without an actual successful producer execution.
 The independent source-layout expectations must not import production owner
 tables simply to remove duplication.
+
+The private dependency direction is planner -> execution -> context ->
+selected-build manifest -> input identities. Context also reads the input
+identity owner directly; neither leaf imports the facade, execution or
+planner. Frozen function-body evidence preserves the extracted algorithms,
+and explicit import/ownership tests protect the narrow shared contract.
 
 ## Acceptance evidence
 
