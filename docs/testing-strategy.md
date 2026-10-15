@@ -678,9 +678,10 @@ execution ledger and a bounded existing-workflow CMake exception. They are
 design only: no command reuse or narrower CMake classification is implemented
 before the separate implementation merges. Default and full execution remain
 fresh.
-The initial-profile implementation is currently blocked by Proposed
+The initial-profile implementation follows Accepted
 [ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md);
-the default-configuration correction does not reduce any validation gate.
+it restarts after corrective design merge. The correction does not reduce
+any validation gate.
 RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
 changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
 generated seed source and catalog, seed embedding/generation, and the

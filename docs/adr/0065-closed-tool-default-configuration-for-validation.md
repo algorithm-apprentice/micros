@@ -1,9 +1,9 @@
 # ADR-0065: Closed Tool Default Configuration for Validation
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
 - Refines: ADR-0032, ADR-0033, ADR-0034, ADR-0064
-- Supersedes in part, only after Acceptance: ADR-0064's initial admitted-root
+- Supersedes in part: ADR-0064's initial admitted-root
   restriction, solely for the selected Homebrew LLVM installation's
   recognized `etc/clang` configuration alias under the conditions below
 
@@ -17,8 +17,9 @@ The initial profile's strict root check correctly refuses both target
 workflows instead of publishing incomplete evidence.
 
 The author preserved three green commits, closed #130 without merging and
-abandoned its branch. Implementation remains blocked while this corrective
-design is reviewed. No native/QEMU/image execution or receipt-reuse success
+abandoned its branch. Independent corrective design review is clean;
+implementation remains blocked until this design merges.
+No native/QEMU/image execution or receipt-reuse success
 was inferred from the read-only metadata probes.
 
 This is a development-tool closure correction, not a MINIX runtime change.
@@ -124,10 +125,10 @@ Installed paths and content digests remain runtime data.
 
 ## Acceptance and phase barrier
 
-Design authors only documents and passes documentation/structure plus the
-three diff checks. Independent design review must be clean before Acceptance
-and merge. No implementation, tests, models, harnesses or prototype belongs
-to this corrective design.
+This Accepted design contains only documents and passes
+documentation/structure plus the three diff checks. Independent correction
+review reports no substantive issue. No implementation, tests, models,
+harnesses or prototype belongs to this corrective design.
 
 Only then may `validation-plan-dedup-implementation` restart from current
 `main`, referencing this design and #129. It must test alias mutation,

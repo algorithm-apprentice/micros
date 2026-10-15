@@ -70,7 +70,7 @@ ineligible. Native metadata closure is not a native gate execution or proof
 that the target profiles work.
 
 The fixed LLVM driver source linked by
-[Proposed ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
+[Accepted ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
 separates disabled automatic loading from still-possible explicit loading.
 That requires both a declared disable policy and exclusion of explicit,
 response and unresolved injected options; hashing a directory alone cannot

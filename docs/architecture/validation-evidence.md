@@ -224,16 +224,16 @@ are not. An unreadable tree, escaping/unknown link or dependency makes reuse
 ineligible. Runtime-discovered installation paths/digests are data, not an
 opportunity to extend these admitted input classes.
 
-### Proposed default-configuration correction
+### Accepted default-configuration correction
 
-Proposed
+Accepted
 [ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
 corrects the concrete initial-profile omission found in abandoned
-implementation #130. It is not active before separate design review,
-Acceptance and merge. The implementation todo is blocked in the meantime.
+implementation #130. Independent correction review is clean. Implementation
+may restart only after this separate design merges.
 Unknown roots continue to be rejected; no workaround was merged.
 
-After that barrier, the initial profile requires an inherited
+The corrected initial profile requires an inherited
 `CLANG_NO_DEFAULT_CONFIG=1` and excludes explicit compiler configuration,
 response files and unresolved argument-injection environment. Only the
 selected LLVM Cellar installation's `etc/clang` alias may add the derived
