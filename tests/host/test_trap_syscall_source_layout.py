@@ -1821,6 +1821,8 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
             additions = {
                 "tools/validation_build_impact.py",
                 "tests/host/test_validation_build_impact.py",
+                "tools/validation_evidence.py",
+                "tests/host/test_validation_evidence.py",
                 "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
             }
             value = ast.literal_eval(node.value)
