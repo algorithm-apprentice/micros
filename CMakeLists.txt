@@ -274,6 +274,16 @@ set(
 )
 
 set(
+    MICROS_RAMFS_HOST_TEST_SOURCES
+    tests/host/ramfs_test.c
+    tests/host/ramfs_test_fixture.c
+    tests/host/ramfs_protocol_test.c
+    tests/host/ramfs_namespace_test.c
+    tests/host/ramfs_io_test.c
+    tests/host/ramfs_directory_test.c
+)
+
+set(
     MICROS_RAMFS_SEED_IMAGE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/ramfs_seed.bin"
 )
@@ -1395,7 +1405,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ramfs_test
         ${MICROS_RAMFS_CORE_SOURCES}
         servers/ramfs/ramfs_seed.c
-        tests/host/ramfs_test.c
+        ${MICROS_RAMFS_HOST_TEST_SOURCES}
     )
     add_dependencies(ramfs_test ramfs_seed_image)
     add_executable(

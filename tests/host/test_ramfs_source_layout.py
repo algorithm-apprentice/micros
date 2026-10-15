@@ -13,6 +13,7 @@ from unittest.mock import patch
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text
 from tests.host.test_kernel_bootstrap_source_layout import c_function_body
 from tests.host.test_pm_service_source_layout import cmake_commands
+from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
 
@@ -79,6 +80,20 @@ PRIVATE_HEADERS = (
     "kernel/ramfs_service_test_internal.h",
 )
 FAMILY_PREFIXES = ("ramfs_", "ramfs_test_", "ramfs_seed_test_", "ramfs_model_", "vfs_", "ramfs_test_")
+FUNCTIONAL_CONTEXT_FIELDS = (
+    "seed_image", "seed_image_size", "state", "state_snapshot",
+    "corrupt_state", "storage_snapshot", "bus",
+)
+FUNCTIONAL_CONTEXT_FUNCTIONS = (
+    "load_seed", "reset_bus", "call_expect", "failure_preserves_state",
+    "initialize_unmounted", "initialize_mounted", "write_grant_bytes",
+    "lookup_path", "create_node", "seed_state_is_exact_and_invariants_fail_closed",
+    "protocol_mount_and_result_layout_are_exact",
+    "lookup_semantics_and_reference_limits_are_exact",
+    "handles_create_mkdir_and_capacity_are_exact",
+    "read_write_sparse_and_block_capacity_are_exact",
+    "getdents_cursor_and_records_are_exact", "putnode_and_handle_validation_are_exact",
+)
 
 ORIGINAL_FUNCTIONS = (
     {
@@ -203,7 +218,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (1, 2, 3, 4, 5)
+    entry for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] in (2, 3, 4, 5)
 )
 LONG_FUNCTION_MIGRATION = LONG_FUNCTIONS
 
@@ -480,6 +495,60 @@ def normal_names(family):
     }
 
 
+def functional_transport_tokens(name, tokens):
+    tokens = list(tokens)
+    if name == "main":
+        binding = list(body_tokens(
+            "struct ramfs_test_fixture *fixture = ramfs_test_context();"
+        ))
+        if tokens[1:1 + len(binding)] != binding:
+            raise AssertionError("functional main must borrow its sole typed fixture once")
+        del tokens[1:1 + len(binding)]
+    functions = {
+        spelling for original in FUNCTIONAL_CONTEXT_FUNCTIONS
+        for spelling in (original, "ramfs_test_" + original)
+    }
+    output = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if tokens[index:index + 3] == ["fixture", "-", ">"]:
+            if index + 3 >= len(tokens) or tokens[index + 3] not in FUNCTIONAL_CONTEXT_FIELDS:
+                raise AssertionError("unknown functional fixture field")
+            output.append(tokens[index + 3])
+            index += 4
+        elif token in functions and tokens[index + 1:index + 2] == ["("]:
+            if tokens[index + 2:index + 3] != ["fixture"]:
+                raise AssertionError("fixture transport must pass the same borrowed context first")
+            delimiter = tokens[index + 3:index + 4]
+            if delimiter not in ([","], [")"]):
+                raise AssertionError("invalid functional context argument")
+            output.extend((token, "("))
+            index += 4 if delimiter == [","] else 3
+        else:
+            output.append(token)
+            index += 1
+    return tuple(output)
+
+
+def original_body_digest(family, name, text):
+    tokens = body_tokens(text)
+    if family == 1 and (ROOT / PRIVATE_HEADERS[1]).exists():
+        tokens = functional_transport_tokens(name, tokens)
+    renames = normal_names(family)
+    if family == 1:
+        constants = {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"}
+        for index, token in enumerate(tokens):
+            if token in constants and (
+                tokens[index - 1:index] == (".",)
+                or tokens[max(0, index - 2):index] == ("-", ">")
+            ):
+                raise AssertionError("a fixture global alias cannot rename a structure member")
+        renames.update(constants)
+    normalized = tuple(renames.get(token, token) for token in tokens)
+    return digest_bytes(json.dumps(normalized, separators=(",", ":")).encode())
+
+
 def restored_cmake(text):
     for family, (name, paths) in enumerate(SOURCE_SETS.items()):
         blocks = cmake_commands(text, "set", name)
@@ -577,6 +646,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
         header = source(PRIVATE_HEADERS[0])
         self.assertEqual({}, c_function_definitions(header))
+        self.assertEqual((), file_scope_objects(header))
         declarations = re.findall(
             r"\b(ramfs_[A-Za-z_]\w*)\s*\([^;{}]*\)\s*;", c_lexical_text(header),
         )
@@ -598,7 +668,72 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             source(paths[3]),
         )
         for path in paths:
-            self.assertNotIn("static struct micros_ramfs_state", source(path))
+            self.assertEqual((), file_scope_objects(source(path)))
+
+    def test_functional_fixture_types_lifetime_and_only_borrow_are_exact(self):
+        paths = family_paths(1)
+        header = source(PRIVATE_HEADERS[1])
+        expected_fields = {
+            "test_bus": (
+                "uint8_t storage[TEST_GRANT_CAPACITY]; bool reject; bool invariant; "
+                "size_t calls; enum micros_ramfs_copy_direction last_direction; "
+                "uint64_t last_offset; size_t last_length;"
+            ),
+            "ramfs_test_fixture": (
+                "uint8_t seed_image[MICROS_RAMFS_SEED_IMAGE_MAX]; size_t seed_image_size; "
+                "struct micros_ramfs_state state; struct micros_ramfs_state state_snapshot; "
+                "struct micros_ramfs_state corrupt_state; "
+                "uint8_t storage_snapshot[TEST_GRANT_CAPACITY]; struct test_bus bus;"
+            ),
+        }
+        for tag, fields in expected_fields.items():
+            record = re.findall(rf"\bstruct\s+{tag}\s*\{{([^{{}}]*)\}}", header)
+            self.assertEqual(1, len(record), tag)
+            self.assertEqual(body_tokens(fields), body_tokens(record[0]), tag)
+        self.assertIn("TEST_GRANT = 1,", header)
+        self.assertIn("TEST_GRANT_CAPACITY = 8192,", header)
+        macro = header[header.index("#define EXPECT_TRUE"):header.index("\nenum {")].strip()
+        self.assertEqual(
+            "dc1fbf95f12b7896694addb93aa8603ed20b7bd57022a9d01f7b8c7342234fb6",
+            body_digest(macro),
+        )
+        expected_objects = (
+            "static struct ramfs_test_fixture test_fixture;",
+            "const micros_endpoint_t ramfs_test_vfs_endpoint = UINT32_C(0x00001005);",
+            "const struct micros_ramfs_io ramfs_test_io = { "
+            ".copy = test_copy, .context = &test_fixture.bus, };",
+        )
+        for path in paths:
+            expected = expected_objects if path == paths[1] else ()
+            self.assertEqual(
+                tuple(map(body_tokens, expected)),
+                tuple(map(body_tokens, file_scope_objects(source(path)))),
+                path,
+            )
+        self.assertEqual(
+            body_tokens("{ return &test_fixture; }"),
+            body_tokens(c_function_body(source(paths[1]), "ramfs_test_context")),
+        )
+        definitions = owned_definitions(1)
+        self.assertEqual(31, len(definitions))
+        for owner, names in ORIGINAL_FUNCTIONS[1].items():
+            for name in names:
+                if name not in FUNCTIONAL_CONTEXT_FUNCTIONS:
+                    continue
+                path, spelling = original_location(1, owner, name, definitions)
+                self.assertEqual(1, len(re.findall(
+                    rf"\b{spelling}\s*\(\s*struct\s+ramfs_test_fixture\s*\*\s*fixture\s*[,)]",
+                    c_lexical_text(source(path)),
+                )), spelling)
+        self.assertEqual({}, c_function_definitions(header))
+        self.assertEqual(
+            tuple(map(body_tokens, (
+                "extern const micros_endpoint_t ramfs_test_vfs_endpoint;",
+                "extern const struct micros_ramfs_io ramfs_test_io;",
+            ))),
+            tuple(map(body_tokens, re.findall(r"(?m)^extern[^;]*;", header))),
+        )
+        self.assertEqual((), file_scope_objects(header))
 
     def test_original_bodies_remain_frozen_during_owner_moves(self):
         for family, owners in enumerate(ORIGINAL_FUNCTIONS):
@@ -609,7 +744,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                         path, spelling = original_location(family, owner, name, definitions)
                         self.assertEqual(
                             BASELINE_BODIES[family][name],
-                            body_digest(c_function_body(source(path), spelling), normal_names(family)),
+                            original_body_digest(family, name, c_function_body(source(path), spelling)),
                         )
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
@@ -736,6 +871,39 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             ):
                 with self.subTest(definitions=definitions), self.assertRaises(AssertionError):
                     original_location(0, 1, "zero_bytes", definitions)
+
+    def test_typed_fixture_transport_preserves_fields_calls_literals_and_caller_exits(self):
+        original = '{ state_snapshot = state; if (!load_seed(path)) return false; bus.calls = 0; }'
+        transported = (
+            '{ fixture->state_snapshot = fixture->state; '
+            'if (!ramfs_test_load_seed(fixture, path)) return false; fixture->bus.calls = 0; }'
+        )
+        normalized = functional_transport_tokens("case", body_tokens(transported))
+        self.assertEqual(
+            body_tokens(original),
+            tuple(normal_names(1).get(token, token) for token in normalized),
+        )
+        for changed in (
+            transported.replace("fixture, path", "other, path"),
+            transported.replace("fixture->state_snapshot", "fixture->unreviewed"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                functional_transport_tokens("case", body_tokens(changed))
+        for changed in (
+            transported.replace("return false", "return true"),
+            transported.replace("= 0", "= 1"),
+            transported.replace("state_snapshot = fixture->state", "state = fixture->state_snapshot"),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(normalized, functional_transport_tokens("case", body_tokens(changed)))
+        with self.assertRaises(AssertionError):
+            functional_transport_tokens("main", body_tokens('{ if (!load_seed(path)) return false; }'))
+
+    def test_fixture_transport_never_renames_a_member_as_a_global_constant(self):
+        with self.assertRaises(AssertionError):
+            original_body_digest(
+                1, "case", "{ fixture->corrupt_state.ramfs_test_vfs_endpoint = 5; }",
+            )
 
 
 if __name__ == "__main__":
