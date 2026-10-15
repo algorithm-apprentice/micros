@@ -6,6 +6,13 @@ import os
 import re
 import shlex
 import subprocess
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools import validation_build_impact
 
 
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
@@ -126,7 +133,10 @@ IMAGE_INPUTS = {
 PLANNER_INPUTS = (
     "tools/validation_plan.py",
     "tests/host/test_validation_plan.py",
+    "tools/validation_build_impact.py",
+    "tests/host/test_validation_build_impact.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
+    "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
 )
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
@@ -1914,6 +1924,25 @@ def changed_paths(base, root):
     return sorted(paths)
 
 
+def repository_plan(root, paths, tier, base="origin/main"):
+    if tier == "full" or "CMakeLists.txt" not in paths:
+        return plan(paths, tier, base)
+    owners = validation_build_impact.discover(root, base)
+    if owners is None:
+        return plan(paths, tier, base)
+    remaining = [path for path in paths if path != "CMakeLists.txt"]
+    commands = plan(remaining, tier, base)[:-3]
+    if not any(command in (UNIT_FAST, UNIT_FULL) for command in commands):
+        commands.insert(0, UNIT_FAST if tier == "fast" else UNIT_FULL)
+    if tier == "pr":
+        append_unique(commands, SMOKE)
+    for name in QEMU_WORKFLOWS:
+        if name in owners:
+            append_unique(commands, workflow(name))
+    commands.extend(diff_commands(base))
+    return commands
+
+
 def untracked_paths(root):
     completed = subprocess.run(
         ("git", "ls-files", "--others", "--exclude-standard"),
@@ -2087,7 +2116,7 @@ def main(argv=None):
         paths = combine_paths(discovered, explicit)
     except ValueError as error:
         raise SystemExit(str(error)) from error
-    commands = plan(paths, arguments.tier, arguments.base)
+    commands = repository_plan(root, paths, arguments.tier, arguments.base)
 
     if arguments.execute:
         try:

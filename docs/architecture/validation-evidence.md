@@ -377,6 +377,13 @@ remains exact. Full remains coverage-equivalent to the documented matrix.
 
 ## Responsibility owners
 
+Implementation follows merged design #129 at
+`0f61a2b2ff2b80aa34f55c51352407090f96b5d0`, in these green slices:
+bounded CMake/Git-layer classification; receipt identity/publication and
+failure tests; supported context/artifact closure; canonical CLI execution
+and provenance; then actual recording/reuse and the fresh full milestone
+gate. No slice may relax the Accepted contract or its independent oracles.
+
 | Planned owner | Responsibility |
 | --- | --- |
 | `tools/validation_plan.py` | Existing root/discovery/inventory/selection facade and CLI |
