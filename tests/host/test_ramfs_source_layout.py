@@ -248,6 +248,35 @@ FUNCTIONAL_CASE_WORK = {
         ),
     },
 }
+PEER_READONLY_STATICS = (
+    'static const uint8_t motd_path[] = "/etc/motd"; '
+    'static const uint8_t motd[] = MICROS_RAMFS_TEST_MOTD; '
+    'static const uint8_t tmp_name[] = "tmp"; '
+    'static const uint8_t note_name[] = "note"; '
+    'static const uint8_t note_data[] = MICROS_RAMFS_TEST_NOTE_DATA; '
+    "static const uint8_t sparse_read[] = { 0, 0, 0, 'n', 'o', 't', 'e', };"
+)
+PEER_CASE_WORK = {
+    "owner": 3,
+    "tag": "ramfs_filesystem_case",
+    "fields": ("result", "root", "motd_node", "tmp_node", "note_node", "stale_node"),
+    "schema": (
+        "struct vfs_ramfs_result result; uint64_t root; uint64_t motd_node; "
+        "uint64_t tmp_node; uint64_t note_node; uint64_t stale_node;"
+    ),
+    "original": PEER_READONLY_STATICS + (
+        " struct vfs_ramfs_result result; uint64_t root; uint64_t motd_node; "
+        "uint64_t tmp_node; uint64_t note_node; uint64_t stale_node;"
+    ),
+    "outlined": "struct ramfs_filesystem_case work;",
+    "phases": (
+        ("filesystem_mount_seed", ("fixture", "&work")),
+        ("filesystem_seed_rights_eof", ("fixture", "&work")),
+        ("filesystem_stale_and_directory", ("fixture", "&work")),
+        ("filesystem_file_reference", ("fixture", "&work")),
+        ("filesystem_sparse_directory_release", ("fixture", "&work")),
+    ),
+}
 DATA_RENAMES = {
     1: {"ramfs_test_io": "test_io", "ramfs_test_vfs_endpoint": "vfs_endpoint"},
     3: {"ramfs_model_io": "model_io"},
@@ -401,6 +430,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (3, "reference_lookup"),
         (0, "handle_create_or_mkdir"),
         (0, "handle_lookup"),
+        (4, "vfs_run_filesystem_scenario"),
     )
 )
 
@@ -828,6 +858,17 @@ def peer_read_tokens(name, tokens):
     return tuple(output)
 
 
+def peer_readonly_data(text):
+    starts = tuple(re.finditer(r"(?m)^static const uint8_t motd_path\[\]\s*=", text))
+    ends = tuple(re.finditer(r"(?m)^static bool filesystem_mount_seed\(", text))
+    if len(starts) != 1 or len(ends) != 1 or starts[0].start() >= ends[0].start():
+        raise AssertionError("peer scenario must own one exact readonly static array block")
+    data = text[starts[0].start():ends[0].start()]
+    if body_tokens(data) != body_tokens(PEER_READONLY_STATICS):
+        raise AssertionError("peer static arrays changed literal values, const/static lifetime or membership")
+    return data
+
+
 def dispatcher_body_tokens(caller, phase):
     caller = list(body_tokens(caller))
     phase = list(body_tokens(phase))
@@ -1226,6 +1267,14 @@ def original_body_digest(family, name, text):
     if family == 3 and name == "reference_lookup" and (3, name) not in LONG_FUNCTION_MIGRATION:
         phase = c_function_body(source(family_paths(3)[2]), "reference_walk_lookup")
         tokens = reference_lookup_body_tokens(text, phase)
+    if family == 4 and name == "vfs_run_filesystem_scenario" and (4, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(4)[3])
+        peer_readonly_data(owner)
+        phases = [
+            (phase, c_function_body(owner, phase[0]))
+            for phase in PEER_CASE_WORK["phases"]
+        ]
+        tokens = work_record_tokens(bool_case_body_tokens(text, phases), PEER_CASE_WORK)
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1727,7 +1776,13 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             "static volatile uint64_t vfs_initialized_data = UINT64_C(0x52414d4653564653);",
         )
         for path in paths:
-            expected = objects if path == paths[1] else ()
+            if path == paths[1]:
+                expected = objects
+            elif path == paths[3] and (4, "vfs_run_filesystem_scenario") not in LONG_FUNCTION_MIGRATION:
+                peer_readonly_data(source(path))
+                expected = file_scope_objects(PEER_READONLY_STATICS)
+            else:
+                expected = ()
             self.assertEqual(
                 tuple(map(body_tokens, expected)),
                 tuple(map(body_tokens, file_scope_objects(source(path)))),
@@ -1740,7 +1795,8 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 body_tokens("{ return " + expression + "; }"),
                 body_tokens(c_function_body(source(paths[1]), getter)),
             )
-        self.assertEqual(38, len(owned_definitions(4)))
+        completed_scenario = (4, "vfs_run_filesystem_scenario") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(38 + 5 * completed_scenario, len(owned_definitions(4)))
         self.assertEqual(21, len(fixture_parameter_matches(4)))
         for spelling, count in fixture_parameter_matches(4):
             self.assertEqual(1, count, spelling)
@@ -2000,6 +2056,24 @@ class RamfsSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, len(signatures))
             self.assertEqual(body_tokens(expected), body_tokens(signatures[0]))
         self.assertLessEqual(definitions["ramfs_handle_lookup"], 120)
+
+    def test_peer_scenario_exposes_exact_automatic_work_and_single_static_arrays(self):
+        text = source(family_paths(4)[3])
+        specification = PEER_CASE_WORK
+        fields = re.findall(r"struct ramfs_filesystem_case\s*\{([^{}]*)\}", text)
+        self.assertEqual(1, len(fields))
+        self.assertEqual(body_tokens(specification["schema"]), body_tokens(fields[0]))
+        definitions = c_function_definitions(text)
+        self.assertLessEqual(definitions["vfs_run_filesystem_scenario"], 120)
+        for name, _ in specification["phases"]:
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            signatures = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+            self.assertEqual(1, len(signatures))
+            self.assertEqual(body_tokens(
+                f"static bool {name}(struct vfs_service_fixture *fixture, struct ramfs_filesystem_case *work) {{"
+            ), body_tokens(signatures[0]))
+        self.assertEqual("", macro_definition_text(text))
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -2492,6 +2566,18 @@ def render_fixture(image, limit):
             body_tokens(expected),
             model_script_body_tokens(MODEL_SCRIPT_ROOT, setup.replace("operation3", "operation4"), proofs),
         )
+
+    def test_peer_static_array_check_preserves_actual_literals_and_original_lifetime(self):
+        text = PEER_READONLY_STATICS.replace("; ", ";\n") + "\nstatic bool filesystem_mount_seed(void) { return true; }\n"
+        self.assertEqual(body_tokens(PEER_READONLY_STATICS), body_tokens(peer_readonly_data(text)))
+        for changed in (
+            text.replace('"/etc/motd"', '"/tmp/motd"'),
+            text.replace("static const uint8_t motd_path", "const uint8_t motd_path"),
+            text.replace("static const uint8_t motd_path[]", "static const uint8_t motd_path[20]"),
+            text.replace("static bool filesystem_mount_seed", "static const uint8_t extra[] = {0};\nstatic bool filesystem_mount_seed"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                peer_readonly_data(changed)
 
     def test_reference_walk_projection_keeps_preflight_error_precedence_and_direct_publication(self):
         current = (

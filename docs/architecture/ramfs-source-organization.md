@@ -541,8 +541,13 @@ traversal and ordinary-error cleanup, and 24-line scratch-tolerant validation
 and reference publication. Exact nested projection preserves missing-name
 versus later-overlong-component precedence, empty/trailing path rules,
 confinement, refcount overflow, every scratch-clear exit and mutation order.
-Five C semantic
-migrations remain pending, alongside the specified
+The target filesystem scenario now has five ordered mount/seed, rights/EOF,
+stale/directory, file-reference, and sparse/enumeration/release tasks with a
+12-line root. Its original result and five handle locals remain one
+uninitialized automatic work record. The six unique readonly arrays retain
+static duration in the same owner; actual raw literals and const/static
+declarations are checked before reconstructing their original local prefix.
+Four C semantic migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
 
