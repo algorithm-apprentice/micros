@@ -87,103 +87,44 @@ static bool path_components_are_bounded(
     return true;
 }
 
-enum micros_ramfs_core_error ramfs_handle_lookup(
+static enum micros_ramfs_core_error publish_lookup_reference(
     struct micros_ramfs_state *state,
-    const struct micros_ramfs_request *request,
-    const struct micros_ramfs_io *io,
+    uint16_t current_slot,
     struct ramfs_result_fields *fields,
     enum micros_ramfs_result *result
 )
 {
-    const struct micros_ramfs_node *start;
-    const struct micros_ramfs_node *root;
-    uint16_t start_slot;
-    uint16_t root_slot;
-    uint16_t current_slot;
-    size_t path_size;
-    size_t position;
-    bool absolute;
-    bool trailing_separator = false;
-    enum micros_ramfs_copy_result copy_result;
-
-    *result = ramfs_resolve_referenced_node(
-        state,
-        request->start,
-        &start_slot,
-        &start
-    );
-    if (*result != MICROS_RAMFS_RESULT_OK) {
-        return MICROS_RAMFS_CORE_OK;
-    }
-    *result = ramfs_resolve_referenced_node(
-        state,
-        request->root,
-        &root_slot,
-        &root
-    );
-    if (*result != MICROS_RAMFS_RESULT_OK) {
-        return MICROS_RAMFS_CORE_OK;
-    }
-    if (!ramfs_node_is_directory(root)) {
-        *result = MICROS_RAMFS_RESULT_NOT_DIRECTORY;
-        return MICROS_RAMFS_CORE_OK;
-    }
-    if (!is_ancestor(state, root_slot, start_slot)) {
-        *result = MICROS_RAMFS_RESULT_RANGE;
-        return MICROS_RAMFS_CORE_OK;
-    }
     if (
-        request->length == 0
-        || request->length > MICROS_RAMFS_PATH_MAX
-        || UINT64_MAX - request->grant_offset < request->length
+        ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK
     ) {
-        *result = MICROS_RAMFS_RESULT_RANGE;
-        return MICROS_RAMFS_CORE_OK;
-    }
-
-    copy_result = ramfs_copy_grant(
-        state,
-        io,
-        MICROS_RAMFS_COPY_FROM_VFS,
-        request->grant,
-        request->grant_offset,
-        state->scratch,
-        request->length
-    );
-    if (copy_result == MICROS_RAMFS_COPY_INVARIANT) {
         ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
         return MICROS_RAMFS_CORE_ERROR_INVARIANT;
     }
-    if (copy_result == MICROS_RAMFS_COPY_REJECTED) {
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        *result = MICROS_RAMFS_RESULT_GRANT;
-        return MICROS_RAMFS_CORE_OK;
-    }
+    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+    ++state->nodes[current_slot].reference_count;
+    fields->node = ramfs_node_handle(
+        current_slot,
+        &state->nodes[current_slot]
+    );
+    fields->file_size = state->nodes[current_slot].size;
+    fields->mode = state->nodes[current_slot].mode;
+    *result = MICROS_RAMFS_RESULT_OK;
+    return MICROS_RAMFS_CORE_OK;
+}
 
-    path_size = request->length - 1;
-    if (
-        state->scratch[path_size] != 0
-        || !ramfs_bytes_are_zero(
-            &state->scratch[path_size],
-            1
-        )
-    ) {
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        *result = MICROS_RAMFS_RESULT_MALFORMED;
-        return MICROS_RAMFS_CORE_OK;
-    }
-    for (position = 0; position < path_size; ++position) {
-        if (state->scratch[position] == 0) {
-            ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-            *result = MICROS_RAMFS_RESULT_MALFORMED;
-            return MICROS_RAMFS_CORE_OK;
-        }
-    }
-    if (!path_components_are_bounded(state->scratch, path_size)) {
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        *result = MICROS_RAMFS_RESULT_RANGE;
-        return MICROS_RAMFS_CORE_OK;
-    }
+static enum micros_ramfs_core_error walk_staged_lookup(
+    struct micros_ramfs_state *state,
+    uint16_t start_slot,
+    uint16_t root_slot,
+    size_t path_size,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result
+)
+{
+    uint16_t current_slot;
+    size_t position;
+    bool absolute;
+    bool trailing_separator = false;
 
     absolute = path_size != 0 && state->scratch[0] == '/';
     current_slot = absolute ? root_slot : start_slot;
@@ -275,26 +216,120 @@ enum micros_ramfs_core_error ramfs_handle_lookup(
         *result = MICROS_RAMFS_RESULT_NO_SPACE;
         goto lookup_done;
     }
-    if (
-        ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK
-    ) {
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-    }
-    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-    ++state->nodes[current_slot].reference_count;
-    fields->node = ramfs_node_handle(
+    return publish_lookup_reference(
+        state,
         current_slot,
-        &state->nodes[current_slot]
+        fields,
+        result
     );
-    fields->file_size = state->nodes[current_slot].size;
-    fields->mode = state->nodes[current_slot].mode;
-    *result = MICROS_RAMFS_RESULT_OK;
-    return MICROS_RAMFS_CORE_OK;
 
 lookup_done:
     ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
     return MICROS_RAMFS_CORE_OK;
+}
+
+enum micros_ramfs_core_error ramfs_handle_lookup(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    const struct micros_ramfs_io *io,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result
+)
+{
+    const struct micros_ramfs_node *start;
+    const struct micros_ramfs_node *root;
+    uint16_t start_slot;
+    uint16_t root_slot;
+    size_t path_size;
+    size_t position;
+    enum micros_ramfs_copy_result copy_result;
+
+    *result = ramfs_resolve_referenced_node(
+        state,
+        request->start,
+        &start_slot,
+        &start
+    );
+    if (*result != MICROS_RAMFS_RESULT_OK) {
+        return MICROS_RAMFS_CORE_OK;
+    }
+    *result = ramfs_resolve_referenced_node(
+        state,
+        request->root,
+        &root_slot,
+        &root
+    );
+    if (*result != MICROS_RAMFS_RESULT_OK) {
+        return MICROS_RAMFS_CORE_OK;
+    }
+    if (!ramfs_node_is_directory(root)) {
+        *result = MICROS_RAMFS_RESULT_NOT_DIRECTORY;
+        return MICROS_RAMFS_CORE_OK;
+    }
+    if (!is_ancestor(state, root_slot, start_slot)) {
+        *result = MICROS_RAMFS_RESULT_RANGE;
+        return MICROS_RAMFS_CORE_OK;
+    }
+    if (
+        request->length == 0
+        || request->length > MICROS_RAMFS_PATH_MAX
+        || UINT64_MAX - request->grant_offset < request->length
+    ) {
+        *result = MICROS_RAMFS_RESULT_RANGE;
+        return MICROS_RAMFS_CORE_OK;
+    }
+
+    copy_result = ramfs_copy_grant(
+        state,
+        io,
+        MICROS_RAMFS_COPY_FROM_VFS,
+        request->grant,
+        request->grant_offset,
+        state->scratch,
+        request->length
+    );
+    if (copy_result == MICROS_RAMFS_COPY_INVARIANT) {
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
+    }
+    if (copy_result == MICROS_RAMFS_COPY_REJECTED) {
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        *result = MICROS_RAMFS_RESULT_GRANT;
+        return MICROS_RAMFS_CORE_OK;
+    }
+
+    path_size = request->length - 1;
+    if (
+        state->scratch[path_size] != 0
+        || !ramfs_bytes_are_zero(
+            &state->scratch[path_size],
+            1
+        )
+    ) {
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        *result = MICROS_RAMFS_RESULT_MALFORMED;
+        return MICROS_RAMFS_CORE_OK;
+    }
+    for (position = 0; position < path_size; ++position) {
+        if (state->scratch[position] == 0) {
+            ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+            *result = MICROS_RAMFS_RESULT_MALFORMED;
+            return MICROS_RAMFS_CORE_OK;
+        }
+    }
+    if (!path_components_are_bounded(state->scratch, path_size)) {
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        *result = MICROS_RAMFS_RESULT_RANGE;
+        return MICROS_RAMFS_CORE_OK;
+    }
+    return walk_staged_lookup(
+        state,
+        start_slot,
+        root_slot,
+        path_size,
+        fields,
+        result
+    );
 }
 
 static void publish_created_node(

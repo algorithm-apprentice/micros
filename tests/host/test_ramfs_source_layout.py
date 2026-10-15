@@ -400,6 +400,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (3, "execute_scripted_operation"),
         (3, "reference_lookup"),
         (0, "handle_create_or_mkdir"),
+        (0, "handle_lookup"),
     )
 )
 
@@ -1123,6 +1124,62 @@ def create_body_tokens(caller, phase):
     return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
 
 
+def lookup_publication_tokens(walk, publication):
+    walk = list(body_tokens(walk))
+    publication = list(body_tokens(publication))
+    call = list(body_tokens("return publish_lookup_reference(state, current_slot, fields, result);"))
+    positions = [
+        index for index in range(len(walk))
+        if walk[index:index + len(call)] == call
+    ]
+    if len(positions) != 1 or publication[:1] != ["{"] or publication[-1:] != ["}"]:
+        raise AssertionError("lookup must directly return one exact checked reference publication")
+    check = list(body_tokens("if (ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK) {"))
+    if publication[1:1 + len(check)] != check:
+        raise AssertionError("lookup publication must validate staged scratch before mutation")
+    cleanup = list(body_tokens(
+        "lookup_done: ramfs_zero_bytes(state->scratch, sizeof(state->scratch)); return MICROS_RAMFS_CORE_OK;"
+    ))
+    if walk[-len(cleanup) - 1:-1] != cleanup:
+        raise AssertionError("confined traversal must retain local cleanup for every ordinary error")
+    for index, token in enumerate(walk):
+        if token == "goto" and walk[index + 1:index + 3] != ["lookup_done", ";"]:
+            raise AssertionError("lookup cannot transfer cleanup to another caller scope")
+    position = positions[0]
+    return tuple(walk[:position] + publication[1:-1] + walk[position + len(call):])
+
+
+def production_lookup_body_tokens(caller, walk):
+    caller = list(body_tokens(caller))
+    walk = list(body_tokens(walk)) if isinstance(walk, str) else list(walk)
+    current = list(body_tokens(
+        "const struct micros_ramfs_node *start; const struct micros_ramfs_node *root; "
+        "uint16_t start_slot; uint16_t root_slot; size_t path_size; size_t position; "
+        "enum micros_ramfs_copy_result copy_result;"
+    ))
+    original = list(body_tokens(
+        "const struct micros_ramfs_node *start; const struct micros_ramfs_node *root; "
+        "uint16_t start_slot; uint16_t root_slot; uint16_t current_slot; size_t path_size; size_t position; "
+        "bool absolute; bool trailing_separator = false; enum micros_ramfs_copy_result copy_result;"
+    ))
+    locals_ = list(body_tokens(
+        "uint16_t current_slot; size_t position; bool absolute; bool trailing_separator = false;"
+    ))
+    call = list(body_tokens("return walk_staged_lookup(state, start_slot, root_slot, path_size, fields, result);"))
+    if caller[1:1 + len(current)] != current or caller[-len(call) - 1:-1] != call:
+        raise AssertionError("lookup must keep exact authority/grant/full-path preflight and tail outcome")
+    if walk[1:1 + len(locals_)] != locals_ or walk[-1:] != ["}"]:
+        raise AssertionError("lookup walk must use only its original automatic traversal locals")
+    inner = walk[1 + len(locals_):-1]
+    reset = list(body_tokens(
+        "absolute = path_size != 0 && state->scratch[0] == '/'; "
+        "current_slot = absolute ? root_slot : start_slot; position = 0;"
+    ))
+    if inner[:len(reset)] != reset:
+        raise AssertionError("confined lookup must reset its independent traversal position before use")
+    return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1138,6 +1195,13 @@ def original_body_digest(family, name, text):
             c_function_body(owner, "publish_created_node"),
         )
         tokens = create_body_tokens(text, phase)
+    if family == 0 and name == "handle_lookup" and (0, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(0)[5])
+        walk = lookup_publication_tokens(
+            c_function_body(owner, "walk_staged_lookup"),
+            c_function_body(owner, "publish_lookup_reference"),
+        )
+        tokens = production_lookup_body_tokens(text, walk)
     if family == 2 and name in SEED_CASE_PHASES and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
         phases = [
@@ -1912,6 +1976,31 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertEqual(body_tokens(expected_publication), body_tokens(publication[0]))
         self.assertLessEqual(definitions["publish_created_node"], 120)
 
+    def test_production_lookup_exposes_staged_walk_and_checked_reference_publication(self):
+        text = source(family_paths(0)[5])
+        definitions = c_function_definitions(text)
+        expected_signatures = {
+            "walk_staged_lookup": (
+                "static enum micros_ramfs_core_error walk_staged_lookup("
+                "struct micros_ramfs_state *state, uint16_t start_slot, uint16_t root_slot, "
+                "size_t path_size, struct ramfs_result_fields *fields, enum micros_ramfs_result *result) {"
+            ),
+            "publish_lookup_reference": (
+                "static enum micros_ramfs_core_error publish_lookup_reference("
+                "struct micros_ramfs_state *state, uint16_t current_slot, "
+                "struct ramfs_result_fields *fields, enum micros_ramfs_result *result) {"
+            ),
+        }
+        for name, expected in expected_signatures.items():
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            signatures = re.findall(
+                rf"(?m)^static enum micros_ramfs_core_error {name}\([^;{{}}]*\)\s*\{{", text,
+            )
+            self.assertEqual(1, len(signatures))
+            self.assertEqual(body_tokens(expected), body_tokens(signatures[0]))
+        self.assertLessEqual(definitions["ramfs_handle_lookup"], 120)
+
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
         for family in range(6):
@@ -2511,6 +2600,66 @@ def render_fixture(image, limit):
                 created_publication_tokens(staged, changed)
         self.assertNotEqual(
             body_tokens(expected), created_publication_tokens(staged, publication.replace("clear_scratch();", "")),
+        )
+
+    def test_lookup_projection_preserves_full_path_before_walk_cleanup_and_checked_commit(self):
+        declarations = (
+            "const struct micros_ramfs_node *start; const struct micros_ramfs_node *root; "
+            "uint16_t start_slot; uint16_t root_slot; size_t path_size; size_t position; "
+            "enum micros_ramfs_copy_result copy_result;"
+        )
+        original = (
+            "const struct micros_ramfs_node *start; const struct micros_ramfs_node *root; "
+            "uint16_t start_slot; uint16_t root_slot; uint16_t current_slot; size_t path_size; size_t position; "
+            "bool absolute; bool trailing_separator = false; enum micros_ramfs_copy_result copy_result;"
+        )
+        locals_ = "uint16_t current_slot; size_t position; bool absolute; bool trailing_separator = false;"
+        reset = (
+            "absolute = path_size != 0 && state->scratch[0] == '/'; "
+            "current_slot = absolute ? root_slot : start_slot; position = 0;"
+        )
+        cleanup = (
+            "lookup_done: ramfs_zero_bytes(state->scratch, sizeof(state->scratch)); return MICROS_RAMFS_CORE_OK;"
+        )
+        caller = (
+            "{ " + declarations + " check_all_bytes_and_components(); "
+            "return walk_staged_lookup(state, start_slot, root_slot, path_size, fields, result); }"
+        )
+        walk = (
+            "{ " + locals_ + reset + "if (bad_component()) { goto lookup_done; } "
+            "return publish_lookup_reference(state, current_slot, fields, result); " + cleanup + " }"
+        )
+        publication = (
+            "{ if (ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK) { return INVARIANT; } "
+            "clear_scratch(); increment_reference(); return CORE_OK; }"
+        )
+        expanded_walk = lookup_publication_tokens(walk, publication)
+        actual = production_lookup_body_tokens(caller, expanded_walk)
+        expected = body_tokens(
+            "{ " + original + " check_all_bytes_and_components(); " + reset
+            + "if (bad_component()) { goto lookup_done; } "
+            + publication[1:-1] + cleanup + " }"
+        )
+        self.assertEqual(expected, actual)
+        for changed in (
+            caller.replace("return walk_staged_lookup", "walk_staged_lookup"),
+            caller.replace("start_slot, root_slot", "root_slot, start_slot"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                production_lookup_body_tokens(changed, expanded_walk)
+        for changed in (
+            publication.replace("state, false", "state, true"),
+            publication.replace("if (ramfs_validate_state", "increment_reference(); if (ramfs_validate_state"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                lookup_publication_tokens(walk, changed)
+        with self.assertRaises(AssertionError):
+            lookup_publication_tokens(walk.replace("goto lookup_done", "goto caller_label"), publication)
+        self.assertNotEqual(
+            expected,
+            production_lookup_body_tokens(
+                caller, lookup_publication_tokens(walk, publication.replace("clear_scratch();", "")),
+            ),
         )
 
 

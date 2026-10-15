@@ -535,7 +535,13 @@ still does not use production helpers. Production create/mkdir now exposes
 validation with local cleanup, and 41-line void/non-failing node publication.
 Nested typed projection preserves every original check, scratch-clear exit,
 node/link/reference/count mutation and result order, including the helper's
-own cleanup labels and direct caller error return. Six C semantic
+own cleanup labels and direct caller error return. Production lookup now
+exposes 103-line authority/grant/full-path staging, 115-line confined
+traversal and ordinary-error cleanup, and 24-line scratch-tolerant validation
+and reference publication. Exact nested projection preserves missing-name
+versus later-overlong-component precedence, empty/trailing path rules,
+confinement, refcount overflow, every scratch-clear exit and mutation order.
+Five C semantic
 migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
