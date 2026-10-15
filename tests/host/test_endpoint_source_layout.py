@@ -25,6 +25,58 @@ BASE_CMAKE_DIGEST = "cd615eaa75141a5626a024de1ad7772e254c47129ed34829a9b01a472da
 BASE_CTOKENS_AST = "3e378fcb1e32c96d05240c3d80401d159715196d92de372d8ca92cdddd9a3cd8"
 MODEL_TYPES_DIGEST = "d6da66f1eb42b10fd121f8316a01b5cedbf6c80bb31696a5b3693779f349fb2e"
 MODEL_OPERATION_NAMES_DIGEST = "7978fb4c6b345f5f3a67f77f681acedd35a62e5b97bd49c5b62899e8b96a8083"
+MODEL_SCRIPT_DATA_DIGEST = "d7dc952e504696855635bcc3630210ea953bfdc54bf7466ac6cb10718ce4435e"
+MODEL_RUN_FIELDS = ("model", "coverage", "random_state", "step")
+MODEL_ITERATION_FIELDS = ("random", "operation", "slot", "value")
+MODEL_RUN_DECLARATIONS = (
+    "struct model_slot model[MODEL_SLOT_COUNT]; struct model_coverage coverage; "
+    "uint32_t random_state = seed; size_t step;"
+)
+MODEL_RUN_HELPERS = (
+    "endpoint_model_setup_run", "endpoint_model_draw_iteration", "endpoint_model_apply_operation",
+    "endpoint_model_cleanup_run", "endpoint_model_coverage_complete",
+)
+MODEL_OPERATION_HELPERS = {
+    "MODEL_OPERATION_" + operation.upper(): "endpoint_model_" + operation
+    for operation in ("create", "reserve", "install", "activate", "authorize", "close", "release", "stale")
+}
+MODEL_AUTHORIZATION_HELPERS = (
+    "endpoint_model_authorize_reply_receive", "endpoint_model_authorize_reply",
+    "endpoint_model_select_authorization_target", "endpoint_model_authorize_selected_target",
+)
+MODEL_MUTABLE_ARGUMENTS = (
+    "struct endpoint_model_fixture *fixture, struct endpoint_model_run *run, "
+    "struct endpoint_model_iteration *iteration"
+)
+MODEL_TASK_SIGNATURES = {
+    "endpoint_model_setup_run": (
+        "static bool", "struct endpoint_model_fixture *fixture, struct endpoint_model_run *run",
+    ),
+    "endpoint_model_draw_iteration": (
+        "static void", "struct endpoint_model_run *run, struct endpoint_model_iteration *iteration",
+    ),
+    "endpoint_model_apply_operation": ("static bool", MODEL_MUTABLE_ARGUMENTS),
+    "endpoint_model_cleanup_run": (
+        "static bool", "struct endpoint_model_fixture *fixture, struct endpoint_model_run *run",
+    ),
+    "endpoint_model_coverage_complete": ("static bool", "const struct endpoint_model_run *run"),
+    **{name: ("bool", MODEL_MUTABLE_ARGUMENTS) for name in MODEL_OPERATION_HELPERS.values()},
+    **{
+        name: (
+            "static bool", MODEL_MUTABLE_ARGUMENTS + ", uint32_t *authorization_operation, "
+            "enum micros_endpoint_error *expected, enum micros_endpoint_error *error",
+        )
+        for name in MODEL_AUTHORIZATION_HELPERS[:2]
+    },
+    "endpoint_model_select_authorization_target": (
+        "static void", "const struct endpoint_model_run *run, const struct endpoint_model_iteration *iteration, "
+        "uint32_t target_random, size_t *target, uint32_t *authorization_operation",
+    ),
+    "endpoint_model_authorize_selected_target": (
+        "static bool", MODEL_MUTABLE_ARGUMENTS + ", size_t target, uint32_t authorization_operation, "
+        "enum micros_endpoint_error *expected, enum micros_endpoint_error *error",
+    ),
+}
 MODEL_CONTEXT_FIELDS = ("registry", "objects", "hart", "trace", "trace_count")
 MODEL_CONTEXT_HELPERS = {
     "record_transition": False, "model_fail": False, "setup_fixture": True, "validate_model": False,
@@ -181,7 +233,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 LONG_FUNCTION_MIGRATION = (
-    (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
 )
 REGISTRY_VALIDATION_DECLARATIONS = (
@@ -509,6 +560,11 @@ def original_locations(family):
         if family == 2 and spelling in MODEL_PROJECTION_HELPERS:
             if path != family_paths(2)[3]:
                 raise AssertionError("complete model projection tasks retain their exact owner")
+            continue
+        if family == 2 and spelling in (*MODEL_RUN_HELPERS, *MODEL_OPERATION_HELPERS.values(), *MODEL_AUTHORIZATION_HELPERS):
+            owner = 0 if spelling in MODEL_RUN_HELPERS else 4
+            if path != family_paths(2)[owner]:
+                raise AssertionError("model run/operation tasks retain their exact control or operation owner")
             continue
         name = renames.get(spelling, spelling)
         if name not in expected or name in locations:
@@ -865,6 +921,191 @@ def model_projection_body_tokens(caller, live, endpoint):
     return tuple(caller)
 
 
+def model_script_data(text):
+    lexical = c_lexical_text(text)
+    declarations = []
+    for name, type_ in (("scripted_operations", "enum model_operation"), ("scripted_values", "uint32_t")):
+        matches = tuple(re.finditer(
+            r"(?m)^static const " + type_ + r"\s+" + name + r"\[\]\s*=\s*\{[^{}]*\};", lexical,
+        ))
+        if len(matches) != 1:
+            raise AssertionError("model scripts retain one exact file-static readonly array each")
+        match = matches[0]
+        if lexical.count("{", 0, match.start()) != lexical.count("}", 0, match.start()):
+            raise AssertionError("outlined draw tasks share readonly scripts only within their original owner")
+        declarations.append(text[match.start():match.end()])
+    raw = "\n".join(declarations)
+    if body_digest(raw) != MODEL_SCRIPT_DATA_DIGEST:
+        raise AssertionError("actual model script types, seventeen operations/values or order changed")
+    return raw
+
+
+def replace_one_token_sequence(body, current, replacement):
+    body = list(body)
+    current = list(tokens(current)) if isinstance(current, str) else list(current)
+    positions = [index for index in range(len(body)) if body[index:index + len(current)] == current]
+    if len(positions) != 1:
+        raise AssertionError("finite phase expansion requires one exact typed caller binding and exit")
+    start = positions[0]
+    body[start:start + len(current)] = replacement
+    return body
+
+
+def phase_inner_tokens(body, allow_success=False):
+    body = list(tokens(body)) if isinstance(body, str) else list(body)
+    success = list(tokens("return true;"))
+    if body[:1] != ["{"] or body[-len(success) - 1:] != success + ["}"]:
+        raise AssertionError("model tasks have one terminal helper success")
+    inner = body[1:-len(success) - 1]
+    if not allow_success and any(inner[index:index + len(success)] == success for index in range(len(inner))):
+        raise AssertionError("model helper success may replace only its original switch break")
+    if "goto" in inner:
+        raise AssertionError("model helpers cannot borrow another caller's label scope")
+    return inner
+
+
+def scalar_output_tokens(body, outputs):
+    body = list(body)
+    result = []
+    index = 0
+    while index < len(body):
+        if body[index] == "*" and body[index + 1:index + 2] and body[index + 1] in outputs:
+            result.append(body[index + 1])
+            index += 2
+        else:
+            if body[index] in outputs:
+                raise AssertionError("authorization scalar outputs retain exact dereferenced caller bindings")
+            result.append(body[index])
+            index += 1
+    return result
+
+
+def model_work_body_tokens(body):
+    result = list(body)
+    for variable, fields in (("run", MODEL_RUN_FIELDS), ("iteration", MODEL_ITERATION_FIELDS)):
+        restored = []
+        index = 0
+        while index < len(result):
+            if result[index:index + 2] in ([variable, "->"], [variable, "."]):
+                if index != 0 and result[index - 1] in (".", "->"):
+                    raise AssertionError("model automatic work cannot qualify an existing member as a root")
+                field = result[index + 2:index + 3]
+                if not field or field[0] not in fields:
+                    raise AssertionError("model work contains only its original typed automatic fields")
+                restored.extend(field)
+                index += 3
+            else:
+                if result[index] == variable:
+                    raise AssertionError("model automatic work cannot be copied, cleared, published or retained")
+                restored.append(result[index])
+                index += 1
+        result = restored
+    return tuple(result)
+
+
+def model_operation_body_tokens(operation, body, authorization):
+    authorize = operation == "MODEL_OPERATION_AUTHORIZE"
+    inner = phase_inner_tokens(body, allow_success=authorize)
+    if authorize:
+        for helper in MODEL_AUTHORIZATION_HELPERS[:2]:
+            call = (
+                "return " + helper
+                + "(fixture, run, iteration, &authorization_operation, &expected, &error);"
+            )
+            expanded = phase_inner_tokens(authorization[helper], allow_success=True) + list(tokens("return true;"))
+            expanded = scalar_output_tokens(expanded, ("authorization_operation", "expected", "error"))
+            inner = replace_one_token_sequence(inner, call, expanded)
+        select = list(tokens(authorization[MODEL_AUTHORIZATION_HELPERS[2]]))
+        if select[:1] != ["{"] or select[-1:] != ["}"] or "return" in select:
+            raise AssertionError("authorization selection is the original non-failing target assignment sequence")
+        select = scalar_output_tokens(select[1:-1], ("target", "authorization_operation"))
+        inner = replace_one_token_sequence(
+            inner,
+            "endpoint_model_select_authorization_target(run, iteration, target_random, &target, &authorization_operation);",
+            select,
+        )
+        selected = scalar_output_tokens(
+            phase_inner_tokens(authorization[MODEL_AUTHORIZATION_HELPERS[3]]), ("expected", "error"),
+        )
+        inner = replace_one_token_sequence(
+            inner,
+            "if (!endpoint_model_authorize_selected_target(fixture, run, iteration, target, authorization_operation, "
+            "&expected, &error)) { return false; }",
+            selected,
+        )
+        success = list(tokens("return true;"))
+        expanded = []
+        index = 0
+        while index < len(inner):
+            if inner[index:index + len(success)] == success:
+                expanded.extend(tokens("break;"))
+                index += len(success)
+            else:
+                expanded.append(inner[index])
+                index += 1
+        return ("{", *expanded, *tokens("break;"), "}")
+    return (*inner, *tokens("break;"))
+
+
+def model_dispatch_body_tokens(caller, operations, authorization):
+    body = list(tokens(caller))
+    if body[:1] != ["{"] or body[-1:] != ["}"]:
+        raise AssertionError("operation dispatcher retains its complete original switch")
+    for operation, helper in MODEL_OPERATION_HELPERS.items():
+        current = "case " + operation + ": return " + helper + "(fixture, run, iteration);"
+        expanded = (*tokens("case " + operation + ":"), *model_operation_body_tokens(operation, operations[helper], authorization))
+        body = replace_one_token_sequence(body, current, expanded)
+    return body[1:-1]
+
+
+def model_draw_body_tokens(body):
+    body = list(tokens(body))
+    if body[:1] != ["{"] or body[-1:] != ["}"] or "return" in body:
+        raise AssertionError("model draw/script task retains its original non-failing sequence")
+    inner = body[1:-1]
+    index = 0
+    for field, type_ in (
+        ("random", "uint32_t"), ("operation", "enum model_operation"), ("slot", "size_t"), ("value", "uint32_t"),
+    ):
+        head = list(tokens("iteration->" + field + " ="))
+        if inner[index:index + len(head)] != head:
+            raise AssertionError("iteration initializes the original random/operation/slot/value in exact order")
+        prefix = list(tokens(type_))
+        inner[index:index] = prefix
+        index = inner.index(";", index + len(prefix) + len(head)) + 1
+    return inner
+
+
+def model_runner_body_tokens(caller, phases, operations, authorization, scripts):
+    body = list(tokens(caller))
+    borrow = "struct endpoint_model_fixture *fixture = endpoint_model_context();"
+    seed = "const uint32_t seed = UINT32_C(0xe029cafe);"
+    current = list(tokens(borrow + seed + "struct endpoint_model_run run; run.random_state = seed;"))
+    if body[:1 + len(current)] != ["{"] + current:
+        raise AssertionError("model root keeps its single fixture borrow, constant seed and original seed initialization")
+    body[1:1 + len(current)] = tokens(borrow + seed + scripts + MODEL_RUN_DECLARATIONS)
+    body = replace_one_token_sequence(
+        body, "if (!endpoint_model_setup_run(fixture, &run)) { return false; }",
+        phase_inner_tokens(phases["endpoint_model_setup_run"]),
+    )
+    body = replace_one_token_sequence(
+        body, "{ struct endpoint_model_iteration iteration; endpoint_model_draw_iteration(&run, &iteration);",
+        ("{", *model_draw_body_tokens(phases["endpoint_model_draw_iteration"])),
+    )
+    body = replace_one_token_sequence(
+        body, "if (!endpoint_model_apply_operation(fixture, &run, &iteration)) { return false; }",
+        model_dispatch_body_tokens(phases["endpoint_model_apply_operation"], operations, authorization),
+    )
+    body = replace_one_token_sequence(
+        body, "if (!endpoint_model_cleanup_run(fixture, &run)) { return false; }",
+        phase_inner_tokens(phases["endpoint_model_cleanup_run"]),
+    )
+    coverage = list(tokens(phases["endpoint_model_coverage_complete"]))
+    phase_inner_tokens(coverage)
+    body = replace_one_token_sequence(body, "return endpoint_model_coverage_complete(&run);", coverage[1:-1])
+    return model_work_body_tokens(body)
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
     body = tokens(text)
@@ -894,6 +1135,16 @@ def original_body_digest(family, name, text):
         owner = source(family_paths(2)[3])
         body = model_projection_body_tokens(
             text, *(c_function_body(owner, helper) for helper in MODEL_PROJECTION_HELPERS),
+        )
+    if family == 2 and name == "micros_endpoint_model_test_run" and (2, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(2)[0])
+        operations = source(family_paths(2)[4])
+        body = model_runner_body_tokens(
+            text,
+            {helper: c_function_body(owner, helper) for helper in MODEL_RUN_HELPERS},
+            {helper: c_function_body(operations, helper) for helper in MODEL_OPERATION_HELPERS.values()},
+            {helper: c_function_body(operations, helper) for helper in MODEL_AUTHORIZATION_HELPERS},
+            model_script_data(owner),
         )
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
@@ -1291,17 +1542,31 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 names = [declaration for declaration in objects if tokens(declaration)[:len(prefix)] == prefix]
                 self.assertEqual(1, len(names))
                 objects.remove(names[0])
+            if path == family_paths(2)[0] and (2, "micros_endpoint_model_test_run") not in LONG_FUNCTION_MIGRATION:
+                self.assertEqual(
+                    tuple(map(tokens, file_scope_objects(model_script_data(source(path))))),
+                    tuple(map(tokens, objects)),
+                )
+                objects = []
             expected = ("static struct endpoint_model_fixture model_fixture_state;",) if path == family_paths(2)[1] else ()
             self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, objects)))
             self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
         completed_projection = (2, "validate_model") not in LONG_FUNCTION_MIGRATION
-        self.assertEqual(16 + len(MODEL_PROJECTION_HELPERS) * completed_projection, len(owned_definitions(2)))
+        completed_runner = (2, "micros_endpoint_model_test_run") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(
+            16 + len(MODEL_PROJECTION_HELPERS) * completed_projection + len(MODEL_TASK_SIGNATURES) * completed_runner,
+            len(owned_definitions(2)),
+        )
         for name, (path, spelling) in original_locations(2).items():
             body = c_function_body(source(path), spelling)
             if name == "micros_endpoint_model_test_run":
                 self.assertEqual(1, body.count("endpoint_model_context()"))
-                self.assertIn("struct model_slot model[MODEL_SLOT_COUNT];", body)
-                self.assertIn("struct model_coverage coverage;", body)
+                if completed_runner:
+                    self.assertIn("struct endpoint_model_run run;", body)
+                    self.assertIn("const uint32_t seed = UINT32_C(0xe029cafe);", body)
+                else:
+                    self.assertIn("struct model_slot model[MODEL_SLOT_COUNT];", body)
+                    self.assertIn("struct model_coverage coverage;", body)
             else:
                 self.assertNotIn("endpoint_model_context(", body)
         setup = c_function_body(fixture, "endpoint_model_setup_fixture")
@@ -1309,6 +1574,245 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         self.assertNotIn("sizeof(*fixture)", setup)
         self.assertNotIn("memset(&fixture->hart", setup)
         self.assertEqual({}, c_function_definitions(header))
+
+    def test_model_runner_has_only_original_typed_work_and_all_ordered_task_owners(self):
+        header = source(PRIVATE_HEADERS[2])
+        expected = {
+            "endpoint_model_run": (
+                "struct model_slot model[MODEL_SLOT_COUNT]; struct model_coverage coverage; "
+                "uint32_t random_state; size_t step;"
+            ),
+            "endpoint_model_iteration": (
+                "uint32_t random; enum model_operation operation; size_t slot; uint32_t value;"
+            ),
+        }
+        for tag, declarations in expected.items():
+            fields = re.findall(r"struct " + tag + r"\s*\{([^{}]*)\}", header)
+            self.assertEqual(1, len(fields), tag)
+            self.assertEqual(tokens(declarations), tokens(fields[0]))
+        owners = {name: path for path, name in owned_definitions(2)}
+        for owner, names in (
+            (0, MODEL_RUN_HELPERS),
+            (4, (*MODEL_OPERATION_HELPERS.values(), *MODEL_AUTHORIZATION_HELPERS)),
+        ):
+            for name in names:
+                self.assertEqual(family_paths(2)[owner], owners.get(name), name)
+                self.assertLessEqual(owned_definitions(2)[owners[name], name], 120)
+                text = source(owners[name])
+                storage, parameters = MODEL_TASK_SIGNATURES[name]
+                signatures = re.findall(rf"(?m)^{storage} {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures), name)
+                self.assertEqual(tokens(f"{storage} {name}({parameters}) {{"), tokens(signatures[0]))
+        entry = c_function_body(source(family_paths(2)[0]), "micros_endpoint_model_test_run")
+        self.assertEqual(1, entry.count("struct endpoint_model_run run;"))
+        self.assertEqual(1, entry.count("struct endpoint_model_iteration iteration;"))
+        self.assertNotIn("memset(&run", entry)
+        self.assertNotIn("memset(&iteration", entry)
+
+    def test_model_work_transport_preserves_original_extents_members_and_scope(self):
+        current = (
+            "memset(run->model, 0, sizeof(run->model)); memset(&run->coverage, 0, sizeof(run->coverage)); "
+            "iteration->random = next_random(&run->random_state); run->model[iteration->slot].generation = generation; "
+            "++run->coverage.authorize_state; record(run->step, iteration->operation, iteration->slot, iteration->value);"
+        )
+        expected = (
+            "memset(model, 0, sizeof(model)); memset(&coverage, 0, sizeof(coverage)); "
+            "random = next_random(&random_state); model[slot].generation = generation; "
+            "++coverage.authorize_state; record(step, operation, slot, value);"
+        )
+        self.assertEqual(tokens(expected), model_work_body_tokens(tokens(current)))
+        for changed in (
+            current.replace("run->model", "run->other"),
+            current.replace("iteration->slot", "iteration->unknown"),
+            current.replace("run->model[iteration->slot].generation", "run->model[iteration->slot].run->model"),
+            current + "save(run);",
+            current + "memset(&iteration, 0, sizeof(iteration));",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_work_body_tokens(tokens(changed))
+
+    def test_model_draw_projection_keeps_two_draws_before_script_overrides(self):
+        current = (
+            "{ iteration->random = next_random(&run->random_state); "
+            "iteration->operation = (enum model_operation)((iteration->random >> 24) % COUNT); "
+            "iteration->slot = SLOTS; iteration->value = next_random(&run->random_state); "
+            "if (run->step < sizeof(scripted_operations) / sizeof(scripted_operations[0])) { "
+            "iteration->operation = scripted_operations[run->step]; iteration->value = scripted_values[run->step]; } }"
+        )
+        expected = (
+            "uint32_t random = next_random(&random_state); "
+            "enum model_operation operation = (enum model_operation)((random >> 24) % COUNT); "
+            "size_t slot = SLOTS; uint32_t value = next_random(&random_state); "
+            "if (step < sizeof(scripted_operations) / sizeof(scripted_operations[0])) { "
+            "operation = scripted_operations[step]; value = scripted_values[step]; }"
+        )
+        self.assertEqual(tokens(expected), model_work_body_tokens(model_draw_body_tokens(current)))
+        for changed in (
+            current.replace("iteration->random =", "iteration->value =", 1),
+            current.replace("iteration->value = next_random", "iteration->random = next_random", 1),
+            current.replace("} }", "} return; }"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_draw_body_tokens(changed)
+        self.assertNotEqual(
+            tokens(expected),
+            model_work_body_tokens(model_draw_body_tokens(current.replace(
+                "iteration->value = next_random(&run->random_state);", "iteration->value = 0;",
+            ))),
+        )
+
+    def test_model_script_data_uses_actual_raw_types_values_order_and_file_scope(self):
+        text = source(family_paths(2)[0])
+        raw = model_script_data(text)
+        self.assertEqual(MODEL_SCRIPT_DATA_DIGEST, body_digest(raw))
+        for changed in (
+            text.replace("MODEL_OPERATION_CREATE,", "MODEL_OPERATION_CLOSE,", 1),
+            text.replace("(UINT32_C(1) << 16) | 8", "(UINT32_C(1) << 16) | 4", 1),
+            text.replace("static const uint32_t scripted_values", "static uint32_t scripted_values", 1),
+            "void local(void) {\n" + text + "\n}",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_script_data(changed)
+
+    def test_model_operation_success_replaces_case_break_not_trace_or_outer_loop(self):
+        body = (
+            "{ for (iteration->slot = 0; iteration->slot < SLOTS; ++iteration->slot) { "
+            "if (available()) { break; } } "
+            "if (failed()) { return model_fail(fixture, run->step, iteration->operation, iteration->value, \"failed\"); } "
+            "++run->coverage.create; return true; }"
+        )
+        expected = (
+            "for (iteration->slot = 0; iteration->slot < SLOTS; ++iteration->slot) { "
+            "if (available()) { break; } } "
+            "if (failed()) { return model_fail(fixture, run->step, iteration->operation, iteration->value, \"failed\"); } "
+            "++run->coverage.create; break;"
+        )
+        self.assertEqual(tokens(expected), model_operation_body_tokens("MODEL_OPERATION_CREATE", body, {}))
+        for changed in (
+            body.replace("return model_fail", "return true; return model_fail"),
+            body.replace("return true;", "return false;"),
+            body.replace("++run->coverage.create;", "goto caller_done;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_operation_body_tokens("MODEL_OPERATION_CREATE", changed, {})
+        self.assertEqual(
+            tokens("authorization_operation = REPLY; expected = ERROR; error = authorize();"),
+            tuple(scalar_output_tokens(tokens("*authorization_operation = REPLY; *expected = ERROR; *error = authorize();"),
+                                       ("authorization_operation", "expected", "error"))),
+        )
+        with self.assertRaises(AssertionError):
+            scalar_output_tokens(tokens("error = authorize();"), ("error",))
+
+    def test_model_authorization_preserves_case_locals_extra_draws_priority_and_noop_exits(self):
+        receive, reply, select, selected = MODEL_AUTHORIZATION_HELPERS
+        phases = {
+            receive: (
+                "{ *authorization_operation = REPLY_RECEIVE; *expected = wanted(); "
+                "if (iteration->slot == SLOTS) { return true; } *error = authorize(); "
+                "iteration->value = *authorization_operation; "
+                "if (*error != *expected) { return model_fail(); } ++run->coverage.reply_receive_allowed; return true; }"
+            ),
+            reply: (
+                "{ *authorization_operation = REPLY; *expected = wanted(); "
+                "if (iteration->slot == SLOTS) { return true; } *error = authorize(); "
+                "iteration->value = *authorization_operation; "
+                "if (*error != *expected) { return model_fail(); } ++run->coverage.reply_allowed; return true; }"
+            ),
+            select: "{ *target = SLOTS; if (active()) { *target = choose(target_random); *authorization_operation = CALL; } }",
+            selected: (
+                "{ *expected = wanted_target(); *error = authorize_target(); iteration->value = authorization_operation; "
+                "if (*error != *expected) { return model_fail(); } ++run->coverage.authorize_allowed; return true; }"
+            ),
+        }
+        caller = (
+            "{ size_t target; uint32_t target_random = next_random(&run->random_state); "
+            "uint32_t authorization_operation = operations[(next_random(&run->random_state) >> 16) % 3]; "
+            "enum micros_endpoint_error expected; enum micros_endpoint_error error; "
+            "iteration->slot = find_slot(run->model, iteration->value); "
+            "if ((iteration->value & 8) != 0) { return " + receive
+            + "(fixture, run, iteration, &authorization_operation, &expected, &error); } "
+            "if ((iteration->value & 4) != 0) { return " + reply
+            + "(fixture, run, iteration, &authorization_operation, &expected, &error); } "
+            + select + "(run, iteration, target_random, &target, &authorization_operation); "
+            "if (iteration->slot == SLOTS || target == SLOTS) { return true; } "
+            "if (!" + selected + "(fixture, run, iteration, target, authorization_operation, &expected, &error)) "
+            "{ return false; } return true; }"
+        )
+        expected = (
+            "{ size_t target; uint32_t target_random = next_random(&run->random_state); "
+            "uint32_t authorization_operation = operations[(next_random(&run->random_state) >> 16) % 3]; "
+            "enum micros_endpoint_error expected; enum micros_endpoint_error error; "
+            "iteration->slot = find_slot(run->model, iteration->value); "
+            "if ((iteration->value & 8) != 0) { authorization_operation = REPLY_RECEIVE; expected = wanted(); "
+            "if (iteration->slot == SLOTS) { break; } error = authorize(); iteration->value = authorization_operation; "
+            "if (error != expected) { return model_fail(); } ++run->coverage.reply_receive_allowed; break; } "
+            "if ((iteration->value & 4) != 0) { authorization_operation = REPLY; expected = wanted(); "
+            "if (iteration->slot == SLOTS) { break; } error = authorize(); iteration->value = authorization_operation; "
+            "if (error != expected) { return model_fail(); } ++run->coverage.reply_allowed; break; } "
+            "target = SLOTS; if (active()) { target = choose(target_random); authorization_operation = CALL; } "
+            "if (iteration->slot == SLOTS || target == SLOTS) { break; } "
+            "expected = wanted_target(); error = authorize_target(); iteration->value = authorization_operation; "
+            "if (error != expected) { return model_fail(); } ++run->coverage.authorize_allowed; break; }"
+        )
+        self.assertEqual(tokens(expected), model_operation_body_tokens("MODEL_OPERATION_AUTHORIZE", caller, phases))
+        for changed in (
+            caller.replace("&expected, &error", "&other, &error", 1),
+            caller.replace("return " + receive, "return " + reply, 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_operation_body_tokens("MODEL_OPERATION_AUTHORIZE", changed, phases)
+        for helper, changed in (
+            (select, phases[select].replace("*target = SLOTS;", "return true; *target = SLOTS;")),
+            (selected, phases[selected].replace("return model_fail();", "return true;")),
+        ):
+            with self.subTest(helper=helper), self.assertRaises(AssertionError):
+                model_operation_body_tokens("MODEL_OPERATION_AUTHORIZE", caller, {**phases, helper: changed})
+        for changed in (
+            caller.replace("iteration->value & 8", "iteration->value & 4", 1),
+            caller.replace("uint32_t target_random = next_random(&run->random_state);", "uint32_t target_random = 0;"),
+            caller.replace("if (iteration->slot == SLOTS || target == SLOTS) { return true; }",
+                           "if (iteration->slot == SLOTS || target == SLOTS) { return false; }"),
+        ):
+            self.assertNotEqual(tokens(expected), model_operation_body_tokens("MODEL_OPERATION_AUTHORIZE", changed, phases))
+
+    def test_model_runner_projection_cannot_skip_record_comparison_or_change_failure_scope(self):
+        root = source(family_paths(2)[0])
+        operation_source = source(family_paths(2)[4])
+        caller = c_function_body(root, "micros_endpoint_model_test_run")
+        phases = {name: c_function_body(root, name) for name in MODEL_RUN_HELPERS}
+        operations = {name: c_function_body(operation_source, name) for name in MODEL_OPERATION_HELPERS.values()}
+        authorization = {name: c_function_body(operation_source, name) for name in MODEL_AUTHORIZATION_HELPERS}
+        scripts = model_script_data(root)
+        aliases = normal_names(2)
+
+        def digest(current, selected):
+            expanded = model_runner_body_tokens(current, selected, operations, authorization, scripts)
+            expanded = tuple(aliases.get(token, token) for token in expanded)
+            expanded = model_fixture_body_tokens("micros_endpoint_model_test_run", expanded)
+            return digest_bytes(json.dumps(expanded, separators=(",", ":")).encode())
+
+        expected = BASELINE_BODIES[2]["micros_endpoint_model_test_run"]
+        self.assertEqual(expected, digest(caller, phases))
+        for changed in (
+            caller.replace("return false;", "return true;", 1),
+            caller.replace("struct endpoint_model_iteration iteration;", "static struct endpoint_model_iteration iteration;"),
+            caller.replace("run.random_state = seed;", "run.random_state = 0;"),
+            caller.replace("fixture, &run, &iteration", "fixture, &other, &iteration"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                digest(changed, phases)
+        for changed in (
+            caller.replace("++run.step", "run.step += 2"),
+            caller.replace("run.step, iteration.operation, iteration.slot", "run.step, iteration.operation, 0", 1),
+            caller.replace("fixture, run.model, run.step, iteration.operation", "fixture, run.model, 0, iteration.operation"),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(expected, digest(changed, phases))
+        setup = phases["endpoint_model_setup_run"]
+        with self.assertRaises(AssertionError):
+            digest(caller, {**phases, "endpoint_model_setup_run": setup.replace(
+                "memset(run->model, 0, sizeof(run->model));", "memset(run, 0, sizeof(*run));",
+            )})
 
     def test_model_transport_retains_caller_bindings_trace_and_reference_lifetime(self):
         current = (

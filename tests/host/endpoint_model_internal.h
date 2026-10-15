@@ -78,6 +78,20 @@ struct endpoint_model_fixture {
     size_t trace_count;
 };
 
+struct endpoint_model_run {
+    struct model_slot model[MODEL_SLOT_COUNT];
+    struct model_coverage coverage;
+    uint32_t random_state;
+    size_t step;
+};
+
+struct endpoint_model_iteration {
+    uint32_t random;
+    enum model_operation operation;
+    size_t slot;
+    uint32_t value;
+};
+
 struct endpoint_model_fixture *endpoint_model_context(void);
 
 uint32_t endpoint_model_next_random(uint32_t *state);
@@ -136,6 +150,54 @@ bool endpoint_model_validate_model(
     size_t step,
     enum model_operation operation,
     uint32_t value
+);
+
+bool endpoint_model_create(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_reserve(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_install(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_activate(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_authorize(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_close(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_release(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
+);
+
+bool endpoint_model_stale(
+    struct endpoint_model_fixture *fixture,
+    struct endpoint_model_run *run,
+    struct endpoint_model_iteration *iteration
 );
 
 bool micros_endpoint_model_test_run(void);

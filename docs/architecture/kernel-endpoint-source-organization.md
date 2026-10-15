@@ -566,8 +566,18 @@ setup, duplicate, shape/name, target-mask and capacity tasks. Its sole
 automatic work holds the original two-profile array and registry snapshot.
 The actual file-local rejection macro is raw-verified before reconstruction
 at its original definition/undef positions; reset, snapshot, mutation and
-comparison order are unchanged. Two original long-function migrations remain
-pending: the complete model runner and target runtime entry.
+comparison order are unchanged. The complete model runner now has a 33-line
+root with setup, two-draw/script, eight-operation dispatch, trace/comparison,
+cleanup and nineteen-counter coverage tasks. Run and iteration work contain
+only the original four fields each; the constant seed stays in entry and
+only the original model/coverage clears run. Actual raw seventeen-pair
+scripts remain unique readonly objects in the original runner owner.
+Authorization keeps its original case-scoped locals and two extra draws
+before selection or any no-slot exit; four tasks preserve reply-receive
+priority, reply, target selection and target authority. The full original
+659-line body reconstructs with helper success mapped only to original case
+breaks, never the outer trace/comparison. Only the target runtime entry
+remains an original long-function migration.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.
