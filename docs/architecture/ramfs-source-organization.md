@@ -516,7 +516,12 @@ namespace continuation, and EOF/error tasks with a 12-line root. One
 automatic work record contains only its original action, message, root, and
 file locals, with only the original root initializer applied. Typed work
 projection restores the exact original declarations and body; it rejects
-whole-work zeroing/copy/publication or additional fields. Eleven C semantic
+whole-work zeroing/copy/publication or additional fields. Protocol and
+regular-I/O evidence use the same checked automatic-work mechanism:
+six protocol and five I/O tasks retain all original objects, result-loop
+variables, reset/copy/failure snapshots, sparse data, maximum-size and
+block-capacity proofs. Their 14/13-line roots initialize only the original
+root handle and preserve the full first-failure order. Nine C semantic
 migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.

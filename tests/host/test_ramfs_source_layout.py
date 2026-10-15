@@ -175,6 +175,50 @@ SEED_CASE_PHASES = {
     ),
 }
 FUNCTIONAL_CASE_WORK = {
+    "protocol_mount_and_result_layout_are_exact": {
+        "owner": 2,
+        "tag": "ramfs_protocol_case",
+        "fields": ("action", "message", "built", "result", "root"),
+        "schema": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "struct micros_ipc_message built; enum micros_ramfs_result result; uint64_t root;"
+        ),
+        "original": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "struct micros_ipc_message built; enum micros_ramfs_result result; "
+            "uint64_t root = micros_ramfs_handle(0, 1);"
+        ),
+        "outlined": "struct ramfs_protocol_case work; work.root = micros_ramfs_handle(0, 1);",
+        "phases": (
+            ("protocol_unmounted_requests", ("fixture", "&work")),
+            ("protocol_invalid_headers", ("fixture", "&work")),
+            ("protocol_mount_and_pin", ("fixture", "&work")),
+            ("protocol_mounted_authority", ("fixture", "&work")),
+            ("protocol_reserved_payloads", ("fixture", "&work")),
+            ("protocol_result_range", ("&work",)),
+        ),
+    },
+    "read_write_sparse_and_block_capacity_are_exact": {
+        "owner": 4,
+        "tag": "ramfs_io_case",
+        "fields": ("action", "message", "root", "file", "second_file", "index"),
+        "schema": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint64_t root; uint64_t file; uint64_t second_file; size_t index;"
+        ),
+        "original": (
+            "struct micros_ramfs_reply_action action; struct micros_ipc_message message; "
+            "uint64_t root = micros_ramfs_handle(0, 1); uint64_t file; uint64_t second_file; size_t index;"
+        ),
+        "outlined": "struct ramfs_io_case work; work.root = micros_ramfs_handle(0, 1);",
+        "phases": (
+            ("io_initial_write_read_eof", ("fixture", "&work")),
+            ("io_sparse_and_cross_block", ("fixture", "&work")),
+            ("io_copy_and_range_rejections", ("fixture", "&work")),
+            ("io_maximum_file_boundary", ("fixture", "&work")),
+            ("io_block_capacity_exhaustion", ("fixture", "&work")),
+        ),
+    },
     "getdents_cursor_and_records_are_exact": {
         "owner": 5,
         "tag": "ramfs_directory_case",
@@ -345,6 +389,8 @@ LONG_FUNCTION_MIGRATION = tuple(
         (2, "header_corruption_is_rejected"),
         (2, "record_name_and_reserved_corruption_is_rejected"),
         (1, "getdents_cursor_and_records_are_exact"),
+        (1, "protocol_mount_and_result_layout_are_exact"),
+        (1, "read_write_sparse_and_block_capacity_are_exact"),
     )
 )
 
@@ -1582,24 +1628,37 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 expected = f"static bool {name}({', '.join(parameters)}) {{"
                 self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
 
-    def test_directory_case_exposes_only_original_automatic_work_and_ordered_phases(self):
-        specification = FUNCTIONAL_CASE_WORK["getdents_cursor_and_records_are_exact"]
+    def check_functional_work_case(self, name):
+        specification = FUNCTIONAL_CASE_WORK[name]
         text = source(family_paths(1)[specification["owner"]])
         tag = specification["tag"]
         fields = re.findall(rf"struct {tag}\s*\{{([^{{}}]*)\}}", text)
         self.assertEqual(1, len(fields))
         self.assertEqual(body_tokens(specification["schema"]), body_tokens(fields[0]))
         definitions = c_function_definitions(text)
-        self.assertLessEqual(definitions["ramfs_test_getdents_cursor_and_records_are_exact"], 120)
-        for name, _ in specification["phases"]:
+        self.assertLessEqual(definitions["ramfs_test_" + name], 120)
+        for name, arguments in specification["phases"]:
             self.assertIn(name, definitions)
             self.assertLessEqual(definitions[name], 120)
             signature = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
             self.assertEqual(1, len(signature))
-            expected = f"static bool {name}(struct ramfs_test_fixture *fixture, struct {tag} *work) {{"
+            parameters = [
+                "struct ramfs_test_fixture *fixture" if argument == "fixture"
+                else f"struct {tag} *work"
+                for argument in arguments
+            ]
+            self.assertLessEqual(set(arguments), {"fixture", "&work"})
+            expected = f"static bool {name}({', '.join(parameters)}) {{"
             self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
         self.assertEqual((), file_scope_objects(text))
         self.assertEqual("", macro_definition_text(text))
+
+    def test_directory_case_exposes_only_original_automatic_work_and_ordered_phases(self):
+        self.check_functional_work_case("getdents_cursor_and_records_are_exact")
+
+    def test_protocol_and_io_cases_expose_checked_work_and_first_failure_tasks(self):
+        self.check_functional_work_case("protocol_mount_and_result_layout_are_exact")
+        self.check_functional_work_case("read_write_sparse_and_block_capacity_are_exact")
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
