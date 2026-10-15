@@ -234,6 +234,15 @@
       }
     },
     {
+      "name": "riscv64-elf-spawn-test",
+      "displayName": "RISC-V 64 production ELF spawn integration test",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-elf-spawn-test",
+      "cacheVariables": {
+        "MICROS_BUILD_ELF_SPAWN_TEST": "ON"
+      }
+    },
+    {
       "name": "riscv64-tty-service-image",
       "displayName": "RISC-V 64 standalone TTY service image",
       "inherits": "riscv64-debug",
@@ -607,6 +616,13 @@
       "configurePreset": "riscv64-vfs-service-test",
       "targets": [
         "test-qemu-vfs"
+      ]
+    },
+    {
+      "name": "test-qemu-elf-spawn",
+      "configurePreset": "riscv64-elf-spawn-test",
+      "targets": [
+        "test-qemu-elf-spawn"
       ]
     },
     {
@@ -1175,6 +1191,20 @@
         {
           "type": "build",
           "name": "test-qemu-vfs"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-elf-spawn",
+      "displayName": "Build and run production ELF spawn and complete child cleanup",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-elf-spawn-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-elf-spawn"
         }
       ]
     },

@@ -575,7 +575,7 @@ static enum micros_vfs_core_error validate_pending_shape(
     ) {
         return MICROS_VFS_CORE_OK;
     }
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     if (
         pending->state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
@@ -670,7 +670,7 @@ static enum micros_vfs_core_error validate_pending_resources(
             ? MICROS_VFS_CORE_OK
             : MICROS_VFS_CORE_ERROR_INVARIANT;
     }
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     if (
         pending->state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE

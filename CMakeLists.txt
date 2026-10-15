@@ -128,6 +128,11 @@ option(
     OFF
 )
 option(
+    MICROS_BUILD_ELF_SPAWN_TEST
+    "Build the production ELF spawn and resource-baseline integration image"
+    OFF
+)
+option(
     MICROS_BUILD_VM_READY_EARLY_TEST
     "Build the early VM readiness role-gate panic image"
     OFF
@@ -215,6 +220,7 @@ set(
     MICROS_BUILD_VFS_SERVICE_IMAGE
     MICROS_BUILD_RAMFS_SERVICE_TEST
     MICROS_BUILD_VFS_SERVICE_TEST
+    MICROS_BUILD_ELF_SPAWN_TEST
     MICROS_BUILD_VM_READY_EARLY_TEST
     MICROS_BUILD_VM_SELF_FAULT_TEST
     MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -714,6 +720,12 @@ set(
     MICROS_SPAWN_REQUEST_SOURCES
     lib/spawn/spawn_request.c
     lib/spawn/spawn_stack_layout.c
+)
+
+set(
+    MICROS_ELF_SPAWN_RESOURCE_SOURCES
+    kernel/elf_spawn_test_compare.c
+    kernel/elf_spawn_test_service_compare.c
 )
 
 set(
@@ -1266,6 +1278,48 @@ if(MICROS_BUILD_HOST_TESTS)
         )
         target_link_options(
             application_runtime_test
+            PRIVATE
+                -fsanitize=address,undefined
+        )
+    endif()
+    add_executable(
+        elf_spawn_fixture_test
+        ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
+        tests/qemu/elf_spawn_request.c
+        tests/qemu/elf_spawn_client.c
+        tests/qemu/elf_spawn_client_vfs.c
+        tests/host/elf_spawn_fixture_test.c
+        tests/host/elf_spawn_resource_test.c
+        tests/host/elf_spawn_client_test.c
+    )
+    target_include_directories(
+        elf_spawn_fixture_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_features(elf_spawn_fixture_test PRIVATE c_std_17)
+    target_compile_definitions(elf_spawn_fixture_test PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+    target_compile_options(
+        elf_spawn_fixture_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+    )
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(
+            elf_spawn_fixture_test
+            PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+        )
+        target_link_options(
+            elf_spawn_fixture_test
             PRIVATE
                 -fsanitize=address,undefined
         )
@@ -2320,6 +2374,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME ipc-model COMMAND ipc_model_test)
     add_test(NAME user-runtime COMMAND runtime_test)
     add_test(NAME application-runtime COMMAND application_runtime_test)
+    add_test(NAME elf-spawn-fixture COMMAND elf_spawn_fixture_test)
     add_test(NAME bootstrap-manifest COMMAND bootstrap_test)
     add_test(NAME bootstrap-control COMMAND bootstrap_control_test)
     add_test(NAME vm-bootstrap COMMAND vm_bootstrap_test)
@@ -2391,6 +2446,7 @@ if(MICROS_BUILD_HOST_TESTS)
             endpoint_test
             runtime_test
             application_runtime_test
+            elf_spawn_fixture_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
@@ -2513,6 +2569,7 @@ if(MICROS_BUILD_HOST_TESTS)
             ipc_model_test
             runtime_test
             application_runtime_test
+            elf_spawn_fixture_test
             bootstrap_test
             bootstrap_control_test
             vm_bootstrap_test
@@ -2565,7 +2622,7 @@ set(MICROS_APPLICATION_LINKER_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtime/application.ld"
 )
 
-if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES)
+if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUILD_ELF_SPAWN_TEST)
     function(micros_add_application target output_name)
         add_executable(
             "${target}"
@@ -2649,6 +2706,49 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES)
             tests/qemu/application_minimal_probe.c
         )
     endif()
+    if(MICROS_BUILD_ELF_SPAWN_TEST OR MICROS_BUILD_APPLICATION_IMAGES)
+        micros_add_application(
+            micros_elf_spawn_init
+            micros-elf-spawn-init
+            tests/qemu/elf_spawn_init.c
+            tests/qemu/elf_spawn_client.c
+            tests/qemu/elf_spawn_client_vfs.c
+            tests/qemu/elf_spawn_request.c
+            tests/qemu/elf_spawn_report.S
+        )
+        micros_add_application(
+            micros_elf_spawn_child
+            micros-elf-spawn-child
+            tests/qemu/elf_spawn_child.c
+            tests/qemu/elf_spawn_client.c
+            tests/qemu/elf_spawn_client_vfs.c
+            tests/qemu/elf_spawn_request.c
+            tests/qemu/elf_spawn_report.S
+        )
+        target_compile_definitions(micros_elf_spawn_init PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+        target_compile_definitions(micros_elf_spawn_child PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+        set(
+            MICROS_ELF_SPAWN_SEED_IMAGE
+            "${CMAKE_BINARY_DIR}/applications/elf-spawn-seed.bin"
+        )
+        add_custom_command(
+            OUTPUT "${MICROS_ELF_SPAWN_SEED_IMAGE}"
+            COMMAND
+                "${MICROS_PYTHON}" -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_seed.py"
+                --init-elf "$<TARGET_FILE:micros_elf_spawn_init>"
+                --child-elf "$<TARGET_FILE:micros_elf_spawn_child>"
+                --output "${MICROS_ELF_SPAWN_SEED_IMAGE}"
+            DEPENDS
+                micros_elf_spawn_init
+                micros_elf_spawn_child
+                ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_seed.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VERBATIM
+        )
+    endif()
     set(
         MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE
         "${CMAKE_BINARY_DIR}/generated/application_runtime_fixture.c"
@@ -2721,6 +2821,9 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES)
             DEPENDS
                 micros_application_runtime_probe
                 micros_application_minimal_probe
+                micros_elf_spawn_init
+                micros_elf_spawn_child
+                "${MICROS_ELF_SPAWN_SEED_IMAGE}"
                 "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
                 "${MICROS_APPLICATION_SEED_IMAGE}"
         )
@@ -2842,6 +2945,7 @@ if(
     OR MICROS_BUILD_VFS_SERVICE_IMAGE
     OR MICROS_BUILD_RAMFS_SERVICE_TEST
     OR MICROS_BUILD_VFS_SERVICE_TEST
+    OR MICROS_BUILD_ELF_SPAWN_TEST
     OR MICROS_BUILD_VM_READY_EARLY_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_TEST
     OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -2935,6 +3039,7 @@ if(
         OR MICROS_BUILD_TTY_SERVICE_TEST
         OR MICROS_BUILD_RAMFS_SERVICE_TEST
         OR MICROS_BUILD_VFS_SERVICE_TEST
+        OR MICROS_BUILD_ELF_SPAWN_TEST
     )
         micros_add_bootstrap_user(
             micros_tty_service
@@ -2964,7 +3069,12 @@ if(
         MICROS_BUILD_RAMFS_SERVICE_IMAGE
         OR MICROS_BUILD_RAMFS_SERVICE_TEST
         OR MICROS_BUILD_VFS_SERVICE_TEST
+        OR MICROS_BUILD_ELF_SPAWN_TEST
     )
+        set(MICROS_RAMFS_SERVICE_SEED_IMAGE "${MICROS_RAMFS_SEED_IMAGE}")
+        if(MICROS_BUILD_ELF_SPAWN_TEST)
+            set(MICROS_RAMFS_SERVICE_SEED_IMAGE "${MICROS_ELF_SPAWN_SEED_IMAGE}")
+        endif()
         set(
             MICROS_RAMFS_EMBEDDED_SEED_SOURCE
             "${CMAKE_BINARY_DIR}/generated/ramfs_embedded_seed.c"
@@ -2976,11 +3086,11 @@ if(
                 -B
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
                 --input
-                "${MICROS_RAMFS_SEED_IMAGE}"
+                "${MICROS_RAMFS_SERVICE_SEED_IMAGE}"
                 --output
                 "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
             DEPENDS
-                "${MICROS_RAMFS_SEED_IMAGE}"
+                "${MICROS_RAMFS_SERVICE_SEED_IMAGE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/ramfs_embedded_seed.h"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3019,6 +3129,7 @@ if(
     if(
         MICROS_BUILD_VFS_SERVICE_IMAGE
         OR MICROS_BUILD_VFS_SERVICE_TEST
+        OR MICROS_BUILD_ELF_SPAWN_TEST
     )
         micros_add_bootstrap_user(
             micros_vfs_service
@@ -3051,6 +3162,9 @@ if(
                     MICROS_BUILD_VFS_SERVICE_TEST=1
             )
         endif()
+        if(MICROS_BUILD_ELF_SPAWN_TEST)
+            target_compile_definitions(micros_vfs_service PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+        endif()
     endif()
 
     micros_add_bootstrap_user(
@@ -3065,6 +3179,7 @@ if(
         OR MICROS_BUILD_TTY_SERVICE_TEST
         OR MICROS_BUILD_RAMFS_SERVICE_TEST
         OR MICROS_BUILD_VFS_SERVICE_TEST
+        OR MICROS_BUILD_ELF_SPAWN_TEST
         OR MICROS_BUILD_VM_READY_EARLY_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_TEST
         OR MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST
@@ -3109,6 +3224,12 @@ if(
                 micros_vm_server
                 PRIVATE
                     MICROS_VM_SCRATCH_PREEMPTION_TEST=1
+            )
+        elseif(MICROS_BUILD_ELF_SPAWN_TEST)
+            target_compile_definitions(
+                micros_vm_server
+                PRIVATE
+                    MICROS_BUILD_ELF_SPAWN_TEST=1
             )
         elseif(MICROS_BUILD_VFS_SERVICE_TEST)
             target_compile_definitions(
@@ -3327,6 +3448,62 @@ if(
             )
             set_source_files_properties(
                 "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
+                PROPERTIES GENERATED TRUE
+            )
+        elseif(MICROS_BUILD_ELF_SPAWN_TEST)
+            micros_add_bootstrap_user(
+                micros_pm_service
+                micros-pm-service
+                servers/pm/pm_control.c
+                ${MICROS_PM_CORE_SOURCES}
+                ${MICROS_PM_SERVICE_SOURCES}
+                ${MICROS_PM_COORDINATOR_SOURCES}
+                ${MICROS_PM_RUNTIME_BACKEND_SOURCES}
+                ${MICROS_SPAWN_REQUEST_SOURCES}
+                tests/qemu/elf_spawn_pm.c
+                tests/qemu/elf_spawn_request.c
+            )
+            target_compile_definitions(
+                micros_pm_service
+                PRIVATE
+                    MICROS_BUILD_ELF_SPAWN_TEST=1
+            )
+            set(
+                MICROS_ELF_SPAWN_FIXTURE_SOURCE
+                "${CMAKE_BINARY_DIR}/generated/elf_spawn_fixture.c"
+            )
+            add_custom_command(
+                OUTPUT "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
+                COMMAND
+                    "${MICROS_PYTHON}" -B
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_fixture.py"
+                    --launcher-elf "$<TARGET_FILE:micros_bootstrap_launcher>"
+                    --vm-elf "$<TARGET_FILE:micros_vm_server>"
+                    --pm-elf "$<TARGET_FILE:micros_pm_service>"
+                    --tty-elf "$<TARGET_FILE:micros_tty_service>"
+                    --ramfs-elf "$<TARGET_FILE:micros_ramfs_service>"
+                    --vfs-elf "$<TARGET_FILE:micros_vfs_service>"
+                    --init-elf "$<TARGET_FILE:micros_elf_spawn_init>"
+                    --child-elf "$<TARGET_FILE:micros_elf_spawn_child>"
+                    --output "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
+                DEPENDS
+                    micros_bootstrap_launcher
+                    micros_vm_server
+                    micros_pm_service
+                    micros_tty_service
+                    micros_ramfs_service
+                    micros_vfs_service
+                    micros_elf_spawn_init
+                    micros_elf_spawn_child
+                    ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/kernel/elf_spawn_test_fixture.h"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                VERBATIM
+            )
+            set_source_files_properties(
+                "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
                 PROPERTIES GENERATED TRUE
             )
         elseif(MICROS_BUILD_VFS_SERVICE_TEST)
@@ -3796,6 +3973,34 @@ if(MICROS_BUILD_RAMFS_SERVICE_TEST)
         PRIVATE
             "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
             kernel/ramfs_service_test.c
+    )
+endif()
+
+if(MICROS_BUILD_ELF_SPAWN_TEST)
+    add_dependencies(
+        micros
+        micros_bootstrap_launcher
+        micros_vm_server
+        micros_pm_service
+        micros_tty_service
+        micros_ramfs_service
+        micros_vfs_service
+        micros_elf_spawn_init
+        micros_elf_spawn_child
+    )
+    target_compile_definitions(micros PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+    target_sources(
+        micros
+        PRIVATE
+            "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
+            kernel/elf_spawn_test.c
+            kernel/elf_spawn_test_fixture.c
+            kernel/elf_spawn_test_runtime.c
+            kernel/elf_spawn_test_capture.c
+            kernel/elf_spawn_test_services.c
+            kernel/elf_spawn_test_service_checks.c
+            kernel/elf_spawn_test_report.c
+            ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
     )
 endif()
 
@@ -4384,6 +4589,33 @@ if(MICROS_BUILD_VFS_SERVICE_TEST)
             --require-objects-ready
             --timeout
             180
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+    )
+endif()
+
+if(MICROS_BUILD_ELF_SPAWN_TEST)
+    add_custom_target(
+        test-qemu-elf-spawn
+        COMMAND
+            "${MICROS_PYTHON}" -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --qemu "${MICROS_QEMU}"
+            --kernel "$<TARGET_FILE:micros>"
+            --marker "MICROS_BOOT ${PROJECT_VERSION}"
+            --marker "MICROS_FDT_READY"
+            --marker "MICROS_TRAP_READY"
+            --marker
+            "MICROS_ELF_SPAWN_TEST_PASS services=production init=dynamic rollback=post-freeze arguments=validated descriptors=inherited io=two-hop exit=normal wait=one-shot resources=baseline"
+            --require-fdt-events
+            --require-fdt-reservations
+            --require-trap-ready
+            --require-frame-allocator-ready
+            --require-mmu-ready
+            --require-frame-ownership-ready
+            --require-objects-ready
+            --timeout 180
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

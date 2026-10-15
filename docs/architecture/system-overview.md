@@ -294,12 +294,18 @@ prepared state back, or atomically publish it. Normal exit first seals the
 application endpoint source-only while retaining its exact reply-blocked call,
 then detaches IPC, grants, thread, context, and scheduler state before VM
 releases the root and frames and PM retires the empty process. An isolated QEMU
-fixture proves this complete kernel lifecycle with a synthetic dynamic child;
+fixture proves this complete kernel lifecycle with a checked application;
 the production PM/VFS/VM coordinator now composes ordinary spawn, rollback,
 exit, and wait through checked service protocols. Its
 [implementation map](pm-spawn-coordinator.md) records the mixed native
-lifecycle proof and real runtime adapters. Application argv/env startup and
-PID-1 QEMU integration remain later Step 14 slices.
+lifecycle proof and real runtime adapters. The separately reviewed
+[application runtime](application-runtime.md) now supplies argv/env startup,
+checked images, and normal-return PM exit. The final
+[PID-1 integration](elf-spawn-integration.md) now composes all six production
+services with dynamic parent/child applications, post-freeze rollback,
+inherited I/O, normal exit/wait, and complete post-init resource equality.
+Implementation #128 records the current author and independent-review gate;
+production init and shell remain node Q.
 
 The PM model contract is
 [ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md), and the
@@ -698,7 +704,7 @@ seize UART permanently in polled mode.
 - The initial user image has one fixed `_start`, no relocation or
   dynamic-loader state, and no allocatable page with both write and execute
   permission.
-- The runtime does not retain syscall authority or results and does
+- The service runtime does not retain syscall authority or results and does
   not initialize service readiness, process lifecycle, heap, TLS, arguments,
   or environment state.
 

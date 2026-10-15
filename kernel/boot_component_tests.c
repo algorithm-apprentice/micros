@@ -38,6 +38,9 @@
 #ifdef MICROS_BUILD_VFS_SERVICE_TEST
 #include "kernel/vfs_service_test.h"
 #endif
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+#include "kernel/elf_spawn_test.h"
+#endif
 #ifdef MICROS_BUILD_UART_CONSOLE_TEST
 #include "kernel/uart_console_test.h"
 #endif
@@ -305,6 +308,10 @@ void boot_test_services(const struct boot_context *boot)
 #ifdef MICROS_BUILD_VFS_SERVICE_TEST
     micros_vfs_service_test_launch();
     MICROS_PANIC(boot->hart_id, "vfs-service-test-returned");
+#endif
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+    micros_elf_spawn_test_launch();
+    MICROS_PANIC(boot->hart_id, "elf-spawn-test-returned");
 #endif
 
 #if defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \

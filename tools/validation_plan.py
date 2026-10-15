@@ -39,6 +39,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-tty",
     "test-qemu-ramfs",
     "test-qemu-vfs",
+    "test-qemu-elf-spawn",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -109,6 +110,16 @@ IMAGE_INPUTS = {
         "tools/application_elf_policy.py",
         "tools/generate_application_seed.py",
         "tools/generate_ramfs_seed.py",
+        "tools/generate_elf_spawn_seed.py",
+        "tests/qemu/elf_spawn_init.c",
+        "tests/qemu/elf_spawn_child.c",
+        "tests/qemu/elf_spawn_client.c",
+        "tests/qemu/elf_spawn_client_vfs.c",
+        "tests/qemu/elf_spawn_client.h",
+        "tests/qemu/elf_spawn_request.c",
+        "tests/qemu/elf_spawn_request.h",
+        "tests/qemu/elf_spawn_report.S",
+        "tests/qemu/elf_spawn_protocol.h",
     ),
 }
 
@@ -842,6 +853,12 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/elf_spawn_client_test.c",
+    "tests/host/elf_spawn_resource_test.c",
+    "tests/host/elf_spawn_fixture_test_internal.h",
+    "tests/host/test_generate_elf_spawn_fixture.py",
+    "tests/host/elf_spawn_fixture_test.c",
+    "tests/host/test_generate_elf_spawn_seed.py",
     "tests/host/application_runtime_test.c",
     "tests/host/application_runtime_test_fixture.c",
     "tests/host/application_runtime_frontend_test.c",
@@ -907,6 +924,7 @@ BOOTSTRAP_CROSS_GATE_WORKFLOWS = (
     "test-qemu-tty",
     "test-qemu-ramfs",
     "test-qemu-vfs",
+    "test-qemu-elf-spawn",
     "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed",
@@ -1540,6 +1558,45 @@ GATE_INPUTS["test-qemu-vm-self-fault"] = GATE_INPUTS[
 GATE_INPUTS["test-qemu-vm-self-fault-sealed"] = GATE_INPUTS[
     "test-qemu-vm-self-fault"
 ]
+ELF_SPAWN_INTEGRATION_INPUTS = (
+    "kernel/elf_spawn_test.c",
+    "kernel/elf_spawn_test.h",
+    "kernel/elf_spawn_test_internal.h",
+    "kernel/elf_spawn_test_fixture.c",
+    "kernel/elf_spawn_test_fixture.h",
+    "kernel/elf_spawn_test_runtime.c",
+    "kernel/elf_spawn_test_capture.c",
+    "kernel/elf_spawn_test_services.c",
+    "kernel/elf_spawn_test_service_checks.c",
+    "kernel/elf_spawn_test_report.c",
+    "kernel/elf_spawn_test_compare.c",
+    "kernel/elf_spawn_test_service_compare.c",
+    "tests/qemu/elf_spawn_protocol.h",
+    "tests/qemu/elf_spawn_resources.h",
+    "tests/qemu/elf_spawn_request.c",
+    "tests/qemu/elf_spawn_request.h",
+    "tests/qemu/elf_spawn_init.c",
+    "tests/qemu/elf_spawn_child.c",
+    "tests/qemu/elf_spawn_client.c",
+    "tests/qemu/elf_spawn_client_vfs.c",
+    "tests/qemu/elf_spawn_client.h",
+    "tests/qemu/elf_spawn_pm.c",
+    "tests/qemu/elf_spawn_report.S",
+    "tools/generate_elf_spawn_fixture.py",
+    "tools/generate_elf_spawn_seed.py",
+    "tools/check_application_elf.py",
+    "tools/application_elf_policy.py",
+    "lib/runtime/application.c",
+    "lib/runtime/application_stack.c",
+    "lib/runtime/application_start.S",
+    "lib/runtime/application.ld",
+    "lib/runtime/application_internal.h",
+    "include/micros/application_runtime.h",
+)
+GATE_INPUTS["test-qemu-elf-spawn"] = (
+    GATE_INPUTS["test-qemu-vfs"] + ELF_SPAWN_INTEGRATION_INPUTS
+)
+
 for bootstrap_workflow in BOOTSTRAP_CROSS_GATE_WORKFLOWS:
     GATE_INPUTS[bootstrap_workflow] += BOOTSTRAP_CROSS_GATE_INPUTS
 

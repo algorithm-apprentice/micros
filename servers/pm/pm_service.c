@@ -55,6 +55,9 @@ void micros_service_main(void)
 #ifdef MICROS_PM_SERVICE_TEST
             pm_service_run_self_test(context);
 #endif
+#ifdef MICROS_BUILD_ELF_SPAWN_TEST
+            pm_service_start_elf_spawn_init(context);
+#endif
             pm_service_clear_bytes(&message, sizeof(message));
             if (
                 micros_runtime_receive(

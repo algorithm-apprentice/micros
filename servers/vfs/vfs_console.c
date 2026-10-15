@@ -1,6 +1,6 @@
 #include "servers/vfs/vfs_internal.h"
 
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
 static enum micros_vfs_core_error submit_test_drain(
     struct micros_vfs_state *state,
     uint64_t reply_token,
@@ -566,7 +566,7 @@ enum micros_vfs_core_error vfs_console_cleanup_pending_operation(
         return MICROS_VFS_CORE_OK;
     case MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT:
     case MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT:
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     case MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE:
 #endif
     case MICROS_VFS_PENDING_NONE:
@@ -586,7 +586,7 @@ static uint64_t expected_tty_event(
         return MICROS_TTY_EVENT_COMPLETION;
     case MICROS_VFS_PENDING_TTY_WRITE_WAIT_WRITABLE:
     case MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT:
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     case MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE:
 #endif
         return MICROS_TTY_EVENT_WRITABLE;
@@ -645,7 +645,7 @@ enum micros_vfs_core_error vfs_console_handle_notification(
             ) {
                 return MICROS_VFS_CORE_ERROR_INVARIANT;
             }
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
         } else if (
             state->pending.state
                 == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
@@ -674,7 +674,7 @@ enum micros_vfs_core_error vfs_console_handle_notification(
     return MICROS_VFS_CORE_OK;
 }
 
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
 static void prepare_test_drain_action(
     uint64_t reply_token,
     enum micros_vfs_result result,

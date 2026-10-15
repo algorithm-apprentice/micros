@@ -264,7 +264,7 @@ enum micros_vfs_core_error vfs_console_handle_notification(
     struct micros_vfs_result_action *action
 );
 
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
 enum micros_vfs_core_error vfs_console_begin_test_drain(
     struct micros_vfs_state *state,
     uint64_t reply_token,

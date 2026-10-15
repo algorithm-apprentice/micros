@@ -263,7 +263,7 @@ uint64_t vm_core_load_page_digest(
     const struct micros_vm_state *state
 )
 {
-    const struct micros_vm_load_transaction *transaction =
+    const struct micros_vm_service_load_transaction *transaction =
         &state->transaction;
     uint64_t digest = MICROS_VM_PAGE_DIGEST_OFFSET;
     size_t index;

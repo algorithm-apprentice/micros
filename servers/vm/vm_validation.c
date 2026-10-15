@@ -134,7 +134,7 @@ static bool vm_core_transaction_common_is_canonical(
     const struct micros_vm_state *state
 )
 {
-    const struct micros_vm_load_transaction *transaction =
+    const struct micros_vm_service_load_transaction *transaction =
         &state->transaction;
     size_t index;
 
@@ -225,7 +225,7 @@ static bool vm_core_record_matches_transaction(
     const struct micros_vm_mapping_record *record
 )
 {
-    const struct micros_vm_load_transaction *transaction =
+    const struct micros_vm_service_load_transaction *transaction =
         &state->transaction;
     static const uint8_t table_roles[MICROS_VM_PAGE_TABLE_FRAME_COUNT] = {
         MICROS_VM_MAPPING_ENTRY_ROOT_PAGE_TABLE,

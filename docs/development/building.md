@@ -958,6 +958,10 @@ runtime probe and a data-free/aligned minimal program, preserves all checked
 header/program/load bytes in the runtime artifact, and uses the existing
 RAMFS encoder for `applications/application-seed.bin`.
 Artifacts are under `build/riscv64-application-images/`.
+The same workflow also checks the dynamic PID-1 integration parent and child,
+then creates `applications/elf-spawn-seed.bin` from their immutable full
+images and a read-only fixture file. This seed is separate from the ordinary
+RAMFS seed and does not publish production init.
 
 The existing PM component now runs a checked application rather than the
 instruction-only child:
@@ -1024,6 +1028,39 @@ waits for physical UART completion and accepts the report only from the probe
 thread after all seven services are ready, launcher authority is sealed, VM and
 TTY handoff state is valid, and the grant registry is empty. The absolute host
 timeout is 180 seconds.
+
+## Production ELF spawn integration
+
+Run the complete development-DAG node-P gate with:
+
+```bash
+cmake --workflow --preset test-qemu-elf-spawn
+```
+
+Exactly six production static services load two checked RAMFS applications
+through ordinary PM/VFS/VM coordination. The dynamic test PID 1 captures the
+post-init baseline, forces one descriptor failure after VM freeze, then
+spawns child PID 3 with inherited descriptors 0/1/2 and exact argv/env.
+The child performs VFS stdout and seeded-file I/O and returns status 37.
+PID 1 requires the exact wait status and one subsequent `NO_CHILD`.
+
+Authenticated fixture checkpoints verify hidden PID consumption, rollback
+before another spawn, actual child descriptor identity, full kernel/service
+resource equality, every persistent process page-table byte, no live
+image/request grant or scratch/transferable frame, and physical UART drain
+before clean SBI termination. The existing no-authority VFS drain barrier
+does not enable the unrelated seven-entry static-probe configuration.
+The harness requires:
+
+```text
+MICROS_ELF_SPAWN_TEST_PASS services=production init=dynamic rollback=post-freeze arguments=validated descriptors=inherited io=two-hop exit=normal wait=one-shot resources=baseline
+```
+
+The absolute host timeout is 180 seconds. No sleep or host timing establishes
+correctness. See the
+[implementation map](../architecture/elf-spawn-integration.md) for ownership
+and current author/review evidence. This PID 1 is an integration reaper,
+not production init or a shell.
 
 ## TTY service acceptance
 

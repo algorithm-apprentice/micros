@@ -119,7 +119,7 @@ static bool service_stale_release_preserves_state(
     struct vm_service_test_fixture *fixture, uint32_t command, const uint64_t arguments[5]
 )
 {
-    struct micros_vm_load_transaction transaction = fixture->context->state.transaction;
+    struct micros_vm_service_load_transaction transaction = fixture->context->state.transaction;
     struct micros_vm_mapping_record record = fixture->context->state.mapping_records[3];
     uint8_t frames[TEST_MANAGED_FRAME_COUNT];
     uint32_t phase = fixture->context->state.phase;

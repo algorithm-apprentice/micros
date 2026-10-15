@@ -920,7 +920,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-grant", "test-qemu-grant-syscall", "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher", "test-qemu-vm-handoff", "test-qemu-pm-service",
     "test-qemu-vm-scratch-preemption", "test-qemu-tty", "test-qemu-ramfs",
-    "test-qemu-vfs", "test-qemu-vm-ready-early", "test-qemu-vm-self-fault",
+    "test-qemu-vfs", "test-qemu-elf-spawn", "test-qemu-vm-ready-early", "test-qemu-vm-self-fault",
     "test-qemu-vm-self-fault-sealed", "test-qemu-bootstrap-ready-timeout",
     "test-qemu-bootstrap-manifest-panic", "test-qemu-ipc", "test-qemu-ipc-ecall-core",
     "test-qemu-ipc-syscall", "test-qemu-ipc-syscall-panic", "test-qemu-nested-trap",
@@ -1778,7 +1778,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         self.assertEqual(17, len(STABLE_ARTIFACT_HASHES))
         self.assertEqual(163, sum(len(frozen_functions(path)) for path in ORIGINAL_SOURCES))
         self.assertEqual(set((*INITIAL_FUNCTION_MIGRATION, *SHORT_PHASE_ROOTS)), set(FROZEN_FACTS))
-        self.assertEqual(37, len(QEMU_WORKFLOWS))
+        self.assertEqual(38, len(QEMU_WORKFLOWS))
         for original, owners in ORIGINAL_FUNCTIONS.items():
             self.assertEqual(
                 set(frozen_functions(original)),

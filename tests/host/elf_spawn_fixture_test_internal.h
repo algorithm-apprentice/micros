@@ -1,0 +1,11 @@
+#ifndef MICROS_TESTS_HOST_ELF_SPAWN_FIXTURE_TEST_INTERNAL_H
+#define MICROS_TESTS_HOST_ELF_SPAWN_FIXTURE_TEST_INTERNAL_H
+
+#include <stdbool.h>
+
+bool test_elf_spawn_kernel_resource_oracle(void);
+bool test_elf_spawn_service_resource_oracle(void);
+bool test_elf_spawn_resource_counter_and_inactive_byte_policy(void);
+bool test_elf_spawn_client_protocol(void);
+
+#endif

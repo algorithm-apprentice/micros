@@ -99,7 +99,7 @@ struct micros_vm_mapping_record {
         entries[MICROS_VM_MAPPING_ENTRY_CAPACITY];
 };
 
-struct micros_vm_load_transaction {
+struct micros_vm_service_load_transaction {
     uint64_t process_reservation_token;
     uint64_t load_token;
     uint64_t semantic_pid;
@@ -152,7 +152,7 @@ struct micros_vm_state {
     uint32_t reserved;
     struct micros_vm_boot_info *boot_info;
     struct micros_vm_boot_summary boot_summary;
-    struct micros_vm_load_transaction transaction;
+    struct micros_vm_service_load_transaction transaction;
     struct micros_vm_mapping_record
         mapping_records[MICROS_VM_MAPPING_RECORD_CAPACITY];
     uint64_t

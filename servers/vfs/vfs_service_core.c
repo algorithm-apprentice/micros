@@ -812,7 +812,7 @@ enum micros_vfs_service_error micros_vfs_service_build_result(
                 )
                 || (
                     !application_type_is_known(result->request_type)
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
                     && result->request_type
                         != MICROS_VFS_TEST_MESSAGE_DRAIN
 #endif
@@ -1376,7 +1376,7 @@ dispatch_application_message(
     if (message->reply_token == 0) {
         return MICROS_VFS_SERVICE_ERROR_INVARIANT;
     }
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
     if (message->type == MICROS_VFS_TEST_MESSAGE_DRAIN) {
         if (
             read_u32_le(&message->payload[0])

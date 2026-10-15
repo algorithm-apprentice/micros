@@ -668,6 +668,7 @@ GENERATOR_IMPORTS = {
     "tools/generate_tty_service_fixture.py": (5, 1, 5),
     "tools/generate_ramfs_service_fixture.py": (6, 1, 6),
     "tools/generate_vfs_service_fixture.py": (7, 1, 1),
+    "tools/generate_elf_spawn_fixture.py": (1, 1, 1),
 }
 
 QEMU_WORKFLOWS = (
@@ -676,7 +677,8 @@ QEMU_WORKFLOWS = (
     "test-qemu-mmu", "test-qemu-object-model", "test-qemu-endpoint", "test-qemu-grant",
     "test-qemu-grant-syscall", "test-qemu-user-runtime", "test-qemu-bootstrap-launcher",
     "test-qemu-vm-handoff", "test-qemu-pm-service", "test-qemu-vm-scratch-preemption",
-    "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs", "test-qemu-vm-ready-early",
+    "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs", "test-qemu-elf-spawn",
+    "test-qemu-vm-ready-early",
     "test-qemu-vm-self-fault", "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout", "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc", "test-qemu-ipc-ecall-core", "test-qemu-ipc-syscall",
@@ -690,6 +692,7 @@ CROSS_GATE_WORKFLOWS = (
     "test-qemu-grant", "test-qemu-grant-syscall", "test-qemu-user-runtime",
     "test-qemu-bootstrap-launcher", "test-qemu-vm-handoff", "test-qemu-pm-service",
     "test-qemu-vm-scratch-preemption", "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs",
+    "test-qemu-elf-spawn",
     "test-qemu-vm-ready-early", "test-qemu-vm-self-fault", "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout", "test-qemu-bootstrap-manifest-panic",
     "test-qemu-ipc", "test-qemu-ipc-ecall-core", "test-qemu-ipc-syscall",
@@ -700,6 +703,7 @@ CROSS_GATE_WORKFLOWS = (
 LAUNCHER_WORKFLOWS = (
     "test-qemu-bootstrap-launcher", "test-qemu-vm-handoff", "test-qemu-pm-service",
     "test-qemu-vm-scratch-preemption", "test-qemu-tty", "test-qemu-ramfs", "test-qemu-vfs",
+    "test-qemu-elf-spawn",
     "test-qemu-vm-ready-early", "test-qemu-vm-self-fault", "test-qemu-vm-self-fault-sealed",
     "test-qemu-bootstrap-ready-timeout", "test-qemu-bootstrap-manifest-panic",
 )
@@ -711,6 +715,7 @@ QEMU_TARGET_HASHES = dict(zip(LAUNCHER_WORKFLOWS, (
     "e749cfc5b07cbd28fffc897c4d2ef90e83582d4ccdc0942278749ef07ae583ca",
     "f8ebbc4f698709571f37a2d0c47f86db4a6940392e3bc561eab2b5aa21c9f94a",
     "a6d9f9383a2cc56210d64375e13c75bb57713c9d7478c8810d09b09a3a43d609",
+    "30e5744d9aa6ad7652e61f4fd64a5f2221d3d94eef9d68d2bb62560ab6cd1810",
     "50f96b3916c9b29ab9271ac2b5efd16610bd543af449ec07ff68cdf1129129bc",
     "fbc76bafb24a02a343e7ae3117a47f9e7cdbd945c9723cd5c11e5f708f377fc1",
     "ab50360a071250981aa9af68a4a323d719ae0b649707b4b2740d5d004ebbecd8",
@@ -792,6 +797,7 @@ BOOT_BRANCHES = (
     ("MICROS_BUILD_TTY_SERVICE_TEST", ("micros_tty_service_test_launch",), ("tty-service-test-returned",)),
     ("MICROS_BUILD_RAMFS_SERVICE_TEST", ("micros_ramfs_service_test_launch",), ("ramfs-service-test-returned",)),
     ("MICROS_BUILD_VFS_SERVICE_TEST", ("micros_vfs_service_test_launch",), ("vfs-service-test-returned",)),
+    ("MICROS_BUILD_ELF_SPAWN_TEST", ("micros_elf_spawn_test_launch",), ("elf-spawn-test-returned",)),
     ("defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST)||defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)",
      ("micros_scheduler_invalid_runtime_run_self_test",), ("scheduler-invalid-test-returned",)),
     ("MICROS_BUILD_OBJECT_MODEL_TEST", ("micros_kernel_object_runtime_run_self_test",), (
@@ -1843,7 +1849,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         )
         self.assertIn(path, self.texts)
         bodies = "\n".join(c_function_body(self.texts[path], name) for name in self.definitions[path])
-        self.assertEqual(30, len(BOOT_BRANCHES))
+        self.assertEqual(31, len(BOOT_BRANCHES))
         self.assertEqual(BOOT_BRANCHES, branch_records(bodies))
         selected = {
             "micros_kernel_object_runtime_initialize", "micros_trap_install",
@@ -2033,7 +2039,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                                     '"${CMAKE_CURRENT_SOURCE_DIR}/include")'))
             self.assertIn(compact(includes), allowed)
         self.assertEqual(
-            "680591f0bec9c2a413790cfb38f4835528ff8771d8263ab6f98a63c414000867",
+            "eae6c86ce5ac8f0e1b39605ebbd6816135558f0b4f8ea293b3680d7ecb79df86",
             hashlib.sha256((REPOSITORY_ROOT / "CMakePresets.json").read_bytes()).hexdigest(),
         )
         presets = json.loads(read_source("CMakePresets.json"))
@@ -2046,9 +2052,9 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             self.assertEqual(expected, compact_hash(cmake_command(cmake, "add_custom_target", target)), target)
 
     def test_validation_baselines_retain_full_cross_gate_and_launcher_metadata(self) -> None:
-        self.assertEqual(37, len(QEMU_WORKFLOWS))
-        self.assertEqual(27, len(CROSS_GATE_WORKFLOWS))
-        self.assertEqual(12, len(LAUNCHER_WORKFLOWS))
+        self.assertEqual(38, len(QEMU_WORKFLOWS))
+        self.assertEqual(28, len(CROSS_GATE_WORKFLOWS))
+        self.assertEqual(13, len(LAUNCHER_WORKFLOWS))
         self.assertEqual(QEMU_WORKFLOWS, tuple(validation_plan.QEMU_WORKFLOWS))
         baselines = {
             "kernel/bootstrap_manifest.c": (False, CROSS_GATE_WORKFLOWS),

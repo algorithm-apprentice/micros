@@ -9,7 +9,7 @@ static bool pending_cleanup_debt_exists(
             == MICROS_VFS_PENDING_TTY_COMPLETION_NOTICE_DEBT
         || state->pending.state
             == MICROS_VFS_PENDING_TTY_WRITABLE_NOTICE_DEBT
-#if defined(MICROS_BUILD_VFS_SERVICE_TEST)
+#if defined(MICROS_BUILD_VFS_SERVICE_TEST) || defined(MICROS_BUILD_ELF_SPAWN_TEST)
         || state->pending.state
             == MICROS_VFS_PENDING_TTY_TEST_DRAIN_WAIT_WRITABLE
 #endif

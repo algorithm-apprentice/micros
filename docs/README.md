@@ -30,6 +30,9 @@ This directory contains the design baseline for `micros`.
 - [Application runtime implementation map](architecture/application-runtime.md)
   maps the Accepted initial stack, separate startup, PM return-exit,
   checked images, and component evidence without claiming PID-1 integration.
+- [ELF spawn integration implementation map](architecture/elf-spawn-integration.md)
+  maps the final six-production-service dynamic PID-1/child rollback,
+  inherited I/O, exit/wait, physical drain, and complete resource proof.
 - [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
   defines exact queue, completion, token, event, cancellation, syscall,
   native/reference-model, and target-script ownership.

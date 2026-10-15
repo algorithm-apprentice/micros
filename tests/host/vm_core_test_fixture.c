@@ -424,7 +424,7 @@ uint64_t vm_core_test_expected_page_digest(
     const struct vm_core_test_context *context
 )
 {
-    const struct micros_vm_load_transaction *transaction =
+    const struct micros_vm_service_load_transaction *transaction =
         &context->state.transaction;
     uint64_t digest = UINT64_C(14695981039346656037);
     size_t index;
