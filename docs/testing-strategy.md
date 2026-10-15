@@ -201,6 +201,23 @@ full-tier classification despite empty separate workflow metadata. Narrow
 green extraction precedes one authoritative final author PR plan; independent
 reviewers inspect rather than routinely rerun the author's evidence.
 
+The RAMFS correction defined by Accepted ADR-0066 preserves the exact `ramfs-seed`,
+`ramfs-core`, and `ramfs-model` CTests, replayable 8,192-step model,
+standalone RAMFS image, authenticated six-service QEMU scenario, and
+downstream VFS/ELF-spawn consumers. The
+[canonical source contract](architecture/ramfs-source-organization.md)
+defines 32 C sources, six private headers/sets, 180 original-definition
+moves, sixteen long C splits, and one Python renderer split. Its separate
+implementation starts only after the separately reviewed design merges.
+Structural Red freezes immutable owner/body/storage/case/trace/output
+inventories and exact CMake reconstruction; full-tier, QEMU, slow-model, and
+image classifications remain independently unchanged. Native/model,
+image/QEMU, and current-candidate validation-profile evidence supplement
+structural checks. Narrow green slices precede one authoritative complete
+author plan and bounded real reuse acceptance; independent reviewers inspect
+the evidence without routinely rerunning it. No implementation is claimed
+by the documentation-only design.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |

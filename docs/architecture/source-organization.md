@@ -301,3 +301,12 @@ policy, bounded instruction inspection, CLI, and private host evidence while
 preserving the old facade, error order, fixture bytes, discovery identities,
 and transitive validation ownership. Its independent design review is clean;
 implementation remains pending the separate design merge.
+
+The selected RAMFS correction is defined by Accepted
+[ADR-0066](../adr/0066-ramfs-source-decomposition.md) and its exact
+[source contract](ramfs-source-organization.md). It separates portable
+filesystem tasks, native fixtures/cases, independent reference/projection,
+target peer/report, and generator phases while preserving ADR-0048 behavior,
+storage lifetimes, evidence identities, and closed validation eligibility.
+Independent design and bounded correction review are clean. Implementation
+remains pending the separate design merge.
