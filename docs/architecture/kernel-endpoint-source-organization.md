@@ -538,8 +538,12 @@ mask remain caller-owned; exact projection preserves dirty/initialized/
 capacity/duplicate/target precedence and copy/count/magic order. Publication
 uses the frozen full registry-array extent rather than the decayed parameter
 size. Independent mask-binding, extent and early-publication mutants reject
-drift. Eight original long-function migrations remain pending, including the
-target entry.
+drift. The native runner now has an 18-line ordered control loop and its
+single exact 25-case file-static readonly table. Raw literal, callback, type
+and scope checks precede reconstruction of the entire original main body;
+case order, output and first failure remain unchanged.
+Seven original long-function migrations remain pending, including the target
+entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

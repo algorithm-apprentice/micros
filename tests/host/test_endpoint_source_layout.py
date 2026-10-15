@@ -30,6 +30,7 @@ MODEL_CONTEXT_HELPERS = {
     "record_transition": False, "model_fail": False, "setup_fixture": True, "validate_model": False,
 }
 NATIVE_ASSERTION_DIGEST = "a6a8819676540e04acd7f9d209aacfca43a90794c5f37f5462f32b2b91d205a1"
+NATIVE_RUNNER_TABLE_DIGEST = "2c71f3886b3dc3a68d7269ccd129036db53da625993828c8a12697eeb109f9e1"
 NATIVE_CONTEXT_FIELDS = ("registry", "objects", "processes", "threads", "hart")
 NATIVE_CONTEXT_CASES = (
     "test_profile_table_is_immutable_and_specific", "test_invalid_profile_tables_preserve_storage",
@@ -183,7 +184,6 @@ LONG_FUNCTION_MIGRATION = (
     (1, "test_endpoint_lifecycle_and_authorization"),
     (1, "test_profile_install_and_close_require_held_threads"),
     (1, "test_source_only_seal_preserves_staged_source"),
-    (1, "main"),
     (2, "validate_model"),
     (2, "micros_endpoint_model_test_run"),
     (3, "micros_endpoint_runtime_run_self_test"),
@@ -606,6 +606,43 @@ def initialization_body_tokens(caller, prepare, closed, publish):
     return tuple(caller)
 
 
+def raw_native_runner_table(text):
+    lexical = c_lexical_text(text)
+    candidates = tuple(re.finditer(
+        r"(?m)^static const struct\s*\{[\s\S]*?\}\s*tests\[\]\s*=\s*\{", lexical,
+    ))
+    if len(candidates) != 1:
+        raise AssertionError("native runner owns one exact file-static readonly case table")
+    match = candidates[0]
+    if lexical.count("{", 0, match.start()) != lexical.count("}", 0, match.start()):
+        raise AssertionError("runner data must have file scope rather than remain a long entry prefix")
+    start = match.end() - 1
+    expected = tokens("static const struct { const char *name; bool (*run)(void); } tests[] = {")
+    if tokens(text[match.start():start + 1]) != expected:
+        raise AssertionError("runner table retains exact const, callback and label types")
+    depth = 0
+    for index in range(start, len(lexical)):
+        if lexical[index] == "{":
+            depth += 1
+        elif lexical[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                while end < len(lexical) and lexical[end].isspace():
+                    end += 1
+                if end >= len(lexical) or lexical[end] != ";":
+                    raise AssertionError("runner table must end at its exact declaration")
+                return text[match.start():end + 1]
+    raise AssertionError("unterminated readonly native case table")
+
+
+def native_runner_table(text):
+    raw = raw_native_runner_table(text)
+    if body_digest(raw, normal_names(1)) != NATIVE_RUNNER_TABLE_DIGEST:
+        raise AssertionError("actual raw native runner labels, functions or order differ from immutable baseline")
+    return raw
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
     body = tokens(text)
@@ -621,6 +658,9 @@ def original_body_digest(family, name, text):
         body = initialization_body_tokens(
             text, *(c_function_body(owner, helper) for helper in INITIALIZER_HELPERS),
         )
+    if family == 1 and name == "main" and (1, "main") not in LONG_FUNCTION_MIGRATION:
+        raw = native_runner_table(source(family_paths(1)[0]))
+        body = ("{", *tokens(raw), *body[1:])
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
@@ -819,6 +859,8 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         self.assertEqual(16, len(owned_definitions(1)))
         for path in family_paths(1):
             expected = ("static struct endpoint_test_fixture fixture_state;",) if path == family_paths(1)[1] else ()
+            if path == family_paths(1)[0] and (1, "main") not in LONG_FUNCTION_MIGRATION:
+                expected = file_scope_objects(native_runner_table(source(path)))
             self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(path)))))
             self.assertNotRegex(source(path), r'#include\s*"[^"]*endpoint_private\.h"')
         macro = header[header.index("#define EXPECT_TRUE"):header.index("struct endpoint_test_fixture {")]
@@ -861,6 +903,35 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 native_fixture_body_tokens(name, tokens(changed))
         changed = current.replace("return false;", "return true;")
         self.assertNotEqual(tokens(expected), native_fixture_body_tokens(name, tokens(changed)))
+
+    def test_native_runner_exposes_one_raw_const_table_and_short_ordered_control(self):
+        text = source(family_paths(1)[0])
+        self.assertLessEqual(c_function_definitions(text)["main"], 120)
+        raw = native_runner_table(text)
+        self.assertEqual(25, len(re.findall(r'\{\s*"[^"\n]+"', raw)))
+        for changed in (
+            text.replace('"endpoint encoding boundaries"', '"changed encoding"'),
+            text.replace("endpoint_test_encoding_boundaries,", "endpoint_test_resolution_rejects_unimplemented_slots,", 1),
+            text.replace("static const struct", "static struct", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_runner_table(changed)
+
+    def test_raw_runner_extraction_preserves_literals_callback_types_and_scope(self):
+        raw = (
+            'static const struct { const char *name; bool (*run)(void); } tests[] = {'
+            '{"first { label", case_a}, {"second", case_b}, };'
+        )
+        text = raw + "\nint main(void) { run(tests); }"
+        self.assertEqual(tokens(raw), tokens(raw_native_runner_table(text)))
+        for changed in (
+            text.replace("static const", "static"),
+            text.replace("bool (*run)(void)", "int (*run)(void)"),
+            text.replace("const char *name", "char *name"),
+            "int main(void) {\n" + raw + "\n}",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                raw_native_runner_table(changed)
 
     def test_model_fixture_preserves_types_separate_storage_trace_data_and_exact_resets(self):
         header = source(PRIVATE_HEADERS[2])
