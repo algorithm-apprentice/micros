@@ -297,6 +297,126 @@ lookup_done:
     return MICROS_RAMFS_CORE_OK;
 }
 
+static void publish_created_node(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    struct ramfs_result_fields *fields,
+    uint16_t parent_slot,
+    uint16_t free_slot,
+    size_t name_length,
+    bool mkdir_request
+)
+{
+    struct micros_ramfs_node *parent;
+    size_t index;
+
+    parent = &state->nodes[parent_slot];
+    ramfs_initialize_empty_node(&state->nodes[free_slot]);
+    state->nodes[free_slot].live = true;
+    state->nodes[free_slot].generation = 1;
+    state->nodes[free_slot].mode = request->mode;
+    state->nodes[free_slot].link_count = mkdir_request ? 2 : 1;
+    state->nodes[free_slot].reference_count = mkdir_request ? 0 : 1;
+    state->nodes[free_slot].name_length = (uint16_t)name_length;
+    state->nodes[free_slot].parent = ramfs_node_handle(
+        parent_slot,
+        parent
+    );
+    for (index = 0; index < name_length; ++index) {
+        state->nodes[free_slot].name[index] = state->scratch[index];
+    }
+    if (mkdir_request) {
+        ++parent->link_count;
+    }
+    ++state->node_count;
+    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+    if (!mkdir_request) {
+        fields->node = ramfs_node_handle(
+            free_slot,
+            &state->nodes[free_slot]
+        );
+        fields->mode = state->nodes[free_slot].mode;
+    }
+}
+
+static enum micros_ramfs_core_error create_from_staged_name(
+    struct micros_ramfs_state *state,
+    const struct micros_ramfs_request *request,
+    struct ramfs_result_fields *fields,
+    enum micros_ramfs_result *result,
+    uint16_t parent_slot,
+    uint16_t free_slot,
+    bool mkdir_request
+)
+{
+    uint16_t existing_slot;
+    size_t name_length;
+    size_t index;
+
+    name_length = request->length - 1;
+    if (state->scratch[name_length] != 0) {
+        *result = MICROS_RAMFS_RESULT_MALFORMED;
+        goto create_done;
+    }
+    for (index = 0; index < name_length; ++index) {
+        if (
+            state->scratch[index] == 0
+            || state->scratch[index] == '/'
+        ) {
+            *result = MICROS_RAMFS_RESULT_MALFORMED;
+            goto create_done;
+        }
+    }
+    if (
+        (
+            name_length == 1
+            && state->scratch[0] == '.'
+        )
+        || (
+            name_length == 2
+            && state->scratch[0] == '.'
+            && state->scratch[1] == '.'
+        )
+    ) {
+        *result = MICROS_RAMFS_RESULT_MALFORMED;
+        goto create_done;
+    }
+    if (
+        find_child(
+            state,
+            parent_slot,
+            state->scratch,
+            name_length,
+            &existing_slot
+        )
+    ) {
+        *result = MICROS_RAMFS_RESULT_EXISTS;
+        goto create_done;
+    }
+    if (
+        ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK
+    ) {
+        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
+    }
+
+    publish_created_node(
+        state,
+        request,
+        fields,
+        parent_slot,
+        free_slot,
+        name_length,
+        mkdir_request
+    );
+    *result = MICROS_RAMFS_RESULT_OK;
+    return MICROS_RAMFS_CORE_OK;
+
+create_done:
+    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
+    return MICROS_RAMFS_CORE_OK;
+}
+
 enum micros_ramfs_core_error ramfs_handle_create_or_mkdir(
     struct micros_ramfs_state *state,
     const struct micros_ramfs_request *request,
@@ -306,12 +426,8 @@ enum micros_ramfs_core_error ramfs_handle_create_or_mkdir(
 )
 {
     const struct micros_ramfs_node *resolved_parent;
-    struct micros_ramfs_node *parent;
     uint16_t parent_slot;
     uint16_t free_slot;
-    uint16_t existing_slot;
-    size_t name_length;
-    size_t index;
     bool mkdir_request =
         request->type == MICROS_RAMFS_MESSAGE_MKDIR;
     enum micros_ramfs_copy_result copy_result;
@@ -382,85 +498,13 @@ enum micros_ramfs_core_error ramfs_handle_create_or_mkdir(
         *result = MICROS_RAMFS_RESULT_GRANT;
         return MICROS_RAMFS_CORE_OK;
     }
-
-    name_length = request->length - 1;
-    if (state->scratch[name_length] != 0) {
-        *result = MICROS_RAMFS_RESULT_MALFORMED;
-        goto create_done;
-    }
-    for (index = 0; index < name_length; ++index) {
-        if (
-            state->scratch[index] == 0
-            || state->scratch[index] == '/'
-        ) {
-            *result = MICROS_RAMFS_RESULT_MALFORMED;
-            goto create_done;
-        }
-    }
-    if (
-        (
-            name_length == 1
-            && state->scratch[0] == '.'
-        )
-        || (
-            name_length == 2
-            && state->scratch[0] == '.'
-            && state->scratch[1] == '.'
-        )
-    ) {
-        *result = MICROS_RAMFS_RESULT_MALFORMED;
-        goto create_done;
-    }
-    if (
-        find_child(
-            state,
-            parent_slot,
-            state->scratch,
-            name_length,
-            &existing_slot
-        )
-    ) {
-        *result = MICROS_RAMFS_RESULT_EXISTS;
-        goto create_done;
-    }
-    if (
-        ramfs_validate_state(state, false) != MICROS_RAMFS_CORE_OK
-    ) {
-        ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-        return MICROS_RAMFS_CORE_ERROR_INVARIANT;
-    }
-
-    parent = &state->nodes[parent_slot];
-    ramfs_initialize_empty_node(&state->nodes[free_slot]);
-    state->nodes[free_slot].live = true;
-    state->nodes[free_slot].generation = 1;
-    state->nodes[free_slot].mode = request->mode;
-    state->nodes[free_slot].link_count = mkdir_request ? 2 : 1;
-    state->nodes[free_slot].reference_count = mkdir_request ? 0 : 1;
-    state->nodes[free_slot].name_length = (uint16_t)name_length;
-    state->nodes[free_slot].parent = ramfs_node_handle(
+    return create_from_staged_name(
+        state,
+        request,
+        fields,
+        result,
         parent_slot,
-        parent
+        free_slot,
+        mkdir_request
     );
-    for (index = 0; index < name_length; ++index) {
-        state->nodes[free_slot].name[index] = state->scratch[index];
-    }
-    if (mkdir_request) {
-        ++parent->link_count;
-    }
-    ++state->node_count;
-    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-    if (!mkdir_request) {
-        fields->node = ramfs_node_handle(
-            free_slot,
-            &state->nodes[free_slot]
-        );
-        fields->mode = state->nodes[free_slot].mode;
-    }
-    *result = MICROS_RAMFS_RESULT_OK;
-    return MICROS_RAMFS_CORE_OK;
-
-create_done:
-    ramfs_zero_bytes(state->scratch, sizeof(state->scratch));
-    return MICROS_RAMFS_CORE_OK;
 }

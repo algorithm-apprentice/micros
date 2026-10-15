@@ -399,6 +399,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (1, "read_write_sparse_and_block_capacity_are_exact"),
         (3, "execute_scripted_operation"),
         (3, "reference_lookup"),
+        (0, "handle_create_or_mkdir"),
     )
 )
 
@@ -1050,6 +1051,78 @@ def reference_lookup_body_tokens(caller, phase):
     return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
 
 
+def created_publication_tokens(staged, publication):
+    staged = list(body_tokens(staged))
+    publication = list(body_tokens(publication))
+    current = list(body_tokens("uint16_t existing_slot; size_t name_length; size_t index;"))
+    original = list(body_tokens(
+        "struct micros_ramfs_node *parent; uint16_t existing_slot; size_t name_length; size_t index;"
+    ))
+    locals_ = list(body_tokens("struct micros_ramfs_node *parent; size_t index;"))
+    call = list(body_tokens(
+        "publish_created_node(state, request, fields, parent_slot, free_slot, name_length, mkdir_request);"
+    ))
+    if staged[1:1 + len(current)] != current:
+        raise AssertionError("staged validation must retain its original automatic name/index locals")
+    if publication[1:1 + len(locals_)] != locals_ or "return" in publication:
+        raise AssertionError("namespace publication must be void/non-failing with only original automatic locals")
+    positions = [
+        index for index in range(len(staged))
+        if staged[index:index + len(call)] == call
+    ]
+    if len(positions) != 1:
+        raise AssertionError("staged creation must invoke one exact prevalidated publication")
+    inner = publication[1 + len(locals_):-1]
+    bind = list(body_tokens("parent = &state->nodes[parent_slot];"))
+    loop = list(body_tokens("for (index = 0; index < name_length; ++index) {"))
+    if inner[:len(bind)] != bind or "for" not in inner:
+        raise AssertionError("publication must bind its validated parent and reset the copy index")
+    at = inner.index("for")
+    if inner[at:at + len(loop)] != loop or inner.index("index") != at + 2:
+        raise AssertionError("automatic publication counter must be initialized before use")
+    position = positions[0]
+    expanded = staged[:position] + inner + staged[position + len(call):]
+    expanded[1:1 + len(current)] = original
+    return tuple(expanded)
+
+
+def create_body_tokens(caller, phase):
+    caller = list(body_tokens(caller))
+    phase = list(body_tokens(phase)) if isinstance(phase, str) else list(phase)
+    current = list(body_tokens(
+        "const struct micros_ramfs_node *resolved_parent; uint16_t parent_slot; uint16_t free_slot; "
+        "bool mkdir_request = request->type == MICROS_RAMFS_MESSAGE_MKDIR; "
+        "enum micros_ramfs_copy_result copy_result;"
+    ))
+    original = list(body_tokens(
+        "const struct micros_ramfs_node *resolved_parent; struct micros_ramfs_node *parent; "
+        "uint16_t parent_slot; uint16_t free_slot; uint16_t existing_slot; size_t name_length; size_t index; "
+        "bool mkdir_request = request->type == MICROS_RAMFS_MESSAGE_MKDIR; "
+        "enum micros_ramfs_copy_result copy_result;"
+    ))
+    locals_ = list(body_tokens(
+        "struct micros_ramfs_node *parent; uint16_t existing_slot; size_t name_length; size_t index;"
+    ))
+    call = list(body_tokens(
+        "return create_from_staged_name(state, request, fields, result, parent_slot, free_slot, mkdir_request);"
+    ))
+    if caller[:1] != ["{"] or caller[1:1 + len(current)] != current or caller[-len(call) - 1:-1] != call:
+        raise AssertionError("creation must retain checked preflight/staging and directly return the exact staged outcome")
+    if phase[:1] != ["{"] or phase[1:1 + len(locals_)] != locals_ or phase[-1:] != ["}"]:
+        raise AssertionError("staged creation must retain only its original automatic publication locals")
+    inner = phase[1 + len(locals_):-1]
+    begin = list(body_tokens("name_length = request->length - 1;"))
+    cleanup = list(body_tokens(
+        "create_done: ramfs_zero_bytes(state->scratch, sizeof(state->scratch)); return MICROS_RAMFS_CORE_OK;"
+    ))
+    if inner[:len(begin)] != begin or inner[-len(cleanup):] != cleanup:
+        raise AssertionError("staged name validation and local scratch cleanup must remain exact")
+    for index, token in enumerate(inner):
+        if token == "goto" and inner[index + 1:index + 3] != ["create_done", ";"]:
+            raise AssertionError("staged creation cannot escape its own cleanup scope")
+    return tuple(["{"] + original + caller[1 + len(current):-len(call) - 1] + inner + ["}"])
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -1058,6 +1131,13 @@ def original_body_digest(family, name, text):
     if family == 0 and name == "handle_write" and (0, name) not in LONG_FUNCTION_MIGRATION:
         phase = c_function_body(source(family_paths(0)[6]), "commit_write")
         tokens = write_body_tokens(text, phase)
+    if family == 0 and name == "handle_create_or_mkdir" and (0, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(0)[5])
+        phase = created_publication_tokens(
+            c_function_body(owner, "create_from_staged_name"),
+            c_function_body(owner, "publish_created_node"),
+        )
+        tokens = create_body_tokens(text, phase)
     if family == 2 and name in SEED_CASE_PHASES and (2, name) not in LONG_FUNCTION_MIGRATION:
         owner = source(family_paths(2)[3])
         phases = [
@@ -1802,6 +1882,36 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
 
+    def test_namespace_creation_exposes_staged_name_validation_and_commit(self):
+        text = source(family_paths(0)[5])
+        definitions = c_function_definitions(text)
+        self.assertIn("create_from_staged_name", definitions)
+        self.assertIn("publish_created_node", definitions)
+        self.assertLessEqual(definitions["create_from_staged_name"], 120)
+        self.assertLessEqual(definitions["ramfs_handle_create_or_mkdir"], 120)
+        signature = re.findall(
+            r"(?m)^static enum micros_ramfs_core_error create_from_staged_name\([^;{}]*\)\s*\{", text,
+        )
+        self.assertEqual(1, len(signature))
+        expected = (
+            "static enum micros_ramfs_core_error create_from_staged_name("
+            "struct micros_ramfs_state *state, const struct micros_ramfs_request *request, "
+            "struct ramfs_result_fields *fields, enum micros_ramfs_result *result, "
+            "uint16_t parent_slot, uint16_t free_slot, bool mkdir_request) {"
+        )
+        self.assertEqual(body_tokens(expected), body_tokens(signature[0]))
+        publication = re.findall(
+            r"(?m)^static void publish_created_node\([^;{}]*\)\s*\{", text,
+        )
+        self.assertEqual(1, len(publication))
+        expected_publication = (
+            "static void publish_created_node(struct micros_ramfs_state *state, "
+            "const struct micros_ramfs_request *request, struct ramfs_result_fields *fields, "
+            "uint16_t parent_slot, uint16_t free_slot, size_t name_length, bool mkdir_request) {"
+        )
+        self.assertEqual(body_tokens(expected_publication), body_tokens(publication[0]))
+        self.assertLessEqual(definitions["publish_created_node"], 120)
+
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
         for family in range(6):
@@ -2328,6 +2438,79 @@ def render_fixture(image, limit):
         self.assertNotEqual(
             body_tokens(expected),
             reference_lookup_body_tokens(caller, phase.replace("return NOT_FOUND", "return OK")),
+        )
+
+    def test_staged_creation_projection_preserves_local_cleanup_and_caller_error_scope(self):
+        declarations = (
+            "const struct micros_ramfs_node *resolved_parent; uint16_t parent_slot; uint16_t free_slot; "
+            "bool mkdir_request = request->type == MICROS_RAMFS_MESSAGE_MKDIR; "
+            "enum micros_ramfs_copy_result copy_result;"
+        )
+        caller = (
+            "{ " + declarations + " preflight(); copy(); "
+            "return create_from_staged_name(state, request, fields, result, parent_slot, free_slot, mkdir_request); }"
+        )
+        phase = (
+            "{ struct micros_ramfs_node *parent; uint16_t existing_slot; size_t name_length; size_t index; "
+            "name_length = request->length - 1; if (bad_name()) { *result = BAD; goto create_done; } "
+            "validate_scratch(false); publish(); return MICROS_RAMFS_CORE_OK; "
+            "create_done: ramfs_zero_bytes(state->scratch, sizeof(state->scratch)); return MICROS_RAMFS_CORE_OK; }"
+        )
+        expected = (
+            "{ const struct micros_ramfs_node *resolved_parent; struct micros_ramfs_node *parent; "
+            "uint16_t parent_slot; uint16_t free_slot; uint16_t existing_slot; size_t name_length; size_t index; "
+            "bool mkdir_request = request->type == MICROS_RAMFS_MESSAGE_MKDIR; "
+            "enum micros_ramfs_copy_result copy_result; preflight(); copy(); "
+            "name_length = request->length - 1; if (bad_name()) { *result = BAD; goto create_done; } "
+            "validate_scratch(false); publish(); return MICROS_RAMFS_CORE_OK; "
+            "create_done: ramfs_zero_bytes(state->scratch, sizeof(state->scratch)); return MICROS_RAMFS_CORE_OK; }"
+        )
+        self.assertEqual(body_tokens(expected), create_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("return create_from_staged_name", "create_from_staged_name"),
+            caller.replace("parent_slot, free_slot", "free_slot, parent_slot"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                create_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("struct micros_ramfs_node *parent;", "static struct micros_ramfs_node *parent;"),
+            phase.replace("goto create_done", "goto caller_label"),
+            phase.replace("create_done: ramfs_zero_bytes", "other_label: ramfs_zero_bytes"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                create_body_tokens(caller, changed)
+        self.assertNotEqual(
+            body_tokens(expected), create_body_tokens(caller, phase.replace("validate_scratch(false)", "validate_scratch(true)")),
+        )
+
+    def test_namespace_publication_projection_cannot_fail_reset_late_or_publish_wrong_parent(self):
+        staged = (
+            "{ uint16_t existing_slot; size_t name_length; size_t index; validate(); "
+            "publish_created_node(state, request, fields, parent_slot, free_slot, name_length, mkdir_request); "
+            "*result = OK; return CORE_OK; }"
+        )
+        publication = (
+            "{ struct micros_ramfs_node *parent; size_t index; "
+            "parent = &state->nodes[parent_slot]; initialize(); "
+            "for (index = 0; index < name_length; ++index) { copy(); } clear_scratch(); }"
+        )
+        expected = (
+            "{ struct micros_ramfs_node *parent; uint16_t existing_slot; size_t name_length; size_t index; "
+            "validate(); parent = &state->nodes[parent_slot]; initialize(); "
+            "for (index = 0; index < name_length; ++index) { copy(); } clear_scratch(); "
+            "*result = OK; return CORE_OK; }"
+        )
+        self.assertEqual(body_tokens(expected), created_publication_tokens(staged, publication))
+        for changed in (
+            publication.replace("initialize();", "if (bad()) { return; } initialize();"),
+            publication.replace("parent_slot", "free_slot"),
+            publication.replace("index = 0", "index = 1"),
+            publication.replace("size_t index;", "static size_t index;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                created_publication_tokens(staged, changed)
+        self.assertNotEqual(
+            body_tokens(expected), created_publication_tokens(staged, publication.replace("clear_scratch();", "")),
         )
 
 

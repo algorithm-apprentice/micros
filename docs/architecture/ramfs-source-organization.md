@@ -530,7 +530,12 @@ lookup now has a 57-line complete preflight and 92-line confined walk/ref
 publication task. Its exact tail-call/local projection retains full path-byte
 and component validation before traversal, error precedence, confinement,
 automatic traversal storage and final reference mutation; expected logic
-still does not use production helpers. Seven C semantic
+still does not use production helpers. Production create/mkdir now exposes
+91-line authority/capacity/grant staging, 77-line staged-name/duplicate/state
+validation with local cleanup, and 41-line void/non-failing node publication.
+Nested typed projection preserves every original check, scratch-clear exit,
+node/link/reference/count mutation and result order, including the helper's
+own cleanup labels and direct caller error return. Six C semantic
 migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.
