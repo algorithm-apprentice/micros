@@ -638,8 +638,15 @@ new helper owner without changing its assertions.
 
 All 23 final C paths, three headers/sets and ten source operands are wired
 once. Still-unextracted owners are explicitly declarations-only units, not
-duplicate state or claimed completed tasks. Forty-eight original owner
-moves and all twelve semantic task dispositions remain pending.
+duplicate state or claimed completed tasks. The following portable slice
+completes all forty-six core moves: all 48 original portable definitions
+now occupy nine owners and the exact necessary private surface is
+twenty-two helpers. The facade contains only the original initializer and
+combined scheduler-delegating validator. The existing lower base-validator
+declaration and all original portable bytes remain independently enforced.
+Only twenty-six native/model owner moves and all twelve semantic task
+dispositions remain pending; twelve evidence units are still explicitly
+declarations-only.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

@@ -81,4 +81,21 @@ bool kernel_object_timer_state_is_initial(
     const struct micros_hart_timer_state *timer
 );
 
+bool kernel_object_stack_range_is_valid(
+    uintptr_t bottom,
+    uintptr_t top,
+    uintptr_t minimum_size
+);
+
+bool kernel_object_ranges_overlap(
+    uintptr_t first_bottom,
+    uintptr_t first_top,
+    uintptr_t second_bottom,
+    uintptr_t second_top
+);
+
+bool kernel_object_trap_anchor_stacks_are_valid(
+    const struct micros_hart_trap_anchor *trap
+);
+
 #endif
