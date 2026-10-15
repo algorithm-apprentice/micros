@@ -76,6 +76,9 @@ class ValidationPlanTests(unittest.TestCase):
         for path in (
             "tests/host/elf_spawn_fixture_test.c",
             "tests/host/test_generate_elf_spawn_seed.py",
+            "tests/host/elf_spawn_resource_test.c",
+            "tests/host/elf_spawn_fixture_test_internal.h",
+            "tests/host/test_generate_elf_spawn_fixture.py",
         ):
             with self.subTest(path=path):
                 self.assertEqual(

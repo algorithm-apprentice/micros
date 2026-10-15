@@ -12,10 +12,10 @@ map of that design, not a new lifecycle, authority, wire, or failure contract.
 The outcome is one `test-qemu-elf-spawn` scenario using exactly the six
 production static services and two RAMFS-seeded dynamic applications.
 Its PID-1 reaper is a test program, not production init.
-The canonical fixture requests and immutable two-application seed generator
-are implemented and native/host tested. The target workflow, application
-scenario, catalog, and resource evidence below remain planned until their
-green implementation lands.
+The canonical requests, immutable seed, checked six-service catalog, and
+portable resource oracle are implemented and native/host tested. Target
+snapshot capture, the workflow, and the dynamic scenario remain planned
+until their green implementation lands.
 
 Production init, shell policy, commands, fault-to-exit, signals, fork,
 recovery, and generalized test or snapshot frameworks are non-goals.
@@ -142,11 +142,31 @@ Every ignored field has this explicit lifetime rationale; no broad masked
 comparison or count-only success is acceptable.
 Native oracle mutations must demonstrate detection of representative leaks
 and reference/identity changes in each captured resource family.
+The kernel snapshot also retains every persistent process page-table page,
+not only root addresses or frame totals. A native PTE mutation regression
+requires byte-exact table equality with unchanged ownership and counts.
 
 The fixture may inspect already mapped service state through the exact
 checked static image metadata and generation-bound kernel copy primitives.
 It adds no user-visible inspection operation, service query, writable alias,
 grant forwarding, or production state mutation.
+
+The portable oracle includes both kernel and service resource types. Their
+previously identical `micros_vm_load_transaction` tags described different
+objects and prevented these headers from being included together. The VM
+policy record is now named `micros_vm_service_load_transaction`; the kernel
+mechanism tag is unchanged. This is an eight-reference internal C-tag
+correction, not a field, layout, wire, or behavior change. The native
+resource fixture retains the joint-header compilation regression.
+
+Saved user registers, remaining quanta, timer/accounting counters, and a
+blocked receiver's particular resident buffer address can legitimately
+change between checkpoints. Capture must revalidate those buffers through
+the exact process mappings; the oracle still compares blocking operation,
+source selection, queue membership, staged messages and reply authority.
+Inactive PM request, VFS bounce, RAMFS scratch, and TTY payload bytes carry
+no live authority. VFS executable/request snapshots, in contrast, must be
+zero after release; their clearing is checked rather than masked.
 
 ## Green sequence and acceptance
 

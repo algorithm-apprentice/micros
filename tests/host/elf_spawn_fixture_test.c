@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "lib/spawn/spawn_request.h"
+#include "tests/host/elf_spawn_fixture_test_internal.h"
 #include "tests/qemu/elf_spawn_request.h"
 
 #define CHECK(condition) \
@@ -128,6 +129,9 @@ int main(void)
         {"canonical-init", test_canonical_init_request},
         {"canonical-child-descriptor", test_canonical_child_and_post_freeze_descriptor_failure},
         {"request-failure-capacity", test_request_failure_preserves_outputs_and_exact_capacity},
+        {"kernel-resource-oracle", test_elf_spawn_kernel_resource_oracle},
+        {"service-resource-oracle", test_elf_spawn_service_resource_oracle},
+        {"resource-counter-policy", test_elf_spawn_resource_counter_and_inactive_byte_policy},
     };
     size_t index;
 

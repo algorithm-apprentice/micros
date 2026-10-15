@@ -136,7 +136,7 @@ enum micros_vm_core_error micros_vm_load_prepare(
     const struct micros_application_stack_values *stack_values
 )
 {
-    struct micros_vm_load_transaction candidate;
+    struct micros_vm_service_load_transaction candidate;
     struct micros_vm_elf_plan elf_plan;
     struct micros_application_stack_plan stack_plan;
     uint64_t table_frames[MICROS_VM_PAGE_TABLE_FRAME_COUNT] = {0};

@@ -668,6 +668,7 @@ GENERATOR_IMPORTS = {
     "tools/generate_tty_service_fixture.py": (5, 1, 5),
     "tools/generate_ramfs_service_fixture.py": (6, 1, 6),
     "tools/generate_vfs_service_fixture.py": (7, 1, 1),
+    "tools/generate_elf_spawn_fixture.py": (1, 1, 1),
 }
 
 QEMU_WORKFLOWS = (

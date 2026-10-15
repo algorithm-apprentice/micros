@@ -106,7 +106,7 @@ STABLE_HEADER_HASHES = {
     "include/micros/vm_bootstrap.h":
         "a37f0a611a0e688478dfb5dfbee487b31a04fa9ff534538c4cb23c5c4967e866",
     "servers/vm/vm_core.h":
-        "97c64900fcf40cb7dcfdba8a61ddabcad290feded7224710c1f2d29d99125bba",
+        "7aca778c415f56b0bf2b943c412fb1a1fdcc38f097037d2968ed038aeb0f45b4",
     "servers/vm/vm_image.h":
         "aeed2227d2817ebde729302df12fe71a3f25dffc774058f2660304ebd0a1f1ae",
     "kernel/vm_scratch_preemption_test.h":

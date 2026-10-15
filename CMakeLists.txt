@@ -717,6 +717,12 @@ set(
 )
 
 set(
+    MICROS_ELF_SPAWN_RESOURCE_SOURCES
+    kernel/elf_spawn_test_compare.c
+    kernel/elf_spawn_test_service_compare.c
+)
+
+set(
     MICROS_PM_SERVICE_SOURCES
     servers/pm/pm_service.c
     servers/pm/pm_service_fixture.c
@@ -1273,8 +1279,10 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         elf_spawn_fixture_test
         ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
         tests/qemu/elf_spawn_request.c
         tests/host/elf_spawn_fixture_test.c
+        tests/host/elf_spawn_resource_test.c
     )
     target_include_directories(
         elf_spawn_fixture_test
