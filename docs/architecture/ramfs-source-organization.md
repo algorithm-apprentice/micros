@@ -521,7 +521,11 @@ regular-I/O evidence use the same checked automatic-work mechanism:
 six protocol and five I/O tasks retain all original objects, result-loop
 variables, reset/copy/failure snapshots, sparse data, maximum-size and
 block-capacity proofs. Their 14/13-line roots initialize only the original
-root handle and preserve the full first-failure order. Nine C semantic
+root handle and preserve the full first-failure order. The model script now
+has a 9-line selector and 73/81-line setup/proof tasks. Exact step partitions
+0-5 and 6-15, one common root query, direct returns, and both false defaults
+reconstruct the immutable sixteen-step switch. Its five readonly arrays
+retain distinct static duration and are not duplicated. Eight C semantic
 migrations remain pending, alongside the specified
 shorter-operation outlines. Completing source ownership alone does not
 complete this implementation.

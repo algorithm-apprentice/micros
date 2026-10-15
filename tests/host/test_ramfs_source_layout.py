@@ -137,6 +137,12 @@ MODEL_STATE_FIELDS = (
 )
 MODEL_TYPE_DIGEST = "93a26c70d7060c60dc9de8fd965111b93d4057895f39e4ee0f4d7ebe65dce702"
 MODEL_MACRO_DIGEST = "f986d01714b3d8caf017f82eebd4e2d8de6de768d0878a543d7ad316c348de18"
+MODEL_SCRIPT_PHASES = ("scripted_setup", "scripted_proofs")
+MODEL_SCRIPT_ROOT = (
+    "{ uint64_t root = ramfs_model_reference_handle(&selected->reference, 0); "
+    "if (selected->step <= 5) { return scripted_setup(selected, root); } "
+    "return scripted_proofs(selected, root); }"
+)
 PEER_RESULT_TYPE_DIGEST = "8e7637dec192ddb613c8fc031ffc39791653e1b0f4b8d8f043d4efe9cfc55803"
 KERNEL_CONST_OBJECT_DIGEST = "49d4895ed14632490d6f1dfddfb0c18a52acd9ae7787eeaff0dea63b63f15cab"
 KERNEL_RAW_OBJECT_DIGEST = "fed126e702cae04edc462115554a1f1dc14fa3a17d26415691f3275c5736df6b"
@@ -391,6 +397,7 @@ LONG_FUNCTION_MIGRATION = tuple(
         (1, "getdents_cursor_and_records_are_exact"),
         (1, "protocol_mount_and_result_layout_are_exact"),
         (1, "read_write_sparse_and_block_capacity_are_exact"),
+        (3, "execute_scripted_operation"),
     )
 )
 
@@ -954,6 +961,65 @@ def work_record_tokens(tokens, specification):
     return tuple(expanded)
 
 
+def script_partition_tokens(body, labels, arrays):
+    tokens = list(body_tokens(body))
+    if tokens.count("switch") != 1 or tokens[:1] != ["{"] or tokens[-2:] != ["}", "}"]:
+        raise AssertionError("script phase must terminate in its one exact step switch")
+    switch = tokens.index("switch")
+    selector = list(body_tokens("switch (selected->step) {"))
+    if tokens[switch:switch + len(selector)] != selector:
+        raise AssertionError("script phase must select the existing model step")
+    declarations = tokens[1:switch]
+    start = 0
+    names = []
+    for index, token in enumerate(declarations):
+        if token == ";":
+            declaration = declarations[start:index + 1]
+            if declaration[:3] != ["static", "const", "uint8_t"] or declaration[4:7] != ["[", "]", "="]:
+                raise AssertionError("script data must remain distinct static readonly arrays")
+            names.append(declaration[3])
+            start = index + 1
+    if start != len(declarations) or tuple(names) != arrays:
+        raise AssertionError("script array ownership/lifetime differs")
+    inner = tokens[switch + len(selector):-2]
+    depth = 0
+    observed = []
+    default = None
+    for index, token in enumerate(inner):
+        if token == "{":
+            depth += 1
+        elif token == "}":
+            depth -= 1
+        elif depth == 0 and token == "case":
+            if not inner[index + 1].isdigit() or inner[index + 2] != ":":
+                raise AssertionError("script labels must retain their literal step identities")
+            observed.append(int(inner[index + 1]))
+        elif depth == 0 and token == "default":
+            if default is not None:
+                raise AssertionError("script must have one rejection default")
+            default = index
+    if tuple(observed) != labels or default is None or inner[default:] != ["default", ":", "return", "false", ";"]:
+        raise AssertionError("script cases/default are incomplete, duplicated, reordered or success-shaped")
+    return tuple(declarations), tuple(inner[:default])
+
+
+def model_script_body_tokens(caller, setup, proofs):
+    if body_tokens(caller) != body_tokens(MODEL_SCRIPT_ROOT):
+        raise AssertionError("script root must retain exact root query, partition and direct return")
+    setup_data, setup_cases = script_partition_tokens(
+        setup, tuple(range(6)), ("etc_path", "motd_relative", "model_path"),
+    )
+    proof_data, proof_cases = script_partition_tokens(
+        proofs, tuple(range(6, 16)), ("grant_path", "sparse_bytes"),
+    )
+    return (
+        ("{",) + setup_data + proof_data
+        + body_tokens("uint64_t root = ramfs_model_reference_handle(&selected->reference, 0);")
+        + body_tokens("switch (selected->step) {")
+        + setup_cases + proof_cases + body_tokens("default: return false;") + ("}", "}")
+    )
+
+
 def original_body_digest(family, name, text):
     tokens = body_tokens(text)
     if family == 0 and name == "micros_ramfs_handle_call" and (0, name) not in LONG_FUNCTION_MIGRATION:
@@ -977,6 +1043,12 @@ def original_body_digest(family, name, text):
             for phase in specification["phases"]
         ]
         tokens = work_record_tokens(bool_case_body_tokens(text, phases), specification)
+    if family == 3 and name == "execute_scripted_operation" and (3, name) not in LONG_FUNCTION_MIGRATION:
+        owner = source(family_paths(3)[5])
+        tokens = model_script_body_tokens(
+            text, c_function_body(owner, MODEL_SCRIPT_PHASES[0]),
+            c_function_body(owner, MODEL_SCRIPT_PHASES[1]),
+        )
     if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
         tokens = fixture_transport_tokens(family, name, tokens)
     if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
@@ -1410,7 +1482,8 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 body_tokens("{ return &" + storage + "; }"),
                 body_tokens(c_function_body(source(paths[1]), getter)),
             )
-        self.assertEqual(56, len(owned_definitions(3)))
+        completed_script = (3, "execute_scripted_operation") not in LONG_FUNCTION_MIGRATION
+        self.assertEqual(56 + 2 * completed_script, len(owned_definitions(3)))
         self.assertEqual({}, c_function_definitions(header))
         self.assertEqual((), file_scope_objects(header))
         self.assertIn("const struct ramfs_model_seed *ramfs_model_seed_context(void);", header)
@@ -1659,6 +1732,24 @@ class RamfsSourceLayoutTest(unittest.TestCase):
     def test_protocol_and_io_cases_expose_checked_work_and_first_failure_tasks(self):
         self.check_functional_work_case("protocol_mount_and_result_layout_are_exact")
         self.check_functional_work_case("read_write_sparse_and_block_capacity_are_exact")
+
+    def test_scripted_model_exposes_exact_setup_and_proof_tasks(self):
+        text = source(family_paths(3)[5])
+        definitions = c_function_definitions(text)
+        for name in MODEL_SCRIPT_PHASES:
+            self.assertIn(name, definitions)
+            self.assertLessEqual(definitions[name], 120)
+            signature = re.findall(rf"(?m)^static bool {name}\([^;{{}}]*\)\s*\{{", text)
+            self.assertEqual(1, len(signature))
+            self.assertEqual(
+                body_tokens(f"static bool {name}(struct ramfs_model *selected, uint64_t root) {{"),
+                body_tokens(signature[0]),
+            )
+        self.assertLessEqual(definitions["ramfs_model_execute_scripted_operation"], 120)
+        self.assertEqual(
+            body_tokens(MODEL_SCRIPT_ROOT),
+            body_tokens(c_function_body(text, "ramfs_model_execute_scripted_operation")),
+        )
 
     def test_exact_long_inventory_has_no_implicit_exceptions(self):
         actual = set()
@@ -2113,6 +2204,44 @@ def render_fixture(image, limit):
         ):
             with self.subTest(changed=changed):
                 self.assertNotEqual(expected, ast_digest(restored_generator(changed, specifications)))
+
+    def test_model_script_partition_preserves_all_steps_arrays_defaults_and_direct_returns(self):
+        setup_data = (
+            'static const uint8_t etc_path[] = "/etc"; '
+            'static const uint8_t motd_relative[] = "motd"; '
+            'static const uint8_t model_path[] = "/model"; '
+        )
+        proof_data = (
+            'static const uint8_t grant_path[] = "/etc"; '
+            "static const uint8_t sparse_bytes[] = {'x', 'y'}; "
+        )
+        cases = [f"case {step}: return operation{step}(selected);" for step in range(16)]
+        setup = "{ " + setup_data + "switch (selected->step) { " + " ".join(cases[:6]) + " default: return false; } }"
+        proofs = "{ " + proof_data + "switch (selected->step) { " + " ".join(cases[6:]) + " default: return false; } }"
+        expected = (
+            "{ " + setup_data + proof_data
+            + "uint64_t root = ramfs_model_reference_handle(&selected->reference, 0); "
+            + "switch (selected->step) { " + " ".join(cases) + " default: return false; } }"
+        )
+        self.assertEqual(body_tokens(expected), model_script_body_tokens(MODEL_SCRIPT_ROOT, setup, proofs))
+        for root in (
+            MODEL_SCRIPT_ROOT.replace("<= 5", "<= 6"),
+            MODEL_SCRIPT_ROOT.replace("return scripted_proofs", "scripted_proofs"),
+        ):
+            with self.subTest(root=root), self.assertRaises(AssertionError):
+                model_script_body_tokens(root, setup, proofs)
+        for changed in (
+            setup.replace("case 5:", "case 6:"),
+            setup.replace("static const", "const", 1),
+            setup.replace("return false;", "return true;"),
+            setup.replace("selected->step", "selected->seed"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_script_body_tokens(MODEL_SCRIPT_ROOT, changed, proofs)
+        self.assertNotEqual(
+            body_tokens(expected),
+            model_script_body_tokens(MODEL_SCRIPT_ROOT, setup.replace("operation3", "operation4"), proofs),
+        )
 
 
 if __name__ == "__main__":

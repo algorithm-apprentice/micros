@@ -223,14 +223,14 @@ bool ramfs_model_execute_random_operation(struct ramfs_model *selected)
     }
 }
 
-bool ramfs_model_execute_scripted_operation(struct ramfs_model *selected)
+static bool scripted_setup(
+    struct ramfs_model *selected,
+    uint64_t root
+)
 {
     static const uint8_t etc_path[] = "/etc";
     static const uint8_t motd_relative[] = "motd";
     static const uint8_t model_path[] = "/model";
-    static const uint8_t grant_path[] = "/etc";
-    static const uint8_t sparse_bytes[] = {'x', 'y'};
-    uint64_t root = ramfs_model_reference_handle(&selected->reference, 0);
 
     switch (selected->step) {
     case 0:
@@ -292,6 +292,20 @@ bool ramfs_model_execute_scripted_operation(struct ramfs_model *selected)
         );
         selected->capacity_file_slot = 4;
         return true;
+    default:
+        return false;
+    }
+}
+
+static bool scripted_proofs(
+    struct ramfs_model *selected,
+    uint64_t root
+)
+{
+    static const uint8_t grant_path[] = "/etc";
+    static const uint8_t sparse_bytes[] = {'x', 'y'};
+
+    switch (selected->step) {
     case 6:
         return ramfs_model_execute_write(
             selected,
@@ -363,4 +377,14 @@ bool ramfs_model_execute_scripted_operation(struct ramfs_model *selected)
     default:
         return false;
     }
+}
+
+bool ramfs_model_execute_scripted_operation(struct ramfs_model *selected)
+{
+    uint64_t root = ramfs_model_reference_handle(&selected->reference, 0);
+
+    if (selected->step <= 5) {
+        return scripted_setup(selected, root);
+    }
+    return scripted_proofs(selected, root);
 }
