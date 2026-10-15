@@ -211,6 +211,9 @@ VALIDATOR_HELPER_OWNERS = {
     specification[0]: family_paths_index
     for family_paths_index, specifications in VALIDATOR_PHASES.values() for specification in specifications
 }
+INITIALIZER_HELPERS = (
+    "prepare_profile_candidates", "candidate_targets_are_closed", "publish_profile_table",
+)
 CORE_DAG = {
     0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
     5: {1, 2}, 6: {1, 2, 5}, 7: {3, 4, 5, 6},
@@ -408,6 +411,10 @@ def original_locations(family):
     renames = normal_names(family)
     locations = {}
     for path, spelling in owned_definitions(family):
+        if family == 0 and spelling in INITIALIZER_HELPERS:
+            if path != family_paths(0)[3]:
+                raise AssertionError("profile initialization phases retain one exact owner")
+            continue
         if family == 0 and spelling in VALIDATOR_HELPER_OWNERS:
             if path != family_paths(0)[VALIDATOR_HELPER_OWNERS[spelling]]:
                 raise AssertionError("validation phases retain their exact file-local owners")
@@ -534,6 +541,71 @@ def validation_phase_body_tokens(name, caller, phases):
     return tuple(caller)
 
 
+def initialization_body_tokens(caller, prepare, closed, publish):
+    caller = list(tokens(caller))
+    prefix = list(tokens(
+        "struct micros_privilege_profile candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY]; "
+        "uint32_t installed = 0;"
+    ))
+    if caller[:1 + len(prefix)] != ["{"] + prefix:
+        raise AssertionError("initialization retains its one caller-owned candidate array and empty mask")
+    caller[1 + len(prefix):1 + len(prefix)] = tokens("size_t source_index; size_t other_index;")
+    specifications = (
+        (
+            "prepare_profile_candidates(profiles, profile_count, candidate_profiles, &installed)",
+            prepare, "size_t source_index; size_t other_index;", 0,
+        ),
+        (
+            "candidate_targets_are_closed(candidate_profiles, installed)",
+            closed, "size_t source_index;", 1,
+        ),
+    )
+    for call_text, body, declarations, first_index in specifications:
+        call = list(tokens("if (!" + call_text + ") { return MICROS_ENDPOINT_ERROR_PROFILE; }"))
+        positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+        if len(positions) != 1:
+            raise AssertionError("candidate preparation/closure preserve exact caller inputs and profile failure")
+        body = list(tokens(body))
+        locals_ = list(tokens(declarations))
+        success = list(tokens("return true;"))
+        if body[:1 + len(locals_)] != ["{"] + locals_ or body[-len(success) - 1:] != success + ["}"]:
+            raise AssertionError("candidate phases retain only original automatic counters and terminal success")
+        inner = body[1 + len(locals_):-len(success) - 1]
+        first = inner.index("source_index") if "source_index" in inner else None
+        if first is None or inner[first - 2:first + 3] != ["for", "(", "source_index", "=", str(first_index)]:
+            raise AssertionError("candidate counter retains its original initial bound")
+        expanded = []
+        index = 0
+        while index < len(inner):
+            if inner[index] == "return":
+                if inner[index:index + 3] != ["return", "false", ";"]:
+                    raise AssertionError("candidate-local success cannot skip caller validation")
+                expanded.extend(tokens("return MICROS_ENDPOINT_ERROR_PROFILE;"))
+                index += 3
+            elif first_index == 0 and inner[index:index + 2] == ["*", "installed"]:
+                expanded.append("installed")
+                index += 2
+            else:
+                if first_index == 0 and inner[index] == "installed":
+                    raise AssertionError("candidate mask transport must dereference its exact scalar output")
+                expanded.append(inner[index])
+                index += 1
+        position = positions[0]
+        caller[position:position + len(call)] = expanded
+    call = list(tokens("publish_profile_table(registry, candidate_profiles, profile_count);"))
+    positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+    publish = list(tokens(publish))
+    if len(positions) != 1 or publish[:1] != ["{"] or publish[-1:] != ["}"] or "return" in publish:
+        raise AssertionError("publication is one exact non-failing caller commit")
+    size = list(tokens("sizeof(registry->profiles)"))
+    sizes = [index for index in range(len(publish)) if publish[index:index + len(size)] == size]
+    if len(sizes) != 1:
+        raise AssertionError("array publication must use the exact frozen full registry profile extent")
+    publish[sizes[0]:sizes[0] + len(size)] = tokens("sizeof(candidate_profiles)")
+    caller[positions[0]:positions[0] + len(call)] = publish[1:-1]
+    return tuple(caller)
+
+
 def original_body_digest(family, name, text):
     names = normal_names(family)
     body = tokens(text)
@@ -544,6 +616,11 @@ def original_body_digest(family, name, text):
             for specification in specifications
         ]
         body = validation_phase_body_tokens(name, text, phases)
+    if family == 0 and name == "micros_endpoint_registry_initialize":
+        owner = source(family_paths(0)[3])
+        body = initialization_body_tokens(
+            text, *(c_function_body(owner, helper) for helper in INITIALIZER_HELPERS),
+        )
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(
         spelling == "endpoint_test_context" for _, spelling in owned_definitions(1)
@@ -886,6 +963,93 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(
                     tokens(f"static bool {name}({parameters[name]}) {{"), tokens(signatures[0]),
                 )
+
+    def test_initialization_exposes_candidate_build_closure_and_nonfailing_full_array_publication(self):
+        text = source(family_paths(0)[3])
+        definitions = c_function_definitions(text)
+        expected = {
+            "prepare_profile_candidates": (
+                "bool", "const struct micros_privilege_profile *profiles, size_t profile_count, "
+                "struct micros_privilege_profile candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY], uint32_t *installed",
+            ),
+            "candidate_targets_are_closed": (
+                "bool", "const struct micros_privilege_profile candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY], uint32_t installed",
+            ),
+            "publish_profile_table": (
+                "void", "struct micros_endpoint_registry *registry, "
+                "const struct micros_privilege_profile candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY], size_t profile_count",
+            ),
+        }
+        for name, (result, parameters) in expected.items():
+            with self.subTest(name=name):
+                self.assertIn(name, definitions)
+                self.assertLessEqual(definitions[name], 120)
+                signatures = re.findall(rf"(?m)^static {result} {name}\([^;{{}}]*\)\s*\{{", text)
+                self.assertEqual(1, len(signatures))
+                self.assertEqual(tokens(f"static {result} {name}({parameters}) {{"), tokens(signatures[0]))
+        self.assertLessEqual(definitions["micros_endpoint_registry_initialize"], 120)
+
+    def test_initialization_projection_preserves_mask_copy_extent_and_last_magic_publication(self):
+        prefix = (
+            "{ struct micros_privilege_profile candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY]; "
+            "uint32_t installed = 0;"
+        )
+        guard = "if (bad_input()) { return ARGUMENT; } clear(candidate_profiles);"
+        caller = (
+            prefix + guard
+            + "if (!prepare_profile_candidates(profiles, profile_count, candidate_profiles, &installed)) { return MICROS_ENDPOINT_ERROR_PROFILE; } "
+            "if (!candidate_targets_are_closed(candidate_profiles, installed)) { return MICROS_ENDPOINT_ERROR_PROFILE; } "
+            "publish_profile_table(registry, candidate_profiles, profile_count); return OK; }"
+        )
+        prepare = (
+            "{ size_t source_index; size_t other_index; for (source_index = 0; source_index < profile_count; ++source_index) { "
+            "if (duplicate(*installed)) { return false; } *installed |= bit(); } return true; }"
+        )
+        closed = (
+            "{ size_t source_index; for (source_index = 1; source_index < LIMIT; ++source_index) { "
+            "if (foreign_targets(candidate_profiles, installed)) { return false; } } return true; }"
+        )
+        publish = (
+            "{ copy(registry->profiles, candidate_profiles, sizeof(registry->profiles)); "
+            "registry->profile_count = profile_count; registry->initialization_magic = MAGIC; }"
+        )
+        expected = (
+            prefix + "size_t source_index; size_t other_index;" + guard
+            + "for (source_index = 0; source_index < profile_count; ++source_index) { "
+            "if (duplicate(installed)) { return MICROS_ENDPOINT_ERROR_PROFILE; } installed |= bit(); } "
+            "for (source_index = 1; source_index < LIMIT; ++source_index) { "
+            "if (foreign_targets(candidate_profiles, installed)) { return MICROS_ENDPOINT_ERROR_PROFILE; } } "
+            "copy(registry->profiles, candidate_profiles, sizeof(candidate_profiles)); "
+            "registry->profile_count = profile_count; registry->initialization_magic = MAGIC; return OK; }"
+        )
+        self.assertEqual(tokens(expected), initialization_body_tokens(caller, prepare, closed, publish))
+        for changed in (
+            caller.replace("candidate_profiles, &installed", "candidate_profiles, &other_mask"),
+            caller.replace("return MICROS_ENDPOINT_ERROR_PROFILE;", "return OK;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                initialization_body_tokens(changed, prepare, closed, publish)
+        for changed in (
+            prepare.replace("size_t source_index", "static size_t source_index"),
+            prepare.replace("source_index = 0", "source_index = 1"),
+            prepare.replace("*installed", "installed"),
+            prepare.replace("return false;", "return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                initialization_body_tokens(caller, changed, closed, publish)
+        for changed in (
+            publish.replace("sizeof(registry->profiles)", "sizeof(candidate_profiles)"),
+            publish.replace("registry->profile_count = profile_count;", "return;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                initialization_body_tokens(caller, prepare, closed, changed)
+        self.assertNotEqual(
+            tokens(expected),
+            initialization_body_tokens(caller, prepare, closed, publish.replace(
+                "registry->profile_count = profile_count; registry->initialization_magic = MAGIC;",
+                "registry->initialization_magic = MAGIC; registry->profile_count = profile_count;",
+            )),
+        )
 
     def test_validation_projection_preserves_original_counters_witness_and_caller_failures(self):
         name = "micros_endpoint_registry_validate"

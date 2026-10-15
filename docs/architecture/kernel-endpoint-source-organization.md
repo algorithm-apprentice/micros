@@ -532,8 +532,14 @@ profile, record, process and thread passes. Exact whole-body projection
 preserves original counter bounds, header/error precedence, every invariant,
 and one caller-owned queued-thread witness shared across process and thread
 closure; helpers do not introduce early success or another witness.
-Eight original long-function migrations remain pending, including the target
-entry; the specified shorter initialization outline also remains required.
+The shorter initializer now exposes candidate preparation, closed-target
+proof and non-failing profile publication. The original automatic array and
+mask remain caller-owned; exact projection preserves dirty/initialized/
+capacity/duplicate/target precedence and copy/count/magic order. Publication
+uses the frozen full registry-array extent rather than the decayed parameter
+size. Independent mask-binding, extent and early-publication mutants reject
+drift. Eight original long-function migrations remain pending, including the
+target entry.
 Complete current final-author/profile-reuse
 acceptance and independent implementation review remain required; this is
 not a completed endpoint correction.

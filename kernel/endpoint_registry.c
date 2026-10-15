@@ -1,5 +1,101 @@
 #include "endpoint_private.h"
 
+static bool prepare_profile_candidates(
+    const struct micros_privilege_profile *profiles,
+    size_t profile_count,
+    struct micros_privilege_profile
+        candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY],
+    uint32_t *installed
+)
+{
+    size_t source_index;
+    size_t other_index;
+
+    for (source_index = 0; source_index < profile_count; ++source_index) {
+        struct micros_privilege_profile canonical;
+        enum micros_endpoint_error error =
+            endpoint_canonicalize_profile(
+                &profiles[source_index],
+                &canonical
+            );
+
+        if (
+            error != MICROS_ENDPOINT_OK
+            || (
+                *installed
+                & (UINT32_C(1) << canonical.id)
+            ) != 0
+        ) {
+            return false;
+        }
+        for (other_index = 0; other_index < source_index; ++other_index) {
+            uint8_t other_id = profiles[other_index].id;
+
+            if (
+                other_id < MICROS_PRIVILEGE_PROFILE_CAPACITY
+                && endpoint_names_equal(
+                    canonical.name,
+                    candidate_profiles[other_id].name
+                )
+            ) {
+                return false;
+            }
+        }
+        candidate_profiles[canonical.id] = canonical;
+        *installed |= UINT32_C(1) << canonical.id;
+    }
+    return true;
+}
+
+static bool candidate_targets_are_closed(
+    const struct micros_privilege_profile
+        candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY],
+    uint32_t installed
+)
+{
+    size_t source_index;
+
+    for (source_index = 1;
+        source_index < MICROS_PRIVILEGE_PROFILE_CAPACITY;
+        ++source_index) {
+        const struct micros_privilege_profile *profile =
+            &candidate_profiles[source_index];
+        uint32_t targets;
+
+        if (profile->id == 0) {
+            continue;
+        }
+        targets =
+            profile->call_targets
+            | profile->send_targets
+            | profile->notify_targets;
+        if (
+            (targets & UINT32_C(1)) != 0
+            || (targets & ~installed) != 0
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void publish_profile_table(
+    struct micros_endpoint_registry *registry,
+    const struct micros_privilege_profile
+        candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY],
+    size_t profile_count
+)
+{
+    endpoint_copy_bytes(
+        registry->profiles,
+        candidate_profiles,
+        sizeof(registry->profiles)
+    );
+    registry->profile_count = profile_count;
+    registry->initialization_magic =
+        MICROS_ENDPOINT_REGISTRY_MAGIC;
+}
+
 enum micros_endpoint_error micros_endpoint_registry_initialize(
     struct micros_endpoint_registry *registry,
     const struct micros_privilege_profile *profiles,
@@ -9,8 +105,6 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
     struct micros_privilege_profile
         candidate_profiles[MICROS_PRIVILEGE_PROFILE_CAPACITY];
     uint32_t installed = 0;
-    size_t source_index;
-    size_t other_index;
 
     if (registry == NULL || profiles == NULL) {
         return MICROS_ENDPOINT_ERROR_ARGUMENT;
@@ -32,69 +126,18 @@ enum micros_endpoint_error micros_endpoint_registry_initialize(
     }
 
     endpoint_clear_bytes(candidate_profiles, sizeof(candidate_profiles));
-    for (source_index = 0; source_index < profile_count; ++source_index) {
-        struct micros_privilege_profile canonical;
-        enum micros_endpoint_error error =
-            endpoint_canonicalize_profile(
-                &profiles[source_index],
-                &canonical
-            );
-
-        if (
-            error != MICROS_ENDPOINT_OK
-            || (
-                installed
-                & (UINT32_C(1) << canonical.id)
-            ) != 0
-        ) {
-            return MICROS_ENDPOINT_ERROR_PROFILE;
-        }
-        for (other_index = 0; other_index < source_index; ++other_index) {
-            uint8_t other_id = profiles[other_index].id;
-
-            if (
-                other_id < MICROS_PRIVILEGE_PROFILE_CAPACITY
-                && endpoint_names_equal(
-                    canonical.name,
-                    candidate_profiles[other_id].name
-                )
-            ) {
-                return MICROS_ENDPOINT_ERROR_PROFILE;
-            }
-        }
-        candidate_profiles[canonical.id] = canonical;
-        installed |= UINT32_C(1) << canonical.id;
+    if (!prepare_profile_candidates(
+            profiles,
+            profile_count,
+            candidate_profiles,
+            &installed
+        )) {
+        return MICROS_ENDPOINT_ERROR_PROFILE;
     }
-    for (source_index = 1;
-        source_index < MICROS_PRIVILEGE_PROFILE_CAPACITY;
-        ++source_index) {
-        const struct micros_privilege_profile *profile =
-            &candidate_profiles[source_index];
-        uint32_t targets;
-
-        if (profile->id == 0) {
-            continue;
-        }
-        targets =
-            profile->call_targets
-            | profile->send_targets
-            | profile->notify_targets;
-        if (
-            (targets & UINT32_C(1)) != 0
-            || (targets & ~installed) != 0
-        ) {
-            return MICROS_ENDPOINT_ERROR_PROFILE;
-        }
+    if (!candidate_targets_are_closed(candidate_profiles, installed)) {
+        return MICROS_ENDPOINT_ERROR_PROFILE;
     }
-
-    endpoint_copy_bytes(
-        registry->profiles,
-        candidate_profiles,
-        sizeof(candidate_profiles)
-    );
-    registry->profile_count = profile_count;
-    registry->initialization_magic =
-        MICROS_ENDPOINT_REGISTRY_MAGIC;
+    publish_profile_table(registry, candidate_profiles, profile_count);
     return MICROS_ENDPOINT_OK;
 }
 
