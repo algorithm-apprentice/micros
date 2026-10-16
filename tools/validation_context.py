@@ -29,7 +29,38 @@ RECIPE_DIGESTS = {
     "CMakeLists.txt": "730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
-QEMU_RUNNER_DIGEST = "9e54f744074d077d05b52880495b73f7c74ae1db0a6ad751f8b7024688bf79e3"
+QEMU_RUNNER_DIGEST = "e5cc208fff305dae0279816fdb9ad45f86b48da4e19cb700fc5dbac3365341c4"
+QEMU_RUNNER_SOURCE_DIGESTS = {
+    "tools/run_qemu_smoke.py": QEMU_RUNNER_DIGEST,
+    "tools/qemu_smoke_records.py": "c1ddf036528c55ac93dda15522558d37cdd5efb09ed57675f3dea976bb96f8ec",
+    "tools/qemu_smoke_platform.py": "e7e4b16fe4c729ae9d0f275c9276a01717ab2e67f12cd666bb4f0fe94f0cea16",
+    "tools/qemu_smoke_objects.py": "5998b2bd91c71491e39cf5ad61a0e331aeb8a5bf4586a675aa7564af3a69cf00",
+    "tools/qemu_smoke_faults.py": "72f7d248ebe3884b8987471d387f1903dc5686eea9ac2b853e6e2df961fc3bbe",
+    "tools/qemu_smoke_command.py": "cfd4ce156aa945eff9233755c36fa885e61696bad5d8bd4f4537772aba504484",
+    "tools/qemu_smoke_execution.py": "62a3146a854f6faea843ac40d6675efc381f8c30b153d95ac7395f4109127493",
+    "tools/qemu_smoke_outcome.py": "78639dd9d203c0d93fc189277f16347b82f739e7f5f0e3890423c6bb4068f897",
+    "tools/qemu_smoke_arguments.py": "e66ac296f6ce79fd71bb1ff56704de67d6414456987126b0fd620ff52607af9c",
+    "tools/qemu_smoke_cli.py": "b8646433cd99c534ae9a5d37dff5e0652455e50c60045ed0255f4ce22d5e4019",
+}
+QEMU_LOADER_PROBE = """
+import importlib.machinery as m, json, sys
+root = sys.argv[1]
+names = json.loads(sys.argv[2])
+def metadata(spec):
+    if spec is None:
+        return {"origin": None, "loader": None, "locations": []}
+    return {"origin": spec.origin,
+            "loader": type(spec.loader).__name__ if spec.loader is not None else None,
+            "locations": list(spec.submodule_search_locations or ())}
+namespace = m.PathFinder.find_spec(
+    "tools", [root, root + "/tools", *[value or root for value in sys.path]],
+)
+helpers = {name: metadata(m.PathFinder.find_spec("tools." + name, [root + "/tools"])) for name in names}
+print(json.dumps({"implementation": sys.implementation.name,
+                  "source": m.SOURCE_SUFFIXES, "bytecode": m.BYTECODE_SUFFIXES,
+                  "extensions": m.EXTENSION_SUFFIXES,
+                  "namespace": metadata(namespace), "helpers": helpers}))
+"""
 STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))
 VENDOR_STARTUP = {
     "Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth":
@@ -44,6 +75,78 @@ class Profile:
     target: str
     target_build: bool
     cache_variables: dict
+
+
+def _validate_qemu_runner_family(root):
+    root = Path(root)
+    directory = root / "tools"
+    if directory.is_symlink() or not directory.is_dir():
+        raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
+    for name, expected in QEMU_RUNNER_SOURCE_DIGESTS.items():
+        path = root / name
+        if path.is_symlink() or not path.is_file() or _file_digest(path) != expected:
+            raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
+    names = tuple(Path(name).stem for name in QEMU_RUNNER_SOURCE_DIGESTS if name != "tools/run_qemu_smoke.py")
+    forbidden = [
+        directory / ("__init__" + suffix) for suffix in (".py", ".pyc", ".pyo")
+    ] + [root / ("tools" + suffix) for suffix in (".py", ".pyc", ".pyo")]
+    for name in names:
+        forbidden.extend((directory / name, directory / (name + ".pyc"), directory / (name + ".pyo")))
+    _absent_paths(tuple(forbidden))
+    cache = directory / "__pycache__"
+    if cache.is_symlink() or cache.exists() and not cache.is_dir():
+        raise UnsupportedContext("QEMU argument-builder cache metadata is unsupported")
+    if cache.is_dir():
+        for entry in cache.iterdir():
+            spelling = entry.name.casefold()
+            if spelling.endswith((".pyc", ".pyo")) and any(spelling.startswith(name.casefold() + ".") for name in names):
+                raise UnsupportedContext("QEMU argument-builder replacement bytecode is unsupported")
+
+
+def _validate_qemu_runner_namespace(root, tools):
+    root = Path(root)
+    names = tuple(Path(name).stem for name in QEMU_RUNNER_SOURCE_DIGESTS if name != "tools/run_qemu_smoke.py")
+    information = json.loads(_run(
+        (tools.python, "-B", "-c", QEMU_LOADER_PROBE, str(root), json.dumps(names)), cwd=root,
+    ))
+    if not isinstance(information, dict) or set(information) != {
+        "implementation", "source", "bytecode", "extensions", "namespace", "helpers",
+    }:
+        raise UnsupportedContext("QEMU argument-builder loader metadata is unsupported")
+    extensions = information["extensions"]
+    if (
+        information["implementation"] != "cpython"
+        or information["source"] != [".py"] or information["bytecode"] != [".pyc"]
+        or not isinstance(extensions, list) or not extensions
+        or any(not isinstance(value, str) or not value.startswith(".") or not value.endswith(".so")
+               or Path(value).name != value for value in extensions)
+    ):
+        raise UnsupportedContext("QEMU argument-builder loader layout is unsupported")
+    namespace = information["namespace"]
+    directory = root / "tools"
+    if (
+        not isinstance(namespace, dict) or set(namespace) != {"origin", "loader", "locations"}
+        or namespace["origin"] is not None or namespace["loader"] is not None
+        or not isinstance(namespace["locations"], list)
+        or any(not isinstance(value, str) for value in namespace["locations"])
+        or {Path(value).resolve() for value in namespace["locations"]} != {directory.resolve()}
+    ):
+        raise UnsupportedContext("QEMU argument-builder namespace is outside the reviewed closure")
+    helpers = information["helpers"]
+    if not isinstance(helpers, dict) or set(helpers) != set(names):
+        raise UnsupportedContext("QEMU argument-builder helper metadata is incomplete")
+    for name in names:
+        value = helpers[name]
+        if (
+            not isinstance(value, dict) or set(value) != {"origin", "loader", "locations"}
+            or value["origin"] != str(directory / (name + ".py"))
+            or value["loader"] != "SourceFileLoader" or value["locations"] != []
+        ):
+            raise UnsupportedContext("QEMU argument-builder source loader is outside the reviewed closure")
+    forbidden = [directory / ("__init__" + suffix) for suffix in extensions]
+    forbidden.extend(root / ("tools" + suffix) for suffix in extensions)
+    forbidden.extend(directory / (name + suffix) for name in names for suffix in extensions)
+    _absent_paths(tuple(forbidden))
 
 
 def environment_digest(environment):
@@ -640,12 +743,14 @@ def collect(root, workflow):
         for name, expected in RECIPE_DIGESTS.items():
             if _file_digest(root / name) != expected:
                 raise UnsupportedContext("build recipe is outside the initial reviewed closure")
-        if workflow == "test-qemu-smoke" and _file_digest(root / "tools/run_qemu_smoke.py") != QEMU_RUNNER_DIGEST:
-            raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
+        if workflow == "test-qemu-smoke":
+            _validate_qemu_runner_family(root)
         if list(root.glob("test_*.py")):
             raise UnsupportedContext("repository-root files would expand the native discovery pattern")
         cache = _cache(root, profile)
         tools = DarwinTools(root, profile, cache, environment)
+        if workflow == "test-qemu-smoke":
+            _validate_qemu_runner_namespace(root, tools)
         qemu = tools.qemu() if workflow == "test-qemu-smoke" else None
         inputs, paths = _build_manifest(root, profile, tools)
         inputs["standard_search_roots"] = _absent_paths(STANDARD_SEARCH_ROOTS)

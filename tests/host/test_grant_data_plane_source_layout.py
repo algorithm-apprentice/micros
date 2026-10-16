@@ -2027,7 +2027,9 @@ def planner_ast_without_grant_paths(text):
 
 
 def context_ast_without_recipe_pin(text):
-    tree = ast.parse(text)
+    from tests.host.test_qemu_runner_source_layout import context_declaration_projection
+
+    tree = context_declaration_projection(text)
     selected = []
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -2912,7 +2914,10 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         self.assertEqual(25, len(STABLE_HASHES))
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()))
+                from tests.host.test_qemu_runner_source_layout import restored_runner_source
+
+                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else (ROOT / path).read_bytes()
+                self.assertEqual(expected, digest_bytes(value))
         self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes((ROOT / "tests/host/c_source_records.py").read_bytes()))
 
     def test_only_declared_recipe_pin_and_classification_metadata_change(self):

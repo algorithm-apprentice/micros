@@ -1472,8 +1472,11 @@ class EndpointSourceLayoutTest(unittest.TestCase):
     def test_public_runtime_driver_and_neighbor_artifacts_remain_byte_exact(self):
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
+                from tests.host.test_qemu_runner_source_layout import restored_runner_source
+
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
+                    else restored_runner_source().encode() if path == "tools/run_qemu_smoke.py"
                     else (ROOT / path).read_bytes()
                 )
                 self.assertEqual(expected, digest_bytes(value))

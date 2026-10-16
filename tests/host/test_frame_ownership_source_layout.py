@@ -829,10 +829,10 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
                 self.assertEqual([owner], observed)
 
     def test_evidence_identities_and_sequences_remain_stable(self) -> None:
+        from tests.host.test_qemu_runner_source_layout import restored_runner_source
+
         cmake = CMAKE_PATH.read_text(encoding="utf-8")
-        runner = (
-            REPOSITORY_ROOT / "tools/run_qemu_smoke.py"
-        ).read_text(encoding="utf-8")
+        runner = restored_runner_source()
         ownership_entry = (
             REPOSITORY_ROOT / "tests/host/frame_ownership_test.c"
         ).read_text(encoding="utf-8")

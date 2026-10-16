@@ -3,12 +3,12 @@
 ## Status, baseline and phase
 
 This is the Accepted exact contract for
-[ADR-0072](../adr/0072-qemu-runner-source-decomposition.md). Only
-`qemu-tooling-decomposition-design` is active.
-`qemu-tooling-decomposition-implementation` remains pending until independent
-design review, acceptance and separate merge. Complete independent design
-and correction review is clean; only separate design merge remains before
-implementation. This phase contains documents only and adds no runtime-DAG node.
+[ADR-0072](../adr/0072-qemu-runner-source-decomposition.md).
+Independent complete design/correction and acceptance-only reviews are clean.
+Design #145 separately merged as
+`934faa9fd0e9e406758c0f2e336fb28af57739db`, with its exact reviewed tree.
+Implementation #146 starts on a fresh branch from that main. The source map
+and evidence requirements below add no runtime-DAG node.
 
 ```text
 reviewed micros base: 34f1048449c221b014530484bfec4b3c0ab51142
@@ -295,6 +295,10 @@ and exactly the nine expected ordinary source-module origins/loaders.
 Duplicate spellings of that same resolved directory are not another input
 root. Concrete/merged foreign packages, native or sourceless replacements,
 unknown loaders/layouts and unreadable/link/ambiguous metadata are ineligible.
+The namespace lookup includes the direct runner's retained script directory
+immediately after its prepended repository root. A `-c` probe must not omit
+that actual search root: ignored `tools/tools.pyc`, native `tools/tools.so`,
+and concrete or merged `tools/tools` packages must also refuse admission.
 
 The probe is fixed to `tools` and those nine names and performs only
 source-free standard `PathFinder`/`FileFinder` metadata lookups. It never
@@ -385,3 +389,42 @@ No accepted report, command interface, guest budget, serial/process error or
 cleanup behavior changes. No configuration/default flag workaround, new
 eligible workflow, generalized parser/import/bytecode/rule engine,
 cross-HEAD reuse, kernel layout or production init/shell work is included.
+
+## Implementation source map and evidence
+
+Before any rewrite, immutable Git `934faa9` facts froze the complete runner,
+46 functions/two classes/43 assignments and six aggregate classes/85 methods/
+36 independent fixtures, plus context/planner/recipe and retained oracles.
+The runtime gate contains only immutable hashes/order/whitespace metadata,
+not an unchecked legacy body archive.
+
+All ten production owners and eight test owners are real. All 212 original
+function/class/data/method/fixture moves and three ordered outlines are
+complete; both active migrations are literal empty. The 57 production
+functions are at most 120 physical lines: acceptance root 113, parser 27
+and main 120. The cohesive 77-line serial lifetime remains intact.
+
+Nine plain case mixins retain all 85 original raw/AST method bodies.
+The fixture owner retains all 36 independent raw/AST assignments. Six
+aggregate identities, explicit aliases, sorted IDs and native discovery
+remain exact and occur once. Actual complete original runner raw/AST,
+test-module AST, context AST and planner AST restore before retained
+oracles; their old expected values are unchanged.
+
+Two exact planner family rows independently preserve full-tier, QEMU,
+slow-model and image dimensions; the one structural gate is host-unit-only.
+The code-family and admitted-interpreter loader predicates remain before
+QEMU metadata, and the original CMake recipe and shared inspection,
+input, manifest, execution and evidence libraries are byte-exact.
+
+Structural and collector Reds preceded transport. Narrow green evidence
+includes 312 source/closure/planner/original-case checks, independent
+binding/body/order/discovery/loader mutations, CLI first errors, symbol
+failures and deterministic serial short-write/timeout custody. Real smoke,
+timer, object/IPC, symbol-resolved trap panic, serial-triggered TTY,
+two-memory growth and sealed VM-fault guests retain their original budgets.
+The implementation PR records exact commands/results and current
+HEAD/staged-tree identities. Final merge still requires the complete
+current fresh author plan, actual same-original-full-producer three-profile
+reuse and clean independent review; no earlier slice or old-head receipt
+substitutes for that barrier.

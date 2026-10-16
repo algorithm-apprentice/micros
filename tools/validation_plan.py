@@ -150,6 +150,32 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        "tools/run_qemu_smoke.py",
+        (
+            "tools/qemu_smoke_records.py",
+            "tools/qemu_smoke_platform.py",
+            "tools/qemu_smoke_objects.py",
+            "tools/qemu_smoke_faults.py",
+            "tools/qemu_smoke_command.py",
+            "tools/qemu_smoke_execution.py",
+            "tools/qemu_smoke_outcome.py",
+            "tools/qemu_smoke_arguments.py",
+            "tools/qemu_smoke_cli.py",
+        ),
+    ),
+    (
+        "tests/host/test_run_qemu_smoke.py",
+        (
+            "tests/host/qemu_smoke_test_fixture.py",
+            "tests/host/qemu_smoke_classification_cases.py",
+            "tests/host/qemu_smoke_panic_cases.py",
+            "tests/host/qemu_smoke_platform_cases.py",
+            "tests/host/qemu_smoke_memory_cases.py",
+            "tests/host/qemu_smoke_object_cases.py",
+            "tests/host/qemu_smoke_execution_cases.py",
+        ),
+    ),
+    (
         'kernel/tty_handoff_runtime.c',
         (
             'kernel/tty_handoff_runtime_state.c',
@@ -1099,6 +1125,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    "tests/host/test_qemu_runner_source_layout.py",
     'tests/host/test_tty_source_layout.py',
     "tests/host/elf_spawn_client_test.c",
     "tests/host/elf_spawn_resource_test.c",
