@@ -665,9 +665,15 @@ neither publishes state. A finite raw-body inverse from their actual bytes
 restores the original complete source hash, including counter declaration,
 loop formatting, error precedence and the unchanged non-failing stores.
 Independent typed-counter/bound/caller/exit/publication/whitespace fixtures
-exercise that inverse. Ten semantic task dispositions remain pending,
-including the target entry. Only the target scenario unit remains
-declarations-only; source movement alone does not complete the task.
+exercise that inverse.
+
+Execution-context attachment similarly exposes 33/36-line attached-peer and
+installed-hart conflict passes under a 65-line root. Admission, original
+geometry and context publication remain in the root; the same finite
+raw-byte mechanism has a separate context caller/type/order fixture.
+Nine semantic task dispositions remain pending, including the target entry.
+Only the target scenario unit remains declarations-only; source movement
+alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

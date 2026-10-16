@@ -45,6 +45,22 @@ HART_STACK_PHASES = (
         "MICROS_THREAD_CAPACITY",
     ),
 )
+CONTEXT_STACK_PHASES = (
+    (
+        "kernel_object_context_stack_avoids_threads",
+        ("objects", "thread", "kernel_stack_bottom", "kernel_stack_top"),
+        "MICROS_THREAD_CAPACITY",
+    ),
+    (
+        "kernel_object_context_stack_avoids_harts",
+        ("objects", "kernel_stack_bottom", "kernel_stack_top"),
+        "MICROS_HART_CAPACITY",
+    ),
+)
+STACK_CONFLICT_TASKS = {
+    "micros_hart_install_trap_stacks": (7, "hart", HART_STACK_PHASES),
+    "micros_thread_attach_execution_context": (6, "thread", CONTEXT_STACK_PHASES),
+}
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
     "kernel/kernel_object_state.c",
@@ -175,7 +191,6 @@ FUNCTION_TASK_MIGRATION = (
     (1, "test_generation_boundaries_and_quarantine"),
     (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
-    (0, "micros_thread_attach_execution_context"),
     (1, "test_fixed_capacities_report_exhaustion_atomically"),
     (1, "test_process_address_space_lifecycle_is_exact"),
     (1, "test_validator_rejects_corrupt_relationships"),
@@ -350,10 +365,13 @@ def owned_records(family, texts=None):
 def original_locations(family, texts=None):
     names = normal_names(family)
     locations = {}
+    stack_owners = {
+        phase[0]: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for phase in phases
+    }
     for (path, spelling), record in owned_records(family, texts).items():
-        if family == 0 and spelling in {phase[0] for phase in HART_STACK_PHASES}:
-            if path != CORE_SOURCES[7]:
-                raise AssertionError("hart stack conflict passes have their exact file-local owner")
+        if family == 0 and spelling in stack_owners:
+            if path != stack_owners[spelling]:
+                raise AssertionError("stack conflict passes have their exact file-local owner")
             continue
         if family == 1 and spelling in {phase[0] for phase in MODEL_PROJECTION_PHASES}:
             if path != family_paths(1)[10]:
@@ -494,9 +512,9 @@ def model_projection_body_tokens(caller, phases):
     return tuple(body)
 
 
-def hart_stack_call_guard():
+def stack_conflict_call_guard(original):
     calls = []
-    for name, arguments, _ in HART_STACK_PHASES:
+    for name, arguments, _ in STACK_CONFLICT_TASKS[original][2]:
         calls.append(name + "(\n" + ",\n".join("            " + arg for arg in arguments) + "\n        )")
     return (
         "    if (\n        !" + "\n        || !".join(calls)
@@ -504,18 +522,19 @@ def hart_stack_call_guard():
     )
 
 
-def hart_stack_body_text(caller, phases):
-    prefix = "\n    struct micros_hart *hart;\n    enum micros_kernel_object_error error;\n"
+def stack_conflict_body_text(original, caller, phases):
+    _, pointer, specification = STACK_CONFLICT_TASKS[original]
+    prefix = "\n    struct micros_" + pointer + " *" + pointer + ";\n    enum micros_kernel_object_error error;\n"
     declaration = "    size_t index;\n"
     phase_prefix = "\n" + declaration + "\n"
     success = "\n    return true;\n"
-    guard = hart_stack_call_guard()
+    guard = stack_conflict_call_guard(original)
     if not caller.startswith(prefix) or "index" in tokens(caller):
-        raise AssertionError("hart stack root retains its original locals without a duplicate counter")
+        raise AssertionError("stack root retains its original locals without a duplicate counter")
     if len(phases) != 2 or caller.count(guard) != 1:
         raise AssertionError("both conflict passes retain ordered checked calls with exact caller arguments")
     loops = []
-    for (_, _, bound), phase in zip(HART_STACK_PHASES, phases):
+    for (_, _, bound), phase in zip(specification, phases):
         if not phase.startswith(phase_prefix) or not phase.endswith(success):
             raise AssertionError("conflict passes own only the original counter and terminal success")
         loop = phase[len(phase_prefix):-len(success)]
@@ -540,9 +559,10 @@ def hart_stack_body_text(caller, phases):
 
 
 def core_body_text(original, record, texts=None):
-    if original == "micros_hart_install_trap_stacks" and (0, original) not in FUNCTION_TASK_MIGRATION:
-        owner = function_records(source(CORE_SOURCES[7]) if texts is None else texts[CORE_SOURCES[7]])
-        return hart_stack_body_text(record.body, [owner[name].body for name, _, _ in HART_STACK_PHASES])
+    if original in STACK_CONFLICT_TASKS and (0, original) not in FUNCTION_TASK_MIGRATION:
+        index, _, phases = STACK_CONFLICT_TASKS[original]
+        owner = function_records(source(CORE_SOURCES[index]) if texts is None else texts[CORE_SOURCES[index]])
+        return stack_conflict_body_text(original, record.body, [owner[name].body for name, _, _ in phases])
     return record.body
 
 
@@ -786,7 +806,9 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         final = {
             name: CORE_SOURCES[owner] for owner, names in ORIGINAL_FUNCTIONS[0].items() for name in names
         }
-        final.update({name: CORE_SOURCES[7] for name, _, _ in HART_STACK_PHASES})
+        final.update({
+            name: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for name, _, _ in phases
+        })
         edges = set()
         projected = set()
         exports = set()
@@ -1071,6 +1093,9 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertLessEqual(records["micros_hart_install_trap_stacks"].lines, 120)
 
     def test_hart_stack_inverse_preserves_actual_bytes_counter_bounds_and_publication(self):
+        def restore(caller, phases):
+            return stack_conflict_body_text("micros_hart_install_trap_stacks", caller, phases)
+
         caller = """
     struct micros_hart *hart;
     enum micros_kernel_object_error error;
@@ -1127,7 +1152,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
 
     publish();
 """
-        self.assertEqual(expected, hart_stack_body_text(caller, phases))
+        self.assertEqual(expected, restore(caller, phases))
         for changed in (
             caller.replace("            hart,", "            other,"),
             caller.replace("|| !kernel_object_hart_stacks_avoid_threads", "&& !kernel_object_hart_stacks_avoid_threads"),
@@ -1136,7 +1161,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         ):
             self.assertNotEqual(caller, changed)
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
-                hart_stack_body_text(changed, phases)
+                restore(changed, phases)
         for changed in (
             phases[0].replace("size_t index", "uint16_t index"),
             phases[0].replace("index = 0", "index = 1"),
@@ -1147,13 +1172,102 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         ):
             self.assertNotEqual(phases[0], changed)
             with self.subTest(changed=changed), self.assertRaises(AssertionError):
-                hart_stack_body_text(caller, (changed, phases[1]))
-        self.assertNotEqual(expected, hart_stack_body_text(caller.replace("publish();", "publish_early();"), phases))
+                restore(caller, (changed, phases[1]))
+        self.assertNotEqual(expected, restore(caller.replace("publish();", "publish_early();"), phases))
         self.assertNotEqual(
-            expected, hart_stack_body_text(caller, (phases[0].replace("bad_hart", "weakened"), phases[1])),
+            expected, restore(caller, (phases[0].replace("bad_hart", "weakened"), phases[1])),
         )
         self.assertNotEqual(
-            expected, hart_stack_body_text(caller, (phases[0].replace("        if (", "         if ("), phases[1])),
+            expected, restore(caller, (phases[0].replace("        if (", "         if ("), phases[1])),
+        )
+
+    def test_context_attach_exposes_typed_peer_and_hart_conflicts_before_copy(self):
+        records = function_records(source(CORE_SOURCES[6]))
+        for name, arguments, _ in CONTEXT_STACK_PHASES:
+            with self.subTest(phase=name):
+                self.assertIn(name, set(records))
+                parameters = "const struct micros_kernel_objects *objects"
+                if "thread" in arguments:
+                    parameters += ", const struct micros_thread *thread"
+                parameters += ", uintptr_t kernel_stack_bottom, uintptr_t kernel_stack_top"
+                self.assertEqual(
+                    tokens("static bool " + name + "(" + parameters + ")"),
+                    tokens(records[name].signature),
+                )
+        self.assertLess(records["micros_thread_attach_execution_context"].lines, 99)
+
+    def test_context_stack_inverse_preserves_raw_peer_order_and_context_copy(self):
+        caller = """
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+
+    original_admission_and_geometry();
+    if (
+        !kernel_object_context_stack_avoids_threads(
+            objects,
+            thread,
+            kernel_stack_bottom,
+            kernel_stack_top
+        )
+        || !kernel_object_context_stack_avoids_harts(
+            objects,
+            kernel_stack_bottom,
+            kernel_stack_top
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STACK;
+    }
+
+    original_context_copy();
+"""
+        phases = (
+            "\n    size_t index;\n\n"
+            "    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {\n"
+            "        if (bad_peer(index)) {\n            return false;\n        }\n    }"
+            "\n    return true;\n",
+            "\n    size_t index;\n\n"
+            "    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {\n"
+            "        if (bad_hart(index)) {\n            return false;\n        }\n    }"
+            "\n    return true;\n",
+        )
+        expected = """
+    struct micros_thread *thread;
+    enum micros_kernel_object_error error;
+    size_t index;
+
+    original_admission_and_geometry();
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        if (bad_peer(index)) {
+            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+        }
+    }
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        if (bad_hart(index)) {
+            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+        }
+    }
+
+    original_context_copy();
+"""
+        original = "micros_thread_attach_execution_context"
+        self.assertEqual(expected, stack_conflict_body_text(original, caller, phases))
+        for changed in (
+            caller.replace("            thread,", "            other,"),
+            caller.replace("kernel_stack_bottom,\n", "kernel_stack_top,\n", 1),
+            caller.replace("|| !kernel_object_context_stack_avoids_harts", "&& !kernel_object_context_stack_avoids_harts"),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                stack_conflict_body_text(original, changed, phases)
+        for changed in (
+            phases[0].replace("MICROS_THREAD_CAPACITY", "MICROS_HART_CAPACITY"),
+            phases[0].replace("return false;", "return true;"),
+            phases[0].replace("size_t index;", "unsigned int index;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                stack_conflict_body_text(original, caller, (changed, phases[1]))
+        self.assertNotEqual(
+            expected, stack_conflict_body_text(original, caller.replace("original_context_copy", "new_copy"), phases),
         )
 
 
