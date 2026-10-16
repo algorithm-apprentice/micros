@@ -517,3 +517,12 @@ publishes only after complete ordinary planning and the final device-fault
 check. Independent pointer/switch/success/fault mutants and complete-body
 reconstruction retain the original range behavior without another IRQ
 scope or mutable state. Seventeen semantic dispositions remain pending.
+
+Remote-only validation now has a 72-line root and a 34-line device/remote-plan
+phase. Its six original objects and sole plan initializer retain caller
+lifetime; early shape, authority, phase and zero-length order still precede
+device lookup and remote translation. A checked void-phase expansion
+preserves the caller-owned result and original common IRQ exit without local
+range, physical overlap or byte-copy work. Shared typed automatic-work
+inspection retains the copy execution contract unchanged. Sixteen semantic
+dispositions and sixty-three original owner moves remain pending.

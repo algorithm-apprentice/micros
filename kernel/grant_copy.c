@@ -222,6 +222,50 @@ done:
     return work.error;
 }
 
+struct grant_copy_validation {
+    const struct micros_frame_ownership *ledger;
+    struct micros_grant_copy_authority authority;
+    struct micros_grant_copy_range_plan remote_plan;
+    struct micros_tty_device_authority device_authority;
+    enum micros_grant_error error;
+    enum micros_tty_device_authority_status device_status;
+};
+
+static void grant_copy_prepare_remote_plan(
+    struct grant_copy_validation *work,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects,
+    size_t length,
+    uint32_t required_permission
+)
+{
+    work->device_status =
+        micros_tty_handoff_runtime_device_authority(
+            endpoint_registry,
+            objects,
+            &work->device_authority
+        );
+    if (
+        work->device_status
+            == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
+    ) {
+        work->error = MICROS_GRANT_ERROR_INVARIANT;
+        return;
+    }
+    work->error = grant_copy_plan_range(
+        work->authority.grantor,
+        work->authority.remote_address,
+        length,
+        required_permission == MICROS_GRANT_PERMISSION_READ
+            ? MICROS_SV39_PERMISSION_READ
+            : MICROS_SV39_PERMISSION_WRITE,
+        work->device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &work->device_authority
+            : NULL,
+        &work->remote_plan
+    );
+}
+
 enum micros_grant_error micros_grant_validate_range(
     const struct micros_grant_registry *grant_registry,
     const struct micros_endpoint_registry *endpoint_registry,
@@ -234,12 +278,8 @@ enum micros_grant_error micros_grant_validate_range(
     uint32_t required_permission
 )
 {
-    const struct micros_frame_ownership *ledger;
-    struct micros_grant_copy_authority authority;
-    struct micros_grant_copy_range_plan remote_plan = {0};
-    struct micros_tty_device_authority device_authority;
-    enum micros_grant_error error;
-    enum micros_tty_device_authority_status device_status;
+    struct grant_copy_validation work;
+    work.remote_plan = (struct micros_grant_copy_range_plan){0};
     uintptr_t saved_status;
 
     if (
@@ -259,7 +299,7 @@ enum micros_grant_error micros_grant_validate_range(
         return MICROS_GRANT_ERROR_RANGE;
     }
     saved_status = riscv_irq_save();
-    error = micros_grant_prepare_copy_authority(
+    work.error = micros_grant_prepare_copy_authority(
         grant_registry,
         endpoint_registry,
         objects,
@@ -269,56 +309,34 @@ enum micros_grant_error micros_grant_validate_range(
         grant_offset,
         length,
         required_permission,
-        &authority
+        &work.authority
     );
-    if (error != MICROS_GRANT_OK) {
+    if (work.error != MICROS_GRANT_OK) {
         goto done;
     }
-    ledger = micros_frame_ownership_runtime_ledger();
-    if (ledger == NULL) {
-        error = MICROS_GRANT_ERROR_INVARIANT;
+    work.ledger = micros_frame_ownership_runtime_ledger();
+    if (work.ledger == NULL) {
+        work.error = MICROS_GRANT_ERROR_INVARIANT;
         goto done;
     }
     if (
-        ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-        && ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+        work.ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+        && work.ledger->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
     ) {
-        error = MICROS_GRANT_ERROR_PHASE;
+        work.error = MICROS_GRANT_ERROR_PHASE;
         goto done;
     }
     if (length == 0) {
-        error = MICROS_GRANT_OK;
+        work.error = MICROS_GRANT_OK;
         goto done;
     }
-    device_status =
-        micros_tty_handoff_runtime_device_authority(
-            endpoint_registry,
-            objects,
-            &device_authority
-        );
-    if (
-        device_status
-            == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
-    ) {
-        error = MICROS_GRANT_ERROR_INVARIANT;
-        goto done;
-    }
-    error = grant_copy_plan_range(
-        authority.grantor,
-        authority.remote_address,
-        length,
-        required_permission == MICROS_GRANT_PERMISSION_READ
-            ? MICROS_SV39_PERMISSION_READ
-            : MICROS_SV39_PERMISSION_WRITE,
-        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
-            ? &device_authority
-            : NULL,
-        &remote_plan
+    grant_copy_prepare_remote_plan(
+        &work, endpoint_registry, objects, length, required_permission
     );
 
 done:
     riscv_irq_restore(saved_status);
-    return error;
+    return work.error;
 }
 
 enum micros_grant_error micros_grant_copy_from(

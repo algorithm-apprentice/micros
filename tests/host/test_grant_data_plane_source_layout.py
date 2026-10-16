@@ -62,6 +62,20 @@ RANGE_DEVICE_PARAMETERS = (
     "uintptr_t *current, size_t *remaining, bool *device_fault, "
     "enum micros_user_address_space_error *address_error, size_t *chunk_length"
 )
+VALIDATION_WORK_TAG = "grant_copy_validation"
+VALIDATION_PHASE = "grant_copy_prepare_remote_plan"
+VALIDATION_FIELDS = (
+    ("const struct micros_frame_ownership *ledger;", False),
+    ("struct micros_grant_copy_authority authority;", False),
+    ("struct micros_grant_copy_range_plan remote_plan;", True),
+    ("struct micros_tty_device_authority device_authority;", False),
+    ("enum micros_grant_error error;", False),
+    ("enum micros_tty_device_authority_status device_status;", False),
+)
+VALIDATION_PARAMETERS = (
+    "struct grant_copy_validation *work, const struct micros_endpoint_registry *endpoint_registry, "
+    "const struct micros_kernel_objects *objects, size_t length, uint32_t required_permission"
+)
 COPY_EXECUTION_FIELDS = (
     ("const struct micros_frame_ownership *ledger;", False),
     ("struct micros_grant_copy_authority authority;", False),
@@ -174,7 +188,6 @@ FUNCTION_TASK_MIGRATION = (
     (4, "test_grant_model"),
     (5, "test_copy_authority_and_bounds"),
     (6, "micros_grant_syscall_core_test_run"),
-    (0, "micros_grant_validate_range"),
     (5, "test_copy_plan_and_commit"),
     (3, "micros_grant_syscall_test_handle_control_trap"),
     (3, "micros_grant_syscall_test_finish"),
@@ -447,7 +460,7 @@ def original_locations(family, texts=None):
     locations = {}
     names = normal_names(family)
     for (path, spelling), record in owned_records(family, texts).items():
-        if family == 0 and spelling in (COPY_EXECUTION_PHASE, COPY_LOCAL_RANGE_PHASE):
+        if family == 0 and spelling in (COPY_EXECUTION_PHASE, COPY_LOCAL_RANGE_PHASE, VALIDATION_PHASE):
             if path != COPY_SOURCES[0]:
                 raise AssertionError("the private participant-plan phase has its exact copy owner")
             continue
@@ -481,20 +494,26 @@ def original_body_digest(family, original, record):
         body = copy_execution_actual_body_tokens(record)
     if family == 0 and original == "plan_range" and (0, original) not in FUNCTION_TASK_MIGRATION:
         body = range_device_actual_body_tokens(record)
+    if family == 0 and original == "micros_grant_validate_range" and (0, original) not in FUNCTION_TASK_MIGRATION:
+        body = validation_actual_body_tokens(record)
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
-def copy_execution_declarations(owner):
+def work_declarations(owner, tag, fields):
     lexical = c_lexical_text(owner)
-    starts = tuple(re.finditer(r"\bstruct " + COPY_EXECUTION_TAG + r"\s*\{", lexical))
+    starts = tuple(re.finditer(r"\bstruct " + tag + r"\s*\{", lexical))
     if len(starts) != 1:
         raise AssertionError("one file-local execution work type owns only original automatic objects")
     opening = lexical.index("{", starts[0].start())
     closing = matching_lexical(lexical, opening, "{", "}")
     declarations = tuple(tokens(part + ";") for part in lexical[opening + 1:closing].split(";") if part.strip())
-    if declarations != tuple(tokens(declaration) for declaration, _ in COPY_EXECUTION_FIELDS):
-        raise AssertionError("execution work retains all eleven original complete types in original order")
+    if declarations != tuple(tokens(declaration) for declaration, _ in fields):
+        raise AssertionError("automatic work retains original fields, complete types and declaration order")
     return declarations
+
+
+def copy_execution_declarations(owner):
+    return work_declarations(owner, COPY_EXECUTION_TAG, COPY_EXECUTION_FIELDS)
 
 
 def copy_execution_body_tokens(caller, phase, declarations, local_phase):
@@ -549,7 +568,14 @@ def copy_execution_body_tokens(caller, phase, declarations, local_phase):
             index += 1
     start = positions[0]
     body[start:start + len(guard)] = restored
-    prefix = list(tokens("{ struct " + COPY_EXECUTION_TAG + " work;"))
+    return restore_automatic_work_tokens(body, COPY_EXECUTION_TAG, COPY_EXECUTION_FIELDS, declarations)
+
+
+def restore_automatic_work_tokens(body, tag, fields, declarations):
+    body = list(body)
+    if tuple(declarations) != tuple(tokens(declaration) for declaration, _ in fields):
+        raise AssertionError("automatic declarations come from the exact verified actual work fields")
+    prefix = list(tokens("{ struct " + tag + " work;"))
     if body[:len(prefix)] != prefix:
         raise AssertionError("execution work is one original uninitialized automatic root object")
     del body[1:len(prefix)]
@@ -570,14 +596,14 @@ def copy_execution_body_tokens(caller, phase, declarations, local_phase):
             restored.append(body[index])
             index += 1
     initializers = []
-    for actual, (_, initialized) in zip(declarations, COPY_EXECUTION_FIELDS):
+    for actual, (_, initialized) in zip(declarations, fields):
         if not initialized:
             initializers.extend(actual)
             continue
         name = actual[-2]
         cast = ["(", *actual[:-2], ")"]
         if restored[1:3] != [name, "="]:
-            raise AssertionError("only the two original plan initializers execute, in original order")
+            raise AssertionError("only original explicit plan initializers execute, in original order")
         end = restored.index(";", 3)
         value = restored[3:end]
         if value[:len(cast) + 1] != cast + ["{"]:
@@ -606,6 +632,48 @@ def copy_execution_actual_body_tokens(record, owner=None):
     return copy_execution_body_tokens(
         "{" + record.body + "}", "{" + phase.body + "}", declarations, "{" + local.body + "}",
     )
+
+
+def validation_body_tokens(caller, phase, declarations):
+    body = list(tokens(caller))
+    call = list(tokens(
+        VALIDATION_PHASE + "(&work, endpoint_registry, objects, length, required_permission);"
+    ))
+    positions = [index for index in range(len(body)) if body[index:index + len(call)] == call]
+    phase = list(tokens(phase))
+    if (
+        len(positions) != 1 or phase[:1] != ["{"] or phase[-1:] != ["}"]
+        or body[positions[0] + len(call):positions[0] + len(call) + 2] != ["done", ":"]
+    ):
+        raise AssertionError("remote-only planning returns directly to the original common IRQ/result exit")
+    inner = phase[1:-1]
+    if {"goto", "break", "continue"} & set(inner):
+        raise AssertionError("remote-only planning cannot borrow a caller label or loop")
+    restored = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "return":
+            if inner[index:index + 2] != ["return", ";"]:
+                raise AssertionError("the void remote phase preserves the original caller-owned error result")
+            restored.extend(tokens("goto done;"))
+            index += 2
+        else:
+            restored.append(inner[index])
+            index += 1
+    start = positions[0]
+    body[start:start + len(call)] = restored
+    return restore_automatic_work_tokens(body, VALIDATION_WORK_TAG, VALIDATION_FIELDS, declarations)
+
+
+def validation_actual_body_tokens(record, owner=None):
+    owner = source(COPY_SOURCES[0]) if owner is None else owner
+    declarations = work_declarations(owner, VALIDATION_WORK_TAG, VALIDATION_FIELDS)
+    phase = function_records(owner)[VALIDATION_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens(
+        "static void " + VALIDATION_PHASE + "(" + VALIDATION_PARAMETERS + ")"
+    ):
+        raise AssertionError("remote-only planning retains exact complete file-local scalar and state types")
+    return validation_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
 def range_device_body_tokens(caller, phase):
@@ -1109,6 +1177,75 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         )
         self.assertNotEqual(
             tokens(expected), range_device_body_tokens(caller.replace("if (device_fault)", "if (false)"), phase),
+        )
+
+    def test_remote_only_validation_exposes_typed_plan_phase_without_copy_or_local_range(self):
+        records = function_records(source(COPY_SOURCES[0]))
+        self.assertIn(VALIDATION_PHASE, set(records))
+        phase = records[VALIDATION_PHASE]
+        self.assertEqual(
+            tokens("static void " + VALIDATION_PHASE + "(" + VALIDATION_PARAMETERS + ")"), tokens(phase.signature),
+        )
+        root = records["micros_grant_validate_range"]
+        self.assertLess(root.lines, 98)
+        self.assertEqual(1, root.body.count("riscv_irq_save()"))
+        self.assertEqual(1, root.body.count("riscv_irq_restore(saved_status)"))
+        for excluded in ("local_address", "micros_grant_copy_commit", "riscv_irq_"):
+            self.assertNotIn(excluded, phase.body)
+
+    def test_remote_validation_inverse_preserves_one_plan_no_copy_and_original_void_error_exit(self):
+        caller = (
+            "{ struct grant_copy_validation work; work.remote_plan = (struct micros_grant_copy_range_plan){0}; "
+            "uintptr_t saved_status; original_early_arguments(); saved_status = riscv_irq_save(); "
+            "original_authority_phase_zero(&work.authority, &work.ledger, &work.error); "
+            "grant_copy_prepare_remote_plan(&work, endpoint_registry, objects, length, required_permission); "
+            "done: riscv_irq_restore(saved_status); return work.error; }"
+        )
+        phase = (
+            "{ work->device_status = capture_device_authority(endpoint_registry, objects, &work->device_authority); "
+            "if (work->device_status == INVALID) { work->error = INVARIANT; return; } "
+            "work->error = prepare_remote(work->authority.grantor, work->authority.remote_address, length, "
+            "required_permission, &work->remote_plan); }"
+        )
+        expected = (
+            "{ const struct micros_frame_ownership *ledger; struct micros_grant_copy_authority authority; "
+            "struct micros_grant_copy_range_plan remote_plan = {0}; "
+            "struct micros_tty_device_authority device_authority; enum micros_grant_error error; "
+            "enum micros_tty_device_authority_status device_status; uintptr_t saved_status; "
+            "original_early_arguments(); saved_status = riscv_irq_save(); "
+            "original_authority_phase_zero(&authority, &ledger, &error); "
+            "device_status = capture_device_authority(endpoint_registry, objects, &device_authority); "
+            "if (device_status == INVALID) { error = INVARIANT; goto done; } "
+            "error = prepare_remote(authority.grantor, authority.remote_address, length, required_permission, &remote_plan); "
+            "done: riscv_irq_restore(saved_status); return error; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in VALIDATION_FIELDS)
+        self.assertEqual(tokens(expected), validation_body_tokens(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct grant_copy_validation work;", "struct grant_copy_validation work = {0};"),
+            caller.replace("(&work, endpoint_registry,", "(&copy, endpoint_registry,"),
+            caller.replace("endpoint_registry, objects, length,", "other_registry, objects, length,"),
+            caller.replace("done: riscv_irq_restore", "new_step(); done: riscv_irq_restore"),
+            caller.replace("(struct micros_grant_copy_range_plan){0}", "(struct other_plan){0}"),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                validation_body_tokens(changed, phase, declarations)
+        for changed in (
+            phase.replace("return;", "return true;"),
+            phase.replace("return;", "goto done;"),
+            phase.replace("work->authority.grantor", "work->local_plan"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                validation_body_tokens(caller, changed, declarations)
+        self.assertNotEqual(
+            tokens(expected), validation_body_tokens(caller, phase.replace("work->error = INVARIANT", "work->error = OK"), declarations),
+        )
+        self.assertNotEqual(
+            tokens(expected), validation_body_tokens(caller, phase.replace("length, required_permission", "length, READ"), declarations),
+        )
+        self.assertNotEqual(
+            tokens(expected), validation_body_tokens(caller, phase.replace("work->error = prepare_remote", "copy_bytes(); work->error = prepare_remote"), declarations),
         )
 
 
