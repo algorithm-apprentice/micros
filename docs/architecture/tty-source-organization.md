@@ -542,3 +542,13 @@ Complete original-body/type reconstruction and independent wrong-binding,
 reset/copy/retention and lifetime fixtures retain all runtime behavior.
 Actual owner directions are acyclic. There are 89 original moves remaining;
 all eight semantic dispositions remain pending, including live binding.
+
+Live-binding validation now has an 89-line root and a 40-line file-local
+prepared/active predicate phase. Caller-owned work contains exactly the
+original three record pointers and two uninitialized booleans. Original
+record resolution/identity failure precedes both predicates, and the original
+console-phase/deadline selector remains in root. The complete old body and
+signature reconstruct from actual typed fields/bindings and the void phase;
+independent ordering, pointer, type, initialization and early-exit fixtures
+protect the outline. No lookup, validation, IRQ or publication is added.
+There are 89 original owner moves and seven semantic dispositions remaining.
