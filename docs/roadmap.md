@@ -381,12 +381,22 @@ four shorter task dispositions over the existing 76-definition object
 family. Public layouts and the cohesive runtime remain unchanged; the
 scheduler/base-validator direction, original storage and full source/recipe
 oracles are explicit. Independently reviewed design #137 is merged.
-Implementation #138 exposes all 23 real owners and all twelve semantic
-dispositions, with both migrations literal empty and 128 current definitions
-bounded by 92 physical lines. Complete current author/reuse acceptance and
-independent implementation review remain merge prerequisites. This is not
-a new runtime node, clock/deadline change, application startup or shell
-outcome.
+Implementation #138 is independently reviewed and merged with all 23 real
+owners and twelve semantic dispositions, both migrations literal empty and
+128 definitions bounded by 92 physical lines. Full fresh author acceptance,
+actual same-producer three-profile reuse, identical reviewed squash tree and
+local/remote branch cleanup close this maintenance outcome.
+
+The next selected maintenance design is Accepted
+[ADR-0069](adr/0069-grant-data-plane-source-decomposition.md), with the exact
+[grant data-plane source contract](architecture/grant-data-plane-source-organization.md).
+It preserves the cohesive grant registry and existing Step 7 authority while
+defining range/copy, captured syscall, native/reference-model and real
+target-script boundaries: 22 C owners, three private headers/sets, four
+consumer operands, 65 moves and fourteen long plus five shorter dispositions.
+This independently reviewed design authors documentation only. Implementation
+remains pending until the separate Accepted design merges. Neither correction
+adds a runtime node, clock/deadline, application startup or shell behavior.
 
 ## v0.1 completion goal
 

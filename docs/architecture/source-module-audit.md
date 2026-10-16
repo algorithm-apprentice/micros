@@ -109,7 +109,7 @@ the next behavior-bearing change to their own subsystem.
 | Kernel objects | 3 | Follow Accepted [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) and the exact [object source contract](kernel-object-source-organization.md), only after reviewed design merge: separate representation/identity, process/thread/context/hart, base validation, native/model and target tasks while retaining distinct identities, original storage and real validation-profile eligibility. | `kernel-object-decomposition-design` / `kernel-object-decomposition-implementation` |
 | Kernel bootstrap | 10 | Apply Accepted [ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) and the exact [bootstrap source contract](kernel-bootstrap-source-organization.md) only after design merge: separate manifest/profile validation, preparation and rollback, diagnostics, captured control, boot entry, launcher, fixtures, reference replay and shared descriptor phases without changing behavior. | `kernel-bootstrap-decomposition-design` / `kernel-bootstrap-decomposition-implementation` |
 | Trap and syscall routing | 6 | Apply Accepted [ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) and the exact [trap/syscall source contract](trap-syscall-source-organization.md) only after design merge: separate routed context, user/supervisor interrupt, syscall, fault, return, bounded test hooks, and existing runtime evidence while preserving register custody and authority. | `trap-syscall-decomposition-design` / `trap-syscall-decomposition-implementation` |
-| Grant data plane | 7 | Preserve the cohesive grant registry while splitting non-atomic range planning, copying, syscall, model, and target-test tasks. | `grant-data-plane-decomposition-design` / `grant-data-plane-decomposition-implementation` |
+| Grant data plane | 7 | Follow Accepted [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md) and the exact [grant data-plane source contract](grant-data-plane-source-organization.md) only after separate design merge: preserve the cohesive registry while exposing range/copy, captured syscall, fixture/reference/model and real target-script tasks. | `grant-data-plane-decomposition-design` / `grant-data-plane-decomposition-implementation` |
 | TTY | 8 | Preserve cohesive portable TTY state ownership while splitting service validation, submit/cancel/collect, console handoff, fixture, and test tasks. | `tty-function-decomposition-design` / `tty-function-decomposition-implementation` |
 
 ### Tooling correction
@@ -232,12 +232,13 @@ three private headers/sets, 72 original moves, 22 necessary portable private
 helpers, eight long and four shorter task dispositions. The design also
 preserves the original complete object-source hash through a bounded inverse
 and avoids a retained-oracle import cycle through unchanged shared inspection.
-Independent design review is clean and separate Accepted design #137 is
-merged. Implementation #138 exposes all 23 real owners, closes both
-migrations as literal empty tuples, and supplies 128 current definitions
-with a maximum of 92 physical lines. Original body/type/storage and complete
-byte-source/recipe oracles remain enforced. Complete current author/reuse
-acceptance and independent implementation review are required before merge.
+Design #137 and implementation #138 are independently reviewed and merged.
+All 23 real owners close both migrations as literal empty tuples; 128 current
+definitions have a maximum of 92 physical lines. Original body/type/storage
+and complete byte-source/recipe oracles remain enforced. Full fresh
+author acceptance, actual three-profile same-producer reuse, identical
+reviewed squash tree and obsolete local/remote branch cleanup close this
+correction.
 
 ### Kernel bootstrap
 
@@ -259,6 +260,18 @@ acceptance and independent implementation review are required before merge.
 `kernel/grant_syscall_test.c`, `tests/host/grant_test.c`,
 `tests/host/grant_copy_test.c`, and
 `tests/host/grant_syscall_core_test.c`.
+
+At object-merged base `6269d924`, those seven files contain 8,018 physical
+lines, 95 definitions and fourteen long functions. Accepted
+[ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md) and the exact
+[grant data-plane contract](grant-data-plane-source-organization.md) name
+22 C owners, three private headers/sets, four consumer operands, 65 moves,
+fourteen long and five shorter task dispositions. Registry/core/runtime/ABI
+and public boundaries stay unchanged. The fixed MINIX trace, actual
+fixture/script/model state and independent validation dimensions precede
+implementation. Independent complete design review is clean. This phase
+contains documentation only; its paired implementation remains pending until
+the separate Accepted design merges.
 
 ### TTY
 
