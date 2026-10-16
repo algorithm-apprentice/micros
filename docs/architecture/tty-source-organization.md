@@ -552,3 +552,16 @@ signature reconstruct from actual typed fields/bindings and the void phase;
 independent ordering, pointer, type, initialization and early-exit fixtures
 protect the outline. No lookup, validation, IRQ or publication is added.
 There are 89 original owner moves and seven semantic dispositions remaining.
+
+Service ownership now places all twenty original definitions in the five
+required stateless owners: facade three, validation five, read three, write
+one and request eight. Exactly ten original private helpers gain complete
+cross-owner declarations; existing explicit service-state parameters and
+public interfaces remain unchanged. The original initialization magic has
+one private-header definition. Complete original body/signature restoration
+and the acyclic owner graph are checked. The shared byte helper uses
+`tty_service_request_clear_bytes` within the required private namespace to
+avoid the retained real service entry's local symbol; actual ELF admission
+and the original QEMU TTY scenario pass without weakening either check.
+There are 72 original moves, twelve declarations-only future C owners and
+seven semantic dispositions remaining, including the original write body.

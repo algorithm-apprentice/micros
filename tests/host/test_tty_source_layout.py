@@ -154,7 +154,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0
+    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2)
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
@@ -185,6 +185,11 @@ LIVE_PARAMETERS = (
     "struct tty_handoff_context *context, const struct micros_bootstrap_binding *binding, "
     "const struct micros_bootstrap_runtime_entry *transition, struct tty_handoff_live_binding *work"
 )
+SERVICE_PRIVATE_EXPORTS = (
+    "clear_bytes", "copy_grant", "endpoint_is_valid", "handle_cancel", "handle_collect",
+    "handle_submit_read", "handle_submit_write", "prepare_protocol_reply", "prepare_reply", "validate_submit",
+)
+SERVICE_MAGIC_DIGEST = "66be1b9eddf34c6e64e89c838b272dc5c86320c15bedaac301d570cda2c4f3d1"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -569,6 +574,12 @@ def normal_names(family):
             "tty_handoff_" + name: name for names in ORIGINAL_FUNCTIONS[0].values()
             for name in names if not name.startswith("micros_")
         }
+    if family == 2:
+        return {
+            ("tty_service_request_clear_bytes" if name == "clear_bytes" else "tty_service_" + name): name
+            for names in ORIGINAL_FUNCTIONS[2].values()
+            for name in names if not name.startswith("micros_")
+        }
     return {}
 
 
@@ -603,6 +614,10 @@ def original_signature_tokens(family, original, record):
     if family == 0 and original in RUNTIME_CONTEXT_HELPERS:
         if (0, original) not in SYMBOL_OWNER_MIGRATION:
             signature = runtime_context_signature_tokens(signature)
+    if family == 2 and original in SERVICE_PRIVATE_EXPORTS and record.name.startswith("tty_service_"):
+        if signature[:1] == ("static",):
+            raise AssertionError("only necessary cross-owner service helpers gain actual private visibility")
+        signature = ("static", *signature)
     return signature
 
 
@@ -752,6 +767,61 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_service_private_symbols_do_not_collide_with_retained_real_elf_neighbors(self):
+        paths = (
+            *SERVICE_SOURCES, "servers/tty/tty_service.c", "servers/tty/tty_control.c",
+            "servers/tty/tty_core.c", "servers/tty/tty_uart.c",
+        )
+        locations = {}
+        for path in paths:
+            for name in function_records(source(path)):
+                self.assertNotIn(name, locations, name + " also defined in " + locations.get(name, ""))
+                locations[name] = path
+
+    def test_service_private_directions_preserve_explicit_state_and_no_facade_cycle(self):
+        records = {
+            name: (owner, record) for owner, path in enumerate(SERVICE_SOURCES)
+            for name, record in function_records(source(path)).items()
+        }
+        allowed = {0: {1, 2, 3, 4}, 1: set(), 2: {1, 4}, 3: {1, 4}, 4: {1}}
+        for name, (owner, record) in records.items():
+            destinations = {
+                records[word][0] for word in tokens(record.body)
+                if word in records and records[word][0] != owner
+            }
+            self.assertLessEqual(destinations, allowed[owner], name)
+
+    def test_service_originals_have_exact_explicit_stateless_owners_and_single_magic_contract(self):
+        private_names = {original: private for private, original in normal_names(2).items()}
+        for owner, names in ORIGINAL_FUNCTIONS[2].items():
+            records = function_records(source(SERVICE_SOURCES[owner]))
+            for name in names:
+                expected = private_names.get(name, name)
+                self.assertIn(expected, set(records), SERVICE_SOURCES[owner])
+        header = source(PRIVATE_HEADERS[1])
+        start = header.index("#define MICROS_TTY_SERVICE_INITIALIZATION_MAGIC")
+        end = header.index("\n\n", start)
+        self.assertEqual(SERVICE_MAGIC_DIGEST, digest_tokens(tokens(header[start:end])))
+        for path in SERVICE_SOURCES:
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+
+    def test_service_private_signature_fixture_preserves_original_full_types_and_no_state(self):
+        owner = (
+            "enum micros_tty_service_error tty_service_handle_cancel("
+            "struct micros_tty_service_state *state, const struct micros_tty_request *request, "
+            "struct micros_tty_service_reply_action *action) { return ORIGINAL_RESULT; }"
+        )
+        record = function_records(owner)["tty_service_handle_cancel"]
+        expected = tokens(
+            "static enum micros_tty_service_error handle_cancel(struct micros_tty_service_state *state, "
+            "const struct micros_tty_request *request, struct micros_tty_service_reply_action *action)"
+        )
+        self.assertEqual(expected, original_signature_tokens(2, "handle_cancel", record))
+        with self.assertRaises(AssertionError):
+            original_signature_tokens(2, "handle_cancel", function_records("static " + owner)["tty_service_handle_cancel"])
+        changed = function_records(owner.replace("const struct micros_tty_request *request", "struct micros_tty_request *request"))["tty_service_handle_cancel"]
+        self.assertNotEqual(expected, original_signature_tokens(2, "handle_cancel", changed))
+
     def test_live_binding_has_typed_ordered_predicates_after_original_record_resolution(self):
         owner = source(RUNTIME_SOURCES[2])
         records = function_records(owner)
@@ -939,7 +1009,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(REQUIRED_TASKS))
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
-        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0})
+        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2)})
         self.assertEqual(set(REQUIRED_TASKS) - {(0, "live_binding_matches")}, set(FUNCTION_TASK_MIGRATION))
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):
