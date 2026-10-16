@@ -4,8 +4,13 @@
 
 This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
-Independent complete read-only design review is clean. This outcome is
-design-only; implementation remains pending until separate design merge.
+Independent complete read-only design review is clean and design #141 is
+separately merged. Implementation #142 is blocked and abandoned after the
+model graph omission described by Accepted
+[ADR-0071](../adr/0071-tty-model-validation-reference-dependency.md).
+Only that documentation-only corrective design is active; implementation
+must restart from current `main` after its separate merge. Complete
+independent corrective-design review is clean.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
@@ -14,6 +19,7 @@ reviewed micros base: ac94a21141b86c2e9b661cf90f500cca82e0c0c4
 fixed MINIX reference: 4db99f4012570a577414fe2a43697b2f239b699e
 design task: tty-function-decomposition-design
 implementation task: tty-function-decomposition-implementation
+corrective design task: tty-model-validation-design-correction
 ```
 
 Grant design #139 and implementation #140 are independently reviewed and
@@ -271,7 +277,7 @@ model reference -> no operation/protocol/I/O/root/validation owner
 model I/O -> reference
 model protocol -> common, I/O
 model operations -> common, reference, I/O, protocol
-model validation -> common
+model validation -> common, reference
 model root -> common, reference, I/O, protocol, operations, validation
 
 handoff fixture -> existing bounded production substrate only
@@ -283,6 +289,13 @@ control fixture -> original production adapter under test
 control observation/controller doubles -> non-resetting fixture
 control root -> fixture
 ```
+
+The validation -> reference edge is the narrowly Accepted ADR-0071
+correction, effective only after its separate merge.
+It preserves the original final `reference_output_pending` call after the
+CR/LF comparison. The predicate remains in the reference owner with its
+existing required declaration; it does not call back into validation.
+No other private direction or complete original body changes.
 
 The existing adapter calls externally named doubles; that test wiring does
 not authorize private callbacks from a double into a returned case/helper.

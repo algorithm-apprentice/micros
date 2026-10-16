@@ -409,10 +409,14 @@ The next single maintenance design is Accepted
 It preserves cohesive terminal/UART/control behavior while defining runtime,
 service, model, native-double and generator responsibilities: 26 C owners,
 five private headers/sets, eight consumer operands, 116 moves and eight
-over-limit C/Python dispositions. This phase contains documentation only;
-complete independent design review is clean and implementation remains
-pending until separate merge. These corrections add no runtime node, clock/deadline,
-application startup or shell behavior.
+over-limit C/Python dispositions. Design #141 is independently reviewed and
+merged. Implementation #142 is blocked and abandoned because the original
+complete model validator needs a reference-owner edge omitted by the graph.
+Accepted [ADR-0071](adr/0071-tty-model-validation-reference-dependency.md)
+is the sole active documentation-only corrective design. After its separate
+merge following clean independent design review, implementation restarts from current `main`
+through test-first green slices. These corrections add no runtime node,
+clock/deadline, application startup or shell behavior.
 
 ## v0.1 completion goal
 
