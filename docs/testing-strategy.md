@@ -294,8 +294,26 @@ move/task migrations. Actual original-body/type/CPP-scope and Python module/
 data/CLI expansion, independent context/initializer/jump/ordering fixtures,
 complete native render bytes and descriptor/error precedence are checked.
 Current narrow native and all four renderer-consumer QEMU gates pass.
-The complete current author plan and actual original-producer reuse remain
-separate prerequisites to independent implementation review.
+Complete current author acceptance passed all 47 commands fresh, including
+35 CTests/908 Python cases/all 38 QEMU workflows/four images. Actual bounded
+three-reused/seven-fresh original-full-producer evidence and complete
+independent read-only review are clean. #144 is merged with its identical
+reviewed tree and obsolete branches removed.
+
+The next correction is Accepted
+[ADR-0072](adr/0072-qemu-runner-source-decomposition.md) and its exact
+[runner source contract](architecture/qemu-runner-source-organization.md).
+Design remains documentation only and independent design/correction review
+is clean. After separate design merge,
+implementation must freeze the original runner/file/AST/data, all 85 test
+IDs and fixture bodies, and prove finite actual-source restoration before
+the reviewed code-family source declaration changes. Retain the cohesive
+serial lifecycle, all first errors/outcomes, independent case expectations
+and every real guest/budget. New source-member, bytecode, same-stem package,
+native-extension and foreign-namespace mutations must reject smoke reuse
+before QEMU metadata while all three supported workflows still
+demonstrate actual eligible original-producer reuse. Full current author
+and complete read-only implementation review remain mandatory.
 
 ## Test layers
 
