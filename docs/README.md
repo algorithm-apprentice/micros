@@ -50,8 +50,11 @@ This directory contains the design baseline for `micros`.
   records the completed runtime, service, independent evidence and generator
   owners without changing terminal or device authority.
 - [QEMU runner source organization](architecture/qemu-runner-source-organization.md)
-  defines Accepted report, command, process/serial, CLI, discovery and
-  argument-builder closure boundaries before implementation.
+  records completed report, command, process/serial, CLI, discovery and
+  exact argument-builder source/loader closure boundaries.
+- [Kernel directory layout](architecture/kernel-directory-layout.md)
+  proposes the closed physical kernel hierarchy, unchanged logical owners,
+  private includes, canonical diagnostics and retained validation transport.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
@@ -113,6 +116,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX QEMU runner responsibility baseline](research/minix-qemu-runner-source-organization.md)
   classifies hosted test-driver responsibilities and the existing
   OpenSBI/QEMU validation adaptations.
+- [MINIX kernel directory-layout baseline](research/minix-kernel-directory-layout.md)
+  traces fixed explicit source/architecture/handler/include ownership
+  without importing MINIX's hierarchy or broad private surface.
 - [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
   traces safe-copy mapping authority after VM startup and derives the
   wired-only `micros` handoff replacement.

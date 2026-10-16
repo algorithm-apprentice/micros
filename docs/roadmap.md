@@ -438,9 +438,20 @@ source-family declaration transports the existing closed argument builder;
 no gate, receipt, default-config or cross-HEAD rule is relaxed.
 Complete independent design/correction and acceptance-only reviews are clean.
 Design #145 separately merged as `934faa9` with its exact reviewed tree and
-obsolete branches removed. The fresh implementation is now the single
-active task, beginning with frozen original facts, structural Red and
-independent source/binding/closure fixtures rather than invented policy.
+obsolete branches removed. Implementation #146 is independently reviewed
+and merged as `f524a23`, including the justified direct-script namespace
+correction. Complete current fresh author and actual same-original-producer
+reuse passed; the squash tree equals the reviewed tree, main fast-forwarded
+clean and exact obsolete branches are removed.
+
+The remaining registered maintenance outcome is the kernel directory layout
+in Proposed [ADR-0073](adr/0073-kernel-directory-layout.md) and its
+[exact source contract](architecture/kernel-directory-layout.md).
+Only its documentation-only design is active; implementation remains
+pending a separate clean design review, acceptance and merge. It preserves
+existing logical source owners and evidence while changing physical
+placement, and adds no runtime-DAG node. Production init/shell remains
+the later node Q, not part of this maintenance task.
 
 ## v0.1 completion goal
 

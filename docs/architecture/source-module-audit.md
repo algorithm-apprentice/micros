@@ -318,6 +318,24 @@ No executable artifact belongs to the design.
 
 `tools/check_user_elf.py` and `tests/host/test_check_user_elf.py`.
 
+## Subsequent directory-navigation outcome
+
+The source-decomposition outcomes are complete through independently
+reviewed QEMU implementation #146, merged as `f524a23` with the identical
+reviewed tree and obsolete branches removed. The current kernel directory
+has 373 tracked files (274 C, 99 headers). This is a new closed
+directory-navigation inventory, not a change to the original 118 numeric
+signals or another semantic decomposition.
+
+Proposed [ADR-0073](../adr/0073-kernel-directory-layout.md) and the
+[exact kernel directory contract](kernel-directory-layout.md) define the
+physical hierarchy, include/diagnostic identity and retained-source/build/
+metadata transport without changing accepted task ownership.
+`kernel-directory-layout-design` is the sole active task;
+`kernel-directory-layout-implementation` stays pending and depends on its
+separate review, acceptance and merge. This adds no runtime-DAG node and
+does not develop production init/shell in parallel.
+
 ## Cohesive exceptions
 
 The following files trigger a numeric review signal but currently retain one
