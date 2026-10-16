@@ -671,9 +671,21 @@ Execution-context attachment similarly exposes 33/36-line attached-peer and
 installed-hart conflict passes under a 65-line root. Admission, original
 geometry and context publication remain in the root; the same finite
 raw-byte mechanism has a separate context caller/type/order fixture.
-Nine semantic task dispositions remain pending, including the target entry.
-Only the target scenario unit remains declarations-only; source movement
-alone does not complete the task.
+
+Base validation now has a 57-line root, four 68/92/25/61-line complete
+process/thread/count/hart passes, and five bounded context/free-hart/
+peer-stack/stack-state/current-binding tasks. The root retains its two
+original automatic witnesses, three zero-initialized observed counts,
+policy admission, witness initialization and final closure. Typed pointers
+transport only those actual scalar/witness objects; the raw inverse
+restores nested counters, free-hart `continue`, pairwise bounds, seven-way
+overlap order and exact count-increment positions from current code.
+Independent nested fixtures and actual-source type/predicate/witness/order
+mutants protect the complete original byte hash.
+
+All three portable semantic dispositions are complete. Eight native/target
+dispositions remain pending. Only the target scenario unit remains
+declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

@@ -61,6 +61,57 @@ STACK_CONFLICT_TASKS = {
     "micros_hart_install_trap_stacks": (7, "hart", HART_STACK_PHASES),
     "micros_thread_attach_execution_context": (6, "thread", CONTEXT_STACK_PHASES),
 }
+BASE_VALIDATION_SIGNATURES = {
+    "kernel_object_validation_process_slots_match": (
+        "const struct micros_kernel_objects *objects, size_t *observed_process_count"
+    ),
+    "kernel_object_validation_thread_context_matches": (
+        "const struct micros_kernel_objects *objects, const struct micros_thread *thread, size_t index"
+    ),
+    "kernel_object_validation_thread_slots_match": (
+        "const struct micros_kernel_objects *objects, "
+        "size_t process_thread_counts[MICROS_PROCESS_CAPACITY], size_t *observed_thread_count"
+    ),
+    "kernel_object_validation_process_counts_match": (
+        "const struct micros_kernel_objects *objects, "
+        "const size_t process_thread_counts[MICROS_PROCESS_CAPACITY]"
+    ),
+    "kernel_object_validation_free_hart_is_clear": "const struct micros_hart *hart",
+    "kernel_object_validation_hart_stacks_avoid_peers": (
+        "const struct micros_kernel_objects *objects, const struct micros_hart *hart, size_t index"
+    ),
+    "kernel_object_validation_hart_stack_state_matches": (
+        "const struct micros_kernel_objects *objects, const struct micros_hart *hart, size_t index"
+    ),
+    "kernel_object_validation_current_binding_matches": (
+        "const struct micros_kernel_objects *objects, const struct micros_hart *hart, "
+        "bool current_threads[MICROS_THREAD_CAPACITY]"
+    ),
+    "kernel_object_validation_hart_slots_match": (
+        "const struct micros_kernel_objects *objects, "
+        "bool current_threads[MICROS_THREAD_CAPACITY], size_t *observed_hart_count"
+    ),
+}
+BASE_VALIDATION_PASSES = (
+    (
+        "kernel_object_validation_process_slots_match", ("objects", "&observed_process_count"),
+        "MICROS_PROCESS_CAPACITY", "observed_process_count",
+    ),
+    (
+        "kernel_object_validation_thread_slots_match",
+        ("objects", "process_thread_counts", "&observed_thread_count"),
+        "MICROS_THREAD_CAPACITY", "observed_thread_count",
+    ),
+    (
+        "kernel_object_validation_process_counts_match", ("objects", "process_thread_counts"),
+        "MICROS_PROCESS_CAPACITY", None,
+    ),
+    (
+        "kernel_object_validation_hart_slots_match",
+        ("objects", "current_threads", "&observed_hart_count"),
+        "MICROS_HART_CAPACITY", "observed_hart_count",
+    ),
+)
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
     "kernel/kernel_object_state.c",
@@ -185,7 +236,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
-    (0, "micros_kernel_objects_validate_base"),
     (1, "test_uninitialized_registry_rejects_every_operation"),
     (1, "test_thread_execution_context_lifecycle_is_exact"),
     (1, "test_generation_boundaries_and_quarantine"),
@@ -368,6 +418,7 @@ def original_locations(family, texts=None):
     stack_owners = {
         phase[0]: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for phase in phases
     }
+    stack_owners.update({name: CORE_SOURCES[8] for name in BASE_VALIDATION_SIGNATURES})
     for (path, spelling), record in owned_records(family, texts).items():
         if family == 0 and spelling in stack_owners:
             if path != stack_owners[spelling]:
@@ -522,6 +573,17 @@ def stack_conflict_call_guard(original):
     )
 
 
+def phase_failure_text(body, error):
+    edits = []
+    for match in re.finditer(r"\breturn\b[^;]*;", c_lexical_text(body)):
+        if match.group() != "return false;":
+            raise AssertionError("phase success cannot bypass the remaining original checks")
+        edits.append((match.start(), match.end()))
+    for start, end in reversed(edits):
+        body = body[:start] + "return " + error + ";" + body[end:]
+    return body
+
+
 def stack_conflict_body_text(original, caller, phases):
     _, pointer, specification = STACK_CONFLICT_TASKS[original]
     prefix = "\n    struct micros_" + pointer + " *" + pointer + ";\n    enum micros_kernel_object_error error;\n"
@@ -546,23 +608,133 @@ def stack_conflict_body_text(original, caller, phases):
             or "goto" in tokens(loop)
         ):
             raise AssertionError("one complete original loop retains its bound and independent exit scope")
-        edits = []
-        for match in re.finditer(r"\breturn\b[^;]*;", lexical):
-            if match.group() != "return false;":
-                raise AssertionError("conflict passes cannot succeed before finishing the original loop")
-            edits.append((match.start(), match.end()))
-        for start, end in reversed(edits):
-            loop = loop[:start] + "return MICROS_KERNEL_OBJECT_ERROR_STACK;" + loop[end:]
-        loops.append(loop)
+        loops.append(phase_failure_text(loop, "MICROS_KERNEL_OBJECT_ERROR_STACK"))
     caller = caller.replace(guard, "\n".join(loops), 1)
     return prefix + phases[0][1:len(declaration) + 1] + caller[len(prefix):]
 
 
+def validation_call(name, arguments, indent, error):
+    pad = " " * indent
+    return (
+        pad + "if (!" + name + "(" + ", ".join(arguments) + ")) {\n"
+        + pad + "    return " + error + ";\n" + pad + "}"
+    )
+
+
+def validation_phase_body(body, counter=None, bound=None):
+    prefix = "\n" + ("    size_t " + counter + ";\n\n" if counter else "")
+    success = "\n    return true;\n"
+    if not body.startswith(prefix) or not body.endswith(success):
+        raise AssertionError("validation phase owns only its exact typed counter and terminal success")
+    body = body[len(prefix):-len(success)]
+    if "goto" in tokens(body):
+        raise AssertionError("base validation phases cannot borrow a caller exit label")
+    phase_failure_text(body, "false")
+    if bound is not None:
+        head = "    for (index = 0; index < " + bound + "; ++index) {"
+        lexical = c_lexical_text(body)
+        if (
+            not body.startswith(head)
+            or matching_lexical(lexical, lexical.index("{"), "{", "}") != len(body) - 1
+        ):
+            raise AssertionError("validation pass retains one complete loop with its exact original bound")
+    return body
+
+
+def expand_validation_call(body, name, arguments, indent, fragment, error="false"):
+    guard = validation_call(name, arguments, indent, error)
+    if body.count(guard) != 1:
+        raise AssertionError("validation phases bind original witnesses, counters, order and checked failure")
+    shifted = "".join(" " * (indent - 4) + line if line.strip() else line for line in fragment.splitlines(True))
+    return body.replace(guard, shifted, 1)
+
+
+def restore_counter_declaration(body, predecessor, counter, actual):
+    declaration = "    size_t " + counter + ";\n"
+    if not actual.startswith("\n" + declaration + "\n") or body.count(predecessor) != 1:
+        raise AssertionError("original nested counter is restored only from its verified actual typed declaration")
+    return body.replace(predecessor, predecessor + "    " + actual[1:len(declaration) + 1], 1)
+
+
+def base_validation_body_text(caller, phases):
+    if set(phases) != set(BASE_VALIDATION_SIGNATURES):
+        raise AssertionError("base validation admits exactly its nine named file-local tasks")
+    fragments = {
+        name: validation_phase_body(body, counter) for name, body, counter in (
+            (
+                "kernel_object_validation_thread_context_matches",
+                phases["kernel_object_validation_thread_context_matches"], "other_index",
+            ),
+            ("kernel_object_validation_free_hart_is_clear", phases["kernel_object_validation_free_hart_is_clear"], "priority"),
+            (
+                "kernel_object_validation_hart_stacks_avoid_peers",
+                phases["kernel_object_validation_hart_stacks_avoid_peers"], "other_index",
+            ),
+            (
+                "kernel_object_validation_hart_stack_state_matches",
+                phases["kernel_object_validation_hart_stack_state_matches"], None,
+            ),
+            (
+                "kernel_object_validation_current_binding_matches",
+                phases["kernel_object_validation_current_binding_matches"], None,
+            ),
+        )
+    }
+    stack = "kernel_object_validation_hart_stack_state_matches"
+    peers = "kernel_object_validation_hart_stacks_avoid_peers"
+    fragments[stack] = expand_validation_call(
+        fragments[stack], peers, ("objects", "hart", "index"), 8, fragments[peers],
+    )
+    expanded = []
+    for name, arguments, bound, count in BASE_VALIDATION_PASSES:
+        body = validation_phase_body(phases[name], "index", bound)
+        if name == "kernel_object_validation_thread_slots_match":
+            context = "kernel_object_validation_thread_context_matches"
+            body = expand_validation_call(body, context, ("objects", "thread", "index"), 12, fragments[context])
+            body = restore_counter_declaration(
+                body, "        uint32_t unused_generation;\n", "other_index", phases[context],
+            )
+        elif name == "kernel_object_validation_hart_slots_match":
+            free = "kernel_object_validation_free_hart_is_clear"
+            current = "kernel_object_validation_current_binding_matches"
+            body = expand_validation_call(body, free, ("hart",), 12, fragments[free])
+            body = restore_counter_declaration(body, "        size_t other_index;\n", "priority", phases[free])
+            body = expand_validation_call(body, stack, ("objects", "hart", "index"), 8, fragments[stack])
+            body = expand_validation_call(body, current, ("objects", "hart", "current_threads"), 8, fragments[current])
+        if count is not None:
+            transported = "++(*" + count + ");"
+            if body.count(transported) != 1 or tokens(body).count(count) != 1:
+                raise AssertionError("each observed count is the exact caller-owned original scalar, incremented once")
+            body = body.replace(transported, "++" + count + ";", 1)
+        expanded.append(phase_failure_text(body, "MICROS_KERNEL_OBJECT_ERROR_INVARIANT"))
+    for (name, arguments, _, _), body in zip(BASE_VALIDATION_PASSES, expanded):
+        caller = expand_validation_call(caller, name, arguments, 4, body, "MICROS_KERNEL_OBJECT_ERROR_INVARIANT")
+    return caller
+
+
+def checked_phase_bodies(records, parameters):
+    for name, arguments in parameters.items():
+        record = records[name]
+        if record.guards or tokens(record.signature) != tokens("static bool " + name + "(" + arguments + ")"):
+            raise AssertionError("actual file-local phases retain their complete admitted parameter types and guards")
+    return {name: records[name].body for name in parameters}
+
+
 def core_body_text(original, record, texts=None):
     if original in STACK_CONFLICT_TASKS and (0, original) not in FUNCTION_TASK_MIGRATION:
-        index, _, phases = STACK_CONFLICT_TASKS[original]
+        index, pointer, phases = STACK_CONFLICT_TASKS[original]
         owner = function_records(source(CORE_SOURCES[index]) if texts is None else texts[CORE_SOURCES[index]])
-        return stack_conflict_body_text(original, record.body, [owner[name].body for name, _, _ in phases])
+        parameters = {
+            name: "const struct micros_kernel_objects *objects" + "".join(
+                ", const struct micros_" + pointer + " *" + arg if arg == pointer else ", uintptr_t " + arg
+                for arg in arguments[1:]
+            ) for name, arguments, _ in phases
+        }
+        bodies = checked_phase_bodies(owner, parameters)
+        return stack_conflict_body_text(original, record.body, [bodies[name] for name, _, _ in phases])
+    if original == "micros_kernel_objects_validate_base" and (0, original) not in FUNCTION_TASK_MIGRATION:
+        owner = function_records(source(CORE_SOURCES[8]) if texts is None else texts[CORE_SOURCES[8]])
+        return base_validation_body_text(record.body, checked_phase_bodies(owner, BASE_VALIDATION_SIGNATURES))
     return record.body
 
 
@@ -809,6 +981,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         final.update({
             name: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for name, _, _ in phases
         })
+        final.update({name: CORE_SOURCES[8] for name in BASE_VALIDATION_SIGNATURES})
         edges = set()
         projected = set()
         exports = set()
@@ -1269,6 +1442,321 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertNotEqual(
             expected, stack_conflict_body_text(original, caller.replace("original_context_copy", "new_copy"), phases),
         )
+
+    def test_base_validation_exposes_typed_passes_and_original_caller_witnesses(self):
+        records = function_records(source(CORE_SOURCES[8]))
+        for name, parameters in BASE_VALIDATION_SIGNATURES.items():
+            with self.subTest(phase=name):
+                self.assertIn(name, set(records))
+                self.assertEqual(
+                    tokens("static bool " + name + "(" + parameters + ")"),
+                    tokens(records[name].signature),
+                )
+                self.assertLessEqual(records[name].lines, 120)
+        root = records["micros_kernel_objects_validate_base"]
+        self.assertLessEqual(root.lines, 120)
+        for declaration in (
+            "size_t process_thread_counts[MICROS_PROCESS_CAPACITY];",
+            "bool current_threads[MICROS_THREAD_CAPACITY];",
+            "size_t observed_process_count = 0;",
+            "size_t observed_thread_count = 0;",
+            "size_t observed_hart_count = 0;",
+        ):
+            self.assertEqual(1, root.body.count(declaration))
+            for name in BASE_VALIDATION_SIGNATURES:
+                if name in records:
+                    self.assertNotIn(declaration, records[name].body)
+
+    def test_base_inverse_preserves_nested_counters_witnesses_continue_and_count_positions(self):
+        caller = """
+    original_header_and_witness_initialization();
+    if (!kernel_object_validation_process_slots_match(objects, &observed_process_count)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+
+    if (!kernel_object_validation_thread_slots_match(objects, process_thread_counts, &observed_thread_count)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+
+    if (!kernel_object_validation_process_counts_match(objects, process_thread_counts)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+
+    if (!kernel_object_validation_hart_slots_match(objects, current_threads, &observed_hart_count)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    original_final_three_counts_and_policy();
+"""
+        phases = {
+            "kernel_object_validation_process_slots_match": """
+    size_t index;
+
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (bad_process(index)) {
+            return false;
+        }
+        ++(*observed_process_count);
+    }
+    return true;
+""",
+            "kernel_object_validation_thread_context_matches": """
+    size_t other_index;
+
+    if (thread->context_attached) {
+        for (other_index = 0; other_index < index; ++other_index) {
+            if (bad_peer(other_index)) {
+                return false;
+            }
+        }
+    } else if (uncleared_context(thread)) {
+        return false;
+    }
+    return true;
+""",
+            "kernel_object_validation_thread_slots_match": """
+    size_t index;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+        uint32_t unused_generation;
+
+        switch (thread->slot_state) {
+        case MICROS_KERNEL_OBJECT_SLOT_LIVE:
+            if (!kernel_object_validation_thread_context_matches(objects, thread, index)) {
+                return false;
+            }
+            ++process_thread_counts[thread->owner.slot];
+            ++(*observed_thread_count);
+            break;
+        default:
+            return false;
+        }
+    }
+    return true;
+""",
+            "kernel_object_validation_process_counts_match": """
+    size_t index;
+
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (wrong_thread_count(process_thread_counts[index])) {
+            return false;
+        }
+    }
+    return true;
+""",
+            "kernel_object_validation_free_hart_is_clear": """
+    size_t priority;
+
+    if (bad_free_hart(hart)) {
+        return false;
+    }
+    for (priority = 0; priority < MICROS_SCHEDULER_PRIORITY_COUNT; ++priority) {
+        if (bad_queue(priority)) {
+            return false;
+        }
+    }
+    return true;
+""",
+            "kernel_object_validation_hart_stacks_avoid_peers": """
+    size_t other_index;
+
+    for (other_index = 0; other_index < index; ++other_index) {
+        if (bad_hart_stack(other_index)) {
+            return false;
+        }
+    }
+    return true;
+""",
+            "kernel_object_validation_hart_stack_state_matches": """
+    if (hart->trap_installed) {
+        if (!kernel_object_validation_hart_stacks_avoid_peers(objects, hart, index)) {
+            return false;
+        }
+    } else if (uncleared_stack(hart)) {
+        return false;
+    }
+    return true;
+""",
+            "kernel_object_validation_current_binding_matches": """
+    if (hart->current_thread.generation != 0) {
+        if (current_threads[hart->current_thread.slot]) {
+            return false;
+        }
+        current_threads[hart->current_thread.slot] = true;
+    }
+    return true;
+""",
+            "kernel_object_validation_hart_slots_match": """
+    size_t index;
+
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+        size_t other_index;
+
+        if (hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_FREE) {
+            if (!kernel_object_validation_free_hart_is_clear(hart)) {
+                return false;
+            }
+            continue;
+        }
+        for (other_index = 0; other_index < index; ++other_index) {
+            if (duplicate_hart(other_index)) {
+                return false;
+            }
+        }
+        if (!kernel_object_validation_hart_stack_state_matches(objects, hart, index)) {
+            return false;
+        }
+        if (!kernel_object_validation_current_binding_matches(objects, hart, current_threads)) {
+            return false;
+        }
+        ++(*observed_hart_count);
+    }
+    return true;
+""",
+        }
+        expected = """
+    original_header_and_witness_initialization();
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (bad_process(index)) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        ++observed_process_count;
+    }
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+        uint32_t unused_generation;
+        size_t other_index;
+
+        switch (thread->slot_state) {
+        case MICROS_KERNEL_OBJECT_SLOT_LIVE:
+            if (thread->context_attached) {
+                for (other_index = 0; other_index < index; ++other_index) {
+                    if (bad_peer(other_index)) {
+                        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                    }
+                }
+            } else if (uncleared_context(thread)) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+            ++process_thread_counts[thread->owner.slot];
+            ++observed_thread_count;
+            break;
+        default:
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+    }
+
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (wrong_thread_count(process_thread_counts[index])) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+    }
+
+    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        const struct micros_hart *hart = &objects->harts[index];
+        size_t other_index;
+        size_t priority;
+
+        if (hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_FREE) {
+            if (bad_free_hart(hart)) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+            for (priority = 0; priority < MICROS_SCHEDULER_PRIORITY_COUNT; ++priority) {
+                if (bad_queue(priority)) {
+                    return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                }
+            }
+            continue;
+        }
+        for (other_index = 0; other_index < index; ++other_index) {
+            if (duplicate_hart(other_index)) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+        }
+        if (hart->trap_installed) {
+            for (other_index = 0; other_index < index; ++other_index) {
+                if (bad_hart_stack(other_index)) {
+                    return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+                }
+            }
+        } else if (uncleared_stack(hart)) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        if (hart->current_thread.generation != 0) {
+            if (current_threads[hart->current_thread.slot]) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+            current_threads[hart->current_thread.slot] = true;
+        }
+        ++observed_hart_count;
+    }
+    original_final_three_counts_and_policy();
+"""
+        self.assertEqual(expected, base_validation_body_text(caller, phases))
+        for changed in (
+            caller.replace("objects, process_thread_counts,", "objects, other_counts,"),
+            caller.replace("&observed_hart_count", "observed_hart_count"),
+            caller.replace("objects, current_threads,", "objects, copied_current_threads,"),
+            caller.replace("return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;", "return MICROS_KERNEL_OBJECT_OK;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                base_validation_body_text(changed, phases)
+        mutations = (
+            ("thread_context_matches", "size_t other_index;", "uint16_t other_index;", True),
+            ("free_hart_is_clear", "size_t priority;", "size_t priority = 0;", True),
+            ("current_binding_matches", "return false;", "return true;", True),
+            ("process_slots_match", "++(*observed_process_count);", "++observed_process_count;", True),
+            ("thread_slots_match", "MICROS_THREAD_CAPACITY", "MICROS_PROCESS_CAPACITY", True),
+            ("hart_stack_state_matches", "(objects, hart, index)", "(objects, hart, other_index)", True),
+            ("current_binding_matches", "] = true;", "] = false;", False),
+            ("hart_slots_match", "            continue;", "            return false;", False),
+            ("thread_context_matches", "other_index < index", "other_index <= index", False),
+            ("thread_slots_match", "++process_thread_counts", "process_thread_counts[0] = 0; ++process_thread_counts", False),
+        )
+        for suffix, before, after, rejects in mutations:
+            name = "kernel_object_validation_" + suffix
+            changed = phases[name].replace(before, after, 1)
+            self.assertNotEqual(phases[name], changed)
+            candidate = {**phases, name: changed}
+            with self.subTest(phase=name, mutation=after):
+                if rejects:
+                    with self.assertRaises(AssertionError):
+                        base_validation_body_text(caller, candidate)
+                else:
+                    self.assertNotEqual(expected, base_validation_body_text(caller, candidate))
+        self.assertNotEqual(
+            expected, base_validation_body_text(caller.replace("final_three_counts_and_policy", "weakened_final"), phases),
+        )
+
+    def test_actual_base_inverse_rejects_changed_types_predicates_witnesses_and_peer_order(self):
+        current = {path: source(path) for path in CORE_SOURCES}
+        path = CORE_SOURCES[8]
+        text = current[path]
+        self.assertEqual(BASE_CORE_DIGEST, digest_bytes(restored_kernel_objects_source(current).encode()))
+        for before, after in (
+            ("size_t *observed_process_count", "uint16_t *observed_process_count"),
+            ("const size_t process_thread_counts[MICROS_PROCESS_CAPACITY]", "size_t process_thread_counts[MICROS_PROCESS_CAPACITY]"),
+            ("|| !kernel_object_process_handle_is_valid", "|| kernel_object_process_handle_is_valid"),
+            ("++(*observed_thread_count);", "++(*observed_thread_count); process_thread_counts[0] = 0;"),
+            ("other_index < index", "other_index <= index"),
+            ("current_threads[hart->current_thread.slot] = true;", "current_threads[hart->current_thread.slot] = false;"),
+            ("            continue;", "            return false;"),
+        ):
+            changed = text.replace(before, after, 1)
+            self.assertNotEqual(text, changed)
+            with self.subTest(mutation=after), self.assertRaises(AssertionError):
+                restored_kernel_objects_source({**current, path: changed})
+        peer = function_records(text)["kernel_object_validation_hart_stacks_avoid_peers"].body
+        first_match = re.search(r"other->trap\.primary_stack_bottom,\n +other->trap\.primary_stack_top", peer)
+        second_match = re.search(r"other->trap\.emergency_stack_bottom,\n +other->trap\.emergency_stack_top", peer)
+        self.assertIsNotNone(first_match)
+        self.assertIsNotNone(second_match)
+        first, second = first_match.group(), second_match.group()
+        changed_peer = peer.replace(first, "__first_pair__", 1).replace(second, first, 1).replace("__first_pair__", second, 1)
+        with self.assertRaises(AssertionError):
+            restored_kernel_objects_source({**current, path: text.replace(peer, changed_peer, 1)})
 
 
 if __name__ == "__main__":
