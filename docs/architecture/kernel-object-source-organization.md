@@ -656,9 +656,18 @@ The first semantic slice outlines complete independent comparison into
 original counter types/bounds, first mismatch and one root diagnostic remain
 exact; the one complete combined validator still follows every pass.
 Finite scope-aware reconstruction and independent caller/bound/early-success
-mutants preserve the full original body. Eleven semantic task dispositions
-remain pending, including the target entry. Only the target scenario unit
-remains declarations-only; source movement alone does not complete the task.
+mutants preserve the full original body.
+
+Hart stack installation now exposes 64/38-line other-hart and attached-thread
+conflict passes under a 78-line admission/geometry/publication root. Each
+pass owns its original typed loop counter and preserves first conflict;
+neither publishes state. A finite raw-body inverse from their actual bytes
+restores the original complete source hash, including counter declaration,
+loop formatting, error precedence and the unchanged non-failing stores.
+Independent typed-counter/bound/caller/exit/publication/whitespace fixtures
+exercise that inverse. Ten semantic task dispositions remain pending,
+including the target entry. Only the target scenario unit remains
+declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

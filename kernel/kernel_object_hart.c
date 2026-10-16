@@ -120,53 +120,17 @@ enum micros_kernel_object_error micros_hart_resolve_context(
     return MICROS_KERNEL_OBJECT_ERROR_STALE;
 }
 
-enum micros_kernel_object_error micros_hart_install_trap_stacks(
-    struct micros_kernel_objects *objects,
-    struct micros_hart_handle handle,
+static bool kernel_object_hart_stacks_avoid_harts(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
     uintptr_t primary_stack_bottom,
     uintptr_t primary_stack_top,
     uintptr_t emergency_stack_bottom,
     uintptr_t emergency_stack_top
 )
 {
-    struct micros_hart *hart;
-    enum micros_kernel_object_error error;
     size_t index;
 
-    if (objects == NULL) {
-        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
-    }
-    error = kernel_object_require_initialized(objects);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    error = kernel_object_resolve_hart_mutable(objects, handle, &hart);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    if (hart->trap_installed) {
-        return MICROS_KERNEL_OBJECT_ERROR_STATE;
-    }
-    if (
-        !kernel_object_stack_range_is_valid(
-            primary_stack_bottom,
-            primary_stack_top,
-            MICROS_PRIMARY_TRAP_STACK_MIN_SIZE
-        )
-        || !kernel_object_stack_range_is_valid(
-            emergency_stack_bottom,
-            emergency_stack_top,
-            MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE
-        )
-        || kernel_object_ranges_overlap(
-            primary_stack_bottom,
-            primary_stack_top,
-            emergency_stack_bottom,
-            emergency_stack_top
-        )
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_STACK;
-    }
     for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
         const struct micros_hart *other = &objects->harts[index];
 
@@ -215,9 +179,22 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
                 other->trap.emergency_stack_top
             )
         ) {
-            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+            return false;
         }
     }
+    return true;
+}
+
+static bool kernel_object_hart_stacks_avoid_threads(
+    const struct micros_kernel_objects *objects,
+    uintptr_t primary_stack_bottom,
+    uintptr_t primary_stack_top,
+    uintptr_t emergency_stack_bottom,
+    uintptr_t emergency_stack_top
+)
+{
+    size_t index;
+
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *thread = &objects->threads[index];
 
@@ -241,8 +218,76 @@ enum micros_kernel_object_error micros_hart_install_trap_stacks(
                 thread->kernel_stack_top
             )
         ) {
-            return MICROS_KERNEL_OBJECT_ERROR_STACK;
+            return false;
         }
+    }
+    return true;
+}
+
+enum micros_kernel_object_error micros_hart_install_trap_stacks(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle handle,
+    uintptr_t primary_stack_bottom,
+    uintptr_t primary_stack_top,
+    uintptr_t emergency_stack_bottom,
+    uintptr_t emergency_stack_top
+)
+{
+    struct micros_hart *hart;
+    enum micros_kernel_object_error error;
+
+    if (objects == NULL) {
+        return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+    }
+    error = kernel_object_require_initialized(objects);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    error = kernel_object_resolve_hart_mutable(objects, handle, &hart);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (hart->trap_installed) {
+        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    }
+    if (
+        !kernel_object_stack_range_is_valid(
+            primary_stack_bottom,
+            primary_stack_top,
+            MICROS_PRIMARY_TRAP_STACK_MIN_SIZE
+        )
+        || !kernel_object_stack_range_is_valid(
+            emergency_stack_bottom,
+            emergency_stack_top,
+            MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE
+        )
+        || kernel_object_ranges_overlap(
+            primary_stack_bottom,
+            primary_stack_top,
+            emergency_stack_bottom,
+            emergency_stack_top
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STACK;
+    }
+    if (
+        !kernel_object_hart_stacks_avoid_harts(
+            objects,
+            hart,
+            primary_stack_bottom,
+            primary_stack_top,
+            emergency_stack_bottom,
+            emergency_stack_top
+        )
+        || !kernel_object_hart_stacks_avoid_threads(
+            objects,
+            primary_stack_bottom,
+            primary_stack_top,
+            emergency_stack_bottom,
+            emergency_stack_top
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STACK;
     }
 
     hart->trap.primary_stack_top = primary_stack_top;
