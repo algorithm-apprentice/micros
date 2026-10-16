@@ -88,4 +88,4 @@ to make the project appear more consistent than it was.
 | [0070](0070-tty-function-and-evidence-decomposition.md) | TTY function and evidence decomposition | Accepted |
 | [0071](0071-tty-model-validation-reference-dependency.md) | TTY model validation reference dependency | Accepted |
 | [0072](0072-qemu-runner-source-decomposition.md) | QEMU runner source decomposition | Accepted |
-| [0073](0073-kernel-directory-layout.md) | Kernel directory layout | Proposed |
+| [0073](0073-kernel-directory-layout.md) | Kernel directory layout | Accepted |

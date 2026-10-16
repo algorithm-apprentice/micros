@@ -323,7 +323,7 @@ workflows/four images, plus actual same-original-full-producer bounded
 reuse. Its reviewed squash tree and obsolete-branch cleanup are verified;
 those pre-squash receipts are historical on the new main.
 
-The next directory-only design is Proposed
+The next directory-only design is Accepted
 [ADR-0073](adr/0073-kernel-directory-layout.md), with its
 [exact kernel directory contract](architecture/kernel-directory-layout.md).
 It preserves the existing executions while defining a closed 373-file

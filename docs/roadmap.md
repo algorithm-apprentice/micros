@@ -445,11 +445,11 @@ reuse passed; the squash tree equals the reviewed tree, main fast-forwarded
 clean and exact obsolete branches are removed.
 
 The remaining registered maintenance outcome is the kernel directory layout
-in Proposed [ADR-0073](adr/0073-kernel-directory-layout.md) and its
+in Accepted [ADR-0073](adr/0073-kernel-directory-layout.md) and its
 [exact source contract](architecture/kernel-directory-layout.md).
-Only its documentation-only design is active; implementation remains
-pending a separate clean design review, acceptance and merge. It preserves
-existing logical source owners and evidence while changing physical
+Complete independent design review is clean. Only its documentation-only
+design remains active through separate merge; implementation stays pending.
+It preserves existing logical source owners and evidence while changing physical
 placement, and adds no runtime-DAG node. Production init/shell remains
 the later node Q, not part of this maintenance task.
 

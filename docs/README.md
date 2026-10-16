@@ -53,7 +53,7 @@ This directory contains the design baseline for `micros`.
   records completed report, command, process/serial, CLI, discovery and
   exact argument-builder source/loader closure boundaries.
 - [Kernel directory layout](architecture/kernel-directory-layout.md)
-  proposes the closed physical kernel hierarchy, unchanged logical owners,
+  defines the Accepted closed physical hierarchy, unchanged logical owners,
   private includes, canonical diagnostics and retained validation transport.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,

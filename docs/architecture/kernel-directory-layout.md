@@ -2,11 +2,12 @@
 
 ## Status, base and outcome
 
-This is the Proposed exact contract for
+This is the Accepted exact contract for
 [ADR-0073](../adr/0073-kernel-directory-layout.md).
-Only `kernel-directory-layout-design` is active. Its paired implementation
-stays pending until independent design review, acceptance and separate
-merge. No implementation artifact belongs to this phase.
+Complete independent read-only design review is clean. Only
+`kernel-directory-layout-design` remains active through its separate merge;
+the paired implementation stays pending until that merge. No
+implementation artifact belongs to this phase.
 
 ```text
 reviewed predecessor: f524a234f7bef07c69f15eba6f388ca5d017625c

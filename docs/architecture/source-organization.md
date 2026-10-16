@@ -209,15 +209,15 @@ The implementation may adjust this move order when required to keep the
 dependency graph acyclic, but it may not change the target ownership or mix
 new VFS behavior into the refactor.
 
-## Kernel directory proposal
+## Kernel directory contract
 
 The completed source owners remain in one flat 373-file kernel directory.
-The separately reviewed design in Proposed
+The separately reviewed design in Accepted
 [ADR-0073](../adr/0073-kernel-directory-layout.md) and its
 [exact directory contract](kernel-directory-layout.md) defines physical
 placement only. It preserves all existing logical authorities, functions,
-private directions, runtime locations and evidence; implementation remains
-pending the design phase barrier.
+private directions, runtime locations and evidence. Complete independent
+design review is clean; implementation stays pending the separate merge.
 
 ## Repository adoption
 

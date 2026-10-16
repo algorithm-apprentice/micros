@@ -1,6 +1,6 @@
 # ADR-0073: Kernel Directory Layout
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-17
 - Refines: ADR-0002, ADR-0025, ADR-0031, ADR-0032, ADR-0033, ADR-0034,
   ADR-0051, ADR-0064, ADR-0065, and ADR-0072
@@ -144,3 +144,16 @@ new executable/CTest/workflow or production init/shell work.
   bounded compiler metadata instead.
 - Rewrite selection or erase old source oracles: rejected; exact existing
   aliases and finite actual-source inverses preserve stronger evidence.
+
+## Design review disposition
+
+Complete independent read-only review inspected the nine-document proposal,
+relevant Accepted authority, closed current inventory and partition,
+private include/consumer feasibility, canonical compiler diagnostics,
+actual-source/generated/recipe/metadata transport and exact current
+four-command author evidence. It reported: "No significant issues found in
+the reviewed changes. No substantive design issue remains."
+Targeted reproduction: None.
+
+Acceptance records that clean design result, not implementation completion.
+The paired implementation stays pending until this separate design merges.
