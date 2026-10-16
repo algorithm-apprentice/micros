@@ -5,12 +5,15 @@
 This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
 Independent complete read-only design review is clean and design #141 is
-separately merged. Implementation #142 is blocked and abandoned after the
-model graph omission described by Accepted
+separately merged. Original implementation #142 was blocked and abandoned
+after the model graph omission described by Accepted
 [ADR-0071](../adr/0071-tty-model-validation-reference-dependency.md).
-Only that documentation-only corrective design is active; implementation
-must restart from current `main` after its separate merge. Complete
-independent corrective-design review is clean.
+Corrective design #143 is independently reviewed and separately merged as
+`caa7573b89ef7501abf82a1ad89f3237c003a237`; its actual squash tree equals
+the reviewed tree and its obsolete branches are deleted. Implementation
+has restarted test-first on a fresh branch from that current `main`.
+Abandoned patches are reference only, not wholesale cherry-picked or
+accepted as current validation evidence.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
@@ -291,7 +294,7 @@ control root -> fixture
 ```
 
 The validation -> reference edge is the narrowly Accepted ADR-0071
-correction, effective only after its separate merge.
+correction, separately merged as #143.
 It preserves the original final `reference_output_pending` call after the
 CR/LF comparison. The predicate remains in the reference owner with its
 existing required declaration; it does not call back into validation.
@@ -517,3 +520,56 @@ ownership, readiness, deadline, timer, interrupt, model, topology or output
 change. No new public contract, allocation, concurrency, recovery, worker,
 retry loop, rollback, generalized framework, path migration, QEMU tooling,
 production application startup or shell work is included.
+
+## Current implementation progress
+
+Draft implementation #144 restarts from merged corrective design #143.
+Each narrow slice reproduces structural Red and independent scope/type/
+binding/initializer/ordering fixtures before source rewriting. Abandoned
+#142 patches are reference only; its historical results are not current
+acceptance evidence.
+
+All 116 original moves and eight required dispositions are complete. Both
+migration collections are literal empty tuples. All 26 C owners are real:
+175 definitions, maximum 118 physical lines per function and sixteen
+definitions per owner. The generator's four functions are also bounded.
+
+| Original disposition | Current root | Actual ordered phases |
+| --- | ---: | --- |
+| Live binding | 89 | Prepared/active predicate phase: 40 lines. |
+| Real UART component | 31 | Five void hardware phases, maximum 54; all reports, flushes, shutdown and reset-return panic remain in root. |
+| Write submission | 106 | Original accepted ID/completion/reply/effects publication: 29. |
+| Model validation | 117 | Resident input/echo/write comparisons: 60; original request/CR-LF/final reference observations remain in root. |
+| Device classification | 79 | Exact original exclusion/physical/managed/out-of-phase observations: 79. |
+| Native runtime lifecycle | 50 | Six phases for seeding, initial authority, begin/map, release/commit, claim/ready and completion/corruption/panic; maximum 77. |
+| Native syscall authority | 78 | Original ordered foreign-thread/free-thread/profile/manifest rejections: 70. |
+| Python renderer | 91 | One exact original manifest/report append statement: 118. |
+
+The runtime's two original objects and native five/twenty-object fixtures
+remain three separate sole-owner families with three non-resetting getters.
+All ordinary context transport preserves complete original types, actual
+enclosing-object pointers, exact initializers and lifetime. Both jump
+targets remain in their actual case roots; callbacks retain the static
+buffer, armed flags and abort fallbacks. The model remains one automatic
+object with original callbacks, self-pointers, draw count and
+`seed=0x4d4943524f535454 steps=8194 trace=0xd962296c803b3115`.
+
+Actual source expansion reconstructs all 156 complete original C bodies and
+seven whole-family signature sets, all three original Python function ASTs
+and the complete original module/data/CLI. All 37 retained artifacts and
+the shared C inspector remain exact. A newly frozen native render vector is
+271,768 UTF-8 bytes with SHA-256
+`0c3cc187b1affd99259d2eae58a546e38949568ad236e371a31095205cd1f0b9`;
+descriptor and first-error precedence have direct native evidence.
+
+The once-only five-set/eight-operand recipe delta still restores the
+complete original `4e370ba5...` recipe before the sole current digest
+`730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab`.
+Five family aliases and one host-only structural input preserve all four
+validation dimensions and prior source/recipe/planner expected values.
+
+Narrow current source, generator and native evidence, including all four
+actual TTY/RAMFS/VFS/ELF renderer consumers, passes. Complete current fresh
+author acceptance, actual same-original-
+producer bounded reuse and independent implementation review remain final
+barriers; source completion alone is not merge or v0.1 completion.

@@ -284,10 +284,18 @@ Implementation #142 exposed the model validator's existing final dependency
 on `reference_output_pending`, omitted by the private graph. Its structural
 failure blocks implementation despite unchanged native behavior. Accepted
 [ADR-0071](adr/0071-tty-model-validation-reference-dependency.md) corrects
-only that necessary acyclic edge; independent design review is clean. After
-separate merge, restart from current `main` and prove the exact final
+only that necessary acyclic edge; independent design review is clean and
+its separate #143 merge is complete. Restart from current `main` and prove the exact final
 comparison, all other owner directions and the original model identity.
 Historical abandoned-candidate results do not satisfy restarted acceptance.
+
+The restarted #144 source outcome has all 26 real C owners and literal-empty
+move/task migrations. Actual original-body/type/CPP-scope and Python module/
+data/CLI expansion, independent context/initializer/jump/ordering fixtures,
+complete native render bytes and descriptor/error precedence are checked.
+Current narrow native and all four renderer-consumer QEMU gates pass.
+The complete current author plan and actual original-producer reuse remain
+separate prerequisites to independent implementation review.
 
 ## Test layers
 

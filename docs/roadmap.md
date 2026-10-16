@@ -413,10 +413,19 @@ over-limit C/Python dispositions. Design #141 is independently reviewed and
 merged. Implementation #142 is blocked and abandoned because the original
 complete model validator needs a reference-owner edge omitted by the graph.
 Accepted [ADR-0071](adr/0071-tty-model-validation-reference-dependency.md)
-is the sole active documentation-only corrective design. After its separate
-merge following clean independent design review, implementation restarts from current `main`
-through test-first green slices. These corrections add no runtime node,
+has independently passed complete and acceptance-only design review and
+separately merged as #143 with identical reviewed tree. Implementation has
+restarted from that current `main` through test-first green slices; abandoned
+results remain historical rather than current evidence.
+These corrections add no runtime node,
 clock/deadline, application startup or shell behavior.
+
+Draft implementation #144 now completes all 26 real TTY source owners,
+116 original moves and eight required dispositions under immutable
+body/type/data facts. Both migrations are literal empty and all current
+C/renderer functions are at most 118 physical lines. Complete current
+fresh author, actual bounded reuse and independent implementation review
+are still required before merge; this is not v0.1 completion.
 
 ## v0.1 completion goal
 

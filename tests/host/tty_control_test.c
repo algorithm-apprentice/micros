@@ -176,6 +176,88 @@ static bool test_complete_shape_rejection(void)
     return true;
 }
 
+struct tty_control_authority_case {
+    struct micros_tty_handoff_runtime_state state;
+    struct micros_bootstrap_binding binding;
+    struct micros_bootstrap_manifest_entry entry;
+    struct micros_syscall_context context;
+    struct micros_process caller_process;
+    struct micros_thread caller_thread;
+    struct micros_endpoint_record endpoint;
+    struct micros_privilege_profile profile;
+};
+
+static bool tty_control_test_check_authority_rejections(
+    struct tty_control_authority_case *work,
+    const struct micros_thread_handle thread_handle
+)
+{
+    work->context.current.slot += 1;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_classify(
+            &work->state,
+            1,
+            MICROS_TTY_SERVICE_ID,
+            &work->binding,
+            &work->entry,
+            &work->context,
+            &work->caller_process,
+            &work->caller_thread,
+            &work->endpoint,
+            &work->profile
+        ) == MICROS_TTY_CONTROL_AUTHORITY_UNAUTHORIZED
+    );
+    work->context.current = thread_handle;
+    work->caller_thread.slot_state = MICROS_KERNEL_OBJECT_SLOT_FREE;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_classify(
+            &work->state,
+            1,
+            MICROS_TTY_SERVICE_ID,
+            &work->binding,
+            &work->entry,
+            &work->context,
+            &work->caller_process,
+            &work->caller_thread,
+            &work->endpoint,
+            &work->profile
+        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
+    );
+    work->caller_thread.slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
+    work->profile.kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_classify(
+            &work->state,
+            1,
+            MICROS_TTY_SERVICE_ID,
+            &work->binding,
+            &work->entry,
+            &work->context,
+            &work->caller_process,
+            &work->caller_thread,
+            &work->endpoint,
+            &work->profile
+        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
+    );
+    work->profile.kernel_operations = MICROS_KERNEL_OPERATION_TTY_CONTROL;
+    work->entry.irq_source -= 1;
+    EXPECT_TRUE(
+        micros_tty_control_syscall_authority_classify(
+            &work->state,
+            1,
+            MICROS_TTY_SERVICE_ID,
+            &work->binding,
+            &work->entry,
+            &work->context,
+            &work->caller_process,
+            &work->caller_thread,
+            &work->endpoint,
+            &work->profile
+        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
+    );
+    return true;
+}
+
 static bool test_syscall_authority(void)
 {
     const struct micros_process_handle process = {3, 7};
@@ -183,7 +265,9 @@ static bool test_syscall_authority(void)
     const micros_endpoint_t endpoint_value =
         (process.generation << MICROS_ENDPOINT_SLOT_BITS)
         | process.slot;
-    struct micros_tty_handoff_runtime_state state = {
+    struct tty_control_authority_case work;
+
+    work.state = (struct micros_tty_handoff_runtime_state){
         .service_id = MICROS_TTY_SERVICE_ID,
         .endpoint = endpoint_value,
         .image_id = 104,
@@ -192,7 +276,7 @@ static bool test_syscall_authority(void)
         .thread = thread_handle,
         .root_physical_address = UINT64_C(0x80200000),
     };
-    struct micros_bootstrap_binding binding = {
+    work.binding = (struct micros_bootstrap_binding){
         .manifest_index = 0,
         .service_id = MICROS_TTY_SERVICE_ID,
         .process = process,
@@ -200,7 +284,7 @@ static bool test_syscall_authority(void)
         .root = UINT64_C(0x80200000),
         .endpoint = endpoint_value,
     };
-    struct micros_bootstrap_manifest_entry entry = {
+    work.entry = (struct micros_bootstrap_manifest_entry){
         .service_id = MICROS_TTY_SERVICE_ID,
         .image_id = 104,
         .process_slot = MICROS_TTY_PROCESS_SLOT,
@@ -210,110 +294,47 @@ static bool test_syscall_authority(void)
         .device_length = MICROS_TTY_UART_MAPPED_LENGTH,
         .irq_source = MICROS_TTY_UART_IRQ_SOURCE,
     };
-    struct micros_syscall_context context = {
+    work.context = (struct micros_syscall_context){
         .current = thread_handle,
         .process = process,
     };
-    struct micros_process caller_process = {
+    work.caller_process = (struct micros_process){
         .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
         .generation = process.generation,
         .address_space_root = UINT64_C(0x80200000),
         .primary_endpoint = endpoint_value,
         .privilege_profile = MICROS_PRIVILEGE_PROFILE_TTY,
     };
-    struct micros_thread caller_thread = {
+    work.caller_thread = (struct micros_thread){
         .slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE,
         .generation = thread_handle.generation,
         .owner = process,
     };
-    struct micros_endpoint_record endpoint = {
+    work.endpoint = (struct micros_endpoint_record){
         .state = MICROS_ENDPOINT_STATE_ACTIVE,
         .owner = process,
         .value = endpoint_value,
     };
-    struct micros_privilege_profile profile = {
+    work.profile = (struct micros_privilege_profile){
         .id = MICROS_PRIVILEGE_PROFILE_TTY,
         .kernel_operations = MICROS_KERNEL_OPERATION_TTY_CONTROL,
     };
 
     EXPECT_TRUE(
         micros_tty_control_syscall_authority_classify(
-            &state,
+            &work.state,
             1,
             MICROS_TTY_SERVICE_ID,
-            &binding,
-            &entry,
-            &context,
-            &caller_process,
-            &caller_thread,
-            &endpoint,
-            &profile
+            &work.binding,
+            &work.entry,
+            &work.context,
+            &work.caller_process,
+            &work.caller_thread,
+            &work.endpoint,
+            &work.profile
         ) == MICROS_TTY_CONTROL_AUTHORITY_AUTHORIZED
     );
-    context.current.slot += 1;
-    EXPECT_TRUE(
-        micros_tty_control_syscall_authority_classify(
-            &state,
-            1,
-            MICROS_TTY_SERVICE_ID,
-            &binding,
-            &entry,
-            &context,
-            &caller_process,
-            &caller_thread,
-            &endpoint,
-            &profile
-        ) == MICROS_TTY_CONTROL_AUTHORITY_UNAUTHORIZED
-    );
-    context.current = thread_handle;
-    caller_thread.slot_state = MICROS_KERNEL_OBJECT_SLOT_FREE;
-    EXPECT_TRUE(
-        micros_tty_control_syscall_authority_classify(
-            &state,
-            1,
-            MICROS_TTY_SERVICE_ID,
-            &binding,
-            &entry,
-            &context,
-            &caller_process,
-            &caller_thread,
-            &endpoint,
-            &profile
-        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
-    );
-    caller_thread.slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
-    profile.kernel_operations = MICROS_KERNEL_OPERATION_PM_CONTROL;
-    EXPECT_TRUE(
-        micros_tty_control_syscall_authority_classify(
-            &state,
-            1,
-            MICROS_TTY_SERVICE_ID,
-            &binding,
-            &entry,
-            &context,
-            &caller_process,
-            &caller_thread,
-            &endpoint,
-            &profile
-        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
-    );
-    profile.kernel_operations = MICROS_KERNEL_OPERATION_TTY_CONTROL;
-    entry.irq_source -= 1;
-    EXPECT_TRUE(
-        micros_tty_control_syscall_authority_classify(
-            &state,
-            1,
-            MICROS_TTY_SERVICE_ID,
-            &binding,
-            &entry,
-            &context,
-            &caller_process,
-            &caller_thread,
-            &endpoint,
-            &profile
-        ) == MICROS_TTY_CONTROL_AUTHORITY_INVARIANT
-    );
-    return true;
+    return tty_control_test_check_authority_rejections(&work, thread_handle);
 }
 
 static bool test_no_console_authority(void)

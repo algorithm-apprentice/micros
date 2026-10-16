@@ -1970,6 +1970,9 @@ def alias_rows():
 
 
 def grant_data_plane_cmake_projection(text):
+    from tests.host.test_tty_source_layout import tty_source_cmake_projection
+
+    text = tty_source_cmake_projection(text)
     blocks = [(name, paths, cmake_commands(text, "set", name)) for name, paths in SOURCE_SETS.items()]
     if not any(found for _, _, found in blocks):
         if any("${" + name + "}" in text for name in SOURCE_SETS):
@@ -1995,7 +1998,10 @@ def restored_cmake(text):
 
 
 def planner_ast_without_grant_paths(text):
+    from tests.host.test_tty_source_layout import tty_planner_projection
+
     tree = ast.parse(text)
+    tree = tty_planner_projection(tree)
     found = set()
     expected = dict(alias_rows())
     for node in tree.body:
