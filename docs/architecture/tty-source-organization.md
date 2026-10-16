@@ -567,3 +567,11 @@ original magic and the acyclic graph are exact. The request byte helper's
 private spelling avoids the retained entry's ELF symbol. Current service,
 model and real TTY gates pass. There are 72 moves, twelve declarations-only
 future C owners and seven semantic dispositions remaining.
+
+The write-publication outline is now reintroduced through its own fresh Red
+and independent order/type/binding/initialization fixtures. All rejection,
+retry, grant and acceptance checks remain in the 106-line root; a 29-line
+void phase performs only original accepted publication, using exactly the
+original three uninitialized caller locals. Current whole-body proofs,
+native service/model and real TTY pass. There are 72 original moves and
+six semantic dispositions remaining.
