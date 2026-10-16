@@ -110,7 +110,7 @@ the next behavior-bearing change to their own subsystem.
 | Kernel bootstrap | 10 | Apply Accepted [ADR-0060](../adr/0060-kernel-bootstrap-source-decomposition.md) and the exact [bootstrap source contract](kernel-bootstrap-source-organization.md) only after design merge: separate manifest/profile validation, preparation and rollback, diagnostics, captured control, boot entry, launcher, fixtures, reference replay and shared descriptor phases without changing behavior. | `kernel-bootstrap-decomposition-design` / `kernel-bootstrap-decomposition-implementation` |
 | Trap and syscall routing | 6 | Apply Accepted [ADR-0061](../adr/0061-trap-and-syscall-source-decomposition.md) and the exact [trap/syscall source contract](trap-syscall-source-organization.md) only after design merge: separate routed context, user/supervisor interrupt, syscall, fault, return, bounded test hooks, and existing runtime evidence while preserving register custody and authority. | `trap-syscall-decomposition-design` / `trap-syscall-decomposition-implementation` |
 | Grant data plane | 7 | Follow Accepted [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md) and the exact [grant data-plane source contract](grant-data-plane-source-organization.md) only after separate design merge: preserve the cohesive registry while exposing range/copy, captured syscall, fixture/reference/model and real target-script tasks. | `grant-data-plane-decomposition-design` / `grant-data-plane-decomposition-implementation` |
-| TTY | 8 | Preserve cohesive portable TTY state ownership while splitting service validation, submit/cancel/collect, console handoff, fixture, and test tasks. | `tty-function-decomposition-design` / `tty-function-decomposition-implementation` |
+| TTY | 8 | Proposed [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md) and the exact [TTY source contract](tty-source-organization.md) separate runtime state/validation/transitions, service request owners, independent evidence and generator phases while preserving cohesive terminal/UART/control state. Implementation stays pending until separate design review and merge. | `tty-function-decomposition-design` / `tty-function-decomposition-implementation` |
 
 ### Tooling correction
 
@@ -276,9 +276,10 @@ structural Red. Its current source outcome has all 22 real owners, 217
 definitions bounded by 115 physical lines, all 65 original moves and all
 nineteen semantic dispositions, with literal-empty migrations and immutable
 original body/type/data inventories. Narrow native/model and real target
-checks are green. Complete current author/reuse acceptance and independent
-implementation review are required before merge; source closure alone is
-not merge acceptance. The implementation pull request records those results.
+checks are green. Complete current 47-command fresh author acceptance,
+actual same-original-producer three-profile reuse and complete independent
+implementation review passed. Implementation #140 is merged with identical
+reviewed squash tree, main fast-forward and exact local/remote branch cleanup.
 
 ### TTY
 
@@ -287,6 +288,15 @@ not merge acceptance. The implementation pull request records those results.
 `tests/host/tty_handoff_test.c`, `tests/host/tty_control_syscall_test.c`,
 `tests/host/tty_control_test.c`, and
 `tools/generate_tty_service_fixture.py`.
+
+At grant-merged base `ac94a211`, these contain 5,803 C lines, 156 C
+definitions, seven long C functions and one 195-line Python renderer.
+Proposed [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md)
+and the [exact TTY contract](tty-source-organization.md) define 26 C owners,
+five private headers/sets, eight consumer operands and 116 original moves.
+The runtime state leaf prevents a facade/validation cycle; existing terminal,
+UART, handoff/control, public ABI and test-double interfaces remain intact.
+This is documentation-only design; its paired implementation stays pending.
 
 ### QEMU runner tooling
 
