@@ -50,7 +50,7 @@ This directory contains the design baseline for `micros`.
   records the completed runtime, service, independent evidence and generator
   owners without changing terminal or device authority.
 - [QEMU runner source organization](architecture/qemu-runner-source-organization.md)
-  proposes exact report, command, process/serial, CLI, discovery and
+  defines Accepted report, command, process/serial, CLI, discovery and
   argument-builder closure boundaries before implementation.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,

@@ -116,7 +116,7 @@ the next behavior-bearing change to their own subsystem.
 
 | Unit | Signal files | Required outcome | Task pair |
 | --- | ---: | --- | --- |
-| QEMU runner tooling | 2 | Proposed [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and the exact [QEMU runner contract](qemu-runner-source-organization.md) define ten production/eight test owners, exact original source/AST/data/CLI and discovery preservation, three bounded outlines and the reviewed source-family closure transport. Only design is active; implementation waits for independent acceptance and separate merge. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
+| QEMU runner tooling | 2 | Accepted [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and the exact [QEMU runner contract](qemu-runner-source-organization.md) define ten production/eight test owners, exact original source/AST/data/CLI and discovery preservation, three bounded outlines and the reviewed source-family closure transport. Complete independent design/correction review is clean; implementation waits for separate design merge. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
 | ELF checker tooling | 2 | Apply Accepted [ADR-0063](../adr/0063-user-elf-checker-source-decomposition.md) and the exact [user ELF checker source contract](user-elf-checker-source-organization.md), after the separately reviewed design merges: separate parsing, structure, service policy, instructions, CLI, fixtures, and case discovery without changing accepted inputs, outputs, or the command interface. | `elf-tooling-decomposition-design` / `elf-tooling-decomposition-implementation` |
 
 The selected ELF tooling correction precedes the application host checker
@@ -309,7 +309,7 @@ actual reviewed squash tree/main fast-forward/branch cleanup are verified.
 At TTY-merged base `34f1048`, these have 2,087 runner lines/46 functions/
 two classes/43 assignments and 2,492 test lines/six classes/85 methods/
 36 fixtures. The three long functions are 217, 330 and 187 lines.
-Proposed [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and its
+Accepted [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and its
 [exact source contract](qemu-runner-source-organization.md) keep command,
 report, process/serial, CLI, discovery and source-closure authority distinct.
 No executable artifact belongs to the design.

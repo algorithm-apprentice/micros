@@ -429,15 +429,15 @@ three-profile reuse passed. It is merged as `34f1048` with identical reviewed
 tree, clean main fast-forward and exact obsolete branch cleanup.
 This is not v0.1 completion.
 
-The next single maintenance task is Proposed
+The next single maintenance task is Accepted
 [ADR-0072](adr/0072-qemu-runner-source-decomposition.md) and the exact
 [QEMU runner source contract](architecture/qemu-runner-source-organization.md).
 It exposes existing outcome/report, argv, process/serial, CLI and host-case
 owners without changing accepted markers, commands or budgets. The exact
 source-family declaration transports the existing closed argument builder;
 no gate, receipt, default-config or cross-HEAD rule is relaxed.
-Only documentation design is active. Implementation stays pending until
-independent review, acceptance and separate design merge.
+Complete independent design/correction review is clean. Only documentation
+design is active; implementation stays pending until separate design merge.
 
 ## v0.1 completion goal
 

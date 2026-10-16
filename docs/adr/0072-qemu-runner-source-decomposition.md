@@ -1,6 +1,6 @@
 # ADR-0072: QEMU Runner Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-16
 - Refines: ADR-0025, ADR-0033, ADR-0034, ADR-0051, ADR-0064, and ADR-0065
 - Supersedes in part: ADR-0065's single-file QEMU argument-builder source
@@ -138,5 +138,12 @@ Initial complete independent read-only review found one substantive loader
 closure omission: same-stem packages or native extensions could shadow
 matching reviewed source. The proposal now rejects those alternatives and
 closes the fixed namespace/source origins before QEMU metadata.
-Updated exact current author evidence and independent correction review
-remain required before acceptance.
+Updated exact current four-command author evidence passed. Complete
+independent correction review reported: "No substantive issue remains in
+the corrected design." It confirmed the bounded source-free admitted-
+interpreter checks close package/native/namespace shadowing before QEMU
+metadata without broadening scope or crossing the implementation barrier.
+Targeted reproduction: None; no validation suites were rerun.
+
+Acceptance records that clean result. The paired implementation remains
+pending until this design separately merges.

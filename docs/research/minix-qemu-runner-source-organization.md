@@ -11,7 +11,7 @@ expansion is copied or executed.
 
 The existing [validation-driver study](minix-validation-driver-baseline.md)
 is the shared ADR-0025 baseline. This narrower study explains responsibility
-boundaries for the Proposed
+boundaries for the Accepted
 [QEMU runner contract](../architecture/qemu-runner-source-organization.md),
 not another kernel/subsystem design.
 

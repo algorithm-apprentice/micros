@@ -2,12 +2,13 @@
 
 ## Status, baseline and phase
 
-This is the Proposed exact contract for
+This is the Accepted exact contract for
 [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md). Only
 `qemu-tooling-decomposition-design` is active.
 `qemu-tooling-decomposition-implementation` remains pending until independent
-design review, acceptance and separate merge. This phase contains documents
-only and adds no runtime-DAG node.
+design review, acceptance and separate merge. Complete independent design
+and correction review is clean; only separate design merge remains before
+implementation. This phase contains documents only and adds no runtime-DAG node.
 
 ```text
 reviewed micros base: 34f1048449c221b014530484bfec4b3c0ab51142
