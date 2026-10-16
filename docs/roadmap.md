@@ -420,6 +420,13 @@ results remain historical rather than current evidence.
 These corrections add no runtime node,
 clock/deadline, application startup or shell behavior.
 
+Draft implementation #144 now completes all 26 real TTY source owners,
+116 original moves and eight required dispositions under immutable
+body/type/data facts. Both migrations are literal empty and all current
+C/renderer functions are at most 118 physical lines. Complete current
+fresh author, actual bounded reuse and independent implementation review
+are still required before merge; this is not v0.1 completion.
+
 ## v0.1 completion goal
 
 The independent validation-efficiency task follows Accepted

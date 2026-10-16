@@ -523,134 +523,53 @@ production application startup or shell work is included.
 
 ## Current implementation progress
 
-The restarted foundation first reproduced structural Red with both byte
-primitives still in the original runtime facade. Independent exact recipe
-and metadata inverse fixtures passed before reintroducing the bounded
-source slice. The immutable reviewed `ac94a211` inventories remain the
-source of all 156 complete bodies/seven signature families, original
-orders/storage, seven long C tasks, three Python ASTs/data, 37 stable
-neighbors, complete recipe and shared/tool facts.
+Draft implementation #144 restarts from merged corrective design #143.
+Each narrow slice reproduces structural Red and independent scope/type/
+binding/initializer/ordering fixtures before source rewriting. Abandoned
+#142 patches are reference only; its historical results are not current
+acceptance evidence.
 
-Only the two complete byte primitives move to the state leaf in this slice;
-the original authoritative objects still remain in the facade. All 26 paths,
-five private headers/source sets and eight consumer operands are wired once,
-with eighteen future C units explicitly declarations-only. Five family
-aliases and one host-only gate input preserve all four validation dimensions.
-The complete recipe inverse restores `4e370ba5...` before the sole current
-digest `730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab`.
+All 116 original moves and eight required dispositions are complete. Both
+migration collections are literal empty tuples. All 26 C owners are real:
+175 definitions, maximum 118 physical lines per function and sixteen
+definitions per owner. The generator's four functions are also bounded.
 
-Current narrow evidence is newly executed: 227 source/tool contract tests,
-all four native TTY consumers with the original model seed/steps/trace,
-and both actual UART and TTY guests pass. There are 114 original moves and
-all eight semantic dispositions remaining. Complete current author/reuse
-and independent implementation review remain final barriers.
+| Original disposition | Current root | Actual ordered phases |
+| --- | ---: | --- |
+| Live binding | 89 | Prepared/active predicate phase: 40 lines. |
+| Real UART component | 31 | Five void hardware phases, maximum 54; all reports, flushes, shutdown and reset-return panic remain in root. |
+| Write submission | 106 | Original accepted ID/completion/reply/effects publication: 29. |
+| Model validation | 117 | Resident input/echo/write comparisons: 60; original request/CR-LF/final reference observations remain in root. |
+| Device classification | 79 | Exact original exclusion/physical/managed/out-of-phase observations: 79. |
+| Native runtime lifecycle | 50 | Six phases for seeding, initial authority, begin/map, release/commit, claim/ready and completion/corruption/panic; maximum 77. |
+| Native syscall authority | 78 | Original ordered foreign-thread/free-thread/profile/manifest rejections: 70. |
+| Python renderer | 91 | One exact original manifest/report append statement: 118. |
 
-The next restarted green slice completes all 27 runtime original moves.
-One state-leaf context owns exactly the original two objects; 26 public
-entries borrow it once, and only two stateful private helpers gain its
-explicit pointer. Pure signatures remain unchanged. All 35 complete original
-bodies/types, acyclic owner directions, native runtime cases and both actual
-UART/TTY guests pass on this candidate. There are 89 original moves and
-eight semantic dispositions remaining.
+The runtime's two original objects and native five/twenty-object fixtures
+remain three separate sole-owner families with three non-resetting getters.
+All ordinary context transport preserves complete original types, actual
+enclosing-object pointers, exact initializers and lifetime. Both jump
+targets remain in their actual case roots; callbacks retain the static
+buffer, armed flags and abort fallbacks. The model remains one automatic
+object with original callbacks, self-pointers, draw count and
+`seed=0x4d4943524f535454 steps=8194 trace=0xd962296c803b3115`.
 
-Live binding now has the original 89-line resolution/selector root and a
-40-line void prepared/active phase. The five original uninitialized locals
-remain caller-owned with exact types; actual original-body restoration and
-independent ordering/binding/lifetime fixtures precede the outline.
-Current native and both real target paths pass. There are 89 moves, sixteen
-declarations-only future C owners and seven semantic dispositions remaining.
+Actual source expansion reconstructs all 156 complete original C bodies and
+seven whole-family signature sets, all three original Python function ASTs
+and the complete original module/data/CLI. All 37 retained artifacts and
+the shared C inspector remain exact. A newly frozen native render vector is
+271,768 UTF-8 bytes with SHA-256
+`0c3cc187b1affd99259d2eae58a546e38949568ad236e371a31095205cd1f0b9`;
+descriptor and first-error precedence have direct native evidence.
 
-All seventeen service moves are now reintroduced through fresh ownership
-Red and independent complete private-signature fixtures. Twenty original
-bodies/types occupy the five stateless owners; ten private exports, one
-original magic and the acyclic graph are exact. The request byte helper's
-private spelling avoids the retained entry's ELF symbol. Current service,
-model and real TTY gates pass. There are 72 moves, twelve declarations-only
-future C owners and seven semantic dispositions remaining.
+The once-only five-set/eight-operand recipe delta still restores the
+complete original `4e370ba5...` recipe before the sole current digest
+`730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab`.
+Five family aliases and one host-only structural input preserve all four
+validation dimensions and prior source/recipe/planner expected values.
 
-The write-publication outline is now reintroduced through its own fresh Red
-and independent order/type/binding/initialization fixtures. All rejection,
-retry, grant and acceptance checks remain in the 106-line root; a 29-line
-void phase performs only original accepted publication, using exactly the
-original three uninitialized caller locals. Current whole-body proofs,
-native service/model and real TTY pass. There are 72 original moves and
-six semantic dispositions remaining.
-
-All 33 model moves now have their seven exact owners. One automatic root,
-its real bus/copy self-pointers and callback bindings, all 38 complete bodies
-and signatures, original types/enums/macro and two readonly common-owner
-endpoint values remain exact. Independent graph fixtures admit only the
-original final reference-output predicate under merged ADR-0071 and reject
-reverse or mutation dependencies. The current native model retains the
-original seed, 8,194 recorded steps and `0xd962296c803b3115` output hash.
-There are 39 original moves, six declarations-only C owners and six
-semantic dispositions remaining.
-
-Model validation now has a 117-line root and a 60-line file-local resident
-input/echo/write comparison phase. Caller work retains the original two
-typed pointer initializers and uninitialized loop index. A plain boolean
-guard propagates failure without adding a second `MODEL_EXPECT` diagnostic;
-production/callback checks precede the phase and original request, CR/LF and
-final reference-output observations follow it. Complete original-body
-restoration and independent scope/order/failure fixtures precede C changes.
-Current model trace is unchanged. There are 39 moves and five semantic
-dispositions remaining.
-
-All seven native handoff moves now have their four exact owners. The fixture
-leaf groups only the original five static objects, with a non-resetting
-getter. Only the three stateful resolver doubles and runtime case borrow it;
-pure doubles and the device case gain no ambient state. All sixteen complete
-original bodies/types and the exact failure macro reconstruct, and actual
-native device/lifecycle/deadline/panic cases pass. There are 32 original
-moves, three declarations-only owners and five semantic dispositions remaining.
-
-Device classification now has a 79-line exact/range root and a 79-line
-terminal exclusion phase. The four original readonly constants remain in
-root and pass by their complete typed values. Only the original authority
-initializer and uninitialized classification occupy caller work; executable,
-alias, foreign, physical-substitution, managed and out-of-phase sentinel
-observations retain their order. Full original-body/type restoration and
-independent fixtures precede the outline; actual native cases pass.
-There are 32 original moves and four semantic dispositions remaining.
-
-The native runtime case now has a 50-line root and six bounded phases:
-record seeding, initial authority, begin/mapping, release/commit,
-claim/readiness and completion/corruption/panic. Four original constants
-remain in root; caller work has exactly eighteen original typed locals and
-eight original initializers, with binding/entry/transition/context pointers
-still addressing their actual enclosing objects. The sole fixture borrow,
-deadline 150, before/after sentinel and every original failure/commit order
-reconstruct from actual source before C publication. All current native
-cases pass. There are 32 original moves and three semantic dispositions left.
-
-All 116 original moves are now complete and the owner migration is a
-literal empty tuple. Captured-control evidence has its four exact owners,
-one original twenty-field static fixture and non-resetting getter. The three
-stateful ordinary helpers receive explicit fixture pointers; the complete
-constructor stays pure, and all existing double signatures remain exact.
-Both `setjmp` sites remain in the actual case roots and both longjmp/armed/
-abort paths remain in their controller doubles. All 38 original bodies and
-types reconstruct; actual native ordering, rejection and panic cases pass.
-The graph gate distinguishes C tags/members from function calls or callback
-bindings, retaining a regression for the shared type/function spelling.
-All 26 C owners are real; three semantic dispositions remain.
-
-Native authority evidence now has a 78-line authorized-tuple root and
-70-line rejection phase. Three original readonly identities remain in root;
-all eight original typed aggregates retain their exact initializers.
-Foreign-thread, free-thread, profile-operation and manifest-source
-corruptions retain their mutation/reset/failure order. Whole-body/type and
-independent initializer/binding/order fixtures precede the outline, and
-actual native operation-14 evidence passes. Only real UART and Python
-renderer semantic dispositions remain.
-
-The real UART component now has a 31-line original reporting/reset root
-and five typed void hardware phases, each at most 54 lines. Eight exact
-original automatic fields retain volatile MMIO type, both initializers,
-saved interrupt-bit observations, the 100,000-attempt claim loop and
-retained-claim/completion/panic chronology. All readonly binding/manifest
-data, masks, fences, reasons, markers and root output/reset-return panic
-remain exact. Independent scope/volatile/binding/bound fixtures and complete
-original-body reconstruction precede C changes. The actual UART/PLIC guest
-passes with its unchanged eight-second budget. All seven original C
-dispositions are complete; only the Python renderer remains.
+Narrow current source, generator and native evidence, including all four
+actual TTY/RAMFS/VFS/ELF renderer consumers, passes. Complete current fresh
+author acceptance, actual same-original-
+producer bounded reuse and independent implementation review remain final
+barriers; source completion alone is not merge or v0.1 completion.

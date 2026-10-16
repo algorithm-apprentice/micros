@@ -154,9 +154,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-FUNCTION_TASK_MIGRATION = (
-    (7, "render_fixture"),
-)
+FUNCTION_TASK_MIGRATION = ()
 RUNTIME_CONTEXT_TAG = "tty_handoff_context"
 RUNTIME_CONTEXT_GETTER = "tty_handoff_context"
 RUNTIME_CONTEXT_FIELDS = (
@@ -356,6 +354,10 @@ UART_PHASES = (
 )
 UART_PARAMETERS = "uintptr_t hart_id, struct uart_console_test_work *work"
 UART_PREFIX_DIGEST = "09e29d522c8d3da34376de686274b2e5a33bd0e3fbe15abed752eea86442c27f"
+GENERATOR_PHASE = "_append_tty_manifest"
+GENERATOR_PARAMETERS = (
+    "output", "total_limit", "vfs_limit", "launcher_limit", "tty_limit", "pm_limit", "vm_limit", "vfs",
+)
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -1147,6 +1149,33 @@ def uart_actual_body_tokens(record, owner=None):
     return uart_body_tokens("{" + record.body + "}", phases, declarations)
 
 
+def generator_module_projection(text):
+    from tests.host.test_ramfs_source_layout import restored_generator
+
+    module = ast.parse(text)
+    phases = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == GENERATOR_PHASE]
+    roots = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "render_fixture"]
+    if len(phases) != 1 or len(roots) != 1 or len(phases[0].body) != 1:
+        raise AssertionError("one exact private manifest append statement belongs to one original renderer")
+    statement = phases[0].body[0]
+    if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
+        raise AssertionError("the manifest phase retains the original single output append")
+    call = statement.value
+    if (
+        not isinstance(call.func, ast.Attribute) or call.func.attr != "extend"
+        or not isinstance(call.func.value, ast.Name) or call.func.value.id != "output"
+        or len(call.args) != 1 or not isinstance(call.args[0], ast.Tuple) or call.keywords
+    ):
+        raise AssertionError("the original complete manifest/report tuple appends to its actual caller output")
+    calls = [
+        node for node in ast.walk(roots[0])
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == GENERATOR_PHASE
+    ]
+    if len(calls) != 1 or not any(isinstance(node, ast.Expr) and node.value is calls[0] for node in roots[0].body):
+        raise AssertionError("the manifest phase has one direct original renderer scope and no duplicate or nested call")
+    return restored_generator(text, {GENERATOR_PHASE: ("void", GENERATOR_PARAMETERS)})
+
+
 def function_references(body, names):
     words = tokens(body)
     return {
@@ -1226,6 +1255,67 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_renderer_has_one_exact_manifest_phase_and_bounded_original_entries(self):
+        module = ast.parse(source(GENERATOR_PATH))
+        functions = {node.name: node for node in module.body if isinstance(node, ast.FunctionDef)}
+        self.assertIn(GENERATOR_PHASE, set(functions))
+        self.assertEqual({*GENERATOR_FUNCTIONS, GENERATOR_PHASE}, set(functions))
+        self.assertEqual(GENERATOR_PARAMETERS, tuple(arg.arg for arg in functions[GENERATOR_PHASE].args.args))
+        for name, node in functions.items():
+            self.assertLessEqual(node.end_lineno - node.lineno + 1, 120, name)
+
+    def test_generator_inverse_preserves_exact_manifest_order_values_report_expression_and_caller_scope(self):
+        original = '''
+REPORT_SYMBOL = "report"
+def render_fixture(launcher_image, vm_image, pm_image, tty_image, vfs_image):
+    launcher_limit = launcher_image["page_count"] + 2
+    output = []
+    output.extend(("header", f"{total_limit}", "VFS", f"{vfs_limit}", "LAUNCHER", f"{launcher_limit}", "TTY", f"{tty_limit}", "PM", f"{pm_limit}", "VM", f"{vm_limit}", f"{vfs['symbols'][REPORT_SYMBOL].value:016x}"))
+    return "\\n".join(output)
+def parse_arguments(argv=None):
+    return original_parser(argv)
+def main(argv=None):
+    return original_main(argv)
+'''
+        outlined = '''
+REPORT_SYMBOL = "report"
+def _append_tty_manifest(output, total_limit, vfs_limit, launcher_limit, tty_limit, pm_limit, vm_limit, vfs):
+    output.extend(("header", f"{total_limit}", "VFS", f"{vfs_limit}", "LAUNCHER", f"{launcher_limit}", "TTY", f"{tty_limit}", "PM", f"{pm_limit}", "VM", f"{vm_limit}", f"{vfs['symbols'][REPORT_SYMBOL].value:016x}"))
+def render_fixture(launcher_image, vm_image, pm_image, tty_image, vfs_image):
+    launcher_limit = launcher_image["page_count"] + 2
+    output = []
+    _append_tty_manifest(output, total_limit, vfs_limit, launcher_limit, tty_limit, pm_limit, vm_limit, vfs)
+    return "\\n".join(output)
+def parse_arguments(argv=None):
+    return original_parser(argv)
+def main(argv=None):
+    return original_main(argv)
+'''
+        expected = ast.dump(ast.parse(original), include_attributes=False)
+        projected = lambda text: ast.dump(generator_module_projection(text), include_attributes=False)
+        self.assertEqual(expected, projected(outlined))
+        for changed in (
+            outlined.replace("    _append_tty_manifest(output,", "    _append_tty_manifest(copied_output,"),
+            outlined.replace("vm_limit, vfs):", "vm_limit, vfs=effect()):"),
+            outlined.replace("def _append_tty_manifest", "@effect()\ndef _append_tty_manifest"),
+            outlined.replace("    output.extend(", "    return\n    output.extend(", 1),
+            outlined.replace("    output.extend(", "    output.append(", 1),
+            outlined.replace(
+                "    _append_tty_manifest(output, total_limit, vfs_limit, launcher_limit, tty_limit, pm_limit, vm_limit, vfs)",
+                "    if condition:\n        _append_tty_manifest(output, total_limit, vfs_limit, launcher_limit, tty_limit, pm_limit, vm_limit, vfs)",
+            ),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                projected(changed)
+        for changed in (
+            outlined.replace('"VFS", f"{vfs_limit}"', '"TTY", f"{tty_limit}"'),
+            outlined.replace(" + 2", " + 1"),
+            outlined.replace("REPORT_SYMBOL].value", "REPORT_SYMBOL].size"),
+            outlined.replace('return "\\n".join(output)', 'return " ".join(output)'),
+            outlined.replace("original_main(argv)", "different_main(argv)"),
+        ):
+            self.assertNotEqual(expected, projected(changed))
+
     def test_real_uart_has_exact_typed_hardware_phases_and_retains_original_root_reporting(self):
         owner = source(FAMILY_PATHS[1][0])
         records = function_records(owner)
@@ -2123,15 +2213,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
         self.assertEqual((), SYMBOL_OWNER_MIGRATION)
-        self.assertEqual(
-            set(REQUIRED_TASKS) - {
-                (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
-                (1, "micros_uart_console_runtime_run_self_test"),
-                (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
-                (6, "test_syscall_authority"),
-            },
-            set(FUNCTION_TASK_MIGRATION),
-        )
+        self.assertEqual((), FUNCTION_TASK_MIGRATION)
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):
         for family, owners in ORIGINAL_FUNCTIONS.items():
@@ -2143,6 +2225,7 @@ class TtySourceLayoutTest(unittest.TestCase):
                 current = 0 if (family, original) in SYMBOL_OWNER_MIGRATION else final
                 with self.subTest(family=family, original=original):
                     self.assertEqual(FAMILY_PATHS[family][current], path)
+                    self.assertEqual((), record.guards)
                     self.assertEqual(BASELINE_BODIES[family][original], original_body_digest(family, record))
                     signatures.append((original, original_signature_tokens(family, original, record)))
             self.assertEqual(BASELINE_SIGNATURES[family], digest_tokens(signatures))
@@ -2156,7 +2239,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(LONG_FUNCTIONS) & set(FUNCTION_TASK_MIGRATION), actual)
 
     def test_original_generator_neighbors_and_shared_inspector_remain_exact(self):
-        generator = ast.parse(source(GENERATOR_PATH))
+        generator = generator_module_projection(source(GENERATOR_PATH))
         self.assertEqual(GENERATOR_AST_DIGEST, digest_bytes(ast.dump(generator, include_attributes=False).encode()))
         functions = {node.name: node for node in generator.body if isinstance(node, ast.FunctionDef)}
         self.assertEqual(set(GENERATOR_FUNCTIONS), set(functions))

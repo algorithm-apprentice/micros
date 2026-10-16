@@ -16,86 +16,10 @@ REPORT_SYMBOL = "micros_tty_service_test_report"
 TTY_UART_VIRTUAL_BASE = 0x000000007FFFE000
 
 
-def render_fixture(
-    launcher_image,
-    vm_image,
-    pm_image,
-    tty_image,
-    vfs_image,
+def _append_tty_manifest(
+    output, total_limit, vfs_limit, launcher_limit, tty_limit, pm_limit,
+    vm_limit, vfs,
 ):
-    launcher = generate_bootstrap_fixture._validated_descriptor(
-        launcher_image,
-        "launcher",
-    )
-    vm = generate_bootstrap_fixture._validated_descriptor(
-        vm_image,
-        "vm",
-    )
-    pm = generate_bootstrap_fixture._validated_descriptor(
-        pm_image,
-        "pm",
-    )
-    tty = generate_bootstrap_fixture._validated_descriptor(
-        tty_image,
-        "tty",
-    )
-    vfs = generate_bootstrap_fixture._validated_descriptor(
-        vfs_image,
-        "vfs",
-    )
-    if vm["vm_boot_info_address"] == 0:
-        raise check_user_elf.ElfFormatError(
-            "VM image has no boot-information object"
-        )
-    if any(
-        descriptor["vm_boot_info_address"] != 0
-        for descriptor in (launcher, pm, tty, vfs)
-    ):
-        raise check_user_elf.ElfFormatError(
-            "non-VM image has VM boot-information metadata"
-        )
-    if REPORT_SYMBOL not in vfs["symbols"]:
-        raise check_user_elf.ElfFormatError(
-            "missing TTY service report symbol"
-        )
-    if tty["image_end"] > TTY_UART_VIRTUAL_BASE:
-        raise check_user_elf.ElfFormatError(
-            "TTY image overlaps its fixed UART mapping"
-        )
-
-    launcher_limit = launcher["page_count"] + 2
-    vm_limit = vm["page_count"] + 1
-    pm_limit = pm["page_count"] + 1
-    tty_limit = tty["page_count"] + 1
-    vfs_limit = vfs["page_count"] + 1
-    total_limit = (
-        launcher_limit
-        + vm_limit
-        + pm_limit
-        + tty_limit
-        + vfs_limit
-    )
-    output = [
-        '#include "kernel/tty_service_test_fixture.h"',
-        "",
-    ]
-    for descriptor in (launcher, vm, pm, tty, vfs):
-        output.extend(
-            generate_bootstrap_fixture._render_segment_bytes(descriptor)
-        )
-    output.extend(
-        (
-            "const struct micros_bootstrap_image",
-            "    micros_tty_service_test_images[",
-            "        MICROS_TTY_HANDOFF_TEST_SERVICE_COUNT",
-            "    ] = {",
-        )
-    )
-    output.extend(generate_bootstrap_fixture._render_image(launcher, 101))
-    output.extend(generate_bootstrap_fixture._render_image(vm, 102))
-    output.extend(generate_bootstrap_fixture._render_image(pm, 103))
-    output.extend(generate_bootstrap_fixture._render_image(tty, 104))
-    output.extend(generate_bootstrap_fixture._render_image(vfs, 105))
     output.extend(
         (
             "};",
@@ -209,6 +133,98 @@ def render_fixture(
             ");",
             "",
         )
+    )
+
+
+def render_fixture(
+    launcher_image,
+    vm_image,
+    pm_image,
+    tty_image,
+    vfs_image,
+):
+    launcher = generate_bootstrap_fixture._validated_descriptor(
+        launcher_image,
+        "launcher",
+    )
+    vm = generate_bootstrap_fixture._validated_descriptor(
+        vm_image,
+        "vm",
+    )
+    pm = generate_bootstrap_fixture._validated_descriptor(
+        pm_image,
+        "pm",
+    )
+    tty = generate_bootstrap_fixture._validated_descriptor(
+        tty_image,
+        "tty",
+    )
+    vfs = generate_bootstrap_fixture._validated_descriptor(
+        vfs_image,
+        "vfs",
+    )
+    if vm["vm_boot_info_address"] == 0:
+        raise check_user_elf.ElfFormatError(
+            "VM image has no boot-information object"
+        )
+    if any(
+        descriptor["vm_boot_info_address"] != 0
+        for descriptor in (launcher, pm, tty, vfs)
+    ):
+        raise check_user_elf.ElfFormatError(
+            "non-VM image has VM boot-information metadata"
+        )
+    if REPORT_SYMBOL not in vfs["symbols"]:
+        raise check_user_elf.ElfFormatError(
+            "missing TTY service report symbol"
+        )
+    if tty["image_end"] > TTY_UART_VIRTUAL_BASE:
+        raise check_user_elf.ElfFormatError(
+            "TTY image overlaps its fixed UART mapping"
+        )
+
+    launcher_limit = launcher["page_count"] + 2
+    vm_limit = vm["page_count"] + 1
+    pm_limit = pm["page_count"] + 1
+    tty_limit = tty["page_count"] + 1
+    vfs_limit = vfs["page_count"] + 1
+    total_limit = (
+        launcher_limit
+        + vm_limit
+        + pm_limit
+        + tty_limit
+        + vfs_limit
+    )
+    output = [
+        '#include "kernel/tty_service_test_fixture.h"',
+        "",
+    ]
+    for descriptor in (launcher, vm, pm, tty, vfs):
+        output.extend(
+            generate_bootstrap_fixture._render_segment_bytes(descriptor)
+        )
+    output.extend(
+        (
+            "const struct micros_bootstrap_image",
+            "    micros_tty_service_test_images[",
+            "        MICROS_TTY_HANDOFF_TEST_SERVICE_COUNT",
+            "    ] = {",
+        )
+    )
+    output.extend(generate_bootstrap_fixture._render_image(launcher, 101))
+    output.extend(generate_bootstrap_fixture._render_image(vm, 102))
+    output.extend(generate_bootstrap_fixture._render_image(pm, 103))
+    output.extend(generate_bootstrap_fixture._render_image(tty, 104))
+    output.extend(generate_bootstrap_fixture._render_image(vfs, 105))
+    _append_tty_manifest(
+        output,
+        total_limit,
+        vfs_limit,
+        launcher_limit,
+        tty_limit,
+        pm_limit,
+        vm_limit,
+        vfs,
     )
     return "\n".join(output)
 
