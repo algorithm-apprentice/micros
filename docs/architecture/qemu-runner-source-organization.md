@@ -427,3 +427,12 @@ source/legacy-case evidence passes 187 checks and both real smoke/panic
 guests with unchanged budgets. Seven future production owners remain
 docstring-only, 44 original functions still reside in the facade, and
 165 original node/method/data moves plus three long dispositions remain.
+
+All seventeen platform-report functions now have their one complete owner,
+with only actual original records/pattern dependencies. Their full original
+bodies/signatures, prerequisite relationships and short-circuits reconstruct
+before current source pins change. Current evidence passes 188 focused
+checks and actual smoke/timer guests at the original eight-second budgets.
+Six future production owners remain docstring-only; 27 original functions
+still reside in the facade. There are 148 original node/method/data moves
+and all three long-function dispositions remaining.
