@@ -29,7 +29,7 @@ RECIPE_DIGESTS = {
     "CMakeLists.txt": "730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
-QEMU_RUNNER_DIGEST = "c2e803436eb6d9150f6a05be6c73b197acbf9dbf1b610becb63fcc118523c69d"
+QEMU_RUNNER_DIGEST = "e5cc208fff305dae0279816fdb9ad45f86b48da4e19cb700fc5dbac3365341c4"
 QEMU_RUNNER_SOURCE_DIGESTS = {
     "tools/run_qemu_smoke.py": QEMU_RUNNER_DIGEST,
     "tools/qemu_smoke_records.py": "c1ddf036528c55ac93dda15522558d37cdd5efb09ed57675f3dea976bb96f8ec",
@@ -38,9 +38,9 @@ QEMU_RUNNER_SOURCE_DIGESTS = {
     "tools/qemu_smoke_faults.py": "72f7d248ebe3884b8987471d387f1903dc5686eea9ac2b853e6e2df961fc3bbe",
     "tools/qemu_smoke_command.py": "cfd4ce156aa945eff9233755c36fa885e61696bad5d8bd4f4537772aba504484",
     "tools/qemu_smoke_execution.py": "62a3146a854f6faea843ac40d6675efc381f8c30b153d95ac7395f4109127493",
-    "tools/qemu_smoke_outcome.py": "8a3dd257e6c6e5753a74c20b78ff156e809921197cad31e6b8135e00aa92f917",
-    "tools/qemu_smoke_arguments.py": "8a3dd257e6c6e5753a74c20b78ff156e809921197cad31e6b8135e00aa92f917",
-    "tools/qemu_smoke_cli.py": "8a3dd257e6c6e5753a74c20b78ff156e809921197cad31e6b8135e00aa92f917",
+    "tools/qemu_smoke_outcome.py": "78639dd9d203c0d93fc189277f16347b82f739e7f5f0e3890423c6bb4068f897",
+    "tools/qemu_smoke_arguments.py": "e66ac296f6ce79fd71bb1ff56704de67d6414456987126b0fd620ff52607af9c",
+    "tools/qemu_smoke_cli.py": "b8646433cd99c534ae9a5d37dff5e0652455e50c60045ed0255f4ce22d5e4019",
 }
 QEMU_LOADER_PROBE = """
 import importlib.machinery as m, json, sys

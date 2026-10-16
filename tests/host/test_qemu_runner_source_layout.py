@@ -1,9 +1,15 @@
 """Source contracts for the independently reviewed QEMU runner correction."""
 
 import ast
+import contextlib
 import hashlib
+import io
+import os
 from pathlib import Path
+import sys
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +76,54 @@ OWNER_PRIVATE_DIRECTIONS = {
     1: set(), 2: {1}, 3: {1, 2}, 4: {1}, 5: set(),
     6: {1}, 7: {1, 2, 3, 4}, 8: set(), 9: {1, 2, 5, 6, 7, 8},
 }
+OUTLINE_PHASES = {
+    "matches_expected_result": (
+        ("_matches_foundation_reports", 2, 9, (
+            "result", "output_lines", "require_fdt_events", "require_fdt_reservations",
+            "require_panic_report", "require_trap_ready", "require_trap_test_report",
+            "require_timer_test_report", "require_frame_allocator_ready", "require_frame_allocator_test_report",
+        ), True),
+        ("_matches_memory_reports", 9, 15, (
+            "result", "require_mmu_ready", "require_mmu_test_report", "require_frame_ownership_ready",
+            "require_frame_ownership_test_report", "require_user_address_space_test_report",
+            "require_user_execution_test_report",
+        ), True),
+        ("_matches_object_reports", 15, 22, (
+            "result", "require_scheduler_test_report", "require_endpoint_test_report", "require_ipc_test_report",
+            "require_scheduler_invalid_context", "require_objects_ready", "require_object_model_test_report",
+            "require_nested_trap_test_report",
+        ), True),
+        ("_matches_fault_reports", 22, 26, (
+            "result", "output_lines", "require_trap_context", "expected_trap_context_sepc",
+            "expected_trap_context_origin", "expected_trap_context_scause", "expected_trap_context_stval",
+            "require_vm_self_fault", "expected_vm_self_fault_sepc", "expected_vm_self_fault_scause",
+            "expected_vm_self_fault_stval", "expected_vm_self_fault_ownership",
+        ), True),
+    ),
+    "parse_arguments": (
+        ("_add_execution_arguments", 1, 14, ("parser",), False),
+        ("_add_platform_report_arguments", 14, 28, ("parser",), False),
+        ("_add_object_report_arguments", 28, 35, ("parser",), False),
+        ("_add_fault_arguments", 35, 46, ("parser",), False),
+        ("_validate_execution_arguments", 48, 58, ("parser", "arguments"), False),
+        ("_validate_fault_arguments", 58, 62, ("parser", "arguments"), False),
+    ),
+}
+OUTLINE_ROOT_PLANS = {
+    "matches_expected_result": (0, 1, *(row[0] for row in OUTLINE_PHASES["matches_expected_result"]), 26),
+    "parse_arguments": (
+        0, *(row[0] for row in OUTLINE_PHASES["parse_arguments"][:4]), 46, 47,
+        *(row[0] for row in OUTLINE_PHASES["parse_arguments"][4:]), 62,
+    ),
+}
+MATCHING_CALL_ARGUMENTS = (
+    "arguments", "result", "outcome", "expected_outcome",
+    "expected_trap_context_sepc", "expected_vm_self_fault_sepc",
+)
+# Frozen from the original 27/63-statement bodies before outlining.
+ORIGINAL_STATEMENT_COUNTS = {"matches_expected_result": 27, "parse_arguments": 63}
+ORIGINAL_STATEMENT_GAPS = {"matches_expected_result": {1: "\n"}, "parse_arguments": {48: "\n"}}
+OUTLINED_FUNCTIONS = {"matches_expected_result", "parse_arguments", "main"}
 
 # Immutable metadata is inserted from the reviewed offline archive before source rewriting.
 ORIGINAL_NODE_LAYOUT = (('Import:0',
@@ -873,11 +927,14 @@ COMPLETED_SOURCE_NODES = {
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[4]),
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[5]),
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[6]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[7]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[8]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[9]),
     *("ClassDef:" + name for name in ORIGINAL_CLASSES),
     *("Assign:" + name for name in ORIGINAL_GLOBAL_NAMES),
 }
 SOURCE_OWNER_MIGRATION = tuple(name for name in INITIAL_SOURCE_OWNER_MIGRATION if name not in COMPLETED_SOURCE_NODES)
-LONG_TASK_MIGRATION = tuple(name for name, _ in ORIGINAL_LONG_FUNCTIONS)
+LONG_TASK_MIGRATION = ()
 
 
 def source(path):
@@ -996,6 +1053,94 @@ def validate_owner_import(owner, node, migrating=None):
             raise AssertionError("cross-owner source bindings keep exact original names and actual single owners")
 
 
+def phase_signature(name, parameters):
+    return ast.parse("def " + name + "(*, " + ", ".join(parameters) + "):\n    pass\n").body[0].args
+
+
+def phase_call(name, parameters, boolean):
+    call = name + "(" + ", ".join(value + "=" + value for value in parameters) + ")"
+    return ast.parse("if not " + call + ":\n    return False\n" if boolean else call).body[0]
+
+
+def restore_phase_function(text, function, phases, plan, count, gaps):
+    nodes = definitions(text)
+    if len(function.body) != len(plan):
+        raise AssertionError("outlined root keeps its exact original statements and phase order")
+    restored = {}
+    by_name = {row[0]: row for row in phases}
+    for statement, entry in zip(function.body, plan):
+        if isinstance(entry, int):
+            restored[entry] = node_source(text, statement)
+            continue
+        name, start, end, parameters, boolean = by_name[entry]
+        helper = nodes.get(name)
+        if (
+            not isinstance(helper, ast.FunctionDef) or helper.decorator_list or helper.returns is not None
+            or ast_digest(helper.args) != ast_digest(phase_signature(name, parameters))
+            or ast_digest(statement) != ast_digest(phase_call(name, parameters, boolean))
+            or len(helper.body) != end - start + int(boolean)
+        ):
+            raise AssertionError("phase keeps exact same-name bindings, scope and continuation: " + name)
+        if boolean and ast_digest(helper.body[-1]) != ast_digest(ast.parse("return True").body[0]):
+            raise AssertionError("boolean phase has only its exact successful continuation")
+        for index, original in enumerate(helper.body[:end - start], start):
+            if index in restored:
+                raise AssertionError("no original statement is duplicated by phase transport")
+            restored[index] = node_source(text, original)
+    if set(restored) != set(range(count)) or any(value.strip() for value in gaps.values()):
+        raise AssertionError("phase inverse covers only complete actual statements and frozen whitespace")
+    lines = text.splitlines(keepends=True)
+    header = "".join(lines[function.lineno - 1:function.body[0].lineno - 1])
+    return header + "".join(gaps.get(index, "") + restored[index] for index in range(count))
+
+
+def restore_main_function(text, function):
+    helper = definitions(text).get("_matches_observed_run")
+    signature = ast.parse(
+        "def _matches_observed_run(" + ", ".join(MATCHING_CALL_ARGUMENTS) + "):\n    pass\n"
+    ).body[0].args
+    if (
+        not isinstance(helper, ast.FunctionDef) or helper.decorator_list or helper.returns is not None
+        or ast_digest(helper.args) != ast_digest(signature)
+        or len(helper.body) != 1 or not isinstance(helper.body[0], ast.Return)
+        or not isinstance(helper.body[0].value, ast.Call)
+        or not isinstance(helper.body[0].value.func, ast.Name)
+        or helper.body[0].value.func.id != "matches_expected_result"
+    ):
+        raise AssertionError("main forwards its one actual matching call through six unchanged local values")
+    assignments = [
+        node for node in ast.walk(function) if isinstance(node, ast.Assign)
+        and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "accepted"
+        and isinstance(node.value, ast.Call)
+    ]
+    expected = ast.parse(
+        "accepted = _matches_observed_run(" + ", ".join(MATCHING_CALL_ARGUMENTS) + ")"
+    ).body[0]
+    if len(assignments) != 1 or ast_digest(assignments[0]) != ast_digest(expected):
+        raise AssertionError("main preserves the acceptance assignment before the original serial gate")
+    actual = node_source(text, helper.body[0]).splitlines(keepends=True)
+    if not actual[0].startswith("    return "):
+        raise AssertionError("matching-call transport keeps ordinary return formatting")
+    expanded = "        accepted = " + actual[0][len("    return "):]
+    expanded += "".join("    " + line for line in actual[1:])
+    original = node_source(text, assignments[0])
+    root = node_source(text, function)
+    if root.count(original) != 1:
+        raise AssertionError("main contains exactly one transported acceptance expression")
+    return root.replace(original, expanded, 1)
+
+
+def restored_function_source(text, function):
+    if function.name not in OUTLINED_FUNCTIONS:
+        return node_source(text, function)
+    if function.name == "main":
+        return restore_main_function(text, function)
+    return restore_phase_function(
+        text, function, OUTLINE_PHASES[function.name], OUTLINE_ROOT_PLANS[function.name],
+        ORIGINAL_STATEMENT_COUNTS[function.name], ORIGINAL_STATEMENT_GAPS[function.name],
+    )
+
+
 def restored_runner_source(text=None, owners=None):
     root_text = source(RUNNER_PATH) if text is None else text
     texts = {RUNNER_PATH: root_text}
@@ -1014,6 +1159,13 @@ def restored_runner_source(text=None, owners=None):
     aliases = facade_alias_bindings(root_text)
     fragments = {}
     bootstraps = 0
+    phase_owners = {
+        row[0]: original_destination("FunctionDef:" + name)
+        for name in OUTLINED_FUNCTIONS if name in OUTLINE_PHASES for row in OUTLINE_PHASES[name]
+    }
+    if "main" in OUTLINED_FUNCTIONS:
+        phase_owners["_matches_observed_run"] = PRODUCTION_PATHS[9]
+    observed_phases = set()
     for path, current in texts.items():
         module = ast.parse(current)
         for node in module.body:
@@ -1028,7 +1180,13 @@ def restored_runner_source(text=None, owners=None):
                 expected_path = RUNNER_PATH if key in SOURCE_OWNER_MIGRATION else original_destination(key)
                 if path != expected_path or key in fragments:
                     raise AssertionError("actual original node has its exact current single owner: " + key)
-                fragments[key] = (node_source(current, node), ast_digest(node))
+                raw = restored_function_source(current, node) if isinstance(node, ast.FunctionDef) else node_source(current, node)
+                fragments[key] = (raw, ast_digest(ast.parse(raw).body[0]))
+                continue
+            if isinstance(node, ast.FunctionDef) and node.name in phase_owners:
+                if phase_owners[node.name] != path or node.name in observed_phases:
+                    raise AssertionError("each ordinary phase has exactly its original responsibility owner")
+                observed_phases.add(node.name)
                 continue
             if path == RUNNER_PATH and ast_digest(node) == bootstrap:
                 bootstraps += 1
@@ -1046,6 +1204,8 @@ def restored_runner_source(text=None, owners=None):
     moved = {key for key in layout if key.startswith(("FunctionDef:", "ClassDef:", "Assign:")) and key not in SOURCE_OWNER_MIGRATION}
     if set(aliases) != moved or bootstraps != bool(moved):
         raise AssertionError("each moved original has its one exact facade alias/bootstrap and no extra binding")
+    if observed_phases != set(phase_owners):
+        raise AssertionError("all required ordinary phases have real actual definitions")
     root_nodes = ast.parse(root_text).body
     first = root_nodes[0]
     header = "".join(root_text.splitlines(keepends=True)[:first.lineno - 1])
@@ -1134,6 +1294,225 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_argument_registration_keeps_one_parser_option_order_and_environment_defaults(self):
+        import argparse
+        from tools import qemu_smoke_arguments as arguments
+
+        expected = (
+            "-h", "--qemu", "--nm", "--kernel", "--memory", "--expected-frame-allocator-managed-delta",
+            "--marker", "--pattern", "--forbid-marker", "--forbid-pattern", "--ordered-pattern",
+            "--serial-input-trigger", "--serial-input-hex", "--expect", "--require-fdt-events",
+            "--require-fdt-reservations", "--require-panic-report", "--require-trap-ready",
+            "--require-trap-test-report", "--require-timer-test-report", "--require-frame-allocator-ready",
+            "--require-frame-allocator-test-report", "--require-mmu-ready", "--require-mmu-test-report",
+            "--require-frame-ownership-ready", "--require-frame-ownership-test-report",
+            "--require-user-address-space-test-report", "--require-user-execution-test-report",
+            "--require-scheduler-test-report", "--require-endpoint-test-report", "--require-ipc-test-report",
+            "--require-scheduler-invalid-context", "--require-objects-ready", "--require-object-model-test-report",
+            "--require-nested-trap-test-report", "--require-trap-context", "--trap-context-sepc-symbol",
+            "--trap-context-origin", "--trap-context-scause", "--trap-context-stval", "--require-vm-self-fault",
+            "--vm-self-fault-elf", "--vm-self-fault-symbol", "--vm-self-fault-scause", "--vm-self-fault-stval",
+            "--vm-self-fault-ownership", "--timeout",
+        )
+        observed = []
+        original = argparse.ArgumentParser.add_argument
+
+        def record(parser, *names, **keywords):
+            observed.append((id(parser), names[0]))
+            return original(parser, *names, **keywords)
+
+        with mock.patch.dict(os.environ, {"MICROS_QEMU": "/fixture/qemu", "MICROS_NM": "/fixture/nm"}):
+            with mock.patch.object(argparse.ArgumentParser, "add_argument", record):
+                result = arguments.parse_arguments(["--kernel", str(ROOT / "README.md"), "--marker", "BOOT"])
+        self.assertEqual(expected, tuple(name for _, name in observed))
+        self.assertEqual(1, len({identity for identity, _ in observed}))
+        self.assertEqual(("/fixture/qemu", "/fixture/nm", ["128M"], 10.0, None), (
+            result.qemu, result.nm, result.memory, result.timeout, result.serial_input,
+        ))
+        output = io.StringIO()
+        with mock.patch.object(sys, "argv", ["run_qemu_smoke.py"]), contextlib.redirect_stdout(output):
+            with self.assertRaises(SystemExit) as stopped:
+                arguments.parse_arguments(["--help"])
+        self.assertEqual(0, stopped.exception.code)
+        self.assertIn("Run the deterministic micros QEMU boot smoke test.", output.getvalue())
+        self.assertIn("LLVM nm executable used for exact target-symbol checks", " ".join(output.getvalue().split()))
+
+    def test_argument_validation_preserves_original_first_error_order(self):
+        from tools import qemu_smoke_arguments as arguments
+
+        base = ["--kernel", str(ROOT / "README.md"), "--marker", "BOOT"]
+        cases = (
+            (["--timeout", "0", "--marker", ""], "--timeout must be greater than zero"),
+            (["--marker", "", "--memory", ""], "--marker values must not be empty"),
+            (["--memory", "", "--serial-input-trigger", "READY"], "--memory must not be empty"),
+            (["--serial-input-trigger", "READY", "--pattern", "["],
+             "--serial-input-trigger and --serial-input-hex must be provided together"),
+            (["--serial-input-trigger", "READY", "--serial-input-hex", ""], "--serial-input-hex must not be empty"),
+            (["--expected-frame-allocator-managed-delta", "1", "--pattern", "["],
+             "--expected-frame-allocator-managed-delta requires two --memory values and a frame allocator report"),
+            (["--trap-context-origin", "U", "--require-vm-self-fault"],
+             "trap-context field requirements need --require-trap-context"),
+            (["--require-vm-self-fault"], "--require-vm-self-fault needs ELF, symbol, scause, stval, and ownership"),
+        )
+        for extra, error in cases:
+            output = io.StringIO()
+            with self.subTest(extra=extra), mock.patch.object(sys, "argv", ["run_qemu_smoke.py"]):
+                with contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as stopped:
+                    arguments.parse_arguments(base + extra)
+                self.assertEqual(2, stopped.exception.code)
+                self.assertEqual("run_qemu_smoke.py: error: " + error, output.getvalue().splitlines()[-1])
+
+    def test_symbol_boundary_preserves_exact_command_and_failure_diagnostics(self):
+        from tools import qemu_smoke_command as command
+
+        with mock.patch.object(command.subprocess, "run") as run:
+            run.return_value = SimpleNamespace(returncode=0, stdout="0000000080202000 T fault\n", stderr="")
+            self.assertEqual(0x80202000, command.resolve_symbol_address("/fixture/nm", Path("/fixture/elf"), "fault"))
+            run.assert_called_once_with(
+                ["/fixture/nm", "-n", "--defined-only", "/fixture/elf"],
+                stdin=command.subprocess.DEVNULL, stdout=command.subprocess.PIPE, stderr=command.subprocess.PIPE,
+                text=True, check=False,
+            )
+            for diagnostic, expected in (("bad nm\n", "bad nm"), ("", "no diagnostic")):
+                run.return_value = SimpleNamespace(returncode=1, stdout="", stderr=diagnostic)
+                with self.assertRaisesRegex(RuntimeError, "^symbol inspection failed: " + expected + "$"):
+                    command.resolve_symbol_address("/fixture/nm", Path("/fixture/elf"), "fault")
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            command.parse_nm_symbol_address("invalid-address T fault\n00000001 T other\n", "fault")
+
+    def test_serial_short_write_retries_the_original_payload_and_closes_owned_resources(self):
+        from tools import qemu_smoke_execution as execution
+
+        process = mock.Mock()
+        process.poll.side_effect = [None, None, 0, 0]
+        process.returncode = 0
+        process.stdin.write.side_effect = [1, 2]
+        selector = mock.Mock()
+        selector.select.return_value = [(SimpleNamespace(fd=77), 0)]
+        with mock.patch.object(execution.subprocess, "Popen", return_value=process):
+            with mock.patch.object(execution.selectors, "DefaultSelector", return_value=selector):
+                with mock.patch.object(execution.os, "read", side_effect=[b"READY\n", b"X\n", b""]):
+                    with mock.patch.object(execution.time, "monotonic", side_effect=[100, 101, 102, 103]):
+                        result = execution.run_qemu(["/fixture/qemu"], 10, "READY", b"xy")
+        self.assertEqual(("READY\nX\n", 0, False, True), (
+            result.output, result.return_code, result.timed_out, result.serial_input_sent,
+        ))
+        self.assertEqual([mock.call(b"xy"), mock.call(b"xy")], process.stdin.write.call_args_list)
+        self.assertEqual([mock.call(9), mock.call(8), mock.call(7)], selector.select.call_args_list)
+        selector.unregister.assert_called_once_with(process.stdout)
+        selector.close.assert_called_once_with()
+        process.stdin.close.assert_called_once_with()
+        process.stdout.close.assert_called_once_with()
+        process.kill.assert_not_called()
+
+    def test_serial_and_ordinary_timeouts_preserve_kill_drain_decode_and_cleanup(self):
+        from tools import qemu_smoke_execution as execution
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.communicate.return_value = (b"tail\xff", None)
+        process.stdin.close.side_effect = BrokenPipeError
+        selector = mock.Mock()
+        with mock.patch.object(execution.subprocess, "Popen", return_value=process):
+            with mock.patch.object(execution.selectors, "DefaultSelector", return_value=selector):
+                with mock.patch.object(execution.time, "monotonic", side_effect=[100, 111]):
+                    result = execution.run_qemu(["/fixture/qemu"], 10, "READY", b"xy")
+        self.assertEqual(("tail\ufffd", None, True, False), (
+            result.output, result.return_code, result.timed_out, result.serial_input_sent,
+        ))
+        process.kill.assert_called_once_with()
+        process.communicate.assert_called_once_with()
+        process.stdin.close.assert_called_once_with()
+        process.stdout.close.assert_called_once_with()
+        selector.close.assert_called_once_with()
+        selector.select.assert_not_called()
+        with mock.patch.object(
+            execution.subprocess, "run",
+            side_effect=execution.subprocess.TimeoutExpired(["/fixture/qemu"], 10, output=b"partial\xff"),
+        ):
+            result = execution.run_qemu(["/fixture/qemu"], 10)
+        self.assertEqual(("partial\ufffd", None, True, False), (
+            result.output, result.return_code, result.timed_out, result.serial_input_sent,
+        ))
+
+    def test_all_required_long_outlines_have_real_bounded_owners(self):
+        for name, _ in ORIGINAL_LONG_FUNCTIONS:
+            owner = original_destination("FunctionDef:" + name)
+            self.assertIn(name, definitions(source(owner)))
+            self.assertIn(name, OUTLINED_FUNCTIONS)
+        for path in PRODUCTION_PATHS[1:]:
+            for node in definitions(source(path)).values():
+                if isinstance(node, ast.FunctionDef):
+                    self.assertLessEqual(node.end_lineno - node.lineno + 1, 120, path + ":" + node.name)
+
+    def test_actual_outline_mutations_cannot_replace_original_source_oracles(self):
+        owners = {path: source(path) for path in PRODUCTION_PATHS[1:]}
+        for owner, before, after in (
+            (7, "require_mmu_ready=require_mmu_ready", "require_mmu_ready=False"),
+            (7, "or result.return_code != 0", "or result.return_code == 0"),
+            (7, "    return True\n", "    return False\n"),
+            (8, "parser=parser", "parser=arguments"),
+            (8, "parser.error(", "parser.exit("),
+            (9, "arguments, result, outcome, expected_outcome,", "arguments, outcome, result, expected_outcome,"),
+            (9, "markers=arguments.marker", "markers=arguments.forbid_marker"),
+            (9, "def main(argv=None)", "def main(argv=())"),
+        ):
+            path = PRODUCTION_PATHS[owner]
+            self.assertIn(before, owners[path])
+            changed = dict(owners)
+            changed[path] = changed[path].replace(before, after, 1)
+            with self.subTest(owner=path, before=before), self.assertRaises(AssertionError):
+                restored_runner_source(owners=changed)
+
+    def test_phase_inverse_requires_actual_statements_exact_bindings_and_order(self):
+        original = "def root(*, value):\n    if value:\n        return False\n    return True\n"
+        outlined = (
+            "def root(*, value):\n    if not phase(value=value):\n        return False\n    return True\n\n\n"
+            "def phase(*, value):\n    if value:\n        return False\n    return True\n"
+        )
+        phases = (("phase", 0, 1, ("value",), True),)
+        restore = lambda text: restore_phase_function(text, definitions(text)["root"], phases, ("phase", 1), 2, {})
+        self.assertEqual(original, restore(outlined))
+        for changed in (
+            outlined.replace("phase(value=value)", "phase(value=other)"),
+            outlined.replace("phase(*, value)", "phase(*, value=False)"),
+            outlined.replace("if not phase", "if phase"),
+            outlined.replace("        return False\n    return True\n", "        return False\n    return False\n"),
+            outlined.replace("def phase(*, value):\n", "def phase(*, value):\n    effect()\n"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore(changed)
+        self.assertNotEqual(original, restore(outlined.replace("if value:", "if not value:")))
+
+    def test_main_inverse_keeps_actual_call_keywords_and_serial_gate_position(self):
+        parameters = (
+            "arguments, result, outcome, expected_outcome, "
+            "expected_trap_context_sepc, expected_vm_self_fault_sepc"
+        )
+        original = (
+            "def main(argv=None):\n    for memory in arguments.memory:\n"
+            "        accepted = matches_expected_result(result=result, markers=arguments.marker)\n"
+            "        accepted = accepted and result.serial_input_sent\n"
+        )
+        outlined = (
+            "def main(argv=None):\n    for memory in arguments.memory:\n"
+            "        accepted = _matches_observed_run(" + parameters + ")\n"
+            "        accepted = accepted and result.serial_input_sent\n\n\n"
+            "def _matches_observed_run(" + parameters + "):\n"
+            "    return matches_expected_result(result=result, markers=arguments.marker)\n"
+        )
+        restore = lambda text: restore_main_function(text, definitions(text)["main"])
+        self.assertEqual(original, restore(outlined))
+        for changed in (
+            outlined.replace("_matches_observed_run(arguments, result,", "_matches_observed_run(arguments, other,"),
+            outlined.replace("def _matches_observed_run(arguments,", "def _matches_observed_run(other,"),
+            outlined.replace("    return matches_expected_result", "    effect()\n    return matches_expected_result"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore(changed)
+        self.assertNotEqual(original, restore(outlined.replace("markers=arguments.marker", "markers=arguments.pattern")))
+        self.assertNotEqual(original, restore(outlined.replace("accepted and result.serial_input_sent", "result.serial_input_sent")))
+
     def test_bounded_diagnostic_command_and_execution_owners_are_complete(self):
         for owner in (4, 5, 6):
             with self.subTest(owner=PRODUCTION_PATHS[owner]):
@@ -1203,7 +1582,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         self.assertEqual(212, len(INITIAL_SOURCE_OWNER_MIGRATION))
         self.assertEqual(set(INITIAL_SOURCE_OWNER_MIGRATION) - COMPLETED_SOURCE_NODES, set(SOURCE_OWNER_MIGRATION))
         self.assertEqual(3, len(ORIGINAL_LONG_FUNCTIONS))
-        self.assertEqual(3, len(LONG_TASK_MIGRATION))
+        self.assertEqual(set(name for name, _ in ORIGINAL_LONG_FUNCTIONS) - OUTLINED_FUNCTIONS, set(LONG_TASK_MIGRATION))
 
     def test_raw_node_fixture_requires_complete_actual_bytes_ast_and_whitespace_only_transport(self):
         original = "#!/usr/bin/env python3\n\nimport os\n\nVALUE = 7\n\n\ndef original(value):\n    return value + VALUE\n"

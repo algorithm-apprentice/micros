@@ -452,3 +452,14 @@ symbol-resolved trap-panic guest and serial-triggered TTY guest pass with
 unchanged budgets. Only outcome, arguments and CLI remain migration stubs:
 seven original functions, 85 methods and 36 fixtures (128 moves), plus the
 three specified long outlines, remain.
+
+All ten production owners are now real. The ordered report/argument phases
+and single main-call forwarding complete all 46 original moves and all
+three required outlines; the long migration is literal empty. The 57
+production functions are at most 120 lines (acceptance root 113, parser 27,
+main 120). Actual complete old raw/AST/context reconstruction, independent
+binding/order/body mutations, CLI first errors, symbol failures and
+deterministic serial short-write/timeout custody pass in 199 focused checks.
+Real two-memory allocator growth and sealed VM-fault guests also pass.
+Only the original 85 methods and 36 fixtures (121 moves), planner wiring and
+final full/reuse/review acceptance remain.
