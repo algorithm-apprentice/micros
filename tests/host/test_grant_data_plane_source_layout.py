@@ -76,6 +76,25 @@ VALIDATION_PARAMETERS = (
     "struct grant_copy_validation *work, const struct micros_endpoint_registry *endpoint_registry, "
     "const struct micros_kernel_objects *objects, size_t length, uint32_t required_permission"
 )
+SYSCALL_WORK_TAG = "grant_syscall_execution"
+SYSCALL_DISPATCH_PHASE = "grant_syscall_execute_request"
+SYSCALL_CREATE_PHASE = "grant_syscall_create_request"
+SYSCALL_PHASE_PARAMETERS = (
+    "struct micros_hart *hart, struct micros_trap_frame *frame, const struct micros_syscall_context *context, "
+    "struct grant_syscall_execution *work"
+)
+SYSCALL_FIELDS = (
+    ("struct micros_grant_registry *grant_registry;", False),
+    ("struct micros_endpoint_registry *endpoint_registry;", False),
+    ("struct micros_grant_create_plan create_plan;", False),
+    ("struct micros_grant_syscall_request request;", False),
+    ("struct micros_tty_device_authority device_authority;", False),
+    ("micros_grant_t created;", "value"),
+    ("enum micros_syscall_abi_result decode_result;", False),
+    ("enum micros_grant_error error;", False),
+    ("enum micros_tty_device_authority_status device_status;", False),
+    ("uint64_t abi_result;", False),
+)
 COPY_EXECUTION_FIELDS = (
     ("const struct micros_frame_ownership *ledger;", False),
     ("struct micros_grant_copy_authority authority;", False),
@@ -175,7 +194,6 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if item not in ((0, "map_address_error"), (0, "plan_range"))
 )
 FUNCTION_TASK_MIGRATION = (
-    (1, "micros_grant_handle_captured_user_ecall"),
     (2, "micros_grant_runtime_run_self_test"),
     (3, "arm_command"),
     (3, "transition_after_return"),
@@ -468,6 +486,10 @@ def original_locations(family, texts=None):
             if path != COPY_SOURCES[1]:
                 raise AssertionError("the device-span phase has only its original range owner")
             continue
+        if family == 1 and spelling in (SYSCALL_DISPATCH_PHASE, SYSCALL_CREATE_PHASE):
+            if path != FAMILY_PATHS[1][0]:
+                raise AssertionError("captured syscall phases remain in their exact file-local adapter")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -496,6 +518,8 @@ def original_body_digest(family, original, record):
         body = range_device_actual_body_tokens(record)
     if family == 0 and original == "micros_grant_validate_range" and (0, original) not in FUNCTION_TASK_MIGRATION:
         body = validation_actual_body_tokens(record)
+    if family == 1 and original == "micros_grant_handle_captured_user_ecall" and (1, original) not in FUNCTION_TASK_MIGRATION:
+        body = syscall_actual_body_tokens(record)
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
@@ -601,14 +625,18 @@ def restore_automatic_work_tokens(body, tag, fields, declarations):
             initializers.extend(actual)
             continue
         name = actual[-2]
-        cast = ["(", *actual[:-2], ")"]
         if restored[1:3] != [name, "="]:
             raise AssertionError("only original explicit plan initializers execute, in original order")
         end = restored.index(";", 3)
         value = restored[3:end]
-        if value[:len(cast) + 1] != cast + ["{"]:
-            raise AssertionError("plan initializer retains its exact original aggregate type")
-        initializers.extend((*actual[:-1], "=", *value[len(cast):], ";"))
+        if initialized is True:
+            cast = ["(", *actual[:-2], ")"]
+            if value[:len(cast) + 1] != cast + ["{"]:
+                raise AssertionError("plan initializer retains its exact original aggregate type")
+            value = value[len(cast):]
+        elif initialized != "value":
+            raise AssertionError("automatic initializer transport is not declared by the original scope")
+        initializers.extend((*actual[:-1], "=", *value, ";"))
         del restored[1:end + 1]
     restored[1:1] = initializers
     return tuple(restored)
@@ -674,6 +702,71 @@ def validation_actual_body_tokens(record, owner=None):
     ):
         raise AssertionError("remote-only planning retains exact complete file-local scalar and state types")
     return validation_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
+
+
+def syscall_body_tokens(caller, dispatch, create, declarations):
+    body = list(tokens(caller))
+    dispatch = list(tokens(dispatch))
+    create = list(tokens(create))
+    if (
+        dispatch[:1] != ["{"] or dispatch[-1:] != ["}"]
+        or create[:1] != ["{"] or create[-1:] != ["}"]
+    ):
+        raise AssertionError("actual captured phases retain complete function scope")
+    create_inner = create[1:-1]
+    if {"break", "continue", "goto", "switch"} & set(create_inner):
+        raise AssertionError("create preparation cannot borrow another switch/loop/caller exit")
+    restored = []
+    index = 0
+    while index < len(create_inner):
+        if create_inner[index] == "return":
+            if create_inner[index:index + 2] != ["return", ";"]:
+                raise AssertionError("create helper preserves only original case exits and caller-owned status")
+            restored.extend(tokens("break;"))
+            index += 2
+        else:
+            restored.append(create_inner[index])
+            index += 1
+    restored.extend(tokens("break;"))
+    dispatch_inner = dispatch[1:-1]
+    if {"return", "continue", "goto"} & set(dispatch_inner):
+        raise AssertionError("dispatch retains its original complete operation switch")
+    branch = list(tokens(
+        "case MICROS_SYSCALL_ABI_GRANT_CREATE: "
+        + SYSCALL_CREATE_PHASE + "(hart, frame, context, work); break;"
+    ))
+    positions = [
+        index for index in range(len(dispatch_inner)) if dispatch_inner[index:index + len(branch)] == branch
+    ]
+    if len(positions) != 1:
+        raise AssertionError("create dispatch binds the exact captured hart/frame/process/work and sole case exit")
+    start = positions[0]
+    dispatch_inner[start:start + len(branch)] = [
+        *tokens("case MICROS_SYSCALL_ABI_GRANT_CREATE:"), *restored,
+    ]
+    call = list(tokens(SYSCALL_DISPATCH_PHASE + "(hart, frame, context, &work);"))
+    positions = [index for index in range(len(body)) if body[index:index + len(call)] == call]
+    if len(positions) != 1:
+        raise AssertionError("captured dispatch binds the exact original runtime context and caller-owned state")
+    start = positions[0]
+    body[start:start + len(call)] = dispatch_inner
+    return restore_automatic_work_tokens(body, SYSCALL_WORK_TAG, SYSCALL_FIELDS, declarations)
+
+
+def syscall_actual_body_tokens(record, owner=None):
+    owner = source(FAMILY_PATHS[1][0]) if owner is None else owner
+    declarations = work_declarations(owner, SYSCALL_WORK_TAG, SYSCALL_FIELDS)
+    records = function_records(owner)
+    for name in (SYSCALL_DISPATCH_PHASE, SYSCALL_CREATE_PHASE):
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens(
+            "static void " + name + "(" + SYSCALL_PHASE_PARAMETERS + ")"
+        ):
+            raise AssertionError("captured private phases retain every complete original pointer/type binding")
+    return syscall_body_tokens(
+        "{" + record.body + "}", "{" + records[SYSCALL_DISPATCH_PHASE].body + "}",
+        "{" + records[SYSCALL_CREATE_PHASE].body + "}", declarations,
+    )
 
 
 def range_device_body_tokens(caller, phase):
@@ -1246,6 +1339,97 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         )
         self.assertNotEqual(
             tokens(expected), validation_body_tokens(caller, phase.replace("work->error = prepare_remote", "copy_bytes(); work->error = prepare_remote"), declarations),
+        )
+
+    def test_captured_syscall_exposes_typed_dispatch_and_prepare_device_publication(self):
+        records = function_records(source(FAMILY_PATHS[1][0]))
+        for name in (SYSCALL_DISPATCH_PHASE, SYSCALL_CREATE_PHASE):
+            with self.subTest(phase=name):
+                self.assertIn(name, set(records))
+                self.assertEqual(
+                    tokens("static void " + name + "(" + SYSCALL_PHASE_PARAMETERS + ")"),
+                    tokens(records[name].signature),
+                )
+                self.assertLessEqual(records[name].lines, 120)
+        self.assertLessEqual(records["micros_grant_handle_captured_user_ecall"].lines, 120)
+
+    def test_syscall_inverse_preserves_runtime_decode_create_case_and_success_only_publication(self):
+        caller = (
+            "{ struct grant_syscall_execution work; work.created = MICROS_GRANT_NONE; "
+            "original_runtime_checks(&work.grant_registry, &work.endpoint_registry); "
+            "work.decode_result = decode(arguments, &work.request); "
+            "if (work.decode_result != OK) { frame->a0 = work.decode_result; return NORMAL; } "
+            "grant_syscall_execute_request(hart, frame, context, &work); "
+            "original_publication(frame, work.request.operation, work.created, work.error, &work.abi_result); return NORMAL; }"
+        )
+        dispatch = (
+            "{ switch (work->request.operation) { "
+            "case MICROS_SYSCALL_ABI_GRANT_CREATE: grant_syscall_create_request(hart, frame, context, work); break; "
+            "case REVOKE: work->error = revoke(work->grant_registry, context->process, work->request.grant); break; "
+            "default: panic_grant_syscall(hart, frame, \"grant-request-invariant\"); } }"
+        )
+        create = (
+            "{ work->error = prepare_create(work->grant_registry, context->process, &work->create_plan); "
+            "if (work->error != OK) { return; } "
+            "work->device_status = capture_device(work->endpoint_registry, context->objects, &work->device_authority); "
+            "if (work->device_status == INVARIANT) { panic_grant_syscall(hart, frame, \"grant-device-authority-invariant\"); } "
+            "if (device_intersects(&work->device_authority, context->process, work->request.local_address)) { "
+            "work->error = FAULT; return; } "
+            "commit_create(work->grant_registry, &work->create_plan, &work->created); }"
+        )
+        expected = (
+            "{ struct micros_grant_registry *grant_registry; struct micros_endpoint_registry *endpoint_registry; "
+            "struct micros_grant_create_plan create_plan; struct micros_grant_syscall_request request; "
+            "struct micros_tty_device_authority device_authority; micros_grant_t created = MICROS_GRANT_NONE; "
+            "enum micros_syscall_abi_result decode_result; enum micros_grant_error error; "
+            "enum micros_tty_device_authority_status device_status; uint64_t abi_result; "
+            "original_runtime_checks(&grant_registry, &endpoint_registry); "
+            "decode_result = decode(arguments, &request); "
+            "if (decode_result != OK) { frame->a0 = decode_result; return NORMAL; } "
+            "switch (request.operation) { case MICROS_SYSCALL_ABI_GRANT_CREATE: "
+            "error = prepare_create(grant_registry, context->process, &create_plan); "
+            "if (error != OK) { break; } "
+            "device_status = capture_device(endpoint_registry, context->objects, &device_authority); "
+            "if (device_status == INVARIANT) { panic_grant_syscall(hart, frame, \"grant-device-authority-invariant\"); } "
+            "if (device_intersects(&device_authority, context->process, request.local_address)) { error = FAULT; break; } "
+            "commit_create(grant_registry, &create_plan, &created); break; "
+            "case REVOKE: error = revoke(grant_registry, context->process, request.grant); break; "
+            "default: panic_grant_syscall(hart, frame, \"grant-request-invariant\"); } "
+            "original_publication(frame, request.operation, created, error, &abi_result); return NORMAL; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in SYSCALL_FIELDS)
+        self.assertEqual(tokens(expected), syscall_body_tokens(caller, dispatch, create, declarations))
+        for changed in (
+            caller.replace("struct grant_syscall_execution work;", "struct grant_syscall_execution work = {0};"),
+            caller.replace("context, &work", "other_context, &work"),
+            caller.replace("context, &work", "context, &copy"),
+            caller.replace("original_publication", "copy = work; original_publication"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                syscall_body_tokens(changed, dispatch, create, declarations)
+        for changed in (
+            dispatch.replace("context, work", "other_context, work"),
+            dispatch.replace("work); break;", "work);", 1),
+            dispatch.replace("case REVOKE:", "return; case REVOKE:"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                syscall_body_tokens(caller, changed, create, declarations)
+        for changed in (
+            create.replace("return;", "return true;", 1),
+            create.replace("return;", "break;", 1),
+            create.replace("return;", "goto done;", 1),
+            create.replace("work->created", "work->extra"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                syscall_body_tokens(caller, dispatch, changed, declarations)
+        for changed in (
+            caller.replace("MICROS_GRANT_NONE", "0"),
+            caller.replace("original_runtime_checks", "weakened_runtime_checks"),
+            caller.replace("original_publication", "early_publication"),
+        ):
+            self.assertNotEqual(tokens(expected), syscall_body_tokens(changed, dispatch, create, declarations))
+        self.assertNotEqual(
+            tokens(expected), syscall_body_tokens(caller, dispatch, create.replace("work->error = FAULT", "work->error = OK"), declarations),
         )
 
 

@@ -526,3 +526,14 @@ preserves the caller-owned result and original common IRQ exit without local
 range, physical overlap or byte-copy work. Shared typed automatic-work
 inspection retains the copy execution contract unchanged. Sixteen semantic
 dispositions and sixty-three original owner moves remain pending.
+
+The captured syscall adapter now has a 54-line runtime/decode/result root,
+63-line operation dispatcher and 55-line create preparation/device/publication
+phase. Its ten original objects retain their exact types, declaration order
+and sole `MICROS_GRANT_NONE` initializer. Checked void returns expand only
+the original create-case breaks, so preparation failure still precedes device
+lookup and device denial still precedes publication. Complete original-body
+reconstruction and independent binding, initializer, case-exit and ordering
+fixtures preserve the public entry, invariant panics and success-only result.
+No IRQ scope or current-process lookup is added. Fifteen semantic dispositions
+and sixty-three original owner moves remain pending.
