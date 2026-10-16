@@ -622,3 +622,15 @@ still addressing their actual enclosing objects. The sole fixture borrow,
 deadline 150, before/after sentinel and every original failure/commit order
 reconstruct from actual source before C publication. All current native
 cases pass. There are 32 original moves and three semantic dispositions left.
+
+All 116 original moves are now complete and the owner migration is a
+literal empty tuple. Captured-control evidence has its four exact owners,
+one original twenty-field static fixture and non-resetting getter. The three
+stateful ordinary helpers receive explicit fixture pointers; the complete
+constructor stays pure, and all existing double signatures remain exact.
+Both `setjmp` sites remain in the actual case roots and both longjmp/armed/
+abort paths remain in their controller doubles. All 38 original bodies and
+types reconstruct; actual native ordering, rejection and panic cases pass.
+The graph gate distinguishes C tags/members from function calls or callback
+bindings, retaining a regression for the shared type/function spelling.
+All 26 C owners are real; three semantic dispositions remain.

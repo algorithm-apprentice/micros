@@ -153,9 +153,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     (family, name) for family, owners in ORIGINAL_FUNCTIONS.items()
     for owner, names in owners.items() if owner != 0 for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3, 4)
-)
+SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
@@ -295,6 +293,37 @@ LIFECYCLE_PHASES = (
         "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work", "fixture, &work",
     ),
 )
+CONTROL_FIXTURE_TAG = "tty_control_syscall_test_fixture"
+CONTROL_FIXTURE_GETTER = "tty_control_syscall_test_fixture"
+CONTROL_FIXTURE_FIELDS = (
+    "struct micros_bootstrap_control_state bootstrap;",
+    "struct micros_endpoint_registry registry;",
+    "struct micros_kernel_objects objects;",
+    "struct micros_tty_handoff_runtime_state tty_state;",
+    "struct micros_syscall_context syscall_context;",
+    "enum micros_tty_control_authority_result authority_result;",
+    "enum micros_plic_phase plic_phase;",
+    "bool runtime_valid;",
+    "bool mapping_valid;",
+    "bool uart_active;",
+    "bool irq_enabled;",
+    "bool timer_enabled;",
+    "bool external_enabled;",
+    "bool plic_prepare_valid;",
+    "bool order_violation;",
+    "unsigned int authority_calls;",
+    "unsigned int owner_fault_count;",
+    "int operation_stage;",
+    "jmp_buf panic_target;",
+    "bool panic_armed;",
+)
+CONTROL_PRIVATE_EXPORTS = ("commit_arguments", "complete_arguments", "invoke", "reset_fixture")
+CONTROL_CONTEXT_HELPERS = {"commit_arguments": True, "invoke": False, "reset_fixture": False}
+CONTROL_CONTEXT_ROOTS = (
+    *tuple(name for name in ORIGINAL_FUNCTIONS[5][0] if name != "main"),
+    *ORIGINAL_FUNCTIONS[5][2], *ORIGINAL_FUNCTIONS[5][3],
+)
+CONTROL_JUMP_ROOTS = ("test_invariant_failure_is_fatal_before_mutation", "test_hardware_corruption_precedes_tuple_failure")
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -698,6 +727,12 @@ def normal_names(family):
             "tty_handoff_test_" + (name[5:] if name.startswith("test_") else name): name
             for names in ORIGINAL_FUNCTIONS[4].values() for name in names if not name.startswith("micros_")
         }
+    if family == 5:
+        return {
+            "tty_control_syscall_test_" + (name[5:] if name.startswith("test_") else name): name
+            for names in ORIGINAL_FUNCTIONS[5].values() for name in names
+            if not name.startswith("micros_") and name not in ("main", "uart_console_handoff_is_active")
+        }
     return {}
 
 
@@ -706,6 +741,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 5 and spelling == CONTROL_FIXTURE_GETTER:
+                if path != CONTROL_SOURCES[1]:
+                    raise AssertionError("captured-control fixture getter has its sole original-family owner")
+                continue
             if family == 4 and spelling in {phase[0] for phase in LIFECYCLE_PHASES}:
                 if path != HANDOFF_SOURCES[3]:
                     raise AssertionError("runtime lifecycle phases retain their actual native case owner")
@@ -764,6 +803,12 @@ def original_signature_tokens(family, original, record):
         if signature[:1] == ("static",):
             raise AssertionError("only the two cross-owner native handoff cases gain private declarations")
         signature = ("static", *signature)
+    if family == 5 and record.name.startswith("tty_control_syscall_test_"):
+        from tests.host.test_grant_data_plane_source_layout import fixture_signature_tokens
+
+        signature = fixture_signature_tokens(
+            original, signature, CONTROL_PRIVATE_EXPORTS, CONTROL_FIXTURE_TAG, CONTROL_CONTEXT_HELPERS,
+        )
     return signature
 
 
@@ -785,6 +830,8 @@ def original_body_digest(family, record):
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
     if family == 4 and (4, "test_runtime_lifecycle_validation") not in SYMBOL_OWNER_MIGRATION:
         body = handoff_fixture_body_tokens(names.get(record.name, record.name), body)
+    if family == 5 and not SYMBOL_OWNER_MIGRATION:
+        body = control_fixture_body_tokens(names.get(record.name, record.name), body)
     return digest_tokens(body)
 
 
@@ -999,6 +1046,23 @@ def lifecycle_actual_body_tokens(record, owner=None):
     return lifecycle_body_tokens("{" + record.body + "}", bodies, declarations)
 
 
+def control_fixture_body_tokens(original, body):
+    from tests.host.test_grant_data_plane_source_layout import fixture_body_tokens, declaration_name
+
+    return fixture_body_tokens(
+        original, body, CONTROL_FIXTURE_TAG, CONTROL_FIXTURE_GETTER, CONTROL_CONTEXT_ROOTS, CONTROL_CONTEXT_HELPERS,
+        tuple(declaration_name(tokens(field)) for field in CONTROL_FIXTURE_FIELDS),
+    )
+
+
+def function_references(body, names):
+    words = tokens(body)
+    return {
+        word for index, word in enumerate(words) if word in names
+        and (index == 0 or words[index - 1] not in ("struct", "enum", "union", ".", "->"))
+    }
+
+
 def source_set_block(name, paths):
     return "set(\n    " + name + "\n" + "".join("    " + path + "\n" for path in paths) + ")"
 
@@ -1070,6 +1134,106 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_captured_control_originals_have_exact_owners_and_one_twenty_field_fixture(self):
+        header = source(PRIVATE_HEADERS[4])
+        expected = tokens("struct " + CONTROL_FIXTURE_TAG + " {" + "".join(CONTROL_FIXTURE_FIELDS) + "};")
+        self.assertIn(" ".join(expected), " ".join(tokens(header)))
+        fixture = source(CONTROL_SOURCES[1])
+        self.assertEqual(("static struct tty_control_syscall_test_fixture fixture_state;",), tuple(file_scope_objects(fixture)))
+        self.assertEqual(tokens("{ return &fixture_state; }"), tokens(
+            "{" + function_records(fixture)[CONTROL_FIXTURE_GETTER].body + "}",
+        ))
+        private = {name: "tty_control_syscall_test_" + (name[5:] if name.startswith("test_") else name)
+                   for names in ORIGINAL_FUNCTIONS[5].values() for name in names
+                   if not name.startswith("micros_") and name not in ("main", "uart_console_handoff_is_active")}
+        for owner, names in ORIGINAL_FUNCTIONS[5].items():
+            records = function_records(source(CONTROL_SOURCES[owner]))
+            for name in names:
+                self.assertIn(private.get(name, name), set(records), CONTROL_SOURCES[owner])
+        for path in (CONTROL_SOURCES[0], *CONTROL_SOURCES[2:]):
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+
+    def test_captured_control_keeps_both_jump_targets_in_actual_case_roots_and_exact_private_directions(self):
+        header = source(PRIVATE_HEADERS[4])
+        start = header.index("#define EXPECT_TRUE")
+        self.assertEqual(HANDOFF_MACRO_DIGEST, digest_tokens(tokens(header[start:header.index("\n\n", start)])))
+        records = {
+            name: (owner, record) for owner, path in enumerate(CONTROL_SOURCES)
+            for name, record in function_records(source(path)).items()
+        }
+        jump_roots = {}
+        longjmp_roots = set()
+        allowed = {0: {1}, 1: set(), 2: {1}, 3: {1}}
+        for name, (owner, record) in records.items():
+            words = tokens(record.body)
+            destinations = {records[word][0] for word in function_references(record.body, records) if records[word][0] != owner}
+            self.assertLessEqual(destinations, allowed[owner], name)
+            if "setjmp" in words:
+                self.assertEqual(0, owner)
+                self.assertEqual(1, words.count("setjmp"))
+                self.assertIn(" ".join(tokens("setjmp(fixture->panic_target)")), " ".join(words))
+                jump_roots[normal_names(5).get(name, name)] = record
+            if "longjmp" in words:
+                self.assertEqual(3, owner)
+                self.assertIn(" ".join(tokens("longjmp(fixture->panic_target, 1)")), " ".join(words))
+                longjmp_roots.add(name)
+        self.assertEqual(set(CONTROL_JUMP_ROOTS), set(jump_roots))
+        self.assertEqual({"micros_bootstrap_runtime_fail", "micros_trap_panic_entry"}, longjmp_roots)
+
+    def test_function_references_distinguish_actual_callbacks_from_separate_c_tag_and_member_namespaces(self):
+        names = {"micros_tty_handoff_runtime_state"}
+        self.assertEqual(set(), function_references(
+            "{ state = (struct micros_tty_handoff_runtime_state){0}; }", names,
+        ))
+        self.assertEqual(set(), function_references(
+            "{ record.micros_tty_handoff_runtime_state = 0; record->micros_tty_handoff_runtime_state = 1; }", names,
+        ))
+        self.assertEqual(names, function_references(
+            "{ callback = &micros_tty_handoff_runtime_state; }", names,
+        ))
+        self.assertEqual(names, function_references("{ callback = micros_tty_handoff_runtime_state; }", names))
+        self.assertEqual(names, function_references("{ return micros_tty_handoff_runtime_state(); }", names))
+
+    def test_captured_control_fixture_inverse_preserves_live_jump_root_and_ordinary_helper_arguments(self):
+        caller = (
+            "{ struct tty_control_syscall_test_fixture *fixture = tty_control_syscall_test_fixture(); "
+            "struct micros_syscall_arguments arguments; struct micros_trap_frame frame = {0}; "
+            "reset_fixture(fixture, false); arguments = commit_arguments(fixture); fixture->panic_armed = true; "
+            "if (setjmp(fixture->panic_target) == 0) { (void)invoke(fixture, &arguments, &frame); "
+            "fixture->panic_armed = false; return false; } fixture->panic_armed = false; "
+            "return original_snapshot(&fixture->tty_state, fixture->operation_stage, fixture->owner_fault_count); }"
+        )
+        expected = tokens(
+            "{ struct micros_syscall_arguments arguments; struct micros_trap_frame frame = {0}; "
+            "reset_fixture(false); arguments = commit_arguments(); panic_armed = true; "
+            "if (setjmp(panic_target) == 0) { (void)invoke(&arguments, &frame); panic_armed = false; return false; } "
+            "panic_armed = false; return original_snapshot(&tty_state, operation_stage, owner_fault_count); }"
+        )
+        original = CONTROL_JUMP_ROOTS[0]
+        self.assertEqual(expected, control_fixture_body_tokens(original, tokens(caller)))
+        for changed in (
+            caller.replace("tty_control_syscall_test_fixture()", "reset_getter()"),
+            caller.replace("invoke(fixture,", "invoke(other,"),
+            caller.replace("fixture->panic_armed", "fixture->unknown"),
+            caller.replace("return original_snapshot", "retain(fixture); return original_snapshot"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                control_fixture_body_tokens(original, tokens(changed))
+        self.assertNotEqual(expected, control_fixture_body_tokens(original, tokens(caller.replace("setjmp(", "returned_helper_setjmp("))))
+        signature = (
+            "struct micros_syscall_arguments tty_control_syscall_test_commit_arguments("
+            "struct tty_control_syscall_test_fixture *fixture) { return original_arguments; }"
+        )
+        record = function_records(signature)["tty_control_syscall_test_commit_arguments"]
+        self.assertEqual(tokens("static struct micros_syscall_arguments commit_arguments(void)"), original_signature_tokens(5, "commit_arguments", record))
+        changed = signature.replace("struct tty_control_syscall_test_fixture *fixture", "struct tty_handoff_test_fixture *fixture")
+        with self.assertRaises(AssertionError):
+            original_signature_tokens(5, "commit_arguments", function_records(changed)[record.name])
+        pure = "struct micros_syscall_arguments tty_control_syscall_test_complete_arguments(void) { return original_complete; }"
+        self.assertEqual(tokens("static struct micros_syscall_arguments complete_arguments(void)"), original_signature_tokens(
+            5, "complete_arguments", function_records(pure)["tty_control_syscall_test_complete_arguments"],
+        ))
+
     def test_runtime_case_has_exact_bounded_seed_authority_begin_map_release_claim_ready_completion_phases(self):
         records = function_records(source(HANDOFF_SOURCES[3]))
         self.assertLessEqual(records["tty_handoff_test_runtime_lifecycle_validation"].lines, 120)
@@ -1718,7 +1882,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(REQUIRED_TASKS))
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
-        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3, 4)})
+        self.assertEqual((), SYMBOL_OWNER_MIGRATION)
         self.assertEqual(
             set(REQUIRED_TASKS) - {
                 (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
