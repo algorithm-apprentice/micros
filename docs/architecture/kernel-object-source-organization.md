@@ -720,8 +720,19 @@ scenario definitions and its one undef precedes the root. Reconstruction
 restores its original in-case scope and full original body. No final
 snapshot restoration or successful validation is added.
 
-Two native/target dispositions remain pending. Only the target scenario unit
-remains declarations-only; source movement alone does not complete the task.
+The seeded model now has a 78-line root and eight 48/39/60/49/42/49/52/44-line
+operations in their separate owner. The original four run locals stay in
+the root; one automatic iteration object contains exactly the original
+value/slot/expected/actual fields. Only value gets its original one draw;
+the other fields remain uninitialized until the selected original operation
+assigns them. Complete typed reconstruction preserves every case-local
+sentinel/context/root, status/output check, reference update, numeric case
+and post-attempt comparison. The RNG body and seed are unchanged. There is
+no new default, script, trace, coverage or teardown.
+
+All eleven portable/native semantic dispositions are complete. Only the
+target entry remains pending, and its scenario unit is still
+declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

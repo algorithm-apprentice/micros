@@ -95,6 +95,69 @@ struct lifecycle_model {
     size_t thread_count;
 };
 
+struct kernel_object_test_model_iteration {
+    uint32_t value;
+    size_t slot;
+    enum micros_kernel_object_error expected;
+    enum micros_kernel_object_error actual;
+};
+
+bool kernel_object_test_model_process_create(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_process_release(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_thread_create(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_thread_release(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_address_space_attach(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_address_space_detach(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_context_attach(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
+bool kernel_object_test_model_context_detach(
+    struct micros_kernel_objects *fixture,
+    struct lifecycle_model *model,
+    size_t step,
+    struct kernel_object_test_model_iteration *iteration
+);
+
 struct micros_kernel_objects *kernel_object_test_registry(void);
 
 void kernel_object_test_reset_objects(struct micros_kernel_objects *fixture);

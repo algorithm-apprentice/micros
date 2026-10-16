@@ -34,6 +34,27 @@ MODEL_PROJECTION_PHASES = (
     ("kernel_object_test_model_threads_match", ("fixture", "model"), "MICROS_THREAD_CAPACITY"),
     ("kernel_object_test_model_harts_match", ("fixture",), "MICROS_HART_CAPACITY"),
 )
+MODEL_OPERATION_TASKS = (
+    "kernel_object_test_model_process_create",
+    "kernel_object_test_model_process_release",
+    "kernel_object_test_model_thread_create",
+    "kernel_object_test_model_thread_release",
+    "kernel_object_test_model_address_space_attach",
+    "kernel_object_test_model_address_space_detach",
+    "kernel_object_test_model_context_attach",
+    "kernel_object_test_model_context_detach",
+)
+MODEL_ITERATION_TAG = "kernel_object_test_model_iteration"
+MODEL_ITERATION_FIELDS = (
+    ("uint32_t value;", "value"),
+    ("size_t slot;", None),
+    ("enum micros_kernel_object_error expected;", None),
+    ("enum micros_kernel_object_error actual;", None),
+)
+MODEL_OPERATION_PARAMETERS = (
+    "struct micros_kernel_objects *fixture, struct lifecycle_model *model, "
+    "size_t step, struct kernel_object_test_model_iteration *iteration"
+)
 HART_STACK_PHASES = (
     (
         "kernel_object_hart_stacks_avoid_harts",
@@ -403,7 +424,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
-    (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
 )
 CORE_DAG = {
@@ -591,6 +611,10 @@ def original_locations(family, texts=None):
         if family == 1 and spelling in case_owners:
             if path != case_owners[spelling]:
                 raise AssertionError("native case tasks have their exact file-local owner")
+            continue
+        if family == 1 and spelling in MODEL_OPERATION_TASKS:
+            if path != family_paths(1)[11]:
+                raise AssertionError("the eight model operations have their exact separate owner")
             continue
         if family == 1 and spelling in {phase[0] for phase in MODEL_PROJECTION_PHASES}:
             if path != family_paths(1)[10]:
@@ -936,6 +960,25 @@ def case_phase_contract(spec, name):
     return ", ".join(parameters), arguments
 
 
+def restore_work_field_tokens(body, binding, names):
+    restored = []
+    index = 0
+    while index < len(body):
+        if body[index] == binding:
+            if (
+                body[index + 1:index + 2] not in (["."], ["->"])
+                or body[index + 2:index + 3] not in ([name] for name in names)
+                or (index and body[index - 1] in (".", "->"))
+            ):
+                raise AssertionError("work transport admits only exact original fields, never a copy, reset or borrowed pointer")
+            restored.append(body[index + 2])
+            index += 3
+        else:
+            restored.append(body[index])
+            index += 1
+    return tuple(restored)
+
+
 def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
     body = list(caller)
     borrow = list(tokens("struct micros_kernel_objects *fixture = kernel_object_test_registry();"))
@@ -949,21 +992,7 @@ def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
         declaration[declaration.index("[") - 1] if "[" in declaration else declaration[-2]
         for declaration in declarations
     )
-    restored = []
-    index = 0
-    while index < len(body):
-        if body[index] == "work":
-            if (
-                body[index + 1:index + 2] not in (["."], ["->"])
-                or body[index + 2:index + 3] not in ([name] for name in names)
-                or (index and body[index - 1] in (".", "->"))
-            ):
-                raise AssertionError("work transport admits only exact original fields, never a copy, reset or borrowed pointer")
-            restored.append(body[index + 2])
-            index += 3
-        else:
-            restored.append(body[index])
-            index += 1
+    restored = list(restore_work_field_tokens(body, "work", names))
     start = 1 + len(prefix_statements)
     initializers = []
     for (declaration, kind), actual, name in zip(fields, declarations, names):
@@ -987,6 +1016,92 @@ def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
         del restored[start:end + 1]
     restored[start:start] = initializers
     return tuple(restored)
+
+
+def model_operation_body_tokens(phase):
+    body = list(tokens(phase))
+    if body[:1] != ["{"] or body[-4:] != ["return", "true", ";", "}"]:
+        raise AssertionError("each model operation has only its original terminal case-success exit")
+    inner = body[1:-4]
+    if {"break", "continue", "goto"} & set(inner):
+        raise AssertionError("model operations cannot borrow loop, switch or caller label exits")
+    for index, token in enumerate(inner):
+        if token == "return" and inner[index:index + 3] != ["return", "false", ";"]:
+            raise AssertionError("a model attempt cannot succeed before its original status/output/reference checks")
+    restored = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "model":
+            if index and inner[index - 1] in (".", "->"):
+                raise AssertionError("independent model transport cannot borrow another member's authority")
+            if inner[index + 1:index + 2] == ["->"]:
+                if inner[index + 2:index + 3] not in (
+                    ["processes"], ["threads"], ["process_count"], ["thread_count"],
+                ):
+                    raise AssertionError("model transport admits only the four original reference fields")
+                restored.extend(("model", ".", inner[index + 2]))
+                index += 3
+                continue
+            if (index and inner[index - 1] in ("&", "*")) or inner[index + 1:index + 2] == ["."]:
+                raise AssertionError("only the original borrowed model pointer, not a copy or address of a pointer, is admitted")
+            restored.extend(("&", "model"))
+        else:
+            restored.append(inner[index])
+        index += 1
+    return (*restored, *tokens("break;"))
+
+
+def model_runner_body_tokens(caller, phases, declarations):
+    if set(phases) != set(MODEL_OPERATION_TASKS) or tuple(declarations) != tuple(
+        tokens(declaration) for declaration, _ in MODEL_ITERATION_FIELDS
+    ):
+        raise AssertionError("model dispatch retains exactly eight operations and four original typed iteration fields")
+    body = list(tokens(caller))
+    head = list(tokens("for (step = 0; step < MODEL_STEPS; ++step) {"))
+    positions = [index for index in range(len(body)) if body[index:index + len(head)] == head]
+    if len(positions) != 1:
+        raise AssertionError("one original model loop owns the complete draw/dispatch/comparison lifetime")
+    start = positions[0] + len(head)
+    prefix = list(tokens("struct " + MODEL_ITERATION_TAG + " iteration; iteration.value ="))
+    if body[start:start + len(prefix)] != prefix:
+        raise AssertionError("iteration work is uninitialized except for its original one draw at loop entry")
+    end = body.index(";", start + len(prefix))
+    value = body[start + len(prefix):end]
+    restored_declarations = [*declarations[0][:-1], "=", *value, ";"]
+    restored_declarations.extend(token for declaration in declarations[1:] for token in declaration)
+    body[start:end + 1] = restored_declarations
+    if body.count("case") != 8 or "default" in body:
+        raise AssertionError("the original numeric cases remain complete and gain no default")
+    branches = []
+    for number, name in enumerate(MODEL_OPERATION_TASKS):
+        guard = list(tokens(
+            "case " + str(number) + ": if (!" + name
+            + "(fixture, &model, step, &iteration)) { return false; } break;"
+        ))
+        starts = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+        if len(starts) != 1:
+            raise AssertionError("each numeric model case binds its actual registry/model/step/iteration with checked failure")
+        fragment = model_operation_body_tokens(phases[name])
+        branches.append((starts[0], len(guard), [*tokens("case " + str(number) + ": {"), *fragment, "}"]))
+    if [start for start, _, _ in branches] != sorted(start for start, _, _ in branches):
+        raise AssertionError("the eight original numeric operations retain exact order")
+    for start, length, replacement in reversed(branches):
+        body[start:start + length] = replacement
+    return restore_work_field_tokens(body, "iteration", ("value", "slot", "expected", "actual"))
+
+
+def native_model_body_tokens(record, operations=None, header=None):
+    operations = source(family_paths(1)[11]) if operations is None else operations
+    header = source(PRIVATE_HEADERS[1]) if header is None else header
+    declarations = case_work_declarations(header, MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS)
+    records = function_records(operations)
+    phases = {}
+    for name in MODEL_OPERATION_TASKS:
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("bool " + name + "(" + MODEL_OPERATION_PARAMETERS + ")"):
+            raise AssertionError("cross-owner model tasks preserve their exact complete private parameter types")
+        phases[name] = "{" + phase.body + "}"
+    return model_runner_body_tokens("{" + record.body + "}", phases, declarations)
 
 
 def native_corruption_macro(owner, records, phases):
@@ -1066,6 +1181,8 @@ def original_body_digest(family, original, record):
         )
     if family == 1 and original in NATIVE_CASE_TASKS and (1, original) not in FUNCTION_TASK_MIGRATION:
         body = native_case_body_tokens(original, record)
+    if family == 1 and original == "test_seeded_lifecycle_model" and (1, original) not in FUNCTION_TASK_MIGRATION:
+        body = native_model_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(name == "kernel_object_test_registry" for _, name in owned_records(1)):
         body = native_registry_body_tokens(original, body)
@@ -1405,7 +1522,8 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         case_phases = sum(
             len(spec["phases"]) for name, spec in NATIVE_CASE_TASKS.items() if (1, name) not in FUNCTION_TASK_MIGRATION
         )
-        self.assertEqual(28 + 3 * completed + case_phases, len(owned_records(1)))
+        model_operations = 8 * ((1, "test_seeded_lifecycle_model") not in FUNCTION_TASK_MIGRATION)
+        self.assertEqual(28 + 3 * completed + case_phases + model_operations, len(owned_records(1)))
 
     def test_registry_transport_retains_whole_snapshot_reset_extent_and_member_scope(self):
         current = (
@@ -2306,6 +2424,105 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             (8, 6, 7), tuple(records[name].body.count("EXPECT_CORRUPTION(") for name in spec["phases"][1:]),
         )
         self.assertEqual(1, owner.count("work->snapshot = *fixture;"))
+
+    def test_model_runner_exposes_eight_typed_operations_and_only_original_iteration_fields(self):
+        records = function_records(source(family_paths(1)[11]))
+        for name in MODEL_OPERATION_TASKS:
+            with self.subTest(operation=name):
+                self.assertIn(name, set(records))
+                self.assertEqual(
+                    tokens("bool " + name + "(" + MODEL_OPERATION_PARAMETERS + ")"), tokens(records[name].signature),
+                )
+                self.assertLessEqual(records[name].lines, 120)
+        self.assertEqual(4, len(case_work_declarations(source(PRIVATE_HEADERS[1]), MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS)))
+        root = function_records(source(family_paths(1)[8]))[host_name("test_seeded_lifecycle_model")]
+        self.assertLessEqual(root.lines, 120)
+
+    def test_model_operation_inverse_preserves_case_locals_and_first_status_output_failure(self):
+        phase = (
+            "{ struct context context = pattern(BASE + step); struct handle output = {MAX_SLOT, MAX_GENERATION}; "
+            "iteration->slot = lowest(model); iteration->expected = expected_error(model, iteration->slot); "
+            "iteration->actual = create(fixture, &output); "
+            "if (iteration->actual != iteration->expected) { return false; } "
+            "if (output.slot != iteration->slot) { return false; } "
+            "model->processes[iteration->slot].live = true; ++model->process_count; return true; }"
+        )
+        expected = (
+            "struct context context = pattern(BASE + step); struct handle output = {MAX_SLOT, MAX_GENERATION}; "
+            "iteration->slot = lowest(&model); iteration->expected = expected_error(&model, iteration->slot); "
+            "iteration->actual = create(fixture, &output); "
+            "if (iteration->actual != iteration->expected) { return false; } "
+            "if (output.slot != iteration->slot) { return false; } "
+            "model.processes[iteration->slot].live = true; ++model.process_count; break;"
+        )
+        self.assertEqual(tokens(expected), model_operation_body_tokens(phase))
+        for changed in (
+            phase.replace("return false;", "return true;", 1),
+            phase.replace("model->processes", "model->extra"),
+            phase.replace("lowest(model)", "lowest(*model)"),
+            phase.replace("return true; }", "break; }"),
+            phase.replace("return false;", "goto comparison;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_operation_body_tokens(changed)
+        self.assertNotEqual(
+            tokens(expected), model_operation_body_tokens(phase.replace("output.slot !=", "output.slot ==")),
+        )
+
+    def test_model_runner_inverse_preserves_one_draw_numeric_dispatch_and_comparison_after_denials(self):
+        caller = (
+            "{ enum { MODEL_STEPS = 4096, }; struct lifecycle_model model = {0}; "
+            "struct micros_hart_handle harts[2]; uint32_t random_state = UINT32_C(0x7a31d4c9); size_t step; "
+            "prepare(fixture, harts); for (step = 0; step < MODEL_STEPS; ++step) { "
+            "struct kernel_object_test_model_iteration iteration; iteration.value = model_random(&random_state); "
+            "switch (iteration.value % 8) { "
+            + " ".join(
+                "case " + str(number) + ": if (!" + name
+                + "(fixture, &model, step, &iteration)) { return false; } break;"
+                for number, name in enumerate(MODEL_OPERATION_TASKS)
+            )
+            + " } if (!compare(fixture, &model, step)) { return false; } } return true; }"
+        )
+        phases = {
+            name: "{ operation" + str(number)
+            + "(fixture, model, step, iteration->value, &iteration->slot, &iteration->expected, &iteration->actual); return true; }"
+            for number, name in enumerate(MODEL_OPERATION_TASKS)
+        }
+        declarations = tuple(tokens(declaration) for declaration, _ in MODEL_ITERATION_FIELDS)
+        expected = (
+            "{ enum { MODEL_STEPS = 4096, }; struct lifecycle_model model = {0}; "
+            "struct micros_hart_handle harts[2]; uint32_t random_state = UINT32_C(0x7a31d4c9); size_t step; "
+            "prepare(fixture, harts); for (step = 0; step < MODEL_STEPS; ++step) { "
+            "uint32_t value = model_random(&random_state); size_t slot; "
+            "enum micros_kernel_object_error expected; enum micros_kernel_object_error actual; switch (value % 8) { "
+            "case 0: { operation0(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 1: { operation1(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 2: { operation2(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 3: { operation3(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 4: { operation4(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 5: { operation5(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 6: { operation6(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "case 7: { operation7(fixture, &model, step, value, &slot, &expected, &actual); break; } "
+            "} if (!compare(fixture, &model, step)) { return false; } } return true; }"
+        )
+        self.assertEqual(tokens(expected), model_runner_body_tokens(caller, phases, declarations))
+        for changed in (
+            caller.replace("struct kernel_object_test_model_iteration iteration;", "struct kernel_object_test_model_iteration iteration = {0};"),
+            caller.replace("(fixture, &model, step, &iteration)", "(fixture, &copy, step, &iteration)", 1),
+            caller.replace("(fixture, &model, step, &iteration)", "(fixture, &model, step + 1, &iteration)", 1),
+            caller.replace("break; } if (!compare", "default: break; } if (!compare"),
+            caller.replace("return false; } break;", "return true; } break;", 1),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_runner_body_tokens(changed, phases, declarations)
+        for changed in (
+            caller.replace("model_random(&random_state)", "two_draws(&random_state)"),
+            caller.replace("compare(fixture, &model, step)", "weakened(fixture, &model, step)"),
+            caller.replace("0x7a31d4c9", "0x7a31d4c8"),
+            caller.replace("iteration.value % 8", "iteration.value % 7"),
+        ):
+            self.assertNotEqual(tokens(expected), model_runner_body_tokens(changed, phases, declarations))
 
 
 if __name__ == "__main__":
