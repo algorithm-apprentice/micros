@@ -60,45 +60,15 @@ static bool expect_decode_failure(
     );
 }
 
-bool micros_grant_syscall_core_test_run(void)
-{
-    static const struct {
-        enum micros_grant_error error;
-        int64_t result;
-    } mappings[] = {
-        {MICROS_GRANT_OK, MICROS_SYSCALL_ABI_OK},
-        {
-            MICROS_GRANT_ERROR_ARGUMENT,
-            MICROS_SYSCALL_ABI_ARGUMENT,
-        },
-        {
-            MICROS_GRANT_ERROR_CAPACITY,
-            MICROS_SYSCALL_ABI_CAPACITY,
-        },
-        {
-            MICROS_GRANT_ERROR_STALE_GRANT,
-            MICROS_SYSCALL_ABI_STALE_GRANT,
-        },
-        {
-            MICROS_GRANT_ERROR_DEAD_ENDPOINT,
-            MICROS_SYSCALL_ABI_DEAD_ENDPOINT,
-        },
-        {
-            MICROS_GRANT_ERROR_UNAUTHORIZED,
-            MICROS_SYSCALL_ABI_UNAUTHORIZED,
-        },
-        {MICROS_GRANT_ERROR_RANGE, MICROS_SYSCALL_ABI_RANGE},
-        {MICROS_GRANT_ERROR_STATE, MICROS_SYSCALL_ABI_STATE},
-        {
-            MICROS_GRANT_ERROR_FAULT,
-            MICROS_SYSCALL_ABI_MEMORY_FAULT,
-        },
-    };
-    struct micros_syscall_arguments arguments = {0};
+struct grant_syscall_abi_case {
+    struct micros_syscall_arguments arguments;
     struct micros_grant_syscall_request request;
     uint64_t output;
     size_t index;
+};
 
+static bool grant_abi_test_numbering(void)
+{
     EXPECT_TRUE(
         MICROS_SYSCALL_ABI_SEND == 1
         && MICROS_SYSCALL_ABI_RECEIVE == 2
@@ -148,24 +118,36 @@ bool micros_grant_syscall_core_test_run(void)
             == (int)MICROS_SYSCALL_ABI_ENDPOINT_CLOSING
         && (uint64_t)(MICROS_GRANT_NONE - 1) <= INT64_MAX
     );
+    return true;
+}
 
-    for (index = 0; index < sizeof(mappings) / sizeof(mappings[0]); ++index) {
-        output = UINT64_C(0xa5a5a5a5a5a5a5a5);
-        EXPECT_TRUE(
-            micros_grant_abi_map_error(
-                mappings[index].error,
-                &output
-            )
-            && output == (uint64_t)mappings[index].result
-        );
-    }
+static bool grant_abi_test_recoverable_mapping(
+    struct grant_syscall_abi_case *work,
+    enum micros_grant_error error,
+    int64_t result
+)
+{
+    work->output = UINT64_C(0xa5a5a5a5a5a5a5a5);
+    EXPECT_TRUE(
+        micros_grant_abi_map_error(
+            error,
+            &work->output
+        )
+        && work->output == (uint64_t)result
+    );
+
+    return true;
+}
+
+static bool grant_abi_test_fatal_mapping(struct grant_syscall_abi_case *work)
+{
     for (
-        index = MICROS_GRANT_ERROR_ALREADY_INITIALIZED;
-        index <= MICROS_GRANT_ERROR_INVARIANT;
-        ++index
+        work->index = MICROS_GRANT_ERROR_ALREADY_INITIALIZED;
+        work->index <= MICROS_GRANT_ERROR_INVARIANT;
+        ++work->index
     ) {
         enum micros_grant_error error =
-            (enum micros_grant_error)index;
+            (enum micros_grant_error)work->index;
         bool fatal = (
             error == MICROS_GRANT_ERROR_ALREADY_INITIALIZED
             || error == MICROS_GRANT_ERROR_NOT_INITIALIZED
@@ -176,23 +158,27 @@ bool micros_grant_syscall_core_test_run(void)
         if (!fatal) {
             continue;
         }
-        output = UINT64_C(0x5a5a5a5a5a5a5a5a);
+        work->output = UINT64_C(0x5a5a5a5a5a5a5a5a);
         EXPECT_TRUE(
-            !micros_grant_abi_map_error(error, &output)
-            && output == UINT64_C(0x5a5a5a5a5a5a5a5a)
+            !micros_grant_abi_map_error(error, &work->output)
+            && work->output == UINT64_C(0x5a5a5a5a5a5a5a5a)
         );
     }
-    output = UINT64_C(0x5a5a5a5a5a5a5a5a);
+    work->output = UINT64_C(0x5a5a5a5a5a5a5a5a);
     EXPECT_TRUE(
         !micros_grant_abi_map_error(
             (enum micros_grant_error)UINT32_C(0x7fffffff),
-            &output
+            &work->output
         )
-        && output == UINT64_C(0x5a5a5a5a5a5a5a5a)
+        && work->output == UINT64_C(0x5a5a5a5a5a5a5a5a)
     );
     EXPECT_TRUE(!micros_grant_abi_map_error(MICROS_GRANT_OK, NULL));
+    return true;
+}
 
-    arguments = (struct micros_syscall_arguments){
+static bool grant_abi_test_valid_full_width(struct grant_syscall_abi_case *work)
+{
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x00123001),
         .a1 = UINT64_C(0x0000000040001000),
         .a2 = UINT64_C(0x0000000100000001),
@@ -200,12 +186,12 @@ bool micros_grant_syscall_core_test_run(void)
             | MICROS_GRANT_PERMISSION_WRITE,
         .a7 = MICROS_SYSCALL_ABI_GRANT_CREATE,
     };
-    memset(&request, 0, sizeof(request));
+    memset(&work->request, 0, sizeof(work->request));
     EXPECT_TRUE(
-        micros_grant_syscall_decode(&arguments, &request)
+        micros_grant_syscall_decode(&work->arguments, &work->request)
             == MICROS_SYSCALL_ABI_OK
         && request_matches(
-            &request,
+            &work->request,
             MICROS_SYSCALL_ABI_GRANT_CREATE,
             UINT32_C(0x00123001),
             0,
@@ -217,15 +203,15 @@ bool micros_grant_syscall_core_test_run(void)
         )
     );
 
-    arguments = (struct micros_syscall_arguments){
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x12345678),
         .a7 = MICROS_SYSCALL_ABI_GRANT_REVOKE,
     };
     EXPECT_TRUE(
-        micros_grant_syscall_decode(&arguments, &request)
+        micros_grant_syscall_decode(&work->arguments, &work->request)
             == MICROS_SYSCALL_ABI_OK
         && request_matches(
-            &request,
+            &work->request,
             MICROS_SYSCALL_ABI_GRANT_REVOKE,
             0,
             UINT32_C(0x12345678),
@@ -236,7 +222,7 @@ bool micros_grant_syscall_core_test_run(void)
         )
     );
 
-    arguments = (struct micros_syscall_arguments){
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x00123001),
         .a1 = UINT32_C(0x12345678),
         .a2 = UINT64_C(0xfedcba9876543210),
@@ -245,10 +231,10 @@ bool micros_grant_syscall_core_test_run(void)
         .a7 = MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
     };
     EXPECT_TRUE(
-        micros_grant_syscall_decode(&arguments, &request)
+        micros_grant_syscall_decode(&work->arguments, &work->request)
             == MICROS_SYSCALL_ABI_OK
         && request_matches(
-            &request,
+            &work->request,
             MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
             UINT32_C(0x00123001),
             UINT32_C(0x12345678),
@@ -258,13 +244,18 @@ bool micros_grant_syscall_core_test_run(void)
             0
         )
     );
-    arguments.a7 = MICROS_SYSCALL_ABI_GRANT_COPY_TO;
+    work->arguments.a7 = MICROS_SYSCALL_ABI_GRANT_COPY_TO;
     EXPECT_TRUE(
-        micros_grant_syscall_decode(&arguments, &request)
+        micros_grant_syscall_decode(&work->arguments, &work->request)
             == MICROS_SYSCALL_ABI_OK
-        && request.operation == MICROS_SYSCALL_ABI_GRANT_COPY_TO
+        && work->request.operation == MICROS_SYSCALL_ABI_GRANT_COPY_TO
     );
-    arguments = (struct micros_syscall_arguments){
+    return true;
+}
+
+static bool grant_abi_test_validate_shapes(struct grant_syscall_abi_case *work)
+{
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x00123001),
         .a1 = UINT32_C(0x12345678),
         .a2 = UINT64_C(0xfedcba9876543210),
@@ -273,10 +264,10 @@ bool micros_grant_syscall_core_test_run(void)
         .a7 = MICROS_SYSCALL_ABI_GRANT_VALIDATE,
     };
     EXPECT_TRUE(
-        micros_grant_syscall_decode(&arguments, &request)
+        micros_grant_syscall_decode(&work->arguments, &work->request)
             == MICROS_SYSCALL_ABI_OK
         && request_matches(
-            &request,
+            &work->request,
             MICROS_SYSCALL_ABI_GRANT_VALIDATE,
             UINT32_C(0x00123001),
             UINT32_C(0x12345678),
@@ -286,90 +277,102 @@ bool micros_grant_syscall_core_test_run(void)
             MICROS_GRANT_PERMISSION_WRITE
         )
     );
-    arguments.a0 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a0 = UINT32_C(0x00123001);
-    arguments.a1 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a1 = UINT32_C(0x12345678);
-    arguments.a4 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a4 = MICROS_GRANT_PERMISSION_WRITE;
-    arguments.a5 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a5 = 0;
-    arguments.a6 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
+    work->arguments.a0 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a0 = UINT32_C(0x00123001);
+    work->arguments.a1 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a1 = UINT32_C(0x12345678);
+    work->arguments.a4 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a4 = MICROS_GRANT_PERMISSION_WRITE;
+    work->arguments.a5 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a5 = 0;
+    work->arguments.a6 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
 
-    arguments.a0 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a0 = UINT32_C(0x00123001);
-    arguments.a1 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a1 = UINT32_C(0x12345678);
-    arguments.a5 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a5 = 0;
-    arguments.a6 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
+    work->arguments.a0 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a0 = UINT32_C(0x00123001);
+    work->arguments.a1 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a1 = UINT32_C(0x12345678);
+    work->arguments.a5 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a5 = 0;
+    work->arguments.a6 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    return true;
+}
 
-    arguments = (struct micros_syscall_arguments){
+static bool grant_abi_test_create_shapes(struct grant_syscall_abi_case *work)
+{
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x00123001),
         .a1 = UINT64_C(0x0000000040001000),
         .a2 = 1,
         .a3 = UINT64_C(1) << 32,
         .a7 = MICROS_SYSCALL_ABI_GRANT_CREATE,
     };
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a3 = MICROS_GRANT_PERMISSION_READ;
-    arguments.a4 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a4 = 0;
-    arguments.a5 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a5 = 0;
-    arguments.a6 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a3 = MICROS_GRANT_PERMISSION_READ;
+    work->arguments.a4 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a4 = 0;
+    work->arguments.a5 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a5 = 0;
+    work->arguments.a6 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    return true;
+}
 
-    arguments = (struct micros_syscall_arguments){
+static bool grant_abi_test_revoke_shapes(struct grant_syscall_abi_case *work)
+{
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x12345678),
         .a7 = MICROS_SYSCALL_ABI_GRANT_REVOKE,
     };
-    for (index = 1; index <= 6; ++index) {
-        switch (index) {
+    for (work->index = 1; work->index <= 6; ++work->index) {
+        switch (work->index) {
         case 1:
-            arguments.a1 = 1;
+            work->arguments.a1 = 1;
             break;
         case 2:
-            arguments.a2 = 1;
+            work->arguments.a2 = 1;
             break;
         case 3:
-            arguments.a3 = 1;
+            work->arguments.a3 = 1;
             break;
         case 4:
-            arguments.a4 = 1;
+            work->arguments.a4 = 1;
             break;
         case 5:
-            arguments.a5 = 1;
+            work->arguments.a5 = 1;
             break;
         case 6:
-            arguments.a6 = 1;
+            work->arguments.a6 = 1;
             break;
         default:
             return false;
         }
-        EXPECT_TRUE(expect_decode_failure(arguments));
-        arguments.a1 = 0;
-        arguments.a2 = 0;
-        arguments.a3 = 0;
-        arguments.a4 = 0;
-        arguments.a5 = 0;
-        arguments.a6 = 0;
+        EXPECT_TRUE(expect_decode_failure(work->arguments));
+        work->arguments.a1 = 0;
+        work->arguments.a2 = 0;
+        work->arguments.a3 = 0;
+        work->arguments.a4 = 0;
+        work->arguments.a5 = 0;
+        work->arguments.a6 = 0;
     }
-    arguments.a0 = UINT64_C(1) << 32;
-    EXPECT_TRUE(expect_decode_failure(arguments));
+    work->arguments.a0 = UINT64_C(1) << 32;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    return true;
+}
 
-    arguments = (struct micros_syscall_arguments){
+static bool grant_abi_test_copy_and_null_shapes(struct grant_syscall_abi_case *work)
+{
+    work->arguments = (struct micros_syscall_arguments){
         .a0 = UINT32_C(0x00123001),
         .a1 = UINT32_C(0x12345678),
         .a2 = UINT64_C(0xfedcba9876543210),
@@ -377,24 +380,91 @@ bool micros_grant_syscall_core_test_run(void)
         .a4 = 1,
         .a7 = MICROS_SYSCALL_ABI_GRANT_COPY_FROM,
     };
-    arguments.a5 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
-    arguments.a5 = 0;
-    arguments.a6 = 1;
-    EXPECT_TRUE(expect_decode_failure(arguments));
+    work->arguments.a5 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
+    work->arguments.a5 = 0;
+    work->arguments.a6 = 1;
+    EXPECT_TRUE(expect_decode_failure(work->arguments));
 
-    arguments = (struct micros_syscall_arguments){0};
+    work->arguments = (struct micros_syscall_arguments){0};
     EXPECT_TRUE(
-        expect_decode_failure(arguments)
+        expect_decode_failure(work->arguments)
         && expect_decode_failure(
             (struct micros_syscall_arguments){
                 .a7 = UINT64_C(11),
             }
         )
-        && micros_grant_syscall_decode(NULL, &request)
+        && micros_grant_syscall_decode(NULL, &work->request)
             == MICROS_SYSCALL_ABI_ARGUMENT
-        && micros_grant_syscall_decode(&arguments, NULL)
+        && micros_grant_syscall_decode(&work->arguments, NULL)
             == MICROS_SYSCALL_ABI_ARGUMENT
     );
     return true;
+}
+
+bool micros_grant_syscall_core_test_run(void)
+{
+    static const struct {
+        enum micros_grant_error error;
+        int64_t result;
+    } mappings[] = {
+        {MICROS_GRANT_OK, MICROS_SYSCALL_ABI_OK},
+        {
+            MICROS_GRANT_ERROR_ARGUMENT,
+            MICROS_SYSCALL_ABI_ARGUMENT,
+        },
+        {
+            MICROS_GRANT_ERROR_CAPACITY,
+            MICROS_SYSCALL_ABI_CAPACITY,
+        },
+        {
+            MICROS_GRANT_ERROR_STALE_GRANT,
+            MICROS_SYSCALL_ABI_STALE_GRANT,
+        },
+        {
+            MICROS_GRANT_ERROR_DEAD_ENDPOINT,
+            MICROS_SYSCALL_ABI_DEAD_ENDPOINT,
+        },
+        {
+            MICROS_GRANT_ERROR_UNAUTHORIZED,
+            MICROS_SYSCALL_ABI_UNAUTHORIZED,
+        },
+        {MICROS_GRANT_ERROR_RANGE, MICROS_SYSCALL_ABI_RANGE},
+        {MICROS_GRANT_ERROR_STATE, MICROS_SYSCALL_ABI_STATE},
+        {
+            MICROS_GRANT_ERROR_FAULT,
+            MICROS_SYSCALL_ABI_MEMORY_FAULT,
+        },
+    };
+    struct grant_syscall_abi_case work;
+    work.arguments = (struct micros_syscall_arguments){0};
+
+    if (!grant_abi_test_numbering()) {
+        return false;
+    }
+    for (work.index = 0; work.index < sizeof(mappings) / sizeof(mappings[0]); ++work.index) {
+        if (!grant_abi_test_recoverable_mapping(
+            &work,
+            mappings[work.index].error,
+            mappings[work.index].result
+        )) {
+            return false;
+        }
+    }
+    if (!grant_abi_test_fatal_mapping(&work)) {
+        return false;
+    }
+    if (!grant_abi_test_valid_full_width(&work)) {
+        return false;
+    }
+    if (!grant_abi_test_validate_shapes(&work)) {
+        return false;
+    }
+    if (!grant_abi_test_create_shapes(&work)) {
+        return false;
+    }
+    if (!grant_abi_test_revoke_shapes(&work)) {
+        return false;
+    }
+    return grant_abi_test_copy_and_null_shapes(&work);
 }

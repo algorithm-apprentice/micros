@@ -566,3 +566,12 @@ the complete original byte, overflow, overlap and precedence checks.
 Independent array/type/binding/initializer fixtures protect the shared typed
 work inverse. Forty original target moves and nine semantic dispositions
 remain pending.
+
+Native ABI evidence now has a 66-line root and eight bounded numbering,
+mapping, full-width and malformed-shape phases. The actual anonymous
+block-static nine-row mapping array and its `sizeof`-bounded loop remain
+lexically in root. The mapping leaf receives each original readonly error/
+signed-result scalar and the original output work; typed binding and
+independent actual-row/sentinel mutants reconstruct the complete old body.
+The four original automatic fields and sole arguments initializer remain
+exact. Forty target moves and eight semantic dispositions remain pending.

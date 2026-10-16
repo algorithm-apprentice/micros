@@ -236,6 +236,19 @@ COPY_CASE_OUTLINES = {
 }
 COPY_TEST_PREFIX_DIGEST = "fd0ea2f64d076a9bac07b143b51da77591218e477dbd6e91bd1168c1789f7a0c"
 ABI_TEST_PREFIX_DIGEST = "aa1a887385bd5f3887691e793b430882e527eb795a7d11d44152c2b2e032b86c"
+ABI_WORK_TAG = "grant_syscall_abi_case"
+ABI_FIELDS = (
+    ("struct micros_syscall_arguments arguments;", True),
+    ("struct micros_grant_syscall_request request;", False),
+    ("uint64_t output;", False),
+    ("size_t index;", False),
+)
+ABI_PHASES = (
+    "grant_abi_test_numbering", "grant_abi_test_recoverable_mapping",
+    "grant_abi_test_fatal_mapping", "grant_abi_test_valid_full_width",
+    "grant_abi_test_validate_shapes", "grant_abi_test_create_shapes",
+    "grant_abi_test_revoke_shapes", "grant_abi_test_copy_and_null_shapes",
+)
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -332,7 +345,6 @@ FUNCTION_TASK_MIGRATION = (
     (3, "validate_command_effect"),
     (3, "micros_grant_syscall_runtime_run_self_test"),
     (4, "test_grant_model"),
-    (6, "micros_grant_syscall_core_test_run"),
     (3, "micros_grant_syscall_test_handle_control_trap"),
     (3, "micros_grant_syscall_test_finish"),
 )
@@ -631,6 +643,10 @@ def original_locations(family, texts=None):
             if path != FAMILY_PATHS[5][0]:
                 raise AssertionError("copy evidence phases remain in their separate original fixture")
             continue
+        if family == 6 and spelling in ABI_PHASES:
+            if path != FAMILY_PATHS[6][0]:
+                raise AssertionError("ABI evidence phases have only the original native ABI owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -669,6 +685,8 @@ def original_body_digest(family, original, record):
         body = native_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 5 and original in COPY_CASE_OUTLINES and (5, original) not in FUNCTION_TASK_MIGRATION:
         body = copy_case_actual_body_tokens(original, record)
+    if family == 6 and original == "micros_grant_syscall_core_test_run" and (6, original) not in FUNCTION_TASK_MIGRATION:
+        body = abi_actual_body_tokens(record)
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
@@ -908,6 +926,51 @@ def copy_case_actual_body_tokens(original, record, owner=None):
         phases.append((name, "&work", "{" + phase.body + "}", index == len(names) - 1))
     body = boolean_case_body_tokens(tokens("{" + record.body + "}"), phases)
     return restore_automatic_work_tokens(body, tag, fields, declarations)
+
+
+def abi_mapping_body_tokens(caller, phase):
+    phase = list(tokens(phase))
+    restored = []
+    aliases = {
+        "error": tokens("mappings[work.index].error"),
+        "result": tokens("mappings[work.index].result"),
+    }
+    for index, token in enumerate(phase):
+        if token in aliases and (not index or phase[index - 1] not in (".", "->")):
+            restored.extend(aliases[token])
+        else:
+            restored.append(token)
+    return boolean_case_body_tokens(caller, ((
+        ABI_PHASES[1], "&work, mappings[work.index].error, mappings[work.index].result",
+        " ".join(restored), False,
+    ),))
+
+
+def abi_actual_body_tokens(record, owner=None):
+    owner = source(FAMILY_PATHS[6][0]) if owner is None else owner
+    declarations = work_declarations(owner, ABI_WORK_TAG, ABI_FIELDS)
+    records = function_records(owner)
+    phases = []
+    for index, name in enumerate(ABI_PHASES):
+        parameters = "void" if index == 0 else "struct " + ABI_WORK_TAG + " *work"
+        if index == 1:
+            parameters += ", enum micros_grant_error error, int64_t result"
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("static bool " + name + "(" + parameters + ")"):
+            raise AssertionError("ABI phases retain exact pure/work/readonly-scalar bindings and widths")
+        if index != 1:
+            phases.append((name, "" if index == 0 else "&work", "{" + phase.body + "}", index == len(ABI_PHASES) - 1))
+    body = boolean_case_body_tokens(tokens("{" + record.body + "}"), phases)
+    body = list(abi_mapping_body_tokens(body, "{" + records[ABI_PHASES[1]].body + "}"))
+    declaration = list(tokens("struct " + ABI_WORK_TAG + " work;"))
+    positions = [index for index in range(len(body)) if body[index:index + len(declaration)] == declaration]
+    if len(positions) != 1:
+        raise AssertionError("ABI work follows the root-owned actual static mapping array")
+    start = positions[0]
+    prefix = body[1:start]
+    restored = list(restore_automatic_work_tokens(["{", *body[start:]], ABI_WORK_TAG, ABI_FIELDS, declarations))
+    restored[1:1] = prefix
+    return tuple(restored)
 
 
 def copy_execution_actual_body_tokens(record, owner=None):
@@ -1168,6 +1231,20 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_abi_cases_keep_root_static_mapping_rows_and_expose_bounded_domains(self):
+        owner = source(FAMILY_PATHS[6][0])
+        records = function_records(owner)
+        first = next(iter(records.values()))
+        self.assertEqual(ABI_TEST_PREFIX_DIGEST, digest_tokens(tokens(owner[:owner.index(first.signature)])))
+        work_declarations(owner, ABI_WORK_TAG, ABI_FIELDS)
+        root = records["micros_grant_syscall_core_test_run"]
+        self.assertIn("static const struct {", root.body)
+        self.assertIn("sizeof(mappings) / sizeof(mappings[0])", root.body)
+        for phase in ABI_PHASES:
+            self.assertIn(phase, records)
+            self.assertLessEqual(records[phase].lines, 120)
+        self.assertLessEqual(root.lines, 120)
+
     def test_native_copy_cases_expose_typed_array_chunk_and_authority_phases(self):
         owner = source(FAMILY_PATHS[5][0])
         records = function_records(owner)
@@ -1268,6 +1345,46 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             tokens(expected), restore_automatic_work_tokens(
                 boolean_case_body_tokens(tokens(caller), changed), "copy_case", fields, declarations,
             ),
+        )
+
+    def test_abi_mapping_inverse_reads_actual_static_rows_and_keeps_root_sizeof_and_sentinels(self):
+        caller = (
+            "{ static const struct { enum micros_grant_error error; int64_t result; } mappings[] = "
+            "{{OK, 0}, {FAULT, -6}}; "
+            "for (work.index = 0; work.index < sizeof(mappings) / sizeof(mappings[0]); ++work.index) { "
+            "if (!grant_abi_test_recoverable_mapping(&work, mappings[work.index].error, mappings[work.index].result)) "
+            "{ return false; } } return true; }"
+        )
+        phase = (
+            "{ work->output = UINT64_C(0xa5a5a5a5a5a5a5a5); "
+            "EXPECT_TRUE(micros_grant_abi_map_error(error, &work->output) "
+            "&& work->output == (uint64_t)result); return true; }"
+        )
+        expected = (
+            "{ static const struct { enum micros_grant_error error; int64_t result; } mappings[] = "
+            "{{OK, 0}, {FAULT, -6}}; "
+            "for (work.index = 0; work.index < sizeof(mappings) / sizeof(mappings[0]); ++work.index) { "
+            "work->output = UINT64_C(0xa5a5a5a5a5a5a5a5); "
+            "EXPECT_TRUE(micros_grant_abi_map_error(mappings[work.index].error, &work->output) "
+            "&& work->output == (uint64_t)mappings[work.index].result); } return true; }"
+        )
+        self.assertEqual(tokens(expected), abi_mapping_body_tokens(tokens(caller), phase))
+        for changed in (
+            caller.replace("&work, mappings", "&copy, mappings"),
+            caller.replace("mappings[work.index].error", "mappings[0].error"),
+            caller.replace("mappings[work.index].result", "mappings[0].result"),
+            caller.replace("return false;", "return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                abi_mapping_body_tokens(tokens(changed), phase)
+        for changed in (
+            caller.replace("{FAULT, -6}", "{FAULT, -1}"),
+            caller.replace("static const struct", "const struct"),
+            caller.replace("sizeof(mappings) / sizeof(mappings[0])", "2"),
+        ):
+            self.assertNotEqual(tokens(expected), abi_mapping_body_tokens(tokens(changed), phase))
+        self.assertNotEqual(
+            tokens(expected), abi_mapping_body_tokens(tokens(caller), phase.replace("0xa5a5a5a5a5a5a5a5", "0")),
         )
 
     def test_native_fixture_has_only_nine_original_fields_and_nonresetting_storage(self):
