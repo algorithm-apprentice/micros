@@ -200,6 +200,65 @@ NATIVE_CASE_TASKS = {
             "kernel_object_test_reuse_process_rejects_stale_root_handles": (("uintptr_t", "root"),),
         },
     },
+    "test_thread_execution_context_lifecycle_is_exact": {
+        "owner": 4,
+        "work": "kernel_object_test_context_work",
+        "fields": (
+            ("struct micros_process_handle process;", "aggregate"),
+            ("struct micros_thread_handle first;", "aggregate"),
+            ("struct micros_thread_handle second;", "aggregate"),
+            ("struct micros_thread_handle stale;", None),
+            ("struct micros_hart_handle hart;", "aggregate"),
+            ("struct micros_hart_handle second_hart;", "aggregate"),
+            ("struct micros_user_context initial;", "value"),
+            ("struct micros_user_context captured;", "value"),
+            ("struct micros_user_context observed;", "value"),
+            ("struct micros_user_context unchanged;", "value"),
+            ("uintptr_t observed_bottom;", "value"),
+            ("uintptr_t observed_top;", "value"),
+            ("struct micros_kernel_objects snapshot;", None),
+        ),
+        "constants": (
+            "const uintptr_t idle_bottom = UINT64_C(0x0000000000100000);",
+            "const uintptr_t idle_top = idle_bottom + MICROS_PRIMARY_TRAP_STACK_MIN_SIZE;",
+            "const uintptr_t emergency_bottom = UINT64_C(0x0000000000200000);",
+            "const uintptr_t emergency_top = emergency_bottom + MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE;",
+            "const uintptr_t first_stack_bottom = UINT64_C(0x0000000000300000);",
+            "const uintptr_t first_stack_top = first_stack_bottom + MICROS_THREAD_KERNEL_STACK_SIZE;",
+            "const uintptr_t second_stack_bottom = UINT64_C(0x0000000000400000);",
+            "const uintptr_t second_stack_top = second_stack_bottom + (2 * MICROS_THREAD_KERNEL_STACK_SIZE);",
+        ),
+        "phases": (
+            "kernel_object_test_prepare_context_peers",
+            "kernel_object_test_first_context_attach_and_inspect",
+            "kernel_object_test_context_peer_stack_conflicts",
+            "kernel_object_test_context_current_capture",
+            "kernel_object_test_context_idle_detach_and_stale",
+            "kernel_object_test_context_lifecycle_cleanup",
+        ),
+        "parameters": {
+            "kernel_object_test_prepare_context_peers": (
+                ("uintptr_t", "idle_bottom"), ("uintptr_t", "idle_top"),
+                ("uintptr_t", "emergency_bottom"), ("uintptr_t", "emergency_top"),
+            ),
+            "kernel_object_test_first_context_attach_and_inspect": (
+                ("uintptr_t", "first_stack_bottom"), ("uintptr_t", "first_stack_top"),
+            ),
+            "kernel_object_test_context_peer_stack_conflicts": (
+                ("uintptr_t", "first_stack_bottom"), ("uintptr_t", "first_stack_top"),
+                ("uintptr_t", "second_stack_bottom"), ("uintptr_t", "second_stack_top"),
+                ("uintptr_t", "idle_bottom"), ("uintptr_t", "idle_top"), ("uintptr_t", "emergency_bottom"),
+            ),
+            "kernel_object_test_context_current_capture": (
+                ("uintptr_t", "first_stack_bottom"), ("uintptr_t", "first_stack_top"),
+                ("uintptr_t", "idle_bottom"), ("uintptr_t", "idle_top"),
+            ),
+            "kernel_object_test_context_idle_detach_and_stale": (
+                ("uintptr_t", "idle_bottom"), ("uintptr_t", "idle_top"),
+                ("uintptr_t", "first_stack_bottom"), ("uintptr_t", "first_stack_top"),
+            ),
+        },
+    },
 }
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
@@ -325,7 +384,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
-    (1, "test_thread_execution_context_lifecycle_is_exact"),
     (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
     (1, "test_validator_rejects_corrupt_relationships"),
@@ -2110,6 +2168,45 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         )
         with self.assertRaises(AssertionError):
             outline_boolean_case_tokens(checked.replace("&work, root", "&work, root + PAGE_SIZE"), phases, calls)
+
+    def test_context_plan_blocks_remain_distinct_automatic_scopes(self):
+        caller = (
+            "{ if (!select_case(fixture, &work)) { return false; } "
+            "if (!idle_case(fixture, &work)) { return false; } return true; }"
+        )
+        phases = {
+            "select_case": (
+                "{ { struct micros_scheduler_return_plan plan; EXPECT_ERROR(OK, admit(fixture)); "
+                "EXPECT_ERROR(OK, plan_return(fixture, &plan)); EXPECT_ERROR(OK, commit(fixture, &plan)); } "
+                "EXPECT_TRUE(current_is_thread()); return true; }"
+            ),
+            "idle_case": (
+                "{ EXPECT_ERROR(STATE, detach(fixture)); { struct micros_scheduler_return_plan plan; "
+                "EXPECT_ERROR(OK, hold(fixture)); EXPECT_ERROR(OK, plan_return(fixture, &plan)); "
+                "EXPECT_ERROR(OK, commit(fixture, &plan)); EXPECT_ERROR(OK, remove(fixture)); } "
+                "EXPECT_TRUE(current_is_idle()); return true; }"
+            ),
+        }
+        expected = (
+            "{ { struct micros_scheduler_return_plan plan; EXPECT_ERROR(OK, admit(fixture)); "
+            "EXPECT_ERROR(OK, plan_return(fixture, &plan)); EXPECT_ERROR(OK, commit(fixture, &plan)); } "
+            "EXPECT_TRUE(current_is_thread()); EXPECT_ERROR(STATE, detach(fixture)); "
+            "{ struct micros_scheduler_return_plan plan; EXPECT_ERROR(OK, hold(fixture)); "
+            "EXPECT_ERROR(OK, plan_return(fixture, &plan)); EXPECT_ERROR(OK, commit(fixture, &plan)); "
+            "EXPECT_ERROR(OK, remove(fixture)); } EXPECT_TRUE(current_is_idle()); return true; }"
+        )
+        calls = (("select_case", ("fixture", "&work")), ("idle_case", ("fixture", "&work")))
+        self.assertEqual(tokens(expected), outline_boolean_case_tokens(caller, phases, calls))
+        changed = phases["select_case"].replace(
+            "{ { struct micros_scheduler_return_plan plan;", "{ struct micros_scheduler_return_plan plan;",
+        ).replace("commit(fixture, &plan)); }", "commit(fixture, &plan));", 1)
+        self.assertNotEqual(
+            tokens(expected), outline_boolean_case_tokens(caller, {**phases, "select_case": changed}, calls),
+        )
+        specification = NATIVE_CASE_TASKS["test_thread_execution_context_lifecycle_is_exact"]
+        self.assertEqual(13, len(specification["fields"]))
+        self.assertEqual(8, len(specification["constants"]))
+        self.assertFalse(any("plan" in tokens(declaration) for declaration, _ in specification["fields"]))
 
 
 if __name__ == "__main__":

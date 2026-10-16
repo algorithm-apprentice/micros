@@ -702,8 +702,18 @@ attach/denial, live-thread retirement and stale-root tasks. The original
 opaque root stays an automatic constant in the caller and is passed
 explicitly; its four original mutable objects and snapshot sites are exact.
 
-Four native/target dispositions remain pending. Only the target scenario unit
-remains declarations-only; source movement alone does not complete the task.
+Context lifecycle evidence now has a 75-line root and six 48/63/76/68/82/23-line
+preparation, attach/inspect, peer-conflict, current-capture, idle/stale and
+cleanup tasks. Its thirteen original mutable objects retain their exact
+initializers. All eight constant stack bounds stay automatic in the root,
+with only each task's used bounds passed explicitly. The two original
+scheduler plans remain in their separate original blocks; independent
+scope fixtures and full-body reconstruction reject hoisting or combining
+them.
+
+Three native/target dispositions remain pending. Only the target scenario
+unit remains declarations-only; source movement alone does not complete
+the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
