@@ -644,9 +644,16 @@ now occupy nine owners and the exact necessary private surface is
 twenty-two helpers. The facade contains only the original initializer and
 combined scheduler-delegating validator. The existing lower base-validator
 declaration and all original portable bytes remain independently enforced.
-Only twenty-six native/model owner moves and all twelve semantic task
-dispositions remain pending; twelve evidence units are still explicitly
-declarations-only.
+The native/model slice now completes all twenty-six original host moves
+across its twelve owners. Cases and reference comparison receive the one
+original registry explicitly; the new getter returns it without resetting.
+Actual assertion macros, reference types, complete bodies/signatures and
+the fifteen-case automatic `const` table reconstruct exactly. The active
+seventy-two-owner migration is now a literal empty tuple.
+
+All twelve semantic task dispositions remain pending, including the target
+entry. Only the target scenario unit remains declarations-only; no completed
+semantic outline is claimed by source movement alone.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

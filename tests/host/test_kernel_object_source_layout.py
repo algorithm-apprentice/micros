@@ -21,6 +21,13 @@ BASE_CMAKE_DIGEST = "50cac89bbc8dfc0246b97d36be3585ff53f7e86c3dbc772539a6f8352e0
 BASE_CORE_DIGEST = "453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a"
 STRUCTURAL_TEST_PATH = "tests/host/test_kernel_object_source_layout.py"
 SHARED_INSPECTION_PATH = "tests/host/c_source_records.py"
+HOST_MACROS_DIGEST = "cef5a866a045d5de47e43507e2dd21dc9c609dd30f096224ae36301633b972a1"
+MODEL_TYPES_DIGEST = "d8e00a14a902b448209ed4f27d866534d4ef32a46baeb2d5407c83fff825a444"
+HOST_CASE_TABLE_DIGEST = "b3566dbd412d23b759fc2fd7c3efaf6f083bb0dfd9617fce9fa35c84a164bf90"
+REGISTRY_FIELDS = (
+    "initialization_magic", "max_threads_per_process", "max_harts", "live_process_count",
+    "live_thread_count", "registered_hart_count", "processes", "threads", "harts",
+)
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
     "kernel/kernel_object_state.c",
@@ -143,34 +150,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     (family, name) for family, owners in ORIGINAL_FUNCTIONS.items()
     for owner, names in owners.items() if owner != 0 for name in names
 )
-SYMBOL_OWNER_MIGRATION = (
-    (1, "reset_objects"),
-    (1, "context_pattern"),
-    (1, "contexts_equal"),
-    (1, "test_initialization_is_checked_and_one_shot"),
-    (1, "test_uninitialized_registry_rejects_every_operation"),
-    (1, "test_fixed_capacities_report_exhaustion_atomically"),
-    (1, "test_process_slots_reuse_with_new_generations"),
-    (1, "test_process_exact_slot_creation_is_isolated"),
-    (1, "test_process_address_space_lifecycle_is_exact"),
-    (1, "test_thread_execution_context_lifecycle_is_exact"),
-    (1, "test_thread_slots_reuse_with_new_generations"),
-    (1, "test_thread_ownership_and_production_limit"),
-    (1, "test_model_policy_supports_multiple_threads"),
-    (1, "test_hart_policy_and_stack_validation_are_atomic"),
-    (1, "test_generation_boundaries_and_quarantine"),
-    (1, "test_invalid_arguments_and_stale_handles_preserve_outputs"),
-    (1, "test_validator_rejects_corrupt_relationships"),
-    (1, "test_seeded_lifecycle_model"),
-    (1, "process_handles_equal"),
-    (1, "model_lowest_free_process"),
-    (1, "model_lowest_free_thread"),
-    (1, "model_process_handle"),
-    (1, "model_thread_handle"),
-    (1, "model_reports_expected_error"),
-    (1, "lifecycle_model_matches_registry"),
-    (1, "model_random"),
-)
+SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = REQUIRED_TASKS
 CORE_DAG = {
     0: {1}, 1: {2}, 2: set(), 3: set(), 4: {2},
@@ -343,6 +323,10 @@ def original_locations(family, texts=None):
     names = normal_names(family)
     locations = {}
     for (path, spelling), record in owned_records(family, texts).items():
+        if family == 1 and spelling == "kernel_object_test_registry":
+            if path != family_paths(1)[1]:
+                raise AssertionError("the sole native registry getter has one exact fixture owner")
+            continue
         name = names.get(spelling, spelling)
         if name not in BASELINE_BODIES[family] or name in locations:
             raise AssertionError(f"unknown/duplicate original or unreviewed phase: {family}/{spelling}")
@@ -362,13 +346,83 @@ def original_signature_tokens(family, original, record):
         if signature[:1] == ("static",):
             raise AssertionError("cross-owner private entries have their exact declared external scope")
         signature = ("static", *signature)
+        if family == 1 and original == "reset_objects":
+            if signature != tokens(
+                "static void reset_objects(struct micros_kernel_objects *fixture)"
+            ):
+                raise AssertionError("reset receives exactly its original registry, never another fixture")
+            signature = tokens("static void reset_objects(void)")
+        elif family == 1 and original == "lifecycle_model_matches_registry":
+            prefix = tokens(
+                "static bool lifecycle_model_matches_registry(const struct micros_kernel_objects *fixture,"
+            )
+            if signature[:len(prefix)] != prefix:
+                raise AssertionError("model projection receives the exact readonly borrowed registry first")
+            signature = (*tokens("static bool lifecycle_model_matches_registry("), *signature[len(prefix):])
     return signature
+
+
+def restore_registry_tokens(body):
+    body = list(body)
+    result = []
+    index = 0
+    while index < len(body):
+        if body[index:index + 2] == ["fixture", "->"]:
+            if index and body[index - 1] in (".", "->"):
+                raise AssertionError("registry transport cannot qualify an existing member as a global root")
+            field = body[index + 2:index + 3]
+            if not field or field[0] not in REGISTRY_FIELDS:
+                raise AssertionError("registry transport admits only the original public registry fields")
+            result.extend(("objects", ".", field[0]))
+            index += 3
+        elif body[index:index + 2] == ["*", "fixture"] and body[index + 2:index + 3] != ["->"]:
+            if index and body[index - 1] in (".", "->"):
+                raise AssertionError("registry dereference cannot be an existing member's new authority")
+            result.append("objects")
+            index += 2
+        else:
+            if body[index] == "fixture":
+                if index and body[index - 1] in (".", "->", "&"):
+                    raise AssertionError("only the explicitly borrowed registry pointer may be transported")
+                result.extend(("&", "objects"))
+            else:
+                result.append(body[index])
+            index += 1
+    return tuple(result)
+
+
+def native_registry_body_tokens(original, body):
+    body = list(body)
+    borrow = list(tokens(
+        "struct micros_kernel_objects *fixture = kernel_object_test_registry();"
+    ))
+    if original.startswith("test_"):
+        if body[:1 + len(borrow)] != ["{"] + borrow:
+            raise AssertionError("each native case borrows its one original registry once without a reset")
+        del body[1:1 + len(borrow)]
+    restored = []
+    index = 0
+    while index < len(body):
+        token = body[index]
+        if token in ("reset_objects", "lifecycle_model_matches_registry") and body[index + 1:index + 2] == ["("]:
+            delimiter = ")" if token == "reset_objects" else ","
+            if body[index + 2:index + 4] != ["fixture", delimiter]:
+                raise AssertionError("registry helpers bind the exact caller-owned fixture as first argument")
+            restored.extend((token, "("))
+            index += 3 if delimiter == ")" else 4
+        else:
+            restored.append(token)
+            index += 1
+    return restore_registry_tokens(restored)
 
 
 def original_body_digest(family, original, record):
     names = normal_names(family)
     body = tokens("{" + record.body + "}")
-    return digest_tokens(names.get(token, token) for token in body)
+    body = tuple(names.get(token, token) for token in body)
+    if family == 1 and any(name == "kernel_object_test_registry" for _, name in owned_records(1)):
+        body = native_registry_body_tokens(original, body)
+    return digest_tokens(body)
 
 
 def rename_core_identifiers(text):
@@ -677,6 +731,127 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
                 kernel_object_cmake_projection(changed)
         with self.assertRaises(AssertionError):
             restored_cmake(text + "\n# unreviewed recipe byte\n")
+
+    def test_host_fixture_owns_one_original_registry_and_a_nonresetting_getter(self):
+        path = family_paths(1)[1]
+        text = source(path)
+        records = function_records(text)
+        self.assertIn("kernel_object_test_registry", records)
+        self.assertEqual(1, text.count("static struct micros_kernel_objects objects;"))
+        self.assertEqual(
+            tokens("{ return &objects; }"),
+            tokens("{" + records["kernel_object_test_registry"].body + "}"),
+        )
+        self.assertEqual(
+            tokens("struct micros_kernel_objects *kernel_object_test_registry(void)"),
+            tokens(records["kernel_object_test_registry"].signature),
+        )
+        for owner in family_paths(1):
+            expected = ("static struct micros_kernel_objects objects;",) if owner == path else ()
+            self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(owner)))))
+            self.assertNotRegex(source(owner), r'#include\s*"[^"]*kernel_object_private\.h"')
+        self.assertEqual(28, len(owned_records(1)))
+
+    def test_registry_transport_retains_whole_snapshot_reset_extent_and_member_scope(self):
+        current = (
+            "{ struct micros_kernel_objects *fixture = kernel_object_test_registry(); "
+            "struct micros_kernel_objects snapshot = *fixture; reset_objects(fixture); "
+            "candidate = &fixture->processes[index]; compare(fixture, sizeof(*fixture)); "
+            "if (!lifecycle_model_matches_registry(fixture, &model, step)) { return false; } return true; }"
+        )
+        expected = (
+            "{ struct micros_kernel_objects snapshot = objects; reset_objects(); "
+            "candidate = &objects.processes[index]; compare(&objects, sizeof(objects)); "
+            "if (!lifecycle_model_matches_registry(&model, step)) { return false; } return true; }"
+        )
+        self.assertEqual(tokens(expected), native_registry_body_tokens("test_example", tokens(current)))
+        for changed in (
+            current.replace("fixture->processes", "fixture->unknown"),
+            current.replace("fixture->processes", "other.fixture->processes"),
+            current.replace("reset_objects(fixture)", "reset_objects(other)"),
+            current.replace("lifecycle_model_matches_registry(fixture,", "lifecycle_model_matches_registry(other,"),
+            current.replace("struct micros_kernel_objects *fixture", "static struct micros_kernel_objects *fixture"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_registry_body_tokens("test_example", tokens(changed))
+        for changed in (
+            current.replace("sizeof(*fixture)", "sizeof(fixture)"),
+            current.replace("return false;", "return true;"),
+            current.replace("candidate =", "reset_objects(fixture); candidate ="),
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(tokens(expected), native_registry_body_tokens("test_example", tokens(changed)))
+
+    def test_original_registry_reset_and_macro_snapshot_are_not_new_bundle_copies(self):
+        current = (
+            "{ struct micros_kernel_objects expected_objects = *fixture; "
+            "enum error actual_error = (expression); "
+            "compare(fixture, &expected_objects, sizeof(*fixture)); return false; }"
+        )
+        expected = (
+            "{ struct micros_kernel_objects expected_objects = objects; "
+            "enum error actual_error = (expression); "
+            "compare(&objects, &expected_objects, sizeof(objects)); return false; }"
+        )
+        self.assertEqual(tokens(expected), restore_registry_tokens(tokens(current)))
+        self.assertEqual(
+            tokens("{ memset(&objects, 0, sizeof(objects)); }"),
+            restore_registry_tokens(tokens("{ memset(fixture, 0, sizeof(*fixture)); }")),
+        )
+        for changed in (
+            current.replace("*fixture", "*other.fixture"),
+            current.replace("compare(fixture,", "compare(&fixture,"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore_registry_tokens(tokens(changed))
+
+    def test_host_macros_model_types_and_automatic_case_table_are_actual_original_data(self):
+        header = source(PRIVATE_HEADERS[1])
+        start = header.index("#define EXPECT_TRUE")
+        model_start = header.index("struct lifecycle_model_process {")
+        macro = restore_registry_tokens(tokens(header[start:model_start]))
+        self.assertEqual(HOST_MACROS_DIGEST, digest_tokens(macro))
+        end = header.index("\n};", header.index("struct lifecycle_model {")) + len("\n};")
+        self.assertEqual(MODEL_TYPES_DIGEST, digest_tokens(tokens(header[model_start:end])))
+        main = function_records(source(family_paths(1)[0]))["main"].body
+        table = main[:main.index("    size_t index;")].strip()
+        self.assertNotIn("static", tokens(table))
+        aliases = normal_names(1)
+        self.assertEqual(
+            HOST_CASE_TABLE_DIGEST,
+            digest_tokens(aliases.get(token, token) for token in tokens(table)),
+        )
+        self.assertEqual(15, len(re.findall(r'\{\s*"[^"\n]+"', table)))
+        for original, (path, record) in original_locations(1).items():
+            count = record.body.count("kernel_object_test_registry()")
+            self.assertEqual(int(original.startswith("test_")), count, original)
+        self.assertEqual({}, c_function_definitions(header))
+
+    def test_host_private_edges_include_callbacks_and_keep_reference_independent(self):
+        paths = family_paths(1)
+        records = owned_records(1)
+        owners = {name: path for path, name in records}
+        self.assertEqual(len(records), len(owners))
+        allowed = {
+            0: {2, 3, 4, 5, 6, 7, 8}, 1: set(), 2: {1}, 3: {1}, 4: {1},
+            5: {1}, 6: {1}, 7: {1}, 8: {1, 9, 10, 11}, 9: set(), 10: {1, 9}, 11: {1, 9},
+        }
+        edges = set()
+        exports = set()
+        for (path, name), record in records.items():
+            referenced = set(re.findall(r"\b[A-Za-z_]\w*\b", c_lexical_text(record.body)))
+            for callee in referenced & set(owners):
+                dependency = owners[callee]
+                if dependency != path:
+                    self.assertIn(paths.index(dependency), allowed[paths.index(path)], (name, callee))
+                    edges.add((dependency, path))
+                    exports.add(callee)
+        self.assertEqual(set(paths), set(topological_order(set(paths), edges)))
+        declarations = re.findall(
+            r"\b(kernel_object_test_\w+)\s*\([^;{}]*\)\s*;", c_lexical_text(source(PRIVATE_HEADERS[1])),
+        )
+        self.assertEqual(len(declarations), len(set(declarations)))
+        self.assertEqual(exports, set(declarations))
 
 
 if __name__ == "__main__":
