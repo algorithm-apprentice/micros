@@ -1412,6 +1412,31 @@ def suite_ids(suite):
     )
 
 
+def alias_rows():
+    return ((RUNNER_PATH, PRODUCTION_PATHS[1:]), (TEST_PATH, TEST_PATHS[1:]))
+
+
+def qemu_planner_projection(tree):
+    assignments = {
+        node.targets[0].id: node for node in tree.body
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    }
+    if "PATH_CLASSIFICATION_EQUIVALENTS" not in assignments or "HOST_UNIT_ONLY_INPUTS" not in assignments:
+        raise AssertionError("complete original planner metadata declarations remain")
+    aliases = assignments["PATH_CLASSIFICATION_EQUIVALENTS"].value
+    host = assignments["HOST_UNIT_ONLY_INPUTS"].value
+    rows, paths = ast.literal_eval(aliases), ast.literal_eval(host)
+    expected = dict(alias_rows())
+    selected = {old: values for old, values in rows if old in expected}
+    if not selected and STRUCTURAL_TEST_PATH not in paths:
+        return tree
+    if selected != expected or sum(old in expected for old, _ in rows) != 2 or paths.count(STRUCTURAL_TEST_PATH) != 1:
+        raise AssertionError("QEMU transport adds only its two exact families and one host-only structural input")
+    aliases.elts = [node for node in aliases.elts if ast.literal_eval(node)[0] not in expected]
+    host.elts = [node for node in host.elts if ast.literal_eval(node) != STRUCTURAL_TEST_PATH]
+    return tree
+
+
 def restored_runner_source(text=None, owners=None):
     root_text = source(RUNNER_PATH) if text is None else text
     texts = {RUNNER_PATH: root_text}
@@ -1465,6 +1490,8 @@ def restored_runner_source(text=None, owners=None):
             if path == RUNNER_PATH and isinstance(node, ast.ImportFrom) and node.module in {
                 item[:-3].replace("/", ".") for item in PRODUCTION_PATHS[1:]
             }:
+                if bootstraps != 1:
+                    raise AssertionError("the sole repository import bootstrap precedes every package alias")
                 continue
             if path != RUNNER_PATH and isinstance(node, (ast.Import, ast.ImportFrom)):
                 validate_owner_import(PRODUCTION_PATHS.index(path), node)
@@ -1565,6 +1592,84 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_facade_bootstrap_must_precede_every_package_alias(self):
+        current = source(RUNNER_PATH)
+        bootstrap = "sys.path.insert(0, str(Path(__file__).resolve().parent.parent))"
+        self.assertEqual(1, current.count(bootstrap))
+        changed = current.replace(bootstrap, "", 1) + "\n" + bootstrap + "\n"
+        with self.assertRaises(AssertionError):
+            restored_runner_source(changed)
+
+    def test_direct_cli_help_preserves_import_bootstrap_outside_repository(self):
+        import subprocess
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, "-B", str(ROOT / RUNNER_PATH), "--help"], cwd=directory,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+            )
+        self.assertEqual((0, ""), (result.returncode, result.stderr))
+        self.assertIn("Run the deterministic micros QEMU boot smoke test.", result.stdout)
+
+    def test_planner_families_keep_all_four_original_metadata_dimensions_and_plans(self):
+        from tools import validation_plan as planner
+
+        aliases = dict(planner.PATH_CLASSIFICATION_EQUIVALENTS)
+        for old, paths in alias_rows():
+            self.assertEqual(paths, aliases.get(old), old)
+            self.assertTrue(planner.requires_full_tier([old]))
+            self.assertEqual(38, len(planner.affected_workflows([old])))
+            self.assertEqual([], planner.affected_slow_models([old]))
+            self.assertEqual([], planner.affected_image_workflows([old]))
+            for path in paths:
+                self.assertEqual(planner.requires_full_tier([old]), planner.requires_full_tier([path]))
+                for classify in (planner.affected_workflows, planner.affected_slow_models, planner.affected_image_workflows):
+                    self.assertEqual(classify([old]), classify([path]), path + ":" + classify.__name__)
+                for tier in ("fast", "pr", "full"):
+                    self.assertEqual(planner.plan([old], tier, "main"), planner.plan([path], tier, "main"))
+        self.assertEqual(1, planner.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertFalse(planner.requires_full_tier([STRUCTURAL_TEST_PATH]))
+        for classify in (planner.affected_workflows, planner.affected_slow_models, planner.affected_image_workflows):
+            self.assertEqual([], classify([STRUCTURAL_TEST_PATH]))
+        self.assertEqual(
+            [planner.UNIT_FAST, *planner.diff_commands("main")], planner.plan([STRUCTURAL_TEST_PATH], "fast", "main"),
+        )
+
+    def test_metadata_inverse_retains_old_rows_algorithms_and_exact_original_planner_ast(self):
+        baseline = (
+            "PATH_CLASSIFICATION_EQUIVALENTS = (('old', ('old_alias',)),)\n"
+            "HOST_UNIT_ONLY_INPUTS = ('old_host',)\n"
+            "def algorithm(value):\n    return value + 1\n"
+        )
+        rows = (("old", ("old_alias",)), *alias_rows())
+        paths = ("old_host", STRUCTURAL_TEST_PATH)
+        current = (
+            "PATH_CLASSIFICATION_EQUIVALENTS = " + repr(rows) + "\n"
+            "HOST_UNIT_ONLY_INPUTS = " + repr(paths) + "\n"
+            "def algorithm(value):\n    return value + 1\n"
+        )
+        project = lambda text: ast_digest(qemu_planner_projection(ast.parse(text)))
+        self.assertEqual(ast_digest(ast.parse(baseline)), project(current))
+        self.assertEqual(ast_digest(ast.parse(baseline)), project(baseline))
+        for changed in (
+            current.replace("qemu_smoke_records.py", "qemu_smoke_other.py"),
+            current.replace("tests/host/qemu_smoke_test_fixture.py", "tests/host/other_fixture.py"),
+            current.replace(STRUCTURAL_TEST_PATH, "tests/host/other_gate.py"),
+            current.replace(repr(rows), repr((*rows, rows[1]))),
+            current.replace(repr(paths), repr((*paths, STRUCTURAL_TEST_PATH))),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                project(changed)
+        self.assertNotEqual(project(baseline), project(current.replace("value + 1", "value - 1")))
+        self.assertNotEqual(project(baseline), project(current.replace("old_alias", "changed_old_alias")))
+        self.assertEqual(ORIGINAL_PLANNER_AST, project(source("tools/validation_plan.py")))
+
+    def test_build_recipe_and_existing_shared_inspection_execution_libraries_are_unchanged(self):
+        self.assertEqual(BASE_CMAKE_DIGEST, digest(source("CMakeLists.txt").encode()))
+        for path, expected in PROTECTED_SOURCE_HASHES.items():
+            self.assertEqual(expected, digest((ROOT / path).read_bytes()), path)
+
     def test_all_test_owners_preserve_complete_original_ast_and_single_discovery(self):
         for path in TEST_PATHS:
             self.assertTrue((ROOT / path).is_file(), path)
@@ -1897,6 +2002,13 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(INITIAL_SOURCE_OWNER_MIGRATION) - COMPLETED_SOURCE_NODES, set(SOURCE_OWNER_MIGRATION))
         self.assertEqual(3, len(ORIGINAL_LONG_FUNCTIONS))
         self.assertEqual(set(name for name, _ in ORIGINAL_LONG_FUNCTIONS) - OUTLINED_FUNCTIONS, set(LONG_TASK_MIGRATION))
+        assignments = {
+            node.targets[0].id: node.value for node in ast.parse(source(STRUCTURAL_TEST_PATH)).body
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+        }
+        for name in ("SOURCE_OWNER_MIGRATION", "LONG_TASK_MIGRATION"):
+            self.assertIsInstance(assignments[name], ast.Tuple)
+            self.assertEqual([], assignments[name].elts)
 
     def test_raw_node_fixture_requires_complete_actual_bytes_ast_and_whitespace_only_transport(self):
         original = "#!/usr/bin/env python3\n\nimport os\n\nVALUE = 7\n\n\ndef original(value):\n    return value + VALUE\n"

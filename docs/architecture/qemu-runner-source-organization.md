@@ -7,9 +7,8 @@ This is the Accepted exact contract for
 Independent complete design/correction and acceptance-only reviews are clean.
 Design #145 separately merged as
 `934faa9fd0e9e406758c0f2e336fb28af57739db`, with its exact reviewed tree.
-Only `qemu-tooling-decomposition-implementation` is active, on a fresh branch
-from that main. Current progress below distinguishes real owners from
-explicit future migration paths. This adds no runtime-DAG node.
+Implementation #146 starts on a fresh branch from that main. The source map
+and evidence requirements below add no runtime-DAG node.
 
 ```text
 reviewed micros base: 34f1048449c221b014530484bfec4b3c0ab51142
@@ -387,7 +386,7 @@ cleanup behavior changes. No configuration/default flag workaround, new
 eligible workflow, generalized parser/import/bytecode/rule engine,
 cross-HEAD reuse, kernel layout or production init/shell work is included.
 
-## Current implementation progress
+## Implementation source map and evidence
 
 Before any rewrite, immutable Git `934faa9` facts froze the complete runner,
 46 functions/two classes/43 assignments and six aggregate classes/85 methods/
@@ -395,80 +394,33 @@ Before any rewrite, immutable Git `934faa9` facts froze the complete runner,
 The runtime gate contains only immutable hashes/order/whitespace metadata,
 not an unchecked legacy body archive.
 
-Structural Red first found the original argument builder still in the
-facade. Independent exact actual-node raw/AST/whitespace and facade-binding
-fixtures preceded its complete 25-line move into the command owner.
-The actual complete original `9e54f744...` file and module AST reconstruct
-before either current source digest changes.
+All ten production owners and eight test owners are real. All 212 original
+function/class/data/method/fixture moves and three ordered outlines are
+complete; both active migrations are literal empty. The 57 production
+functions are at most 120 physical lines: acceptance root 113, parser 27
+and main 120. The cohesive 77-line serial lifetime remains intact.
 
-All ten production paths are present; eight future modules are explicitly
-single-docstring migration owners, not completed responsibilities.
-The original other 45 functions, two classes and data still remain in the
-facade; all 85 original cases still execute through their unchanged root.
-There are 211 original node/method/data moves and all three long-function
-dispositions remaining.
+Nine plain case mixins retain all 85 original raw/AST method bodies.
+The fixture owner retains all 36 independent raw/AST assignments. Six
+aggregate identities, explicit aliases, sorted IDs and native discovery
+remain exact and occur once. Actual complete original runner raw/AST,
+test-module AST, context AST and planner AST restore before retained
+oracles; their old expected values are unchanged.
 
-The reviewed ten-member code declaration, exact early package/cache/source
-checks and fixed source-free admitted-interpreter namespace/helper-origin
-checks are wired. Actual installed native/smoke/TTY-image metadata closure
-remains eligible; no dirty-iteration workflow receipt or reuse is claimed.
-The original full context AST and all prior runner byte/text expectations
-restore before retained checks. Current narrow evidence passes 223 primary
-checks, four other retained source checks and the real unchanged-budget
-smoke guest. Final full author/reuse and independent implementation review
-are not claimed complete.
+Two exact planner family rows independently preserve full-tier, QEMU,
+slow-model and image dimensions; the one structural gate is host-unit-only.
+The code-family and admitted-interpreter loader predicates remain before
+QEMU metadata, and the original CMake recipe and shared inspection,
+input, manifest, execution and evidence libraries are byte-exact.
 
-The records slice now moves all 43 original assignments, both complete
-class/decorator definitions and the 16-line record splitter into their one
-owner. Explicit facade aliases preserve the actual enum/result/pattern
-object identities and original dataclass defaults. All original raw bytes/
-ASTs restore before updating either current member digest. Current narrow
-source/legacy-case evidence passes 187 checks and both real smoke/panic
-guests with unchanged budgets. Seven future production owners remain
-docstring-only, 44 original functions still reside in the facade, and
-165 original node/method/data moves plus three long dispositions remain.
-
-All seventeen platform-report functions now have their one complete owner,
-with only actual original records/pattern dependencies. Their full original
-bodies/signatures, prerequisite relationships and short-circuits reconstruct
-before current source pins change. Current evidence passes 188 focused
-checks and actual smoke/timer guests at the original eight-second budgets.
-Six future production owners remain docstring-only; 27 original functions
-still reside in the facade. There are 148 original node/method/data moves
-and all three long-function dispositions remaining.
-
-The ten original object/user-space/scheduler/endpoint/IPC report functions
-now occupy their complete owner with exact record/platform dependencies.
-All raw bodies, prerequisite/order tests and actual whole-file/context
-inverses pass. Current evidence is 189 focused checks and real object-model
-and IPC guests at their original budgets. Five production migration
-stubs remain; seventeen original functions still reside in the facade,
-with 138 original node/method/data moves and three long tasks pending.
-
-The diagnostic, symbol/argv and process/serial owners are now complete.
-Their original bodies, including the cohesive 77-line serial loop, restore
-exactly before current pin updates. The 190 focused checks, real
-symbol-resolved trap-panic guest and serial-triggered TTY guest pass with
-unchanged budgets. Only outcome, arguments and CLI remain migration stubs:
-seven original functions, 85 methods and 36 fixtures (128 moves), plus the
-three specified long outlines, remain.
-
-All ten production owners are now real. The ordered report/argument phases
-and single main-call forwarding complete all 46 original moves and all
-three required outlines; the long migration is literal empty. The 57
-production functions are at most 120 lines (acceptance root 113, parser 27,
-main 120). Actual complete old raw/AST/context reconstruction, independent
-binding/order/body mutations, CLI first errors, symbol failures and
-deterministic serial short-write/timeout custody pass in 199 focused checks.
-Real two-memory allocator growth and sealed VM-fault guests also pass.
-Only the original 85 methods and 36 fixtures (121 moves), planner wiring and
-final full/reuse/review acceptance remain.
-
-All eight test owners are now real: nine plain mixins carry the unchanged
-85 raw/AST method bodies, and the fixture owner retains all 36 independent
-raw/AST assignments. Six original aggregate classes, aliases, sorted IDs
-and native discovery remain exact and occur once. Both migrations are
-literal empty. The 201 focused checks pass, including complete original
-test-module AST restoration and independent inheritance/override/fixture/
-loader mutations. Planner transport and final full/reuse/review acceptance
-are still required.
+Structural and collector Reds preceded transport. Narrow green evidence
+includes 311 source/closure/planner/original-case checks, independent
+binding/body/order/discovery/loader mutations, CLI first errors, symbol
+failures and deterministic serial short-write/timeout custody. Real smoke,
+timer, object/IPC, symbol-resolved trap panic, serial-triggered TTY,
+two-memory growth and sealed VM-fault guests retain their original budgets.
+The implementation PR records exact commands/results and current
+HEAD/staged-tree identities. Final merge still requires the complete
+current fresh author plan, actual same-original-full-producer three-profile
+reuse and clean independent review; no earlier slice or old-head receipt
+substitutes for that barrier.

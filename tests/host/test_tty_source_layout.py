@@ -1217,6 +1217,9 @@ def restored_cmake(text):
 
 
 def tty_planner_projection(tree):
+    from tests.host.test_qemu_runner_source_layout import qemu_planner_projection
+
+    tree = qemu_planner_projection(tree)
     expected = dict(alias_rows())
     assignments = {
         node.targets[0].id: node for node in tree.body
