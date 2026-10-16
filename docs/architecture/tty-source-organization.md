@@ -603,3 +603,12 @@ pure doubles and the device case gain no ambient state. All sixteen complete
 original bodies/types and the exact failure macro reconstruct, and actual
 native device/lifecycle/deadline/panic cases pass. There are 32 original
 moves, three declarations-only owners and five semantic dispositions remaining.
+
+Device classification now has a 79-line exact/range root and a 79-line
+terminal exclusion phase. The four original readonly constants remain in
+root and pass by their complete typed values. Only the original authority
+initializer and uninitialized classification occupy caller work; executable,
+alias, foreign, physical-substitution, managed and out-of-phase sentinel
+observations retain their order. Full original-body/type restoration and
+independent fixtures precede the outline; actual native cases pass.
+There are 32 original moves and four semantic dispositions remaining.

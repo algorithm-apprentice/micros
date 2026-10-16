@@ -158,7 +158,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
-    (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
+    (4, "test_runtime_lifecycle_validation"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
 )
 RUNTIME_CONTEXT_TAG = "tty_handoff_context"
@@ -234,6 +234,17 @@ HANDOFF_CONTEXT_ROOTS = (
 )
 HANDOFF_PRIVATE_EXPORTS = ("test_device_leaf_classification", "test_runtime_lifecycle_validation")
 HANDOFF_MACRO_DIGEST = "dc1fbf95f12b7896694addb93aa8603ed20b7bd57022a9d01f7b8c7342234fb6"
+DEVICE_WORK_TAG = "tty_handoff_device_work"
+DEVICE_PHASE = "tty_handoff_test_check_device_exclusions"
+DEVICE_FIELDS = (
+    ("struct micros_tty_device_authority authority;", True),
+    ("enum micros_tty_device_leaf_class classification;", False),
+)
+DEVICE_PARAMETERS = (
+    "struct tty_handoff_device_work *work, const struct micros_process_handle tty_process, "
+    "const struct micros_process_handle foreign_process, const uint64_t tty_root, const uint32_t exact_permissions"
+)
+DEVICE_ARGUMENTS = "&work, tty_process, foreign_process, tty_root, exact_permissions"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -645,6 +656,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 4 and spelling == DEVICE_PHASE:
+                if path != HANDOFF_SOURCES[2]:
+                    raise AssertionError("device exclusions have their exact private classification-case owner")
+                continue
             if family == 4 and spelling == HANDOFF_FIXTURE_GETTER:
                 if path != HANDOFF_SOURCES[1]:
                     raise AssertionError("native handoff fixture getter has its sole original-family owner")
@@ -707,6 +722,8 @@ def original_body_digest(family, record):
         body = write_actual_body_tokens(record)
     if family == 3 and record.name == "tty_model_validate" and (3, "model_validate") not in FUNCTION_TASK_MIGRATION:
         body = model_validation_actual_body_tokens(record)
+    if family == 4 and record.name == "tty_handoff_test_device_leaf_classification" and (4, "test_device_leaf_classification") not in FUNCTION_TASK_MIGRATION:
+        body = device_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
@@ -859,6 +876,40 @@ def handoff_fixture_body_tokens(original, body):
     )
 
 
+def root_work_body_tokens(body, tag, fields, declarations):
+    from tests.host.test_grant_data_plane_source_layout import restore_automatic_work_tokens
+
+    body = list(body)
+    declaration = list(tokens("struct " + tag + " work;"))
+    positions = [index for index in range(len(body)) if body[index:index + len(declaration)] == declaration]
+    if len(positions) != 1 or body[:1] != ["{"]:
+        raise AssertionError("one exact uninitialized automatic work follows original root-owned constants")
+    start = positions[0]
+    restored = restore_automatic_work_tokens(["{", *body[start:]], tag, fields, declarations)
+    return (restored[0], *body[1:start], *restored[1:])
+
+
+def device_body_tokens(caller, phase, declarations):
+    from tests.host.test_grant_data_plane_source_layout import boolean_case_body_tokens
+
+    phase_tokens = tokens(phase)
+    if phase_tokens[-4:] != ("return", "true", ";", "}") or set(phase_tokens[1:-4]) & {"return", "goto", "break", "continue"}:
+        raise AssertionError("device exclusions complete only after all original first-failure observations")
+    body = boolean_case_body_tokens(tokens(caller), ((DEVICE_PHASE, DEVICE_ARGUMENTS, phase, True),))
+    return root_work_body_tokens(body, DEVICE_WORK_TAG, DEVICE_FIELDS, declarations)
+
+
+def device_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(HANDOFF_SOURCES[2]) if owner is None else owner
+    declarations = work_declarations(owner, DEVICE_WORK_TAG, DEVICE_FIELDS)
+    phase = function_records(owner)[DEVICE_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens("static bool " + DEVICE_PHASE + "(" + DEVICE_PARAMETERS + ")"):
+        raise AssertionError("device phase binds exact original caller work and root-owned readonly scalar/handle values")
+    return device_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
+
+
 def source_set_block(name, paths):
     return "set(\n    " + name + "\n" + "".join("    " + path + "\n" for path in paths) + ")"
 
@@ -930,6 +981,62 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_device_classification_has_one_typed_exclusion_phase_after_exact_range_observations(self):
+        records = function_records(source(HANDOFF_SOURCES[2]))
+        self.assertIn(DEVICE_PHASE, set(records))
+        self.assertEqual(tokens("static bool " + DEVICE_PHASE + "(" + DEVICE_PARAMETERS + ")"), tokens(records[DEVICE_PHASE].signature))
+        self.assertLessEqual(records["tty_handoff_test_device_leaf_classification"].lines, 120)
+        self.assertLessEqual(records[DEVICE_PHASE].lines, 120)
+
+    def test_device_inverse_retains_root_constants_exact_authority_initializer_and_output_sentinel_order(self):
+        caller = (
+            "{ const struct micros_process_handle tty_process = {3, 7}; "
+            "const struct micros_process_handle foreign_process = {2, 5}; "
+            "const uint64_t tty_root = ROOT; const uint32_t exact_permissions = READ | WRITE | USER; "
+            "struct tty_handoff_device_work work; "
+            "work.authority = (struct micros_tty_device_authority){ .process = tty_process, .root = tty_root, .phase = MAPPED }; "
+            "EXPECT_TRUE(original_exact_range(&work.authority, &work.classification)); "
+            "return tty_handoff_test_check_device_exclusions(&work, tty_process, foreign_process, tty_root, exact_permissions); }"
+        )
+        phase = (
+            "{ EXPECT_TRUE(original_invalid_execute_alias_foreign(&work->authority, tty_process, foreign_process, tty_root, exact_permissions)); "
+            "EXPECT_TRUE(original_physical_substitution_and_managed(&work->classification)); "
+            "work->authority.phase = MAP_REQUESTED; work->classification = INVALID; "
+            "EXPECT_TRUE(original_out_of_phase(&work->authority, &work->classification) == STATE && work->classification == INVALID); return true; }"
+        )
+        expected = (
+            "{ const struct micros_process_handle tty_process = {3, 7}; "
+            "const struct micros_process_handle foreign_process = {2, 5}; "
+            "const uint64_t tty_root = ROOT; const uint32_t exact_permissions = READ | WRITE | USER; "
+            "struct micros_tty_device_authority authority = { .process = tty_process, .root = tty_root, .phase = MAPPED }; "
+            "enum micros_tty_device_leaf_class classification; EXPECT_TRUE(original_exact_range(&authority, &classification)); "
+            "EXPECT_TRUE(original_invalid_execute_alias_foreign(&authority, tty_process, foreign_process, tty_root, exact_permissions)); "
+            "EXPECT_TRUE(original_physical_substitution_and_managed(&classification)); authority.phase = MAP_REQUESTED; classification = INVALID; "
+            "EXPECT_TRUE(original_out_of_phase(&authority, &classification) == STATE && classification == INVALID); return true; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in DEVICE_FIELDS)
+        self.assertEqual(tokens(expected), device_body_tokens(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct tty_handoff_device_work work;", "struct tty_handoff_device_work work = {0};"),
+            caller.replace("&work, tty_process", "&copy, tty_process"),
+            caller.replace("foreign_process, tty_root, exact_permissions);", "foreign_process, tty_root, other_permissions);"),
+            caller.replace("return tty_handoff_test_check_device_exclusions", "retain(&work); return tty_handoff_test_check_device_exclusions"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                device_body_tokens(changed, phase, declarations)
+        with self.assertRaises(AssertionError):
+            device_body_tokens(caller, phase.replace("return true;", "return false;"), declarations)
+        with self.assertRaises(AssertionError):
+            device_body_tokens(caller, phase, (tokens("uint64_t authority;"), declarations[1]))
+        self.assertNotEqual(
+            tokens(expected), device_body_tokens(caller.replace(".phase = MAPPED", ".phase = OWNED"), phase, declarations),
+        )
+        reordered = phase.replace(
+            "work->classification = INVALID; EXPECT_TRUE(original_out_of_phase",
+            "EXPECT_TRUE(original_out_of_phase",
+        ).replace("return true;", "work->classification = INVALID; return true;")
+        self.assertNotEqual(tokens(expected), device_body_tokens(caller, reordered, declarations))
+
     def test_handoff_originals_have_exact_task_owners_and_sole_five_field_fixture(self):
         for owner, names in ORIGINAL_FUNCTIONS[4].items():
             records = function_records(source(HANDOFF_SOURCES[owner]))
@@ -1437,7 +1544,10 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(37, len(STABLE_HASHES))
         self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3, 4)})
         self.assertEqual(
-            set(REQUIRED_TASKS) - {(0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate")},
+            set(REQUIRED_TASKS) - {
+                (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
+                (4, "test_device_leaf_classification"),
+            },
             set(FUNCTION_TASK_MIGRATION),
         )
 
