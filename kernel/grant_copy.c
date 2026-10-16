@@ -17,7 +17,96 @@ _Static_assert(
     "grant copy maximum must remain one page"
 );
 
-static enum micros_grant_error copy_grant(
+struct grant_copy_execution {
+    const struct micros_frame_ownership *ledger;
+    struct micros_grant_copy_authority authority;
+    struct micros_grant_copy_range_plan remote_plan;
+    struct micros_grant_copy_range_plan local_plan;
+    struct micros_tty_device_authority device_authority;
+    const struct micros_grant_copy_range_plan *source_plan;
+    const struct micros_grant_copy_range_plan *destination_plan;
+    enum micros_grant_error remote_error;
+    enum micros_grant_error local_error;
+    enum micros_grant_error error;
+    enum micros_tty_device_authority_status device_status;
+};
+
+static bool grant_copy_local_range_is_valid(
+    uintptr_t local_address,
+    size_t length
+)
+{
+    if (
+        length != 0
+        && (
+            local_address == 0
+            || local_address < MICROS_USER_VIRTUAL_BASE
+            || local_address >= MICROS_USER_VIRTUAL_END
+            || UINTPTR_MAX - local_address < length
+            || length > MICROS_USER_VIRTUAL_END - local_address
+        )
+    ) {
+        return false;
+    }
+    return true;
+}
+
+static bool grant_copy_prepare_participant_plans(
+    struct grant_copy_execution *work,
+    uintptr_t local_address,
+    size_t length,
+    uint32_t required_permission
+)
+{
+    work->remote_error = grant_copy_plan_range(
+        work->authority.grantor,
+        work->authority.remote_address,
+        length,
+        required_permission == MICROS_GRANT_PERMISSION_READ
+            ? MICROS_SV39_PERMISSION_READ
+            : MICROS_SV39_PERMISSION_WRITE,
+        work->device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &work->device_authority
+            : NULL,
+        &work->remote_plan
+    );
+    work->local_error = grant_copy_plan_range(
+        work->authority.grantee,
+        local_address,
+        length,
+        required_permission == MICROS_GRANT_PERMISSION_READ
+            ? MICROS_SV39_PERMISSION_WRITE
+            : MICROS_SV39_PERMISSION_READ,
+        work->device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
+            ? &work->device_authority
+            : NULL,
+        &work->local_plan
+    );
+    if (
+        work->remote_error == MICROS_GRANT_ERROR_INVARIANT
+        || work->local_error == MICROS_GRANT_ERROR_INVARIANT
+    ) {
+        work->error = MICROS_GRANT_ERROR_INVARIANT;
+        return false;
+    }
+    if (
+        work->remote_error == MICROS_GRANT_ERROR_PHASE
+        || work->local_error == MICROS_GRANT_ERROR_PHASE
+    ) {
+        work->error = MICROS_GRANT_ERROR_PHASE;
+        return false;
+    }
+    if (
+        work->remote_error != MICROS_GRANT_OK
+        || work->local_error != MICROS_GRANT_OK
+    ) {
+        work->error = MICROS_GRANT_ERROR_FAULT;
+        return false;
+    }
+    return true;
+}
+
+static enum micros_grant_error grant_copy_execute(
     const struct micros_grant_registry *grant_registry,
     const struct micros_endpoint_registry *endpoint_registry,
     const struct micros_kernel_objects *objects,
@@ -30,17 +119,9 @@ static enum micros_grant_error copy_grant(
     uint32_t required_permission
 )
 {
-    const struct micros_frame_ownership *ledger;
-    struct micros_grant_copy_authority authority;
-    struct micros_grant_copy_range_plan remote_plan = {0};
-    struct micros_grant_copy_range_plan local_plan = {0};
-    struct micros_tty_device_authority device_authority;
-    const struct micros_grant_copy_range_plan *source_plan;
-    const struct micros_grant_copy_range_plan *destination_plan;
-    enum micros_grant_error remote_error;
-    enum micros_grant_error local_error;
-    enum micros_grant_error error;
-    enum micros_tty_device_authority_status device_status;
+    struct grant_copy_execution work;
+    work.remote_plan = (struct micros_grant_copy_range_plan){0};
+    work.local_plan = (struct micros_grant_copy_range_plan){0};
     uintptr_t saved_status;
 
     if (
@@ -59,20 +140,11 @@ static enum micros_grant_error copy_grant(
     if (length > MICROS_GRANT_COPY_MAX) {
         return MICROS_GRANT_ERROR_RANGE;
     }
-    if (
-        length != 0
-        && (
-            local_address == 0
-            || local_address < MICROS_USER_VIRTUAL_BASE
-            || local_address >= MICROS_USER_VIRTUAL_END
-            || UINTPTR_MAX - local_address < length
-            || length > MICROS_USER_VIRTUAL_END - local_address
-        )
-    ) {
+    if (!grant_copy_local_range_is_valid(local_address, length)) {
         return MICROS_GRANT_ERROR_RANGE;
     }
     saved_status = riscv_irq_save();
-    error = micros_grant_prepare_copy_authority(
+    work.error = micros_grant_prepare_copy_authority(
         grant_registry,
         endpoint_registry,
         objects,
@@ -82,112 +154,72 @@ static enum micros_grant_error copy_grant(
         grant_offset,
         length,
         required_permission,
-        &authority
+        &work.authority
     );
-    if (error != MICROS_GRANT_OK) {
+    if (work.error != MICROS_GRANT_OK) {
         goto done;
     }
-    ledger = micros_frame_ownership_runtime_ledger();
-    if (ledger == NULL) {
-        error = MICROS_GRANT_ERROR_INVARIANT;
+    work.ledger = micros_frame_ownership_runtime_ledger();
+    if (work.ledger == NULL) {
+        work.error = MICROS_GRANT_ERROR_INVARIANT;
         goto done;
     }
     if (
-        ledger->phase
+        work.ledger->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-        && ledger->phase
+        && work.ledger->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
     ) {
-        error = MICROS_GRANT_ERROR_PHASE;
+        work.error = MICROS_GRANT_ERROR_PHASE;
         goto done;
     }
     if (length == 0) {
-        error = MICROS_GRANT_OK;
+        work.error = MICROS_GRANT_OK;
         goto done;
     }
-    device_status =
+    work.device_status =
         micros_tty_handoff_runtime_device_authority(
             endpoint_registry,
             objects,
-            &device_authority
+            &work.device_authority
         );
     if (
-        device_status
+        work.device_status
             == MICROS_TTY_DEVICE_AUTHORITY_INVARIANT
     ) {
-        error = MICROS_GRANT_ERROR_INVARIANT;
+        work.error = MICROS_GRANT_ERROR_INVARIANT;
         goto done;
     }
 
-    remote_error = grant_copy_plan_range(
-        authority.grantor,
-        authority.remote_address,
-        length,
-        required_permission == MICROS_GRANT_PERMISSION_READ
-            ? MICROS_SV39_PERMISSION_READ
-            : MICROS_SV39_PERMISSION_WRITE,
-        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
-            ? &device_authority
-            : NULL,
-        &remote_plan
-    );
-    local_error = grant_copy_plan_range(
-        authority.grantee,
-        local_address,
-        length,
-        required_permission == MICROS_GRANT_PERMISSION_READ
-            ? MICROS_SV39_PERMISSION_WRITE
-            : MICROS_SV39_PERMISSION_READ,
-        device_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE
-            ? &device_authority
-            : NULL,
-        &local_plan
-    );
-    if (
-        remote_error == MICROS_GRANT_ERROR_INVARIANT
-        || local_error == MICROS_GRANT_ERROR_INVARIANT
-    ) {
-        error = MICROS_GRANT_ERROR_INVARIANT;
-        goto done;
-    }
-    if (
-        remote_error == MICROS_GRANT_ERROR_PHASE
-        || local_error == MICROS_GRANT_ERROR_PHASE
-    ) {
-        error = MICROS_GRANT_ERROR_PHASE;
-        goto done;
-    }
-    if (
-        remote_error != MICROS_GRANT_OK
-        || local_error != MICROS_GRANT_OK
-    ) {
-        error = MICROS_GRANT_ERROR_FAULT;
+    if (!grant_copy_prepare_participant_plans(
+        &work, local_address, length, required_permission
+    )) {
         goto done;
     }
     if (required_permission == MICROS_GRANT_PERMISSION_READ) {
-        source_plan = &remote_plan;
-        destination_plan = &local_plan;
+        work.source_plan = &work.remote_plan;
+        work.destination_plan = &work.local_plan;
     } else {
-        source_plan = &local_plan;
-        destination_plan = &remote_plan;
+        work.source_plan = &work.local_plan;
+        work.destination_plan = &work.remote_plan;
     }
-    error = micros_grant_copy_plan_validate(
-        source_plan,
-        destination_plan,
+    work.error = micros_grant_copy_plan_validate(
+        work.source_plan,
+        work.destination_plan,
         length
     );
-    if (error != MICROS_GRANT_OK) {
+    if (work.error != MICROS_GRANT_OK) {
         goto done;
     }
     micros_grant_copy_commit(
-        source_plan,
-        destination_plan,
+        work.source_plan,
+        work.destination_plan,
         length
     );
 
 done:
     riscv_irq_restore(saved_status);
-    return error;
+    return work.error;
 }
 
 enum micros_grant_error micros_grant_validate_range(
@@ -301,7 +333,7 @@ enum micros_grant_error micros_grant_copy_from(
     size_t length
 )
 {
-    return copy_grant(
+    return grant_copy_execute(
         grant_registry,
         endpoint_registry,
         objects,
@@ -327,7 +359,7 @@ enum micros_grant_error micros_grant_copy_to(
     size_t length
 )
 {
-    return copy_grant(
+    return grant_copy_execute(
         grant_registry,
         endpoint_registry,
         objects,

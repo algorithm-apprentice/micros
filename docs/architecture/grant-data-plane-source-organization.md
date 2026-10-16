@@ -497,3 +497,13 @@ maintaining only the admitted current digest
 `4e370ba5578b0b114a51d2d5ae738320ce7503a3d51bd7c2e6fb2623284981b3`.
 Earlier source/recipe/planner expected values remain unchanged under only
 that finite delta. This is not final author/reuse or review completion.
+
+The next semantic slice outlines copy execution into a 115-line root,
+19-line local-range admission and 54-line complete participant-plan phase.
+Its caller-owned work contains exactly the original eleven objects, with
+only the two original plan initializers. Saved IRQ status stays separate
+in root; authority/phase/zero/device order, both plans before classification,
+direction/physical validation/commit and the common restoration remain
+exact. Independent typed-work/binding/return/initializer/IRQ mutants and
+full original-body reconstruction protect that outline. Sixty-three owner
+moves and eighteen semantic dispositions remain pending.

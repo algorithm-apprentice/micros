@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import unittest
 
-from tests.host.c_source_records import function_records
+from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tools import validation_context, validation_plan
@@ -52,6 +52,22 @@ PRIVATE_HEADERS = (
     "kernel/grant_copy_internal.h",
     "tests/host/grant_test_internal.h",
     "kernel/grant_syscall_test_internal.h",
+)
+COPY_EXECUTION_TAG = "grant_copy_execution"
+COPY_EXECUTION_PHASE = "grant_copy_prepare_participant_plans"
+COPY_LOCAL_RANGE_PHASE = "grant_copy_local_range_is_valid"
+COPY_EXECUTION_FIELDS = (
+    ("const struct micros_frame_ownership *ledger;", False),
+    ("struct micros_grant_copy_authority authority;", False),
+    ("struct micros_grant_copy_range_plan remote_plan;", True),
+    ("struct micros_grant_copy_range_plan local_plan;", True),
+    ("struct micros_tty_device_authority device_authority;", False),
+    ("const struct micros_grant_copy_range_plan *source_plan;", False),
+    ("const struct micros_grant_copy_range_plan *destination_plan;", False),
+    ("enum micros_grant_error remote_error;", False),
+    ("enum micros_grant_error local_error;", False),
+    ("enum micros_grant_error error;", False),
+    ("enum micros_tty_device_authority_status device_status;", False),
 )
 ORIGINAL_FUNCTIONS = {
     0: {
@@ -138,7 +154,26 @@ SYMBOL_OWNER_MIGRATION = tuple(
     item for item in INITIAL_SYMBOL_OWNER_MIGRATION
     if item not in ((0, "map_address_error"), (0, "plan_range"))
 )
-FUNCTION_TASK_MIGRATION = REQUIRED_TASKS
+FUNCTION_TASK_MIGRATION = (
+    (1, "micros_grant_handle_captured_user_ecall"),
+    (2, "micros_grant_runtime_run_self_test"),
+    (3, "arm_command"),
+    (3, "transition_after_return"),
+    (3, "validate_command_effect"),
+    (3, "micros_grant_syscall_runtime_run_self_test"),
+    (4, "test_create_inspect_revoke_and_reuse"),
+    (4, "test_endpoint_cancellation_and_reuse"),
+    (4, "test_error_precedence_and_output_preservation"),
+    (4, "test_grant_model_boundaries"),
+    (4, "test_grant_model"),
+    (5, "test_copy_authority_and_bounds"),
+    (6, "micros_grant_syscall_core_test_run"),
+    (0, "plan_range"),
+    (0, "micros_grant_validate_range"),
+    (5, "test_copy_plan_and_commit"),
+    (3, "micros_grant_syscall_test_handle_control_trap"),
+    (3, "micros_grant_syscall_test_finish"),
+)
 
 # Immutable oracle literals are inserted from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'copy_grant': '1c7df8ef2d611dc882f8e0617dcc03afafe45bc344edab5b32e386bf973172af',
@@ -407,6 +442,10 @@ def original_locations(family, texts=None):
     locations = {}
     names = normal_names(family)
     for (path, spelling), record in owned_records(family, texts).items():
+        if family == 0 and spelling in (COPY_EXECUTION_PHASE, COPY_LOCAL_RANGE_PHASE):
+            if path != COPY_SOURCES[0]:
+                raise AssertionError("the private participant-plan phase has its exact copy owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -428,7 +467,134 @@ def original_signature_tokens(family, original, record):
 
 def original_body_digest(family, original, record):
     names = normal_names(family)
-    return digest_tokens(tuple(names.get(token, token) for token in tokens("{" + record.body + "}")))
+    body = tokens("{" + record.body + "}")
+    if family == 0 and original == "copy_grant" and (0, original) not in FUNCTION_TASK_MIGRATION:
+        body = copy_execution_actual_body_tokens(record)
+    return digest_tokens(tuple(names.get(token, token) for token in body))
+
+
+def copy_execution_declarations(owner):
+    lexical = c_lexical_text(owner)
+    starts = tuple(re.finditer(r"\bstruct " + COPY_EXECUTION_TAG + r"\s*\{", lexical))
+    if len(starts) != 1:
+        raise AssertionError("one file-local execution work type owns only original automatic objects")
+    opening = lexical.index("{", starts[0].start())
+    closing = matching_lexical(lexical, opening, "{", "}")
+    declarations = tuple(tokens(part + ";") for part in lexical[opening + 1:closing].split(";") if part.strip())
+    if declarations != tuple(tokens(declaration) for declaration, _ in COPY_EXECUTION_FIELDS):
+        raise AssertionError("execution work retains all eleven original complete types in original order")
+    return declarations
+
+
+def copy_execution_body_tokens(caller, phase, declarations, local_phase):
+    if tuple(declarations) != tuple(tokens(declaration) for declaration, _ in COPY_EXECUTION_FIELDS):
+        raise AssertionError("original declarations come from actual verified execution fields")
+    body = list(tokens(caller))
+    local_guard = list(tokens(
+        "if (!" + COPY_LOCAL_RANGE_PHASE + "(local_address, length)) { return MICROS_GRANT_ERROR_RANGE; }"
+    ))
+    local_positions = [
+        index for index in range(len(body)) if body[index:index + len(local_guard)] == local_guard
+    ]
+    local = list(tokens(local_phase))
+    if len(local_positions) != 1 or local[:1] != ["{"] or local[-4:] != ["return", "true", ";", "}"]:
+        raise AssertionError("local range admission retains exact original scalar arguments before IRQ save")
+    local = local[1:-4]
+    local_restored = []
+    index = 0
+    while index < len(local):
+        if local[index] == "return":
+            if local[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError("local range success cannot bypass its original full shape check")
+            local_restored.extend(tokens("return MICROS_GRANT_ERROR_RANGE;"))
+            index += 3
+        else:
+            local_restored.append(local[index])
+            index += 1
+    start = local_positions[0]
+    body[start:start + len(local_guard)] = local_restored
+    guard = list(tokens(
+        "if (!" + COPY_EXECUTION_PHASE + "(&work, local_address, length, required_permission)) { goto done; }"
+    ))
+    positions = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+    if len(positions) != 1:
+        raise AssertionError("dual-plan execution binds exact caller state/scalars and common failure label")
+    phase = list(tokens(phase))
+    if phase[:1] != ["{"] or phase[-4:] != ["return", "true", ";", "}"]:
+        raise AssertionError("participant-plan success follows both original plans and complete error classification")
+    inner = phase[1:-4]
+    if {"goto", "break", "continue"} & set(inner):
+        raise AssertionError("participant planning cannot borrow caller exit or loop scope")
+    restored = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "return":
+            if inner[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError("partial participant planning cannot bypass remaining classification")
+            restored.extend(tokens("goto done;"))
+            index += 3
+        else:
+            restored.append(inner[index])
+            index += 1
+    start = positions[0]
+    body[start:start + len(guard)] = restored
+    prefix = list(tokens("{ struct " + COPY_EXECUTION_TAG + " work;"))
+    if body[:len(prefix)] != prefix:
+        raise AssertionError("execution work is one original uninitialized automatic root object")
+    del body[1:len(prefix)]
+    names = tuple(declaration[-2] for declaration in declarations)
+    restored = []
+    index = 0
+    while index < len(body):
+        if body[index] == "work":
+            if (
+                body[index + 1:index + 2] not in (["."], ["->"])
+                or body[index + 2:index + 3] not in ([name] for name in names)
+                or (index and body[index - 1] in (".", "->"))
+            ):
+                raise AssertionError("execution work is not copied, reset, nested-qualified or retained")
+            restored.append(body[index + 2])
+            index += 3
+        else:
+            restored.append(body[index])
+            index += 1
+    initializers = []
+    for actual, (_, initialized) in zip(declarations, COPY_EXECUTION_FIELDS):
+        if not initialized:
+            initializers.extend(actual)
+            continue
+        name = actual[-2]
+        cast = ["(", *actual[:-2], ")"]
+        if restored[1:3] != [name, "="]:
+            raise AssertionError("only the two original plan initializers execute, in original order")
+        end = restored.index(";", 3)
+        value = restored[3:end]
+        if value[:len(cast) + 1] != cast + ["{"]:
+            raise AssertionError("plan initializer retains its exact original aggregate type")
+        initializers.extend((*actual[:-1], "=", *value[len(cast):], ";"))
+        del restored[1:end + 1]
+    restored[1:1] = initializers
+    return tuple(restored)
+
+
+def copy_execution_actual_body_tokens(record, owner=None):
+    owner = source(COPY_SOURCES[0]) if owner is None else owner
+    declarations = copy_execution_declarations(owner)
+    phase = function_records(owner)[COPY_EXECUTION_PHASE]
+    local = function_records(owner)[COPY_LOCAL_RANGE_PHASE]
+    expected = (
+        "static bool " + COPY_EXECUTION_PHASE
+        + "(struct grant_copy_execution *work, uintptr_t local_address, size_t length, uint32_t required_permission)"
+    )
+    if phase.guards or tokens(phase.signature) != tokens(expected):
+        raise AssertionError("actual participant-plan phase retains its complete file-local typed contract")
+    if local.guards or tokens(local.signature) != tokens(
+        "static bool " + COPY_LOCAL_RANGE_PHASE + "(uintptr_t local_address, size_t length)"
+    ):
+        raise AssertionError("local range admission retains its complete pure scalar types")
+    return copy_execution_body_tokens(
+        "{" + record.body + "}", "{" + phase.body + "}", declarations, "{" + local.body + "}",
+    )
 
 
 def source_set_block(name, paths):
@@ -702,6 +868,110 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             fingerprint(ast.parse(expected)),
             fingerprint(planner_ast_without_grant_paths(current.replace("value + 1", "value - 1"))),
         )
+
+    def test_copy_execution_exposes_typed_dual_plan_phase_and_root_irq_lifetime(self):
+        owner = source(COPY_SOURCES[0])
+        records = function_records(owner)
+        self.assertIn(COPY_EXECUTION_PHASE, set(records))
+        self.assertEqual(
+            tokens("static bool " + COPY_EXECUTION_PHASE + "(struct grant_copy_execution *work, "
+                   "uintptr_t local_address, size_t length, uint32_t required_permission)"),
+            tokens(records[COPY_EXECUTION_PHASE].signature),
+        )
+        self.assertIsNotNone(re.search(r"\bstruct grant_copy_execution\s*\{", owner))
+        root = records["grant_copy_execute"]
+        self.assertLessEqual(root.lines, 120)
+        self.assertEqual(1, root.body.count("riscv_irq_save()"))
+        self.assertEqual(1, root.body.count("riscv_irq_restore(saved_status)"))
+        self.assertNotIn("riscv_irq_", records[COPY_EXECUTION_PHASE].body)
+        self.assertEqual(
+            tokens("static bool " + COPY_LOCAL_RANGE_PHASE + "(uintptr_t local_address, size_t length)"),
+            tokens(records[COPY_LOCAL_RANGE_PHASE].signature),
+        )
+        self.assertLess(root.body.index(COPY_LOCAL_RANGE_PHASE), root.body.index("riscv_irq_save()"))
+
+    def test_copy_execution_inverse_preserves_dual_plan_order_scope_initializers_and_common_exit(self):
+        caller = (
+            "{ struct grant_copy_execution work; "
+            "work.remote_plan = (struct micros_grant_copy_range_plan){0}; "
+            "work.local_plan = (struct micros_grant_copy_range_plan){0}; uintptr_t saved_status; "
+            "if (bad_shape()) { return ARGUMENT; } "
+            "if (!grant_copy_local_range_is_valid(local_address, length)) { return MICROS_GRANT_ERROR_RANGE; } "
+            "saved_status = riscv_irq_save(); "
+            "original_authority_phase_zero_device(&work.authority, &work.ledger); "
+            "if (!grant_copy_prepare_participant_plans(&work, local_address, length, required_permission)) { goto done; } "
+            "select_direction(&work.remote_plan, &work.local_plan, &work.source_plan, &work.destination_plan); "
+            "work.error = validate(work.source_plan, work.destination_plan, length); "
+            "if (work.error != OK) { goto done; } commit(work.source_plan, work.destination_plan, length); "
+            "done: riscv_irq_restore(saved_status); return work.error; }"
+        )
+        phase = (
+            "{ work->remote_error = remote(work->authority.grantor, length, required_permission); "
+            "work->local_error = local(work->authority.grantee, local_address, length, required_permission); "
+            "if (work->remote_error == INVARIANT || work->local_error == INVARIANT) { work->error = INVARIANT; return false; } "
+            "if (work->remote_error == PHASE || work->local_error == PHASE) { work->error = PHASE; return false; } "
+            "if (work->remote_error != OK || work->local_error != OK) { work->error = FAULT; return false; } return true; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in COPY_EXECUTION_FIELDS)
+        local_phase = "{ if (length != 0 && local_address == 0) { return false; } return true; }"
+
+        def restore(caller, phase, declarations):
+            return copy_execution_body_tokens(caller, phase, declarations, local_phase)
+
+        expected = (
+            "{ const struct micros_frame_ownership *ledger; struct micros_grant_copy_authority authority; "
+            "struct micros_grant_copy_range_plan remote_plan = {0}; struct micros_grant_copy_range_plan local_plan = {0}; "
+            "struct micros_tty_device_authority device_authority; "
+            "const struct micros_grant_copy_range_plan *source_plan; "
+            "const struct micros_grant_copy_range_plan *destination_plan; "
+            "enum micros_grant_error remote_error; enum micros_grant_error local_error; enum micros_grant_error error; "
+            "enum micros_tty_device_authority_status device_status; uintptr_t saved_status; "
+            "if (bad_shape()) { return ARGUMENT; } "
+            "if (length != 0 && local_address == 0) { return MICROS_GRANT_ERROR_RANGE; } "
+            "saved_status = riscv_irq_save(); "
+            "original_authority_phase_zero_device(&authority, &ledger); "
+            "remote_error = remote(authority.grantor, length, required_permission); "
+            "local_error = local(authority.grantee, local_address, length, required_permission); "
+            "if (remote_error == INVARIANT || local_error == INVARIANT) { error = INVARIANT; goto done; } "
+            "if (remote_error == PHASE || local_error == PHASE) { error = PHASE; goto done; } "
+            "if (remote_error != OK || local_error != OK) { error = FAULT; goto done; } "
+            "select_direction(&remote_plan, &local_plan, &source_plan, &destination_plan); "
+            "error = validate(source_plan, destination_plan, length); if (error != OK) { goto done; } "
+            "commit(source_plan, destination_plan, length); done: riscv_irq_restore(saved_status); return error; }"
+        )
+        self.assertEqual(tokens(expected), restore(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct grant_copy_execution work;", "struct grant_copy_execution work = {0};"),
+            caller.replace("(&work, local_address,", "(&other, local_address,"),
+            caller.replace("local_address, length, required_permission", "other_address, length, required_permission"),
+            caller.replace("work.error = validate", "copy = work; work.error = validate"),
+            caller.replace("(struct micros_grant_copy_range_plan){0}", "(struct other_plan){0}", 1),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore(changed, phase, declarations)
+        for changed in (
+            phase.replace("return false;", "return true;", 1),
+            phase.replace("work->remote_error", "work->extra", 1),
+            phase.replace("return false;", "goto done;", 1),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore(caller, changed, declarations)
+        self.assertNotEqual(
+            tokens(expected), restore(caller, phase.replace("work->error = PHASE", "work->error = FAULT"), declarations),
+        )
+        self.assertNotEqual(
+            tokens(expected), restore(caller.replace("riscv_irq_restore(saved_status);", ""), phase, declarations),
+        )
+        with self.assertRaises(AssertionError):
+            copy_execution_body_tokens(caller, phase, declarations, local_phase.replace("return false;", "return true;"))
+        with self.assertRaises(AssertionError):
+            copy_execution_body_tokens(caller.replace("local_range_is_valid(local_address", "local_range_is_valid(other_address"),
+                                       phase, declarations, local_phase)
+        owner = "struct grant_copy_execution { " + " ".join(declaration for declaration, _ in COPY_EXECUTION_FIELDS) + " };"
+        self.assertEqual(declarations, copy_execution_declarations(owner))
+        with self.assertRaises(AssertionError):
+            copy_execution_declarations(owner.replace("enum micros_grant_error remote_error;", "uint32_t remote_error;"))
 
 
 if __name__ == "__main__":
