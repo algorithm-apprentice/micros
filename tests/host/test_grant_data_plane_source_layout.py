@@ -350,6 +350,52 @@ MODEL_AUTH_PARAMETERS = {
         "fixture, run, iteration, &work, step",
     ),
 }
+MECHANISM_TAG = "grant_mechanism_case"
+MECHANISM_FIELDS = (
+    ("const struct micros_frame_ownership *ledger;", False),
+    ("struct micros_kernel_objects *objects;", False),
+    ("struct micros_endpoint_registry *endpoint_registry;", False),
+    ("struct micros_grant_registry *grant_registry;", False),
+    ("struct micros_process_handle processes[GRANT_TEST_PROCESS_COUNT];", False),
+    ("struct micros_process_handle replacement;", False),
+    ("micros_endpoint_t endpoints[GRANT_TEST_PROCESS_COUNT];", False),
+    ("micros_endpoint_t replacement_endpoint;", False),
+    ("struct micros_grant_cancel_plan cancel_plan;", False),
+    ("micros_grant_t read_grant;", False),
+    ("micros_grant_t write_grant;", False),
+    ("micros_grant_t remote_read_only_grant;", False),
+    ("micros_grant_t unmapped_grant;", False),
+    ("micros_grant_t cross_remote_permission_grant;", False),
+    ("micros_grant_t cross_remote_unmapped_grant;", False),
+    ("micros_grant_t stale_grant;", False),
+    ("size_t baseline_processes;", False),
+    ("size_t baseline_threads;", False),
+    ("uint64_t baseline_owned;", False),
+    ("uint64_t baseline_free;", False),
+    ("micros_endpoint_t old_grantor_endpoint;", False),
+    ("size_t process_index;", False),
+    ("size_t page_index;", False),
+    ("uint64_t failure_stage;", "value"),
+    ("unsigned char wrong_local_before;", False),
+    ("unsigned char grantor_remote_before;", False),
+    ("unsigned char grantee_local_before;", False),
+    ("unsigned char grantor_read_only_before;", False),
+    ("unsigned char grantee_read_only_before;", False),
+    ("enum micros_frame_ownership_phase saved_phase;", False),
+)
+MECHANISM_PHASES = (
+    "grant_test_mechanism_prepare_processes", "grant_test_mechanism_create_grants",
+    "grant_test_mechanism_cross_from", "grant_test_mechanism_cross_to_and_local",
+    "grant_test_mechanism_prepare_fault_canaries", "grant_test_mechanism_cross_faults",
+    "grant_test_mechanism_unmapped_local_fault", "grant_test_mechanism_authority_range_faults",
+    "grant_test_mechanism_phase_and_stale_grant", "grant_test_mechanism_stale_endpoint",
+    "grant_test_mechanism_cancel_close_reuse", "grant_test_mechanism_cleanup_baseline",
+)
+MECHANISM_DENIALS = (
+    "grant_test_mechanism_authority_denials", "grant_test_mechanism_range_denials",
+    "grant_test_mechanism_mapping_zero_and_outputs",
+)
+MECHANISM_PREFIX_DIGEST = "a7310b3d2640261410dd4fea964cbea7c11e5cb2934d4c17c255069b13b5ade1"
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -440,7 +486,6 @@ SYMBOL_OWNER_MIGRATION = tuple(
     if item[0] != 4 and item not in ((0, "map_address_error"), (0, "plan_range"))
 )
 FUNCTION_TASK_MIGRATION = (
-    (2, "micros_grant_runtime_run_self_test"),
     (3, "arm_command"),
     (3, "transition_after_return"),
     (3, "validate_command_effect"),
@@ -747,6 +792,10 @@ def original_locations(family, texts=None):
             if path != FAMILY_PATHS[6][0]:
                 raise AssertionError("ABI evidence phases have only the original native ABI owner")
             continue
+        if family == 2 and spelling in (*MECHANISM_PHASES, *MECHANISM_DENIALS):
+            if path != FAMILY_PATHS[2][0]:
+                raise AssertionError("the actual mechanism retains its one original target fixture owner")
+            continue
         if family == 4 and spelling in (
             MODEL_SELECT, MODEL_DISPATCH, MODEL_COMPARE, MODEL_AUTHORIZE,
             *MODEL_AUTH_PHASES, *(name for _, name, _ in MODEL_OPERATIONS),
@@ -791,6 +840,8 @@ def original_body_digest(family, original, record):
         body = validation_actual_body_tokens(record)
     if family == 1 and original == "micros_grant_handle_captured_user_ecall" and (1, original) not in FUNCTION_TASK_MIGRATION:
         body = syscall_actual_body_tokens(record)
+    if family == 2 and original == "micros_grant_runtime_run_self_test" and (2, original) not in FUNCTION_TASK_MIGRATION:
+        body = mechanism_actual_body_tokens(record)
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
             body = native_case_actual_body_tokens(original, record)
@@ -1223,6 +1274,96 @@ def model_actual_body_tokens(record, texts=None, header=None):
     return tuple(body)
 
 
+def common_failure_body_tokens(caller, phases):
+    caller = list(caller)
+    for name, phase in phases:
+        phase = list(tokens(phase))
+        if phase[:1] != ["{"] or phase[-4:] != ["return", "true", ";", "}"]:
+            raise AssertionError("a mechanism task succeeds only after its entire original ordered body")
+        inner = phase[1:-4]
+        restored = []
+        index = 0
+        while index < len(inner):
+            if inner[index] == "return":
+                if inner[index:index + 3] != ["return", "false", ";"]:
+                    raise AssertionError("a mechanism task preserves only its original common failure exit")
+                restored.extend(tokens("goto done;"))
+                index += 3
+            else:
+                restored.append(inner[index])
+                index += 1
+        caller = list(bound_body_tokens(
+            caller, "if (!" + name + "(&work)) { goto done; }", "{ " + " ".join(restored) + " }",
+        ))
+    return tuple(caller)
+
+
+def denial_predicate_body_tokens(caller, predicates):
+    caller = list(caller)
+    for name, predicate in predicates:
+        predicate = list(tokens(predicate))
+        if (
+            predicate[:4] != ["{", "return", "!", "("] or predicate[-3:] != [")", ";", "}"]
+            or matching_lexical(predicate, 3, "(", ")") != len(predicate) - 3
+        ):
+            raise AssertionError("a denial predicate is only its complete original ordered short-circuit condition")
+        call = list(tokens("!" + name + "(work)"))
+        positions = [index for index in range(len(caller)) if caller[index:index + len(call)] == call]
+        if len(positions) != 1:
+            raise AssertionError("each original denial group has one exact borrowed-work binding")
+        start = positions[0]
+        caller[start:start + len(call)] = predicate[4:-3]
+    return tuple(caller)
+
+
+def mechanism_actual_body_tokens(record, owner=None):
+    owner = source(FAMILY_PATHS[2][0]) if owner is None else owner
+    records = function_records(owner)
+    declarations = work_declarations(owner, MECHANISM_TAG, MECHANISM_FIELDS)
+    phases = []
+    for index, name in enumerate(MECHANISM_PHASES):
+        result = "static void" if index == 4 else "static bool"
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens(result + " " + name + "(struct " + MECHANISM_TAG + " *work)"):
+            raise AssertionError("mechanism phases borrow only the complete original typed caller work")
+        if index != 4:
+            phases.append((name, "{" + phase.body + "}"))
+    body = common_failure_body_tokens(tokens("{" + record.body + "}"), phases)
+    canaries = MECHANISM_PHASES[4]
+    body = bound_body_tokens(body, canaries + "(&work);", "{" + records[canaries].body + "}")
+    predicates = []
+    for name in MECHANISM_DENIALS:
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("static bool " + name + "(struct " + MECHANISM_TAG + " *work)"):
+            raise AssertionError("denial predicates retain their original state/participant/canary work")
+        predicates.append((name, "{" + phase.body + "}"))
+    body = list(denial_predicate_body_tokens(body, predicates))
+    declaration = list(tokens("struct " + MECHANISM_TAG + " work;"))
+    positions = [index for index in range(len(body)) if body[index:index + len(declaration)] == declaration]
+    if len(positions) != 1:
+        raise AssertionError("the mechanism root owns one uninitialized automatic work object")
+    start = positions[0]
+    prefix = body[1:start]
+    fixed = list(tokens("uintptr_t saved_status; bool passed = false;"))
+    fixed_start = start + len(declaration)
+    if body[fixed_start:fixed_start + len(fixed)] != fixed:
+        raise AssertionError("IRQ status and initialized pass/failure control remain separate in actual root")
+    del body[fixed_start:fixed_start + len(fixed)]
+    body = list(restore_automatic_work_tokens(["{", *body[start:]], MECHANISM_TAG, MECHANISM_FIELDS, declarations))
+    for marker, original in (
+        ("uint64_t baseline_free;", "uintptr_t saved_status;"),
+        ("micros_endpoint_t old_grantor_endpoint;", "bool passed = false;"),
+    ):
+        after = list(tokens(marker))
+        positions = [index for index in range(len(body)) if body[index:index + len(after)] == after]
+        if len(positions) != 1:
+            raise AssertionError("original root-only declarations retain their exact original field order/lifetime")
+        insert = positions[0] + len(after)
+        body[insert:insert] = tokens(original)
+    body[1:1] = prefix
+    return tuple(body)
+
+
 def copy_execution_actual_body_tokens(record, owner=None):
     owner = source(COPY_SOURCES[0]) if owner is None else owner
     declarations = copy_execution_declarations(owner)
@@ -1481,6 +1622,85 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_target_mechanism_has_bounded_domains_and_actual_root_irq_report_lifetime(self):
+        owner = source(FAMILY_PATHS[2][0])
+        records = function_records(owner)
+        first = next(iter(records.values()))
+        prefix = owner[:owner.index(first.signature)]
+        self.assertEqual(MECHANISM_PREFIX_DIGEST, digest_tokens(tokens(prefix)))
+        self.assertEqual(tuple(file_scope_objects(prefix)), tuple(file_scope_objects(owner)))
+        work_declarations(owner, MECHANISM_TAG, MECHANISM_FIELDS)
+        root = records["micros_grant_runtime_run_self_test"]
+        self.assertLessEqual(root.lines, 120)
+        self.assertIn("static const struct micros_privilege_profile profile", root.body)
+        self.assertIn("micros_ipc_runtime_initialize(&profile, 1)", root.body)
+        self.assertEqual(1, root.body.count("riscv_irq_save()"))
+        self.assertEqual(1, root.body.count("riscv_irq_restore(saved_status)"))
+        for name in (*MECHANISM_PHASES, *MECHANISM_DENIALS):
+            self.assertIn(name, records)
+            self.assertLessEqual(records[name].lines, 120)
+            self.assertNotIn("riscv_irq_", records[name].body)
+
+    def test_mechanism_failure_inverse_keeps_stage_root_report_irq_and_success_only_cleanup(self):
+        caller = (
+            "{ saved_status = riscv_irq_save(); "
+            "if (!exercise(&work)) { goto done; } if (!cleanup(&work)) { goto done; } "
+            "passed = true; done: original_failure_report(work.failure_stage); "
+            "riscv_irq_restore(saved_status); return passed; }"
+        )
+        exercise = "{ work->failure_stage = 4; original_snapshot(); if (copy_failed()) { return false; } return true; }"
+        cleanup = "{ original_cancel_and_release(); if (!original_baseline()) { return false; } return true; }"
+        expected = (
+            "{ saved_status = riscv_irq_save(); "
+            "work->failure_stage = 4; original_snapshot(); if (copy_failed()) { goto done; } "
+            "original_cancel_and_release(); if (!original_baseline()) { goto done; } "
+            "passed = true; done: original_failure_report(work.failure_stage); "
+            "riscv_irq_restore(saved_status); return passed; }"
+        )
+        phases = (("exercise", exercise), ("cleanup", cleanup))
+        self.assertEqual(tokens(expected), common_failure_body_tokens(tokens(caller), phases))
+        for changed in (
+            caller.replace("exercise(&work)", "exercise(&copy)"),
+            caller.replace("goto done;", "return false;", 1),
+            caller.replace("cleanup(&work)", "cleanup(work)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                common_failure_body_tokens(tokens(changed), phases)
+        with self.assertRaises(AssertionError):
+            common_failure_body_tokens(tokens(caller), (
+                ("exercise", exercise.replace("return false;", "return true;")), phases[1],
+            ))
+        self.assertNotEqual(
+            tokens(expected), common_failure_body_tokens(tokens(caller.replace("original_failure_report", "changed_report")), phases),
+        )
+
+    def test_denial_predicates_keep_actual_short_circuit_calls_canaries_and_bound_work(self):
+        caller = "{ original_canary_snapshot(); if (!authority(work) || !range(work) || !mapping(work)) { return false; } return true; }"
+        predicates = (
+            ("authority", "{ return !(wrong_actor() != UNAUTHORIZED || wrong_endpoint() != UNAUTHORIZED); }"),
+            ("range", "{ return !(overflow() != RANGE || oversize() != RANGE); }"),
+            ("mapping", "{ return !(unmapped() != FAULT || zero_length() != OK || !original_canaries()); }"),
+        )
+        expected = (
+            "{ original_canary_snapshot(); if (wrong_actor() != UNAUTHORIZED || wrong_endpoint() != UNAUTHORIZED "
+            "|| overflow() != RANGE || oversize() != RANGE "
+            "|| unmapped() != FAULT || zero_length() != OK || !original_canaries()) { return false; } return true; }"
+        )
+        self.assertEqual(tokens(expected), denial_predicate_body_tokens(tokens(caller), predicates))
+        for changed in (
+            caller.replace("authority(work)", "authority(other)"),
+            caller.replace("range(work)", "range(&work)"),
+            caller.replace("!mapping(work)", "mapping(work)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                denial_predicate_body_tokens(tokens(changed), predicates)
+        with self.assertRaises(AssertionError):
+            denial_predicate_body_tokens(tokens(caller), (
+                predicates[0], ("range", "{ return true; }"), predicates[2],
+            ))
+        changed = (predicates[0], predicates[1], ("mapping", predicates[2][1].replace("zero_length() != OK || ", "")))
+        self.assertNotEqual(tokens(expected), denial_predicate_body_tokens(tokens(caller), changed))
+
     def test_seeded_model_exposes_real_operation_and_authorization_owners(self):
         header = source(PRIVATE_HEADERS[1])
         for tag, fields in ((MODEL_RUN_TAG, MODEL_RUN_FIELDS), (MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS)):

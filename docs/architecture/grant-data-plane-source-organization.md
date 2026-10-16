@@ -588,3 +588,15 @@ reconstructs from actual typed helpers and case-success exits, with independent
 draw/forced-prefix/inner-loop/coverage/trace/denial/array mutants. No teardown,
 blanket work initialization or new model state is added. Forty original
 target moves and seven target semantic dispositions remain pending.
+
+The real mechanism now has an 85-line root, twelve ordered domain phases
+and three typed denial predicates; all 25 definitions are at most 111 lines.
+Its thirty grouped automatic fields preserve original types, actual process/
+endpoint arrays and the sole failure-stage initializer. Saved IRQ status,
+initialized pass control, static profile, runtime admission and common report/
+restoration remain in actual root. Denial predicates preserve the original
+left-to-right short-circuit calls and all previously captured canaries;
+phase reversal, stale authority, success-path cancellation/reuse/cleanup and
+baseline checks retain their complete original order. The four original
+static mechanism objects remain separate and unchanged. Forty syscall-target
+owner moves and six syscall-target semantic dispositions remain pending.
