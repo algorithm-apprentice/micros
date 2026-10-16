@@ -2,6 +2,7 @@
 
 import ast
 import contextlib
+import copy
 import hashlib
 import io
 import os
@@ -32,6 +33,148 @@ TEST_PATHS = (
     "tests/host/qemu_smoke_platform_cases.py", "tests/host/qemu_smoke_memory_cases.py",
     "tests/host/qemu_smoke_object_cases.py", "tests/host/qemu_smoke_execution_cases.py",
 )
+TEST_CASE_LAYOUT = {
+    2: (("SmokeClassificationCases", "SmokeClassificationTest", tuple(range(12))),),
+    3: (("PanicReportCases", "ExpectedOutcomeTest", (*range(9), *range(59, 64))),),
+    4: (("PlatformReportCases", "ExpectedOutcomeTest", tuple(range(9, 31))),),
+    5: (("MemoryReportCases", "ExpectedOutcomeTest", tuple(range(31, 46))),),
+    6: (("ObjectReportCases", "ExpectedOutcomeTest", tuple(range(46, 59))),),
+    7: (
+        ("NmSymbolCases", "NmSymbolTest", tuple(range(2))),
+        ("QemuCommandCases", "QemuCommandTest", tuple(range(2))),
+        ("QemuSerialInputCases", "QemuSerialInputTest", tuple(range(4))),
+        ("TapOutputCases", "TapOutputTest", (0,)),
+    ),
+}
+AGGREGATE_MIXINS = {
+    "SmokeClassificationTest": ("SmokeClassificationCases",),
+    "ExpectedOutcomeTest": ("PanicReportCases", "PlatformReportCases", "MemoryReportCases", "ObjectReportCases"),
+    "NmSymbolTest": ("NmSymbolCases",),
+    "QemuCommandTest": ("QemuCommandCases",),
+    "QemuSerialInputTest": ("QemuSerialInputCases",),
+    "TapOutputTest": ("TapOutputCases",),
+}
+ORIGINAL_TEST_METHOD_RAW = {'ExpectedOutcomeTest.test_accepts_complete_clean_panic': '9d8fd0ce5d831be5566d803d6f98efc24ec93201430bcb026b2677246c08ced5',
+ 'ExpectedOutcomeTest.test_accepts_complete_endpoint_test_report': '464c6fa2c97fa62e35897661e3db9b00ef03c185bcbadbdf9c697104ef992ea7',
+ 'ExpectedOutcomeTest.test_accepts_complete_frame_allocator_ready_report': '0384456bbf6652497a77e1e8c8b69635e1ad7db15b199d475c40fa4e02b9d8a3',
+ 'ExpectedOutcomeTest.test_accepts_complete_frame_allocator_test_report': '10780b0b5fb99c947b0a6c5b8d316cef32683e4378c15f438d8179abc0ef0dab',
+ 'ExpectedOutcomeTest.test_accepts_complete_frame_ownership_ready_report': '725fa8c7be9dca6482c211a2015a1b8701d32fc2b521bafc828bdbf186323aa1',
+ 'ExpectedOutcomeTest.test_accepts_complete_frame_ownership_test_report': '9e003029789131e5f9a45cead112697f4f7f0bb7a21fe9250fdded1954e11a3e',
+ 'ExpectedOutcomeTest.test_accepts_complete_ipc_test_report': 'b20a9602199e07074f1b0e801385fd81908373a1522c749b216f10bb7e37fd81',
+ 'ExpectedOutcomeTest.test_accepts_complete_mmu_ready_report': '26f559517d0a83c032d106164a3cfcb5f3c52ba63fb2564c497c2eeeccf85176',
+ 'ExpectedOutcomeTest.test_accepts_complete_mmu_test_report': '6dac36a77cfbac0ad9d2dc124ec41fddabe4ca85a3f4d4d70f1b572a9ac7e69d',
+ 'ExpectedOutcomeTest.test_accepts_complete_nested_trap_test_report': '590ed26b3e2752b3bce6664722c4f6699b1bd899d8fa3deedb6c91b09b6a1a3f',
+ 'ExpectedOutcomeTest.test_accepts_complete_object_model_test_report': 'ad704773a685de696bd9430cc5ef29836fe83b58cb484e7286393aba48918ed5',
+ 'ExpectedOutcomeTest.test_accepts_complete_objects_ready_report': 'ccc94de1944dbe2ab39f63ff9993363b3dd0f1677754593d8927eaf26649ea2f',
+ 'ExpectedOutcomeTest.test_accepts_complete_scheduler_test_report': 'e69a468c89cc25a5c48d89d82822b532aa6d11a0b974d711134e61912269c10f',
+ 'ExpectedOutcomeTest.test_accepts_complete_timer_test_report': '8baf773e31f508f859ea08d5d7ea1951049e89aec2d585ec460f2d85b145bfcb',
+ 'ExpectedOutcomeTest.test_accepts_complete_trap_panic_context': '5780d31ffa43b45bb9d7e49238d00ca08b737d0a3376c7d68e5455d84d1e2eb0',
+ 'ExpectedOutcomeTest.test_accepts_complete_trap_recovery': '738b8e91bdee00c47761e49edcd8e7407210f30030a658ca0f7ed6fee4ed304f',
+ 'ExpectedOutcomeTest.test_accepts_complete_user_address_space_test_report': 'a799204860023c9c18be423908c416bd1c6f21e600f2aabbb6cd3fa02f698646',
+ 'ExpectedOutcomeTest.test_accepts_complete_user_execution_test_report': '7246f113b4935ad1311acd04ed0b10214f53daad291aa2fbb6b44245b109f754',
+ 'ExpectedOutcomeTest.test_ignores_unrelated_target_prefix_before_allocator_ready': '815fd5f0101d4ee2c0e71d6db6ad9657b48af60e6726e412a2e205d7483afc08',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_or_early_frame_allocator_ready': 'dba2e7251ed00fc5828304fa6c791324870c7476da43a4c5e0d2e802dc4afe3a',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_or_early_mmu_ready_report': 'd816eb615b807fc845d09bae85a860c12f94dd0152d7bb39c3d3b62fa0595a64',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_or_out_of_order_panic_records': '63765aef49edd1d19f63e7ce009095f1fdb917e3ff29634ef8d350706bd0e112',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_timer_test_report': 'c6e93d925b151d9f78c66ece28a8793b8898bee60bc04c743276f2aafb8a7a5a',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_trap_panic_context': 'd8855332e7c73a919582f12989c0f78a97980f0c904ec485e86baae41959e67c',
+ 'ExpectedOutcomeTest.test_rejects_duplicate_trap_recovery_pass': '247c8c984c7f6e64b563a2fd324c1f3748a2aabfb496cd49c621ad54a7db638a',
+ 'ExpectedOutcomeTest.test_rejects_early_or_malformed_frame_allocator_test_report': '7aa5c1d09c964ac1e37fe176e640c8a68e4dee287e5c91b76cea7403cd6739c3',
+ 'ExpectedOutcomeTest.test_rejects_forbidden_marker': 'ce4e610435723029860beb49ca484a8e2bc7fac85eadd17e4621c07a41b2410d',
+ 'ExpectedOutcomeTest.test_rejects_forbidden_pattern': '453360a7978e875e44f683c736ee7d09f1ca865161077b73046b4be49ae0ab6a',
+ 'ExpectedOutcomeTest.test_rejects_frame_allocator_ready_after_target_outcome': 'bd78608cd9e72dbf38c12f7de3f30f11ab34f8f9630d3c8c1f87f9a31570f71a',
+ 'ExpectedOutcomeTest.test_rejects_frame_ownership_ready_after_target_outcome': '3eaaa92d5758c2ce60aeb2ff9589d25d1da9877751b7071208e31d3b67c161a1',
+ 'ExpectedOutcomeTest.test_rejects_invalid_endpoint_test_report': '518075b4ac66924de117057050535553db5acd3ae8520fa525347314ee7fc089',
+ 'ExpectedOutcomeTest.test_rejects_invalid_frame_ownership_ready_report': '8690c7b56a4f2d8b28f4e1fb1b44d7d8f85f9511c59853a6a9a22af1ba2021ec',
+ 'ExpectedOutcomeTest.test_rejects_invalid_frame_ownership_test_report': '2502674bb4050ef162c0c17ea57429a01b9d43c52d1ed612c5ad66a1b6d86ae2',
+ 'ExpectedOutcomeTest.test_rejects_invalid_ipc_test_report': '7984de3c4ca11e747140a22a757072cba66d5a4cecd0867e1232d1e5222963f4',
+ 'ExpectedOutcomeTest.test_rejects_invalid_mmu_ready_report': 'e815a87c3041287fd5214962392fb6d754be4d39f9f63b629c15027a678c8c5a',
+ 'ExpectedOutcomeTest.test_rejects_invalid_mmu_test_report': 'f0edeffccd132b73f7048ace4e59229892fd4b2470c936acb1b7d176839c2488',
+ 'ExpectedOutcomeTest.test_rejects_invalid_nested_trap_test_report': 'e471c679b43e8f34230bc4de87e1ecab1cf5ec7831144d40be8f6788c100622b',
+ 'ExpectedOutcomeTest.test_rejects_invalid_object_model_test_report': '374298b2dd40b240009db55ef172d53e02e76a9997b3b955a129bda0843b06fb',
+ 'ExpectedOutcomeTest.test_rejects_invalid_objects_ready_report': '4677d55ec451e31f483cc60896f71e408fa54421ca1686129188239bb0dbfc9c',
+ 'ExpectedOutcomeTest.test_rejects_invalid_scheduler_test_report': 'f4d08c75e24f9e0036738052f40a852a03de9f9ca79b0a4d9b53b258000adb40',
+ 'ExpectedOutcomeTest.test_rejects_invalid_user_address_space_test_report': '8225fe58490c18b5980f881d3a0c6d4ad6fd5faf05a34c9fc0cc8e14f86b1c99',
+ 'ExpectedOutcomeTest.test_rejects_invalid_user_execution_test_report': 'dc44e257bc0fb0c8e4f3a4fd794fc2038682bda5a7a028c4d655829c18a65abe',
+ 'ExpectedOutcomeTest.test_rejects_malformed_or_unterminated_frame_allocator_ready': 'b8397494ceabc402f0b2687c7b27cfc1fa425a2c053bbc12fc555a29566fb069',
+ 'ExpectedOutcomeTest.test_rejects_malformed_timer_interval': '783144910d13d3a85c0441f25aa99bd0914b8ee69ade00ebab03c562e15248b6',
+ 'ExpectedOutcomeTest.test_rejects_malformed_timer_tick_count': 'e0a2616e105810ff5b3577cd38ecb9db957fb839c85c0cde56c11d4e7c18a3b5',
+ 'ExpectedOutcomeTest.test_rejects_missing_or_duplicate_frame_allocator_test_report': '18b4dab344826483ab3c1d572b1dc782fbf2bc0028b711b4447d90dc265fdb65',
+ 'ExpectedOutcomeTest.test_rejects_missing_timer_test_report': '74d7a01fd230ac4c967227bd5ff3540f34c4990be373f3c701640421c6c5bbc8',
+ 'ExpectedOutcomeTest.test_rejects_mmu_ready_after_target_outcome': '982610a28e93a9659e42343a3b5106b5ae5f62b3c3c52d2dd0613dc2754a5faa',
+ 'ExpectedOutcomeTest.test_rejects_out_of_order_trap_recovery_pass': '2d31c31754580dc91bc847e6369ba2547496fe5cf4225a23d08d90e8365b935b',
+ 'ExpectedOutcomeTest.test_rejects_panic_that_times_out': '2870f671a8add21d06df7e7fb537e49369f27f77d9a278b804dbbc6efa9b8925',
+ 'ExpectedOutcomeTest.test_rejects_panic_with_explicit_failure': 'ae2b685e88b68a9d4958187ebe374234b53f33a44de8145abb3a2de863ea1a2a',
+ 'ExpectedOutcomeTest.test_rejects_timer_test_report_before_fdt_ready': '0fb675e1c7841716de4dd559d07050732264b4b909033ecf3eb3a114ac03e81e',
+ 'ExpectedOutcomeTest.test_rejects_trap_context_for_direct_panic': 'db5e0e052203ebdc33533253024c89147f49753d0cd14e22298b5a56afef9213',
+ 'ExpectedOutcomeTest.test_rejects_trap_pass_before_fdt_ready': '094699eaf895f49cff20593d907a59141371b91ae8033003a2de1eeff2099954',
+ 'ExpectedOutcomeTest.test_rejects_unterminated_final_panic_record': '56346da112f99195a628977d0dcf5bdcc201647b7df8fd4c7e4b092d2918facb',
+ 'ExpectedOutcomeTest.test_rejects_unterminated_frame_allocator_test_report': '4df18e25ddf7a421c12e46ad86ba7006f5ddf6736b1fa4be6b994e5154caa0e7',
+ 'ExpectedOutcomeTest.test_rejects_unterminated_timer_test_report': 'c7188e6de24307c061b157ee08720750cf8187463b273ba862b620d860dabed4',
+ 'ExpectedOutcomeTest.test_rejects_unterminated_trap_panic_context': '1d01ddbe1e009c1b4dbd2440bd451db1bdb93ac38631ed96e1e144aaef9ae72f',
+ 'ExpectedOutcomeTest.test_rejects_wrong_trap_context_sepc': 'f5fff8b0de65549843f85cc306b544bd2813543c66f01da8544a38376591e158',
+ 'ExpectedOutcomeTest.test_rejects_zero_or_mismatched_frame_allocator_counts': 'b994825f36c14a227fd5429a9818e090166f671660db1c0ed7133b7595fa982f',
+ 'ExpectedOutcomeTest.test_requires_exact_invalid_scheduler_context_report': 'af621cc55d03ef5351269ba3ae0db6f2e753027bdf975460cae40627b56c399b',
+ 'ExpectedOutcomeTest.test_requires_exact_vm_self_fault_and_context': 'ee48fa2b3d4505f760a8a621a9e7b6249c5460978b33a9b2946548148c284074',
+ 'ExpectedOutcomeTest.test_requires_expected_frame_allocator_growth': '919b70a41f45d61ed93ba8285b7f4bf819aa697126b81cbcbab3e088d600d4ea',
+ 'ExpectedOutcomeTest.test_requires_patterns_in_order': '6f0231013dea411aff52b2b027f92ded5682140dbf42b151ca57be17f85bc435',
+ 'NmSymbolTest.test_parses_exact_defined_symbol': '31ed5e6373f20ba9736da9d97cd3eaf9eb5205b255f4de9abe04187755841dee',
+ 'NmSymbolTest.test_rejects_duplicate_defined_symbol': 'e027b6618f2fa27c541fa434674e02f4780594d7e2866cd8ebfc85c61b374d0b',
+ 'QemuCommandTest.test_accepts_explicit_guest_memory_size': '8e019d4217dbb5bbf38bb76ee3f0c38ecfeb9bfcd1a2295d6991e731afea41cf',
+ 'QemuCommandTest.test_uses_explicit_single_hart_plic_machine': '1ac3c23f9324e96302b30eb5e85cb05f44dd2553eb7cc292a2ad54f72b228eee',
+ 'QemuSerialInputTest.test_closed_serial_input_pipe_returns_a_normal_result': '2c606d7317e4a9f15abc4b75890e3bc483a5918c1d2873e4ae1a151d9dcf6679',
+ 'QemuSerialInputTest.test_default_execution_keeps_stdin_closed': 'cee66d32839541226158242ea131fa7197a173f426f4796448ba5e7442b900c9',
+ 'QemuSerialInputTest.test_trigger_requires_an_exact_terminated_line': 'd61b6250cf4f2f38ede6d8caa7c77ae88a229896f7f42b76df0f34ae307947df',
+ 'QemuSerialInputTest.test_writes_serial_input_once_after_complete_trigger_line': '84430c555be2e7c306298f195037a5ac0cb72ab6cf6954c8bafeec5d1b680dde',
+ 'SmokeClassificationTest.test_accepts_complete_fdt_event_stream': 'f6e5cd4a58d0f99ea7d1f577b227160ead7db91a6fe5c710562b61ab826e3afa',
+ 'SmokeClassificationTest.test_accepts_marker_followed_by_clean_exit': 'ce5a383e04c110014dc77c5a67af9e6f5fd932b6f8f392541a18183f61771972',
+ 'SmokeClassificationTest.test_rejects_empty_fdt_reservation_result': '5932233cf098cb95bffdde82af88c9d44098bd253fe04fb1b82a16f8de886103',
+ 'SmokeClassificationTest.test_rejects_incomplete_fdt_event_stream': '0d031936498ac3192f073279cc8553d01ae2fc8436321e6892fcd43fc6ba5be3',
+ 'SmokeClassificationTest.test_rejects_malformed_duplicate_fdt_count_summary': '5b91a69557e74e8d7cbc8ec97de7d503f9b2174aaa937c56aa649dbe1d2ea778',
+ 'SmokeClassificationTest.test_rejects_malformed_fdt_range_event': '62918c994064d0b0d8f4ac62cd100d8b5561c00715a66d96ebffa7c8f2f871f6',
+ 'SmokeClassificationTest.test_rejects_marker_embedded_in_another_line': 'eab27ab7b3568c53646ccb229cb0851f089be2350504e98221bf8bd215d12af0',
+ 'SmokeClassificationTest.test_reports_explicit_target_failure': '986f2a9d7bfe6804ed8a05ec185cd36ebbc5db72f6dd25870b088f046f78bed1',
+ 'SmokeClassificationTest.test_reports_kernel_panic': '5190344d55e12325cd142a88585f52ddb0adbc8a90df8a313adaa44d5e7137d3',
+ 'SmokeClassificationTest.test_reports_timeout_before_other_output_states': 'e93f8d546a71fac87903bb6c9e48f5bbdf054ec7bbcdd02eefb59899518b8648',
+ 'SmokeClassificationTest.test_reports_unexpected_exit_without_marker': 'c05a835f5b20f6c455a679c1f336944e284d959ab080f6b69679f17934653d9e',
+ 'SmokeClassificationTest.test_requires_every_expected_marker': '3e255b1420ac5a1c625ab01f9bdfe79e0de5cf90c3a1fc5773b9620a42325506',
+ 'TapOutputTest.test_pass_includes_machine_readable_outcome': '644d5d6b6491c7d741267ebe86ed3d6bce6fdf3765ca83230fd0f0326b083603'}
+ORIGINAL_TEST_DATA_RAW = {'ENDPOINT_TEST_OUTPUT': '939b303a0e6a8639b0371dcb3324b350f6acf37d32049225ef95fe8cf06813e6',
+ 'ENDPOINT_TEST_PASS': '2cedd0527ce74d4aefeda0c7136c04caf4b117f989fd45fbce59c36a0f96cd78',
+ 'FRAME_ALLOCATOR_OUTPUT': 'd76d359f78267052b8c3eaa96a8dd55da412e86b185358b95bf37aa5beaaacf7',
+ 'FRAME_ALLOCATOR_READY_RECORD': 'ee6d68a3900270216b348729b1ca5bd4b31506f9dc10bdd7b3aa9f4ae2c046a9',
+ 'FRAME_ALLOCATOR_TEST_OUTPUT': 'a6db5c6f0601aac940f1c9888ea513319ac1de181539ca5180aadfed48330e70',
+ 'FRAME_ALLOCATOR_TEST_PASS': 'b80c54dac7570fe7ee901f5c708087abc0f1ca45313dc3720cf472be963b4b39',
+ 'FRAME_OWNERSHIP_OUTPUT': 'aa41a96217f00170c68b3180416fcfaaa8201f18fce9b1f4d1f96256ec3a46f7',
+ 'FRAME_OWNERSHIP_READY_RECORD': 'dfa91213c49cce5d5092cc8f6477c2d38d8c770f8be8e31f545f118cba650fd5',
+ 'FRAME_OWNERSHIP_TEST_OUTPUT': '2599e6547f361893550cad4342d638fc7ec05b249cec687a982ecc83e7bd91d6',
+ 'FRAME_OWNERSHIP_TEST_PASS': '8976588f0216408037d861e3025891a9a686fc3b63e491aac47c0b7edc30d293',
+ 'IPC_ADDRESS_SPACES_PASS': 'c12d02765c4edfdf11026bec4991144c976839203d0879f344a0ad8d65d8a229',
+ 'IPC_TEST_OUTPUT': '41ea8c34e49b1efb1b3096e9571725cfae3c981cddf593b4713a3085678d98e2',
+ 'IPC_TEST_PASS': 'aa44735aeccd02de6e74384013bdb7f48a8305f4d096dcf02514a6129f55ab89',
+ 'MMU_OUTPUT': '5c6f9c9521b6750e6fa0b72d9679189483ffd537ee025ae0e8964dbcfc9ca50e',
+ 'MMU_READY_RECORD': 'b9f6c6a6115fb87b68e8829f0cce43334752392a38151b8a5524f017f6004705',
+ 'MMU_TEST_OUTPUT': 'bf6a85f763bbdb1e0259601e0f18f84444c67236ef3d254a259e5ca80e914bcb',
+ 'MMU_TEST_PASS': '0a361de8d2142b693cdd7eb1eec463ee2085fc91f21ef10d78ea3eeedf9fd0c9',
+ 'NESTED_TRAP_TEST_OUTPUT': '745a0cd6f31e215c8b0adb85b893d1def0697467ace97d628bf39b90e14304e6',
+ 'NESTED_TRAP_TEST_PASS': '4593c1f6fff7a66caa977dc796e85b5bcd9380101f202b9e210d31ad68c63ba6',
+ 'OBJECTS_READY_RECORD': '3dc8a8a0431e75f6c02eaaaf6cef59cd39510a7f1f82f149b16d7ada29a85f17',
+ 'OBJECT_MODEL_TEST_OUTPUT': '322d844ec08f8d1e50d0ffc2e77942a35cec71ad0d94e153f7af36ae83b593ec',
+ 'OBJECT_MODEL_TEST_PASS': 'a89906486e5e8af87c193ff0d0704c321aaedfb3bf6a0cb3b1f6941d519802ee',
+ 'PANIC_OUTPUT': 'cd533d9fd7467dab1b4e9ce092a06cec38e6c271861a6140a9129f341b343cbc',
+ 'SCHEDULER_INVALID_CONTEXT_RECORD': 'd003b0f589bd4a7e82c4450047a82dbda5ed344def4bcd2560ab1e33d359aa54',
+ 'SCHEDULER_INVALID_DIAGNOSTIC': 'c9665692e07724cb2e65052d232ba198a01b5349a04c8aa7d7971452b4d2521e',
+ 'SCHEDULER_INVALID_OUTPUT': '428c76245fca97971b627831ef6dd1283417caae494750dd5f6fc667070eec94',
+ 'SCHEDULER_TEST_OUTPUT': '633bbbe9d0e31457609ed0da3a78bfbb24fb66201b5df978c333e7bbb37e3260',
+ 'SCHEDULER_TEST_PASS': '33c88824a5cfa7fe377d4120cdc4b03a7eeef844dc3fa379b15948d9e0c98a45',
+ 'TIMER_TEST_OUTPUT': '98289eae378b9ea98134e475f65c3b3402fc6cbed181d9df7d182b88443ae18e',
+ 'TRAP_CONTEXT_RECORD': 'b3d0841a9382b4df9ee01fc43a29fa8421ffafa68d4b374d031a64296b69cb8c',
+ 'TRAP_PANIC_OUTPUT': '095feb62a20fede62fed379a499a446cbf245447c25c3d151fac82e73ed2938b',
+ 'TRAP_RECOVERY_OUTPUT': '6665a4f247b996c609343396d66b93c6951f3cc6a32f36e86e4cdf1e5a1068ec',
+ 'USER_ADDRESS_SPACE_TEST_OUTPUT': 'a6916bc3361e42062ee37e4f42fc11476382eed7b62d8d326551360299cbc89e',
+ 'USER_ADDRESS_SPACE_TEST_PASS': '7099df6228459b6f42ea4b47e45d1d01dac567e5eb53b79c345acfb4ea750944',
+ 'USER_EXECUTION_TEST_OUTPUT': '5f449b1afb0e8e5f7434a7c84d35a8334baa63766d5307f0e826a44712d1180b',
+ 'USER_EXECUTION_TEST_PASS': '0607c704b6ad02dd96b6480656d379426aef2cf9c0c5b47329a34f061888df75'}
 ORIGINAL_LONG_FUNCTIONS = (
     ("matches_expected_result", 217), ("parse_arguments", 330), ("main", 187),
 )
@@ -932,8 +1075,10 @@ COMPLETED_SOURCE_NODES = {
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[9]),
     *("ClassDef:" + name for name in ORIGINAL_CLASSES),
     *("Assign:" + name for name in ORIGINAL_GLOBAL_NAMES),
+    *("TestMethod:" + name for name in ORIGINAL_TEST_METHODS),
+    *("TestAssign:" + name for name, _ in ORIGINAL_TEST_DATA),
 }
-SOURCE_OWNER_MIGRATION = tuple(name for name in INITIAL_SOURCE_OWNER_MIGRATION if name not in COMPLETED_SOURCE_NODES)
+SOURCE_OWNER_MIGRATION = ()
 LONG_TASK_MIGRATION = ()
 
 
@@ -1076,6 +1221,7 @@ def restore_phase_function(text, function, phases, plan, count, gaps):
         helper = nodes.get(name)
         if (
             not isinstance(helper, ast.FunctionDef) or helper.decorator_list or helper.returns is not None
+            or getattr(helper, "type_params", ())
             or ast_digest(helper.args) != ast_digest(phase_signature(name, parameters))
             or ast_digest(statement) != ast_digest(phase_call(name, parameters, boolean))
             or len(helper.body) != end - start + int(boolean)
@@ -1101,6 +1247,7 @@ def restore_main_function(text, function):
     ).body[0].args
     if (
         not isinstance(helper, ast.FunctionDef) or helper.decorator_list or helper.returns is not None
+        or getattr(helper, "type_params", ())
         or ast_digest(helper.args) != ast_digest(signature)
         or len(helper.body) != 1 or not isinstance(helper.body[0], ast.Return)
         or not isinstance(helper.body[0].value, ast.Call)
@@ -1138,6 +1285,130 @@ def restored_function_source(text, function):
     return restore_phase_function(
         text, function, OUTLINE_PHASES[function.name], OUTLINE_ROOT_PLANS[function.name],
         ORIGINAL_STATEMENT_COUNTS[function.name], ORIGINAL_STATEMENT_GAPS[function.name],
+    )
+
+
+def test_case_methods(owner):
+    return {
+        mixin: (aggregate, tuple(ORIGINAL_TEST_METHOD_ORDER[aggregate][index] for index in indices))
+        for mixin, aggregate, indices in TEST_CASE_LAYOUT[owner]
+    }
+
+
+def case_owner_methods(text, owner):
+    expected = test_case_methods(owner)
+    methods = {}
+    imports = set()
+    references = set()
+    classes = set()
+    fixtures = {name for name, _ in ORIGINAL_TEST_DATA}
+    for node in ast.parse(text).body:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if isinstance(node, ast.Import) and len(node.names) == 1 and node.names[0].name in ("contextlib", "io", "sys"):
+                names = [node.names[0].name]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == "tools" and [value.name for value in node.names] == ["run_qemu_smoke"]:
+                names = ["run_qemu_smoke"]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == "tests.host.qemu_smoke_test_fixture":
+                names = [value.name for value in node.names]
+                if not set(names) <= fixtures:
+                    raise AssertionError("test case imports only original independent fixture names")
+            else:
+                raise AssertionError("test cases keep only necessary standard, runner and independent fixture imports")
+            if any(value.asname is not None for value in node.names) or len(set(names)) != len(names) or imports & set(names):
+                raise AssertionError("test imports do not rename or duplicate bindings")
+            imports.update(names)
+            continue
+        if (
+            not isinstance(node, ast.ClassDef) or node.name not in expected or node.name in classes
+            or node.bases or node.keywords or node.decorator_list or getattr(node, "type_params", ())
+            or not all(isinstance(value, ast.FunctionDef) for value in node.body)
+        ):
+            raise AssertionError("case owners contain only their plain original-method mixins, never another loader")
+        classes.add(node.name)
+        aggregate, names = expected[node.name]
+        if tuple(value.name for value in node.body) != names:
+            raise AssertionError("each plain mixin retains its exact original method order")
+        for method in node.body:
+            key = aggregate + "." + method.name
+            if (
+                key in methods or ast_digest(method) != ORIGINAL_TEST_METHODS[key]
+                or digest(node_source(text, method).encode()) != ORIGINAL_TEST_METHOD_RAW[key]
+            ):
+                raise AssertionError("test method retains its complete independent raw body/signature/AST: " + key)
+            methods[key] = method
+            references.update(value.id for value in ast.walk(method) if isinstance(value, ast.Name) and isinstance(value.ctx, ast.Load))
+    if classes != set(expected) or imports != references & (fixtures | {"contextlib", "io", "sys", "run_qemu_smoke"}):
+        raise AssertionError("all and only required case classes/import bindings have real owners")
+    return methods
+
+
+def restored_test_ast(texts=None):
+    texts = {path: source(path) for path in TEST_PATHS} if texts is None else texts
+    data = ast.parse(texts[TEST_PATHS[1]]).body
+    if len(data) != len(ORIGINAL_TEST_DATA):
+        raise AssertionError("independent fixture owner keeps exactly all original assignments")
+    for node, (name, expected) in zip(data, ORIGINAL_TEST_DATA):
+        if (
+            not isinstance(node, ast.Assign) or len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name)
+            or node.targets[0].id != name or ast_digest(node) != expected
+            or digest(node_source(texts[TEST_PATHS[1]], node).encode()) != ORIGINAL_TEST_DATA_RAW[name]
+        ):
+            raise AssertionError("fixture bytes/AST/order stay independent of production report tables: " + name)
+    methods = {}
+    for owner in TEST_CASE_LAYOUT:
+        selected = case_owner_methods(texts[TEST_PATHS[owner]], owner)
+        if methods.keys() & selected.keys():
+            raise AssertionError("test methods have one actual owner")
+        methods.update(selected)
+    if set(methods) != set(ORIGINAL_TEST_METHODS):
+        raise AssertionError("all 85 original methods remain present exactly once")
+    root = ast.parse(texts[TEST_PATH])
+    original_imports = {ast_digest(node) for node in ast.parse(
+        "import contextlib\nimport io\nimport sys\nimport unittest\nfrom tools import run_qemu_smoke\n"
+    ).body}
+    modules = {
+        TEST_PATHS[owner][:-3].replace("/", "."): tuple(test_case_methods(owner))
+        for owner in TEST_CASE_LAYOUT
+    }
+    observed = set()
+    projected = []
+    for node in root.body:
+        if isinstance(node, ast.ImportFrom) and node.module in (*modules, "tests.host.qemu_smoke_test_fixture"):
+            names = tuple(alias.name for alias in node.names)
+            expected = modules.get(node.module, tuple(name for name, _ in ORIGINAL_TEST_DATA))
+            if node.level or names != expected or any(alias.asname is not None for alias in node.names) or node.module in observed:
+                raise AssertionError("test facade uses only exact explicit fixture/mixin aliases")
+            observed.add(node.module)
+            if node.module == "tests.host.qemu_smoke_test_fixture":
+                projected.extend(data)
+            continue
+        if isinstance(node, ast.ClassDef) and node.name in AGGREGATE_MIXINS:
+            expected = ast.parse(
+                "class " + node.name + "(" + ", ".join((*AGGREGATE_MIXINS[node.name], "unittest.TestCase")) + "):\n    pass\n"
+            ).body[0]
+            if ast_digest(node) != ast_digest(expected) or node.name in observed:
+                raise AssertionError("six original aggregate identities keep exact plain-mixin bases and no local overrides")
+            observed.add(node.name)
+            restored = copy.deepcopy(node)
+            restored.bases = ast.parse("class Original(unittest.TestCase):\n    pass\n").body[0].bases
+            restored.body = [methods[node.name + "." + name] for name in ORIGINAL_TEST_METHOD_ORDER[node.name]]
+            projected.append(restored)
+            continue
+        if isinstance(node, (ast.Import, ast.ImportFrom)) and ast_digest(node) not in original_imports:
+            raise AssertionError("facade retains only original standard/runner bindings and exact case aliases")
+        projected.append(node)
+    if observed != set(modules) | {"tests.host.qemu_smoke_test_fixture"} | set(AGGREGATE_MIXINS):
+        raise AssertionError("every test owner is wired through the one original discovery facade")
+    result = ast.Module(body=projected, type_ignores=root.type_ignores)
+    if ast_digest(result) != ORIGINAL_TEST_AST:
+        raise AssertionError("the complete actual original test module AST must restore before acceptance")
+    return result
+
+
+def suite_ids(suite):
+    return tuple(
+        identity for value in suite
+        for identity in (suite_ids(value) if isinstance(value, unittest.TestSuite) else (value.id(),))
     )
 
 
@@ -1294,6 +1565,49 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_all_test_owners_preserve_complete_original_ast_and_single_discovery(self):
+        for path in TEST_PATHS:
+            self.assertTrue((ROOT / path).is_file(), path)
+        self.assertEqual(ORIGINAL_TEST_AST, ast_digest(restored_test_ast()))
+        from tests.host import test_run_qemu_smoke as cases
+
+        expected = tuple(
+            "tests.host.test_run_qemu_smoke." + name + "." + method
+            for name in sorted(ORIGINAL_TEST_METHOD_ORDER) for method in sorted(ORIGINAL_TEST_METHOD_ORDER[name])
+        )
+        loader = unittest.TestLoader()
+        self.assertEqual(85, len(expected))
+        self.assertEqual(expected, suite_ids(loader.loadTestsFromModule(cases)))
+        with mock.patch.object(sys, "path", list(sys.path)):
+            discovered = loader.discover(str(ROOT / "tests/host"), pattern="test_run_qemu_smoke.py")
+        self.assertEqual(tuple(value[len("tests.host."):] for value in expected), suite_ids(discovered))
+
+    def test_independent_case_ownership_and_discovery_mutations_fail_closed(self):
+        texts = {path: source(path) for path in TEST_PATHS}
+        self.assertEqual((12, 14, 22, 15, 13, 9), tuple(
+            len(case_owner_methods(texts[TEST_PATHS[owner]], owner)) for owner in range(2, 8)
+        ))
+        for owner, before, after in (
+            (0, "unittest.TestCase", "object"),
+            (0, "    pass", "    def test_override(self):\n        pass"),
+            (0, "PANIC_OUTPUT,", "PANIC_OUTPUT as other,"),
+            (1, "MICROS_BOOT", "CHANGED_BOOT"),
+            (2, "class SmokeClassificationCases:", "class SmokeClassificationCases(unittest.TestCase):"),
+            (2, "self.assertEqual(", "self.assertNotEqual("),
+            (7, "def test_parses_exact_defined_symbol", "def test_changed_symbol"),
+        ):
+            path = TEST_PATHS[owner]
+            self.assertIn(before, texts[path])
+            changed = dict(texts)
+            changed[path] = changed[path].replace(before, after, 1)
+            with self.subTest(path=path, before=before), self.assertRaises(AssertionError):
+                restored_test_ast(changed)
+        for owner, extra in ((0, "\neffect()\n"), (1, "\nfrom tools import run_qemu_smoke\n"), (2, "\ndef load_tests(*args):\n    pass\n")):
+            changed = dict(texts)
+            changed[TEST_PATHS[owner]] += extra
+            with self.subTest(owner=owner), self.assertRaises(AssertionError):
+                restored_test_ast(changed)
+
     def test_argument_registration_keeps_one_parser_option_order_and_environment_defaults(self):
         import argparse
         from tools import qemu_smoke_arguments as arguments

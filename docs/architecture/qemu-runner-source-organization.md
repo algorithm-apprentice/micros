@@ -463,3 +463,12 @@ deterministic serial short-write/timeout custody pass in 199 focused checks.
 Real two-memory allocator growth and sealed VM-fault guests also pass.
 Only the original 85 methods and 36 fixtures (121 moves), planner wiring and
 final full/reuse/review acceptance remain.
+
+All eight test owners are now real: nine plain mixins carry the unchanged
+85 raw/AST method bodies, and the fixture owner retains all 36 independent
+raw/AST assignments. Six original aggregate classes, aliases, sorted IDs
+and native discovery remain exact and occur once. Both migrations are
+literal empty. The 201 focused checks pass, including complete original
+test-module AST restoration and independent inheritance/override/fixture/
+loader mutations. Planner transport and final full/reuse/review acceptance
+are still required.
