@@ -436,3 +436,11 @@ checks and actual smoke/timer guests at the original eight-second budgets.
 Six future production owners remain docstring-only; 27 original functions
 still reside in the facade. There are 148 original node/method/data moves
 and all three long-function dispositions remaining.
+
+The ten original object/user-space/scheduler/endpoint/IPC report functions
+now occupy their complete owner with exact record/platform dependencies.
+All raw bodies, prerequisite/order tests and actual whole-file/context
+inverses pass. Current evidence is 189 focused checks and real object-model
+and IPC guests at their original budgets. Five production migration
+stubs remain; seventeen original functions still reside in the facade,
+with 138 original node/method/data moves and three long tasks pending.

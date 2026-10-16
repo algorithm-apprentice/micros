@@ -869,6 +869,7 @@ INITIAL_SOURCE_OWNER_MIGRATION = (
 COMPLETED_SOURCE_NODES = {
     "FunctionDef:build_qemu_command", "FunctionDef:_split_output_records",
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[2]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[3]),
     *("ClassDef:" + name for name in ORIGINAL_CLASSES),
     *("Assign:" + name for name in ORIGINAL_GLOBAL_NAMES),
 }
@@ -1130,6 +1131,11 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_object_and_ipc_reports_have_their_complete_original_owner(self):
+        self.assertEqual(set(FUNCTION_OWNERS[3]), {
+            node.name for node in ast.parse(source(PRODUCTION_PATHS[3])).body if isinstance(node, ast.FunctionDef)
+        })
+
     def test_platform_reports_have_their_complete_dependency_ordered_owner(self):
         self.assertEqual(set(FUNCTION_OWNERS[2]), {
             node.name for node in ast.parse(source(PRODUCTION_PATHS[2])).body if isinstance(node, ast.FunctionDef)
