@@ -1,5 +1,12 @@
 #include "kernel_objects_test_internal.h"
 
+struct kernel_object_test_address_space_work {
+    struct micros_process_handle process;
+    struct micros_process_handle stale;
+    struct micros_thread_handle thread;
+    struct micros_kernel_objects snapshot;
+};
+
 bool kernel_object_test_process_slots_reuse_with_new_generations(void)
 {
     struct micros_kernel_objects *fixture = kernel_object_test_registry();
@@ -111,15 +118,12 @@ bool kernel_object_test_process_exact_slot_creation_is_isolated(void)
     return true;
 }
 
-bool kernel_object_test_process_address_space_lifecycle_is_exact(void)
+static bool kernel_object_test_prepare_address_space_rejections(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_address_space_work *work,
+    uintptr_t root
+)
 {
-    struct micros_kernel_objects *fixture = kernel_object_test_registry();
-    const uintptr_t root = UINT64_C(0x0000000081000000);
-    struct micros_process_handle process = {0};
-    struct micros_process_handle stale;
-    struct micros_thread_handle thread = {0};
-    struct micros_kernel_objects snapshot;
-
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -127,28 +131,37 @@ bool kernel_object_test_process_address_space_lifecycle_is_exact(void)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &process)
+        micros_process_create(fixture, &work->process)
     );
-    stale = process;
+    work->stale = work->process;
 
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
-        micros_process_attach_address_space(NULL, process, root)
+        micros_process_attach_address_space(NULL, work->process, root)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
-        micros_process_detach_address_space(NULL, process, root)
+        micros_process_detach_address_space(NULL, work->process, root)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
-        micros_process_attach_address_space(fixture, process, 0)
+        micros_process_attach_address_space(fixture, work->process, 0)
     );
+    return true;
+}
+
+static bool kernel_object_test_attach_address_space_and_reject_mutations(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_address_space_work *work,
+    uintptr_t root
+)
+{
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_attach_address_space(fixture, process, root)
+        micros_process_attach_address_space(fixture, work->process, root)
     );
     EXPECT_TRUE(
-        fixture->processes[process.slot].address_space_root == root
+        fixture->processes[work->process.slot].address_space_root == root
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -159,7 +172,7 @@ bool kernel_object_test_process_address_space_lifecycle_is_exact(void)
         MICROS_KERNEL_OBJECT_ERROR_STATE,
         micros_process_attach_address_space(
             fixture,
-            process,
+            work->process,
             root + UINT64_C(0x1000)
         )
     );
@@ -167,53 +180,95 @@ bool kernel_object_test_process_address_space_lifecycle_is_exact(void)
         MICROS_KERNEL_OBJECT_ERROR_STATE,
         micros_process_detach_address_space(
             fixture,
-            process,
+            work->process,
             root + UINT64_C(0x1000)
         )
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_process_release(fixture, process)
+        micros_process_release(fixture, work->process)
     );
+    return true;
+}
 
+static bool kernel_object_test_detach_address_space_after_thread_release(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_address_space_work *work,
+    uintptr_t root
+)
+{
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(fixture, process, &thread)
+        micros_thread_create(fixture, work->process, &work->thread)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_STATE,
-        micros_process_detach_address_space(fixture, process, root)
+        micros_process_detach_address_space(fixture, work->process, root)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_release(fixture, thread)
+        micros_thread_release(fixture, work->thread)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_detach_address_space(fixture, process, root)
+        micros_process_detach_address_space(fixture, work->process, root)
     );
     EXPECT_TRUE(
-        fixture->processes[process.slot].address_space_root == 0
+        fixture->processes[work->process.slot].address_space_root == 0
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_release(fixture, process)
+        micros_process_release(fixture, work->process)
     );
+    return true;
+}
 
+static bool kernel_object_test_reuse_process_rejects_stale_root_handles(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_address_space_work *work,
+    uintptr_t root
+)
+{
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &process)
+        micros_process_create(fixture, &work->process)
     );
-    snapshot = *fixture;
+    work->snapshot = *fixture;
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_STALE,
-        micros_process_attach_address_space(fixture, stale, root)
+        micros_process_attach_address_space(fixture, work->stale, root)
     );
-    EXPECT_TRUE(memcmp(fixture, &snapshot, sizeof(*fixture)) == 0);
+    EXPECT_TRUE(memcmp(fixture, &work->snapshot, sizeof(*fixture)) == 0);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_STALE,
-        micros_process_detach_address_space(fixture, stale, root)
+        micros_process_detach_address_space(fixture, work->stale, root)
     );
-    EXPECT_TRUE(memcmp(fixture, &snapshot, sizeof(*fixture)) == 0);
+    EXPECT_TRUE(memcmp(fixture, &work->snapshot, sizeof(*fixture)) == 0);
+    return true;
+}
+
+bool kernel_object_test_process_address_space_lifecycle_is_exact(void)
+{
+    struct micros_kernel_objects *fixture = kernel_object_test_registry();
+    const uintptr_t root = UINT64_C(0x0000000081000000);
+    struct kernel_object_test_address_space_work work;
+    work.process = (struct micros_process_handle){0};
+    work.thread = (struct micros_thread_handle){0};
+
+    if (!kernel_object_test_prepare_address_space_rejections(fixture, &work, root)) {
+        return false;
+    }
+
+    if (!kernel_object_test_attach_address_space_and_reject_mutations(fixture, &work, root)) {
+        return false;
+    }
+
+    if (!kernel_object_test_detach_address_space_after_thread_release(fixture, &work, root)) {
+        return false;
+    }
+
+    if (!kernel_object_test_reuse_process_rejects_stale_root_handles(fixture, &work, root)) {
+        return false;
+    }
     return true;
 }

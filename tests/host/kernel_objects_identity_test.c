@@ -1,48 +1,51 @@
 #include "kernel_objects_test_internal.h"
 
-bool kernel_object_test_generation_boundaries_and_quarantine(void)
-{
-    struct micros_kernel_objects *fixture = kernel_object_test_registry();
-    uint32_t next = UINT32_C(0xfeedface);
-    struct micros_process_handle process = {0};
-    struct micros_process_handle stale_process = {0};
-    struct micros_process_handle replacement = {0};
-    struct micros_thread_handle thread = {0};
-    struct micros_thread_handle stale_thread = {0};
-    struct micros_thread_handle final_thread = {0};
-    const struct micros_process *resolved_process = NULL;
-    const struct micros_thread *resolved_thread = NULL;
+struct kernel_object_test_generation_work {
+    uint32_t next;
+    struct micros_process_handle process;
+    struct micros_process_handle stale_process;
+    struct micros_process_handle replacement;
+    struct micros_thread_handle thread;
+    struct micros_thread_handle stale_thread;
+    struct micros_thread_handle final_thread;
+    const struct micros_process *resolved_process;
+    const struct micros_thread *resolved_thread;
+};
 
+static bool kernel_object_test_generation_value_boundaries(
+    struct kernel_object_test_generation_work *work
+)
+{
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_next_generation(0, 0, &next)
+        micros_process_next_generation(0, 0, &work->next)
     );
-    EXPECT_TRUE(next == 1);
+    EXPECT_TRUE(work->next == 1);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_process_next_generation(
             0,
             MICROS_PROCESS_GENERATION_MAX - 1,
-            &next
+            &work->next
         )
     );
-    EXPECT_TRUE(next == MICROS_PROCESS_GENERATION_MAX);
-    next = UINT32_C(0xfeedface);
+    EXPECT_TRUE(work->next == MICROS_PROCESS_GENERATION_MAX);
+    work->next = UINT32_C(0xfeedface);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED,
         micros_process_next_generation(
             UINT16_C(0x0ffe),
             MICROS_PROCESS_GENERATION_MAX - 1,
-            &next
+            &work->next
         )
     );
-    EXPECT_TRUE(next == UINT32_C(0xfeedface));
+    EXPECT_TRUE(work->next == UINT32_C(0xfeedface));
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED,
         micros_process_next_generation(
             UINT16_C(0x0fff),
             MICROS_PROCESS_GENERATION_MAX - 1,
-            &next
+            &work->next
         )
     );
     EXPECT_ERROR(
@@ -50,25 +53,32 @@ bool kernel_object_test_generation_boundaries_and_quarantine(void)
         micros_process_next_generation(
             0,
             MICROS_PROCESS_GENERATION_MAX,
-            &next
+            &work->next
         )
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_ARGUMENT,
-        micros_process_next_generation(UINT16_C(0x1000), 0, &next)
+        micros_process_next_generation(UINT16_C(0x1000), 0, &work->next)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_next_generation(UINT32_MAX - 1, &next)
+        micros_thread_next_generation(UINT32_MAX - 1, &work->next)
     );
-    EXPECT_TRUE(next == UINT32_MAX);
-    next = UINT32_C(0xfeedface);
+    EXPECT_TRUE(work->next == UINT32_MAX);
+    work->next = UINT32_C(0xfeedface);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_GENERATION_EXHAUSTED,
-        micros_thread_next_generation(UINT32_MAX, &next)
+        micros_thread_next_generation(UINT32_MAX, &work->next)
     );
-    EXPECT_TRUE(next == UINT32_C(0xfeedface));
+    EXPECT_TRUE(work->next == UINT32_C(0xfeedface));
+    return true;
+}
 
+static bool kernel_object_test_thread_generation_quarantine(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_generation_work *work
+)
+{
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -76,50 +86,57 @@ bool kernel_object_test_generation_boundaries_and_quarantine(void)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &process)
+        micros_process_create(fixture, &work->process)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(fixture, process, &thread)
+        micros_thread_create(fixture, work->process, &work->thread)
     );
-    fixture->threads[thread.slot].generation = UINT32_MAX - 1;
-    thread.generation = UINT32_MAX - 1;
-    stale_thread = thread;
+    fixture->threads[work->thread.slot].generation = UINT32_MAX - 1;
+    work->thread.generation = UINT32_MAX - 1;
+    work->stale_thread = work->thread;
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_release(fixture, thread)
+        micros_thread_release(fixture, work->thread)
     );
     EXPECT_TRUE(
-        fixture->threads[thread.slot].slot_state
+        fixture->threads[work->thread.slot].slot_state
         == MICROS_KERNEL_OBJECT_SLOT_FREE
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_create(fixture, process, &final_thread)
+        micros_thread_create(fixture, work->process, &work->final_thread)
     );
-    EXPECT_TRUE(final_thread.slot == stale_thread.slot);
-    EXPECT_TRUE(final_thread.generation == UINT32_MAX);
+    EXPECT_TRUE(work->final_thread.slot == work->stale_thread.slot);
+    EXPECT_TRUE(work->final_thread.generation == UINT32_MAX);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_STALE,
         micros_thread_resolve(
             fixture,
-            stale_thread,
-            &resolved_thread
+            work->stale_thread,
+            &work->resolved_thread
         )
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_thread_release(fixture, final_thread)
+        micros_thread_release(fixture, work->final_thread)
     );
     EXPECT_TRUE(
-        fixture->threads[final_thread.slot].slot_state
+        fixture->threads[work->final_thread.slot].slot_state
         == MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(fixture)
     );
+    return true;
+}
 
+static bool kernel_object_test_process_generation_quarantine(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_generation_work *work
+)
+{
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -127,53 +144,81 @@ bool kernel_object_test_generation_boundaries_and_quarantine(void)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &process)
+        micros_process_create(fixture, &work->process)
     );
-    fixture->processes[process.slot].generation =
+    fixture->processes[work->process.slot].generation =
         MICROS_PROCESS_GENERATION_MAX - 1;
-    process.generation = MICROS_PROCESS_GENERATION_MAX - 1;
-    stale_process = process;
+    work->process.generation = MICROS_PROCESS_GENERATION_MAX - 1;
+    work->stale_process = work->process;
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_release(fixture, process)
+        micros_process_release(fixture, work->process)
     );
     EXPECT_TRUE(
-        fixture->processes[process.slot].slot_state
+        fixture->processes[work->process.slot].slot_state
         == MICROS_KERNEL_OBJECT_SLOT_FREE
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &process)
+        micros_process_create(fixture, &work->process)
     );
-    EXPECT_TRUE(process.slot == stale_process.slot);
+    EXPECT_TRUE(work->process.slot == work->stale_process.slot);
     EXPECT_TRUE(
-        process.generation == MICROS_PROCESS_GENERATION_MAX
+        work->process.generation == MICROS_PROCESS_GENERATION_MAX
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_STALE,
         micros_process_resolve(
             fixture,
-            stale_process,
-            &resolved_process
+            work->stale_process,
+            &work->resolved_process
         )
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_release(fixture, process)
+        micros_process_release(fixture, work->process)
     );
     EXPECT_TRUE(
-        fixture->processes[process.slot].slot_state
+        fixture->processes[work->process.slot].slot_state
         == MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &replacement)
+        micros_process_create(fixture, &work->replacement)
     );
-    EXPECT_TRUE(replacement.slot == 1 && replacement.generation == 1);
+    EXPECT_TRUE(work->replacement.slot == 1 && work->replacement.generation == 1);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(fixture)
     );
+    return true;
+}
+
+bool kernel_object_test_generation_boundaries_and_quarantine(void)
+{
+    struct micros_kernel_objects *fixture = kernel_object_test_registry();
+    struct kernel_object_test_generation_work work;
+    work.next = UINT32_C(0xfeedface);
+    work.process = (struct micros_process_handle){0};
+    work.stale_process = (struct micros_process_handle){0};
+    work.replacement = (struct micros_process_handle){0};
+    work.thread = (struct micros_thread_handle){0};
+    work.stale_thread = (struct micros_thread_handle){0};
+    work.final_thread = (struct micros_thread_handle){0};
+    work.resolved_process = NULL;
+    work.resolved_thread = NULL;
+
+    if (!kernel_object_test_generation_value_boundaries(&work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_thread_generation_quarantine(fixture, &work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_process_generation_quarantine(fixture, &work)) {
+        return false;
+    }
     return true;
 }
 

@@ -156,6 +156,50 @@ NATIVE_CASE_TASKS = {
             "kernel_object_test_hart_capacity_refusal",
         ),
     },
+    "test_generation_boundaries_and_quarantine": {
+        "owner": 6,
+        "work": "kernel_object_test_generation_work",
+        "fields": (
+            ("uint32_t next;", "value"),
+            ("struct micros_process_handle process;", "aggregate"),
+            ("struct micros_process_handle stale_process;", "aggregate"),
+            ("struct micros_process_handle replacement;", "aggregate"),
+            ("struct micros_thread_handle thread;", "aggregate"),
+            ("struct micros_thread_handle stale_thread;", "aggregate"),
+            ("struct micros_thread_handle final_thread;", "aggregate"),
+            ("const struct micros_process *resolved_process;", "value"),
+            ("const struct micros_thread *resolved_thread;", "value"),
+        ),
+        "phases": (
+            "kernel_object_test_generation_value_boundaries",
+            "kernel_object_test_thread_generation_quarantine",
+            "kernel_object_test_process_generation_quarantine",
+        ),
+        "without_fixture": ("kernel_object_test_generation_value_boundaries",),
+    },
+    "test_process_address_space_lifecycle_is_exact": {
+        "owner": 3,
+        "work": "kernel_object_test_address_space_work",
+        "fields": (
+            ("struct micros_process_handle process;", "aggregate"),
+            ("struct micros_process_handle stale;", None),
+            ("struct micros_thread_handle thread;", "aggregate"),
+            ("struct micros_kernel_objects snapshot;", None),
+        ),
+        "constants": ("const uintptr_t root = UINT64_C(0x0000000081000000);",),
+        "phases": (
+            "kernel_object_test_prepare_address_space_rejections",
+            "kernel_object_test_attach_address_space_and_reject_mutations",
+            "kernel_object_test_detach_address_space_after_thread_release",
+            "kernel_object_test_reuse_process_rejects_stale_root_handles",
+        ),
+        "parameters": {
+            "kernel_object_test_prepare_address_space_rejections": (("uintptr_t", "root"),),
+            "kernel_object_test_attach_address_space_and_reject_mutations": (("uintptr_t", "root"),),
+            "kernel_object_test_detach_address_space_after_thread_release": (("uintptr_t", "root"),),
+            "kernel_object_test_reuse_process_rejects_stale_root_handles": (("uintptr_t", "root"),),
+        },
+    },
 }
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
@@ -282,10 +326,8 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (1, "test_thread_execution_context_lifecycle_is_exact"),
-    (1, "test_generation_boundaries_and_quarantine"),
     (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
-    (1, "test_process_address_space_lifecycle_is_exact"),
     (1, "test_validator_rejects_corrupt_relationships"),
 )
 CORE_DAG = {
@@ -806,14 +848,27 @@ def outline_boolean_case_tokens(caller, phases, calls):
     return tuple(body)
 
 
-def restore_case_work_tokens(caller, tag, fields, declarations):
+def case_phase_contract(spec, name):
+    arguments = (() if name in spec.get("without_fixture", ()) else ("fixture",)) + ("&work",)
+    parameters = (
+        (() if name in spec.get("without_fixture", ()) else ("struct micros_kernel_objects *fixture",))
+        + ("struct " + spec["work"] + " *work",)
+    )
+    for kind, variable in spec.get("parameters", {}).get(name, ()):
+        parameters += (kind + " " + variable,)
+        arguments += (variable,)
+    return ", ".join(parameters), arguments
+
+
+def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
     body = list(caller)
     borrow = list(tokens("struct micros_kernel_objects *fixture = kernel_object_test_registry();"))
+    prefix_statements = borrow + [token for declaration in constants for token in tokens(declaration)]
     work = list(tokens("struct " + tag + " work;"))
-    prefix = ["{"] + borrow + work
+    prefix = ["{"] + prefix_statements + work
     if body[:len(prefix)] != prefix:
         raise AssertionError("case work is one uninitialized automatic root object after the sole registry borrow")
-    del body[1 + len(borrow):len(prefix)]
+    del body[1 + len(prefix_statements):len(prefix)]
     names = tuple(
         declaration[declaration.index("[") - 1] if "[" in declaration else declaration[-2]
         for declaration in declarations
@@ -833,7 +888,7 @@ def restore_case_work_tokens(caller, tag, fields, declarations):
         else:
             restored.append(body[index])
             index += 1
-    start = 1 + len(borrow)
+    start = 1 + len(prefix_statements)
     initializers = []
     for (declaration, kind), actual, name in zip(fields, declarations, names):
         if tuple(actual) != tokens(declaration):
@@ -862,16 +917,13 @@ def native_case_body_tokens(original, record, owner=None):
     spec = NATIVE_CASE_TASKS[original]
     owner = source(family_paths(1)[spec["owner"]]) if owner is None else owner
     declarations = case_work_declarations(owner, spec["work"], spec["fields"])
-    parameters = {
-        name: "struct micros_kernel_objects *fixture, struct " + spec["work"] + " *work"
-        for name in spec["phases"]
-    }
+    parameters = {name: case_phase_contract(spec, name)[0] for name in spec["phases"]}
     phases = checked_phase_bodies(function_records(owner), parameters)
     body = outline_boolean_case_tokens(
         "{" + record.body + "}", {name: "{" + phase + "}" for name, phase in phases.items()},
-        tuple((name, ("fixture", "&work")) for name in spec["phases"]),
+        tuple((name, case_phase_contract(spec, name)[1]) for name in spec["phases"]),
     )
-    return restore_case_work_tokens(body, spec["work"], spec["fields"], declarations)
+    return restore_case_work_tokens(body, spec["work"], spec["fields"], declarations, spec.get("constants", ()))
 
 
 def core_body_text(original, record, texts=None):
@@ -1917,17 +1969,17 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             restored_kernel_objects_source({**current, path: text.replace(peer, changed_peer, 1)})
 
-    def test_native_initialization_cases_expose_exact_typed_original_work_and_tasks(self):
+    def test_native_cases_expose_exact_typed_original_work_and_tasks(self):
         for original, specification in NATIVE_CASE_TASKS.items():
             owner = source(family_paths(1)[specification["owner"]])
             records = function_records(owner)
             work = specification["work"]
-            self.assertRegex(owner, r"\bstruct " + work + r"\s*\{")
+            self.assertIsNotNone(re.search(r"\bstruct " + work + r"\s*\{", owner), work)
             for name in specification["phases"]:
                 with self.subTest(case=original, phase=name):
                     self.assertIn(name, set(records))
                     self.assertEqual(
-                        tokens("static bool " + name + "(struct micros_kernel_objects *fixture, struct " + work + " *work)"),
+                        tokens("static bool " + name + "(" + case_phase_contract(specification, name)[0] + ")"),
                         tokens(records[name].signature),
                     )
                     self.assertLessEqual(records[name].lines, 120)
@@ -2019,6 +2071,45 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertNotEqual(
             tokens(expected), outline_boolean_case_tokens(caller.replace("final_validation", "weakened"), phases, calls),
         )
+
+    def test_case_root_constants_stay_automatic_and_pure_phases_gain_no_registry(self):
+        fields = (("struct handle process;", "aggregate"), ("struct registry snapshot;", None))
+        declarations = tuple(tokens(field) for field, _ in fields)
+        constant = "const uintptr_t root = UINT64_C(0x81000000);"
+        caller = (
+            "{ struct micros_kernel_objects *fixture = kernel_object_test_registry(); "
+            + constant + " struct example_work work; work.process = (struct handle){0}; "
+            "EXPECT_ERROR(error, attach(fixture, work.process, root)); work.snapshot = *fixture; return true; }"
+        )
+        expected = (
+            "{ struct micros_kernel_objects *fixture = kernel_object_test_registry(); "
+            + constant + " struct handle process = {0}; struct registry snapshot; "
+            "EXPECT_ERROR(error, attach(fixture, process, root)); snapshot = *fixture; return true; }"
+        )
+        self.assertEqual(
+            tokens(expected), restore_case_work_tokens(tokens(caller), "example_work", fields, declarations, (constant,)),
+        )
+        for changed in (
+            caller.replace(constant, ""),
+            caller.replace("const uintptr_t root", "static const uintptr_t root"),
+            caller.replace("UINT64_C(0x81000000)", "UINT64_C(0x82000000)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore_case_work_tokens(tokens(changed), "example_work", fields, declarations, (constant,))
+        pure = NATIVE_CASE_TASKS["test_generation_boundaries_and_quarantine"]
+        self.assertEqual(
+            ("struct kernel_object_test_generation_work *work", ("&work",)),
+            case_phase_contract(pure, "kernel_object_test_generation_value_boundaries"),
+        )
+        phases = {"attach_case": "{ EXPECT_ERROR(error, attach(fixture, work.process, root)); return true; }"}
+        calls = (("attach_case", ("fixture", "&work", "root")),)
+        checked = "{ if (!attach_case(fixture, &work, root)) { return false; } return true; }"
+        self.assertEqual(
+            tokens("{ EXPECT_ERROR(error, attach(fixture, work.process, root)); return true; }"),
+            outline_boolean_case_tokens(checked, phases, calls),
+        )
+        with self.assertRaises(AssertionError):
+            outline_boolean_case_tokens(checked.replace("&work, root", "&work, root + PAGE_SIZE"), phases, calls)
 
 
 if __name__ == "__main__":

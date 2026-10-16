@@ -694,7 +694,15 @@ extra fields, changed extents/types, reordered initializers and early success.
 The three capacity resets and original macro snapshots stay at their exact
 execution boundaries.
 
-Six native/target dispositions remain pending. Only the target scenario unit
+Generation evidence now has a 27-line root and 61/57/61-line pure-boundary,
+thread-quarantine and process-quarantine tasks. Its nine original objects
+retain their exact initializers; the pure task receives no registry.
+Address-space evidence has a 25-line root and 31/40/31/23-line rejection,
+attach/denial, live-thread retirement and stale-root tasks. The original
+opaque root stays an automatic constant in the caller and is passed
+explicitly; its four original mutable objects and snapshot sites are exact.
+
+Four native/target dispositions remain pending. Only the target scenario unit
 remains declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
