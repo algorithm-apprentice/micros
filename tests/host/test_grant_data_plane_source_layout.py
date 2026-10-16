@@ -249,6 +249,107 @@ ABI_PHASES = (
     "grant_abi_test_validate_shapes", "grant_abi_test_create_shapes",
     "grant_abi_test_revoke_shapes", "grant_abi_test_copy_and_null_shapes",
 )
+MODEL_RUN_TAG = "grant_model_run"
+MODEL_ITERATION_TAG = "grant_model_iteration"
+MODEL_AUTH_TAG = "grant_model_authorization"
+MODEL_RUN_FIELDS = (
+    ("struct micros_grant_registry expected;", False),
+    ("uint16_t expected_process_slot[GRANT_PROCESS_COUNT];", False),
+    ("uint32_t expected_process_generation[GRANT_PROCESS_COUNT];", False),
+    ("micros_endpoint_t expected_endpoint[GRANT_PROCESS_COUNT];", False),
+    ("unsigned char grantor_bytes[64];", False),
+    ("unsigned char grantee_bytes[64];", False),
+    ("unsigned char expected_grantor_bytes[64];", False),
+    ("unsigned char expected_grantee_bytes[64];", False),
+    ("uint32_t random_state;", "value"),
+)
+MODEL_ITERATION_FIELDS = (
+    ("uint32_t random;", "value"),
+    ("enum grant_model_operation operation;", "value"),
+    ("size_t grantor;", "value"),
+    ("size_t grantee;", "value"),
+    ("size_t slot;", "value"),
+    ("micros_grant_t grant;", "value"),
+    ("size_t trace_offset;", "value"),
+    ("size_t trace_length;", "value"),
+    ("uint32_t trace_permission;", "value"),
+    ("enum micros_grant_error actual;", False),
+)
+MODEL_AUTH_FIELDS = (
+    ("struct micros_grant_registry snapshot;", "value"),
+    ("struct micros_grant_copy_authority authority;", False),
+    ("struct micros_grant_copy_authority sentinel;", False),
+    ("struct micros_grant_copy_range_plan source_plan;", True),
+    ("struct micros_grant_copy_range_plan destination_plan;", True),
+    ("const struct micros_grant_record *record;", False),
+    ("struct micros_process_handle candidate_grantee;", "value"),
+    ("micros_endpoint_t candidate_grantor;", "value"),
+    ("enum micros_grant_error expected_result;", False),
+    ("size_t selected_slot;", "value"),
+    ("size_t record_grantor;", "value"),
+    ("size_t record_grantee;", "value"),
+    ("size_t index;", False),
+)
+MODEL_PARAMETERS = (
+    "struct grant_test_fixture *fixture, struct grant_model_run *run, "
+    "struct grant_model_iteration *iteration, size_t step"
+)
+MODEL_OPERATIONS = (
+    ("GRANT_MODEL_CREATE", "grant_test_model_create", True),
+    ("GRANT_MODEL_REVOKE", "grant_test_model_revoke", True),
+    ("GRANT_MODEL_INSPECT", "grant_test_model_inspect", True),
+    ("GRANT_MODEL_CANCEL", "grant_test_model_cancel", True),
+    ("GRANT_MODEL_CLOSE_REUSE", "grant_test_model_close_reuse", True),
+    ("GRANT_MODEL_MALFORMED_TOKEN", "grant_test_model_malformed_token", False),
+    ("GRANT_MODEL_PLAN_FAILURE", "grant_test_model_plan_failure", True),
+    ("GRANT_MODEL_INVALID_CREATE", "grant_test_model_invalid_create", False),
+)
+MODEL_AUTH_LABELS = (
+    "GRANT_MODEL_AUTHORIZE_FROM", "GRANT_MODEL_AUTHORIZE_TO", "GRANT_MODEL_AUTHORIZE_DENIAL",
+    "GRANT_MODEL_AUTHORIZE_STALE", "GRANT_MODEL_AUTHORIZE_BOUNDS",
+)
+MODEL_SELECT = "grant_test_model_select_operation"
+MODEL_DISPATCH = "grant_test_model_apply_operation"
+MODEL_COMPARE = "grant_test_model_compare_state"
+MODEL_AUTHORIZE = "grant_test_model_authorize"
+MODEL_AUTH_PHASES = (
+    "grant_test_model_select_reference", "grant_test_model_expect_authority",
+    "grant_test_model_select_participants", "grant_test_model_observe_authority",
+    "grant_test_model_denial_outputs", "grant_test_model_authority_output",
+    "grant_test_model_copy_bytes",
+)
+MODEL_AUTH_PARAMETERS = {
+    MODEL_AUTH_PHASES[0]: (
+        "static void", "struct grant_model_run *run, struct grant_model_iteration *iteration, "
+        "struct grant_model_authorization *work", "run, iteration, &work",
+    ),
+    MODEL_AUTH_PHASES[1]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_run *run, "
+        "struct grant_model_iteration *iteration, struct grant_model_authorization *work, size_t step",
+        "fixture, run, iteration, &work, step",
+    ),
+    MODEL_AUTH_PHASES[2]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_iteration *iteration, "
+        "struct grant_model_authorization *work, size_t step", "fixture, iteration, work, step",
+    ),
+    MODEL_AUTH_PHASES[3]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_iteration *iteration, "
+        "struct grant_model_authorization *work, size_t step", "fixture, iteration, &work, step",
+    ),
+    MODEL_AUTH_PHASES[4]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_run *run, "
+        "struct grant_model_authorization *work, size_t step", "fixture, run, &work, step",
+    ),
+    MODEL_AUTH_PHASES[5]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_iteration *iteration, "
+        "struct grant_model_authorization *work, size_t step", "fixture, iteration, &work, step",
+    ),
+    MODEL_AUTH_PHASES[6]: (
+        "static bool", "struct grant_test_fixture *fixture, struct grant_model_run *run, "
+        "struct grant_model_iteration *iteration, struct grant_model_authorization *work, size_t step",
+        "fixture, run, iteration, &work, step",
+    ),
+}
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -344,7 +445,6 @@ FUNCTION_TASK_MIGRATION = (
     (3, "transition_after_return"),
     (3, "validate_command_effect"),
     (3, "micros_grant_syscall_runtime_run_self_test"),
-    (4, "test_grant_model"),
     (3, "micros_grant_syscall_test_handle_control_trap"),
     (3, "micros_grant_syscall_test_finish"),
 )
@@ -647,6 +747,18 @@ def original_locations(family, texts=None):
             if path != FAMILY_PATHS[6][0]:
                 raise AssertionError("ABI evidence phases have only the original native ABI owner")
             continue
+        if family == 4 and spelling in (
+            MODEL_SELECT, MODEL_DISPATCH, MODEL_COMPARE, MODEL_AUTHORIZE,
+            *MODEL_AUTH_PHASES, *(name for _, name, _ in MODEL_OPERATIONS),
+        ):
+            owner = (
+                HOST_SOURCES[4] if spelling in (MODEL_SELECT, MODEL_DISPATCH, MODEL_COMPARE)
+                else HOST_SOURCES[6] if spelling in tuple(name for _, name, _ in MODEL_OPERATIONS)
+                else HOST_SOURCES[7]
+            )
+            if path != owner:
+                raise AssertionError("model phases have exactly their reviewed root/operation/copy owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -682,6 +794,8 @@ def original_body_digest(family, original, record):
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
             body = native_case_actual_body_tokens(original, record)
+        if original == "test_grant_model" and (4, original) not in FUNCTION_TASK_MIGRATION:
+            body = model_actual_body_tokens(record)
         body = native_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 5 and original in COPY_CASE_OUTLINES and (5, original) not in FUNCTION_TASK_MIGRATION:
         body = copy_case_actual_body_tokens(original, record)
@@ -762,16 +876,16 @@ def copy_execution_body_tokens(caller, phase, declarations, local_phase):
     return restore_automatic_work_tokens(body, COPY_EXECUTION_TAG, COPY_EXECUTION_FIELDS, declarations)
 
 
-def restore_automatic_work_tokens(body, tag, fields, declarations):
+def restore_automatic_work_tokens(body, tag, fields, declarations, variable="work"):
     body = list(body)
     if tuple(declarations) != tuple(tokens(declaration) for declaration, _ in fields):
         raise AssertionError("automatic declarations come from the exact verified actual work fields")
-    prefix = list(tokens("{ struct " + tag + " work;"))
+    prefix = list(tokens("{ struct " + tag + " " + variable + ";"))
     if body[:len(prefix)] != prefix:
         raise AssertionError("execution work is one original uninitialized automatic root object")
     del body[1:len(prefix)]
     names = tuple(declaration_name(declaration) for declaration in declarations)
-    restored = list(restore_state_members(body, "work", names))
+    restored = list(restore_state_members(body, variable, names))
     initializers = []
     for actual, (_, initialized) in zip(declarations, fields):
         if not initialized:
@@ -971,6 +1085,142 @@ def abi_actual_body_tokens(record, owner=None):
     restored = list(restore_automatic_work_tokens(["{", *body[start:]], ABI_WORK_TAG, ABI_FIELDS, declarations))
     restored[1:1] = prefix
     return tuple(restored)
+
+
+def bound_body_tokens(caller, binding, body):
+    caller = list(caller)
+    binding = list(tokens(binding))
+    body = list(tokens(body))
+    positions = [index for index in range(len(caller)) if caller[index:index + len(binding)] == binding]
+    if len(positions) != 1 or body[:1] != ["{"] or body[-1:] != ["}"]:
+        raise AssertionError("an actual complete phase has one exact caller binding and scope")
+    start = positions[0]
+    caller[start:start + len(binding)] = body[1:-1]
+    return tuple(caller)
+
+
+def model_case_success_tokens(body, expected_successes):
+    body = list(body)
+    if body[:1] != ["{"] or body[-4:] != ["return", "true", ";", "}"]:
+        raise AssertionError("a model case completes its original switch attempt only on actual success")
+    restored = []
+    successes = 0
+    index = 0
+    while index < len(body):
+        if body[index:index + 3] == ["return", "true", ";"]:
+            restored.extend(tokens("break;"))
+            successes += 1
+            index += 3
+        else:
+            restored.append(body[index])
+            index += 1
+    if successes != expected_successes:
+        raise AssertionError("only the original terminal or expected-denial case exits complete an attempt")
+    return tuple(restored)
+
+
+def model_authorization_body_tokens(copy):
+    records = function_records(copy)
+    declarations = work_declarations(copy, MODEL_AUTH_TAG, MODEL_AUTH_FIELDS)
+    for name, (result, parameters, _) in MODEL_AUTH_PARAMETERS.items():
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens(result + " " + name + "(" + parameters + ")"):
+            raise AssertionError("authorization phases retain only their exact original typed work/input bindings")
+    phases = []
+    for index in (1, 3, 4, 5, 6):
+        name = MODEL_AUTH_PHASES[index]
+        inner = tokens("{" + records[name].body + "}")
+        if index == 1:
+            participant = MODEL_AUTH_PHASES[2]
+            inner = boolean_case_body_tokens(inner, ((
+                participant, MODEL_AUTH_PARAMETERS[participant][2], "{" + records[participant].body + "}", False,
+            ),))
+        phases.append((name, MODEL_AUTH_PARAMETERS[name][2], " ".join(inner), index == 6))
+    body = boolean_case_body_tokens(tokens("{" + records[MODEL_AUTHORIZE].body + "}"), phases)
+    selection = MODEL_AUTH_PHASES[0]
+    body = bound_body_tokens(
+        body, selection + "(" + MODEL_AUTH_PARAMETERS[selection][2] + ");",
+        "{" + records[selection].body + "}",
+    )
+    body = restore_automatic_work_tokens(body, MODEL_AUTH_TAG, MODEL_AUTH_FIELDS, declarations)
+    return model_case_success_tokens(body, 2)
+
+
+def model_dispatch_body_tokens(dispatch, operations, authorization):
+    body = list(tokens(dispatch))
+    for label, name, uses_run in MODEL_OPERATIONS:
+        arguments = "fixture, run, iteration, step" if uses_run else "fixture, iteration, step"
+        case = "case " + label + ": return " + name + "(" + arguments + ");"
+        complete_case = model_case_success_tokens(tokens(operations[name]), 1)
+        body = list(bound_body_tokens(body, case, "{ case " + label + ": " + " ".join(complete_case) + " }"))
+    labels = " ".join("case " + label + ":" for label in MODEL_AUTH_LABELS)
+    case = labels + " return " + MODEL_AUTHORIZE + "(fixture, run, iteration, step);"
+    return bound_body_tokens(body, case, "{ " + labels + " " + " ".join(authorization) + " }")
+
+
+def model_actual_body_tokens(record, texts=None, header=None):
+    paths = (HOST_SOURCES[4], HOST_SOURCES[6], HOST_SOURCES[7])
+    texts = {path: source(path) for path in paths} if texts is None else texts
+    if set(texts) != set(paths):
+        raise AssertionError("model reconstruction reads all and only the actual three outlined owners")
+    header = source(PRIVATE_HEADERS[1]) if header is None else header
+    run_declarations = work_declarations(header, MODEL_RUN_TAG, MODEL_RUN_FIELDS)
+    iteration_declarations = work_declarations(header, MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS)
+    root = function_records(texts[HOST_SOURCES[4]])
+    operations = function_records(texts[HOST_SOURCES[6]])
+    authorization = function_records(texts[HOST_SOURCES[7]])
+    for name, result, parameters in (
+        (MODEL_SELECT, "static void", "struct grant_model_run *run, struct grant_model_iteration *iteration, size_t step"),
+        (MODEL_DISPATCH, "static bool", MODEL_PARAMETERS),
+        (MODEL_COMPARE, "static bool", MODEL_PARAMETERS),
+    ):
+        if root[name].guards or tokens(root[name].signature) != tokens(result + " " + name + "(" + parameters + ")"):
+            raise AssertionError("seeded root phases preserve exact run/iteration/step types and bindings")
+    for _, name, uses_run in MODEL_OPERATIONS:
+        parameters = MODEL_PARAMETERS if uses_run else (
+            "struct grant_test_fixture *fixture, struct grant_model_iteration *iteration, size_t step"
+        )
+        if operations[name].guards or tokens(operations[name].signature) != tokens("bool " + name + "(" + parameters + ")"):
+            raise AssertionError("cross-owner cases retain exact actual inputs without unused state")
+    if authorization[MODEL_AUTHORIZE].guards or tokens(authorization[MODEL_AUTHORIZE].signature) != tokens(
+        "bool " + MODEL_AUTHORIZE + "(" + MODEL_PARAMETERS + ")"
+    ):
+        raise AssertionError("authorization dispatch retains only its required private model interface")
+    dispatch = model_dispatch_body_tokens(
+        "{" + root[MODEL_DISPATCH].body + "}",
+        {name: "{" + phase.body + "}" for name, phase in operations.items()},
+        model_authorization_body_tokens(texts[HOST_SOURCES[7]]),
+    )
+    body = bound_body_tokens(
+        tokens("{" + record.body + "}"),
+        "if (!" + MODEL_DISPATCH + "(fixture, &run, &iteration, step)) { return false; }",
+        " ".join(dispatch),
+    )
+    body = bound_body_tokens(
+        body, MODEL_SELECT + "(&run, &iteration, step);", "{" + root[MODEL_SELECT].body + "}",
+    )
+    body = list(boolean_case_body_tokens(body, ((
+        MODEL_COMPARE, "fixture, &run, &iteration, step", "{" + root[MODEL_COMPARE].body + "}", False,
+    ),)))
+    loop = list(tokens("for (step = 0; step < GRANT_MODEL_STEPS; ++step) {"))
+    positions = [index for index in range(len(body)) if body[index:index + len(loop)] == loop]
+    if len(positions) != 1:
+        raise AssertionError("one original model attempt loop owns each iteration's complete automatic state")
+    opening = positions[0] + len(loop) - 1
+    closing = matching_lexical(body, opening, "{", "}")
+    body[opening:closing + 1] = restore_automatic_work_tokens(
+        body[opening:closing + 1], MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS, iteration_declarations, "iteration",
+    )
+    prefix = list(tokens(
+        "struct grant_test_fixture *fixture = " + NATIVE_FIXTURE_GETTER + "(); "
+        "const uint32_t seed = UINT32_C(0x38a110c5);"
+    ))
+    if body[:1 + len(prefix)] != ["{"] + prefix:
+        raise AssertionError("the actual model root retains its sole fixture borrow and original constant seed")
+    del body[1:1 + len(prefix)]
+    body = list(restore_automatic_work_tokens(body, MODEL_RUN_TAG, MODEL_RUN_FIELDS, run_declarations, "run"))
+    body[1:1] = prefix
+    return tuple(body)
 
 
 def copy_execution_actual_body_tokens(record, owner=None):
@@ -1231,6 +1481,148 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_seeded_model_exposes_real_operation_and_authorization_owners(self):
+        header = source(PRIVATE_HEADERS[1])
+        for tag, fields in ((MODEL_RUN_TAG, MODEL_RUN_FIELDS), (MODEL_ITERATION_TAG, MODEL_ITERATION_FIELDS)):
+            work_declarations(header, tag, fields)
+        operations = function_records(source(HOST_SOURCES[6]))
+        for _, name, _ in MODEL_OPERATIONS:
+            self.assertIn(name, operations)
+            self.assertLessEqual(operations[name].lines, 120)
+        copy = source(HOST_SOURCES[7])
+        work_declarations(copy, MODEL_AUTH_TAG, MODEL_AUTH_FIELDS)
+        authorization = function_records(copy)
+        for name in (*MODEL_AUTH_PHASES, MODEL_AUTHORIZE):
+            self.assertIn(name, authorization)
+            self.assertLessEqual(authorization[name].lines, 120)
+        root = function_records(source(HOST_SOURCES[4]))
+        for name in (MODEL_SELECT, MODEL_DISPATCH, MODEL_COMPARE, "grant_test_grant_model"):
+            self.assertIn(name, root)
+            self.assertLessEqual(root[name].lines, 120)
+        self.assertIn("const uint32_t seed = UINT32_C(0x38a110c5);", root["grant_test_grant_model"].body)
+        self.assertIn("size_t coverage[GRANT_MODEL_OPERATION_COUNT] = {0};", root["grant_test_grant_model"].body)
+        self.assertIn("size_t step;", root["grant_test_grant_model"].body)
+
+    def test_model_case_inverse_preserves_denial_completion_and_inner_loop_breaks(self):
+        actual = (
+            "{ if (denied) { if (changed_output) { return model_fail(step); } return true; } "
+            "for (index = 0; index < capacity; ++index) { if (selected) { break; } } "
+            "original_copy_and_compare(); return true; }"
+        )
+        expected = (
+            "{ if (denied) { if (changed_output) { return model_fail(step); } break; } "
+            "for (index = 0; index < capacity; ++index) { if (selected) { break; } } "
+            "original_copy_and_compare(); break; }"
+        )
+        self.assertEqual(tokens(expected), model_case_success_tokens(tokens(actual), 2))
+        for changed in (
+            actual.replace("return true;", "return false;", 1),
+            actual.replace("original_copy_and_compare();", "return true; original_copy_and_compare();"),
+            actual[:-len("return true; }")] + "return false; }",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_case_success_tokens(tokens(changed), 2)
+        self.assertNotEqual(
+            tokens(expected), model_case_success_tokens(tokens(actual.replace("if (selected) { break; }", "if (selected) { continue; }")), 2),
+        )
+
+    def test_model_phase_fixture_keeps_one_draw_forced_prefix_and_coverage_trace_compare_order(self):
+        caller = (
+            "{ for (step = 0; step < 4096; ++step) { "
+            "grant_test_model_select_operation(&run, &iteration, step); "
+            "if (!grant_test_model_apply_operation(fixture, &run, &iteration, step)) { return false; } "
+            "++coverage[iteration.operation]; original_trace(iteration); original_full_compare(iteration); "
+            "} original_final_coverage_and_report(); return true; }"
+        )
+        selection = (
+            "{ iteration->random = model_next(&run->random_state); "
+            "iteration->operation = (iteration->random >> 24) % 13; "
+            "if (step < 13) { iteration->operation = step; } }"
+        )
+        dispatch = (
+            "{ switch (iteration->operation) { case 0: { "
+            "if (expected_denial) { break; } original_success_copy(); break; "
+            "} default: return model_fail(step); } }"
+        )
+        binding = "if (!grant_test_model_apply_operation(fixture, &run, &iteration, step)) { return false; }"
+        select_binding = "grant_test_model_select_operation(&run, &iteration, step);"
+        expected = (
+            "{ for (step = 0; step < 4096; ++step) { "
+            "iteration->random = model_next(&run->random_state); "
+            "iteration->operation = (iteration->random >> 24) % 13; "
+            "if (step < 13) { iteration->operation = step; } "
+            "switch (iteration->operation) { case 0: { if (expected_denial) { break; } original_success_copy(); break; } "
+            "default: return model_fail(step); } "
+            "++coverage[iteration.operation]; original_trace(iteration); original_full_compare(iteration); "
+            "} original_final_coverage_and_report(); return true; }"
+        )
+        expand = lambda text, draw=selection: bound_body_tokens(
+            bound_body_tokens(tokens(text), binding, dispatch), select_binding, draw,
+        )
+        self.assertEqual(tokens(expected), expand(caller))
+        for changed in (
+            caller.replace(select_binding, select_binding + " " + select_binding),
+            caller.replace("&run, &iteration, step);", "&other, &iteration, step);"),
+            caller.replace("return false;", "return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                expand(changed)
+        for changed in (
+            caller.replace("original_trace(iteration); ", ""),
+            caller.replace("++coverage[iteration.operation];", "++coverage[0];"),
+            caller.replace(
+                "original_trace(iteration); original_full_compare(iteration);",
+                "original_full_compare(iteration); original_trace(iteration);",
+            ),
+            caller.replace("4096", "4095"),
+        ):
+            self.assertNotEqual(tokens(expected), expand(changed))
+        self.assertNotEqual(
+            tokens(expected), expand(caller, selection.replace(
+                "iteration->random = model_next", "model_next(&run->random_state); iteration->random = model_next",
+            )),
+        )
+
+    def test_actual_model_inverse_rejects_draw_coverage_trace_case_exit_and_extent_drift(self):
+        paths = (HOST_SOURCES[4], HOST_SOURCES[6], HOST_SOURCES[7])
+        texts = {path: source(path) for path in paths}
+        header = source(PRIVATE_HEADERS[1])
+
+        def restored(current, actual_header=header):
+            record = function_records(current[HOST_SOURCES[4]])["grant_test_grant_model"]
+            body = model_actual_body_tokens(record, current, actual_header)
+            body = tuple(normal_names(4).get(token, token) for token in body)
+            return digest_tokens(native_fixture_body_tokens("test_grant_model", body))
+
+        expected = BASELINE_BODIES[4]["test_grant_model"]
+        self.assertEqual(expected, restored(texts))
+        for path, before, after in (
+            (paths[0], "step < GRANT_MODEL_OPERATION_COUNT", "step <= GRANT_MODEL_OPERATION_COUNT"),
+            (paths[0], "++coverage[iteration.operation]", "++coverage[0]"),
+            (paths[1], "produced = MICROS_GRANT_NONE", "produced = UINT32_C(0xdeadbeef)"),
+            (paths[2], "memset(&work->sentinel, 0xa5", "memset(&work->sentinel, 0"),
+        ):
+            with self.subTest(before=before):
+                self.assertIn(before, texts[path])
+                changed = dict(texts)
+                changed[path] = texts[path].replace(before, after, 1)
+                self.assertNotEqual(expected, restored(changed))
+        for path, before, after in (
+            (paths[0], "iteration->random = grant_test_model_next", "grant_test_model_next(&run->random_state); iteration->random = grant_test_model_next"),
+            (paths[0], "grant_test_record_model_trace(", "mutated_trace("),
+            (paths[0], "struct grant_model_run run;", "struct grant_model_run run = {0};"),
+            (paths[0], "fixture, &run, &iteration, step", "fixture, &other, &iteration, step"),
+            (paths[2], "        return true;", "        return false;"),
+        ):
+            with self.subTest(before=before):
+                self.assertIn(before, texts[path])
+                changed = dict(texts)
+                changed[path] = texts[path].replace(before, after, 1)
+                with self.assertRaises(AssertionError):
+                    restored(changed)
+        with self.assertRaises(AssertionError):
+            restored(texts, header.replace("grantor_bytes[64]", "grantor_bytes[63]", 1))
+
     def test_abi_cases_keep_root_static_mapping_rows_and_expose_bounded_domains(self):
         owner = source(FAMILY_PATHS[6][0])
         records = function_records(owner)

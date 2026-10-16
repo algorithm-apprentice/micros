@@ -575,3 +575,16 @@ signed-result scalar and the original output work; typed binding and
 independent actual-row/sentinel mutants reconstruct the complete old body.
 The four original automatic fields and sole arguments initializer remain
 exact. Forty target moves and eight semantic dispositions remain pending.
+
+The seeded model now has a 60-line root, eight actual lifecycle-operation
+helpers and one authorization-group owner with seven bounded phases.
+Every native owner is real. Root retains the constant seed, original
+coverage-array initializer and step lifetime; nine other run objects, ten
+iteration objects and thirteen case-local authorization objects retain their
+exact types, extents, initializers and nested scopes. Expected denials finish
+the original attempt and still reach coverage, trace and full comparison;
+failed checks stop before those actions. The complete original model
+reconstructs from actual typed helpers and case-success exits, with independent
+draw/forced-prefix/inner-loop/coverage/trace/denial/array mutants. No teardown,
+blanket work initialization or new model state is added. Forty original
+target moves and seven target semantic dispositions remain pending.

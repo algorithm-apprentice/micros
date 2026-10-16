@@ -60,6 +60,31 @@ struct grant_test_fixture {
     size_t model_trace_count;
 };
 
+struct grant_model_run {
+    struct micros_grant_registry expected;
+    uint16_t expected_process_slot[GRANT_PROCESS_COUNT];
+    uint32_t expected_process_generation[GRANT_PROCESS_COUNT];
+    micros_endpoint_t expected_endpoint[GRANT_PROCESS_COUNT];
+    unsigned char grantor_bytes[64];
+    unsigned char grantee_bytes[64];
+    unsigned char expected_grantor_bytes[64];
+    unsigned char expected_grantee_bytes[64];
+    uint32_t random_state;
+};
+
+struct grant_model_iteration {
+    uint32_t random;
+    enum grant_model_operation operation;
+    size_t grantor;
+    size_t grantee;
+    size_t slot;
+    micros_grant_t grant;
+    size_t trace_offset;
+    size_t trace_length;
+    uint32_t trace_permission;
+    enum micros_grant_error actual;
+};
+
 struct grant_test_fixture *grant_test_context(void);
 
 bool micros_grant_test_run(void);
@@ -141,6 +166,67 @@ bool grant_test_cancel_plan_matches_reference(
     const struct micros_grant_cancel_plan *plan,
     const struct micros_grant_registry *model,
     micros_endpoint_t endpoint
+);
+
+bool grant_test_model_create(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_revoke(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_inspect(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_cancel(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_close_reuse(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_malformed_token(
+    struct grant_test_fixture *fixture,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_plan_failure(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_invalid_create(
+    struct grant_test_fixture *fixture,
+    struct grant_model_iteration *iteration,
+    size_t step
+);
+
+bool grant_test_model_authorize(
+    struct grant_test_fixture *fixture,
+    struct grant_model_run *run,
+    struct grant_model_iteration *iteration,
+    size_t step
 );
 
 #define EXPECT_TRUE(expression) \
