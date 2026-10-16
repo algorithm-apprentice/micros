@@ -396,6 +396,68 @@ MECHANISM_DENIALS = (
     "grant_test_mechanism_mapping_zero_and_outputs",
 )
 MECHANISM_PREFIX_DIGEST = "a7310b3d2640261410dd4fea964cbea7c11e5cb2934d4c17c255069b13b5ade1"
+TARGET_FIXTURE_TAG = "grant_syscall_test_fixture"
+TARGET_FIXTURE_GETTER = "grant_syscall_test_context"
+TARGET_FIELDS = (
+    ("struct micros_process_handle processes[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("struct micros_thread_handle threads[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("micros_endpoint_t endpoints[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("bool thread_live[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("bool address_space_live[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("uint64_t user_physical[GRANT_SYSCALL_PROCESS_COUNT][GRANT_SYSCALL_PAGE_COUNT];", False),
+    ("struct grant_syscall_script scripts[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("struct micros_endpoint_registry *endpoint_registry;", False),
+    ("struct micros_grant_registry *grant_registry;", False),
+    ("micros_grant_t read_grant;", False),
+    ("micros_grant_t write_grant;", False),
+    ("micros_grant_t remote_read_only_grant;", False),
+    ("micros_grant_t unmapped_grant;", False),
+    ("micros_grant_t stale_grant;", False),
+    ("micros_endpoint_t old_grantor_endpoint;", False),
+    ("enum grant_syscall_control_action control_action;", False),
+    ("size_t control_next_actor;", False),
+    ("enum grant_syscall_command control_next_command;", False),
+    ("size_t dispatch_actor;", "value"),
+    ("uint64_t baseline_owned;", False),
+    ("uint64_t baseline_free;", False),
+    ("size_t baseline_processes;", False),
+    ("size_t baseline_threads;", False),
+    ("size_t baseline_harts;", False),
+    ("struct micros_frame_ownership ownership_snapshot;", False),
+    ("struct micros_frame_allocator allocator_snapshot;", False),
+    ("struct micros_kernel_objects objects_snapshot;", False),
+    ("struct micros_kernel_objects objects_observed;", False),
+    ("struct micros_endpoint_registry endpoint_snapshot;", False),
+    ("struct micros_grant_registry grant_snapshot;", False),
+    ("bool root_snapshot[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("bool root_observed[GRANT_SYSCALL_PROCESS_COUNT];", False),
+    ("unsigned char page_table_snapshot[GRANT_SYSCALL_PROCESS_COUNT][3][MICROS_SV39_PAGE_SIZE];", False),
+    ("unsigned char page_table_observed[GRANT_SYSCALL_PROCESS_COUNT][3][MICROS_SV39_PAGE_SIZE];", False),
+    ("uint64_t user_physical_snapshot[GRANT_SYSCALL_PROCESS_COUNT][GRANT_SYSCALL_PAGE_COUNT];", False),
+    ("unsigned char user_bytes_snapshot[GRANT_SYSCALL_PROCESS_COUNT][GRANT_SYSCALL_PAGE_COUNT][MICROS_SV39_PAGE_SIZE];", False),
+    ("unsigned char user_bytes_observed[GRANT_SYSCALL_PROCESS_COUNT][GRANT_SYSCALL_PAGE_COUNT][MICROS_SV39_PAGE_SIZE];", False),
+    ("bool failure_snapshot_active;", False),
+)
+TARGET_CONTEXT_HELPERS = {
+    "arm_command": False, "arm_raw": False, "capture_page_tables": False, "close_endpoint": False,
+    "current_actor": False, "endpoint_registry_is_empty": True, "failure_state_matches": True,
+    "pattern_matches": False, "physical_for": False, "prepare_process": False, "range_is_value": False,
+    "release_address_space": False, "release_thread": False, "reuse_grantor": True,
+    "schedule_finish": False, "schedule_next": False, "schedule_reuse": False, "scheduler_state_valid": False,
+    "snapshot_failure_state": True, "snapshot_user_bytes": True, "transition_after_return": False,
+    "user_bytes_match": True, "validate_command_effect": False, "write_pattern": False,
+}
+TARGET_CONTEXT_ROOTS = (
+    "micros_grant_syscall_runtime_run_self_test", "micros_grant_syscall_test_finish",
+    "micros_grant_syscall_test_before_ecall", "micros_grant_syscall_test_after_dispatch",
+    "micros_grant_syscall_test_after_return", "micros_grant_syscall_test_handle_control_trap",
+)
+TARGET_SAVED_OBJECTS = tuple(
+    "uintptr_t micros_grant_syscall_test_saved_" + register + ";" for register in ("sp", "gp", "tp")
+)
+TARGET_TYPES_DIGEST = "126262b93b4bcb61beaa1cc8ec449c5626b9dae669d24c5bd711b3f56a098ce1"
+TARGET_CONSTANTS_DIGEST = "deded705274f60d65ef06aae677c737cf0e2026971b38e6ec04b6e47077299e7"
+TARGET_EXTERNS_DIGEST = "2da61971c68bcd102a5c344ee3c8ad6be9d5c6131e61b1bcd773601c781fce66"
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -454,6 +516,13 @@ NATIVE_EXPORTS = tuple(
     name for owner in (1, 2, 3, 5) for name in ORIGINAL_FUNCTIONS[4][owner]
     if name not in ("context_pattern", "model_operation_name")
 )
+TARGET_EXPORTS = tuple(
+    name for owner in (1, 2, 4, 5, 7) for name in ORIGINAL_FUNCTIONS[3][owner]
+    if name not in (
+        "normalize_objects", "capture_page_tables", "snapshot_user_bytes", "user_bytes_match",
+        "schedule_next", "schedule_reuse", "schedule_finish",
+    )
+)
 LONG_FUNCTIONS = (
     (0, "copy_grant"),
     (1, "micros_grant_handle_captured_user_ecall"),
@@ -481,10 +550,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     (family, name) for family, owners in ORIGINAL_FUNCTIONS.items()
     for owner, names in owners.items() if owner != 0 for name in names
 )
-SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION
-    if item[0] != 4 and item not in ((0, "map_address_error"), (0, "plan_range"))
-)
+SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (3, "arm_command"),
     (3, "transition_after_return"),
@@ -777,6 +843,10 @@ def original_locations(family, texts=None):
             if path != HOST_SOURCES[1]:
                 raise AssertionError("the native fixture getter has its sole state owner")
             continue
+        if family == 3 and spelling == TARGET_FIXTURE_GETTER:
+            if path != SYSCALL_TEST_SOURCES[1]:
+                raise AssertionError("the target fixture getter has its one original state owner")
+            continue
         if family == 4 and any(spelling in specification[3] for specification in NATIVE_CASE_OUTLINES.values()):
             paths = tuple(
                 specification[0] for specification in NATIVE_CASE_OUTLINES.values() if spelling in specification[3]
@@ -826,6 +896,8 @@ def original_signature_tokens(family, original, record):
         signature = ("static", *signature)
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         signature = native_fixture_signature_tokens(original, signature)
+    if family == 3 and (3, "copy_bytes") not in SYMBOL_OWNER_MIGRATION:
+        signature = fixture_signature_tokens(original, signature, TARGET_EXPORTS, TARGET_FIXTURE_TAG, TARGET_CONTEXT_HELPERS)
     return signature
 
 
@@ -842,6 +914,8 @@ def original_body_digest(family, original, record):
         body = syscall_actual_body_tokens(record)
     if family == 2 and original == "micros_grant_runtime_run_self_test" and (2, original) not in FUNCTION_TASK_MIGRATION:
         body = mechanism_actual_body_tokens(record)
+    if family == 3 and (3, "copy_bytes") not in SYMBOL_OWNER_MIGRATION:
+        body = target_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
             body = native_case_actual_body_tokens(original, record)
@@ -985,15 +1059,19 @@ def restore_state_members(body, variable, names, access=(".", "->")):
 
 
 def native_fixture_signature_tokens(original, signature):
+    return fixture_signature_tokens(original, signature, NATIVE_EXPORTS, NATIVE_FIXTURE_TAG, NATIVE_CONTEXT_HELPERS)
+
+
+def fixture_signature_tokens(original, signature, exports, tag, helpers):
     signature = list(signature)
-    if original in NATIVE_EXPORTS:
+    if original in exports:
         if signature[:1] == ["static"]:
             raise AssertionError("only required cross-owner native helpers have actual external declarations")
         signature.insert(0, "static")
-    if original in NATIVE_CONTEXT_HELPERS:
+    if original in helpers:
         start = signature.index("(") + 1
-        parameter = list(tokens("struct grant_test_fixture *fixture"))
-        delimiter = ")" if NATIVE_CONTEXT_HELPERS[original] else ","
+        parameter = list(tokens("struct " + tag + " *fixture"))
+        delimiter = ")" if helpers[original] else ","
         if signature[start:start + len(parameter) + 1] != parameter + [delimiter]:
             raise AssertionError("native helpers borrow only the exact original family as first typed parameter")
         signature[start:start + len(parameter) + (delimiter == ",")] = (
@@ -1003,9 +1081,24 @@ def native_fixture_signature_tokens(original, signature):
 
 
 def native_fixture_body_tokens(original, body):
+    return fixture_body_tokens(
+        original, body, NATIVE_FIXTURE_TAG, NATIVE_FIXTURE_GETTER,
+        NATIVE_CONTEXT_ROOTS, NATIVE_CONTEXT_HELPERS, NATIVE_FIELD_NAMES,
+    )
+
+
+def target_fixture_body_tokens(original, body):
+    names = tuple(declaration_name(tokens(declaration)) for declaration, _ in TARGET_FIELDS)
+    return fixture_body_tokens(
+        original, body, TARGET_FIXTURE_TAG, TARGET_FIXTURE_GETTER,
+        TARGET_CONTEXT_ROOTS, TARGET_CONTEXT_HELPERS, names,
+    )
+
+
+def fixture_body_tokens(original, body, tag, getter, roots, helpers, fields):
     body = list(body)
-    borrow = list(tokens("struct grant_test_fixture *fixture = " + NATIVE_FIXTURE_GETTER + "();"))
-    if original in NATIVE_CONTEXT_ROOTS:
+    borrow = list(tokens("struct " + tag + " *fixture = " + getter + "();"))
+    if original in roots:
         if body[:1 + len(borrow)] != ["{"] + borrow:
             raise AssertionError("stateful native case roots borrow their original fixture once without resetting it")
         del body[1:1 + len(borrow)]
@@ -1013,8 +1106,8 @@ def native_fixture_body_tokens(original, body):
     index = 0
     while index < len(body):
         name = body[index]
-        if name in NATIVE_CONTEXT_HELPERS and body[index + 1:index + 2] == ["("]:
-            delimiter = ")" if NATIVE_CONTEXT_HELPERS[name] else ","
+        if name in helpers and body[index + 1:index + 2] == ["("]:
+            delimiter = ")" if helpers[name] else ","
             if body[index + 2:index + 4] != ["fixture", delimiter]:
                 raise AssertionError("native calls pass only the exact original borrowed fixture")
             restored.extend((name, "("))
@@ -1022,7 +1115,7 @@ def native_fixture_body_tokens(original, body):
         else:
             restored.append(name)
             index += 1
-    return restore_state_members(restored, "fixture", NATIVE_FIELD_NAMES, ("->",))
+    return restore_state_members(restored, "fixture", fields, ("->",))
 
 
 def boolean_case_body_tokens(caller, phases):
@@ -1622,6 +1715,109 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_syscall_fixture_owns_exact_38_fields_but_not_root_assembly_save_objects(self):
+        header = source(PRIVATE_HEADERS[2])
+        work_declarations(header, TARGET_FIXTURE_TAG, TARGET_FIELDS)
+        self.assertEqual(38, len(TARGET_FIELDS))
+        self.assertEqual(29, len(TARGET_EXPORTS))
+        fixture = source(SYSCALL_TEST_SOURCES[1])
+        getter = function_records(fixture)[TARGET_FIXTURE_GETTER]
+        self.assertEqual(tokens("{ return &fixture_state; }"), tokens("{" + getter.body + "}"))
+        self.assertIn(
+            "static struct grant_syscall_test_fixture fixture_state = {\n"
+            "    .dispatch_actor = GRANT_SYSCALL_PROCESS_COUNT,\n};", fixture,
+        )
+        constants = tuple(
+            declaration for declaration in file_scope_objects(fixture) if declaration.startswith("const uint64_t TEST_")
+        )
+        self.assertEqual(7, len(constants))
+        self.assertEqual(8, len(tuple(file_scope_objects(fixture))))
+        self.assertEqual(TARGET_CONSTANTS_DIGEST, digest_tokens(tokens("\n".join("static " + value for value in constants))))
+        for path in SYSCALL_TEST_SOURCES[2:]:
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+        self.assertEqual(TARGET_SAVED_OBJECTS, tuple(file_scope_objects(source(SYSCALL_TEST_SOURCES[0]))))
+        for declaration in TARGET_SAVED_OBJECTS:
+            self.assertIn("extern " + declaration, header)
+        types = header[header.index("#define TEST_SSTATUS_UBE"):header.index("struct grant_syscall_test_fixture {")]
+        self.assertEqual(TARGET_TYPES_DIGEST, digest_tokens(tokens(types)))
+        externs = header[header.index("extern const unsigned char micros_grant_syscall_payload_start"):header.index("struct grant_syscall_test_fixture *grant_syscall_test_context")]
+        self.assertEqual(TARGET_EXTERNS_DIGEST, digest_tokens(tokens(externs)))
+        root = function_records(source(SYSCALL_TEST_SOURCES[0]))["micros_grant_syscall_runtime_run_self_test"]
+        self.assertIn('__asm__ volatile("fence.i"', root.body)
+        self.assertIn('"mv %0, sp\\n"', root.body)
+        self.assertIn("micros_scheduler_test_enter_without_timer(", root.body)
+
+    def test_target_fixture_inverse_preserves_raw_control_snapshot_arrays_and_pure_helpers(self):
+        caller = (
+            "{ struct grant_syscall_test_fixture *fixture = grant_syscall_test_context(); "
+            "if (!snapshot_failure_state(fixture)) { return false; } "
+            "arm_raw(fixture, actor, &fixture->scripts[actor].captured, command); "
+            "arm_control(context); original_copy(fixture->page_table_snapshot, sizeof(fixture->page_table_snapshot)); "
+            "micros_grant_syscall_test_saved_sp = original_sp; return fixture->thread_live[actor]; }"
+        )
+        expected = (
+            "{ if (!snapshot_failure_state()) { return false; } "
+            "arm_raw(actor, &scripts[actor].captured, command); "
+            "arm_control(context); original_copy(page_table_snapshot, sizeof(page_table_snapshot)); "
+            "micros_grant_syscall_test_saved_sp = original_sp; return thread_live[actor]; }"
+        )
+        original = "micros_grant_syscall_test_after_return"
+        self.assertEqual(tokens(expected), target_fixture_body_tokens(original, tokens(caller)))
+        for changed in (
+            caller.replace("grant_syscall_test_context()", "reset_fixture()"),
+            caller.replace("arm_raw(fixture,", "arm_raw(other,"),
+            caller.replace("snapshot_failure_state(fixture)", "snapshot_failure_state()"),
+            caller.replace("fixture->page_table_snapshot", "fixture->unknown_tables"),
+            caller.replace("return fixture->thread_live", "copy = *fixture; return fixture->thread_live"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                target_fixture_body_tokens(original, tokens(changed))
+        self.assertEqual(
+            tokens("static void arm_raw(size_t actor, struct micros_user_context *context)"),
+            fixture_signature_tokens(
+                "arm_raw", tokens("void arm_raw(struct grant_syscall_test_fixture *fixture, size_t actor, "
+                                  "struct micros_user_context *context)"),
+                TARGET_EXPORTS, TARGET_FIXTURE_TAG, TARGET_CONTEXT_HELPERS,
+            ),
+        )
+        self.assertEqual(
+            tokens("static void arm_control(struct micros_user_context *context)"),
+            fixture_signature_tokens(
+                "arm_control", tokens("void arm_control(struct micros_user_context *context)"),
+                TARGET_EXPORTS, TARGET_FIXTURE_TAG, TARGET_CONTEXT_HELPERS,
+            ),
+        )
+        owner = "struct grant_syscall_test_fixture {" + "".join(declaration for declaration, _ in TARGET_FIELDS) + "};"
+        work_declarations(owner, TARGET_FIXTURE_TAG, TARGET_FIELDS)
+        for changed in (
+            owner.replace("page_table_snapshot[GRANT_SYSCALL_PROCESS_COUNT][3]", "page_table_snapshot[GRANT_SYSCALL_PROCESS_COUNT][2]"),
+            owner.replace("user_bytes_snapshot[GRANT_SYSCALL_PROCESS_COUNT][GRANT_SYSCALL_PAGE_COUNT]", "*user_bytes_snapshot"),
+            owner.replace("size_t dispatch_actor;", "uint32_t dispatch_actor;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                work_declarations(changed, TARGET_FIXTURE_TAG, TARGET_FIELDS)
+
+    def test_actual_private_owner_directions_are_acyclic_and_raw_control_are_fixture_leaves(self):
+        directions = {
+            0: {0: (1,), 1: ()},
+            3: {0: (1, 2, 7), 1: (), 2: (1, 3), 3: (1,), 4: (1, 2), 5: (1,), 6: (1, 2, 4, 5, 7), 7: (1,)},
+            4: {0: (2, 3), 1: (5,), 2: (1, 5), 3: (1, 5), 4: (1, 5, 6, 7), 5: (), 6: (1, 5), 7: (1, 5)},
+        }
+        for family, allowed in directions.items():
+            records = owned_records(family)
+            owners = {name: FAMILY_PATHS[family].index(path) for path, name in records}
+            for (path, name), record in records.items():
+                origin = FAMILY_PATHS[family].index(path)
+                destinations = {
+                    owners[word] for word in tokens(record.body) if word in owners and owners[word] != origin
+                }
+                self.assertLessEqual(destinations, set(allowed[origin]), (path, name, destinations))
+            remaining = set(allowed)
+            while remaining:
+                leaves = {owner for owner in remaining if not set(allowed[owner]) & remaining}
+                self.assertTrue(leaves, (family, remaining))
+                remaining -= leaves
+
     def test_target_mechanism_has_bounded_domains_and_actual_root_irq_report_lifetime(self):
         owner = source(FAMILY_PATHS[2][0])
         records = function_records(owner)

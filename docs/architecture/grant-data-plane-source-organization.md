@@ -600,3 +600,18 @@ phase reversal, stale authority, success-path cancellation/reuse/cleanup and
 baseline checks retain their complete original order. The four original
 static mechanism objects remain separate and unchanged. Forty syscall-target
 owner moves and six syscall-target semantic dispositions remain pending.
+
+All forty syscall-target originals now have their required owners, completing
+all sixty-five original moves. The owner migration is a literal empty tuple.
+One fixture owns exactly the original thirty-eight fields and sole dispatch-
+actor initializer; seven readonly constants, complete enums/masks/script data
+and payload declarations retain their frozen values and types. Six stateful
+public roots borrow once, stateful ordinary helpers receive the fixture
+explicitly, and pure raw-control/observer helpers keep their original inputs.
+The three assembly save definitions, actual `fence.i`, stack/register capture
+and scheduler entry remain in root, with typed private extern declarations
+for cross-owner resume use. Actual private owner directions are acyclic;
+raw arming/control are fixture leaves. All forty-two target bodies/signatures
+reconstruct completely. Six semantic dispositions remain pending, and the
+future copy-command file is still declarations-only until its real templates
+are outlined.
