@@ -575,3 +575,13 @@ void phase performs only original accepted publication, using exactly the
 original three uninitialized caller locals. Current whole-body proofs,
 native service/model and real TTY pass. There are 72 original moves and
 six semantic dispositions remaining.
+
+All 33 model moves now have their seven exact owners. One automatic root,
+its real bus/copy self-pointers and callback bindings, all 38 complete bodies
+and signatures, original types/enums/macro and two readonly common-owner
+endpoint values remain exact. Independent graph fixtures admit only the
+original final reference-output predicate under merged ADR-0071 and reject
+reverse or mutation dependencies. The current native model retains the
+original seed, 8,194 recorded steps and `0xd962296c803b3115` output hash.
+There are 39 original moves, six declarations-only C owners and six
+semantic dispositions remaining.

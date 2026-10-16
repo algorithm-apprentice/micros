@@ -154,7 +154,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2)
+    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3)
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
@@ -201,6 +201,17 @@ WRITE_PARAMETERS = (
     "struct micros_tty_service_state *state, const struct micros_tty_request *request, "
     "struct micros_tty_service_reply_action *action, struct tty_service_write_work *work"
 )
+MODEL_PRIVATE_EXPORTS = (
+    "identity_request", "model_bus_read", "model_bus_write", "model_cancel", "model_check_reply",
+    "model_collect", "model_commit_reply", "model_copy_grant", "model_failure", "model_input_irq",
+    "model_malformed_submit", "model_random", "model_record", "model_submit_read", "model_submit_write",
+    "model_transmit_irq", "model_validate", "read_u32_le", "read_u64_le", "reference_consume_input",
+    "reference_first_line_length", "reference_output_pending", "reference_output_take", "reference_receive_byte",
+    "reference_write_accept", "reference_write_arm_retry", "submit_request", "write_u32_le", "write_u64_le",
+)
+MODEL_READONLY_NAMES = {"tty_model_tty_endpoint": "tty_endpoint", "tty_model_vfs_endpoint": "vfs_endpoint"}
+MODEL_PREFIX_DIGEST = "720118eb98561c97ab5b721fbdfa1329cdca3bb690695530e67727f3d6f321f2"
+MODEL_MACRO_DIGEST = "6c4301b5c2309dbb1c1c1af28fbb35438c945005d399d97acc749b1ab15a3bca"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -591,6 +602,14 @@ def normal_names(family):
             for names in ORIGINAL_FUNCTIONS[2].values()
             for name in names if not name.startswith("micros_")
         }
+    if family == 3:
+        return {
+            **{
+                "tty_model_" + (name[6:] if name.startswith("model_") else name): name
+                for names in ORIGINAL_FUNCTIONS[3].values() for name in names if name != "main"
+            },
+            **MODEL_READONLY_NAMES,
+        }
     return {}
 
 
@@ -632,6 +651,10 @@ def original_signature_tokens(family, original, record):
     if family == 2 and original in SERVICE_PRIVATE_EXPORTS and record.name.startswith("tty_service_"):
         if signature[:1] == ("static",):
             raise AssertionError("only necessary cross-owner service helpers gain actual private visibility")
+        signature = ("static", *signature)
+    if family == 3 and original in MODEL_PRIVATE_EXPORTS and record.name.startswith("tty_model_"):
+        if signature[:1] == ("static",):
+            raise AssertionError("only required model cross-owner helpers gain complete private declarations")
         signature = ("static", *signature)
     return signature
 
@@ -733,6 +756,36 @@ def write_actual_body_tokens(record, owner=None):
     return write_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
+def model_prefix_tokens(prefix, constants):
+    body = list(tokens(prefix))
+    for name in MODEL_READONLY_NAMES:
+        declaration = [value for value in constants if name in tokens(value)]
+        if len(declaration) != 1:
+            raise AssertionError("each original readonly endpoint has one complete common-owner definition")
+        external = list(tokens("extern const micros_endpoint_t " + name + ";"))
+        positions = [index for index in range(len(body)) if body[index:index + len(external)] == external]
+        if len(positions) != 1:
+            raise AssertionError("the model header exposes only its exact original readonly endpoint type")
+        start = positions[0]
+        body[start:start + len(external)] = tokens("static " + declaration[0])
+    return tuple(normal_names(3).get(token, token) for token in body)
+
+
+def check_model_owner_dependencies(records):
+    allowed = {0: {1, 2, 3, 4, 5, 6}, 1: set(), 2: set(), 3: {2}, 4: {1, 3}, 5: {1, 2, 3, 4}, 6: {1, 2}}
+    for name, (owner, record) in records.items():
+        callees = {word for word in tokens(record.body) if word in records and records[word][0] != owner}
+        destinations = {records[word][0] for word in callees}
+        if "MODEL_EXPECT" in tokens(record.body) and owner != 1:
+            destinations.add(1)
+        if owner == 6 and any(
+            records[word][0] == 2 and word != "tty_model_reference_output_pending" for word in callees
+        ):
+            raise AssertionError("the corrected validation/reference edge permits only the original final output observation")
+        if not destinations <= allowed[owner]:
+            raise AssertionError("model private owner direction changed: " + name)
+
+
 def source_set_block(name, paths):
     return "set(\n    " + name + "\n" + "".join("    " + path + "\n" for path in paths) + ")"
 
@@ -804,6 +857,83 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_model_originals_have_exact_task_owners_and_one_automatic_root(self):
+        for owner, names in ORIGINAL_FUNCTIONS[3].items():
+            records = function_records(source(MODEL_SOURCES[owner]))
+            for name in names:
+                expected = "main" if name == "main" else "tty_model_" + (name[6:] if name.startswith("model_") else name)
+                self.assertIn(expected, set(records), MODEL_SOURCES[owner])
+        root = function_records(source(MODEL_SOURCES[0]))["tty_model_test_replayable_mixed_transition_model"]
+        self.assertEqual(1, tokens(root.body).count("tty_model"))
+
+    def test_model_types_constants_macro_and_owner_directions_remain_original(self):
+        header = source(PRIVATE_HEADERS[2])
+        prefix = header[header.index("#include"):header.index("#define MODEL_EXPECT")]
+        constants = tuple(file_scope_objects(source(MODEL_SOURCES[1])))
+        self.assertEqual(2, len(constants))
+        self.assertEqual(MODEL_PREFIX_DIGEST, digest_tokens(model_prefix_tokens(prefix, constants)))
+        start = header.index("#define MODEL_EXPECT")
+        macro = header[start:header.index("\n\n", start)]
+        self.assertEqual(MODEL_MACRO_DIGEST, digest_tokens(
+            tuple(normal_names(3).get(token, token) for token in tokens(macro)),
+        ))
+        for path in (MODEL_SOURCES[0], *MODEL_SOURCES[2:]):
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+        records = {
+            name: (owner, record) for owner, path in enumerate(MODEL_SOURCES)
+            for name, record in function_records(source(path)).items()
+        }
+        check_model_owner_dependencies(records)
+
+    def test_model_graph_admits_only_original_reference_observation_without_reverse_edge(self):
+        owners = {
+            1: "bool tty_model_failure(void) { return false; }",
+            2: (
+                "bool tty_model_reference_output_pending(void) { return original_pending; } "
+                "void tty_model_reference_receive_byte(void) { original_mutation(); }"
+            ),
+            6: (
+                "bool tty_model_validate(void) { MODEL_EXPECT(model, original_crlf); "
+                "MODEL_EXPECT(model, !expect_lf || tty_model_reference_output_pending()); return true; }"
+            ),
+        }
+        records = lambda sources: {
+            name: (owner, record) for owner, text in sources.items()
+            for name, record in function_records(text).items()
+        }
+        check_model_owner_dependencies(records(owners))
+        for changed in (
+            {**owners, 6: owners[6].replace("tty_model_reference_output_pending()", "tty_model_reference_receive_byte()")},
+            {**owners, 2: owners[2].replace("original_pending", "tty_model_validate()")},
+            {**owners, 1: owners[1].replace("false", "tty_model_reference_output_pending()")},
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                check_model_owner_dependencies(records(changed))
+
+    def test_model_readonly_type_and_signature_fixture_rejects_shadow_state_and_changed_types(self):
+        prefix = "extern const micros_endpoint_t tty_model_tty_endpoint; extern const micros_endpoint_t tty_model_vfs_endpoint;"
+        constants = (
+            "const micros_endpoint_t tty_model_tty_endpoint = UINT32_C(0x00007003);",
+            "const micros_endpoint_t tty_model_vfs_endpoint = UINT32_C(0x00009005);",
+        )
+        expected = tokens(
+            "static const micros_endpoint_t tty_endpoint = UINT32_C(0x00007003);"
+            "static const micros_endpoint_t vfs_endpoint = UINT32_C(0x00009005);"
+        )
+        self.assertEqual(expected, model_prefix_tokens(prefix, constants))
+        with self.assertRaises(AssertionError):
+            model_prefix_tokens(prefix.replace("extern const", "extern"), constants)
+        with self.assertRaises(AssertionError):
+            model_prefix_tokens(prefix, constants[:1])
+        with self.assertRaises(AssertionError):
+            model_prefix_tokens(prefix, (*constants, constants[0]))
+        self.assertNotEqual(expected, model_prefix_tokens(prefix, (constants[0].replace("7003", "7004"), constants[1])))
+        owner = "bool tty_model_failure(const char *expression, int line, const struct tty_model *model) { return false; }"
+        signature = original_signature_tokens(3, "model_failure", function_records(owner)["tty_model_failure"])
+        self.assertEqual(tokens("static bool model_failure(const char *expression, int line, const struct tty_model *model)"), signature)
+        with self.assertRaises(AssertionError):
+            original_signature_tokens(3, "model_failure", function_records("static " + owner)["tty_model_failure"])
+
     def test_write_publication_has_one_typed_void_phase_after_all_original_rejections(self):
         records = function_records(source(SERVICE_SOURCES[3]))
         self.assertIn(WRITE_PHASE, set(records))
@@ -1105,7 +1235,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(REQUIRED_TASKS))
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
-        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2)})
+        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3)})
         self.assertEqual(set(REQUIRED_TASKS) - {(0, "live_binding_matches"), (2, "handle_submit_write")}, set(FUNCTION_TASK_MIGRATION))
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):
