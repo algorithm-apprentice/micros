@@ -499,6 +499,31 @@ TARGET_TRANSITION_FIELDS = (
     ("size_t next_actor;", False),
     ("enum grant_syscall_command next_command;", False),
 )
+TARGET_ARMING_TAG = "grant_syscall_arming_input"
+TARGET_ARMING_FIELDS = (
+    ("size_t actor;", False),
+    ("struct micros_user_context *context;", False),
+    ("enum grant_syscall_command command;", False),
+    ("uint64_t stale_endpoint;", False),
+)
+TARGET_COMMAND_BINDING_TAG = "grant_syscall_command_binding"
+TARGET_COMMAND_TABLE = "command_bindings"
+TARGET_COMMAND_BINDING_FIELDS = (
+    ("enum grant_syscall_command command;", False),
+    ("bool (*arm)(struct grant_syscall_test_fixture *fixture, const struct grant_syscall_arming_input *input);", False),
+)
+TARGET_ARMING_HELPERS = tuple(
+    "grant_syscall_test_arm_" + suffix for suffix in (
+        "ipc_notify", "create_read", "create_upper_endpoint", "create_upper_permission", "create_unused",
+        "revoke_stale", "revoke_upper_token", "revoke_unused", "validate_read", "validate_zero",
+        "validate_wrong_direction", "validate_unmapped", "validate_overflow_stale", "validate_upper_permission",
+        "copy_from_cross", "copy_to_cross", "copy_from_local", "copy_to_local", "copy_from_zero",
+        "copy_from_wrong_direction", "copy_wrong_grantor", "copy_stale_endpoint", "copy_stale_token", "copy_range",
+        "copy_overflow", "copy_oversize", "copy_local_unmapped", "copy_remote_unmapped", "copy_local_permission",
+        "copy_remote_permission", "copy_upper_endpoint", "copy_upper_token", "copy_unused",
+        "unknown_operation", "bootstrap_unavailable", "copy_wrong_grantee", "copy_revoked", "copy_reused_endpoint",
+    )
+)
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -592,9 +617,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-FUNCTION_TASK_MIGRATION = (
-    (3, "arm_command"),
-)
+FUNCTION_TASK_MIGRATION = ()
 
 # Immutable oracle literals are inserted from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'copy_grant': '1c7df8ef2d611dc882f8e0617dcc03afafe45bc344edab5b32e386bf973172af',
@@ -887,6 +910,11 @@ def original_locations(family, texts=None):
             if path != SYSCALL_TEST_SOURCES[TARGET_BOUND_PHASES[spelling][0]]:
                 raise AssertionError("target boundary phases remain in their original root/hook/effect owner")
             continue
+        if family == 3 and spelling in TARGET_ARMING_HELPERS:
+            owner = 2 if TARGET_ARMING_HELPERS.index(spelling) < 14 else 3
+            if path != SYSCALL_TEST_SOURCES[owner]:
+                raise AssertionError("all fourteen non-copy and twenty-four copy templates have their exact owner")
+            continue
         if family == 4 and any(spelling in specification[3] for specification in NATIVE_CASE_OUTLINES.values()):
             paths = tuple(
                 specification[0] for specification in NATIVE_CASE_OUTLINES.values() if spelling in specification[3]
@@ -962,6 +990,8 @@ def original_body_digest(family, original, record):
             body = target_boundary_actual_body_tokens(original, record)
         if original == "transition_after_return" and (3, original) not in FUNCTION_TASK_MIGRATION:
             body = transition_actual_body_tokens(record)
+        if original == "arm_command" and (3, original) not in FUNCTION_TASK_MIGRATION:
+            body = arming_actual_body_tokens(record)
         body = target_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
@@ -1679,6 +1709,78 @@ def transition_actual_body_tokens(record, owner=None):
     return transition_rows_body_tokens(rows)
 
 
+def arming_rows_body_tokens(rows, templates, scalar):
+    result = ["{", *scalar, *tokens("switch (command) {")]
+    seen = set()
+    groups = []
+    index = 0
+    while index < len(rows):
+        helper = rows[index][1]
+        if helper not in templates or helper in groups:
+            raise AssertionError("each actual original template has one contiguous ordered label group")
+        groups.append(helper)
+        while index < len(rows) and rows[index][1] == helper:
+            command = rows[index][0]
+            if command in seen or command == "GRANT_COMMAND_NONE" or not command.startswith("GRANT_COMMAND_"):
+                raise AssertionError("actual command bindings preserve each non-NONE identity exactly once")
+            seen.add(command)
+            result.extend(tokens("case " + command + ":"))
+            index += 1
+        template = list(tokens(templates[helper]))
+        if template[:1] != ["{"] or template[-1:] != ["}"]:
+            raise AssertionError("the complete actual arming function retains its original nested case scope")
+        result.extend(restore_state_members(
+            template[1:-1], "input", ("actor", "context", "command", "stale_endpoint"), ("->",),
+        ))
+    if set(groups) != set(templates):
+        raise AssertionError("every actual original arming template participates in its real command table")
+    result.extend(tokens("case GRANT_COMMAND_NONE: return false; } return false; }"))
+    return tuple(result)
+
+
+def arming_actual_body_tokens(record, commands=None, copies=None, header=None):
+    commands = source(SYSCALL_TEST_SOURCES[2]) if commands is None else commands
+    copies = source(SYSCALL_TEST_SOURCES[3]) if copies is None else copies
+    header = source(PRIVATE_HEADERS[2]) if header is None else header
+    work_declarations(header, TARGET_ARMING_TAG, TARGET_ARMING_FIELDS)
+    work_declarations(commands, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_BINDING_FIELDS)
+    _, rows = typed_identifier_rows(commands, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_TABLE, 2)
+    if len(rows) != 46 or {row[1] for row in rows} != set(TARGET_ARMING_HELPERS):
+        raise AssertionError("all forty-six real labels bind only the thirty-eight original typed templates")
+    owners = (function_records(commands), function_records(copies))
+    templates = {}
+    for index, name in enumerate(TARGET_ARMING_HELPERS):
+        helper = owners[index >= 14][name]
+        result = "static bool" if index < 14 else "bool"
+        if helper.guards or tokens(helper.signature) != tokens(
+            result + " " + name + "(struct grant_syscall_test_fixture *fixture, const struct grant_syscall_arming_input *input)"
+        ):
+            raise AssertionError("arming templates retain only exact fixture and non-retained original inputs")
+        if len(re.findall(r"\bgrant_syscall_test_arm_raw\s*\(", c_lexical_text(helper.body))) != 1:
+            raise AssertionError("each complete original raw-arming body remains actual exactly once")
+        templates[name] = "{" + helper.body + "}"
+    body = list(tokens("{" + record.body + "}"))
+    if body[:4] != ["{", "uint64_t", "stale_endpoint", "="]:
+        raise AssertionError("the original full-width stale endpoint is still evaluated before every dispatch")
+    end = body.index(";")
+    scalar = body[1:end + 1]
+    expected = tokens("""
+        const struct grant_syscall_arming_input input = {
+            .actor = actor, .context = context, .command = command, .stale_endpoint = stale_endpoint,
+        };
+        size_t index;
+        for (index = 0; index < sizeof(command_bindings) / sizeof(command_bindings[0]); ++index) {
+            if (command_bindings[index].command == command) {
+                return command_bindings[index].arm(fixture, &input);
+            }
+        }
+        return false;
+    """)
+    if tuple(body[end + 1:-1]) != expected:
+        raise AssertionError("arming lookup retains exact original input bindings, actual array bounds and false fallback")
+    return arming_rows_body_tokens(rows, templates, scalar)
+
+
 def copy_execution_actual_body_tokens(record, owner=None):
     owner = source(COPY_SOURCES[0]) if owner is None else owner
     declarations = copy_execution_declarations(owner)
@@ -1937,6 +2039,97 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_completed_contract_has_literal_empty_migrations_and_all_22_real_bounded_owners(self):
+        tree = ast.parse(source(STRUCTURAL_TEST_PATH))
+        for name in ("SYMBOL_OWNER_MIGRATION", "FUNCTION_TASK_MIGRATION"):
+            assigned = [
+                node.value for node in tree.body if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+            ]
+            self.assertEqual(1, len(assigned), name)
+            self.assertIsInstance(assigned[0], ast.Tuple)
+            self.assertEqual([], assigned[0].elts, name)
+        for paths in FAMILY_PATHS:
+            for path in paths:
+                with self.subTest(path=path):
+                    records = function_records(source(path))
+                    self.assertTrue(records)
+                    self.assertLessEqual(len(records), 25)
+                    for record in records.values():
+                        self.assertLessEqual(record.lines, 120, record.name)
+
+    def test_command_arming_has_actual_46_rows_38_typed_templates_and_original_scalar_admission(self):
+        header = source(PRIVATE_HEADERS[2])
+        work_declarations(header, TARGET_ARMING_TAG, TARGET_ARMING_FIELDS)
+        commands = source(SYSCALL_TEST_SOURCES[2])
+        work_declarations(commands, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_BINDING_FIELDS)
+        _, rows = typed_identifier_rows(commands, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_TABLE, 2)
+        self.assertEqual(46, len(rows))
+        self.assertEqual(46, len({row[0] for row in rows}))
+        self.assertEqual(set(TARGET_ARMING_HELPERS), {row[1] for row in rows})
+        for index, name in enumerate(TARGET_ARMING_HELPERS):
+            owner = SYSCALL_TEST_SOURCES[2 if index < 14 else 3]
+            record = function_records(source(owner))[name]
+            self.assertLessEqual(record.lines, 120)
+        self.assertLessEqual(function_records(commands)["grant_syscall_test_arm_command"].lines, 120)
+
+    def test_actual_arming_fixture_keeps_group_scope_flags_scalar_binding_and_every_argument(self):
+        table = (
+            "static const struct grant_syscall_command_binding command_bindings[] = {"
+            "{GRANT_COMMAND_CREATE_READ, arm_create}, {GRANT_COMMAND_CREATE_WRITE, arm_create}, "
+            "{GRANT_COMMAND_COPY_STALE_ENDPOINT, arm_stale}, };"
+        )
+        templates = {
+            "arm_create": (
+                "{ { uint64_t base = TEST_DATA_ADDRESS; "
+                "arm_raw(fixture, input->actor, input->context, input->command, CREATE, base, 64, READ, "
+                "0, 0, 0, 0, true, false, NORMAL); return true; } }"
+            ),
+            "arm_stale": (
+                "{ arm_raw(fixture, input->actor, input->context, input->command, COPY_FROM, "
+                "input->stale_endpoint, grant, 0, DATA, 1, 0, 0, DEAD_ENDPOINT, false, true, NORMAL); return true; }"
+            ),
+        }
+        scalar = tokens("uint64_t stale_endpoint = (uint64_t)fixture->endpoints[0] + (UINT64_C(1) << 6);")
+        expected = (
+            "{ uint64_t stale_endpoint = (uint64_t)fixture->endpoints[0] + (UINT64_C(1) << 6); switch (command) { "
+            "case GRANT_COMMAND_CREATE_READ: case GRANT_COMMAND_CREATE_WRITE: { uint64_t base = TEST_DATA_ADDRESS; "
+            "arm_raw(fixture, actor, context, command, CREATE, base, 64, READ, 0, 0, 0, 0, true, false, NORMAL); return true; } "
+            "case GRANT_COMMAND_COPY_STALE_ENDPOINT: arm_raw(fixture, actor, context, command, COPY_FROM, "
+            "stale_endpoint, grant, 0, DATA, 1, 0, 0, DEAD_ENDPOINT, false, true, NORMAL); return true; "
+            "case GRANT_COMMAND_NONE: return false; } return false; }"
+        )
+        _, rows = typed_identifier_rows(table, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_TABLE, 2)
+        self.assertEqual(tokens(expected), arming_rows_body_tokens(rows, templates, scalar))
+        for changed in (
+            table.replace("arm_stale", "unknown_template"),
+            table.replace("GRANT_COMMAND_COPY_STALE_ENDPOINT", "GRANT_COMMAND_CREATE_WRITE"),
+            table.replace("GRANT_COMMAND_COPY_STALE_ENDPOINT", "GRANT_COMMAND_NONE"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                _, changed_rows = typed_identifier_rows(changed, TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_TABLE, 2)
+                arming_rows_body_tokens(changed_rows, templates, scalar)
+        for before, after in (
+            ("input->stale_endpoint", "input->extra"),
+            ("return true; }", "saved_input = input; return true; }"),
+        ):
+            with self.subTest(before=before), self.assertRaises(AssertionError):
+                changed = dict(templates)
+                changed["arm_stale"] = changed["arm_stale"].replace(before, after)
+                arming_rows_body_tokens(rows, changed, scalar)
+        for before, after in (
+            ("false, true, NORMAL", "false, false, NORMAL"),
+            ("grant, 0, DATA, 1", "grant, 1, DATA, 1"),
+            ("NORMAL", "CAPTURED"),
+        ):
+            changed = dict(templates)
+            changed["arm_stale"] = changed["arm_stale"].replace(before, after)
+            self.assertNotEqual(tokens(expected), arming_rows_body_tokens(rows, changed, scalar))
+        with self.assertRaises(AssertionError):
+            arming_rows_body_tokens((rows[0], rows[2], rows[1]), templates, scalar)
+        with self.assertRaises(AssertionError):
+            arming_rows_body_tokens(rows, dict(templates, unused="{ return true; }"), scalar)
+
     def test_target_transitions_use_actual_typed_ordered_rows_and_bounded_dispatch(self):
         owner = source(SYSCALL_TEST_SOURCES[4])
         work_declarations(owner, TARGET_TRANSITION_TAG, TARGET_TRANSITION_FIELDS)
@@ -2085,6 +2278,8 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             expected = ()
             if path == SYSCALL_TEST_SOURCES[4] and (3, "transition_after_return") not in FUNCTION_TASK_MIGRATION:
                 expected = (typed_identifier_rows(source(path), TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)[0],)
+            if path == SYSCALL_TEST_SOURCES[2] and (3, "arm_command") not in FUNCTION_TASK_MIGRATION:
+                expected = (typed_identifier_rows(source(path), TARGET_COMMAND_BINDING_TAG, TARGET_COMMAND_TABLE, 2)[0],)
             self.assertEqual(expected, tuple(file_scope_objects(source(path))), path)
         self.assertEqual(TARGET_SAVED_OBJECTS, tuple(file_scope_objects(source(SYSCALL_TEST_SOURCES[0]))))
         for declaration in TARGET_SAVED_OBJECTS:
@@ -2163,6 +2358,12 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
                     owners[word] for word in tokens(record.body) if word in owners and owners[word] != origin
                 }
                 self.assertLessEqual(destinations, set(allowed[origin]), (path, name, destinations))
+            for origin, path in enumerate(FAMILY_PATHS[family]):
+                destinations = {
+                    owners[word] for declaration in file_scope_objects(source(path))
+                    for word in tokens(declaration) if word in owners and owners[word] != origin
+                }
+                self.assertLessEqual(destinations, set(allowed[origin]), (path, destinations))
             remaining = set(allowed)
             while remaining:
                 leaves = {owner for owner in remaining if not set(allowed[owner]) & remaining}

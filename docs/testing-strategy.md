@@ -260,6 +260,12 @@ start with structural Red, narrow existing native or real target gates, one
 complete current PR plan and actual original-producer three-profile reuse.
 This design adds no executable test/model/harness, new invocation, marker,
 timeout, policy or profile-admission change.
+Implementation's structural gate is
+`tests/host/test_grant_data_plane_source_layout.py`: all 95 original complete
+bodies/signatures and original data remain immutable under finite typed
+scope/row/helper expansion. Independent positive and negative fixtures
+precede C outlines; literal-empty migrations and all 22 real bounded owners
+close source work, not final author/reuse or independent-review acceptance.
 
 ## Test layers
 

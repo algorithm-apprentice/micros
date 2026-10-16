@@ -153,6 +153,13 @@ struct grant_syscall_test_fixture {
     bool failure_snapshot_active;
 };
 
+struct grant_syscall_arming_input {
+    size_t actor;
+    struct micros_user_context *context;
+    enum grant_syscall_command command;
+    uint64_t stale_endpoint;
+};
+
 extern const uint64_t TEST_CODE_ADDRESS;
 extern const uint64_t TEST_STACK_ADDRESS;
 extern const uint64_t TEST_DATA_ADDRESS;
@@ -332,6 +339,126 @@ bool grant_syscall_test_endpoint_registry_is_empty(
 
 bool grant_syscall_test_scheduler_is_at_idle_baseline(
     const struct micros_kernel_objects *objects
+);
+
+bool grant_syscall_test_arm_copy_from_cross(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_to_cross(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_from_local(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_to_local(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_from_zero(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_from_wrong_direction(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_wrong_grantor(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_stale_endpoint(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_stale_token(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_range(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_overflow(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_oversize(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_local_unmapped(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_remote_unmapped(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_local_permission(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_remote_permission(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_upper_endpoint(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_upper_token(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_unused(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_unknown_operation(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_bootstrap_unavailable(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_wrong_grantee(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_revoked(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
+);
+
+bool grant_syscall_test_arm_copy_reused_endpoint(
+    struct grant_syscall_test_fixture *fixture,
+    const struct grant_syscall_arming_input *input
 );
 
 #endif

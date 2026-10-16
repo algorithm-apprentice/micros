@@ -636,3 +636,26 @@ introduced. The three original scheduling helpers keep complete bodies and
 types. Independent order/actor/command/action/unused-field mutants protect
 the table and root's actual array-bound lookup. Only command arming remains
 as a semantic migration.
+
+Command arming now has a 26-line root, fourteen static non-copy templates
+and twenty-four cross-owner copy/control-error templates, all at most 45
+lines. Its actual readonly forty-six-row binding table retains all original
+groups, the two scoped local declaration blocks, all thirty-eight raw calls,
+byte preparation, scalar expressions, flags and result/return selectors.
+The original full-width stale-endpoint scalar is still computed before
+dispatch; the readonly transient input contains only that scalar and the
+original actor/context/command inputs and is never retained. Typed actual
+row/helper expansion reconstructs the complete original arming body.
+
+The source outcome now has all 22 real C owners and 217 definitions, with
+at most 25 definitions per owner and 115 physical lines per function. All
+65 moves and nineteen semantic dispositions are implemented; both migration
+collections are literal empty tuples, while the immutable 95-body/signature,
+fourteen-long/five-shorter and 25-stable-artifact inventories remain intact.
+Actual function and readonly callback-table dependencies follow the Accepted
+acyclic directions. Source/recipe/classification oracles and all original
+native/model/target identities remain protected. Narrow native and real
+QEMU checks are green. The complete current author plan, original-producer
+reuse acceptance and independent implementation review form the separate
+final acceptance barrier. The implementation pull request records those
+results; source closure alone does not claim them.
