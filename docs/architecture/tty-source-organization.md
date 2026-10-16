@@ -559,3 +559,11 @@ remain caller-owned with exact types; actual original-body restoration and
 independent ordering/binding/lifetime fixtures precede the outline.
 Current native and both real target paths pass. There are 89 moves, sixteen
 declarations-only future C owners and seven semantic dispositions remaining.
+
+All seventeen service moves are now reintroduced through fresh ownership
+Red and independent complete private-signature fixtures. Twenty original
+bodies/types occupy the five stateless owners; ten private exports, one
+original magic and the acyclic graph are exact. The request byte helper's
+private spelling avoids the retained entry's ELF symbol. Current service,
+model and real TTY gates pass. There are 72 moves, twelve declarations-only
+future C owners and seven semantic dispositions remaining.
