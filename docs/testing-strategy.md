@@ -280,6 +280,15 @@ all four selection dimensions. Full current author acceptance and bounded
 actual original-producer reuse follow narrow green slices; reviewers inspect
 that evidence without routinely rerunning it.
 
+Implementation #142 exposed the model validator's existing final dependency
+on `reference_output_pending`, omitted by the private graph. Its structural
+failure blocks implementation despite unchanged native behavior. Proposed
+[ADR-0071](adr/0071-tty-model-validation-reference-dependency.md) corrects
+only that necessary acyclic edge. After independent design acceptance and
+separate merge, restart from current `main` and prove the exact final
+comparison, all other owner directions and the original model identity.
+Historical abandoned-candidate results do not satisfy restarted acceptance.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |
