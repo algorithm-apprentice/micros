@@ -245,7 +245,7 @@ complete PR plan and additional actual same-producer native/smoke/TTY-image
 reuse acceptance. Its design authors no executable test or model and
 changes no existing execution, timeout or policy.
 
-The proposed grant data-plane correction follows
+The Accepted grant data-plane correction follows
 [ADR-0069](adr/0069-grant-data-plane-source-decomposition.md) and its exact
 [source contract](architecture/grant-data-plane-source-organization.md).
 It preserves the cohesive registry/core/runtime, the existing endpoint and
@@ -258,7 +258,7 @@ inverses preserve previous recipe/planner oracles and all four validation
 dimensions. Only after separate clean design merge may implementation
 start with structural Red, narrow existing native or real target gates, one
 complete current PR plan and actual original-producer three-profile reuse.
-This proposal adds no executable test/model/harness, new invocation, marker,
+This design adds no executable test/model/harness, new invocation, marker,
 timeout, policy or profile-admission change.
 
 ## Test layers

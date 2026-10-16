@@ -2,10 +2,10 @@
 
 ## Status and scope
 
-This is the exact proposal for
+This is the exact Accepted design for
 [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md).
-The paired implementation is pending until this separate design is
-independently clean, Accepted and merged.
+Independent complete design review is clean. The paired implementation
+remains pending until this separate Accepted design is merged.
 
 ```text
 reviewed micros base: 6269d9247de6beafed2448aa0ffd6904de5e8833

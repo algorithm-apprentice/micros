@@ -44,7 +44,7 @@ This directory contains the design baseline for `micros`.
   base-validation, native/reference-model and target ownership, including
   retained byte-source oracles and closed-profile coupling.
 - [Grant data-plane source organization](architecture/grant-data-plane-source-organization.md)
-  proposes exact range/copy, captured syscall, native/reference-model and
+  defines Accepted range/copy, captured syscall, native/reference-model and
   real target-script boundaries while retaining the cohesive registry.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
@@ -100,7 +100,7 @@ This directory contains the design baseline for `micros`.
   traces grant identity, table authority, direction and bounds checks, fault
   behavior, revocation, and checked cross-address-space copy.
 - [MINIX grant data-plane source-organization baseline](research/minix-grant-data-plane-source-organization.md)
-  traces those fixed ownership and failure boundaries before the proposed
+  traces those fixed ownership and failure boundaries before the Accepted
   source-only range, adapter, model and target-script correction.
 - [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
   traces safe-copy mapping authority after VM startup and derives the

@@ -762,9 +762,9 @@ maintaining only the admitted current digest
 Prior scheduler/endpoint source and recipe/planner expected values remain
 unchanged under only these verified inverses.
 
-Proposed [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md)
+Accepted [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md)
 defines a later grant-only recipe delta. Only after that separate design is
-Accepted and merged may its actual three source sets/four consumer operands
+merged may its actual three source sets/four consumer operands
 be inverted before this contract's existing complete recipe inverse. The
 original object byte hash, all original bodies/types, shared inspector ASTs
 and behavioral/classification expectations remain unchanged; this is not

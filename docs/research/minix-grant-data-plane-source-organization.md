@@ -2,7 +2,7 @@
 
 ## Fixed reference and purpose
 
-This read-only trace supports proposed
+This read-only trace supports Accepted
 [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md) and its
 [exact source contract](../architecture/grant-data-plane-source-organization.md).
 The local reference is `/Users/alephling/Repo/minix`, fixed commit
@@ -102,7 +102,7 @@ keeps conceptually distinct:
 - raw command arming versus real post-return transitions and effect checks;
 - fixture snapshots/observations versus resource lifecycle and trap hooks.
 
-The proposed 22-owner contract keeps exactly one mutable context for each
+The Accepted 22-owner contract keeps exactly one mutable context for each
 existing evidence family. In particular, raw arming/control are a lower
 fixture boundary rather than living with dispatch, avoiding a command/
 copy-helper cycle. Existing assembly save objects remain outside the context.

@@ -387,15 +387,15 @@ owners and twelve semantic dispositions, both migrations literal empty and
 actual same-producer three-profile reuse, identical reviewed squash tree and
 local/remote branch cleanup close this maintenance outcome.
 
-The next selected maintenance design is proposed
+The next selected maintenance design is Accepted
 [ADR-0069](adr/0069-grant-data-plane-source-decomposition.md), with the exact
 [grant data-plane source contract](architecture/grant-data-plane-source-organization.md).
 It preserves the cohesive grant registry and existing Step 7 authority while
 defining range/copy, captured syscall, native/reference-model and real
 target-script boundaries: 22 C owners, three private headers/sets, four
 consumer operands, 65 moves and fourteen long plus five shorter dispositions.
-This design authors documentation only. Implementation remains pending until
-the separately reviewed design is Accepted and merged. Neither correction
+This independently reviewed design authors documentation only. Implementation
+remains pending until the separate Accepted design merges. Neither correction
 adds a runtime node, clock/deadline, application startup or shell behavior.
 
 ## v0.1 completion goal

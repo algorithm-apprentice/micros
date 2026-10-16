@@ -1,6 +1,6 @@
 # ADR-0069: Grant Data-Plane Source Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-16
 - Refines: ADR-0005, ADR-0025, ADR-0038, ADR-0039, ADR-0040, ADR-0041,
   ADR-0047, ADR-0049, ADR-0050, ADR-0051, ADR-0062, ADR-0064, ADR-0065,
@@ -129,3 +129,15 @@ plan passes, and bounded actual native/smoke/TTY-image reuse matches the
 original full producer. Review inspects exact evidence without routine
 suite or QEMU reruns. Exact reviewed-head squash/tree equality and obsolete
 local/remote branch cleanup finish the outcome.
+
+## Design review disposition
+
+Independent complete read-only design review inspected the nine-document
+proposal, relevant Accepted authority, current 95-definition source family,
+fixed MINIX evidence, exact state/data/assembly/failure contracts, acyclic
+private ownership, retained recipe/classification constraints and current
+four-command author evidence. It reported no substantive issue remaining;
+no targeted reproduction or required correction was reported.
+
+Acceptance records that clean design result, not implementation completion.
+The paired implementation stays pending until this separate design PR merges.
