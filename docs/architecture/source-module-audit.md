@@ -232,8 +232,12 @@ three private headers/sets, 72 original moves, 22 necessary portable private
 helpers, eight long and four shorter task dispositions. The design also
 preserves the original complete object-source hash through a bounded inverse
 and avoids a retained-oracle import cycle through unchanged shared inspection.
-Independent design review is clean. Implementation remains pending until
-the separate Accepted design PR #137 merges.
+Independent design review is clean and separate Accepted design #137 is
+merged. Implementation #138 exposes all 23 real owners, closes both
+migrations as literal empty tuples, and supplies 128 current definitions
+with a maximum of 92 physical lines. Original body/type/storage and complete
+byte-source/recipe oracles remain enforced. Complete current author/reuse
+acceptance and independent implementation review are required before merge.
 
 ### Kernel bootstrap
 

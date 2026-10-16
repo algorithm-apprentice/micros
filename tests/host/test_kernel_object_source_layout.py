@@ -55,6 +55,32 @@ MODEL_OPERATION_PARAMETERS = (
     "struct micros_kernel_objects *fixture, struct lifecycle_model *model, "
     "size_t step, struct kernel_object_test_model_iteration *iteration"
 )
+TARGET_WORK_TAG = "kernel_object_model_test_work"
+TARGET_WORK_FIELDS = (
+    ("struct micros_kernel_objects *objects;", None),
+    ("struct micros_hart *hart;", None),
+    ("struct micros_hart_handle hart_handle;", None),
+    ("struct micros_process_handle first_process;", None),
+    ("struct micros_process_handle replacement_process;", None),
+    ("struct micros_thread_handle thread;", None),
+    ("struct micros_thread_handle unchanged_thread;", "aggregate"),
+    ("struct micros_thread_handle current;", None),
+    ("struct micros_scheduler_return_plan plan;", None),
+    ("const struct micros_process *resolved_process;", "value"),
+    ("enum micros_kernel_object_error error;", None),
+)
+TARGET_TASKS = (
+    "kernel_object_model_test_create_process_and_thread",
+    "kernel_object_model_test_attach_and_select_thread",
+    "kernel_object_model_test_retire_thread_and_process",
+    "kernel_object_model_test_verify_process_reuse",
+)
+TARGET_PARAMETERS = {
+    name: "struct " + TARGET_WORK_TAG + " *work" + (
+        ", uintptr_t stack_bottom, uintptr_t stack_top, const struct micros_user_context *context"
+        if name == TARGET_TASKS[1] else ""
+    ) for name in TARGET_TASKS
+}
 HART_STACK_PHASES = (
     (
         "kernel_object_hart_stacks_avoid_harts",
@@ -423,9 +449,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-FUNCTION_TASK_MIGRATION = (
-    (2, "micros_kernel_object_runtime_run_self_test"),
-)
+FUNCTION_TASK_MIGRATION = ()
 CORE_DAG = {
     0: {1}, 1: {2}, 2: set(), 3: set(), 4: {2},
     5: {1, 2}, 6: {1, 2, 3, 5}, 7: {2, 3, 5}, 8: {1, 2, 3},
@@ -615,6 +639,10 @@ def original_locations(family, texts=None):
         if family == 1 and spelling in MODEL_OPERATION_TASKS:
             if path != family_paths(1)[11]:
                 raise AssertionError("the eight model operations have their exact separate owner")
+            continue
+        if family == 2 and spelling in TARGET_TASKS:
+            if path != family_paths(2)[1]:
+                raise AssertionError("target scenarios have their exact separate owner")
             continue
         if family == 1 and spelling in {phase[0] for phase in MODEL_PROJECTION_PHASES}:
             if path != family_paths(1)[10]:
@@ -979,10 +1007,9 @@ def restore_work_field_tokens(body, binding, names):
     return tuple(restored)
 
 
-def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
+def restore_automatic_work_tokens(caller, tag, fields, declarations, prefix_statements):
     body = list(caller)
-    borrow = list(tokens("struct micros_kernel_objects *fixture = kernel_object_test_registry();"))
-    prefix_statements = borrow + [token for declaration in constants for token in tokens(declaration)]
+    prefix_statements = list(prefix_statements)
     work = list(tokens("struct " + tag + " work;"))
     prefix = ["{"] + prefix_statements + work
     if body[:len(prefix)] != prefix:
@@ -1016,6 +1043,14 @@ def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
         del restored[start:end + 1]
     restored[start:start] = initializers
     return tuple(restored)
+
+
+def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
+    prefix = (
+        *tokens("struct micros_kernel_objects *fixture = kernel_object_test_registry();"),
+        *(token for declaration in constants for token in tokens(declaration)),
+    )
+    return restore_automatic_work_tokens(caller, tag, fields, declarations, prefix)
 
 
 def model_operation_body_tokens(phase):
@@ -1104,6 +1139,106 @@ def native_model_body_tokens(record, operations=None, header=None):
     return model_runner_body_tokens("{" + record.body + "}", phases, declarations)
 
 
+def target_phase_tokens(phase):
+    body = list(tokens(phase))
+    if body[:1] != ["{"] or body[-4:] != ["return", "true", ";", "}"]:
+        raise AssertionError("target scenario success follows all original checks")
+    body = body[1:-4]
+    if {"goto", "break", "continue"} & set(body):
+        raise AssertionError("target scenarios cannot borrow root IRQ or loop exit scope")
+    for index, token in enumerate(body):
+        if token == "return" and body[index:index + 3] != ["return", "false", ";"]:
+            raise AssertionError("target scenario success cannot bypass its remaining original operations")
+    return tuple(body)
+
+
+def target_predicate_tokens(phase):
+    body = target_phase_tokens(phase)
+    if body[:2] != ("if", "(") or body[-6:] != (")", "{", "return", "false", ";", "}"):
+        raise AssertionError("each retirement/reuse task is one complete checked original predicate group")
+    condition = body[2:-6]
+    if {"{", "}", ";"} & set(condition):
+        raise AssertionError("retirement/reuse groups cannot hide another statement or success boundary")
+    return condition
+
+
+def target_body_tokens(caller, phases, declarations):
+    if set(phases) != set(TARGET_TASKS) or tuple(declarations) != tuple(
+        tokens(declaration) for declaration, _ in TARGET_WORK_FIELDS
+    ):
+        raise AssertionError("target scenarios retain exactly the original eleven typed mutable objects")
+    body = list(tokens(caller))
+    calls = (
+        (TARGET_TASKS[0], ("&work",)),
+        (
+            TARGET_TASKS[1],
+            ("&work", "(uintptr_t)thread_stack", "(uintptr_t)thread_stack + sizeof(thread_stack)", "&context"),
+        ),
+    )
+    expansions = []
+    for name, arguments in calls:
+        guard = list(tokens("if (!" + name + "(" + ", ".join(arguments) + ")) { goto done; }"))
+        starts = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+        if len(starts) != 1:
+            raise AssertionError("target checked calls bind actual root work, static context and complete array bounds")
+        phase = list(target_phase_tokens(phases[name]))
+        if name == TARGET_TASKS[1]:
+            bindings = {
+                "stack_bottom": tokens(arguments[1]), "stack_top": tokens(arguments[2]), "context": tokens(arguments[3]),
+            }
+            expanded = []
+            for index, token in enumerate(phase):
+                if token in bindings:
+                    if index and phase[index - 1] in (".", "->"):
+                        raise AssertionError("explicit stack/context parameters cannot replace a nested member")
+                    expanded.extend(bindings[token])
+                else:
+                    expanded.append(token)
+            phase = expanded
+        restored = []
+        index = 0
+        while index < len(phase):
+            if phase[index:index + 3] == ["return", "false", ";"]:
+                restored.extend(tokens("goto done;"))
+                index += 3
+            else:
+                restored.append(phase[index])
+                index += 1
+        expansions.append((starts[0], len(guard), restored))
+    combined = list(tokens(
+        "if (!" + TARGET_TASKS[2] + "(&work) || !" + TARGET_TASKS[3] + "(&work)) { goto done; }"
+    ))
+    starts = [index for index in range(len(body)) if body[index:index + len(combined)] == combined]
+    if len(starts) != 1:
+        raise AssertionError("success-only retirement and reuse retain one ordered short-circuit root failure boundary")
+    predicate = (
+        *tokens("if ("), *target_predicate_tokens(phases[TARGET_TASKS[2]]), "||",
+        *target_predicate_tokens(phases[TARGET_TASKS[3]]), *tokens(") { goto done; }"),
+    )
+    expansions.append((starts[0], len(combined), predicate))
+    if [start for start, _, _ in expansions] != sorted(start for start, _, _ in expansions):
+        raise AssertionError("target create/select/retire/reuse tasks retain original order")
+    for start, length, replacement in reversed(expansions):
+        body[start:start + length] = replacement
+    return restore_automatic_work_tokens(body, TARGET_WORK_TAG, TARGET_WORK_FIELDS, declarations, ())
+
+
+def target_actual_body_tokens(record, scenarios=None, header=None):
+    scenarios = source(family_paths(2)[1]) if scenarios is None else scenarios
+    header = source(PRIVATE_HEADERS[2]) if header is None else header
+    declarations = case_work_declarations(header, TARGET_WORK_TAG, TARGET_WORK_FIELDS)
+    records = function_records(scenarios)
+    if set(records) != set(TARGET_TASKS):
+        raise AssertionError("target scenario owner contains only its four necessary actual tasks")
+    phases = {}
+    for name, parameters in TARGET_PARAMETERS.items():
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("bool " + name + "(" + parameters + ")"):
+            raise AssertionError("target cross-owner tasks retain exact complete private types")
+        phases[name] = "{" + phase.body + "}"
+    return target_body_tokens("{" + record.body + "}", phases, declarations)
+
+
 def native_corruption_macro(owner, records, phases):
     definitions = tuple(re.finditer(
         r"(?m)^#define EXPECT_CORRUPTION\(statement\) \\\n(?:[^\n]*\\\n)*[^\n]*", owner,
@@ -1183,6 +1318,8 @@ def original_body_digest(family, original, record):
         body = native_case_body_tokens(original, record)
     if family == 1 and original == "test_seeded_lifecycle_model" and (1, original) not in FUNCTION_TASK_MIGRATION:
         body = native_model_body_tokens(record)
+    if family == 2 and (2, original) not in FUNCTION_TASK_MIGRATION:
+        body = target_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(name == "kernel_object_test_registry" for _, name in owned_records(1)):
         body = native_registry_body_tokens(original, body)
@@ -2523,6 +2660,194 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             caller.replace("iteration.value % 8", "iteration.value % 7"),
         ):
             self.assertNotEqual(tokens(expected), model_runner_body_tokens(changed, phases, declarations))
+
+    def test_target_entry_exposes_typed_scenarios_with_root_irq_resources_and_array_bounds(self):
+        records = function_records(source(family_paths(2)[1]))
+        for name, parameters in TARGET_PARAMETERS.items():
+            with self.subTest(scenario=name):
+                self.assertIn(name, set(records))
+                self.assertEqual(tokens("bool " + name + "(" + parameters + ")"), tokens(records[name].signature))
+                self.assertLessEqual(records[name].lines, 120)
+        self.assertEqual(11, len(case_work_declarations(source(PRIVATE_HEADERS[2]), TARGET_WORK_TAG, TARGET_WORK_FIELDS)))
+        root = function_records(source(family_paths(2)[0]))["micros_kernel_object_runtime_run_self_test"]
+        self.assertLessEqual(root.lines, 120)
+        for value in (
+            "riscv_irq_save()", "riscv_irq_restore(saved_status)", "bool passed = false;",
+            "static unsigned char thread_stack[", "static struct micros_user_context context;",
+            "sizeof(thread_stack)",
+        ):
+            self.assertEqual(1, root.body.count(value), value)
+        for record in records.values():
+            self.assertNotIn("riscv_irq_", record.body)
+            self.assertNotIn("sizeof(thread_stack)", record.body)
+            self.assertNotIn("micros_kernel_object_runtime_", record.body)
+
+    def test_target_inverse_preserves_actual_array_bounds_one_irq_exit_and_flat_success_only_retirement(self):
+        caller = """
+{
+    struct kernel_object_model_test_work work;
+    work.unchanged_thread = (struct micros_thread_handle){UINT16_MAX, UINT32_MAX,};
+    work.resolved_process = NULL;
+    uintptr_t saved_status;
+    bool passed = false;
+    static unsigned char thread_stack[STACK_SIZE] __attribute__((aligned(ALIGNMENT)));
+    static struct micros_user_context context;
+    saved_status = riscv_irq_save();
+    work.objects = runtime_registry();
+    work.hart = runtime_hart();
+    work.hart_handle = runtime_handle();
+    if (work.objects == NULL || work.hart == NULL) {
+        goto done;
+    }
+    if (!kernel_object_model_test_create_process_and_thread(&work)) {
+        goto done;
+    }
+    if (!kernel_object_model_test_attach_and_select_thread(
+        &work, (uintptr_t)thread_stack, (uintptr_t)thread_stack + sizeof(thread_stack), &context
+    )) {
+        goto done;
+    }
+    if (!kernel_object_model_test_retire_thread_and_process(&work) || !kernel_object_model_test_verify_process_reuse(&work)) {
+        goto done;
+    }
+    passed = true;
+done:
+    riscv_irq_restore(saved_status);
+    return passed;
+}
+"""
+        phases = {
+            TARGET_TASKS[0]: (
+                "{ work->error = create(work->objects, &work->first_process); "
+                "if (work->error != OK) { return false; } return true; }"
+            ),
+            TARGET_TASKS[1]: (
+                "{ work->error = attach(work->objects, work->thread, stack_bottom, stack_top, context); "
+                "if (work->error != OK) { return false; } return true; }"
+            ),
+            TARGET_TASKS[2]: (
+                "{ if (hold(work->objects, work->thread) != OK || idle(&work->plan) != OK "
+                "|| release(work->objects, work->first_process) != OK) { return false; } return true; }"
+            ),
+            TARGET_TASKS[3]: (
+                "{ if (reuse(work->objects, &work->replacement_process) != OK "
+                "|| work->replacement_process.generation != work->first_process.generation + 1 "
+                "|| resolve(work->objects, work->first_process, &work->resolved_process) != STALE "
+                "|| work->resolved_process != NULL || validate(work->objects) != OK) { return false; } return true; }"
+            ),
+        }
+        declarations = tuple(tokens(declaration) for declaration, _ in TARGET_WORK_FIELDS)
+        expected = """
+{
+    struct micros_kernel_objects *objects;
+    struct micros_hart *hart;
+    struct micros_hart_handle hart_handle;
+    struct micros_process_handle first_process;
+    struct micros_process_handle replacement_process;
+    struct micros_thread_handle thread;
+    struct micros_thread_handle unchanged_thread = {UINT16_MAX, UINT32_MAX,};
+    struct micros_thread_handle current;
+    struct micros_scheduler_return_plan plan;
+    const struct micros_process *resolved_process = NULL;
+    enum micros_kernel_object_error error;
+    uintptr_t saved_status;
+    bool passed = false;
+    static unsigned char thread_stack[STACK_SIZE] __attribute__((aligned(ALIGNMENT)));
+    static struct micros_user_context context;
+    saved_status = riscv_irq_save();
+    objects = runtime_registry();
+    hart = runtime_hart();
+    hart_handle = runtime_handle();
+    if (objects == NULL || hart == NULL) {
+        goto done;
+    }
+    error = create(objects, &first_process);
+    if (error != OK) {
+        goto done;
+    }
+    error = attach(objects, thread, (uintptr_t)thread_stack, (uintptr_t)thread_stack + sizeof(thread_stack), &context);
+    if (error != OK) {
+        goto done;
+    }
+    if (hold(objects, thread) != OK || idle(&plan) != OK || release(objects, first_process) != OK
+        || reuse(objects, &replacement_process) != OK || replacement_process.generation != first_process.generation + 1
+        || resolve(objects, first_process, &resolved_process) != STALE || resolved_process != NULL || validate(objects) != OK) {
+        goto done;
+    }
+    passed = true;
+done:
+    riscv_irq_restore(saved_status);
+    return passed;
+}
+"""
+        self.assertEqual(tokens(expected), target_body_tokens(caller, phases, declarations))
+        for changed in (
+            caller.replace("sizeof(thread_stack)", "sizeof(stack_pointer)"),
+            caller.replace(", &context", ", context"),
+            caller.replace("struct kernel_object_model_test_work work;", "struct kernel_object_model_test_work work = {0};"),
+            caller.replace("|| !kernel_object_model_test_verify_process_reuse", "&& !kernel_object_model_test_verify_process_reuse"),
+            caller.replace("(&work))", "(&copy))", 1),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                target_body_tokens(changed, phases, declarations)
+        for name, changed in (
+            (TARGET_TASKS[0], phases[TARGET_TASKS[0]].replace("return false;", "return true;")),
+            (TARGET_TASKS[1], phases[TARGET_TASKS[1]].replace("return false;", "goto done;")),
+            (
+                TARGET_TASKS[2],
+                "{ if (first_bad()) { return false; } if (second_bad()) { return false; } return true; }",
+            ),
+        ):
+            with self.subTest(scenario=name), self.assertRaises(AssertionError):
+                target_body_tokens(caller, {**phases, name: changed}, declarations)
+        for changed in (
+            caller.replace("riscv_irq_restore(saved_status);", ""),
+            caller.replace("bool passed = false", "bool passed = true"),
+            caller.replace("static struct micros_user_context", "struct micros_user_context"),
+        ):
+            self.assertNotEqual(tokens(expected), target_body_tokens(changed, phases, declarations))
+        self.assertNotEqual(
+            tokens(expected),
+            target_body_tokens(
+                caller, {**phases, TARGET_TASKS[3]: phases[TARGET_TASKS[3]].replace("!= STALE", "!= OK")}, declarations,
+            ),
+        )
+
+    def test_final_migrations_are_literal_empty_and_all_23_owners_have_bounded_real_tasks(self):
+        tree = ast.parse(source(STRUCTURAL_TEST_PATH))
+        assignments = {
+            target.id: node.value for node in tree.body if isinstance(node, ast.Assign)
+            for target in node.targets if isinstance(target, ast.Name)
+        }
+        for name in ("SYMBOL_OWNER_MIGRATION", "FUNCTION_TASK_MIGRATION"):
+            self.assertIsInstance(assignments[name], ast.Tuple)
+            self.assertEqual([], assignments[name].elts)
+        for family in SOURCE_SETS.values():
+            for path in family:
+                records = function_records(source(path))
+                self.assertTrue(records, path)
+                for record in records.values():
+                    self.assertLessEqual(record.lines, 120, (path, record.name))
+
+    def test_target_private_edges_are_exact_and_add_no_runtime_or_static_storage_owner(self):
+        root_path, scenarios_path = family_paths(2)
+        records = function_records(source(scenarios_path))
+        header = source(PRIVATE_HEADERS[2])
+        declared = re.findall(r"\b(kernel_object_model_test_\w+)\s*\([^;{}]*\)\s*;", c_lexical_text(header))
+        self.assertEqual(set(TARGET_TASKS), set(declared))
+        self.assertEqual(4, len(declared))
+        root = function_records(source(root_path))["micros_kernel_object_runtime_run_self_test"]
+        for name in TARGET_TASKS:
+            self.assertEqual(1, tokens(root.body).count(name))
+        for record in records.values():
+            self.assertFalse(set(TARGET_TASKS) & set(tokens(record.body)))
+            self.assertNotIn("thread_stack", tokens(record.body))
+            self.assertNotIn("saved_status", tokens(record.body))
+            self.assertNotIn("passed", tokens(record.body))
+        self.assertEqual((), file_scope_objects(source(scenarios_path)))
+        self.assertEqual((), file_scope_objects(header))
+        self.assertEqual({}, c_function_definitions(header))
 
 
 if __name__ == "__main__":
