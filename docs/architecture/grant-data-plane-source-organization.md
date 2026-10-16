@@ -537,3 +537,14 @@ reconstruction and independent binding, initializer, case-exit and ordering
 fixtures preserve the public entry, invariant panics and success-only result.
 No IRQ scope or current-process lookup is added. Fifteen semantic dispositions
 and sixty-three original owner moves remain pending.
+
+All twenty-three native registry/model definitions now have their required
+owners. One fixture owns exactly the original nine static fields and a
+non-resetting getter. Stateful case roots borrow it once; ordinary stateful
+helpers receive it explicitly, while token/comparison/LCG/name helpers retain
+their original pure signatures. The root's original block-static eight-case
+table remains unchanged. Complete-body and signature inverses retain all
+twenty-four native originals, exact array extents, macros, trace chronology
+and reset sites. The two future model-operation owners still contain no
+outlined tasks. Forty original syscall-target moves and fifteen semantic
+dispositions remain pending.

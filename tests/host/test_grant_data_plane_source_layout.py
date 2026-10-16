@@ -10,6 +10,7 @@ import unittest
 from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
+from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools import validation_context, validation_plan
 
 
@@ -108,6 +109,35 @@ COPY_EXECUTION_FIELDS = (
     ("enum micros_grant_error error;", False),
     ("enum micros_tty_device_authority_status device_status;", False),
 )
+NATIVE_FIXTURE_TAG = "grant_test_fixture"
+NATIVE_FIXTURE_GETTER = "grant_test_context"
+NATIVE_FIELDS = (
+    ("struct micros_endpoint_registry endpoint_registry;", False),
+    ("struct micros_grant_registry grant_registry;", False),
+    ("struct micros_kernel_objects objects;", False),
+    ("struct micros_process_handle processes[GRANT_PROCESS_COUNT];", False),
+    ("struct micros_thread_handle threads[GRANT_PROCESS_COUNT];", False),
+    ("micros_endpoint_t endpoints[GRANT_PROCESS_COUNT];", False),
+    ("struct micros_hart_handle hart;", False),
+    ("struct grant_model_trace_entry model_trace[GRANT_MODEL_TRACE_COUNT];", False),
+    ("size_t model_trace_count;", False),
+)
+NATIVE_FIELD_NAMES = (
+    "endpoint_registry", "grant_registry", "objects", "processes", "threads",
+    "endpoints", "hart", "model_trace", "model_trace_count",
+)
+NATIVE_CONTEXT_HELPERS = {
+    "setup_fixture": True, "recreate_process": False, "expect_create_failure_unchanged": False,
+    "record_model_trace": False, "model_fail": False, "cancel_plan_matches_reference": False,
+}
+NATIVE_CONTEXT_ROOTS = (
+    "test_create_inspect_revoke_and_reuse", "test_create_failures_and_capacity",
+    "test_terminal_generation_quarantines", "test_endpoint_cancellation_and_reuse",
+    "test_failed_ipc_close_preserves_cancel_plan", "test_error_precedence_and_output_preservation",
+    "test_validator_rejects_corruption", "test_grant_model_boundaries", "test_grant_model",
+)
+NATIVE_TYPES_DIGEST = "471822c9669476abc88e7c5504c3e6257a651f2e3ef6474108f8418dc6201f51"
+NATIVE_ASSERTIONS_DIGEST = "e5644256b70b07a218fca2f41a93824ca4f75c66610f08825bed1d04e416d11a"
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -162,6 +192,10 @@ ORIGINAL_FUNCTIONS = {
     ).split()},
     6: {0: "request_matches expect_decode_failure micros_grant_syscall_core_test_run".split()},
 }
+NATIVE_EXPORTS = tuple(
+    name for owner in (1, 2, 3, 5) for name in ORIGINAL_FUNCTIONS[4][owner]
+    if name not in ("context_pattern", "model_operation_name")
+)
 LONG_FUNCTIONS = (
     (0, "copy_grant"),
     (1, "micros_grant_handle_captured_user_ecall"),
@@ -191,7 +225,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = tuple(
     item for item in INITIAL_SYMBOL_OWNER_MIGRATION
-    if item not in ((0, "map_address_error"), (0, "plan_range"))
+    if item[0] != 4 and item not in ((0, "map_address_error"), (0, "plan_range"))
 )
 FUNCTION_TASK_MIGRATION = (
     (2, "micros_grant_runtime_run_self_test"),
@@ -490,6 +524,10 @@ def original_locations(family, texts=None):
             if path != FAMILY_PATHS[1][0]:
                 raise AssertionError("captured syscall phases remain in their exact file-local adapter")
             continue
+        if family == 4 and spelling == NATIVE_FIXTURE_GETTER:
+            if path != HOST_SOURCES[1]:
+                raise AssertionError("the native fixture getter has its sole state owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -506,6 +544,8 @@ def original_signature_tokens(family, original, record):
         if signature[:1] == ("static",):
             raise AssertionError("the one required range interface has its actual external declaration")
         signature = ("static", *signature)
+    if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
+        signature = native_fixture_signature_tokens(original, signature)
     return signature
 
 
@@ -520,6 +560,8 @@ def original_body_digest(family, original, record):
         body = validation_actual_body_tokens(record)
     if family == 1 and original == "micros_grant_handle_captured_user_ecall" and (1, original) not in FUNCTION_TASK_MIGRATION:
         body = syscall_actual_body_tokens(record)
+    if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
+        body = native_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
@@ -604,21 +646,7 @@ def restore_automatic_work_tokens(body, tag, fields, declarations):
         raise AssertionError("execution work is one original uninitialized automatic root object")
     del body[1:len(prefix)]
     names = tuple(declaration[-2] for declaration in declarations)
-    restored = []
-    index = 0
-    while index < len(body):
-        if body[index] == "work":
-            if (
-                body[index + 1:index + 2] not in (["."], ["->"])
-                or body[index + 2:index + 3] not in ([name] for name in names)
-                or (index and body[index - 1] in (".", "->"))
-            ):
-                raise AssertionError("execution work is not copied, reset, nested-qualified or retained")
-            restored.append(body[index + 2])
-            index += 3
-        else:
-            restored.append(body[index])
-            index += 1
+    restored = list(restore_state_members(body, "work", names))
     initializers = []
     for actual, (_, initialized) in zip(declarations, fields):
         if not initialized:
@@ -640,6 +668,67 @@ def restore_automatic_work_tokens(body, tag, fields, declarations):
         del restored[1:end + 1]
     restored[1:1] = initializers
     return tuple(restored)
+
+
+def restore_state_members(body, variable, names, access=(".", "->")):
+    body = list(body)
+    restored = []
+    index = 0
+    while index < len(body):
+        if body[index] == variable:
+            if (
+                body[index + 1:index + 2] not in ([operator] for operator in access)
+                or body[index + 2:index + 3] not in ([name] for name in names)
+                or (index and body[index - 1] in (".", "->"))
+            ):
+                raise AssertionError("typed state is not copied, reset, nested-qualified or retained")
+            restored.append(body[index + 2])
+            index += 3
+        else:
+            restored.append(body[index])
+            index += 1
+    return tuple(restored)
+
+
+def native_fixture_signature_tokens(original, signature):
+    signature = list(signature)
+    if original in NATIVE_EXPORTS:
+        if signature[:1] == ["static"]:
+            raise AssertionError("only required cross-owner native helpers have actual external declarations")
+        signature.insert(0, "static")
+    if original in NATIVE_CONTEXT_HELPERS:
+        start = signature.index("(") + 1
+        parameter = list(tokens("struct grant_test_fixture *fixture"))
+        delimiter = ")" if NATIVE_CONTEXT_HELPERS[original] else ","
+        if signature[start:start + len(parameter) + 1] != parameter + [delimiter]:
+            raise AssertionError("native helpers borrow only the exact original family as first typed parameter")
+        signature[start:start + len(parameter) + (delimiter == ",")] = (
+            ["void"] if delimiter == ")" else []
+        )
+    return tuple(signature)
+
+
+def native_fixture_body_tokens(original, body):
+    body = list(body)
+    borrow = list(tokens("struct grant_test_fixture *fixture = " + NATIVE_FIXTURE_GETTER + "();"))
+    if original in NATIVE_CONTEXT_ROOTS:
+        if body[:1 + len(borrow)] != ["{"] + borrow:
+            raise AssertionError("stateful native case roots borrow their original fixture once without resetting it")
+        del body[1:1 + len(borrow)]
+    restored = []
+    index = 0
+    while index < len(body):
+        name = body[index]
+        if name in NATIVE_CONTEXT_HELPERS and body[index + 1:index + 2] == ["("]:
+            delimiter = ")" if NATIVE_CONTEXT_HELPERS[name] else ","
+            if body[index + 2:index + 4] != ["fixture", delimiter]:
+                raise AssertionError("native calls pass only the exact original borrowed fixture")
+            restored.extend((name, "("))
+            index += 3 if delimiter == ")" else 4
+        else:
+            restored.append(name)
+            index += 1
+    return restore_state_members(restored, "fixture", NATIVE_FIELD_NAMES, ("->",))
 
 
 def copy_execution_actual_body_tokens(record, owner=None):
@@ -900,6 +989,85 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_native_fixture_has_only_nine_original_fields_and_nonresetting_storage(self):
+        header = source(PRIVATE_HEADERS[1])
+        self.assertEqual(
+            tuple(tokens(declaration) for declaration, _ in NATIVE_FIELDS),
+            work_declarations(header, NATIVE_FIXTURE_TAG, NATIVE_FIELDS),
+        )
+        fixture = source(HOST_SOURCES[1])
+        self.assertEqual(
+            tokens("{ return &fixture_state; }"),
+            tokens("{" + function_records(fixture)[NATIVE_FIXTURE_GETTER].body + "}"),
+        )
+        for index, path in enumerate(HOST_SOURCES):
+            expected = ("static struct grant_test_fixture fixture_state;",) if index == 1 else ()
+            self.assertEqual(expected, tuple(file_scope_objects(source(path))), path)
+        types = header[header.index("enum {"):header.index("struct grant_test_fixture {")]
+        self.assertEqual(NATIVE_TYPES_DIGEST, digest_tokens(tokens(types)))
+        assertions = header[header.index("#define EXPECT_TRUE"):header.rindex("#endif")]
+        self.assertEqual(NATIVE_ASSERTIONS_DIGEST, digest_tokens(tokens(assertions)))
+
+    def test_native_fixture_inverse_preserves_actual_arrays_resets_calls_and_pure_signatures(self):
+        caller = (
+            "{ struct grant_test_fixture *fixture = grant_test_context(); "
+            "EXPECT_TRUE(setup_fixture(fixture)); "
+            "memset(fixture->processes, 0, sizeof(fixture->processes)); "
+            "record_model_trace(fixture, step, operation); "
+            "return registries_equal(&fixture->grant_registry, &snapshot); }"
+        )
+        expected = (
+            "{ EXPECT_TRUE(setup_fixture()); memset(processes, 0, sizeof(processes)); "
+            "record_model_trace(step, operation); return registries_equal(&grant_registry, &snapshot); }"
+        )
+        self.assertEqual(
+            tokens(expected),
+            native_fixture_body_tokens("test_create_inspect_revoke_and_reuse", tokens(caller)),
+        )
+        for changed in (
+            caller.replace("grant_test_context()", "reset_context()"),
+            caller.replace("setup_fixture(fixture)", "setup_fixture(other)"),
+            caller.replace("record_model_trace(fixture,", "record_model_trace(other,"),
+            caller.replace("fixture->processes", "fixture->extra"),
+            caller.replace("fixture->processes", "record.fixture->processes"),
+            caller.replace("return registries_equal", "copy = *fixture; return registries_equal"),
+            caller.replace("return registries_equal", "memset(fixture, 0, sizeof(*fixture)); return registries_equal"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_fixture_body_tokens("test_create_inspect_revoke_and_reuse", tokens(changed))
+        self.assertEqual(
+            tokens("static bool setup_fixture(void)"),
+            native_fixture_signature_tokens("setup_fixture", tokens("bool setup_fixture(struct grant_test_fixture *fixture)")),
+        )
+        self.assertEqual(
+            tokens("static bool recreate_process(size_t index)"),
+            native_fixture_signature_tokens(
+                "recreate_process", tokens("bool recreate_process(struct grant_test_fixture *fixture, size_t index)"),
+            ),
+        )
+        pure = tokens("static uint32_t model_next(uint32_t *state)")
+        self.assertEqual(pure, native_fixture_signature_tokens("model_next", pure[1:]))
+        for changed in (
+            "static bool setup_fixture(struct grant_test_fixture *fixture)",
+            "bool setup_fixture(struct micros_kernel_objects *fixture)",
+            "bool setup_fixture(struct grant_test_fixture *other)",
+            "bool setup_fixture(struct grant_test_fixture *fixture, size_t added)",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_fixture_signature_tokens("setup_fixture", tokens(changed))
+        owner = "struct grant_test_fixture {" + "".join(declaration for declaration, _ in NATIVE_FIELDS) + "};"
+        self.assertEqual(
+            tuple(tokens(declaration) for declaration, _ in NATIVE_FIELDS),
+            work_declarations(owner, NATIVE_FIXTURE_TAG, NATIVE_FIELDS),
+        )
+        for changed in (
+            owner.replace("processes[GRANT_PROCESS_COUNT]", "*processes"),
+            owner.replace("model_trace[GRANT_MODEL_TRACE_COUNT]", "model_trace[1]"),
+            owner.replace("size_t model_trace_count;", "uint32_t model_trace_count;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                work_declarations(changed, NATIVE_FIXTURE_TAG, NATIVE_FIELDS)
+
     def test_range_planning_has_its_exact_read_only_leaf_owner(self):
         facade = function_records(source(COPY_SOURCES[0]))
         self.assertNotIn("plan_range", set(facade))
