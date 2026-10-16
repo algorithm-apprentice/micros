@@ -417,3 +417,13 @@ restore before retained checks. Current narrow evidence passes 223 primary
 checks, four other retained source checks and the real unchanged-budget
 smoke guest. Final full author/reuse and independent implementation review
 are not claimed complete.
+
+The records slice now moves all 43 original assignments, both complete
+class/decorator definitions and the 16-line record splitter into their one
+owner. Explicit facade aliases preserve the actual enum/result/pattern
+object identities and original dataclass defaults. All original raw bytes/
+ASTs restore before updating either current member digest. Current narrow
+source/legacy-case evidence passes 187 checks and both real smoke/panic
+guests with unchanged budgets. Seven future production owners remain
+docstring-only, 44 original functions still reside in the facade, and
+165 original node/method/data moves plus three long dispositions remain.

@@ -55,6 +55,21 @@ FUNCTION_OWNERS = {
     8: ("parse_arguments",),
     9: ("main",),
 }
+OWNER_STDLIB_IMPORTS = {
+    1: ("import enum", "import re", "from dataclasses import dataclass", "from typing import Optional"),
+    2: (),
+    3: (),
+    4: ("from pathlib import Path",),
+    5: ("import subprocess",),
+    6: ("import os", "import selectors", "import subprocess", "import time"),
+    7: ("import re", "import shlex"),
+    8: ("import argparse", "import os", "import re", "from pathlib import Path"),
+    9: ("import sys",),
+}
+OWNER_PRIVATE_DIRECTIONS = {
+    1: set(), 2: {1}, 3: {1, 2}, 4: {1}, 5: set(),
+    6: {1}, 7: {1, 2, 3, 4}, 8: set(), 9: {1, 2, 5, 6, 7, 8},
+}
 
 # Immutable metadata is inserted from the reviewed offline archive before source rewriting.
 ORIGINAL_NODE_LAYOUT = (('Import:0',
@@ -851,9 +866,12 @@ INITIAL_SOURCE_OWNER_MIGRATION = (
     *("TestMethod:" + name for name in ORIGINAL_TEST_METHODS),
     *("TestAssign:" + name for name, _ in ORIGINAL_TEST_DATA),
 )
-SOURCE_OWNER_MIGRATION = tuple(
-    name for name in INITIAL_SOURCE_OWNER_MIGRATION if name != "FunctionDef:build_qemu_command"
-)
+COMPLETED_SOURCE_NODES = {
+    "FunctionDef:build_qemu_command", "FunctionDef:_split_output_records",
+    *("ClassDef:" + name for name in ORIGINAL_CLASSES),
+    *("Assign:" + name for name in ORIGINAL_GLOBAL_NAMES),
+}
+SOURCE_OWNER_MIGRATION = tuple(name for name in INITIAL_SOURCE_OWNER_MIGRATION if name not in COMPLETED_SOURCE_NODES)
 LONG_TASK_MIGRATION = tuple(name for name, _ in ORIGINAL_LONG_FUNCTIONS)
 
 
@@ -947,6 +965,32 @@ def facade_alias_bindings(text):
     return bindings
 
 
+def validate_owner_import(owner, node, migrating=None):
+    migrating = SOURCE_OWNER_MIGRATION if migrating is None else migrating
+    expected = {
+        ast_digest(ast.parse(statement).body[0]) for statement in OWNER_STDLIB_IMPORTS[owner]
+    }
+    if ast_digest(node) in expected:
+        return
+    modules = {path[:-3].replace("/", "."): index for index, path in enumerate(PRODUCTION_PATHS) if index}
+    if (
+        not isinstance(node, ast.ImportFrom) or node.level
+        or node.module not in modules or modules[node.module] not in OWNER_PRIVATE_DIRECTIONS[owner]
+    ):
+        raise AssertionError("new owner imports only its exact necessary standard/private responsibilities")
+    symbols = {
+        key.split(":", 1)[1]: key for key, _, _, _ in ORIGINAL_NODE_LAYOUT
+        if key.startswith(("FunctionDef:", "ClassDef:", "Assign:"))
+    }
+    for alias in node.names:
+        key = symbols.get(alias.name)
+        if (
+            alias.asname is not None or key is None or key in migrating
+            or original_destination(key) != PRODUCTION_PATHS[modules[node.module]]
+        ):
+            raise AssertionError("cross-owner source bindings keep exact original names and actual single owners")
+
+
 def restored_runner_source(text=None, owners=None):
     root_text = source(RUNNER_PATH) if text is None else text
     texts = {RUNNER_PATH: root_text}
@@ -989,7 +1033,8 @@ def restored_runner_source(text=None, owners=None):
             }:
                 continue
             if path != RUNNER_PATH and isinstance(node, (ast.Import, ast.ImportFrom)):
-                raise AssertionError("new owner imports need an exact reviewed transport declaration")
+                validate_owner_import(PRODUCTION_PATHS.index(path), node)
+                continue
             if path != RUNNER_PATH and len(module.body) == 1 and isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                 continue
             raise AssertionError("unreviewed module-level execution or unknown source node: " + path)
@@ -1084,6 +1129,47 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_private_import_fixture_keeps_single_type_pattern_binding_and_acyclic_owners(self):
+        validate_owner_import(1, ast.parse("import enum").body[0])
+        validate_owner_import(1, ast.parse("from typing import Optional").body[0])
+        correct = ast.parse("from tools.qemu_smoke_records import PANIC_CORE_PATTERNS").body[0]
+        validate_owner_import(4, correct, ())
+        for owner, statement in (
+            (1, "from tools.qemu_smoke_faults import _has_complete_panic_report"),
+            (4, "from tools.run_qemu_smoke import PANIC_CORE_PATTERNS"),
+            (4, "from tools.qemu_smoke_records import PANIC_CORE_PATTERNS as copied"),
+            (4, "from tools.qemu_smoke_records import *"),
+            (4, "import subprocess"),
+        ):
+            with self.subTest(owner=owner, statement=statement), self.assertRaises(AssertionError):
+                validate_owner_import(owner, ast.parse(statement).body[0], ())
+        with self.assertRaises(AssertionError):
+            validate_owner_import(4, correct, ("Assign:PANIC_CORE_PATTERNS",))
+
+    def test_records_have_one_actual_type_pattern_and_complete_line_owner(self):
+        records = ast.parse(source(PRODUCTION_PATHS[1]))
+        classes = {node.name for node in records.body if isinstance(node, ast.ClassDef)}
+        values = {
+            node.targets[0].id for node in records.body if isinstance(node, ast.Assign)
+            and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+        }
+        self.assertEqual(set(ORIGINAL_CLASSES), classes)
+        self.assertEqual(set(ORIGINAL_GLOBAL_NAMES), values)
+        self.assertIn("_split_output_records", definitions(source(PRODUCTION_PATHS[1])))
+
+    def test_facade_reexports_actual_record_singletons_and_original_frozen_result(self):
+        from tools import qemu_smoke_records, run_qemu_smoke
+
+        for name in (*ORIGINAL_GLOBAL_NAMES, *ORIGINAL_CLASSES, "_split_output_records"):
+            self.assertIs(getattr(qemu_smoke_records, name), getattr(run_qemu_smoke, name), name)
+        value = run_qemu_smoke.QemuResult("exact", 0, False)
+        self.assertFalse(value.serial_input_sent)
+        self.assertEqual(("output", "return_code", "timed_out", "serial_input_sent"), tuple(value.__dataclass_fields__))
+        self.assertEqual(
+            ("pass", "failure", "panic", "unexpected-exit", "timeout"),
+            tuple(value.value for value in run_qemu_smoke.SmokeOutcome),
+        )
+
     def test_immutable_original_inventory_exists_before_any_source_rewriting(self):
         self.assertEqual(46, sum(map(len, FUNCTION_OWNERS.values())))
         self.assertEqual(46, len(ORIGINAL_FUNCTIONS))
@@ -1092,7 +1178,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         self.assertEqual(85, len(ORIGINAL_TEST_METHODS))
         self.assertEqual(36, len(ORIGINAL_TEST_DATA))
         self.assertEqual(212, len(INITIAL_SOURCE_OWNER_MIGRATION))
-        self.assertEqual(set(INITIAL_SOURCE_OWNER_MIGRATION) - {"FunctionDef:build_qemu_command"}, set(SOURCE_OWNER_MIGRATION))
+        self.assertEqual(set(INITIAL_SOURCE_OWNER_MIGRATION) - COMPLETED_SOURCE_NODES, set(SOURCE_OWNER_MIGRATION))
         self.assertEqual(3, len(ORIGINAL_LONG_FUNCTIONS))
         self.assertEqual(3, len(LONG_TASK_MIGRATION))
 
