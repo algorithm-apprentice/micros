@@ -627,3 +627,12 @@ Notification, five token publications, revoke/reuse checks and effect-default
 `true` remain exact. Complete-body reconstruction and independent borrowed-
 lvalue/context/exit fixtures preserve these four outlines. Only command
 arming and post-return transitions remain as semantic migrations.
+
+Post-return dispatch now has a 37-line root and an actual readonly table of
+all forty-six original ordered rows. Typed row expansion retains current-
+actor versus the four fixed-actor transitions, exact next commands, reuse/
+finish calls and original `NONE`/unknown `false`; no enum-adjacency rule is
+introduced. The three original scheduling helpers keep complete bodies and
+types. Independent order/actor/command/action/unused-field mutants protect
+the table and root's actual array-bound lookup. Only command arming remains
+as a semantic migration.

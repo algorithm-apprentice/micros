@@ -491,6 +491,14 @@ TARGET_BOUND_PHASES = {
         for _, name in TARGET_EFFECT_PHASES
     },
 }
+TARGET_TRANSITION_TAG = "grant_syscall_transition"
+TARGET_TRANSITION_TABLE = "transition_bindings"
+TARGET_TRANSITION_FIELDS = (
+    ("enum grant_syscall_command command;", False),
+    ("enum grant_syscall_control_action action;", False),
+    ("size_t next_actor;", False),
+    ("enum grant_syscall_command next_command;", False),
+)
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -586,7 +594,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (3, "arm_command"),
-    (3, "transition_after_return"),
 )
 
 # Immutable oracle literals are inserted from the offline reviewed Git manifest.
@@ -953,6 +960,8 @@ def original_body_digest(family, original, record):
             "micros_grant_syscall_test_handle_control_trap", "validate_command_effect",
         ) and (3, original) not in FUNCTION_TASK_MIGRATION:
             body = target_boundary_actual_body_tokens(original, record)
+        if original == "transition_after_return" and (3, original) not in FUNCTION_TASK_MIGRATION:
+            body = transition_actual_body_tokens(record)
         body = target_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
@@ -1578,6 +1587,98 @@ def target_boundary_actual_body_tokens(original, record, owner=None):
     return body
 
 
+def typed_identifier_rows(owner, tag, table, columns):
+    prefix = tokens("static const struct " + tag + " " + table + "[] = {")
+    declarations = [
+        declaration for declaration in file_scope_objects(owner) if tokens(declaration)[:len(prefix)] == prefix
+    ]
+    if len(declarations) != 1:
+        raise AssertionError("one actual typed readonly table owns all original ordered binding rows")
+    body = list(tokens(declarations[0]))
+    if body[-2:] != ["}", ";"]:
+        raise AssertionError("the complete binding array has its original actual storage and finite initializer")
+    body = body[len(prefix):-2]
+    rows = []
+    width = columns * 2 + 2
+    for start in range(0, len(body), width):
+        row = body[start:start + width]
+        if len(row) != width or row[0] != "{" or row[-2:] != ["}", ","]:
+            raise AssertionError("each actual binding row has exactly its declared scalar fields")
+        values = []
+        for index in range(columns):
+            value = row[1 + index * 2]
+            if not re.fullmatch(r"[A-Za-z_]\w*", value) or row[2 + index * 2] != ("}" if index == columns - 1 else ","):
+                raise AssertionError("binding rows contain only complete original typed identifier values")
+            values.append(value)
+        rows.append(tuple(values))
+    if not rows:
+        raise AssertionError("the actual original binding table cannot be empty")
+    return declarations[0], tuple(rows)
+
+
+def transition_rows_body_tokens(rows):
+    result = list(tokens("{ switch (command) {"))
+    seen = set()
+    for command, action, actor, next_command in rows:
+        if command in seen or command == "GRANT_COMMAND_NONE" or not command.startswith("GRANT_COMMAND_"):
+            raise AssertionError("every original non-NONE transition has one actual ordered row")
+        seen.add(command)
+        if action == "GRANT_CONTROL_SWITCH":
+            if actor not in (
+                "GRANT_SYSCALL_PROCESS_COUNT", "GRANT_SYSCALL_GRANTOR", "GRANT_SYSCALL_GRANTEE", "GRANT_SYSCALL_WRONG",
+            ) or not next_command.startswith("GRANT_COMMAND_") or next_command == "GRANT_COMMAND_NONE":
+                raise AssertionError("a next-step row preserves only its original current/fixed actor and command")
+            actor = "actor" if actor == "GRANT_SYSCALL_PROCESS_COUNT" else actor
+            call = "grant_syscall_test_schedule_next(fixture, actor, " + actor + ", " + next_command + ", frame)"
+        elif action in ("GRANT_CONTROL_REUSE_GRANTOR", "GRANT_CONTROL_FINISH"):
+            if actor != "GRANT_SYSCALL_PROCESS_COUNT" or next_command != "GRANT_COMMAND_NONE":
+                raise AssertionError("reuse/finish rows cannot hide unused alternate actor/command inputs")
+            call = (
+                "grant_syscall_test_schedule_reuse" if action == "GRANT_CONTROL_REUSE_GRANTOR"
+                else "grant_syscall_test_schedule_finish"
+            ) + "(fixture, frame)"
+        else:
+            raise AssertionError("a transition row cannot introduce another control action")
+        result.extend(tokens("case " + command + ": return " + call + ";"))
+    result.extend(tokens("case GRANT_COMMAND_NONE: return false; } return false; }"))
+    return tuple(result)
+
+
+def transition_actual_body_tokens(record, owner=None):
+    owner = source(SYSCALL_TEST_SOURCES[4]) if owner is None else owner
+    work_declarations(owner, TARGET_TRANSITION_TAG, TARGET_TRANSITION_FIELDS)
+    _, rows = typed_identifier_rows(owner, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+    if len(rows) != 46:
+        raise AssertionError("all forty-six original transition rows remain actual and ordered")
+    expected = tokens("""
+        {
+            size_t index;
+            for (index = 0; index < sizeof(transition_bindings) / sizeof(transition_bindings[0]); ++index) {
+                const struct grant_syscall_transition *binding = &transition_bindings[index];
+                if (binding->command != command) { continue; }
+                switch (binding->action) {
+                case GRANT_CONTROL_SWITCH:
+                    return grant_syscall_test_schedule_next(
+                        fixture, actor,
+                        binding->next_actor == GRANT_SYSCALL_PROCESS_COUNT ? actor : binding->next_actor,
+                        binding->next_command, frame
+                    );
+                case GRANT_CONTROL_REUSE_GRANTOR:
+                    return grant_syscall_test_schedule_reuse(fixture, frame);
+                case GRANT_CONTROL_FINISH:
+                    return grant_syscall_test_schedule_finish(fixture, frame);
+                case GRANT_CONTROL_NONE:
+                    return false;
+                }
+            }
+            return false;
+        }
+    """)
+    if tokens("{" + record.body + "}") != expected:
+        raise AssertionError("transition lookup binds the actual array extent/row and original scheduler arguments/fallback")
+    return transition_rows_body_tokens(rows)
+
+
 def copy_execution_actual_body_tokens(record, owner=None):
     owner = source(COPY_SOURCES[0]) if owner is None else owner
     declarations = copy_execution_declarations(owner)
@@ -1836,6 +1937,58 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_target_transitions_use_actual_typed_ordered_rows_and_bounded_dispatch(self):
+        owner = source(SYSCALL_TEST_SOURCES[4])
+        work_declarations(owner, TARGET_TRANSITION_TAG, TARGET_TRANSITION_FIELDS)
+        _, rows = typed_identifier_rows(owner, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+        self.assertEqual(46, len(rows))
+        self.assertEqual(46, len({row[0] for row in rows}))
+        self.assertNotIn("GRANT_COMMAND_NONE", {row[0] for row in rows})
+        self.assertLessEqual(function_records(owner)["grant_syscall_test_transition_after_return"].lines, 120)
+
+    def test_transition_row_fixture_preserves_actual_order_current_fixed_actor_and_control_actions(self):
+        actual = (
+            "static const struct grant_syscall_transition transition_bindings[] = {"
+            "{GRANT_COMMAND_IPC_NOTIFY, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_READ},"
+            "{GRANT_COMMAND_REVOKE_UNUSED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_GRANTEE, GRANT_COMMAND_VALIDATE_READ},"
+            "{GRANT_COMMAND_COPY_REVOKED, GRANT_CONTROL_REUSE_GRANTOR, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_NONE},"
+            "{GRANT_COMMAND_COPY_REUSED_ENDPOINT, GRANT_CONTROL_FINISH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_NONE},"
+            "};"
+        )
+        expected = (
+            "{ switch (command) { "
+            "case GRANT_COMMAND_IPC_NOTIFY: return grant_syscall_test_schedule_next(fixture, actor, actor, GRANT_COMMAND_CREATE_READ, frame); "
+            "case GRANT_COMMAND_REVOKE_UNUSED: return grant_syscall_test_schedule_next(fixture, actor, GRANT_SYSCALL_GRANTEE, GRANT_COMMAND_VALIDATE_READ, frame); "
+            "case GRANT_COMMAND_COPY_REVOKED: return grant_syscall_test_schedule_reuse(fixture, frame); "
+            "case GRANT_COMMAND_COPY_REUSED_ENDPOINT: return grant_syscall_test_schedule_finish(fixture, frame); "
+            "case GRANT_COMMAND_NONE: return false; } return false; }"
+        )
+        _, rows = typed_identifier_rows(actual, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+        self.assertEqual(tokens(expected), transition_rows_body_tokens(rows))
+        for changed in (
+            actual.replace("GRANT_CONTROL_REUSE_GRANTOR, GRANT_SYSCALL_PROCESS_COUNT", "GRANT_CONTROL_REUSE_GRANTOR, GRANT_SYSCALL_WRONG"),
+            actual.replace("GRANT_CONTROL_FINISH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_NONE", "GRANT_CONTROL_FINISH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_READ"),
+            actual.replace("GRANT_CONTROL_FINISH", "GRANT_CONTROL_NONE"),
+            actual.replace("GRANT_COMMAND_COPY_REVOKED", "GRANT_COMMAND_IPC_NOTIFY"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                _, changed_rows = typed_identifier_rows(changed, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+                transition_rows_body_tokens(changed_rows)
+        for changed in (
+            actual.replace("static const struct", "static struct"),
+            actual.replace("GRANT_COMMAND_CREATE_READ}", "GRANT_COMMAND_CREATE_READ, EXTRA}"),
+            actual.replace("GRANT_SYSCALL_GRANTEE", "(GRANT_SYSCALL_GRANTEE + 1)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                typed_identifier_rows(changed, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+        for changed in (
+            actual.replace("GRANT_SYSCALL_GRANTEE", "GRANT_SYSCALL_WRONG"),
+            actual.replace("GRANT_COMMAND_VALIDATE_READ", "GRANT_COMMAND_VALIDATE_ZERO"),
+        ):
+            _, changed_rows = typed_identifier_rows(changed, TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)
+            self.assertNotEqual(tokens(expected), transition_rows_body_tokens(changed_rows))
+        self.assertNotEqual(tokens(expected), transition_rows_body_tokens(tuple(reversed(rows))))
+
     def test_target_setup_finish_control_and_effect_expose_exact_bounded_domains(self):
         for name, (owner, result, parameters) in TARGET_BOUND_PHASES.items():
             with self.subTest(phase=name):
@@ -1929,7 +2082,10 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(tuple(file_scope_objects(fixture))))
         self.assertEqual(TARGET_CONSTANTS_DIGEST, digest_tokens(tokens("\n".join("static " + value for value in constants))))
         for path in SYSCALL_TEST_SOURCES[2:]:
-            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+            expected = ()
+            if path == SYSCALL_TEST_SOURCES[4] and (3, "transition_after_return") not in FUNCTION_TASK_MIGRATION:
+                expected = (typed_identifier_rows(source(path), TARGET_TRANSITION_TAG, TARGET_TRANSITION_TABLE, 4)[0],)
+            self.assertEqual(expected, tuple(file_scope_objects(source(path))), path)
         self.assertEqual(TARGET_SAVED_OBJECTS, tuple(file_scope_objects(source(SYSCALL_TEST_SOURCES[0]))))
         for declaration in TARGET_SAVED_OBJECTS:
             self.assertIn("extern " + declaration, header)

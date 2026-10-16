@@ -59,6 +59,62 @@ static bool grant_syscall_test_schedule_finish(
     return true;
 }
 
+struct grant_syscall_transition {
+    enum grant_syscall_command command;
+    enum grant_syscall_control_action action;
+    size_t next_actor;
+    enum grant_syscall_command next_command;
+};
+
+static const struct grant_syscall_transition transition_bindings[] = {
+    {GRANT_COMMAND_IPC_NOTIFY, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_READ},
+    {GRANT_COMMAND_CREATE_READ, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_WRITE},
+    {GRANT_COMMAND_CREATE_WRITE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_REMOTE_READ_ONLY},
+    {GRANT_COMMAND_CREATE_REMOTE_READ_ONLY, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_UNMAPPED},
+    {GRANT_COMMAND_CREATE_UNMAPPED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_STALE},
+    {GRANT_COMMAND_CREATE_STALE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_UPPER_ENDPOINT},
+    {GRANT_COMMAND_CREATE_UPPER_ENDPOINT, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_UPPER_PERMISSION},
+    {GRANT_COMMAND_CREATE_UPPER_PERMISSION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_CREATE_UNUSED},
+    {GRANT_COMMAND_CREATE_UNUSED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_REVOKE_STALE},
+    {GRANT_COMMAND_REVOKE_STALE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_REVOKE_UPPER_TOKEN},
+    {GRANT_COMMAND_REVOKE_UPPER_TOKEN, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_REVOKE_UNUSED},
+    {GRANT_COMMAND_REVOKE_UNUSED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_GRANTEE, GRANT_COMMAND_VALIDATE_READ},
+    {GRANT_COMMAND_VALIDATE_READ, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_VALIDATE_ZERO},
+    {GRANT_COMMAND_VALIDATE_ZERO, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_VALIDATE_WRONG_DIRECTION},
+    {GRANT_COMMAND_VALIDATE_WRONG_DIRECTION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_VALIDATE_UNMAPPED},
+    {GRANT_COMMAND_VALIDATE_UNMAPPED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_VALIDATE_OVERFLOW_STALE},
+    {GRANT_COMMAND_VALIDATE_OVERFLOW_STALE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_VALIDATE_UPPER_PERMISSION},
+    {GRANT_COMMAND_VALIDATE_UPPER_PERMISSION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_FROM_CROSS},
+    {GRANT_COMMAND_COPY_FROM_CROSS, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_TO_CROSS},
+    {GRANT_COMMAND_COPY_TO_CROSS, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_FROM_LOCAL},
+    {GRANT_COMMAND_COPY_FROM_LOCAL, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_TO_LOCAL},
+    {GRANT_COMMAND_COPY_TO_LOCAL, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_FROM_ZERO},
+    {GRANT_COMMAND_COPY_FROM_ZERO, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_TO_ZERO},
+    {GRANT_COMMAND_COPY_TO_ZERO, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_FROM_WRONG_DIRECTION},
+    {GRANT_COMMAND_COPY_FROM_WRONG_DIRECTION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_TO_WRONG_DIRECTION},
+    {GRANT_COMMAND_COPY_TO_WRONG_DIRECTION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_WRONG_GRANTOR},
+    {GRANT_COMMAND_COPY_WRONG_GRANTOR, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_STALE_ENDPOINT},
+    {GRANT_COMMAND_COPY_STALE_ENDPOINT, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_STALE_TOKEN},
+    {GRANT_COMMAND_COPY_STALE_TOKEN, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_RANGE},
+    {GRANT_COMMAND_COPY_RANGE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_OVERFLOW},
+    {GRANT_COMMAND_COPY_OVERFLOW, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_OVERSIZE},
+    {GRANT_COMMAND_COPY_OVERSIZE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_LOCAL_UNMAPPED},
+    {GRANT_COMMAND_COPY_LOCAL_UNMAPPED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_REMOTE_UNMAPPED},
+    {GRANT_COMMAND_COPY_REMOTE_UNMAPPED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_LOCAL_PERMISSION},
+    {GRANT_COMMAND_COPY_LOCAL_PERMISSION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_REMOTE_PERMISSION},
+    {GRANT_COMMAND_COPY_REMOTE_PERMISSION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_UPPER_ENDPOINT},
+    {GRANT_COMMAND_COPY_UPPER_ENDPOINT, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_UPPER_TOKEN},
+    {GRANT_COMMAND_COPY_UPPER_TOKEN, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_COPY_UNUSED},
+    {GRANT_COMMAND_COPY_UNUSED, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_UNKNOWN_OPERATION},
+    {GRANT_COMMAND_UNKNOWN_OPERATION, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE},
+    {GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_WRONG, GRANT_COMMAND_COPY_WRONG_GRANTEE},
+    {GRANT_COMMAND_COPY_WRONG_GRANTEE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_GRANTOR, GRANT_COMMAND_REVOKE_READ},
+    {GRANT_COMMAND_REVOKE_READ, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_REVOKE_WRITE},
+    {GRANT_COMMAND_REVOKE_WRITE, GRANT_CONTROL_SWITCH, GRANT_SYSCALL_GRANTEE, GRANT_COMMAND_COPY_REVOKED},
+    {GRANT_COMMAND_COPY_REVOKED, GRANT_CONTROL_REUSE_GRANTOR, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_NONE},
+    {GRANT_COMMAND_COPY_REUSED_ENDPOINT, GRANT_CONTROL_FINISH, GRANT_SYSCALL_PROCESS_COUNT, GRANT_COMMAND_NONE},
+};
+
 bool grant_syscall_test_transition_after_return(
     struct grant_syscall_test_fixture *fixture,
     size_t actor,
@@ -66,365 +122,33 @@ bool grant_syscall_test_transition_after_return(
     struct micros_trap_frame *frame
 )
 {
-    switch (command) {
-    case GRANT_COMMAND_IPC_NOTIFY:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_READ,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_READ:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_WRITE,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_WRITE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_REMOTE_READ_ONLY,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_REMOTE_READ_ONLY:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_UNMAPPED,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_UNMAPPED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_STALE,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_STALE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_UPPER_ENDPOINT,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_UPPER_ENDPOINT:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_UPPER_PERMISSION,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_UPPER_PERMISSION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_CREATE_UNUSED,
-            frame
-        );
-    case GRANT_COMMAND_CREATE_UNUSED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_REVOKE_STALE,
-            frame
-        );
-    case GRANT_COMMAND_REVOKE_STALE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_REVOKE_UPPER_TOKEN,
-            frame
-        );
-    case GRANT_COMMAND_REVOKE_UPPER_TOKEN:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_REVOKE_UNUSED,
-            frame
-        );
-    case GRANT_COMMAND_REVOKE_UNUSED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            GRANT_SYSCALL_GRANTEE,
-            GRANT_COMMAND_VALIDATE_READ,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_READ:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_VALIDATE_ZERO,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_ZERO:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_VALIDATE_WRONG_DIRECTION,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_WRONG_DIRECTION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_VALIDATE_UNMAPPED,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_UNMAPPED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_VALIDATE_OVERFLOW_STALE,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_OVERFLOW_STALE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_VALIDATE_UPPER_PERMISSION,
-            frame
-        );
-    case GRANT_COMMAND_VALIDATE_UPPER_PERMISSION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_FROM_CROSS,
-            frame
-        );
-    case GRANT_COMMAND_COPY_FROM_CROSS:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_TO_CROSS,
-            frame
-        );
-    case GRANT_COMMAND_COPY_TO_CROSS:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_FROM_LOCAL,
-            frame
-        );
-    case GRANT_COMMAND_COPY_FROM_LOCAL:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_TO_LOCAL,
-            frame
-        );
-    case GRANT_COMMAND_COPY_TO_LOCAL:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_FROM_ZERO,
-            frame
-        );
-    case GRANT_COMMAND_COPY_FROM_ZERO:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_TO_ZERO,
-            frame
-        );
-    case GRANT_COMMAND_COPY_TO_ZERO:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_FROM_WRONG_DIRECTION,
-            frame
-        );
-    case GRANT_COMMAND_COPY_FROM_WRONG_DIRECTION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_TO_WRONG_DIRECTION,
-            frame
-        );
-    case GRANT_COMMAND_COPY_TO_WRONG_DIRECTION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_WRONG_GRANTOR,
-            frame
-        );
-    case GRANT_COMMAND_COPY_WRONG_GRANTOR:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_STALE_ENDPOINT,
-            frame
-        );
-    case GRANT_COMMAND_COPY_STALE_ENDPOINT:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_STALE_TOKEN,
-            frame
-        );
-    case GRANT_COMMAND_COPY_STALE_TOKEN:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_RANGE,
-            frame
-        );
-    case GRANT_COMMAND_COPY_RANGE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_OVERFLOW,
-            frame
-        );
-    case GRANT_COMMAND_COPY_OVERFLOW:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_OVERSIZE,
-            frame
-        );
-    case GRANT_COMMAND_COPY_OVERSIZE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_LOCAL_UNMAPPED,
-            frame
-        );
-    case GRANT_COMMAND_COPY_LOCAL_UNMAPPED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_REMOTE_UNMAPPED,
-            frame
-        );
-    case GRANT_COMMAND_COPY_REMOTE_UNMAPPED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_LOCAL_PERMISSION,
-            frame
-        );
-    case GRANT_COMMAND_COPY_LOCAL_PERMISSION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_REMOTE_PERMISSION,
-            frame
-        );
-    case GRANT_COMMAND_COPY_REMOTE_PERMISSION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_UPPER_ENDPOINT,
-            frame
-        );
-    case GRANT_COMMAND_COPY_UPPER_ENDPOINT:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_UPPER_TOKEN,
-            frame
-        );
-    case GRANT_COMMAND_COPY_UPPER_TOKEN:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_COPY_UNUSED,
-            frame
-        );
-    case GRANT_COMMAND_COPY_UNUSED:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_UNKNOWN_OPERATION,
-            frame
-        );
-    case GRANT_COMMAND_UNKNOWN_OPERATION:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE,
-            frame
-        );
-    case GRANT_COMMAND_BOOTSTRAP_UNAVAILABLE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            GRANT_SYSCALL_WRONG,
-            GRANT_COMMAND_COPY_WRONG_GRANTEE,
-            frame
-        );
-    case GRANT_COMMAND_COPY_WRONG_GRANTEE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            GRANT_SYSCALL_GRANTOR,
-            GRANT_COMMAND_REVOKE_READ,
-            frame
-        );
-    case GRANT_COMMAND_REVOKE_READ:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            actor,
-            GRANT_COMMAND_REVOKE_WRITE,
-            frame
-        );
-    case GRANT_COMMAND_REVOKE_WRITE:
-        return grant_syscall_test_schedule_next(
-            fixture,
-            actor,
-            GRANT_SYSCALL_GRANTEE,
-            GRANT_COMMAND_COPY_REVOKED,
-            frame
-        );
-    case GRANT_COMMAND_COPY_REVOKED:
-        return grant_syscall_test_schedule_reuse(fixture, frame);
-    case GRANT_COMMAND_COPY_REUSED_ENDPOINT:
-        return grant_syscall_test_schedule_finish(fixture, frame);
-    case GRANT_COMMAND_NONE:
-        return false;
+    size_t index;
+
+    for (index = 0; index < sizeof(transition_bindings) / sizeof(transition_bindings[0]); ++index) {
+        const struct grant_syscall_transition *binding =
+            &transition_bindings[index];
+
+        if (binding->command != command) {
+            continue;
+        }
+        switch (binding->action) {
+        case GRANT_CONTROL_SWITCH:
+            return grant_syscall_test_schedule_next(
+                fixture,
+                actor,
+                binding->next_actor == GRANT_SYSCALL_PROCESS_COUNT
+                    ? actor
+                    : binding->next_actor,
+                binding->next_command,
+                frame
+            );
+        case GRANT_CONTROL_REUSE_GRANTOR:
+            return grant_syscall_test_schedule_reuse(fixture, frame);
+        case GRANT_CONTROL_FINISH:
+            return grant_syscall_test_schedule_finish(fixture, frame);
+        case GRANT_CONTROL_NONE:
+            return false;
+        }
     }
     return false;
 }
