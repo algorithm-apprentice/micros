@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from collections import Counter
 import hashlib
 from pathlib import Path
@@ -96,6 +97,19 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                 kernel_layout_source.restored_gate_ast_sha256(ROOT, path),
                 path,
             )
+
+    def test_existing_source_gates_use_the_bounded_path_adapter(self) -> None:
+        direct_methods = {"exists", "glob", "is_file", "read_bytes", "read_text"}
+        for path in kernel_layout_source.ORIGINAL_GATE_AST_SHA256:
+            tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+            direct = [
+                (node.lineno, node.func.attr)
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in direct_methods
+            ]
+            self.assertEqual([], direct, path)
 
     def test_shared_c_inspector_remains_byte_exact(self) -> None:
         self.assertEqual(

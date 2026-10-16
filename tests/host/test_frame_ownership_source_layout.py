@@ -5,6 +5,7 @@ import re
 import unittest
 
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -582,8 +583,8 @@ def static_definition_paths(
     for relative_path in sources:
         path = REPOSITORY_ROOT / relative_path
         if (
-            path.is_file()
-            and pattern.search(path.read_text(encoding="utf-8"))
+            kernel_layout_source.is_file_path(path)
+            and pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
         ):
             matches.append(relative_path)
 
@@ -596,13 +597,13 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in required
-            if not (REPOSITORY_ROOT / path).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
 
         self.assertEqual([], missing)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for source_set_name, expected_sources in SOURCE_SETS.items():
             with self.subTest(source_set=source_set_name):
@@ -624,7 +625,7 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, cmake.count(source), source)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         consumers = {
             "frame-allocator": (
                 cmake_command(cmake, "add_executable", "frame_allocator_test"),
@@ -680,10 +681,10 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
 
         for relative_path in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             selected = c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative_path] = selected
@@ -697,9 +698,9 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
 
         for relative_path in production_sources():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             for private_path in TEST_PRIVATE_HEADERS:
                 if (
                     private_path in text
@@ -721,8 +722,8 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
         ):
             path = REPOSITORY_ROOT / relative_path
             if (
-                path.is_file()
-                and include.search(path.read_text(encoding="utf-8"))
+                kernel_layout_source.is_file_path(path)
+                and include.search(kernel_layout_source.read_path(path, encoding="utf-8"))
             ):
                 violations.append(relative_path)
 
@@ -752,10 +753,10 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
 
         for relative_path in symbol_scan_sources():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for symbol in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 definitions.setdefault(symbol, []).append(relative_path)
 
@@ -821,8 +822,8 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
             for relative_path in sources:
                 path = REPOSITORY_ROOT / relative_path
                 if (
-                    path.is_file()
-                    and pattern.search(path.read_text(encoding="utf-8"))
+                    kernel_layout_source.is_file_path(path)
+                    and pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
                 ):
                     observed.append(relative_path)
             if observed:
@@ -831,23 +832,19 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
     def test_evidence_identities_and_sequences_remain_stable(self) -> None:
         from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         runner = restored_runner_source()
-        ownership_entry = (
-            REPOSITORY_ROOT / "tests/host/frame_ownership_test.c"
-        ).read_text(encoding="utf-8")
-        allocator_entry = (
-            REPOSITORY_ROOT / "tests/host/frame_allocator_test.c"
-        ).read_text(encoding="utf-8")
+        ownership_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/frame_ownership_test.c", encoding="utf-8")
+        allocator_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/frame_allocator_test.c", encoding="utf-8")
         all_host_text = "\n".join(
-            (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            kernel_layout_source.read_path(REPOSITORY_ROOT / path, encoding="utf-8")
             for path in (
                 *SOURCE_SETS["MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES"],
                 *SOURCE_SETS["MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES"],
                 "tests/host/frame_allocator_test_internal.h",
                 "tests/host/frame_ownership_test_internal.h",
             )
-            if (REPOSITORY_ROOT / path).is_file()
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         )
         marker = (
             "MICROS_FRAME_OWNERSHIP_TEST_PASS "
@@ -959,10 +956,10 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
 
         for relative_path in all_source_set_paths():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for function_name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative_path, function_name)] = line_count

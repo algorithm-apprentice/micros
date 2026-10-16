@@ -4437,7 +4437,10 @@ def read_logical_bytes(root: Path, logical: str) -> bytes:
 
 
 def _logical_from_path(path: Path) -> Optional[str]:
-    relative = _relative_path(path)
+    try:
+        relative = _relative_path(path)
+    except ValueError:
+        return None
     if relative in KERNEL_FILE_FACTS:
         return relative
     return KERNEL_PHYSICAL_TO_LOGICAL.get(relative)
@@ -4472,7 +4475,12 @@ def exists_path(path: Path) -> bool:
 
 
 def glob_paths(root: Path, pattern: str) -> tuple[Path, ...]:
-    if pattern == "kernel" or pattern.startswith("kernel/"):
+    try:
+        root.relative_to(REPOSITORY_ROOT)
+        repository_root = True
+    except ValueError:
+        repository_root = root == REPOSITORY_ROOT
+    if repository_root and (pattern == "kernel" or pattern.startswith("kernel/")):
         return tuple(
             root / logical
             for logical in KERNEL_LOGICAL_PATHS
@@ -4520,8 +4528,8 @@ class _RestoreGateAdapter(ast.NodeTransformer):
                     attr="glob",
                     ctx=ast.Load(),
                 ),
-                args=(node.args[1],),
-                keywords=(),
+                args=[node.args[1]],
+                keywords=[],
             )
         return node
 

@@ -39,6 +39,7 @@ from tests.host.test_vm_service_source_layout import (
     python_function_definitions,
 )
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -556,7 +557,7 @@ RUNTIME_MARKER = (
 
 
 def read_source(relative: str) -> str:
-    return (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+    return kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
 
 
 @lru_cache(maxsize=256)
@@ -1887,12 +1888,12 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.texts = {
             path: read_source(path) for path in all_sources()
-            if (REPOSITORY_ROOT / path).is_file()
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         }
         cls.definitions = source_definitions(cls.texts)
 
     def required_text(self, path: str) -> str:
-        self.assertTrue((REPOSITORY_ROOT / path).is_file(), f"missing required owner: {path}")
+        self.assertTrue(kernel_layout_source.is_file_path(REPOSITORY_ROOT / path), f"missing required owner: {path}")
         return read_source(path)
 
     def body(self, old: str, name: str) -> str:
@@ -1913,7 +1914,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         )
         discovered = {
             str(path.relative_to(REPOSITORY_ROOT))
-            for pattern in patterns for path in REPOSITORY_ROOT.glob(pattern)
+            for pattern in patterns for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
         }
         neighbors = {
             "kernel/trap_route_core.c", "kernel/trap_route_core.h", "kernel/syscall.h",

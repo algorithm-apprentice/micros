@@ -21,6 +21,7 @@ from tests.host.test_vm_service_source_layout import (
     file_scope_objects,
 )
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -584,7 +585,7 @@ def discovered_family_paths() -> set[str]:
     return {
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in patterns
-        for path in REPOSITORY_ROOT.glob(pattern)
+        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
         if not path.name.startswith("pm_control_")
     } | {"include/micros/pm.h", "include/micros/spawn.h",
          *SHARED_PROTOCOL_HEADERS, "tests/qemu/pm_service_protocol.h", GENERATOR_PATH}
@@ -601,7 +602,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
 def owner_dependency_text(relative: str) -> str:
     selected = []
     for dependency in vm_layout.local_include_closure(relative):
-        text = (REPOSITORY_ROOT / dependency).read_text(encoding="utf-8")
+        text = kernel_layout_source.read_path(REPOSITORY_ROOT / dependency, encoding="utf-8")
         if dependency in DECLARATION_ONLY_HEADERS and dependency != relative:
             text = macro_definition_text(text)
         selected.append(re.sub(
@@ -686,7 +687,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             [],
             [
                 path for path in (*all_sources(), *PRIVATE_HEADERS)
-                if not (REPOSITORY_ROOT / path).is_file()
+                if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
             ],
         )
         self.assertEqual(accepted_family_paths(), discovered_family_paths())
@@ -695,16 +696,16 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             STABLE_HEADER_HASHES,
             {
-                path: hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest()
+                path: hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)).hexdigest()
                 for path in STABLE_HEADER_HASHES
             },
         )
         self.assertEqual(
-            WRAPPER_HASH, hashlib.sha256((REPOSITORY_ROOT / WRAPPER_PATH).read_bytes()).hexdigest(),
+            WRAPPER_HASH, hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / WRAPPER_PATH)).hexdigest(),
         )
 
     def test_source_sets_and_current_consumers_are_exact(self) -> None:
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         for name, sources in SOURCE_SETS.items():
             with self.subTest(source_set=name):
                 block = cmake_command(cmake, "set", name)
@@ -784,7 +785,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(1, pm_kernel.count("${MICROS_PM_SERVICE_QEMU_TEST_SOURCES}"))
 
     def test_common_pm_post_link_check_enforces_exact_budget_once(self) -> None:
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         start = cmake.index("function(micros_add_bootstrap_user ")
         helper = cmake[start:cmake.index("endfunction()", start)]
         self.assertIn('if("${target}" STREQUAL "micros_pm_service")', helper)
@@ -813,9 +814,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         current = {name: owner for owner, _, name in migration}
         definitions = {}
         for path in all_sources():
-            if not (REPOSITORY_ROOT / path).is_file():
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path):
                 continue
-            for name in c_function_definitions((REPOSITORY_ROOT / path).read_text()):
+            for name in c_function_definitions(kernel_layout_source.read_path(REPOSITORY_ROOT / path)):
                 definitions.setdefault(name, []).append(path)
         for owner, names in FINAL_OWNER_GROUPS.items():
             for name in names:
@@ -824,7 +825,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
     def test_retained_and_private_helpers_have_exact_owners(self) -> None:
         definitions = {}
         for path in compiled_source_header_closure():
-            for name in c_function_definitions((REPOSITORY_ROOT / path).read_text()):
+            for name in c_function_definitions(kernel_layout_source.read_path(REPOSITORY_ROOT / path)):
                 definitions.setdefault(name, []).append(path)
         for owner, names in {**RETAINED_OWNER_GROUPS, **HELPER_OWNER_GROUPS}.items():
             for name in names:
@@ -903,7 +904,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             ),
         }
         for private_header, expected in expected_declarations.items():
-            text = c_declaration_text((REPOSITORY_ROOT / private_header).read_text())
+            text = c_declaration_text(kernel_layout_source.read_path(REPOSITORY_ROOT / private_header))
             declarations = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\((?!\s*\*)", text)
             self.assertEqual(len(expected), len(declarations), private_header)
             self.assertEqual(set(expected), set(declarations), private_header)
@@ -917,7 +918,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             ("servers/pm/pm_exit.c", "pm_exit_commit_begin", "micros_pm_exit_begin"),
         ):
             with self.subTest(commit=commit):
-                text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+                text = c_lexical_text(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
                 begin = re.search(rf"\bvoid\s+{commit}\s*\(", text)
                 end = re.search(rf"\benum\s+micros_pm_model_error\s+{public}\s*\(", text)
                 self.assertIsNotNone(begin)
@@ -933,9 +934,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
 
     def test_private_headers_are_declarations_only(self) -> None:
         for path in DECLARATION_ONLY_HEADERS:
-            if not (REPOSITORY_ROOT / path).is_file():
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path):
                 continue
-            text = (REPOSITORY_ROOT / path).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             self.assertEqual({}, c_function_definitions(text), path)
             self.assertEqual((), file_scope_objects(text), path)
             self.assertNotRegex(c_declaration_text(text), r"\bstatic\b")
@@ -943,7 +944,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
     def test_recursive_includes_and_dependency_direction_are_bounded(self) -> None:
         symbols = {}
         for path in PERMITTED_OWNER_DEPENDENCIES:
-            for name in c_function_definitions((REPOSITORY_ROOT / path).read_text()):
+            for name in c_function_definitions(kernel_layout_source.read_path(REPOSITORY_ROOT / path)):
                 symbols.setdefault(name, set()).add(path)
         private_functions = {
             *HELPER_OWNER_GROUPS[COMMON_OWNER], "pm_wait_stage_result",
@@ -955,7 +956,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             closure = vm_layout.local_include_closure(path)
             for dependency in closure:
                 self.assertNotRegex(
-                    (REPOSITORY_ROOT / dependency).read_text(),
+                    kernel_layout_source.read_path(REPOSITORY_ROOT / dependency),
                     r'(?m)^\s*#\s*include\s*[<"][^">]+\.(?:c|py)[">]',
                     dependency,
                 )
@@ -984,7 +985,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             self.assertEqual({}, violations, path)
         exit_text = owner_dependency_text("servers/pm/pm_exit.c")
         for name in c_function_definitions(
-            (REPOSITORY_ROOT / "servers/pm/pm_wait.c").read_text(),
+            kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/pm/pm_wait.c"),
         ):
             if name != "pm_wait_stage_result":
                 self.assertNotRegex(exit_text, rf"\b{re.escape(name)}\b")
@@ -992,7 +993,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
     def test_file_scope_and_static_local_storage_have_exact_owners(self) -> None:
         observed = {}
         for path in compiled_source_header_closure():
-            text = (REPOSITORY_ROOT / path).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             objects = file_scope_objects(text)
             if objects:
                 observed[path] = objects
@@ -1030,10 +1031,10 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
 
     def test_contexts_retain_exact_members_and_buffer_geometry(self) -> None:
         service = c_declaration_text(
-            (REPOSITORY_ROOT / "servers/pm/pm_service_internal.h").read_text(),
+            kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/pm/pm_service_internal.h"),
         )
         spawn = c_declaration_text(
-            (REPOSITORY_ROOT / "tests/host/spawn_abi_test_internal.h").read_text(),
+            kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/spawn_abi_test_internal.h"),
         )
         for text, name, expected in (
             (
@@ -1080,18 +1081,18 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                 rf"{re.escape(name)}\b"
             )
             for path in all_sources():
-                text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+                text = c_lexical_text(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
                 observed.extend(path for _ in pattern.finditer(text))
             self.assertEqual(owners, observed, name)
         for path in (*SOURCE_SETS["MICROS_PM_CORE_HOST_TEST_SOURCES"],
                      *SOURCE_SETS["MICROS_PM_SERVICE_QEMU_TEST_SOURCES"]):
-            text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+            text = c_lexical_text(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
             self.assertNotRegex(
                 text, r"\bstatic\s+(?:volatile\s+)?struct\s+micros_pm_table\b",
             )
         contexts = []
         for path in all_sources():
-            text = c_lexical_text((REPOSITORY_ROOT / path).read_text())
+            text = c_lexical_text(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
             contexts.extend(
                 (path, match.group(1)) for match in re.finditer(
                     r"\bstatic\s+struct\s+(spawn_abi_test_context|pm_service_context)\b",
@@ -1147,12 +1148,12 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         )
 
     def test_native_cases_and_existing_executions_remain_exact(self) -> None:
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         for path, expected in (
             ("tests/host/pm_test.c", PM_CASE_ORDER),
             ("tests/host/spawn_abi_test.c", SPAWN_CASE_ORDER),
         ):
-            text = (REPOSITORY_ROOT / path).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             main = text[text.index("int main("):]
             self.assertEqual(
                 expected,
@@ -1163,7 +1164,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(1, cmake.count("NAME spawn-abi"))
         self.assertIn(
             'printf("spawn ABI tests passed\\n");',
-            (REPOSITORY_ROOT / "tests/host/spawn_abi_test.c").read_text(),
+            kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/spawn_abi_test.c"),
         )
         for target in (
             "test-qemu-pm-service", "test-qemu-vm-scratch-preemption",
@@ -1172,9 +1173,9 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             cmake_command(cmake, "add_custom_target", target)
 
     def test_seeded_model_draw_dispatch_trace_and_comparison_are_retained(self) -> None:
-        model = (REPOSITORY_ROOT / "tests/host/pm_model_test.c").read_text()
-        operations = (REPOSITORY_ROOT / "tests/host/pm_model_operations.c").read_text()
-        header = (REPOSITORY_ROOT / "tests/host/pm_model_test_internal.h").read_text()
+        model = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_model_test.c")
+        operations = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_model_operations.c")
+        header = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_model_test_internal.h")
         self.assertIn("PM_MODEL_STEP_COUNT = 4096", header)
         self.assertIn("context->seed = UINT64_C(0x4d4943524f53504d)", model)
         self.assertIn("struct pm_model_context state;", model)
@@ -1203,7 +1204,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertIn("index <= step", model)
 
     def test_service_guards_and_startup_dispatch_order_are_retained(self) -> None:
-        service = (REPOSITORY_ROOT / "servers/pm/pm_service.c").read_text()
+        service = kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/pm/pm_service.c")
         ordered = (
             "pm_service_context_get", "context->pm_service_data",
             "pm_service_validate_configuration", "micros_pm_table_initialize",
@@ -1221,12 +1222,12 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             ("pm_service_self_test.c", "#ifdef MICROS_PM_SERVICE_TEST"),
             ("pm_service_scratch.c", "#ifdef MICROS_VM_SCRATCH_PREEMPTION_TEST"),
         ):
-            text = (REPOSITORY_ROOT / "servers/pm" / owner).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/pm" / owner)
             self.assertTrue(text.startswith(
                 '#include "servers/pm/pm_service_internal.h"\n\n' + guard,
             ), owner)
             self.assertTrue(text.rstrip().endswith("#endif"), owner)
-        scenario = (REPOSITORY_ROOT / "servers/pm/pm_service_self_test.c").read_text()
+        scenario = kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/pm/pm_service_self_test.c")
         body = scenario[scenario.index("_Noreturn void pm_service_run_self_test"):]
         phases = (
             "initialize_self_test_outputs", "reserve_and_load_child",
@@ -1238,11 +1239,11 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
                          [body.index(name) for name in phases])
 
     def test_report_and_generator_evidence_identities_remain_stable(self) -> None:
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         target = cmake_command(cmake, "add_custom_target", "test-qemu-pm-service")
         self.assertIn("--timeout\n            45", target)
         self.assertEqual(1, cmake.count("MICROS_PM_SERVICE_TEST_PASS"))
-        generator = ast.parse((REPOSITORY_ROOT / GENERATOR_PATH).read_text())
+        generator = ast.parse(kernel_layout_source.read_path(REPOSITORY_ROOT / GENERATOR_PATH))
         flags = tuple(
             node.args[0].value for node in ast.walk(generator)
             if isinstance(node, ast.Call)
@@ -1258,7 +1259,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertIn("micros_pm_service_report", constants)
         self.assertIn('#include "kernel/pm_service_test_fixture.h"', constants)
         self.assertIn("PM service fixture generation failed: ", constants)
-        golden = (REPOSITORY_ROOT / "tests/host/test_generate_pm_service_fixture.py").read_text()
+        golden = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/test_generate_pm_service_fixture.py")
         self.assertIn(
             "0792855c7e977b78c07e47b08da10e849e753cbd833f2ebeb46ba2725fda8585", golden,
         )
@@ -1267,14 +1268,14 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
         self.assertEqual(16, len(INITIAL_LONG_FUNCTION_MIGRATION))
         oversized = set()
         for path in all_sources():
-            if not (REPOSITORY_ROOT / path).is_file():
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path):
                 continue
             for name, count in c_function_definitions(
-                (REPOSITORY_ROOT / path).read_text()
+                kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             ).items():
                 if count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized.add((path, name))
-        for node in ast.walk(ast.parse((REPOSITORY_ROOT / GENERATOR_PATH).read_text())):
+        for node in ast.walk(ast.parse(kernel_layout_source.read_path(REPOSITORY_ROOT / GENERATOR_PATH))):
             if (
                 isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 and node.end_lineno - node.lineno + 1 > FUNCTION_REVIEW_LINE_LIMIT

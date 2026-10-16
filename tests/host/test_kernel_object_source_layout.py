@@ -14,6 +14,7 @@ from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -587,7 +588,7 @@ def family_paths(family):
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def private_name(name):
@@ -610,7 +611,7 @@ def normal_names(family):
 
 def owned_records(family, texts=None):
     texts = texts if texts is not None else {
-        path: source(path) for path in family_paths(family) if (ROOT / path).is_file()
+        path: source(path) for path in family_paths(family) if kernel_layout_source.is_file_path(ROOT / path)
     }
     return {
         (path, name): record for path, text in texts.items()
@@ -1341,7 +1342,7 @@ def rename_core_identifiers(text):
 
 def restored_kernel_objects_source(texts=None, private_header=None):
     texts = texts if texts is not None else {
-        path: source(path) for path in CORE_SOURCES if (ROOT / path).is_file()
+        path: source(path) for path in CORE_SOURCES if kernel_layout_source.is_file_path(ROOT / path)
     }
     locations = original_locations(0, texts)
     root = texts[CORE_SOURCES[0]]
@@ -1415,15 +1416,15 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         spellings = {"storage_is_zero", "kernel_object_storage_is_zero"}
         owners = [
             path for path in CORE_SOURCES
-            if (ROOT / path).is_file()
-            and spellings & set(c_function_definitions((ROOT / path).read_text()))
+            if kernel_layout_source.is_file_path(ROOT / path)
+            and spellings & set(c_function_definitions(kernel_layout_source.read_path(ROOT / path)))
         ]
         self.assertEqual(["kernel/kernel_object_state.c"], owners)
 
     def test_shared_records_preserve_complete_reviewed_asts_and_reexports(self):
         path = ROOT / "tests/host/c_source_records.py"
-        self.assertTrue(path.is_file())
-        shared = ast.parse(path.read_text())
+        self.assertTrue(kernel_layout_source.is_file_path(path))
+        shared = ast.parse(kernel_layout_source.read_path(path))
         definitions = {
             node.name: node for node in shared.body
             if isinstance(node, (ast.FunctionDef, ast.ClassDef))
@@ -1433,7 +1434,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             with self.subTest(name=name):
                 current = ast.dump(definitions[name], include_attributes=False)
                 self.assertEqual(expected, hashlib.sha256(current.encode()).hexdigest())
-        scheduler = ast.parse((ROOT / "tests/host/test_scheduler_source_layout.py").read_text())
+        scheduler = ast.parse(kernel_layout_source.read_path(ROOT / "tests/host/test_scheduler_source_layout.py"))
         self.assertFalse(any(
             isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in SHARED_INSPECTION_ASTS
             for node in scheduler.body
@@ -1492,7 +1493,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(LONG_FUNCTIONS) & set(FUNCTION_TASK_MIGRATION), actual)
 
     def test_portable_complete_byte_inverse_is_independent_and_rejects_changed_code(self):
-        current = {path: source(path) for path in CORE_SOURCES if (ROOT / path).is_file()}
+        current = {path: source(path) for path in CORE_SOURCES if kernel_layout_source.is_file_path(ROOT / path)}
         restored = restored_kernel_objects_source(current)
         self.assertEqual(BASE_CORE_DIGEST, digest_bytes(restored.encode()))
         path, record = original_locations(0, current)["require_initialized"]
@@ -1530,7 +1531,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         for family, (name, paths) in enumerate(SOURCE_SETS.items()):
             self.assertEqual((source_set_block(name, paths),), cmake_commands(cmake, "set", name))
             for path in (*paths, PRIVATE_HEADERS[family]):
-                self.assertTrue((ROOT / path).is_file(), path)
+                self.assertTrue(kernel_layout_source.is_file_path(ROOT / path), path)
             self.assertEqual((8, 1, 1)[family], cmake.count("${" + name + "}"))
         core, host, target = ("${" + name + "}" for name in SOURCE_SETS)
         for consumer in (
@@ -1592,7 +1593,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             with self.subTest(path=path):
                 from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
-                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else (ROOT / path).read_bytes()
+                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
                 self.assertEqual(expected, digest_bytes(value))
 
     def test_all_four_classification_dimensions_and_two_host_only_inputs_are_exact(self):

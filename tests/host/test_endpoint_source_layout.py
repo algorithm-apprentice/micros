@@ -21,6 +21,7 @@ from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -498,7 +499,7 @@ STABLE_HASHES = {
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest_bytes(data):
@@ -552,7 +553,7 @@ def body_digest(text, renames=None):
 def owned_definitions(family):
     return {
         (path, name): lines
-        for path in family_paths(family) if (ROOT / path).is_file()
+        for path in family_paths(family) if kernel_layout_source.is_file_path(ROOT / path)
         for name, lines in c_function_definitions(source(path)).items()
     }
 
@@ -1326,8 +1327,8 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         names = {"storage_is_zero", "endpoint_storage_is_zero"}
         owners = [
             path for path in CORE_SOURCES
-            if (ROOT / path).is_file()
-            and names & set(c_function_definitions((ROOT / path).read_text()))
+            if kernel_layout_source.is_file_path(ROOT / path)
+            and names & set(c_function_definitions(kernel_layout_source.read_path(ROOT / path)))
         ]
         self.assertEqual(["kernel/endpoint_codec.c"], owners)
 
@@ -1400,7 +1401,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 self.assertEqual((source_set_block(name, paths),), cmake_commands(cmake, "set", name))
                 self.assertEqual((5, 1, 2, 1)[family], cmake.count("${" + name + "}"))
                 for path in (*paths, PRIVATE_HEADERS[family]):
-                    self.assertTrue((ROOT / path).is_file(), path)
+                    self.assertTrue(kernel_layout_source.is_file_path(ROOT / path), path)
         consumers = {
             "endpoint_test": (0, 1, 2), "ipc_model_test": (0, 2),
             "bootstrap_control_test": (0,), "pm_test": (0,), "micros": (0,),
@@ -1477,7 +1478,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
                     else restored_runner_source().encode() if path == "tools/run_qemu_smoke.py"
-                    else (ROOT / path).read_bytes()
+                    else kernel_layout_source.read_bytes_path(ROOT / path)
                 )
                 self.assertEqual(expected, digest_bytes(value))
 

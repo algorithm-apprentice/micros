@@ -34,6 +34,7 @@ from tests.host.test_frame_ownership_source_layout import (
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
 from tests.host.test_trap_syscall_source_layout import c_statement_text
 from tests.host.test_vm_service_source_layout import c_declaration_text, file_scope_objects
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -1492,9 +1493,9 @@ def frozen_functions(original: str) -> dict[str, tuple[int, str]]:
 
 def source_texts() -> dict[str, str]:
     return {
-        path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+        path: kernel_layout_source.read_path(REPOSITORY_ROOT / path, encoding="utf-8")
         for path in (*ALL_SOURCES, *PRIVATE_HEADERS)
-        if (REPOSITORY_ROOT / path).is_file()
+        if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
     }
 
 
@@ -1664,7 +1665,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.texts = source_texts()
         cls.records = tuple(family_records(cls.texts, index) for index in range(6))
-        cls.cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        cls.cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt", encoding="utf-8")
 
     def original(self, family: int, name: str) -> str:
         record = find_original(self.records[family], family, name)
@@ -1703,13 +1704,13 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         discovered = {
             path.relative_to(REPOSITORY_ROOT).as_posix()
             for pattern in ("kernel/scheduler*.c", "tests/host/scheduler*.c")
-            for path in REPOSITORY_ROOT.glob(pattern)
+            for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
         }
         self.assertEqual(set(ALL_SOURCES), discovered)
         headers = {
             path.relative_to(REPOSITORY_ROOT).as_posix()
             for pattern in ("kernel/scheduler*.h", "tests/host/scheduler*.h")
-            for path in REPOSITORY_ROOT.glob(pattern)
+            for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
         }
         self.assertEqual({*PRIVATE_HEADERS, "kernel/scheduler_core_internal.h"}, headers)
 
@@ -1723,7 +1724,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             self.assertEqual(len(active), len(set(active)))
             self.assertLessEqual(set(active), set(initial))
             if not active:
-                module = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+                module = ast.parse(kernel_layout_source.read_path(Path(__file__), encoding="utf-8"))
                 values = [
                     node.value for node in module.body if isinstance(node, ast.Assign)
                     and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
@@ -1764,7 +1765,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
 
     def test_complete_original_supported_definition_signatures(self) -> None:
         headers = "\n".join(
-            (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            kernel_layout_source.read_path(REPOSITORY_ROOT / path, encoding="utf-8")
             for path in (
                 "include/micros/scheduler.h", "include/micros/scheduler_core.h",
                 "kernel/scheduler_core_internal.h",
@@ -1797,7 +1798,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             with self.subTest(path=path):
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
-                    else (REPOSITORY_ROOT / path).read_bytes()
+                    else kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
                 )
                 self.assertEqual(expected, hashlib.sha256(value).hexdigest())
 

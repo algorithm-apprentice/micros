@@ -20,6 +20,7 @@ from tests.host.test_vm_service_source_layout import file_scope_objects
 from tests.host.test_user_elf_source_layout import ast_digest
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -721,7 +722,7 @@ BASELINE_GENERATOR_OUTPUT = 'feca6c3c32b0f87883c6ef7a67cf4b410445550e2314b10c174
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest_bytes(value):
@@ -799,7 +800,7 @@ def alias_rows():
 def owned_definitions(family):
     return {
         (path, name): lines
-        for path in family_paths(family) if (ROOT / path).is_file()
+        for path in family_paths(family) if kernel_layout_source.is_file_path(ROOT / path)
         for name, lines in c_function_definitions(source(path)).items()
     }
 
@@ -1576,11 +1577,11 @@ def original_body_digest(family, name, text):
             text, c_function_body(owner, "observe_pre_ready_report"),
             c_function_body(owner, "validate_reported_runtime"),
         )
-    if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
+    if family in FIXTURE_TRANSPORTS and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[family]):
         tokens = fixture_transport_tokens(family, name, tokens)
-    if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
+    if family == 3 and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[3]):
         tokens = model_transport_tokens(name, tokens)
-    if family == 4 and (ROOT / PRIVATE_HEADERS[4]).exists():
+    if family == 4 and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[4]):
         tokens = peer_read_tokens(name, tokens)
     renames = normal_names(family)
     if family in DATA_RENAMES:
@@ -1803,9 +1804,9 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] == family
             )
             with self.subTest(family=family):
-                present = tuple(path for path in paths if (ROOT / path).is_file())
+                present = tuple(path for path in paths if kernel_layout_source.is_file_path(ROOT / path))
                 self.assertEqual(paths if active else paths[:1], present)
-                self.assertEqual(active, (ROOT / PRIVATE_HEADERS[family]).is_file())
+                self.assertEqual(active, kernel_layout_source.is_file_path(ROOT / PRIVATE_HEADERS[family]))
                 blocks = cmake_commands(cmake, "set", name)
                 if not active:
                     self.assertEqual((), blocks)
@@ -2499,10 +2500,10 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertEqual(17, len(STABLE_HASHES))
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()), REVIEWED_BASE)
+                self.assertEqual(expected, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / path)), REVIEWED_BASE)
         self.assertEqual(
             {"servers/ramfs/seed/etc/motd"},
-            {str(path.relative_to(ROOT)) for path in (ROOT / "servers/ramfs/seed").rglob("*") if path.is_file()},
+            {str(path.relative_to(ROOT)) for path in (ROOT / "servers/ramfs/seed").rglob("*") if kernel_layout_source.is_file_path(path)},
         )
         self.assertFalse(any(path.is_symlink() for path in (ROOT / "servers/ramfs/seed").rglob("*")))
 

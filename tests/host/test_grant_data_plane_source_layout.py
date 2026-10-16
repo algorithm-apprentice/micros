@@ -12,6 +12,7 @@ from tests.host.test_frame_ownership_source_layout import c_function_definitions
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -845,7 +846,7 @@ CONTEXT_AST_DIGEST = '0c2af36928f0b9646d25c12f6c24b9a3e5cff97222f1041cbd90288973
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest_bytes(value):
@@ -874,7 +875,7 @@ def normal_names(family):
 
 def owned_records(family, texts=None):
     texts = texts if texts is not None else {
-        path: source(path) for path in FAMILY_PATHS[family] if (ROOT / path).is_file()
+        path: source(path) for path in FAMILY_PATHS[family] if kernel_layout_source.is_file_path(ROOT / path)
     }
     return {
         (path, name): record for path, text in texts.items()
@@ -2839,8 +2840,8 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         self.assertNotIn("plan_range", set(facade))
         self.assertNotIn("grant_copy_plan_range", set(facade))
         leaf = ROOT / COPY_SOURCES[1]
-        self.assertTrue(leaf.is_file())
-        self.assertIn("grant_copy_plan_range", set(function_records(leaf.read_text())))
+        self.assertTrue(kernel_layout_source.is_file_path(leaf))
+        self.assertIn("grant_copy_plan_range", set(function_records(kernel_layout_source.read_path(leaf))))
 
     def test_immutable_inventories_and_explicit_remaining_work_are_exact(self):
         self.assertEqual((6, 2, 10, 42, 24, 8, 3), tuple(len(value) for value in BASELINE_BODIES.values()))
@@ -2895,12 +2896,12 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         cmake = source("CMakeLists.txt")
         for paths in FAMILY_PATHS:
             for path in paths:
-                self.assertTrue((ROOT / path).is_file(), path)
+                self.assertTrue(kernel_layout_source.is_file_path(ROOT / path), path)
         for index, (name, paths) in enumerate(SOURCE_SETS.items()):
             self.assertEqual((source_set_block(name, paths),), cmake_commands(cmake, "set", name))
             self.assertEqual((1, 2, 1)[index], cmake.count("${" + name + "}"))
         for header in PRIVATE_HEADERS:
-            self.assertTrue((ROOT / header).is_file(), header)
+            self.assertTrue(kernel_layout_source.is_file_path(ROOT / header), header)
             self.assertEqual({}, c_function_definitions(source(header)))
         self.assertEqual(1, cmake_commands(cmake, "add_executable", "micros")[0].count("${MICROS_GRANT_COPY_TARGET_SOURCES}"))
         for consumer in ("endpoint_test", "ipc_model_test"):
@@ -2916,9 +2917,9 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             with self.subTest(path=path):
                 from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
-                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else (ROOT / path).read_bytes()
+                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
                 self.assertEqual(expected, digest_bytes(value))
-        self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes((ROOT / "tests/host/c_source_records.py").read_bytes()))
+        self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / "tests/host/c_source_records.py")))
 
     def test_only_declared_recipe_pin_and_classification_metadata_change(self):
         for name, tree, expected in (
