@@ -531,3 +531,14 @@ Prior source/recipe/planner expected values remain unchanged under only
 that additional finite composition. There are 114 original owner moves and
 all eight semantic dispositions still pending; final author/reuse and
 independent implementation review are not claimed complete.
+
+Runtime ownership now places all 35 original definitions in the four required
+owners. The state leaf owns one two-field context containing exactly the
+original authoritative state and bootstrap pointer, plus original byte
+primitives and one non-resetting getter. The 26 existing public entries
+borrow it once; only the two original stateful private binding helpers gain
+the typed context parameter. Pure identity primitives retain their inputs.
+Complete original-body/type reconstruction and independent wrong-binding,
+reset/copy/retention and lifetime fixtures retain all runtime behavior.
+Actual owner directions are acyclic. There are 89 original moves remaining;
+all eight semantic dispositions remain pending, including live binding.

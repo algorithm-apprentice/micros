@@ -3,6 +3,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static struct tty_handoff_context context_state;
+
+struct tty_handoff_context *tty_handoff_context(void)
+{
+    return &context_state;
+}
+
 void tty_handoff_clear_bytes(void *storage, size_t size)
 {
     uint8_t *bytes = storage;
