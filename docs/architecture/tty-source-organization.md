@@ -10,10 +10,13 @@ after the model graph omission described by Accepted
 [ADR-0071](../adr/0071-tty-model-validation-reference-dependency.md).
 Corrective design #143 is independently reviewed and separately merged as
 `caa7573b89ef7501abf82a1ad89f3237c003a237`; its actual squash tree equals
-the reviewed tree and its obsolete branches are deleted. Implementation
-has restarted test-first on a fresh branch from that current `main`.
-Abandoned patches are reference only, not wholesale cherry-picked or
-accepted as current validation evidence.
+the reviewed tree and its obsolete branches are deleted. Fresh test-first
+implementation #144 is independently reviewed and merged as
+`34f1048449c221b014530484bfec4b3c0ab51142`; its actual squash tree equals
+the reviewed `99735737e0f0090afc5b1dbf08457d688a4c92c5` tree. Main is
+fast-forwarded clean and both obsolete feature branches are deleted.
+Abandoned #142 patches and old-head receipts are historical, not current
+cross-HEAD acceptance evidence.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
@@ -523,11 +526,10 @@ production application startup or shell work is included.
 
 ## Current implementation progress
 
-Draft implementation #144 restarts from merged corrective design #143.
-Each narrow slice reproduces structural Red and independent scope/type/
+Merged implementation #144 restarts from merged corrective design #143.
+Each narrow slice reproduced structural Red and independent scope/type/
 binding/initializer/ordering fixtures before source rewriting. Abandoned
-#142 patches are reference only; its historical results are not current
-acceptance evidence.
+#142 results were not used as current acceptance evidence.
 
 All 116 original moves and eight required dispositions are complete. Both
 migration collections are literal empty tuples. All 26 C owners are real:
@@ -568,8 +570,12 @@ complete original `4e370ba5...` recipe before the sole current digest
 Five family aliases and one host-only structural input preserve all four
 validation dimensions and prior source/recipe/planner expected values.
 
-Narrow current source, generator and native evidence, including all four
-actual TTY/RAMFS/VFS/ELF renderer consumers, passes. Complete current fresh
-author acceptance, actual same-original-
-producer bounded reuse and independent implementation review remain final
-barriers; source completion alone is not merge or v0.1 completion.
+Complete current author acceptance passed all 47 commands fresh: 35 native
+CTests, 908 Python tests, all 38 QEMU workflows, four images, documentation
+and three diff checks. Additional actual bounded reuse passed three reused
+and seven fresh commands from the same original full producer with exact
+candidate/attempt/complete-log identities. Complete independent read-only
+implementation review reported no substantive issue and no targeted
+reproduction. Exact reviewed-head squash/tree equality, main fast-forward
+and obsolete local/remote branch cleanup close this maintenance outcome,
+not v0.1. Old-head receipts remain historical after squash.

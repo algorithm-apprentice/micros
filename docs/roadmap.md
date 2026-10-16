@@ -420,12 +420,24 @@ results remain historical rather than current evidence.
 These corrections add no runtime node,
 clock/deadline, application startup or shell behavior.
 
-Draft implementation #144 now completes all 26 real TTY source owners,
+Independently reviewed implementation #144 completes all 26 real TTY source owners,
 116 original moves and eight required dispositions under immutable
 body/type/data facts. Both migrations are literal empty and all current
 C/renderer functions are at most 118 physical lines. Complete current
-fresh author, actual bounded reuse and independent implementation review
-are still required before merge; this is not v0.1 completion.
+47-command fresh author acceptance and actual same-original-full-producer
+three-profile reuse passed. It is merged as `34f1048` with identical reviewed
+tree, clean main fast-forward and exact obsolete branch cleanup.
+This is not v0.1 completion.
+
+The next single maintenance task is Proposed
+[ADR-0072](adr/0072-qemu-runner-source-decomposition.md) and the exact
+[QEMU runner source contract](architecture/qemu-runner-source-organization.md).
+It exposes existing outcome/report, argv, process/serial, CLI and host-case
+owners without changing accepted markers, commands or budgets. The exact
+source-family declaration transports the existing closed argument builder;
+no gate, receipt, default-config or cross-HEAD rule is relaxed.
+Only documentation design is active. Implementation stays pending until
+independent review, acceptance and separate design merge.
 
 ## v0.1 completion goal
 

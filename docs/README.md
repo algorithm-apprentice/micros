@@ -44,9 +44,14 @@ This directory contains the design baseline for `micros`.
   base-validation, native/reference-model and target ownership, including
   retained byte-source oracles and closed-profile coupling.
 - [Grant data-plane source organization](architecture/grant-data-plane-source-organization.md)
-- [TTY source organization](architecture/tty-source-organization.md)
   defines Accepted range/copy, captured syscall, native/reference-model and
   real target-script boundaries while retaining the cohesive registry.
+- [TTY source organization](architecture/tty-source-organization.md)
+  records the completed runtime, service, independent evidence and generator
+  owners without changing terminal or device authority.
+- [QEMU runner source organization](architecture/qemu-runner-source-organization.md)
+  proposes exact report, command, process/serial, CLI, discovery and
+  argument-builder closure boundaries before implementation.
 - [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
   defines exact manifest, preparation, runtime, syscall, boot-entry,
   launcher, native-reference, and generator ownership before implementation.
@@ -101,9 +106,13 @@ This directory contains the design baseline for `micros`.
   traces grant identity, table authority, direction and bounds checks, fault
   behavior, revocation, and checked cross-address-space copy.
 - [MINIX grant data-plane source-organization baseline](research/minix-grant-data-plane-source-organization.md)
-- [MINIX TTY source-organization baseline](research/minix-tty-source-organization.md)
   traces those fixed ownership and failure boundaries before the Accepted
   source-only range, adapter, model and target-script correction.
+- [MINIX TTY source-organization baseline](research/minix-tty-source-organization.md)
+  traces terminal, request, output, resource and interrupt responsibilities.
+- [MINIX QEMU runner responsibility baseline](research/minix-qemu-runner-source-organization.md)
+  classifies hosted test-driver responsibilities and the existing
+  OpenSBI/QEMU validation adaptations.
 - [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
   traces safe-copy mapping authority after VM startup and derives the
   wired-only `micros` handoff replacement.

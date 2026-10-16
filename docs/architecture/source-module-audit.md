@@ -116,7 +116,7 @@ the next behavior-bearing change to their own subsystem.
 
 | Unit | Signal files | Required outcome | Task pair |
 | --- | ---: | --- | --- |
-| QEMU runner tooling | 2 | Separate outcome parsing, command construction, serial driving, CLI construction, and host tests without changing the command interface or accepted markers. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
+| QEMU runner tooling | 2 | Proposed [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and the exact [QEMU runner contract](qemu-runner-source-organization.md) define ten production/eight test owners, exact original source/AST/data/CLI and discovery preservation, three bounded outlines and the reviewed source-family closure transport. Only design is active; implementation waits for independent acceptance and separate merge. | `qemu-tooling-decomposition-design` / `qemu-tooling-decomposition-implementation` |
 | ELF checker tooling | 2 | Apply Accepted [ADR-0063](../adr/0063-user-elf-checker-source-decomposition.md) and the exact [user ELF checker source contract](user-elf-checker-source-organization.md), after the separately reviewed design merges: separate parsing, structure, service policy, instructions, CLI, fixtures, and case discovery without changing accepted inputs, outputs, or the command interface. | `elf-tooling-decomposition-design` / `elf-tooling-decomposition-implementation` |
 
 The selected ELF tooling correction precedes the application host checker
@@ -296,12 +296,23 @@ and the [exact TTY contract](tty-source-organization.md) define 26 C owners,
 five private headers/sets, eight consumer operands and 116 original moves.
 The runtime state leaf prevents a facade/validation cycle; existing terminal,
 UART, handoff/control, public ABI and test-double interfaces remain intact.
-Complete independent design review is clean. This is documentation-only
-design; its paired implementation stays pending until separate merge.
+Complete independent original/corrective design and implementation reviews
+are clean. Implementation #144 is merged as `34f1048`, with all 26 real
+owners, 116 moves/eight dispositions and literal-empty migrations.
+Complete current fresh author and actual original-producer reuse passed;
+actual reviewed squash tree/main fast-forward/branch cleanup are verified.
 
 ### QEMU runner tooling
 
 `tools/run_qemu_smoke.py` and `tests/host/test_run_qemu_smoke.py`.
+
+At TTY-merged base `34f1048`, these have 2,087 runner lines/46 functions/
+two classes/43 assignments and 2,492 test lines/six classes/85 methods/
+36 fixtures. The three long functions are 217, 330 and 187 lines.
+Proposed [ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) and its
+[exact source contract](qemu-runner-source-organization.md) keep command,
+report, process/serial, CLI, discovery and source-closure authority distinct.
+No executable artifact belongs to the design.
 
 ### ELF checker tooling
 

@@ -263,6 +263,17 @@ An unknown layout, config option or present/unreadable file/directory/link
 makes the workflow ineligible, not silently reconfigured.
 The guest command and all required gates remain unchanged.
 
+Proposed
+[ADR-0072](../adr/0072-qemu-runner-source-decomposition.md) defines a
+separate, bounded source-organization transport for this reviewed argument
+builder. Its [exact source contract](qemu-runner-source-organization.md)
+requires complete original runner byte/AST restoration before the single
+file declaration becomes a fixed ten-member family with narrowly closed
+loader inputs. This is not implemented or authorized by this proposal
+alone: the existing declaration remains authoritative until independent
+acceptance and separate merge. All other profile, default-config, coverage,
+provenance and failure rules stay unchanged.
+
 The already required native shim/import closure also distinguishes declared
 SDK paths from arbitrary include/library overrides. Active SDK/toolchain
 paths are fully hashed. Standard `/usr/local/include` and `/usr/local/lib`
