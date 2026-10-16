@@ -150,6 +150,44 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        "kernel/kernel_objects.c",
+        (
+            "kernel/kernel_object_state.c",
+            "kernel/kernel_object_identity.c",
+            "kernel/kernel_object_stack.c",
+            "kernel/kernel_object_process.c",
+            "kernel/kernel_object_thread.c",
+            "kernel/kernel_object_context.c",
+            "kernel/kernel_object_hart.c",
+            "kernel/kernel_object_validation.c",
+            "kernel/kernel_object_private.h",
+        ),
+    ),
+    (
+        "tests/host/kernel_objects_test.c",
+        (
+            "tests/host/kernel_objects_test_fixture.c",
+            "tests/host/kernel_objects_initialization_test.c",
+            "tests/host/kernel_objects_process_test.c",
+            "tests/host/kernel_objects_thread_test.c",
+            "tests/host/kernel_objects_hart_test.c",
+            "tests/host/kernel_objects_identity_test.c",
+            "tests/host/kernel_objects_validation_test.c",
+            "tests/host/kernel_objects_model_test.c",
+            "tests/host/kernel_objects_model_reference.c",
+            "tests/host/kernel_objects_model_projection.c",
+            "tests/host/kernel_objects_model_operations.c",
+            "tests/host/kernel_objects_test_internal.h",
+        ),
+    ),
+    (
+        "kernel/object_model_test.c",
+        (
+            "kernel/object_model_test_scenarios.c",
+            "kernel/object_model_test_internal.h",
+        ),
+    ),
+    (
         "kernel/endpoint.c",
         (
             "kernel/endpoint_codec.c",
@@ -998,6 +1036,8 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_trap_syscall_source_layout.py",
     "tests/host/test_ramfs_source_layout.py",
     "tests/host/test_endpoint_source_layout.py",
+    "tests/host/test_kernel_object_source_layout.py",
+    "tests/host/c_source_records.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",
     "tests/host/test_kernel_ipc_source_layout.py",

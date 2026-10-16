@@ -373,16 +373,20 @@ task boundaries. The full 47-command fresh author plan and additional actual
 three-profile reuse passed before exact reviewed-tree squash and branch
 cleanup. No endpoint behavior or runtime dependency was added.
 
-The next selected maintenance design is Accepted
+Kernel-object maintenance follows Accepted
 [ADR-0068](adr/0068-kernel-object-source-decomposition.md), with the exact
 [object source contract](architecture/kernel-object-source-organization.md).
 It names 23 C owners, three private headers/sets, 72 moves, eight long and
 four shorter task dispositions over the existing 76-definition object
 family. Public layouts and the cohesive runtime remain unchanged; the
 scheduler/base-validator direction, original storage and full source/recipe
-oracles are explicit. Independent design review is clean. Implementation
-remains pending until separate design PR #137 merges. This is not a new
-runtime node, clock/deadline change, application startup or shell outcome.
+oracles are explicit. Independently reviewed design #137 is merged.
+Implementation #138 exposes all 23 real owners and all twelve semantic
+dispositions, with both migrations literal empty and 128 current definitions
+bounded by 92 physical lines. Complete current author/reuse acceptance and
+independent implementation review remain merge prerequisites. This is not
+a new runtime node, clock/deadline change, application startup or shell
+outcome.
 
 ## v0.1 completion goal
 

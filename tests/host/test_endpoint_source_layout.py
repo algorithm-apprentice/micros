@@ -13,6 +13,10 @@ from tests.host.test_frame_ownership_source_layout import (
     tokens,
 )
 from tests.host.test_kernel_bootstrap_source_layout import c_function_body
+from tests.host.test_kernel_object_source_layout import (
+    kernel_object_cmake_projection,
+    restored_kernel_objects_source,
+)
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools.check_docs import topological_order
@@ -1289,6 +1293,7 @@ def source_set_block(name, paths):
 
 
 def endpoint_cmake_projection(text):
+    text = kernel_object_cmake_projection(text)
     blocks = [(name, paths, cmake_commands(text, "set", name)) for name, paths in SOURCE_SETS.items()]
     if not any(found for _, _, found in blocks):
         if any("${" + name + "}" in text for name in SOURCE_SETS):
@@ -1467,7 +1472,11 @@ class EndpointSourceLayoutTest(unittest.TestCase):
     def test_public_runtime_driver_and_neighbor_artifacts_remain_byte_exact(self):
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()))
+                value = (
+                    restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
+                    else (ROOT / path).read_bytes()
+                )
+                self.assertEqual(expected, digest_bytes(value))
 
     def test_native_fixture_has_exact_original_fields_resets_and_single_root_borrows(self):
         header = source(PRIVATE_HEADERS[1])

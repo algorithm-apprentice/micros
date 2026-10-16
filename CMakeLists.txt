@@ -262,6 +262,41 @@ set(
 )
 
 set(
+    MICROS_KERNEL_OBJECT_CORE_SOURCES
+    kernel/kernel_objects.c
+    kernel/kernel_object_state.c
+    kernel/kernel_object_identity.c
+    kernel/kernel_object_stack.c
+    kernel/kernel_object_process.c
+    kernel/kernel_object_thread.c
+    kernel/kernel_object_context.c
+    kernel/kernel_object_hart.c
+    kernel/kernel_object_validation.c
+)
+
+set(
+    MICROS_KERNEL_OBJECT_HOST_TEST_SOURCES
+    tests/host/kernel_objects_test.c
+    tests/host/kernel_objects_test_fixture.c
+    tests/host/kernel_objects_initialization_test.c
+    tests/host/kernel_objects_process_test.c
+    tests/host/kernel_objects_thread_test.c
+    tests/host/kernel_objects_hart_test.c
+    tests/host/kernel_objects_identity_test.c
+    tests/host/kernel_objects_validation_test.c
+    tests/host/kernel_objects_model_test.c
+    tests/host/kernel_objects_model_reference.c
+    tests/host/kernel_objects_model_projection.c
+    tests/host/kernel_objects_model_operations.c
+)
+
+set(
+    MICROS_KERNEL_OBJECT_QEMU_TEST_SOURCES
+    kernel/object_model_test.c
+    kernel/object_model_test_scenarios.c
+)
+
+set(
     MICROS_ENDPOINT_CORE_SOURCES
     kernel/endpoint.c
     kernel/endpoint_codec.c
@@ -1173,21 +1208,21 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         kernel_objects_test
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
-        tests/host/kernel_objects_test.c
+        ${MICROS_KERNEL_OBJECT_HOST_TEST_SOURCES}
     )
     add_executable(
         frame_ownership_test
         kernel/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_FRAME_OWNERSHIP_HOST_TEST_SOURCES}
     )
     add_executable(
         scheduler_test
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         tests/host/ipc_current_guard_test.c
         ${MICROS_SCHEDULER_MODEL_HOST_TEST_SOURCES}
@@ -1195,7 +1230,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         endpoint_test
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant.c
@@ -1226,7 +1261,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         ipc_model_test
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant.c
@@ -1260,7 +1295,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_BOOTSTRAP_CONTROL_HOST_TEST_SOURCES}
     )
@@ -1280,7 +1315,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
-        kernel/kernel_objects.c
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_PM_CONTROL_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
@@ -3843,7 +3878,7 @@ add_executable(
     ${MICROS_IPC_SYSCALL_SOURCES}
     ${MICROS_SYSCALL_SOURCES}
     kernel/kernel_object_runtime.c
-    kernel/kernel_objects.c
+    ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
     ${MICROS_SCHEDULER_CORE_SOURCES}
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
@@ -5330,7 +5365,7 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/object_model_test.c
+            ${MICROS_KERNEL_OBJECT_QEMU_TEST_SOURCES}
     )
 endif()
 

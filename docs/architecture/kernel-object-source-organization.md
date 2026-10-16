@@ -5,8 +5,11 @@
 This is the exact design contract for the three kernel-object signal files
 in the [source-module audit](source-module-audit.md).
 [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) is Accepted
-after a clean independent read-only design review. Implementation remains
-pending until the separate design PR #137 merges.
+after clean independent complete and acceptance-only design reviews.
+Design #137 merged as `4a7e49764533fbbef1e2d10188f837e7f092817e`;
+implementation #138 uses a fresh branch from that outcome. All specified
+owners and semantic dispositions are implemented; merge remains subject to
+the complete author/reuse evidence and independent implementation review.
 
 ```text
 reviewed micros base: 4eb1c4d68de3830b888a0d239a2874bd79792244
@@ -19,7 +22,7 @@ Endpoint #136 is complete, including full fresh author acceptance, actual
 three-profile reuse, clean independent review and identical squash tree.
 This is the next sequential maintenance outcome, not a new runtime-DAG node.
 
-| Current source | Physical lines | Original definitions | Above 120 lines |
+| Reviewed-base source | Physical lines | Original definitions | Above 120 lines |
 | --- | ---: | ---: | ---: |
 | `kernel/kernel_objects.c` | 1,900 | 48 | 2 |
 | `tests/host/kernel_objects_test.c` | 2,355 | 27 | 5 |
@@ -28,8 +31,8 @@ This is the next sequential maintenance outcome, not a new runtime-DAG node.
 
 Expose representation, identity, range geometry, process/thread/context/hart
 lifetime, base validation, independent expected-state logic and target
-scenario tasks. Names below are future ownership requirements, not claims
-that implementation files already exist.
+scenario tasks. Names below define the required owners; current closure is
+recorded in the implementation progress section.
 
 No identity, generation, quarantine, policy, capacity, supported API, layout,
 scheduler, IPC, endpoint, grant, mapping, runtime, clock, deadline, model,
@@ -619,3 +622,140 @@ the exact obsolete local/remote branches.
 
 This design itself changes documentation only. It authors no executable
 source, test, model, harness, build scaffold or reusable prototype.
+
+### Current implementation progress
+
+The initial structural Red exposed the registry-storage helper in its old
+monolithic owner. The first implementation slice moved the original twelve
+representation and twelve identity definitions to their required owners.
+Their complete bodies and types remain frozen; the initial necessary
+portable private surface was nineteen helpers, growing only to the final
+twenty-two as remaining owners moved.
+
+All 76 original bodies/signatures and eighteen neighboring artifacts are
+frozen from immutable `4eb1c4d`, not rewritten output. The six shared
+inspection definitions move unchanged with whole-AST proof and compatible
+scheduler re-exports. Its existing cache/lexing fixture follows the real
+new helper owner without changing its assertions.
+
+All 23 final C paths, three headers/sets and ten source operands are wired
+once. All 23 units now contain their actual tasks; no temporary
+declarations-only owner remains. The portable ownership slice completed
+all forty-six core moves: all 48 original portable definitions
+now occupy nine owners and the exact necessary private surface is
+twenty-two helpers. The facade contains only the original initializer and
+combined scheduler-delegating validator. The existing lower base-validator
+declaration and all original portable bytes remain independently enforced.
+The native/model slice now completes all twenty-six original host moves
+across its twelve owners. Cases and reference comparison receive the one
+original registry explicitly; the new getter returns it without resetting.
+Actual assertion macros, reference types, complete bodies/signatures and
+the fifteen-case automatic `const` table reconstruct exactly. The active
+seventy-two-owner migration is now a literal empty tuple.
+
+The first semantic slice outlines complete independent comparison into
+32/64/33-line process, thread and hart passes with a 41-line root. Their
+original counter types/bounds, first mismatch and one root diagnostic remain
+exact; the one complete combined validator still follows every pass.
+Finite scope-aware reconstruction and independent caller/bound/early-success
+mutants preserve the full original body.
+
+Hart stack installation now exposes 64/38-line other-hart and attached-thread
+conflict passes under a 78-line admission/geometry/publication root. Each
+pass owns its original typed loop counter and preserves first conflict;
+neither publishes state. A finite raw-body inverse from their actual bytes
+restores the original complete source hash, including counter declaration,
+loop formatting, error precedence and the unchanged non-failing stores.
+Independent typed-counter/bound/caller/exit/publication/whitespace fixtures
+exercise that inverse.
+
+Execution-context attachment similarly exposes 33/36-line attached-peer and
+installed-hart conflict passes under a 65-line root. Admission, original
+geometry and context publication remain in the root; the same finite
+raw-byte mechanism has a separate context caller/type/order fixture.
+
+Base validation now has a 57-line root, four 68/92/25/61-line complete
+process/thread/count/hart passes, and five bounded context/free-hart/
+peer-stack/stack-state/current-binding tasks. The root retains its two
+original automatic witnesses, three zero-initialized observed counts,
+policy admission, witness initialization and final closure. Typed pointers
+transport only those actual scalar/witness objects; the raw inverse
+restores nested counters, free-hart `continue`, pairwise bounds, seven-way
+overlap order and exact count-increment positions from current code.
+Independent nested fixtures and actual-source type/predicate/witness/order
+mutants protect the complete original byte hash.
+
+All three portable semantic dispositions are complete. Native uninitialized
+admission now has a 46-line root and 47/62/49-line process/thread-context/
+hart tasks; capacity evidence has a 30-line root and 27/46/39-line independent
+fill/refusal tasks. Their automatic work contains exactly the original
+fourteen/seven objects, with only original explicit initializers in order.
+Finite typed-field and checked-call reconstruction restores both complete
+original bodies; independent fixtures reject blanket zeroing, copies,
+extra fields, changed extents/types, reordered initializers and early success.
+The three capacity resets and original macro snapshots stay at their exact
+execution boundaries.
+
+Generation evidence now has a 27-line root and 61/57/61-line pure-boundary,
+thread-quarantine and process-quarantine tasks. Its nine original objects
+retain their exact initializers; the pure task receives no registry.
+Address-space evidence has a 25-line root and 31/40/31/23-line rejection,
+attach/denial, live-thread retirement and stale-root tasks. The original
+opaque root stays an automatic constant in the caller and is passed
+explicitly; its four original mutable objects and snapshot sites are exact.
+
+Context lifecycle evidence now has a 75-line root and six 48/63/76/68/82/23-line
+preparation, attach/inspect, peer-conflict, current-capture, idle/stale and
+cleanup tasks. Its thirteen original mutable objects retain their exact
+initializers. All eight constant stack bounds stay automatic in the root,
+with only each task's used bounds passed explicitly. The two original
+scheduler plans remain in their separate original blocks; independent
+scope fixtures and full-body reconstruction reject hoisting or combining
+them.
+
+Corruption evidence now has a 27-line root and 37/22/26/37-line preparation
+and mutation-stream tasks. The six original objects and sole snapshot are
+unchanged. Mutation groups remain exactly 1-8, 9-14 and 15-21. The actual
+macro's bytes are verified against immutable pre-outline owner evidence
+under only snapshot-field transport; its one definition encloses all
+scenario definitions and its one undef precedes the root. Reconstruction
+restores its original in-case scope and full original body. No final
+snapshot restoration or successful validation is added.
+
+The seeded model now has a 78-line root and eight 48/39/60/49/42/49/52/44-line
+operations in their separate owner. The original four run locals stay in
+the root; one automatic iteration object contains exactly the original
+value/slot/expected/actual fields. Only value gets its original one draw;
+the other fields remain uninitialized until the selected original operation
+assigns them. Complete typed reconstruction preserves every case-local
+sentinel/context/root, status/output check, reference update, numeric case
+and post-attempt comparison. The RNG body and seed are unchanged. There is
+no new default, script, trace, coverage or teardown.
+
+The target now has a 58-line root and 30/57/28/28-line process/thread-limit,
+attach/select/current, retirement and reuse/stale/baseline scenarios.
+Exactly eleven original mutable objects share the caller-owned work;
+only the original MAX thread sentinel and NULL resolved pointer are
+initialized. Saved status, `passed = false`, aligned static stack, mutable
+static context and the sole `done` IRQ restoration stay in the entry.
+The caller computes both real array bounds, including `sizeof(thread_stack)`.
+Finite reconstruction recombines the original flat retirement/reuse
+short-circuit chain and preserves every failure and success effect.
+No failure rollback or additional runtime capture is added.
+
+Both the 72-owner and 12-task migrations are literal empty tuples. All
+23 C owners contain real definitions: 61 portable, 62 native/model and five
+target definitions, 128 total. The largest current C definition has 92
+physical lines; all eight original long and four shorter mixed tasks have
+their required outlines. Original inventories and hashes are not shrunk or
+rebaselined. This closes source dispositions, not the merge gate: the
+complete current author plan, same-producer actual reuse and independent
+implementation review remain required before merge.
+
+The complete current portable source restores the original
+`453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
+bytes. The exact complete recipe inverse restores `50cac89...` before
+maintaining only the admitted current digest
+`44d8a8615e5465ad199ed916b30e72af05643ef00ae5ac9a7df00a0dc4cad2c1`.
+Prior scheduler/endpoint source and recipe/planner expected values remain
+unchanged under only these verified inverses.

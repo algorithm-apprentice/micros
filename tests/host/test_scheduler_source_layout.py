@@ -7,8 +7,6 @@ This module never invokes Git, a compiler, a model, QEMU, or the network.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
-from functools import lru_cache
 import hashlib
 from pathlib import Path
 import re
@@ -16,6 +14,15 @@ import unittest
 from unittest.mock import patch
 
 from tools import validation_plan
+from tests.host.c_source_records import (
+    Function,
+    compact,
+    cpp_guards,
+    function_records,
+    matching,
+    matching_lexical,
+)
+from tests.host.test_kernel_object_source_layout import restored_kernel_objects_source
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
     c_lexical_text,
@@ -953,88 +960,8 @@ MODEL_OPERATION_HANDLERS = (
 )
 
 
-def compact(text: str) -> str:
-    return " ".join(tokens(text))
-
-
 def digest(text: str) -> str:
     return hashlib.sha256(compact(text).encode("utf-8")).hexdigest()
-
-
-def matching(text: str, start: int, opening: str = "(", closing: str = ")") -> int:
-    return matching_lexical(c_lexical_text(text), start, opening, closing)
-
-
-def matching_lexical(
-    lexical: str, start: int, opening: str = "(", closing: str = ")",
-) -> int:
-    depth = 0
-    for index in range(start, len(lexical)):
-        if lexical[index] == opening:
-            depth += 1
-        elif lexical[index] == closing:
-            depth -= 1
-            if depth == 0:
-                return index
-    raise AssertionError(f"unbalanced {opening}{closing}")
-
-
-def cpp_guards(text: str, end: int) -> tuple[str, ...]:
-    stack = []
-    logical = re.sub(r"\\\n", " ", text[:end])
-    for line in logical.splitlines():
-        directive = re.match(r"\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)", line)
-        if not directive:
-            continue
-        operation, expression = directive.groups()
-        if operation in ("if", "ifdef", "ifndef"):
-            stack.append(compact(operation + " " + expression))
-        elif operation in ("elif", "else"):
-            if not stack:
-                raise AssertionError("unmatched CPP alternative")
-            stack[-1] += " / " + compact(operation + " " + expression)
-        else:
-            if not stack:
-                raise AssertionError("unmatched CPP endif")
-            stack.pop()
-    return tuple(stack)
-
-
-@dataclass(frozen=True)
-class Function:
-    name: str
-    signature: str
-    body: str
-    lines: int
-    guards: tuple[str, ...]
-
-
-@lru_cache(maxsize=128)
-def function_records(text: str) -> dict[str, Function]:
-    lexical = c_lexical_text(text)
-    declarations = c_declaration_text(text)
-    result = {}
-    for name, lines in c_function_definitions(text).items():
-        candidates = []
-        for match in re.finditer(rf"\b{re.escape(name)}\s*\(", lexical):
-            open_at = lexical.find("(", match.start())
-            close_at = matching_lexical(lexical, open_at)
-            body_at = close_at + 1
-            while body_at < len(lexical) and lexical[body_at].isspace():
-                body_at += 1
-            if body_at < len(lexical) and lexical[body_at] == "{":
-                candidates.append((match.start(), body_at))
-        if len(candidates) != 1:
-            raise AssertionError(f"ambiguous function definition: {name}")
-        name_at, body_at = candidates[0]
-        boundary = max(lexical.rfind("}", 0, name_at), lexical.rfind(";", 0, name_at)) + 1
-        start = c_signature_start(declarations, boundary, name_at)
-        body_end = matching_lexical(lexical, body_at, "{", "}")
-        result[name] = Function(
-            name, text[start:body_at], text[body_at + 1:body_end],
-            lines, cpp_guards(text, name_at),
-        )
-    return result
 
 
 def family_index(path: str) -> int:
@@ -1868,7 +1795,11 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
     def test_stable_artifacts_are_literal_reviewed_base_hashes(self) -> None:
         for path, expected in STABLE_ARTIFACT_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+                value = (
+                    restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
+                    else (REPOSITORY_ROOT / path).read_bytes()
+                )
+                self.assertEqual(expected, hashlib.sha256(value).hexdigest())
 
     def test_cmake_exact_ordered_sets_and_every_existing_consumer(self) -> None:
         for name, paths in SOURCE_SETS.items():
@@ -1889,7 +1820,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         self.assertEqual(1, micros.count("${MICROS_SCHEDULER_RUNTIME_SOURCES}"))
         scheduler = cmake_command(self.cmake, "add_executable", "scheduler_test")
         require_order(
-            scheduler, "kernel/kernel_objects.c", "${MICROS_SCHEDULER_CORE_SOURCES}",
+            scheduler, "${MICROS_KERNEL_OBJECT_CORE_SOURCES}", "${MICROS_SCHEDULER_CORE_SOURCES}",
             "tests/host/ipc_current_guard_test.c", "${MICROS_SCHEDULER_MODEL_HOST_TEST_SOURCES}",
             "${MICROS_SCHEDULER_HOST_TEST_SOURCES}",
         )
@@ -2401,7 +2332,7 @@ class SchedulerSourceSafetyFixtureTest(unittest.TestCase):
     def test_function_records_reuses_lexing_for_repeated_body_checks(self) -> None:
         source = "void leaf(void) {}\nvoid root(void) {" + "leaf();" * 200 + "}\n"
         function_records.cache_clear()
-        with patch(__name__ + ".c_lexical_text", wraps=c_lexical_text) as lexical:
+        with patch("tests.host.c_source_records.c_lexical_text", wraps=c_lexical_text) as lexical:
             first = function_records(source)
             second = function_records(source)
         self.assertEqual({"leaf", "root"}, set(first))
