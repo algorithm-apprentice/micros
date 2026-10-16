@@ -158,7 +158,6 @@ SYMBOL_OWNER_MIGRATION = tuple(
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
-    (4, "test_runtime_lifecycle_validation"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
 )
 RUNTIME_CONTEXT_TAG = "tty_handoff_context"
@@ -245,6 +244,57 @@ DEVICE_PARAMETERS = (
     "const struct micros_process_handle foreign_process, const uint64_t tty_root, const uint32_t exact_permissions"
 )
 DEVICE_ARGUMENTS = "&work, tty_process, foreign_process, tty_root, exact_permissions"
+LIFECYCLE_WORK_TAG = "tty_handoff_runtime_case"
+LIFECYCLE_FIELDS = (
+    ("struct micros_bootstrap_control_state bootstrap;", True),
+    ("struct micros_bootstrap_binding *binding;", "value"),
+    ("struct micros_bootstrap_manifest_entry *entry;", "value"),
+    ("struct micros_bootstrap_runtime_entry *transition;", "value"),
+    ("struct micros_endpoint_registry registry;", True),
+    ("struct micros_kernel_objects objects;", True),
+    ("struct micros_syscall_context context;", True),
+    ("struct micros_tty_handoff mapped;", False),
+    ("struct micros_tty_handoff begin;", False),
+    ("struct micros_tty_handoff released;", False),
+    ("struct micros_tty_handoff committed;", False),
+    ("struct micros_tty_handoff claimed;", False),
+    ("struct micros_tty_handoff completed;", False),
+    ("struct micros_tty_handoff ready;", False),
+    ("struct micros_tty_device_authority authority;", False),
+    ("struct micros_tty_device_authority authority_sentinel;", False),
+    ("struct micros_tty_handoff_runtime_state unexpected_state;", True),
+    ("struct micros_tty_handoff_runtime_state *runtime;", False),
+)
+LIFECYCLE_PHASES = (
+    (
+        "tty_handoff_test_seed_runtime_records", "void",
+        "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work, "
+        "const struct micros_process_handle process, const struct micros_thread_handle thread, "
+        "const micros_endpoint_t endpoint, const uint64_t root",
+        "fixture, &work, process, thread, endpoint, root",
+    ),
+    (
+        "tty_handoff_test_check_initial_runtime_authority", "bool",
+        "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work", "fixture, &work",
+    ),
+    (
+        "tty_handoff_test_begin_and_map_runtime", "bool",
+        "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work, "
+        "const struct micros_process_handle process, const uint64_t root", "fixture, &work, process, root",
+    ),
+    (
+        "tty_handoff_test_release_and_commit_runtime", "bool",
+        "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work", "fixture, &work",
+    ),
+    (
+        "tty_handoff_test_claim_and_ready_runtime", "bool",
+        "struct tty_handoff_runtime_case *work", "&work",
+    ),
+    (
+        "tty_handoff_test_complete_and_panic_runtime", "bool",
+        "struct tty_handoff_test_fixture *fixture, struct tty_handoff_runtime_case *work", "fixture, &work",
+    ),
+)
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -656,6 +706,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 4 and spelling in {phase[0] for phase in LIFECYCLE_PHASES}:
+                if path != HANDOFF_SOURCES[3]:
+                    raise AssertionError("runtime lifecycle phases retain their actual native case owner")
+                continue
             if family == 4 and spelling == DEVICE_PHASE:
                 if path != HANDOFF_SOURCES[2]:
                     raise AssertionError("device exclusions have their exact private classification-case owner")
@@ -724,6 +778,8 @@ def original_body_digest(family, record):
         body = model_validation_actual_body_tokens(record)
     if family == 4 and record.name == "tty_handoff_test_device_leaf_classification" and (4, "test_device_leaf_classification") not in FUNCTION_TASK_MIGRATION:
         body = device_actual_body_tokens(record)
+    if family == 4 and record.name == "tty_handoff_test_runtime_lifecycle_validation" and (4, "test_runtime_lifecycle_validation") not in FUNCTION_TASK_MIGRATION:
+        body = lifecycle_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
@@ -910,6 +966,39 @@ def device_actual_body_tokens(record, owner=None):
     return device_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
+def lifecycle_body_tokens(caller, phase_bodies, declarations):
+    from tests.host.test_grant_data_plane_source_layout import boolean_case_body_tokens, bound_body_tokens
+
+    body = tokens(caller)
+    for index, (name, result, _, arguments) in enumerate(LIFECYCLE_PHASES):
+        phase = phase_bodies[name]
+        actual = tokens(phase)
+        if result == "void":
+            if set(actual) & {"return", "goto", "break", "continue"}:
+                raise AssertionError("original runtime record seeding adds no failure or new control exit")
+            body = bound_body_tokens(body, name + "(" + arguments + ");", phase)
+        else:
+            if actual[-4:] != ("return", "true", ";", "}") or set(actual[1:-4]) & {"return", "goto", "break", "continue"}:
+                raise AssertionError("runtime phases retain original first-failure observations and terminal success")
+            body = boolean_case_body_tokens(body, ((name, arguments, phase, index == len(LIFECYCLE_PHASES) - 1),))
+    return root_work_body_tokens(body, LIFECYCLE_WORK_TAG, LIFECYCLE_FIELDS, declarations)
+
+
+def lifecycle_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(HANDOFF_SOURCES[3]) if owner is None else owner
+    declarations = work_declarations(owner, LIFECYCLE_WORK_TAG, LIFECYCLE_FIELDS)
+    records = function_records(owner)
+    bodies = {}
+    for name, result, parameters, _ in LIFECYCLE_PHASES:
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("static " + result + " " + name + "(" + parameters + ")"):
+            raise AssertionError("runtime phases bind only original fixture/work and necessary exact readonly values")
+        bodies[name] = "{" + phase.body + "}"
+    return lifecycle_body_tokens("{" + record.body + "}", bodies, declarations)
+
+
 def source_set_block(name, paths):
     return "set(\n    " + name + "\n" + "".join("    " + path + "\n" for path in paths) + ")"
 
@@ -981,6 +1070,93 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_runtime_case_has_exact_bounded_seed_authority_begin_map_release_claim_ready_completion_phases(self):
+        records = function_records(source(HANDOFF_SOURCES[3]))
+        self.assertLessEqual(records["tty_handoff_test_runtime_lifecycle_validation"].lines, 120)
+        for name, result, parameters, _ in LIFECYCLE_PHASES:
+            self.assertIn(name, set(records))
+            self.assertEqual(tokens("static " + result + " " + name + "(" + parameters + ")"), tokens(records[name].signature))
+            self.assertLessEqual(records[name].lines, 120)
+
+    def test_runtime_case_inverse_preserves_original_initializers_derived_pointers_and_lifecycle_order(self):
+        prefix = (
+            "{ struct tty_handoff_test_fixture *fixture = tty_handoff_test_fixture(); "
+            "const struct micros_process_handle process = {3, 7}; const struct micros_thread_handle thread = {5, 9}; "
+            "const micros_endpoint_t endpoint = (process.generation << SLOT_BITS) | process.slot; const uint64_t root = ROOT; "
+        )
+        caller = (
+            prefix + "struct tty_handoff_runtime_case work; "
+            "work.bootstrap = (struct micros_bootstrap_control_state){0}; work.binding = &work.bootstrap.bindings[0]; "
+            "work.entry = &work.bootstrap.manifest.entries[0]; work.transition = &work.bootstrap.transitions.entries[0]; "
+            "work.registry = (struct micros_endpoint_registry){0}; work.objects = (struct micros_kernel_objects){0}; "
+            "work.context = (struct micros_syscall_context){ .objects = &work.objects, .current = thread, .process = process }; "
+            "work.unexpected_state = (struct micros_tty_handoff_runtime_state){ .process = {4, 7}, .thread = {6, 9} }; "
+            "tty_handoff_test_seed_runtime_records(fixture, &work, process, thread, endpoint, root); "
+            "if (!tty_handoff_test_check_initial_runtime_authority(fixture, &work)) { return false; } "
+            "if (!tty_handoff_test_begin_and_map_runtime(fixture, &work, process, root)) { return false; } "
+            "if (!tty_handoff_test_release_and_commit_runtime(fixture, &work)) { return false; } "
+            "if (!tty_handoff_test_claim_and_ready_runtime(&work)) { return false; } "
+            "return tty_handoff_test_complete_and_panic_runtime(fixture, &work); }"
+        )
+        bodies = dict(zip((phase[0] for phase in LIFECYCLE_PHASES), (
+            "{ *work->binding = original_binding(process, thread, endpoint, root); fixture->runtime_process_handle = process; }",
+            "{ work->bootstrap.plan.console_service_id = 0; EXPECT_TRUE(original_absent_and_unexpected(&work->unexpected_state)); "
+            "work->bootstrap.plan.console_service_id = TTY; EXPECT_TRUE(original_prepare_bind(&work->bootstrap)); return true; }",
+            "{ work->runtime = original_authoritative(); EXPECT_TRUE(original_begin_deadline150(&work->begin)); "
+            "EXPECT_TRUE(original_map_authority(&work->authority, process, root)); "
+            "memset(&work->authority_sentinel, 0xa5, sizeof(work->authority_sentinel)); work->authority = work->authority_sentinel; "
+            "EXPECT_TRUE(original_preserve_sentinel(&work->authority, &work->authority_sentinel)); return true; }",
+            "{ fixture->runtime_thread.scheduler_assigned = true; "
+            "EXPECT_TRUE(original_release_then_commit(&work->released, &work->committed)); return true; }",
+            "{ EXPECT_TRUE(original_claim_then_ready149(&work->claimed, &work->ready)); "
+            "work->transition->ready_deadline = 0; original_commit_ready(&work->ready); return true; }",
+            "{ EXPECT_TRUE(original_complete_then_source_only(&work->completed)); "
+            "EXPECT_TRUE(original_terminal_panic(work->runtime)); return true; }",
+        )))
+        expected = tokens(
+            prefix + "struct micros_bootstrap_control_state bootstrap = {0}; "
+            "struct micros_bootstrap_binding *binding = &bootstrap.bindings[0]; "
+            "struct micros_bootstrap_manifest_entry *entry = &bootstrap.manifest.entries[0]; "
+            "struct micros_bootstrap_runtime_entry *transition = &bootstrap.transitions.entries[0]; "
+            "struct micros_endpoint_registry registry = {0}; struct micros_kernel_objects objects = {0}; "
+            "struct micros_syscall_context context = { .objects = &objects, .current = thread, .process = process }; "
+            "struct micros_tty_handoff mapped; struct micros_tty_handoff begin; struct micros_tty_handoff released; "
+            "struct micros_tty_handoff committed; struct micros_tty_handoff claimed; struct micros_tty_handoff completed; "
+            "struct micros_tty_handoff ready; struct micros_tty_device_authority authority; "
+            "struct micros_tty_device_authority authority_sentinel; "
+            "struct micros_tty_handoff_runtime_state unexpected_state = { .process = {4, 7}, .thread = {6, 9} }; "
+            "struct micros_tty_handoff_runtime_state *runtime; "
+            "*binding = original_binding(process, thread, endpoint, root); fixture->runtime_process_handle = process; "
+            "bootstrap.plan.console_service_id = 0; EXPECT_TRUE(original_absent_and_unexpected(&unexpected_state)); "
+            "bootstrap.plan.console_service_id = TTY; EXPECT_TRUE(original_prepare_bind(&bootstrap)); "
+            "runtime = original_authoritative(); EXPECT_TRUE(original_begin_deadline150(&begin)); "
+            "EXPECT_TRUE(original_map_authority(&authority, process, root)); "
+            "memset(&authority_sentinel, 0xa5, sizeof(authority_sentinel)); authority = authority_sentinel; "
+            "EXPECT_TRUE(original_preserve_sentinel(&authority, &authority_sentinel)); "
+            "fixture->runtime_thread.scheduler_assigned = true; EXPECT_TRUE(original_release_then_commit(&released, &committed)); "
+            "EXPECT_TRUE(original_claim_then_ready149(&claimed, &ready)); transition->ready_deadline = 0; original_commit_ready(&ready); "
+            "EXPECT_TRUE(original_complete_then_source_only(&completed)); EXPECT_TRUE(original_terminal_panic(runtime)); return true; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in LIFECYCLE_FIELDS)
+        self.assertEqual(expected, lifecycle_body_tokens(caller, bodies, declarations))
+        for changed in (
+            caller.replace("struct tty_handoff_runtime_case work;", "struct tty_handoff_runtime_case work = {0};"),
+            caller.replace("fixture, &work, process, root)", "other, &work, process, root)"),
+            caller.replace("fixture, &work, process, root)", "fixture, &copy, process, root)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                lifecycle_body_tokens(changed, bodies, declarations)
+        changed = dict(bodies)
+        name = LIFECYCLE_PHASES[2][0]
+        changed[name] = changed[name].replace("EXPECT_TRUE", "return false; EXPECT_TRUE", 1)
+        with self.assertRaises(AssertionError):
+            lifecycle_body_tokens(caller, changed, declarations)
+        with self.assertRaises(AssertionError):
+            lifecycle_body_tokens(caller, bodies, (tokens("uint64_t bootstrap;"), *declarations[1:]))
+        self.assertNotEqual(expected, lifecycle_body_tokens(caller.replace("&work.bootstrap.bindings[0]", "&copied.bindings[0]"), bodies, declarations))
+        changed[name] = bodies[name].replace("0xa5", "0")
+        self.assertNotEqual(expected, lifecycle_body_tokens(caller, changed, declarations))
+
     def test_device_classification_has_one_typed_exclusion_phase_after_exact_range_observations(self):
         records = function_records(source(HANDOFF_SOURCES[2]))
         self.assertIn(DEVICE_PHASE, set(records))
@@ -1546,7 +1722,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             set(REQUIRED_TASKS) - {
                 (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
-                (4, "test_device_leaf_classification"),
+                (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
             },
             set(FUNCTION_TASK_MIGRATION),
         )

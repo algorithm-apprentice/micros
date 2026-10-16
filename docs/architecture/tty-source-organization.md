@@ -612,3 +612,13 @@ alias, foreign, physical-substitution, managed and out-of-phase sentinel
 observations retain their order. Full original-body/type restoration and
 independent fixtures precede the outline; actual native cases pass.
 There are 32 original moves and four semantic dispositions remaining.
+
+The native runtime case now has a 50-line root and six bounded phases:
+record seeding, initial authority, begin/mapping, release/commit,
+claim/readiness and completion/corruption/panic. Four original constants
+remain in root; caller work has exactly eighteen original typed locals and
+eight original initializers, with binding/entry/transition/context pointers
+still addressing their actual enclosing objects. The sole fixture borrow,
+deadline 150, before/after sentinel and every original failure/commit order
+reconstruct from actual source before C publication. All current native
+cases pass. There are 32 original moves and three semantic dispositions left.
