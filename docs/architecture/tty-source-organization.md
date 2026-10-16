@@ -595,3 +595,11 @@ final reference-output observations follow it. Complete original-body
 restoration and independent scope/order/failure fixtures precede C changes.
 Current model trace is unchanged. There are 39 moves and five semantic
 dispositions remaining.
+
+All seven native handoff moves now have their four exact owners. The fixture
+leaf groups only the original five static objects, with a non-resetting
+getter. Only the three stateful resolver doubles and runtime case borrow it;
+pure doubles and the device case gain no ambient state. All sixteen complete
+original bodies/types and the exact failure macro reconstruct, and actual
+native device/lifecycle/deadline/panic cases pass. There are 32 original
+moves, three declarations-only owners and five semantic dispositions remaining.

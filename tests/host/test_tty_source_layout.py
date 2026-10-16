@@ -154,7 +154,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3)
+    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3, 4)
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
@@ -219,6 +219,21 @@ MODEL_VALIDATE_FIELDS = (
     ("size_t index;", False),
 )
 MODEL_VALIDATE_PARAMETERS = "struct tty_model *model, struct tty_model_validation_work *work"
+HANDOFF_FIXTURE_TAG = "tty_handoff_test_fixture"
+HANDOFF_FIXTURE_GETTER = "tty_handoff_test_fixture"
+HANDOFF_FIXTURE_FIELDS = (
+    "struct micros_process runtime_process;",
+    "struct micros_thread runtime_thread;",
+    "struct micros_endpoint_record runtime_endpoint;",
+    "struct micros_process_handle runtime_process_handle;",
+    "struct micros_thread_handle runtime_thread_handle;",
+)
+HANDOFF_CONTEXT_ROOTS = (
+    "micros_process_resolve", "micros_thread_resolve", "micros_endpoint_resolve_internal",
+    "test_runtime_lifecycle_validation",
+)
+HANDOFF_PRIVATE_EXPORTS = ("test_device_leaf_classification", "test_runtime_lifecycle_validation")
+HANDOFF_MACRO_DIGEST = "dc1fbf95f12b7896694addb93aa8603ed20b7bd57022a9d01f7b8c7342234fb6"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -617,6 +632,11 @@ def normal_names(family):
             },
             **MODEL_READONLY_NAMES,
         }
+    if family == 4:
+        return {
+            "tty_handoff_test_" + (name[5:] if name.startswith("test_") else name): name
+            for names in ORIGINAL_FUNCTIONS[4].values() for name in names if not name.startswith("micros_")
+        }
     return {}
 
 
@@ -625,6 +645,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 4 and spelling == HANDOFF_FIXTURE_GETTER:
+                if path != HANDOFF_SOURCES[1]:
+                    raise AssertionError("native handoff fixture getter has its sole original-family owner")
+                continue
             if family == 3 and spelling == MODEL_VALIDATE_PHASE:
                 if path != MODEL_SOURCES[6]:
                     raise AssertionError("resident comparisons have their exact private model validation owner")
@@ -667,6 +691,10 @@ def original_signature_tokens(family, original, record):
         if signature[:1] == ("static",):
             raise AssertionError("only required model cross-owner helpers gain complete private declarations")
         signature = ("static", *signature)
+    if family == 4 and original in HANDOFF_PRIVATE_EXPORTS and record.name.startswith("tty_handoff_test_"):
+        if signature[:1] == ("static",):
+            raise AssertionError("only the two cross-owner native handoff cases gain private declarations")
+        signature = ("static", *signature)
     return signature
 
 
@@ -682,6 +710,8 @@ def original_body_digest(family, record):
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
+    if family == 4 and (4, "test_runtime_lifecycle_validation") not in SYMBOL_OWNER_MIGRATION:
+        body = handoff_fixture_body_tokens(names.get(record.name, record.name), body)
     return digest_tokens(body)
 
 
@@ -820,6 +850,15 @@ def model_validation_actual_body_tokens(record, owner=None):
     return model_validation_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
+def handoff_fixture_body_tokens(original, body):
+    from tests.host.test_grant_data_plane_source_layout import fixture_body_tokens, declaration_name
+
+    return fixture_body_tokens(
+        original, body, HANDOFF_FIXTURE_TAG, HANDOFF_FIXTURE_GETTER, HANDOFF_CONTEXT_ROOTS, {},
+        tuple(declaration_name(tokens(field)) for field in HANDOFF_FIXTURE_FIELDS),
+    )
+
+
 def source_set_block(name, paths):
     return "set(\n    " + name + "\n" + "".join("    " + path + "\n" for path in paths) + ")"
 
@@ -891,6 +930,67 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_handoff_originals_have_exact_task_owners_and_sole_five_field_fixture(self):
+        for owner, names in ORIGINAL_FUNCTIONS[4].items():
+            records = function_records(source(HANDOFF_SOURCES[owner]))
+            for name in names:
+                expected = name if name.startswith("micros_") else "tty_handoff_test_" + (name[5:] if name.startswith("test_") else name)
+                self.assertIn(expected, set(records), HANDOFF_SOURCES[owner])
+        header = source(PRIVATE_HEADERS[3])
+        expected = tokens("struct " + HANDOFF_FIXTURE_TAG + " {" + "".join(HANDOFF_FIXTURE_FIELDS) + "};")
+        self.assertIn(" ".join(expected), " ".join(tokens(header)))
+        fixture = source(HANDOFF_SOURCES[1])
+        self.assertEqual(("static struct tty_handoff_test_fixture fixture_state;",), tuple(file_scope_objects(fixture)))
+        self.assertEqual(tokens("{ return &fixture_state; }"), tokens(
+            "{" + function_records(fixture)[HANDOFF_FIXTURE_GETTER].body + "}",
+        ))
+        for path in (HANDOFF_SOURCES[0], *HANDOFF_SOURCES[2:]):
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+
+    def test_handoff_macro_and_acyclic_private_directions_remain_original(self):
+        header = source(PRIVATE_HEADERS[3])
+        start = header.index("#define EXPECT_TRUE")
+        self.assertEqual(HANDOFF_MACRO_DIGEST, digest_tokens(tokens(header[start:header.index("\n\n", start)])))
+        records = {
+            name: (owner, record) for owner, path in enumerate(HANDOFF_SOURCES)
+            for name, record in function_records(source(path)).items()
+        }
+        allowed = {0: {2, 3}, 1: set(), 2: set(), 3: {1}}
+        for name, (owner, record) in records.items():
+            destinations = {
+                records[word][0] for word in tokens(record.body)
+                if word in records and records[word][0] != owner
+            }
+            self.assertLessEqual(destinations, allowed[owner], name)
+
+    def test_handoff_fixture_inverse_preserves_original_mock_family_addresses_and_pure_doubles(self):
+        caller = (
+            "{ struct tty_handoff_test_fixture *fixture = tty_handoff_test_fixture(); "
+            "const struct micros_process_handle process = {3, 7}; "
+            "fixture->runtime_process_handle = process; "
+            "EXPECT_TRUE(original_observe(&fixture->runtime_process, fixture->runtime_thread_handle)); return true; }"
+        )
+        expected = tokens(
+            "{ const struct micros_process_handle process = {3, 7}; runtime_process_handle = process; "
+            "EXPECT_TRUE(original_observe(&runtime_process, runtime_thread_handle)); return true; }"
+        )
+        self.assertEqual(expected, handoff_fixture_body_tokens("test_runtime_lifecycle_validation", tokens(caller)))
+        for changed in (
+            caller.replace("tty_handoff_test_fixture()", "reset_fixture()"),
+            caller.replace("fixture->runtime_process_handle", "fixture->unknown_field"),
+            caller.replace("&fixture->runtime_process", "&other.fixture->runtime_process"),
+            caller.replace("return true;", "retain(fixture); return true;"),
+            caller.replace("return true;", "copy = *fixture; return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                handoff_fixture_body_tokens("test_runtime_lifecycle_validation", tokens(changed))
+        pure = tokens("{ return registry != NULL && profile_id == TTY && operation == 3; }")
+        self.assertEqual(pure, handoff_fixture_body_tokens("micros_privilege_profile_allows_kernel_operation", pure))
+        signature = "bool tty_handoff_test_device_leaf_classification(void) { return true; }"
+        self.assertEqual(tokens("static bool test_device_leaf_classification(void)"), original_signature_tokens(
+            4, "test_device_leaf_classification", function_records(signature)["tty_handoff_test_device_leaf_classification"],
+        ))
+
     def test_model_validation_has_one_typed_resident_comparison_phase_and_original_root_observations(self):
         records = function_records(source(MODEL_SOURCES[6]))
         self.assertIn(MODEL_VALIDATE_PHASE, set(records))
@@ -1335,7 +1435,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(REQUIRED_TASKS))
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
-        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3)})
+        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2, 3, 4)})
         self.assertEqual(
             set(REQUIRED_TASKS) - {(0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate")},
             set(FUNCTION_TASK_MIGRATION),
