@@ -444,3 +444,11 @@ inverses pass. Current evidence is 189 focused checks and real object-model
 and IPC guests at their original budgets. Five production migration
 stubs remain; seventeen original functions still reside in the facade,
 with 138 original node/method/data moves and three long tasks pending.
+
+The diagnostic, symbol/argv and process/serial owners are now complete.
+Their original bodies, including the cohesive 77-line serial loop, restore
+exactly before current pin updates. The 190 focused checks, real
+symbol-resolved trap-panic guest and serial-triggered TTY guest pass with
+unchanged budgets. Only outcome, arguments and CLI remain migration stubs:
+seven original functions, 85 methods and 36 fixtures (128 moves), plus the
+three specified long outlines, remain.

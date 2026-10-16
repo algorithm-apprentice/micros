@@ -74,30 +74,7 @@ from tools.qemu_smoke_platform import _has_complete_fdt_events
 from tools.qemu_smoke_records import _split_output_records
 
 
-def _has_complete_panic_report(output):
-    output_lines, terminated = _split_output_records(output)
-
-    indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith(PANIC_MARKER)
-    ]
-    if len(indices) != len(PANIC_CORE_PATTERNS):
-        return False
-    if indices != list(range(indices[0], indices[0] + len(indices))):
-        return False
-    if not all(terminated[index] for index in indices):
-        return False
-
-    for pattern, index in zip(PANIC_CORE_PATTERNS, indices):
-        match = pattern.fullmatch(output_lines[index])
-        if match is None:
-            return False
-        if pattern is PANIC_CORE_PATTERNS[2]:
-            source_path = Path(match.group(1))
-            if source_path.is_absolute() or ".." in source_path.parts:
-                return False
-    return True
+from tools.qemu_smoke_faults import _has_complete_panic_report
 
 
 from tools.qemu_smoke_platform import _has_complete_trap_ready
@@ -178,149 +155,19 @@ from tools.qemu_smoke_objects import _has_complete_object_model_test_report
 from tools.qemu_smoke_objects import _has_complete_nested_trap_test_report
 
 
-def _has_complete_trap_context(
-    output,
-    expected_sepc=None,
-    expected_origin=None,
-    expected_scause=None,
-    expected_stval=None,
-):
-    output_lines, terminated = _split_output_records(output)
-    panic_indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith(PANIC_MARKER)
-    ]
-    context_indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith("MICROS_TRAP_CONTEXT")
-    ]
-    if (
-        len(panic_indices) != len(PANIC_CORE_PATTERNS)
-        or len(context_indices) != 1
-    ):
-        return False
-
-    context_index = context_indices[0]
-    match = TRAP_CONTEXT_PATTERN.fullmatch(output_lines[context_index])
-    if (
-        context_index != panic_indices[-1] + 1
-        or not terminated[context_index]
-        or match is None
-        or TRAP_TEST_PASS in output_lines
-        or any(
-            line.startswith(SCHEDULER_TEST_MARKER)
-            for line in output_lines
-        )
-    ):
-        return False
-    return (
-        (expected_origin is None or match.group(1) == expected_origin)
-        and (
-            expected_scause is None
-            or int(match.group(2), 16) == expected_scause
-        )
-        and (
-            expected_stval is None
-            or int(match.group(3), 16) == expected_stval
-        )
-        and (
-            expected_sepc is None
-            or int(match.group(4), 16) == expected_sepc
-        )
-    )
+from tools.qemu_smoke_faults import _has_complete_trap_context
 
 
-def _has_vm_self_fault(
-    output,
-    *,
-    expected_sepc,
-    expected_scause,
-    expected_stval,
-    expected_ownership,
-):
-    output_lines, terminated = _split_output_records(output)
-    indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith("MICROS_VM_SELF_FAULT")
-    ]
-    if len(indices) != 1 or not terminated[indices[0]]:
-        return False
-    match = VM_SELF_FAULT_PATTERN.fullmatch(output_lines[indices[0]])
-    return (
-        match is not None
-        and int(match.group(5), 16) == expected_scause
-        and int(match.group(6), 16) == expected_stval
-        and int(match.group(7), 16) == expected_sepc
-        and match.group(8) == expected_ownership
-    )
+from tools.qemu_smoke_faults import _has_vm_self_fault
 
 
-def _has_complete_scheduler_invalid_context(output, expected_state):
-    output_lines, terminated = _split_output_records(output)
-    expected = (
-        "MICROS_SCHEDULER_INVALID_CONTEXT "
-        f"state={expected_state} "
-        "ownership=preserved accounting=kernel"
-    )
-    diagnostic_indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith("MICROS_SCHEDULER_INVALID_CONTEXT")
-    ]
-    panic_indices = [
-        index
-        for index, line in enumerate(output_lines)
-        if line.startswith(PANIC_MARKER)
-    ]
-    return (
-        expected_state in ("outgoing", "next")
-        and len(diagnostic_indices) == 1
-        and output_lines[diagnostic_indices[0]] == expected
-        and terminated[diagnostic_indices[0]]
-        and len(panic_indices) == len(PANIC_CORE_PATTERNS)
-        and diagnostic_indices[0] < panic_indices[0]
-        and not any(
-            line.startswith(SCHEDULER_TEST_MARKER)
-            for line in output_lines
-        )
-    )
+from tools.qemu_smoke_faults import _has_complete_scheduler_invalid_context
 
 
-def parse_nm_symbol_address(output, symbol):
-    addresses = []
-
-    for line in output.splitlines():
-        fields = line.split()
-        if len(fields) < 3 or fields[-1] != symbol:
-            continue
-        try:
-            addresses.append(int(fields[0], 16))
-        except ValueError:
-            continue
-    if len(addresses) != 1:
-        raise ValueError(
-            f"expected exactly one defined symbol {symbol!r}, "
-            f"found {len(addresses)}"
-        )
-    return addresses[0]
+from tools.qemu_smoke_command import parse_nm_symbol_address
 
 
-def resolve_symbol_address(nm, kernel, symbol):
-    completed = subprocess.run(
-        [nm, "-n", "--defined-only", str(kernel)],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.strip() or "no diagnostic"
-        raise RuntimeError(f"symbol inspection failed: {detail}")
-    return parse_nm_symbol_address(completed.stdout, symbol)
+from tools.qemu_smoke_command import resolve_symbol_address
 
 
 def _has_required_output(output_lines, markers, patterns):
@@ -600,147 +447,16 @@ def classify_smoke(
 from tools.qemu_smoke_command import build_qemu_command
 
 
-def _decode_output(output):
-    if output is None:
-        return ""
-    if isinstance(output, bytes):
-        return output.decode("utf-8", errors="replace")
-    return output
+from tools.qemu_smoke_execution import _decode_output
 
 
-def _serial_trigger_observed(output, trigger):
-    output_lines, terminated = _split_output_records(
-        _decode_output(output)
-    )
-    return any(
-        line == trigger and is_terminated
-        for line, is_terminated in zip(output_lines, terminated)
-    )
+from tools.qemu_smoke_execution import _serial_trigger_observed
 
 
-def _run_qemu_with_serial_input(
-    command,
-    timeout_seconds,
-    serial_input_trigger,
-    serial_input,
-):
-    process = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=False,
-    )
-    if process.stdin is None or process.stdout is None:
-        raise RuntimeError("failed to open QEMU serial pipes")
-
-    selector = selectors.DefaultSelector()
-    selector.register(process.stdout, selectors.EVENT_READ)
-    output = bytearray()
-    serial_input_sent = False
-    stdout_open = True
-    deadline = time.monotonic() + timeout_seconds
-
-    try:
-        while process.poll() is None or stdout_open:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                process.kill()
-                trailing_output, _ = process.communicate()
-                if trailing_output:
-                    output.extend(trailing_output)
-                return QemuResult(
-                    output=_decode_output(bytes(output)),
-                    return_code=None,
-                    timed_out=True,
-                    serial_input_sent=serial_input_sent,
-                )
-
-            events = selector.select(remaining)
-            if not events:
-                continue
-            for key, _ in events:
-                chunk = os.read(key.fd, 4096)
-                if not chunk:
-                    selector.unregister(process.stdout)
-                    stdout_open = False
-                    continue
-                output.extend(chunk)
-                if (
-                    not serial_input_sent
-                    and _serial_trigger_observed(
-                        bytes(output),
-                        serial_input_trigger,
-                    )
-                ):
-                    try:
-                        written = process.stdin.write(serial_input)
-                        process.stdin.flush()
-                    except BrokenPipeError:
-                        written = 0
-                    serial_input_sent = written == len(serial_input)
-    finally:
-        selector.close()
-        if process.stdin is not None:
-            try:
-                process.stdin.close()
-            except BrokenPipeError:
-                pass
-        if process.stdout is not None:
-            process.stdout.close()
-
-    return QemuResult(
-        output=_decode_output(bytes(output)),
-        return_code=process.returncode,
-        timed_out=False,
-        serial_input_sent=serial_input_sent,
-    )
+from tools.qemu_smoke_execution import _run_qemu_with_serial_input
 
 
-def run_qemu(
-    command,
-    timeout_seconds,
-    serial_input_trigger=None,
-    serial_input=None,
-):
-    if (serial_input_trigger is None) != (serial_input is None):
-        raise ValueError(
-            "serial input trigger and payload must be provided together"
-        )
-    if serial_input_trigger is not None:
-        if not serial_input_trigger:
-            raise ValueError("serial input trigger must not be empty")
-        if not serial_input:
-            raise ValueError("serial input payload must not be empty")
-        return _run_qemu_with_serial_input(
-            command,
-            timeout_seconds,
-            serial_input_trigger,
-            serial_input,
-        )
-
-    try:
-        completed = subprocess.run(
-            command,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as error:
-        return QemuResult(
-            output=_decode_output(error.stdout),
-            return_code=None,
-            timed_out=True,
-        )
-
-    return QemuResult(
-        output=completed.stdout,
-        return_code=completed.returncode,
-        timed_out=False,
-    )
+from tools.qemu_smoke_execution import run_qemu
 
 
 def print_tap_result(

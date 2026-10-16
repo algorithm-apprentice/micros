@@ -870,6 +870,9 @@ COMPLETED_SOURCE_NODES = {
     "FunctionDef:build_qemu_command", "FunctionDef:_split_output_records",
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[2]),
     *("FunctionDef:" + name for name in FUNCTION_OWNERS[3]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[4]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[5]),
+    *("FunctionDef:" + name for name in FUNCTION_OWNERS[6]),
     *("ClassDef:" + name for name in ORIGINAL_CLASSES),
     *("Assign:" + name for name in ORIGINAL_GLOBAL_NAMES),
 }
@@ -1131,6 +1134,14 @@ def context_declaration_projection(text):
 
 
 class QemuRunnerSourceLayoutTest(unittest.TestCase):
+    def test_bounded_diagnostic_command_and_execution_owners_are_complete(self):
+        for owner in (4, 5, 6):
+            with self.subTest(owner=PRODUCTION_PATHS[owner]):
+                self.assertEqual(set(FUNCTION_OWNERS[owner]), {
+                    node.name for node in ast.parse(source(PRODUCTION_PATHS[owner])).body
+                    if isinstance(node, ast.FunctionDef)
+                })
+
     def test_object_and_ipc_reports_have_their_complete_original_owner(self):
         self.assertEqual(set(FUNCTION_OWNERS[3]), {
             node.name for node in ast.parse(source(PRODUCTION_PATHS[3])).body if isinstance(node, ast.FunctionDef)
