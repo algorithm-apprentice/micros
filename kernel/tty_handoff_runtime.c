@@ -1,4 +1,4 @@
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty_handoff_runtime_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -9,27 +9,6 @@
 static struct micros_tty_handoff_runtime_state tty_handoff_state;
 static const struct micros_bootstrap_control_state
     *tty_bootstrap_state;
-
-static void clear_bytes(void *storage, size_t size)
-{
-    uint8_t *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
-}
-
-static void copy_bytes(void *destination, const void *source, size_t size)
-{
-    uint8_t *output = destination;
-    const uint8_t *input = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        output[index] = input[index];
-    }
-}
 
 static bool process_handles_equal(
     struct micros_process_handle left,
@@ -327,7 +306,7 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_prepare(
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
 
-    clear_bytes(&candidate, sizeof(candidate));
+    tty_handoff_clear_bytes(&candidate, sizeof(candidate));
     candidate.service_id = binding->service_id;
     candidate.endpoint = binding->endpoint;
     candidate.image_id = entry->image_id;
@@ -342,7 +321,7 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_prepare(
     ) {
         return MICROS_TTY_HANDOFF_ERROR_INVARIANT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state,
         &candidate,
         sizeof(tty_handoff_state)
@@ -384,7 +363,7 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_reset(void)
     ) {
         return MICROS_TTY_HANDOFF_ERROR_STATE;
     }
-    clear_bytes(&tty_handoff_state, sizeof(tty_handoff_state));
+    tty_handoff_clear_bytes(&tty_handoff_state, sizeof(tty_handoff_state));
     tty_bootstrap_state = NULL;
     return MICROS_TTY_HANDOFF_OK;
 }
@@ -421,7 +400,7 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_begin(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         &candidate,
         sizeof(tty_handoff_state.handoff)
@@ -442,7 +421,7 @@ micros_tty_handoff_runtime_prepare_begin(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -451,7 +430,7 @@ micros_tty_handoff_runtime_prepare_begin(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -486,7 +465,7 @@ micros_tty_handoff_runtime_prepare_mapped(
     if (candidate == NULL) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -495,7 +474,7 @@ micros_tty_handoff_runtime_prepare_mapped(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -503,7 +482,7 @@ void micros_tty_handoff_runtime_commit_mapped_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -521,7 +500,7 @@ micros_tty_handoff_runtime_prepare_release(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -530,7 +509,7 @@ micros_tty_handoff_runtime_prepare_release(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -538,7 +517,7 @@ void micros_tty_handoff_runtime_commit_release_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -556,7 +535,7 @@ micros_tty_handoff_runtime_prepare_commit(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -565,7 +544,7 @@ micros_tty_handoff_runtime_prepare_commit(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -573,7 +552,7 @@ void micros_tty_handoff_runtime_commit_console_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -592,7 +571,7 @@ micros_tty_handoff_runtime_prepare_claim(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -601,7 +580,7 @@ micros_tty_handoff_runtime_prepare_claim(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -609,7 +588,7 @@ void micros_tty_handoff_runtime_commit_claim_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -628,7 +607,7 @@ micros_tty_handoff_runtime_prepare_complete(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -637,7 +616,7 @@ micros_tty_handoff_runtime_prepare_complete(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -645,7 +624,7 @@ void micros_tty_handoff_runtime_commit_complete_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -664,7 +643,7 @@ micros_tty_handoff_runtime_prepare_ready(
     if (candidate == NULL || tty_handoff_state.service_id == 0) {
         return MICROS_TTY_HANDOFF_ERROR_ARGUMENT;
     }
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &local,
         &tty_handoff_state.handoff,
         sizeof(local)
@@ -673,7 +652,7 @@ micros_tty_handoff_runtime_prepare_ready(
     if (error != MICROS_TTY_HANDOFF_OK) {
         return error;
     }
-    copy_bytes(candidate, &local, sizeof(local));
+    tty_handoff_copy_bytes(candidate, &local, sizeof(local));
     return MICROS_TTY_HANDOFF_OK;
 }
 
@@ -681,7 +660,7 @@ void micros_tty_handoff_runtime_commit_ready_prevalidated(
     const struct micros_tty_handoff *candidate
 )
 {
-    copy_bytes(
+    tty_handoff_copy_bytes(
         &tty_handoff_state.handoff,
         candidate,
         sizeof(tty_handoff_state.handoff)
@@ -778,7 +757,7 @@ micros_tty_handoff_runtime_device_authority(
         .console_phase =
             tty_handoff_state.handoff.console_phase,
     };
-    copy_bytes(authority, &candidate, sizeof(candidate));
+    tty_handoff_copy_bytes(authority, &candidate, sizeof(candidate));
     return MICROS_TTY_DEVICE_AUTHORITY_ACTIVE;
 }
 

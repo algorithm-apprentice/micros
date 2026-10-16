@@ -1814,8 +1814,10 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
             expected.update(object_alias_rows())
             from tests.host.test_grant_data_plane_source_layout import alias_rows as grant_alias_rows
             expected.update(grant_alias_rows())
+            from tests.host.test_tty_source_layout import alias_rows as tty_alias_rows
+            expected.update(tty_alias_rows())
             selected = {old: aliases for old, aliases in value if old in expected}
-            if selected != expected or sum(old in expected for old, _ in value) != 21:
+            if selected != expected or sum(old in expected for old, _ in value) != 26:
                 raise AssertionError("missing/duplicate/wrong same-owner classification aliases")
             node.value.elts = [
                 item for item in node.value.elts if ast.literal_eval(item)[0] not in expected
@@ -1828,6 +1830,7 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
                 "tests/host/test_endpoint_source_layout.py",
                 "tests/host/test_kernel_object_source_layout.py", "tests/host/c_source_records.py",
                 "tests/host/test_grant_data_plane_source_layout.py",
+                "tests/host/test_tty_source_layout.py",
             )
             if any(value.count(path) != 1 for path in additions):
                 raise AssertionError("the structural gate must be explicitly host-unit-only once")
@@ -3070,6 +3073,7 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         from tests.host.test_ramfs_source_layout import alias_rows as ramfs_alias_rows
         from tests.host.test_kernel_object_source_layout import alias_rows as object_alias_rows
         from tests.host.test_grant_data_plane_source_layout import alias_rows as grant_alias_rows
+        from tests.host.test_tty_source_layout import alias_rows as tty_alias_rows
 
         cmake = "\n".join(
             f"set({name} {' '.join(paths)})\nconsumer(${{{name}}})"
@@ -3086,14 +3090,14 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
         aliases = tuple(
             (paths[0], (*paths[1:], FAMILY_HEADERS[family]))
             for family, paths in SOURCE_SETS.items()
-        ) + ramfs_alias_rows() + endpoint_alias_rows() + object_alias_rows() + grant_alias_rows()
+        ) + ramfs_alias_rows() + endpoint_alias_rows() + object_alias_rows() + grant_alias_rows() + tty_alias_rows()
         planner = (
             f"PATH_CLASSIFICATION_EQUIVALENTS = {aliases!r}\n"
             f"HOST_UNIT_ONLY_INPUTS = ({STRUCTURAL_TEST_PATH!r}, "
             "'tests/host/test_ramfs_source_layout.py', "
             "'tests/host/test_endpoint_source_layout.py', "
             "'tests/host/test_kernel_object_source_layout.py', 'tests/host/c_source_records.py', "
-            "'tests/host/test_grant_data_plane_source_layout.py')\n"
+            "'tests/host/test_grant_data_plane_source_layout.py', 'tests/host/test_tty_source_layout.py')\n"
         )
         planner_ast_without_new_paths(planner)
         for changed in (
@@ -3108,6 +3112,8 @@ class TrapSyscallFailClosedMutationTest(MetaFixtureState, unittest.TestCase):
             planner.replace("tests/host/c_source_records.py", "tests/host/other_records.py"),
             planner.replace("kernel/grant_copy_range.c", "kernel/unreviewed_grant_range.c"),
             planner.replace("tests/host/test_grant_data_plane_source_layout.py", "tests/host/other_grant.py"),
+            planner.replace("kernel/tty_handoff_runtime_state.c", "kernel/unreviewed_tty_state.c"),
+            planner.replace("tests/host/test_tty_source_layout.py", "tests/host/other_tty.py"),
         ):
             with self.assertRaises(AssertionError):
                 planner_ast_without_new_paths(changed)

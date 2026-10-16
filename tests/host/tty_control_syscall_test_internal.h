@@ -1,0 +1,6 @@
+#ifndef MICROS_TESTS_HOST_TTY_CONTROL_SYSCALL_TEST_INTERNAL_H
+#define MICROS_TESTS_HOST_TTY_CONTROL_SYSCALL_TEST_INTERNAL_H
+
+#include "kernel/tty_control_syscall.h"
+
+#endif

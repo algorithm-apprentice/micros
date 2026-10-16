@@ -5,12 +5,15 @@
 This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
 Independent complete read-only design review is clean and design #141 is
-separately merged. Implementation #142 is blocked and abandoned after the
-model graph omission described by Accepted
+separately merged. Original implementation #142 was blocked and abandoned
+after the model graph omission described by Accepted
 [ADR-0071](../adr/0071-tty-model-validation-reference-dependency.md).
-Only that documentation-only corrective design is active; implementation
-must restart from current `main` after its separate merge. Complete
-independent corrective-design review is clean.
+Corrective design #143 is independently reviewed and separately merged as
+`caa7573b89ef7501abf82a1ad89f3237c003a237`; its actual squash tree equals
+the reviewed tree and its obsolete branches are deleted. Implementation
+has restarted test-first on a fresh branch from that current `main`.
+Abandoned patches are reference only, not wholesale cherry-picked or
+accepted as current validation evidence.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
@@ -291,7 +294,7 @@ control root -> fixture
 ```
 
 The validation -> reference edge is the narrowly Accepted ADR-0071
-correction, effective only after its separate merge.
+correction, separately merged as #143.
 It preserves the original final `reference_output_pending` call after the
 CR/LF comparison. The predicate remains in the reference owner with its
 existing required declaration; it does not call back into validation.
@@ -517,3 +520,27 @@ ownership, readiness, deadline, timer, interrupt, model, topology or output
 change. No new public contract, allocation, concurrency, recovery, worker,
 retry loop, rollback, generalized framework, path migration, QEMU tooling,
 production application startup or shell work is included.
+
+## Current implementation progress
+
+The restarted foundation first reproduced structural Red with both byte
+primitives still in the original runtime facade. Independent exact recipe
+and metadata inverse fixtures passed before reintroducing the bounded
+source slice. The immutable reviewed `ac94a211` inventories remain the
+source of all 156 complete bodies/seven signature families, original
+orders/storage, seven long C tasks, three Python ASTs/data, 37 stable
+neighbors, complete recipe and shared/tool facts.
+
+Only the two complete byte primitives move to the state leaf in this slice;
+the original authoritative objects still remain in the facade. All 26 paths,
+five private headers/source sets and eight consumer operands are wired once,
+with eighteen future C units explicitly declarations-only. Five family
+aliases and one host-only gate input preserve all four validation dimensions.
+The complete recipe inverse restores `4e370ba5...` before the sole current
+digest `730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab`.
+
+Current narrow evidence is newly executed: 227 source/tool contract tests,
+all four native TTY consumers with the original model seed/steps/trace,
+and both actual UART and TTY guests pass. There are 114 original moves and
+all eight semantic dispositions remaining. Complete current author/reuse
+and independent implementation review remain final barriers.
