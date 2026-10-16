@@ -155,7 +155,6 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
-    (1, "micros_uart_console_runtime_run_self_test"),
     (7, "render_fixture"),
 )
 RUNTIME_CONTEXT_TAG = "tty_handoff_context"
@@ -337,6 +336,26 @@ AUTHORITY_FIELDS = (
     ("struct micros_privilege_profile profile;", True),
 )
 AUTHORITY_PARAMETERS = "struct tty_control_authority_case *work, const struct micros_thread_handle thread_handle"
+UART_WORK_TAG = "uart_console_test_work"
+UART_FIELDS = (
+    ("volatile uint8_t *registers;", "value"),
+    ("const struct micros_tty_handoff_runtime_state *state;", False),
+    ("struct micros_tty_handoff candidate;", False),
+    ("struct micros_plic_tty_enable_plan plic_plan;", False),
+    ("bool timer_was_enabled;", False),
+    ("bool irq_was_enabled;", False),
+    ("uint32_t source;", "value"),
+    ("uint32_t attempt;", False),
+)
+UART_PHASES = (
+    "uart_console_test_prepare_handoff",
+    "uart_console_test_quiesce_console",
+    "uart_console_test_publish_irq_route",
+    "uart_console_test_claim_and_retain",
+    "uart_console_test_complete_and_seize",
+)
+UART_PARAMETERS = "uintptr_t hart_id, struct uart_console_test_work *work"
+UART_PREFIX_DIGEST = "09e29d522c8d3da34376de686274b2e5a33bd0e3fbe15abed752eea86442c27f"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -754,6 +773,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 1 and spelling in UART_PHASES:
+                if path != FAMILY_PATHS[1][0]:
+                    raise AssertionError("real UART hardware phases retain their original component owner")
+                continue
             if family == 6 and spelling == AUTHORITY_PHASE:
                 if path != FAMILY_PATHS[6][0]:
                     raise AssertionError("native authority rejections retain their original case owner")
@@ -844,6 +867,8 @@ def original_body_digest(family, record):
         body = lifecycle_actual_body_tokens(record)
     if family == 6 and record.name == "test_syscall_authority" and (6, "test_syscall_authority") not in FUNCTION_TASK_MIGRATION:
         body = authority_actual_body_tokens(record)
+    if family == 1 and record.name == "micros_uart_console_runtime_run_self_test" and (1, record.name) not in FUNCTION_TASK_MIGRATION:
+        body = uart_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
@@ -1095,6 +1120,33 @@ def authority_actual_body_tokens(record, owner=None):
     return authority_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
+def uart_body_tokens(caller, phases, declarations):
+    from tests.host.test_grant_data_plane_source_layout import bound_body_tokens, restore_automatic_work_tokens
+
+    body = tokens(caller)
+    for name in UART_PHASES:
+        phase = phases[name]
+        if set(tokens(phase)) & {"return", "goto"}:
+            raise AssertionError("real UART phases retain original panic and loop scopes without early return")
+        body = bound_body_tokens(body, name + "(hart_id, &work);", phase)
+    return restore_automatic_work_tokens(body, UART_WORK_TAG, UART_FIELDS, declarations)
+
+
+def uart_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(FAMILY_PATHS[1][0]) if owner is None else owner
+    declarations = work_declarations(owner, UART_WORK_TAG, UART_FIELDS)
+    records = function_records(owner)
+    phases = {}
+    for name in UART_PHASES:
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens("static void " + name + "(" + UART_PARAMETERS + ")"):
+            raise AssertionError("real hardware phases bind exact original hart identifier and typed caller automatic work")
+        phases[name] = "{" + phase.body + "}"
+    return uart_body_tokens("{" + record.body + "}", phases, declarations)
+
+
 def function_references(body, names):
     words = tokens(body)
     return {
@@ -1174,6 +1226,87 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_real_uart_has_exact_typed_hardware_phases_and_retains_original_root_reporting(self):
+        owner = source(FAMILY_PATHS[1][0])
+        records = function_records(owner)
+        for name in UART_PHASES:
+            self.assertIn(name, set(records))
+            self.assertEqual(tokens("static void " + name + "(" + UART_PARAMETERS + ")"), tokens(records[name].signature))
+            self.assertLessEqual(records[name].lines, 120)
+        root = records["micros_uart_console_runtime_run_self_test"]
+        self.assertLessEqual(root.lines, 120)
+        self.assertEqual(3, tokens(root.body).count("uart_write"))
+        self.assertEqual(2, tokens(root.body).count("uart_flush"))
+        self.assertEqual(1, tokens(root.body).count("sbi_system_reset"))
+        self.assertIn('"uart-console-reset-returned"', tokens(root.body))
+        prefix = owner[:owner.index("static volatile uint8_t *uart_registers")]
+        self.assertEqual(UART_PREFIX_DIGEST, digest_tokens(tokens(prefix)))
+
+    def test_uart_inverse_preserves_volatile_mmio_initializers_flags_bounded_claim_and_root_reporting(self):
+        caller = (
+            "{ struct uart_console_test_work work; work.registers = uart_registers(); work.source = 0; "
+            "uart_console_test_prepare_handoff(hart_id, &work); uart_write(\"begin\"); uart_flush(); "
+            "uart_console_test_quiesce_console(hart_id, &work); uart_console_test_publish_irq_route(hart_id, &work); "
+            "uart_console_test_claim_and_retain(hart_id, &work); uart_console_test_complete_and_seize(hart_id, &work); "
+            "uart_write(\"pass\"); uart_write(\"irqpass\"); uart_flush(); "
+            "(void)sbi_system_reset(SHUTDOWN, NONE); MICROS_PANIC(hart_id, \"reset-returned\"); }"
+        )
+        phases = dict(zip(UART_PHASES, (
+            "{ original_prepare_and_release(&work->candidate); }",
+            "{ work->registers[OFFSET] = TEST; original_quiesce(); "
+            "if (work->registers[OFFSET] != 0) { MICROS_PANIC(hart_id, \"ier\"); } "
+            "original_console_commit(); work->registers[OFFSET] = RX; riscv_mmio_fence(); }",
+            "{ work->timer_was_enabled = original_timer_bit(); work->irq_was_enabled = original_irq_bit(); "
+            "original_state_before_route(&work->candidate, &work->plic_plan); original_external_enable(); "
+            "work->state = original_state(); original_observe_bits(work->state, work->timer_was_enabled, work->irq_was_enabled); }",
+            "{ work->registers[OFFSET] = TX; riscv_mmio_fence(); "
+            "for (work->attempt = 0; work->attempt < CLAIM_ATTEMPTS; ++work->attempt) { "
+            "if (!original_claim(&work->source)) { MICROS_PANIC(hart_id, \"claim\"); } if (work->source != 0) { break; } } "
+            "original_commit_claim(&work->candidate); work->source = UINT32_MAX; "
+            "original_retained_probe(&work->source, work->state); work->registers[OFFSET] = 0; riscv_mmio_fence(); }",
+            "{ original_complete(&work->candidate); original_seize(); work->state = original_state(); "
+            "original_terminal_panic_observation(work->state); }",
+        )))
+        expected = tokens(
+            "{ volatile uint8_t *registers = uart_registers(); const struct micros_tty_handoff_runtime_state *state; "
+            "struct micros_tty_handoff candidate; struct micros_plic_tty_enable_plan plic_plan; "
+            "bool timer_was_enabled; bool irq_was_enabled; uint32_t source = 0; uint32_t attempt; "
+            "original_prepare_and_release(&candidate); uart_write(\"begin\"); uart_flush(); "
+            "registers[OFFSET] = TEST; original_quiesce(); if (registers[OFFSET] != 0) { MICROS_PANIC(hart_id, \"ier\"); } "
+            "original_console_commit(); registers[OFFSET] = RX; riscv_mmio_fence(); "
+            "timer_was_enabled = original_timer_bit(); irq_was_enabled = original_irq_bit(); "
+            "original_state_before_route(&candidate, &plic_plan); original_external_enable(); state = original_state(); "
+            "original_observe_bits(state, timer_was_enabled, irq_was_enabled); registers[OFFSET] = TX; riscv_mmio_fence(); "
+            "for (attempt = 0; attempt < CLAIM_ATTEMPTS; ++attempt) { "
+            "if (!original_claim(&source)) { MICROS_PANIC(hart_id, \"claim\"); } if (source != 0) { break; } } "
+            "original_commit_claim(&candidate); source = UINT32_MAX; original_retained_probe(&source, state); "
+            "registers[OFFSET] = 0; riscv_mmio_fence(); original_complete(&candidate); original_seize(); state = original_state(); "
+            "original_terminal_panic_observation(state); uart_write(\"pass\"); uart_write(\"irqpass\"); uart_flush(); "
+            "(void)sbi_system_reset(SHUTDOWN, NONE); MICROS_PANIC(hart_id, \"reset-returned\"); }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in UART_FIELDS)
+        self.assertEqual(expected, uart_body_tokens(caller, phases, declarations))
+        for changed in (
+            caller.replace("struct uart_console_test_work work;", "struct uart_console_test_work work = {0};"),
+            caller.replace("hart_id, &work)", "other_hart, &work)"),
+            caller.replace("hart_id, &work)", "hart_id, &copy)"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                uart_body_tokens(changed, phases, declarations)
+        with self.assertRaises(AssertionError):
+            uart_body_tokens(caller, phases, (tokens("uint8_t *registers;"), *declarations[1:]))
+        changed = {**phases, UART_PHASES[0]: "{ return; }"}
+        with self.assertRaises(AssertionError):
+            uart_body_tokens(caller, changed, declarations)
+        for index, old, new in (
+            (2, "original_state_before_route", "riscv_irq_save(); original_state_before_route"),
+            (3, "< CLAIM_ATTEMPTS", "< OTHER_ATTEMPTS"),
+            (3, "UINT32_MAX", "0"),
+        ):
+            changed = {**phases, UART_PHASES[index]: phases[UART_PHASES[index]].replace(old, new)}
+            self.assertNotEqual(expected, uart_body_tokens(caller, changed, declarations))
+        self.assertNotEqual(expected, uart_body_tokens(caller.replace("= uart_registers()", "= other_registers()"), phases, declarations))
+
     def test_native_control_authority_has_exact_typed_rejection_phase_after_authorized_tuple(self):
         records = function_records(source(FAMILY_PATHS[6][0]))
         self.assertIn(AUTHORITY_PHASE, set(records))
@@ -1993,6 +2126,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             set(REQUIRED_TASKS) - {
                 (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
+                (1, "micros_uart_console_runtime_run_self_test"),
                 (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
                 (6, "test_syscall_authority"),
             },

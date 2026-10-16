@@ -643,3 +643,14 @@ corruptions retain their mutation/reset/failure order. Whole-body/type and
 independent initializer/binding/order fixtures precede the outline, and
 actual native operation-14 evidence passes. Only real UART and Python
 renderer semantic dispositions remain.
+
+The real UART component now has a 31-line original reporting/reset root
+and five typed void hardware phases, each at most 54 lines. Eight exact
+original automatic fields retain volatile MMIO type, both initializers,
+saved interrupt-bit observations, the 100,000-attempt claim loop and
+retained-claim/completion/panic chronology. All readonly binding/manifest
+data, masks, fences, reasons, markers and root output/reset-return panic
+remain exact. Independent scope/volatile/binding/bound fixtures and complete
+original-body reconstruction precede C changes. The actual UART/PLIC guest
+passes with its unchanged eight-second budget. All seven original C
+dispositions are complete; only the Python renderer remains.

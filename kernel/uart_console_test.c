@@ -46,19 +46,22 @@ static volatile uint8_t *uart_registers(void)
         MICROS_TTY_UART_PHYSICAL_BASE;
 }
 
-_Noreturn void micros_uart_console_runtime_run_self_test(
-    uintptr_t hart_id
-)
-{
-    volatile uint8_t *registers = uart_registers();
+struct uart_console_test_work {
+    volatile uint8_t *registers;
     const struct micros_tty_handoff_runtime_state *state;
     struct micros_tty_handoff candidate;
     struct micros_plic_tty_enable_plan plic_plan;
     bool timer_was_enabled;
     bool irq_was_enabled;
-    uint32_t source = 0;
+    uint32_t source;
     uint32_t attempt;
+};
 
+static void uart_console_test_prepare_handoff(
+    uintptr_t hart_id,
+    struct uart_console_test_work *work
+)
+{
     if (
         micros_tty_handoff_runtime_reset()
             != MICROS_TTY_HANDOFF_OK
@@ -69,37 +72,42 @@ _Noreturn void micros_uart_console_runtime_run_self_test(
             != MICROS_TTY_HANDOFF_OK
         || micros_tty_handoff_runtime_begin(1, 100)
             != MICROS_TTY_HANDOFF_OK
-        || micros_tty_handoff_runtime_prepare_mapped(&candidate)
+        || micros_tty_handoff_runtime_prepare_mapped(&work->candidate)
             != MICROS_TTY_HANDOFF_OK
     ) {
         MICROS_PANIC(hart_id, "uart-console-preflight");
     }
     micros_tty_handoff_runtime_commit_mapped_prevalidated(
-        &candidate
+        &work->candidate
     );
     if (
-        micros_tty_handoff_runtime_prepare_release(&candidate)
+        micros_tty_handoff_runtime_prepare_release(&work->candidate)
             != MICROS_TTY_HANDOFF_OK
         || !uart_console_begin_preflight()
     ) {
         MICROS_PANIC(hart_id, "uart-console-preflight");
     }
     micros_tty_handoff_runtime_commit_release_prevalidated(
-        &candidate
+        &work->candidate
     );
-    uart_write("MICROS_UART_CONSOLE_TEST begin=early\n");
-    uart_flush();
-    registers[UART_INTERRUPT_ENABLE_OFFSET] =
+}
+
+static void uart_console_test_quiesce_console(
+    uintptr_t hart_id,
+    struct uart_console_test_work *work
+)
+{
+    work->registers[UART_INTERRUPT_ENABLE_OFFSET] =
         UART_INTERRUPT_ENABLE_TEST_VALUE;
     if (
-        registers[UART_INTERRUPT_ENABLE_OFFSET]
+        work->registers[UART_INTERRUPT_ENABLE_OFFSET]
             != UART_INTERRUPT_ENABLE_TEST_VALUE
     ) {
         MICROS_PANIC(hart_id, "uart-console-ier-write");
     }
 
     uart_console_begin_quiesce_prevalidated();
-    if (registers[UART_INTERRUPT_ENABLE_OFFSET] != 0) {
+    if (work->registers[UART_INTERRUPT_ENABLE_OFFSET] != 0) {
         MICROS_PANIC(hart_id, "uart-console-ier-disable");
     }
     uart_console_handoff_commit_prevalidated();
@@ -107,7 +115,7 @@ _Noreturn void micros_uart_console_runtime_run_self_test(
         MICROS_PANIC(hart_id, "uart-console-handoff");
     }
 
-    registers[UART_INTERRUPT_ENABLE_OFFSET] =
+    work->registers[UART_INTERRUPT_ENABLE_OFFSET] =
         UART_INTERRUPT_ENABLE_RX_LINE;
     riscv_mmio_fence();
     if (
@@ -116,114 +124,151 @@ _Noreturn void micros_uart_console_runtime_run_self_test(
     ) {
         MICROS_PANIC(hart_id, "uart-console-owned-programming");
     }
+}
+
+static void uart_console_test_publish_irq_route(
+    uintptr_t hart_id,
+    struct uart_console_test_work *work
+)
+{
     if (
-        micros_tty_handoff_runtime_prepare_commit(&candidate)
+        micros_tty_handoff_runtime_prepare_commit(&work->candidate)
             != MICROS_TTY_HANDOFF_OK
-        || !micros_plic_prepare_tty_enable(&plic_plan)
+        || !micros_plic_prepare_tty_enable(&work->plic_plan)
     ) {
         MICROS_PANIC(hart_id, "uart-console-route-preflight");
     }
-    timer_was_enabled = riscv_timer_interrupt_is_enabled();
-    irq_was_enabled = riscv_irq_is_enabled();
+    work->timer_was_enabled = riscv_timer_interrupt_is_enabled();
+    work->irq_was_enabled = riscv_irq_is_enabled();
     micros_tty_handoff_runtime_commit_console_prevalidated(
-        &candidate
+        &work->candidate
     );
-    micros_plic_commit_tty_prepare_prevalidated(&plic_plan);
-    micros_plic_commit_tty_enable_prevalidated(&plic_plan);
+    micros_plic_commit_tty_prepare_prevalidated(&work->plic_plan);
+    micros_plic_commit_tty_enable_prevalidated(&work->plic_plan);
     riscv_external_interrupt_enable();
-    state = micros_tty_handoff_runtime_state();
+    work->state = micros_tty_handoff_runtime_state();
     if (
-        state == NULL
-        || state->handoff.console_phase != MICROS_TTY_CONSOLE_OWNED
-        || state->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
+        work->state == NULL
+        || work->state->handoff.console_phase != MICROS_TTY_CONSOLE_OWNED
+        || work->state->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
         || !micros_plic_validate(MICROS_PLIC_ENABLED)
         || !riscv_external_interrupt_is_enabled()
-        || riscv_timer_interrupt_is_enabled() != timer_was_enabled
-        || riscv_irq_is_enabled() != irq_was_enabled
+        || riscv_timer_interrupt_is_enabled() != work->timer_was_enabled
+        || riscv_irq_is_enabled() != work->irq_was_enabled
     ) {
         MICROS_PANIC(hart_id, "uart-console-route-commit");
     }
+}
 
-    registers[UART_INTERRUPT_ENABLE_OFFSET] =
+static void uart_console_test_claim_and_retain(
+    uintptr_t hart_id,
+    struct uart_console_test_work *work
+)
+{
+    work->registers[UART_INTERRUPT_ENABLE_OFFSET] =
         UART_INTERRUPT_ENABLE_TX_EMPTY;
     riscv_mmio_fence();
     if (
         micros_tty_handoff_runtime_prepare_claim(
             MICROS_TTY_UART_IRQ_SOURCE,
-            &candidate
+            &work->candidate
         ) != MICROS_TTY_HANDOFF_OK
     ) {
         MICROS_PANIC(hart_id, "uart-console-claim-preflight");
     }
-    for (attempt = 0; attempt < TTY_IRQ_CLAIM_ATTEMPTS; ++attempt) {
-        if (!micros_plic_claim(&source)) {
+    for (work->attempt = 0; work->attempt < TTY_IRQ_CLAIM_ATTEMPTS; ++work->attempt) {
+        if (!micros_plic_claim(&work->source)) {
             MICROS_PANIC(hart_id, "uart-console-claim");
         }
-        if (source != 0) {
+        if (work->source != 0) {
             break;
         }
     }
     if (
-        source != MICROS_TTY_UART_IRQ_SOURCE
+        work->source != MICROS_TTY_UART_IRQ_SOURCE
     ) {
         MICROS_PANIC(hart_id, "uart-console-claim-source");
     }
     micros_tty_handoff_runtime_commit_claim_prevalidated(
-        &candidate
+        &work->candidate
     );
-    state = micros_tty_handoff_runtime_state();
+    work->state = micros_tty_handoff_runtime_state();
     if (
-        state == NULL
-        || state->handoff.route_phase
+        work->state == NULL
+        || work->state->handoff.route_phase
             != MICROS_TTY_ROUTE_IN_SERVICE
-        || state->handoff.claimed_source
+        || work->state->handoff.claimed_source
             != MICROS_TTY_UART_IRQ_SOURCE
     ) {
         MICROS_PANIC(hart_id, "uart-console-claim-state");
     }
-    source = UINT32_MAX;
+    work->source = UINT32_MAX;
     if (
-        !micros_plic_claim(&source)
-        || source != 0
-        || state->handoff.route_phase
+        !micros_plic_claim(&work->source)
+        || work->source != 0
+        || work->state->handoff.route_phase
             != MICROS_TTY_ROUTE_IN_SERVICE
     ) {
         MICROS_PANIC(hart_id, "uart-console-claim-retained");
     }
-    registers[UART_INTERRUPT_ENABLE_OFFSET] = 0;
+    work->registers[UART_INTERRUPT_ENABLE_OFFSET] = 0;
     riscv_mmio_fence();
+}
+
+static void uart_console_test_complete_and_seize(
+    uintptr_t hart_id,
+    struct uart_console_test_work *work
+)
+{
     if (
         micros_tty_handoff_runtime_prepare_complete(
             MICROS_TTY_UART_IRQ_SOURCE,
-            &candidate
+            &work->candidate
         ) != MICROS_TTY_HANDOFF_OK
         || !micros_plic_complete(MICROS_TTY_UART_IRQ_SOURCE)
     ) {
         MICROS_PANIC(hart_id, "uart-console-complete");
     }
     micros_tty_handoff_runtime_commit_complete_prevalidated(
-        &candidate
+        &work->candidate
     );
-    state = micros_tty_handoff_runtime_state();
+    work->state = micros_tty_handoff_runtime_state();
     if (
-        state == NULL
-        || state->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
-        || state->handoff.claimed_source != 0
+        work->state == NULL
+        || work->state->handoff.route_phase != MICROS_TTY_ROUTE_IDLE
+        || work->state->handoff.claimed_source != 0
     ) {
         MICROS_PANIC(hart_id, "uart-console-complete-state");
     }
     micros_panic_seize();
-    state = micros_tty_handoff_runtime_state();
+    work->state = micros_tty_handoff_runtime_state();
     if (
-        state == NULL
-        || state->handoff.console_phase != MICROS_TTY_CONSOLE_PANIC
-        || state->handoff.route_phase != MICROS_TTY_ROUTE_PANIC
+        work->state == NULL
+        || work->state->handoff.console_phase != MICROS_TTY_CONSOLE_PANIC
+        || work->state->handoff.route_phase != MICROS_TTY_ROUTE_PANIC
         || !micros_plic_validate(MICROS_PLIC_DISABLED)
         || riscv_external_interrupt_is_enabled()
         || !uart_console_panic_is_active()
     ) {
         MICROS_PANIC(hart_id, "uart-console-panic-seize");
     }
+}
+
+_Noreturn void micros_uart_console_runtime_run_self_test(
+    uintptr_t hart_id
+)
+{
+    struct uart_console_test_work work;
+
+    work.registers = uart_registers();
+    work.source = 0;
+    uart_console_test_prepare_handoff(hart_id, &work);
+    uart_write("MICROS_UART_CONSOLE_TEST begin=early\n");
+    uart_flush();
+    uart_console_test_quiesce_console(hart_id, &work);
+    uart_console_test_publish_irq_route(hart_id, &work);
+    uart_console_test_claim_and_retain(hart_id, &work);
+    uart_console_test_complete_and_seize(hart_id, &work);
     uart_write(
         "MICROS_UART_CONSOLE_TEST_PASS "
         "quiesce=drained ier=disabled ownership=tty panic=seized\n"
