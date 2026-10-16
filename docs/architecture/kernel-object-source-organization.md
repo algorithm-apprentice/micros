@@ -7,9 +7,11 @@ in the [source-module audit](source-module-audit.md).
 [ADR-0068](../adr/0068-kernel-object-source-decomposition.md) is Accepted
 after clean independent complete and acceptance-only design reviews.
 Design #137 merged as `4a7e49764533fbbef1e2d10188f837e7f092817e`;
-implementation #138 uses a fresh branch from that outcome. All specified
-owners and semantic dispositions are implemented; merge remains subject to
-the complete author/reuse evidence and independent implementation review.
+implementation #138 merged as `6269d9247de6beafed2448aa0ffd6904de5e8833`.
+Its tree exactly matches reviewed/validated
+`5b92776417224d297fc770c62d89b3986484ab17`. Full fresh author acceptance,
+actual same-producer three-profile reuse, clean independent implementation
+review and exact obsolete local/remote branch cleanup are complete.
 
 ```text
 reviewed micros base: 4eb1c4d68de3830b888a0d239a2874bd79792244
@@ -750,7 +752,7 @@ physical lines; all eight original long and four shorter mixed tasks have
 their required outlines. Original inventories and hashes are not shrunk or
 rebaselined. This closes source dispositions, not the merge gate: the
 complete current author plan, same-producer actual reuse and independent
-implementation review remain required before merge.
+implementation review passed before the identical-tree squash merge.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
@@ -759,3 +761,11 @@ maintaining only the admitted current digest
 `44d8a8615e5465ad199ed916b30e72af05643ef00ae5ac9a7df00a0dc4cad2c1`.
 Prior scheduler/endpoint source and recipe/planner expected values remain
 unchanged under only these verified inverses.
+
+Proposed [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md)
+defines a later grant-only recipe delta. Only after that separate design is
+Accepted and merged may its actual three source sets/four consumer operands
+be inverted before this contract's existing complete recipe inverse. The
+original object byte hash, all original bodies/types, shared inspector ASTs
+and behavioral/classification expectations remain unchanged; this is not
+permission to rebaseline or broaden object authority.
