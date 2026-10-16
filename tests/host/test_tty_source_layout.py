@@ -157,7 +157,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
     item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0
 )
 FUNCTION_TASK_MIGRATION = (
-    (0, "live_binding_matches"), (1, "micros_uart_console_runtime_run_self_test"),
+    (1, "micros_uart_console_runtime_run_self_test"),
     (2, "handle_submit_write"), (3, "model_validate"),
     (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
@@ -171,6 +171,19 @@ RUNTIME_CONTEXT_FIELDS = (
 RUNTIME_CONTEXT_HELPERS = ("binding_identity_matches", "live_binding_matches")
 RUNTIME_PRIVATE_EXPORTS = (
     "clear_bytes", "copy_bytes", "endpoint_matches_process", "identity_is_valid", "binding_identity_matches",
+)
+LIVE_WORK_TAG = "tty_handoff_live_binding"
+LIVE_PHASE = "tty_handoff_classify_live_binding"
+LIVE_FIELDS = (
+    ("const struct micros_process *process;", False),
+    ("const struct micros_thread *thread;", False),
+    ("const struct micros_endpoint_record *endpoint;", False),
+    ("bool prepared;", False),
+    ("bool active;", False),
+)
+LIVE_PARAMETERS = (
+    "struct tty_handoff_context *context, const struct micros_bootstrap_binding *binding, "
+    "const struct micros_bootstrap_runtime_entry *transition, struct tty_handoff_live_binding *work"
 )
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
@@ -564,6 +577,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 0 and spelling == LIVE_PHASE:
+                if path != RUNTIME_SOURCES[2]:
+                    raise AssertionError("live-binding predicate phase has its exact private validation owner")
+                continue
             if family == 0 and spelling == RUNTIME_CONTEXT_GETTER:
                 if path != RUNTIME_SOURCES[1]:
                     raise AssertionError("runtime context getter has its sole state leaf owner")
@@ -591,7 +608,10 @@ def original_signature_tokens(family, original, record):
 
 def original_body_digest(family, record):
     names = normal_names(family)
-    body = tuple(names.get(token, token) for token in tokens("{" + record.body + "}"))
+    body = tokens("{" + record.body + "}")
+    if family == 0 and record.name == "tty_handoff_live_binding_matches" and (0, "live_binding_matches") not in FUNCTION_TASK_MIGRATION:
+        body = live_binding_actual_body_tokens(record)
+    body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
     return digest_tokens(body)
@@ -636,6 +656,29 @@ def runtime_context_body_tokens(original, body):
             result.append(token)
             index += 1
     return tuple(result)
+
+
+def live_binding_body_tokens(caller, phase, declarations):
+    from tests.host.test_grant_data_plane_source_layout import restore_automatic_work_tokens, bound_body_tokens
+
+    phase_tokens = tokens(phase)
+    if any(token in ("return", "goto") for token in phase_tokens):
+        raise AssertionError("the complete void predicate phase cannot bypass resolution or caller phase/deadline selection")
+    body = bound_body_tokens(
+        tokens(caller), LIVE_PHASE + "(context, binding, transition, &work);", phase,
+    )
+    return restore_automatic_work_tokens(body, LIVE_WORK_TAG, LIVE_FIELDS, declarations)
+
+
+def live_binding_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(RUNTIME_SOURCES[2]) if owner is None else owner
+    declarations = work_declarations(owner, LIVE_WORK_TAG, LIVE_FIELDS)
+    phase = function_records(owner)[LIVE_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens("static void " + LIVE_PHASE + "(" + LIVE_PARAMETERS + ")"):
+        raise AssertionError("the live predicate phase preserves every exact typed context/binding/transition/work input")
+    return live_binding_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
 def source_set_block(name, paths):
@@ -709,6 +752,50 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_live_binding_has_typed_ordered_predicates_after_original_record_resolution(self):
+        owner = source(RUNTIME_SOURCES[2])
+        records = function_records(owner)
+        self.assertIn(LIVE_PHASE, set(records))
+        self.assertEqual(
+            tokens("static void " + LIVE_PHASE + "(" + LIVE_PARAMETERS + ")"), tokens(records[LIVE_PHASE].signature),
+        )
+        self.assertLessEqual(records["tty_handoff_live_binding_matches"].lines, 120)
+        self.assertLessEqual(records[LIVE_PHASE].lines, 120)
+
+    def test_live_binding_inverse_keeps_resolution_before_two_predicates_and_original_selector(self):
+        caller = (
+            "{ struct tty_handoff_live_binding work; "
+            "if (!original_resolve(registry, objects, &work.process, &work.thread, &work.endpoint)) { return false; } "
+            "tty_handoff_classify_live_binding(context, binding, transition, &work); "
+            "return original_phase_and_deadline(context, work.prepared, work.active); }"
+        )
+        phase = (
+            "{ work->prepared = original_prepared(work->process, work->thread, work->endpoint, transition); "
+            "work->active = original_active(context, binding, transition, work->process, work->thread, work->endpoint); }"
+        )
+        expected = (
+            "{ const struct micros_process *process; const struct micros_thread *thread; "
+            "const struct micros_endpoint_record *endpoint; bool prepared; bool active; "
+            "if (!original_resolve(registry, objects, &process, &thread, &endpoint)) { return false; } "
+            "prepared = original_prepared(process, thread, endpoint, transition); "
+            "active = original_active(context, binding, transition, process, thread, endpoint); "
+            "return original_phase_and_deadline(context, prepared, active); }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in LIVE_FIELDS)
+        self.assertEqual(tokens(expected), live_binding_body_tokens(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct tty_handoff_live_binding work;", "struct tty_handoff_live_binding work = {0};"),
+            caller.replace("context, binding, transition, &work", "other, binding, transition, &work"),
+            caller.replace("context, binding, transition, &work", "context, binding, transition, &copy"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                live_binding_body_tokens(changed, phase, declarations)
+        with self.assertRaises(AssertionError):
+            live_binding_body_tokens(caller, phase.replace("work->active =", "return; work->active ="), declarations)
+        self.assertNotEqual(
+            tokens(expected), live_binding_body_tokens(caller, phase.replace("original_prepared", "weakened_prepared"), declarations),
+        )
+
     def test_runtime_state_leaf_keeps_actual_owner_directions_acyclic(self):
         records = {
             name: (owner, record) for owner, path in enumerate(RUNTIME_SOURCES)
@@ -853,7 +940,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
         self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0})
-        self.assertEqual(set(REQUIRED_TASKS), set(FUNCTION_TASK_MIGRATION))
+        self.assertEqual(set(REQUIRED_TASKS) - {(0, "live_binding_matches")}, set(FUNCTION_TASK_MIGRATION))
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):
         for family, owners in ORIGINAL_FUNCTIONS.items():

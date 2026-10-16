@@ -552,3 +552,10 @@ explicit pointer. Pure signatures remain unchanged. All 35 complete original
 bodies/types, acyclic owner directions, native runtime cases and both actual
 UART/TTY guests pass on this candidate. There are 89 original moves and
 eight semantic dispositions remaining.
+
+Live binding now has the original 89-line resolution/selector root and a
+40-line void prepared/active phase. The five original uninitialized locals
+remain caller-owned with exact types; actual original-body restoration and
+independent ordering/binding/lifetime fixtures precede the outline.
+Current native and both real target paths pass. There are 89 moves, sixteen
+declarations-only future C owners and seven semantic dispositions remaining.

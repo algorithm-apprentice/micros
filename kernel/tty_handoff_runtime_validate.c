@@ -142,6 +142,55 @@ bool tty_handoff_binding_identity_matches(
     );
 }
 
+struct tty_handoff_live_binding {
+    const struct micros_process *process;
+    const struct micros_thread *thread;
+    const struct micros_endpoint_record *endpoint;
+    bool prepared;
+    bool active;
+};
+
+static void tty_handoff_classify_live_binding(
+    struct tty_handoff_context *context,
+    const struct micros_bootstrap_binding *binding,
+    const struct micros_bootstrap_runtime_entry *transition,
+    struct tty_handoff_live_binding *work
+)
+{
+    work->prepared = (
+        transition->state == MICROS_BOOTSTRAP_SERVICE_PREPARED
+        && transition->endpoint_state
+            == MICROS_BOOTSTRAP_ENDPOINT_RESERVED
+        && !transition->profile_installed
+        && !transition->scheduler_assigned
+        && transition->ready_deadline == 0
+        && work->process->privilege_profile == 0
+        && work->endpoint->state == MICROS_ENDPOINT_STATE_RESERVED
+        && work->thread->runtime_flags == MICROS_THREAD_RTS_INACTIVE
+        && !work->thread->scheduler_assigned
+    );
+    work->active = (
+        (
+            transition->state == MICROS_BOOTSTRAP_SERVICE_STARTING
+            || transition->state == MICROS_BOOTSTRAP_SERVICE_READY
+        )
+        && transition->endpoint_state
+            == MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
+        && transition->profile_installed
+        && transition->scheduler_assigned
+        && work->process->privilege_profile
+            == context->tty_handoff_state.profile_id
+        && work->endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && work->thread->scheduler_assigned
+        && work->thread->scheduler_priority
+            == binding->scheduler_priority
+        && work->thread->scheduler_preemptible
+            == binding->scheduler_preemptible
+        && work->thread->quantum_counter_ticks
+            == binding->scheduler_quantum_counter_ticks
+    );
+}
+
 static bool tty_handoff_live_binding_matches(
     struct tty_handoff_context *context,
     const struct micros_endpoint_registry *registry,
@@ -150,11 +199,8 @@ static bool tty_handoff_live_binding_matches(
     const struct micros_bootstrap_runtime_entry *transition
 )
 {
-    const struct micros_process *process;
-    const struct micros_thread *thread;
-    const struct micros_endpoint_record *endpoint;
-    bool prepared;
-    bool active;
+    struct tty_handoff_live_binding work;
+
 
     if (
         registry == NULL
@@ -164,77 +210,46 @@ static bool tty_handoff_live_binding_matches(
         || micros_process_resolve(
             objects,
             context->tty_handoff_state.process,
-            &process
+            &work.process
         ) != MICROS_KERNEL_OBJECT_OK
         || micros_thread_resolve(
             objects,
             context->tty_handoff_state.thread,
-            &thread
+            &work.thread
         ) != MICROS_KERNEL_OBJECT_OK
         || micros_endpoint_resolve_internal(
             registry,
             objects,
             context->tty_handoff_state.endpoint,
-            &endpoint
+            &work.endpoint
         ) != MICROS_ENDPOINT_OK
-        || process->address_space_root
+        || work.process->address_space_root
             != context->tty_handoff_state.root_physical_address
-        || process->primary_endpoint != context->tty_handoff_state.endpoint
+        || work.process->primary_endpoint != context->tty_handoff_state.endpoint
         || !tty_handoff_process_handles_equal(
-            thread->owner,
+            work.thread->owner,
             context->tty_handoff_state.process
         )
-        || !thread->context_attached
+        || !work.thread->context_attached
         || !tty_handoff_process_handles_equal(
-            endpoint->owner,
+            work.endpoint->owner,
             context->tty_handoff_state.process
         )
-        || endpoint->value != context->tty_handoff_state.endpoint
+        || work.endpoint->value != context->tty_handoff_state.endpoint
     ) {
         return false;
     }
 
-    prepared = (
-        transition->state == MICROS_BOOTSTRAP_SERVICE_PREPARED
-        && transition->endpoint_state
-            == MICROS_BOOTSTRAP_ENDPOINT_RESERVED
-        && !transition->profile_installed
-        && !transition->scheduler_assigned
-        && transition->ready_deadline == 0
-        && process->privilege_profile == 0
-        && endpoint->state == MICROS_ENDPOINT_STATE_RESERVED
-        && thread->runtime_flags == MICROS_THREAD_RTS_INACTIVE
-        && !thread->scheduler_assigned
-    );
-    active = (
-        (
-            transition->state == MICROS_BOOTSTRAP_SERVICE_STARTING
-            || transition->state == MICROS_BOOTSTRAP_SERVICE_READY
-        )
-        && transition->endpoint_state
-            == MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
-        && transition->profile_installed
-        && transition->scheduler_assigned
-        && process->privilege_profile
-            == context->tty_handoff_state.profile_id
-        && endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
-        && thread->scheduler_assigned
-        && thread->scheduler_priority
-            == binding->scheduler_priority
-        && thread->scheduler_preemptible
-            == binding->scheduler_preemptible
-        && thread->quantum_counter_ticks
-            == binding->scheduler_quantum_counter_ticks
-    );
+    tty_handoff_classify_live_binding(context, binding, transition, &work);
 
     switch (context->tty_handoff_state.handoff.console_phase) {
     case MICROS_TTY_CONSOLE_EARLY:
     case MICROS_TTY_CONSOLE_MAP_REQUESTED:
     case MICROS_TTY_CONSOLE_MAPPED:
-        return prepared;
+        return work.prepared;
     case MICROS_TTY_CONSOLE_STARTING:
         return (
-            active
+            work.active
             && transition->state
                 == MICROS_BOOTSTRAP_SERVICE_STARTING
             && context->tty_handoff_state.handoff.deadline_armed
@@ -242,7 +257,7 @@ static bool tty_handoff_live_binding_matches(
                 == context->tty_handoff_state.handoff.deadline
         );
     case MICROS_TTY_CONSOLE_OWNED:
-        if (!active) {
+        if (!work.active) {
             return false;
         }
         if (
@@ -261,7 +276,7 @@ static bool tty_handoff_live_binding_matches(
             && transition->ready_deadline == 0
         );
     case MICROS_TTY_CONSOLE_PANIC:
-        return prepared || active;
+        return work.prepared || work.active;
     }
     return false;
 }
