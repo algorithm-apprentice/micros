@@ -10,6 +10,7 @@ import unittest
 from tests.host.c_source_records import function_records
 from tests.host.test_frame_ownership_source_layout import tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
+from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools import validation_context, validation_plan
 
 
@@ -153,13 +154,23 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = tuple(
-    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item not in ((0, "clear_bytes"), (0, "copy_bytes"))
+    item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0
 )
 FUNCTION_TASK_MIGRATION = (
     (0, "live_binding_matches"), (1, "micros_uart_console_runtime_run_self_test"),
     (2, "handle_submit_write"), (3, "model_validate"),
     (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
+)
+RUNTIME_CONTEXT_TAG = "tty_handoff_context"
+RUNTIME_CONTEXT_GETTER = "tty_handoff_context"
+RUNTIME_CONTEXT_FIELDS = (
+    "struct micros_tty_handoff_runtime_state tty_handoff_state;",
+    "const struct micros_bootstrap_control_state *tty_bootstrap_state;",
+)
+RUNTIME_CONTEXT_HELPERS = ("binding_identity_matches", "live_binding_matches")
+RUNTIME_PRIVATE_EXPORTS = (
+    "clear_bytes", "copy_bytes", "endpoint_matches_process", "identity_is_valid", "binding_identity_matches",
 )
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
@@ -541,7 +552,10 @@ def digest_tokens(value):
 
 def normal_names(family):
     if family == 0:
-        return {"tty_handoff_clear_bytes": "clear_bytes", "tty_handoff_copy_bytes": "copy_bytes"}
+        return {
+            "tty_handoff_" + name: name for names in ORIGINAL_FUNCTIONS[0].values()
+            for name in names if not name.startswith("micros_")
+        }
     return {}
 
 
@@ -550,6 +564,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 0 and spelling == RUNTIME_CONTEXT_GETTER:
+                if path != RUNTIME_SOURCES[1]:
+                    raise AssertionError("runtime context getter has its sole state leaf owner")
+                continue
             original = names.get(spelling, spelling)
             if original not in BASELINE_BODIES[family] or original in locations:
                 raise AssertionError("unknown/duplicate original or unreviewed TTY phase: " + spelling)
@@ -561,16 +579,63 @@ def original_locations(family):
 
 def original_signature_tokens(family, original, record):
     signature = tuple(normal_names(family).get(token, token) for token in tokens(record.signature))
-    if family == 0 and original in ("clear_bytes", "copy_bytes") and record.name.startswith("tty_handoff_"):
+    if family == 0 and original in RUNTIME_PRIVATE_EXPORTS and record.name.startswith("tty_handoff_"):
         if signature[:1] == ("static",):
             raise AssertionError("the necessary byte primitives have actual private cross-owner declarations")
         signature = ("static", *signature)
+    if family == 0 and original in RUNTIME_CONTEXT_HELPERS:
+        if (0, original) not in SYMBOL_OWNER_MIGRATION:
+            signature = runtime_context_signature_tokens(signature)
     return signature
 
 
 def original_body_digest(family, record):
     names = normal_names(family)
-    return digest_tokens(tuple(names.get(token, token) for token in tokens("{" + record.body + "}")))
+    body = tuple(names.get(token, token) for token in tokens("{" + record.body + "}"))
+    if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
+        body = runtime_context_body_tokens(names.get(record.name, record.name), body)
+    return digest_tokens(body)
+
+
+def runtime_context_signature_tokens(signature):
+    signature = list(signature)
+    start = signature.index("(") + 1
+    parameter = list(tokens("struct tty_handoff_context *context,"))
+    if signature[start:start + len(parameter)] != parameter:
+        raise AssertionError("stateful runtime helpers receive the exact original typed context first")
+    del signature[start:start + len(parameter)]
+    return tuple(signature)
+
+
+def runtime_context_body_tokens(original, body):
+    body = list(body)
+    if original.startswith("micros_"):
+        borrow = list(tokens("struct tty_handoff_context *context = tty_handoff_context();"))
+        if body[:1 + len(borrow)] != ["{"] + borrow:
+            raise AssertionError("each stateful runtime API borrows its original family once without reset")
+        del body[1:1 + len(borrow)]
+    result = []
+    index = 0
+    while index < len(body):
+        token = body[index]
+        if token in RUNTIME_CONTEXT_HELPERS and body[index + 1:index + 2] == ["("]:
+            if body[index + 2:index + 4] != ["context", ","]:
+                raise AssertionError("runtime calls bind their sole original context explicitly")
+            result.extend((token, "("))
+            index += 4
+        elif token == "context":
+            if (
+                body[index + 1:index + 2] != ["->"]
+                or body[index + 2:index + 3] not in (["tty_handoff_state"], ["tty_bootstrap_state"])
+                or (index and body[index - 1] in (".", "->"))
+            ):
+                raise AssertionError("runtime context is not copied, reset, nested-qualified or retained")
+            result.append(body[index + 2])
+            index += 3
+        else:
+            result.append(token)
+            index += 1
+    return tuple(result)
 
 
 def source_set_block(name, paths):
@@ -644,6 +709,75 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_runtime_state_leaf_keeps_actual_owner_directions_acyclic(self):
+        records = {
+            name: (owner, record) for owner, path in enumerate(RUNTIME_SOURCES)
+            for name, record in function_records(source(path)).items()
+        }
+        allowed = {0: {1, 2, 3}, 1: set(), 2: {1}, 3: {1}}
+        for name, (owner, record) in records.items():
+            destinations = {
+                records[word][0] for word in tokens(record.body)
+                if word in records and records[word][0] != owner
+            }
+            self.assertLessEqual(destinations, allowed[owner], name)
+
+    def test_runtime_context_has_only_two_original_fields_in_its_one_state_leaf(self):
+        header = source(PRIVATE_HEADERS[0])
+        expected = tokens("struct tty_handoff_context {" + "".join(RUNTIME_CONTEXT_FIELDS) + "};")
+        self.assertIn(" ".join(expected), " ".join(tokens(header)))
+        state = source(RUNTIME_SOURCES[1])
+        self.assertEqual(
+            ("static struct tty_handoff_context context_state;",), tuple(file_scope_objects(state)),
+        )
+        self.assertEqual(
+            tokens("{ return &context_state; }"),
+            tokens("{" + function_records(state)[RUNTIME_CONTEXT_GETTER].body + "}"),
+        )
+        for path in (RUNTIME_SOURCES[0], *RUNTIME_SOURCES[2:]):
+            self.assertEqual((), tuple(file_scope_objects(source(path))), path)
+
+    def test_runtime_context_inverse_keeps_original_object_bindings_lifetimes_and_pure_inputs(self):
+        caller = (
+            "{ struct tty_handoff_context *context = tty_handoff_context(); "
+            "if (!binding_identity_matches(context, bootstrap)) { return INVARIANT; } "
+            "copy_bytes(&context->tty_handoff_state, &candidate, sizeof(context->tty_handoff_state)); "
+            "context->tty_bootstrap_state = bootstrap; return OK; }"
+        )
+        expected = (
+            "{ if (!binding_identity_matches(bootstrap)) { return INVARIANT; } "
+            "copy_bytes(&tty_handoff_state, &candidate, sizeof(tty_handoff_state)); "
+            "tty_bootstrap_state = bootstrap; return OK; }"
+        )
+        original = "micros_tty_handoff_runtime_prepare"
+        self.assertEqual(tokens(expected), runtime_context_body_tokens(original, tokens(caller)))
+        for changed in (
+            caller.replace("tty_handoff_context()", "reset_context()"),
+            caller.replace("binding_identity_matches(context,", "binding_identity_matches(other,"),
+            caller.replace("context->tty_handoff_state", "context->extra"),
+            caller.replace("return OK;", "copy = *context; return OK;"),
+            caller.replace("return OK;", "clear_bytes(context, sizeof(*context)); return OK;"),
+            caller.replace("context->tty_bootstrap_state", "record.context->tty_bootstrap_state"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                runtime_context_body_tokens(original, tokens(changed))
+        signature = tokens(
+            "static bool binding_identity_matches(struct tty_handoff_context *context, "
+            "const struct micros_bootstrap_control_state *bootstrap)"
+        )
+        self.assertEqual(
+            tokens("static bool binding_identity_matches(const struct micros_bootstrap_control_state *bootstrap)"),
+            runtime_context_signature_tokens(signature),
+        )
+        for changed in (
+            "static bool binding_identity_matches(void *context, const struct micros_bootstrap_control_state *bootstrap)",
+            "static bool binding_identity_matches(struct tty_handoff_context *other, const struct micros_bootstrap_control_state *bootstrap)",
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                runtime_context_signature_tokens(tokens(changed))
+        pure = tokens("{ return left.slot == right.slot && left.generation == right.generation; }")
+        self.assertEqual(pure, runtime_context_body_tokens("process_handles_equal", pure))
+
     def test_independent_recipe_fixture_preserves_all_eight_literal_consumers(self):
         expected = (
             "add_executable(micros before kernel/tty_handoff_runtime.c after)\n"
@@ -718,7 +852,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(8, len(REQUIRED_TASKS))
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
-        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), set(INITIAL_SYMBOL_OWNER_MIGRATION) - {(0, "clear_bytes"), (0, "copy_bytes")})
+        self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] != 0})
         self.assertEqual(set(REQUIRED_TASKS), set(FUNCTION_TASK_MIGRATION))
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):

@@ -544,3 +544,11 @@ all four native TTY consumers with the original model seed/steps/trace,
 and both actual UART and TTY guests pass. There are 114 original moves and
 all eight semantic dispositions remaining. Complete current author/reuse
 and independent implementation review remain final barriers.
+
+The next restarted green slice completes all 27 runtime original moves.
+One state-leaf context owns exactly the original two objects; 26 public
+entries borrow it once, and only two stateful private helpers gain its
+explicit pointer. Pure signatures remain unchanged. All 35 complete original
+bodies/types, acyclic owner directions, native runtime cases and both actual
+UART/TTY guests pass on this candidate. There are 89 original moves and
+eight semantic dispositions remaining.
