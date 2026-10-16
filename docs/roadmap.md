@@ -394,9 +394,15 @@ It preserves the cohesive grant registry and existing Step 7 authority while
 defining range/copy, captured syscall, native/reference-model and real
 target-script boundaries: 22 C owners, three private headers/sets, four
 consumer operands, 65 moves and fourteen long plus five shorter dispositions.
-This independently reviewed design authors documentation only. Implementation
-remains pending until the separate Accepted design merges. Neither correction
-adds a runtime node, clock/deadline, application startup or shell behavior.
+This independently reviewed design contains documentation only and merged
+separately as #139. Implementation #140 has all 22 real owners, 217 definitions
+bounded by 115 physical lines, all 65 original moves and nineteen semantic
+dispositions, and literal-empty migrations under immutable original-body/type
+facts. Narrow native/model and real target checks are green; complete current
+author/reuse acceptance and independent review are required before merge and
+recorded in that implementation pull request. Neither
+correction adds a runtime node, clock/deadline, application startup or shell
+behavior.
 
 ## v0.1 completion goal
 

@@ -269,9 +269,16 @@ lines, 95 definitions and fourteen long functions. Accepted
 fourteen long and five shorter task dispositions. Registry/core/runtime/ABI
 and public boundaries stay unchanged. The fixed MINIX trace, actual
 fixture/script/model state and independent validation dimensions precede
-implementation. Independent complete design review is clean. This phase
-contains documentation only; its paired implementation remains pending until
-the separate Accepted design merges.
+implementation. Independent complete design review is clean. That design
+contained documentation only and merged separately as #139.
+Implementation started from that outcome with immutable inventories and
+structural Red. Its current source outcome has all 22 real owners, 217
+definitions bounded by 115 physical lines, all 65 original moves and all
+nineteen semantic dispositions, with literal-empty migrations and immutable
+original body/type/data inventories. Narrow native/model and real target
+checks are green. Complete current author/reuse acceptance and independent
+implementation review are required before merge; source closure alone is
+not merge acceptance. The implementation pull request records those results.
 
 ### TTY
 

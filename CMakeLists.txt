@@ -262,6 +262,36 @@ set(
 )
 
 set(
+    MICROS_GRANT_COPY_TARGET_SOURCES
+    kernel/grant_copy.c
+    kernel/grant_copy_range.c
+)
+
+set(
+    MICROS_GRANT_HOST_TEST_SOURCES
+    tests/host/grant_test.c
+    tests/host/grant_test_fixture.c
+    tests/host/grant_lifecycle_test.c
+    tests/host/grant_validation_test.c
+    tests/host/grant_model_test.c
+    tests/host/grant_model_reference.c
+    tests/host/grant_model_operations.c
+    tests/host/grant_model_copy.c
+)
+
+set(
+    MICROS_GRANT_SYSCALL_QEMU_TEST_SOURCES
+    kernel/grant_syscall_test.c
+    kernel/grant_syscall_test_fixture.c
+    kernel/grant_syscall_test_commands.c
+    kernel/grant_syscall_test_copy_commands.c
+    kernel/grant_syscall_test_transitions.c
+    kernel/grant_syscall_test_effects.c
+    kernel/grant_syscall_test_hooks.c
+    kernel/grant_syscall_test_lifecycle.c
+)
+
+set(
     MICROS_KERNEL_OBJECT_CORE_SOURCES
     kernel/kernel_objects.c
     kernel/kernel_object_state.c
@@ -1246,7 +1276,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_IPC_CLOSE_HOST_TEST_SOURCES}
         tests/host/ipc_deadlock_test.c
         tests/host/ipc_delivery_test.c
-        tests/host/grant_test.c
+        ${MICROS_GRANT_HOST_TEST_SOURCES}
         tests/host/grant_copy_test.c
         tests/host/grant_syscall_core_test.c
         ${MICROS_USER_ADDRESS_SPACE_HOST_TEST_SOURCES}
@@ -1268,7 +1298,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant_copy_core.c
         ${MICROS_IPC_CORE_SOURCES}
         ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
-        tests/host/grant_test.c
+        ${MICROS_GRANT_HOST_TEST_SOURCES}
         tests/host/grant_copy_test.c
         ${MICROS_IPC_CLOSE_HOST_TEST_SOURCES}
         tests/host/ipc_model_main.c
@@ -3866,7 +3896,7 @@ add_executable(
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
     kernel/grant.c
     kernel/grant_abi.c
-    kernel/grant_copy.c
+    ${MICROS_GRANT_COPY_TARGET_SOURCES}
     kernel/grant_copy_core.c
     kernel/grant_syscall_core.c
     kernel/grant_syscall.c
@@ -5085,7 +5115,7 @@ if(MICROS_BUILD_GRANT_SYSCALL_TEST)
         micros
         PRIVATE
             arch/riscv64/grant_syscall_test.S
-            kernel/grant_syscall_test.c
+            ${MICROS_GRANT_SYSCALL_QEMU_TEST_SOURCES}
     )
 endif()
 
