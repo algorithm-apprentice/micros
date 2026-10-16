@@ -634,3 +634,12 @@ types reconstruct; actual native ordering, rejection and panic cases pass.
 The graph gate distinguishes C tags/members from function calls or callback
 bindings, retaining a regression for the shared type/function spelling.
 All 26 C owners are real; three semantic dispositions remain.
+
+Native authority evidence now has a 78-line authorized-tuple root and
+70-line rejection phase. Three original readonly identities remain in root;
+all eight original typed aggregates retain their exact initializers.
+Foreign-thread, free-thread, profile-operation and manifest-source
+corruptions retain their mutation/reset/failure order. Whole-body/type and
+independent initializer/binding/order fixtures precede the outline, and
+actual native operation-14 evidence passes. Only real UART and Python
+renderer semantic dispositions remain.

@@ -156,7 +156,7 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
-    (6, "test_syscall_authority"), (7, "render_fixture"),
+    (7, "render_fixture"),
 )
 RUNTIME_CONTEXT_TAG = "tty_handoff_context"
 RUNTIME_CONTEXT_GETTER = "tty_handoff_context"
@@ -324,6 +324,19 @@ CONTROL_CONTEXT_ROOTS = (
     *ORIGINAL_FUNCTIONS[5][2], *ORIGINAL_FUNCTIONS[5][3],
 )
 CONTROL_JUMP_ROOTS = ("test_invariant_failure_is_fatal_before_mutation", "test_hardware_corruption_precedes_tuple_failure")
+AUTHORITY_WORK_TAG = "tty_control_authority_case"
+AUTHORITY_PHASE = "tty_control_test_check_authority_rejections"
+AUTHORITY_FIELDS = (
+    ("struct micros_tty_handoff_runtime_state state;", True),
+    ("struct micros_bootstrap_binding binding;", True),
+    ("struct micros_bootstrap_manifest_entry entry;", True),
+    ("struct micros_syscall_context context;", True),
+    ("struct micros_process caller_process;", True),
+    ("struct micros_thread caller_thread;", True),
+    ("struct micros_endpoint_record endpoint;", True),
+    ("struct micros_privilege_profile profile;", True),
+)
+AUTHORITY_PARAMETERS = "struct tty_control_authority_case *work, const struct micros_thread_handle thread_handle"
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -741,6 +754,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 6 and spelling == AUTHORITY_PHASE:
+                if path != FAMILY_PATHS[6][0]:
+                    raise AssertionError("native authority rejections retain their original case owner")
+                continue
             if family == 5 and spelling == CONTROL_FIXTURE_GETTER:
                 if path != CONTROL_SOURCES[1]:
                     raise AssertionError("captured-control fixture getter has its sole original-family owner")
@@ -825,6 +842,8 @@ def original_body_digest(family, record):
         body = device_actual_body_tokens(record)
     if family == 4 and record.name == "tty_handoff_test_runtime_lifecycle_validation" and (4, "test_runtime_lifecycle_validation") not in FUNCTION_TASK_MIGRATION:
         body = lifecycle_actual_body_tokens(record)
+    if family == 6 and record.name == "test_syscall_authority" and (6, "test_syscall_authority") not in FUNCTION_TASK_MIGRATION:
+        body = authority_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
@@ -1055,6 +1074,27 @@ def control_fixture_body_tokens(original, body):
     )
 
 
+def authority_body_tokens(caller, phase, declarations):
+    from tests.host.test_grant_data_plane_source_layout import boolean_case_body_tokens
+
+    actual = tokens(phase)
+    if actual[-4:] != ("return", "true", ";", "}") or set(actual[1:-4]) & {"return", "goto", "break", "continue"}:
+        raise AssertionError("authority rejections retain original ordered first-failure observations and success")
+    body = boolean_case_body_tokens(tokens(caller), ((AUTHORITY_PHASE, "&work, thread_handle", phase, True),))
+    return root_work_body_tokens(body, AUTHORITY_WORK_TAG, AUTHORITY_FIELDS, declarations)
+
+
+def authority_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(FAMILY_PATHS[6][0]) if owner is None else owner
+    declarations = work_declarations(owner, AUTHORITY_WORK_TAG, AUTHORITY_FIELDS)
+    phase = function_records(owner)[AUTHORITY_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens("static bool " + AUTHORITY_PHASE + "(" + AUTHORITY_PARAMETERS + ")"):
+        raise AssertionError("authority phase binds only exact original typed automatic fixture and root readonly thread")
+    return authority_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
+
+
 def function_references(body, names):
     words = tokens(body)
     return {
@@ -1134,6 +1174,73 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_native_control_authority_has_exact_typed_rejection_phase_after_authorized_tuple(self):
+        records = function_records(source(FAMILY_PATHS[6][0]))
+        self.assertIn(AUTHORITY_PHASE, set(records))
+        self.assertEqual(tokens("static bool " + AUTHORITY_PHASE + "(" + AUTHORITY_PARAMETERS + ")"), tokens(records[AUTHORITY_PHASE].signature))
+        self.assertLessEqual(records["test_syscall_authority"].lines, 120)
+        self.assertLessEqual(records[AUTHORITY_PHASE].lines, 120)
+
+    def test_authority_inverse_retains_root_identity_initializers_authorized_first_and_ordered_corruptions(self):
+        prefix = (
+            "{ const struct micros_process_handle process = {3, 7}; "
+            "const struct micros_thread_handle thread_handle = {5, 9}; "
+            "const micros_endpoint_t endpoint_value = (process.generation << SLOT_BITS) | process.slot; "
+        )
+        caller = (
+            prefix + "struct tty_control_authority_case work; "
+            "work.state = (struct micros_tty_handoff_runtime_state){ .process = process, .thread = thread_handle }; "
+            "work.binding = (struct micros_bootstrap_binding){ .endpoint = endpoint_value }; "
+            "work.entry = (struct micros_bootstrap_manifest_entry){ .irq_source = SOURCE }; "
+            "work.context = (struct micros_syscall_context){ .current = thread_handle, .process = process }; "
+            "work.caller_process = (struct micros_process){ .privilege_profile = TTY }; "
+            "work.caller_thread = (struct micros_thread){ .owner = process }; "
+            "work.endpoint = (struct micros_endpoint_record){ .value = endpoint_value }; "
+            "work.profile = (struct micros_privilege_profile){ .kernel_operations = TTY_OP }; "
+            "EXPECT_TRUE(original_authorized(&work.state, &work.binding, &work.entry, &work.context, "
+            "&work.caller_process, &work.caller_thread, &work.endpoint, &work.profile)); "
+            "return tty_control_test_check_authority_rejections(&work, thread_handle); }"
+        )
+        phase = (
+            "{ work->context.current.slot += 1; EXPECT_TRUE(original_foreign(&work->context)); "
+            "work->context.current = thread_handle; work->caller_thread.slot_state = FREE; "
+            "EXPECT_TRUE(original_free_thread(&work->caller_thread)); work->caller_thread.slot_state = LIVE; "
+            "work->profile.kernel_operations = PM_OP; EXPECT_TRUE(original_profile(&work->profile)); "
+            "work->profile.kernel_operations = TTY_OP; work->entry.irq_source -= 1; "
+            "EXPECT_TRUE(original_manifest(&work->entry)); return true; }"
+        )
+        expected = tokens(
+            prefix + "struct micros_tty_handoff_runtime_state state = { .process = process, .thread = thread_handle }; "
+            "struct micros_bootstrap_binding binding = { .endpoint = endpoint_value }; "
+            "struct micros_bootstrap_manifest_entry entry = { .irq_source = SOURCE }; "
+            "struct micros_syscall_context context = { .current = thread_handle, .process = process }; "
+            "struct micros_process caller_process = { .privilege_profile = TTY }; "
+            "struct micros_thread caller_thread = { .owner = process }; "
+            "struct micros_endpoint_record endpoint = { .value = endpoint_value }; "
+            "struct micros_privilege_profile profile = { .kernel_operations = TTY_OP }; "
+            "EXPECT_TRUE(original_authorized(&state, &binding, &entry, &context, &caller_process, &caller_thread, &endpoint, &profile)); "
+            "context.current.slot += 1; EXPECT_TRUE(original_foreign(&context)); context.current = thread_handle; "
+            "caller_thread.slot_state = FREE; EXPECT_TRUE(original_free_thread(&caller_thread)); caller_thread.slot_state = LIVE; "
+            "profile.kernel_operations = PM_OP; EXPECT_TRUE(original_profile(&profile)); profile.kernel_operations = TTY_OP; "
+            "entry.irq_source -= 1; EXPECT_TRUE(original_manifest(&entry)); return true; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in AUTHORITY_FIELDS)
+        self.assertEqual(expected, authority_body_tokens(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct tty_control_authority_case work;", "struct tty_control_authority_case work = {0};"),
+            caller.replace("&work, thread_handle)", "&work, other_thread)"),
+            caller.replace("&work, thread_handle)", "&copy, thread_handle)"),
+            caller.replace("return tty_control_test", "retain(&work); return tty_control_test"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                authority_body_tokens(changed, phase, declarations)
+        with self.assertRaises(AssertionError):
+            authority_body_tokens(caller, phase.replace("return true;", "return false;"), declarations)
+        with self.assertRaises(AssertionError):
+            authority_body_tokens(caller, phase, (tokens("struct micros_thread state;"), *declarations[1:]))
+        self.assertNotEqual(expected, authority_body_tokens(caller.replace("{5, 9}", "{5, 8}"), phase, declarations))
+        self.assertNotEqual(expected, authority_body_tokens(caller, phase.replace("= PM_OP", "= TTY_OP"), declarations))
+
     def test_captured_control_originals_have_exact_owners_and_one_twenty_field_fixture(self):
         header = source(PRIVATE_HEADERS[4])
         expected = tokens("struct " + CONTROL_FIXTURE_TAG + " {" + "".join(CONTROL_FIXTURE_FIELDS) + "};")
@@ -1887,6 +1994,7 @@ class TtySourceLayoutTest(unittest.TestCase):
             set(REQUIRED_TASKS) - {
                 (0, "live_binding_matches"), (2, "handle_submit_write"), (3, "model_validate"),
                 (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
+                (6, "test_syscall_authority"),
             },
             set(FUNCTION_TASK_MIGRATION),
         )
