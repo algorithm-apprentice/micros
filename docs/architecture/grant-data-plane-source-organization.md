@@ -548,3 +548,12 @@ twenty-four native originals, exact array extents, macros, trace chronology
 and reset sites. The two future model-operation owners still contain no
 outlined tasks. Forty original syscall-target moves and fifteen semantic
 dispositions remain pending.
+
+The create/revoke, endpoint-cancellation, error-precedence and model-boundary
+cases now expose their ordered domain phases with roots of 18, 19, 19 and
+16 lines. Their eighteen phases retain the original typed automatic objects,
+initializers, case-local capacity snapshot/sentinel block and first-failure
+returns. The capacity-only phase borrows the fixture without an unused work
+parameter. Actual complete-body reconstruction retains the original fourteen
+long and five shorter inventories unchanged. Forty target moves and eleven
+semantic dispositions remain pending.

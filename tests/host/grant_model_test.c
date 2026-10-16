@@ -1,18 +1,21 @@
 #include "grant_test_internal.h"
 
-static bool grant_test_grant_model_boundaries(void)
-{
-    struct grant_test_fixture *fixture = grant_test_context();
-
+struct grant_test_boundary_case {
     struct micros_grant_registry expected;
     micros_grant_t terminal;
     size_t index;
+};
 
+static bool grant_test_boundary_fill_registry(
+    struct grant_test_fixture *fixture,
+    struct grant_test_boundary_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
-    expected = fixture->grant_registry;
-    for (index = 0; index < MICROS_GRANT_CAPACITY; ++index) {
+    work->expected = fixture->grant_registry;
+    for (work->index = 0; work->index < MICROS_GRANT_CAPACITY; ++work->index) {
         struct micros_grant_record *record =
-            &expected.grants[index];
+            &work->expected.grants[work->index];
         micros_grant_t grant;
 
         EXPECT_GRANT_ERROR(
@@ -24,7 +27,7 @@ static bool grant_test_grant_model_boundaries(void)
                 fixture->processes[0],
                 fixture->endpoints[1],
                 MICROS_USER_VIRTUAL_BASE
-                    + index * UINT64_C(0x100),
+                    + work->index * UINT64_C(0x100),
                 16,
                 MICROS_GRANT_PERMISSION_READ,
                 &grant
@@ -37,13 +40,20 @@ static bool grant_test_grant_model_boundaries(void)
             .grantor_endpoint = fixture->endpoints[0],
             .grantee_endpoint = fixture->endpoints[1],
             .base = MICROS_USER_VIRTUAL_BASE
-                + index * UINT64_C(0x100),
+                + work->index * UINT64_C(0x100),
             .length = 16,
             .permissions = MICROS_GRANT_PERMISSION_READ,
         };
-        ++expected.active_count;
-        EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &expected));
+        ++work->expected.active_count;
+        EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->expected));
     }
+    return true;
+}
+
+static bool grant_test_boundary_capacity_output(
+    struct grant_test_fixture *fixture
+)
+{
     {
         struct micros_grant_registry snapshot = fixture->grant_registry;
         micros_grant_t output = UINT32_C(0xdeadbeef);
@@ -67,17 +77,32 @@ static bool grant_test_grant_model_boundaries(void)
             && grant_test_registries_equal(&fixture->grant_registry, &snapshot)
         );
     }
+    return true;
+}
 
+static bool grant_test_boundary_quarantine_prepare(
+    struct grant_test_fixture *fixture,
+    struct grant_test_boundary_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
-    for (index = 0; index + 1 < MICROS_GRANT_CAPACITY; ++index) {
-        fixture->grant_registry.grants[index].state =
+    for (work->index = 0; work->index + 1 < MICROS_GRANT_CAPACITY; ++work->index) {
+        fixture->grant_registry.grants[work->index].state =
             MICROS_GRANT_SLOT_QUARANTINED;
-        fixture->grant_registry.grants[index].generation =
+        fixture->grant_registry.grants[work->index].generation =
             MICROS_GRANT_GENERATION_MAX;
     }
     fixture->grant_registry.grants[MICROS_GRANT_CAPACITY - 1].generation =
         MICROS_GRANT_GENERATION_MAX - 1;
-    expected = fixture->grant_registry;
+    work->expected = fixture->grant_registry;
+    return true;
+}
+
+static bool grant_test_boundary_terminal_revoke(
+    struct grant_test_fixture *fixture,
+    struct grant_test_boundary_case *work
+)
+{
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_create(
@@ -89,10 +114,10 @@ static bool grant_test_grant_model_boundaries(void)
             MICROS_USER_VIRTUAL_BASE,
             1,
             MICROS_GRANT_PERMISSION_WRITE,
-            &terminal
+            &work->terminal
         )
     );
-    expected.grants[MICROS_GRANT_CAPACITY - 1] =
+    work->expected.grants[MICROS_GRANT_CAPACITY - 1] =
         (struct micros_grant_record){
             .state = MICROS_GRANT_SLOT_ACTIVE,
             .generation = MICROS_GRANT_GENERATION_MAX - 1,
@@ -103,8 +128,8 @@ static bool grant_test_grant_model_boundaries(void)
             .length = 1,
             .permissions = MICROS_GRANT_PERMISSION_WRITE,
         };
-    expected.active_count = 1;
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &expected));
+    work->expected.active_count = 1;
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->expected));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_revoke(
@@ -112,27 +137,44 @@ static bool grant_test_grant_model_boundaries(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            terminal
+            work->terminal
         )
     );
     memset(
-        &expected.grants[MICROS_GRANT_CAPACITY - 1],
+        &work->expected.grants[MICROS_GRANT_CAPACITY - 1],
         0,
-        sizeof(expected.grants[MICROS_GRANT_CAPACITY - 1])
+        sizeof(work->expected.grants[MICROS_GRANT_CAPACITY - 1])
     );
-    expected.grants[MICROS_GRANT_CAPACITY - 1].state =
+    work->expected.grants[MICROS_GRANT_CAPACITY - 1].state =
         MICROS_GRANT_SLOT_QUARANTINED;
-    expected.grants[MICROS_GRANT_CAPACITY - 1].generation =
+    work->expected.grants[MICROS_GRANT_CAPACITY - 1].generation =
         MICROS_GRANT_GENERATION_MAX - 1;
-    expected.active_count = 0;
+    work->expected.active_count = 0;
     return (
-        grant_test_registries_equal(&fixture->grant_registry, &expected)
+        grant_test_registries_equal(&fixture->grant_registry, &work->expected)
         && micros_grant_registry_validate(
             &fixture->grant_registry,
             &fixture->endpoint_registry,
             &fixture->objects
         ) == MICROS_GRANT_OK
     );
+}
+
+static bool grant_test_grant_model_boundaries(void)
+{
+    struct grant_test_fixture *fixture = grant_test_context();
+    struct grant_test_boundary_case work;
+
+    if (!grant_test_boundary_fill_registry(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_boundary_capacity_output(fixture)) {
+        return false;
+    }
+    if (!grant_test_boundary_quarantine_prepare(fixture, &work)) {
+        return false;
+    }
+    return grant_test_boundary_terminal_revoke(fixture, &work);
 }
 
 static bool grant_test_grant_model(void)

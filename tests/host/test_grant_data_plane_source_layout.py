@@ -138,6 +138,72 @@ NATIVE_CONTEXT_ROOTS = (
 )
 NATIVE_TYPES_DIGEST = "471822c9669476abc88e7c5504c3e6257a651f2e3ef6474108f8418dc6201f51"
 NATIVE_ASSERTIONS_DIGEST = "e5644256b70b07a218fca2f41a93824ca4f75c66610f08825bed1d04e416d11a"
+NATIVE_CASE_OUTLINES = {
+    "test_create_inspect_revoke_and_reuse": (
+        HOST_SOURCES[2], "grant_test_create_case",
+        (
+            ("struct micros_grant_record observed;", False),
+            ("struct micros_grant_record sentinel;", False),
+            ("struct micros_grant_registry snapshot;", False),
+            ("micros_grant_t first;", "value"),
+            ("micros_grant_t second;", "value"),
+        ),
+        (
+            "grant_test_create_shape_and_setup", "grant_test_create_record",
+            "grant_test_create_foreign_denials", "grant_test_create_revoke_and_reuse",
+        ),
+    ),
+    "test_endpoint_cancellation_and_reuse": (
+        HOST_SOURCES[2], "grant_test_cancel_case",
+        (
+            ("struct micros_grant_cancel_plan plan;", False),
+            ("struct micros_grant_cancel_plan corrupted;", False),
+            ("struct micros_grant_registry snapshot;", False),
+            ("struct micros_grant_registry foreign_registry;", False),
+            ("struct micros_grant_record observed;", False),
+            ("struct micros_process_handle old_process;", False),
+            ("micros_grant_t from_closing;", False),
+            ("micros_grant_t to_closing;", False),
+            ("micros_grant_t unrelated;", False),
+        ),
+        (
+            "grant_test_cancel_create_participants", "grant_test_cancel_prepare_source",
+            "grant_test_cancel_reject_foreign_plans", "grant_test_cancel_commit_and_survivor",
+            "grant_test_cancel_generation_reuse",
+        ),
+    ),
+    "test_error_precedence_and_output_preservation": (
+        HOST_SOURCES[3], "grant_test_precedence_case",
+        (
+            ("struct micros_grant_cancel_plan plan;", False),
+            ("struct micros_grant_cancel_plan plan_sentinel;", False),
+            ("struct micros_grant_record record;", False),
+            ("struct micros_grant_record record_sentinel;", False),
+            ("struct micros_grant_registry valid;", False),
+            ("struct micros_process_handle stale_process;", False),
+            ("micros_grant_t grant;", False),
+            ("micros_grant_t stale_grant;", False),
+        ),
+        (
+            "grant_test_precedence_range_before_invariant", "grant_test_precedence_record_output",
+            "grant_test_precedence_stale_shape", "grant_test_precedence_cancel_shape",
+            "grant_test_precedence_closed_endpoint",
+        ),
+    ),
+    "test_grant_model_boundaries": (
+        HOST_SOURCES[4], "grant_test_boundary_case",
+        (
+            ("struct micros_grant_registry expected;", False),
+            ("micros_grant_t terminal;", False),
+            ("size_t index;", False),
+        ),
+        (
+            "grant_test_boundary_fill_registry", "grant_test_boundary_capacity_output",
+            "grant_test_boundary_quarantine_prepare", "grant_test_boundary_terminal_revoke",
+        ),
+    ),
+}
+NATIVE_FIXTURE_ONLY_PHASES = ("grant_test_boundary_capacity_output",)
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -233,10 +299,6 @@ FUNCTION_TASK_MIGRATION = (
     (3, "transition_after_return"),
     (3, "validate_command_effect"),
     (3, "micros_grant_syscall_runtime_run_self_test"),
-    (4, "test_create_inspect_revoke_and_reuse"),
-    (4, "test_endpoint_cancellation_and_reuse"),
-    (4, "test_error_precedence_and_output_preservation"),
-    (4, "test_grant_model_boundaries"),
     (4, "test_grant_model"),
     (5, "test_copy_authority_and_bounds"),
     (6, "micros_grant_syscall_core_test_run"),
@@ -528,6 +590,13 @@ def original_locations(family, texts=None):
             if path != HOST_SOURCES[1]:
                 raise AssertionError("the native fixture getter has its sole state owner")
             continue
+        if family == 4 and any(spelling in specification[3] for specification in NATIVE_CASE_OUTLINES.values()):
+            paths = tuple(
+                specification[0] for specification in NATIVE_CASE_OUTLINES.values() if spelling in specification[3]
+            )
+            if paths != (path,):
+                raise AssertionError("native case phases have one exact file-local domain owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -561,6 +630,8 @@ def original_body_digest(family, original, record):
     if family == 1 and original == "micros_grant_handle_captured_user_ecall" and (1, original) not in FUNCTION_TASK_MIGRATION:
         body = syscall_actual_body_tokens(record)
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
+        if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
+            body = native_case_actual_body_tokens(original, record)
         body = native_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
@@ -729,6 +800,57 @@ def native_fixture_body_tokens(original, body):
             restored.append(name)
             index += 1
     return restore_state_members(restored, "fixture", NATIVE_FIELD_NAMES, ("->",))
+
+
+def boolean_case_body_tokens(caller, phases):
+    caller = list(caller)
+    for name, arguments, phase, terminal in phases:
+        binding = name + "(" + arguments + ")"
+        call = list(tokens(
+            "return " + binding + ";" if terminal else "if (!" + binding + ") { return false; }"
+        ))
+        positions = [
+            index for index in range(len(caller)) if caller[index:index + len(call)] == call
+        ]
+        body = list(tokens(phase))
+        if len(positions) != 1 or body[:1] != ["{"] or body[-1:] != ["}"]:
+            raise AssertionError("each domain phase binds exactly one caller-owned work/fixture and failure exit")
+        if terminal:
+            inner = body[1:-1]
+        else:
+            if body[-4:] != ["return", "true", ";", "}"]:
+                raise AssertionError("a nonterminal phase continues only after its entire original task succeeds")
+            inner = body[1:-4]
+        start = positions[0]
+        caller[start:start + len(call)] = inner
+    return tuple(caller)
+
+
+def native_case_actual_body_tokens(original, record, owner=None):
+    path, tag, fields, names = NATIVE_CASE_OUTLINES[original]
+    owner = source(path) if owner is None else owner
+    declarations = work_declarations(owner, tag, fields)
+    records = function_records(owner)
+    phases = []
+    for index, name in enumerate(names):
+        phase = records[name]
+        parameters = "struct grant_test_fixture *fixture"
+        if name not in NATIVE_FIXTURE_ONLY_PHASES:
+            parameters += ", struct " + tag + " *work"
+        if phase.guards or tokens(phase.signature) != tokens(
+            "static bool " + name + "(" + parameters + ")"
+        ):
+            raise AssertionError("native phases borrow only their original fixture and exact typed automatic work")
+        arguments = "fixture" if name in NATIVE_FIXTURE_ONLY_PHASES else "fixture, &work"
+        phases.append((name, arguments, "{" + phase.body + "}", index == len(names) - 1))
+    body = list(tokens("{" + record.body + "}"))
+    borrow = list(tokens("struct grant_test_fixture *fixture = " + NATIVE_FIXTURE_GETTER + "();"))
+    if body[:1 + len(borrow)] != ["{"] + borrow:
+        raise AssertionError("the original native case root retains the sole non-resetting fixture borrow")
+    del body[1:1 + len(borrow)]
+    body = list(restore_automatic_work_tokens(boolean_case_body_tokens(body, phases), tag, fields, declarations))
+    body[1:1] = borrow
+    return tuple(body)
 
 
 def copy_execution_actual_body_tokens(record, owner=None):
@@ -989,6 +1111,51 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_native_deterministic_cases_expose_ordered_bounded_domain_phases(self):
+        for original, (path, tag, fields, phases) in NATIVE_CASE_OUTLINES.items():
+            owner = source(path)
+            records = function_records(owner)
+            with self.subTest(original=original):
+                self.assertEqual(
+                    tuple(tokens(declaration) for declaration, _ in fields), work_declarations(owner, tag, fields),
+                )
+                for phase in phases:
+                    self.assertIn(phase, records)
+                    self.assertLessEqual(records[phase].lines, 120)
+                name = next(name for name, old in normal_names(4).items() if old == original)
+                self.assertLessEqual(records[name].lines, 120)
+
+    def test_boolean_case_inverse_preserves_first_failure_nested_scope_and_terminal_result(self):
+        caller = "{ if (!fill(fixture, &work)) { return false; } return finish(fixture, &work); }"
+        first = "{ EXPECT_TRUE(original_setup(fixture)); { uint32_t sentinel = 0xa5; original_check(sentinel); } return true; }"
+        final = "{ original_restore(fixture); return original_final_comparison(fixture); }"
+        phases = (
+            ("fill", "fixture, &work", first, False),
+            ("finish", "fixture, &work", final, True),
+        )
+        expected = (
+            "{ EXPECT_TRUE(original_setup(fixture)); { uint32_t sentinel = 0xa5; original_check(sentinel); } "
+            "original_restore(fixture); return original_final_comparison(fixture); }"
+        )
+        self.assertEqual(tokens(expected), boolean_case_body_tokens(tokens(caller), phases))
+        for changed in (
+            caller.replace("fixture, &work", "other, &work", 1),
+            caller.replace("fixture, &work", "fixture, &copy", 1),
+            caller.replace("return false;", "return true;", 1),
+            caller.replace("return finish", "finish"),
+            caller.replace("return finish", "if (!fill(fixture, &work)) { return false; } return finish"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                boolean_case_body_tokens(tokens(changed), phases)
+        with self.assertRaises(AssertionError):
+            boolean_case_body_tokens(tokens(caller), (
+                ("fill", "fixture, &work", first.replace("return true;", "return false;"), False), phases[1],
+            ))
+        changed = (
+            ("fill", "fixture, &work", first.replace("0xa5", "0"), False), phases[1],
+        )
+        self.assertNotEqual(tokens(expected), boolean_case_body_tokens(tokens(caller), changed))
+
     def test_native_fixture_has_only_nine_original_fields_and_nonresetting_storage(self):
         header = source(PRIVATE_HEADERS[1])
         self.assertEqual(

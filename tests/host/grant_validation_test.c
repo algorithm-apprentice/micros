@@ -1,9 +1,6 @@
 #include "grant_test_internal.h"
 
-bool grant_test_error_precedence_and_output_preservation(void)
-{
-    struct grant_test_fixture *fixture = grant_test_context();
-
+struct grant_test_precedence_case {
     struct micros_grant_cancel_plan plan;
     struct micros_grant_cancel_plan plan_sentinel;
     struct micros_grant_record record;
@@ -12,7 +9,13 @@ bool grant_test_error_precedence_and_output_preservation(void)
     struct micros_process_handle stale_process;
     micros_grant_t grant;
     micros_grant_t stale_grant;
+};
 
+static bool grant_test_precedence_range_before_invariant(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
@@ -25,10 +28,10 @@ bool grant_test_error_precedence_and_output_preservation(void)
             MICROS_USER_VIRTUAL_BASE,
             64,
             MICROS_GRANT_PERMISSION_READ,
-            &grant
+            &work->grant
         )
     );
-    valid = fixture->grant_registry;
+    work->valid = fixture->grant_registry;
     ++fixture->grant_registry.active_count;
     EXPECT_TRUE(grant_test_expect_create_failure_unchanged(
         fixture,
@@ -39,10 +42,17 @@ bool grant_test_error_precedence_and_output_preservation(void)
         2,
         MICROS_GRANT_PERMISSION_READ
     ));
-    fixture->grant_registry = valid;
+    fixture->grant_registry = work->valid;
+    return true;
+}
 
-    memset(&record_sentinel, 0xa5, sizeof(record_sentinel));
-    record = record_sentinel;
+static bool grant_test_precedence_record_output(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
+    memset(&work->record_sentinel, 0xa5, sizeof(work->record_sentinel));
+    work->record = work->record_sentinel;
     ++fixture->grant_registry.active_count;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_INVARIANT,
@@ -51,18 +61,25 @@ bool grant_test_error_precedence_and_output_preservation(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            grant,
-            &record
+            work->grant,
+            &work->record
         )
     );
-    EXPECT_TRUE(memcmp(&record, &record_sentinel, sizeof(record)) == 0);
-    fixture->grant_registry = valid;
+    EXPECT_TRUE(memcmp(&work->record, &work->record_sentinel, sizeof(work->record)) == 0);
+    fixture->grant_registry = work->valid;
+    return true;
+}
 
-    stale_process = fixture->processes[0];
-    ++stale_process.generation;
+static bool grant_test_precedence_stale_shape(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
+    work->stale_process = fixture->processes[0];
+    ++work->stale_process.generation;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
-        micros_grant_pack(1, 1, &stale_grant)
+        micros_grant_pack(1, 1, &work->stale_grant)
     );
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_DEAD_ENDPOINT,
@@ -70,9 +87,9 @@ bool grant_test_error_precedence_and_output_preservation(void)
             &fixture->grant_registry,
             &fixture->endpoint_registry,
             &fixture->objects,
-            stale_process,
-            stale_grant,
-            &record
+            work->stale_process,
+            work->stale_grant,
+            &work->record
         )
     );
     EXPECT_GRANT_ERROR(
@@ -86,9 +103,16 @@ bool grant_test_error_precedence_and_output_preservation(void)
             NULL
         )
     );
+    return true;
+}
 
-    memset(&plan_sentinel, 0xa5, sizeof(plan_sentinel));
-    plan = plan_sentinel;
+static bool grant_test_precedence_cancel_shape(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
+    memset(&work->plan_sentinel, 0xa5, sizeof(work->plan_sentinel));
+    work->plan = work->plan_sentinel;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_ARGUMENT,
         micros_grant_prepare_endpoint_cancel(
@@ -96,29 +120,36 @@ bool grant_test_error_precedence_and_output_preservation(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             MICROS_ENDPOINT_ANY,
-            &plan
+            &work->plan
         )
     );
-    EXPECT_TRUE(memcmp(&plan, &plan_sentinel, sizeof(plan)) == 0);
+    EXPECT_TRUE(memcmp(&work->plan, &work->plan_sentinel, sizeof(work->plan)) == 0);
 
-    memset(&plan, 0, sizeof(plan));
-    plan.active = true;
-    plan.registry_identity = (uintptr_t)&fixture->grant_registry + 1;
-    plan.endpoint = fixture->endpoints[0];
-    plan.selected_slots = UINT64_MAX;
+    memset(&work->plan, 0, sizeof(work->plan));
+    work->plan.active = true;
+    work->plan.registry_identity = (uintptr_t)&fixture->grant_registry + 1;
+    work->plan.endpoint = fixture->endpoints[0];
+    work->plan.selected_slots = UINT64_MAX;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_STATE,
         micros_grant_commit_endpoint_cancel(
             &fixture->grant_registry,
-            &plan
+            &work->plan
         )
     );
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &valid));
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->valid));
+    return true;
+}
 
+static bool grant_test_precedence_closed_endpoint(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
-        micros_grant_pack(0, 1, &stale_grant)
+        micros_grant_pack(0, 1, &work->stale_grant)
     );
     EXPECT_TRUE(
         micros_ipc_endpoint_close(
@@ -127,7 +158,7 @@ bool grant_test_error_precedence_and_output_preservation(void)
             fixture->endpoints[0]
         ) == MICROS_IPC_OK
     );
-    record = record_sentinel;
+    work->record = work->record_sentinel;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_DEAD_ENDPOINT,
         micros_grant_inspect(
@@ -135,11 +166,11 @@ bool grant_test_error_precedence_and_output_preservation(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            stale_grant,
-            &record
+            work->stale_grant,
+            &work->record
         )
     );
-    EXPECT_TRUE(memcmp(&record, &record_sentinel, sizeof(record)) == 0);
+    EXPECT_TRUE(memcmp(&work->record, &work->record_sentinel, sizeof(work->record)) == 0);
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_DEAD_ENDPOINT,
         micros_grant_revoke(
@@ -147,10 +178,30 @@ bool grant_test_error_precedence_and_output_preservation(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            stale_grant
+            work->stale_grant
         )
     );
     return true;
+}
+
+bool grant_test_error_precedence_and_output_preservation(void)
+{
+    struct grant_test_fixture *fixture = grant_test_context();
+    struct grant_test_precedence_case work;
+
+    if (!grant_test_precedence_range_before_invariant(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_precedence_record_output(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_precedence_stale_shape(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_precedence_cancel_shape(fixture, &work)) {
+        return false;
+    }
+    return grant_test_precedence_closed_endpoint(fixture, &work);
 }
 
 bool grant_test_validator_rejects_corruption(void)

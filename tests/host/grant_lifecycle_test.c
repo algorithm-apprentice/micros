@@ -65,18 +65,21 @@ bool grant_test_token_boundaries(void)
     return true;
 }
 
-bool grant_test_create_inspect_revoke_and_reuse(void)
-{
-    struct grant_test_fixture *fixture = grant_test_context();
-
+struct grant_test_create_case {
     struct micros_grant_record observed;
     struct micros_grant_record sentinel;
     struct micros_grant_registry snapshot;
-    micros_grant_t first = MICROS_GRANT_NONE;
-    micros_grant_t second = MICROS_GRANT_NONE;
+    micros_grant_t first;
+    micros_grant_t second;
+};
 
+static bool grant_test_create_shape_and_setup(
+    struct grant_test_fixture *fixture,
+    struct grant_test_create_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
-    snapshot = fixture->grant_registry;
+    work->snapshot = fixture->grant_registry;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_ARGUMENT,
         micros_grant_create(
@@ -91,7 +94,15 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             NULL
         )
     );
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &snapshot));
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->snapshot));
+    return true;
+}
+
+static bool grant_test_create_record(
+    struct grant_test_fixture *fixture,
+    struct grant_test_create_case *work
+)
+{
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_create(
@@ -103,11 +114,11 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             MICROS_USER_VIRTUAL_BASE + UINT64_C(0x1000),
             128,
             MICROS_GRANT_PERMISSION_READ,
-            &first
+            &work->first
         )
     );
-    EXPECT_TRUE(first == UINT32_C(0x40));
-    memset(&observed, 0, sizeof(observed));
+    EXPECT_TRUE(work->first == UINT32_C(0x40));
+    memset(&work->observed, 0, sizeof(work->observed));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_inspect(
@@ -115,24 +126,31 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            first,
-            &observed
+            work->first,
+            &work->observed
         )
     );
     EXPECT_TRUE(
-        observed.state == MICROS_GRANT_SLOT_ACTIVE
-        && observed.generation == 1
-        && grant_test_process_handles_equal(observed.grantor, fixture->processes[0])
-        && observed.grantor_endpoint == fixture->endpoints[0]
-        && observed.grantee_endpoint == fixture->endpoints[1]
-        && observed.base
+        work->observed.state == MICROS_GRANT_SLOT_ACTIVE
+        && work->observed.generation == 1
+        && grant_test_process_handles_equal(work->observed.grantor, fixture->processes[0])
+        && work->observed.grantor_endpoint == fixture->endpoints[0]
+        && work->observed.grantee_endpoint == fixture->endpoints[1]
+        && work->observed.base
             == MICROS_USER_VIRTUAL_BASE + UINT64_C(0x1000)
-        && observed.length == 128
-        && observed.permissions == MICROS_GRANT_PERMISSION_READ
+        && work->observed.length == 128
+        && work->observed.permissions == MICROS_GRANT_PERMISSION_READ
     );
+    return true;
+}
 
-    memset(&sentinel, 0xa5, sizeof(sentinel));
-    observed = sentinel;
+static bool grant_test_create_foreign_denials(
+    struct grant_test_fixture *fixture,
+    struct grant_test_create_case *work
+)
+{
+    memset(&work->sentinel, 0xa5, sizeof(work->sentinel));
+    work->observed = work->sentinel;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_UNAUTHORIZED,
         micros_grant_inspect(
@@ -140,13 +158,13 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[2],
-            first,
-            &observed
+            work->first,
+            &work->observed
         )
     );
-    EXPECT_TRUE(memcmp(&observed, &sentinel, sizeof(observed)) == 0);
+    EXPECT_TRUE(memcmp(&work->observed, &work->sentinel, sizeof(work->observed)) == 0);
 
-    snapshot = fixture->grant_registry;
+    work->snapshot = fixture->grant_registry;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_UNAUTHORIZED,
         micros_grant_revoke(
@@ -154,10 +172,18 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[2],
-            first
+            work->first
         )
     );
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &snapshot));
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->snapshot));
+    return true;
+}
+
+static bool grant_test_create_revoke_and_reuse(
+    struct grant_test_fixture *fixture,
+    struct grant_test_create_case *work
+)
+{
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_revoke(
@@ -165,7 +191,7 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            first
+            work->first
         )
     );
     EXPECT_TRUE(
@@ -181,8 +207,8 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            first,
-            &observed
+            work->first,
+            &work->observed
         )
     );
     EXPECT_GRANT_ERROR(
@@ -196,11 +222,30 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
             MICROS_USER_VIRTUAL_BASE + UINT64_C(0x2000),
             64,
             MICROS_GRANT_PERMISSION_WRITE,
-            &second
+            &work->second
         )
     );
-    EXPECT_TRUE(second != first && second == UINT32_C(0x80));
+    EXPECT_TRUE(work->second != work->first && work->second == UINT32_C(0x80));
     return true;
+}
+
+bool grant_test_create_inspect_revoke_and_reuse(void)
+{
+    struct grant_test_fixture *fixture = grant_test_context();
+    struct grant_test_create_case work;
+    work.first = MICROS_GRANT_NONE;
+    work.second = MICROS_GRANT_NONE;
+
+    if (!grant_test_create_shape_and_setup(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_create_record(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_create_foreign_denials(fixture, &work)) {
+        return false;
+    }
+    return grant_test_create_revoke_and_reuse(fixture, &work);
 }
 
 bool grant_test_create_failures_and_capacity(void)
@@ -359,10 +404,7 @@ bool grant_test_terminal_generation_quarantines(void)
     return true;
 }
 
-bool grant_test_endpoint_cancellation_and_reuse(void)
-{
-    struct grant_test_fixture *fixture = grant_test_context();
-
+struct grant_test_cancel_case {
     struct micros_grant_cancel_plan plan;
     struct micros_grant_cancel_plan corrupted;
     struct micros_grant_registry snapshot;
@@ -372,7 +414,13 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
     micros_grant_t from_closing;
     micros_grant_t to_closing;
     micros_grant_t unrelated;
+};
 
+static bool grant_test_cancel_create_participants(
+    struct grant_test_fixture *fixture,
+    struct grant_test_cancel_case *work
+)
+{
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
@@ -385,7 +433,7 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             MICROS_USER_VIRTUAL_BASE,
             64,
             MICROS_GRANT_PERMISSION_READ,
-            &from_closing
+            &work->from_closing
         )
     );
     EXPECT_GRANT_ERROR(
@@ -399,7 +447,7 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             MICROS_USER_VIRTUAL_BASE + UINT64_C(0x1000),
             64,
             MICROS_GRANT_PERMISSION_WRITE,
-            &to_closing
+            &work->to_closing
         )
     );
     EXPECT_GRANT_ERROR(
@@ -413,9 +461,17 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             MICROS_USER_VIRTUAL_BASE + UINT64_C(0x2000),
             64,
             MICROS_GRANT_PERMISSION_READ,
-            &unrelated
+            &work->unrelated
         )
     );
+    return true;
+}
+
+static bool grant_test_cancel_prepare_source(
+    struct grant_test_fixture *fixture,
+    struct grant_test_cancel_case *work
+)
+{
     EXPECT_TRUE(
         micros_endpoint_seal_source_only(
             &fixture->endpoint_registry,
@@ -423,7 +479,7 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             fixture->endpoints[0]
         ) == MICROS_ENDPOINT_OK
     );
-    memset(&plan, 0xa5, sizeof(plan));
+    memset(&work->plan, 0xa5, sizeof(work->plan));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_prepare_endpoint_cancel(
@@ -431,35 +487,50 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->endpoints[0],
-            &plan
+            &work->plan
         )
     );
-    snapshot = fixture->grant_registry;
-    corrupted = plan;
-    corrupted.expected_generation[
-        from_closing
+    return true;
+}
+
+static bool grant_test_cancel_reject_foreign_plans(
+    struct grant_test_fixture *fixture,
+    struct grant_test_cancel_case *work
+)
+{
+    work->snapshot = fixture->grant_registry;
+    work->corrupted = work->plan;
+    work->corrupted.expected_generation[
+        work->from_closing
             & ((UINT32_C(1) << MICROS_GRANT_SLOT_BITS) - 1)
     ]++;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_INVARIANT,
         micros_grant_commit_endpoint_cancel(
             &fixture->grant_registry,
-            &corrupted
+            &work->corrupted
         )
     );
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &snapshot));
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->snapshot));
 
-    foreign_registry = fixture->grant_registry;
+    work->foreign_registry = fixture->grant_registry;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_STATE,
         micros_grant_commit_endpoint_cancel(
-            &foreign_registry,
-            &plan
+            &work->foreign_registry,
+            &work->plan
         )
     );
-    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &snapshot));
+    EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->snapshot));
+    return true;
+}
 
-    old_process = fixture->processes[0];
+static bool grant_test_cancel_commit_and_survivor(
+    struct grant_test_fixture *fixture,
+    struct grant_test_cancel_case *work
+)
+{
+    work->old_process = fixture->processes[0];
     EXPECT_TRUE(
         micros_ipc_endpoint_close(
             &fixture->endpoint_registry,
@@ -471,7 +542,7 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
         MICROS_GRANT_OK,
         micros_grant_commit_endpoint_cancel(
             &fixture->grant_registry,
-            &plan
+            &work->plan
         )
     );
     EXPECT_TRUE(fixture->grant_registry.active_count == 1);
@@ -482,8 +553,8 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[1],
-            to_closing,
-            &observed
+            work->to_closing,
+            &work->observed
         )
     );
     EXPECT_GRANT_ERROR(
@@ -493,22 +564,29 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[1],
-            unrelated,
-            &observed
+            work->unrelated,
+            &work->observed
         )
     );
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_STATE,
         micros_grant_commit_endpoint_cancel(
             &fixture->grant_registry,
-            &plan
+            &work->plan
         )
     );
+    return true;
+}
 
+static bool grant_test_cancel_generation_reuse(
+    struct grant_test_fixture *fixture,
+    struct grant_test_cancel_case *work
+)
+{
     EXPECT_TRUE(grant_test_recreate_process(fixture, 0));
     EXPECT_TRUE(
-        fixture->processes[0].slot == old_process.slot
-        && fixture->processes[0].generation == old_process.generation + 1
+        fixture->processes[0].slot == work->old_process.slot
+        && fixture->processes[0].generation == work->old_process.generation + 1
     );
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_STALE_GRANT,
@@ -517,8 +595,8 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
             &fixture->endpoint_registry,
             &fixture->objects,
             fixture->processes[0],
-            from_closing,
-            &observed
+            work->from_closing,
+            &work->observed
         )
     );
     EXPECT_GRANT_ERROR(
@@ -530,6 +608,26 @@ bool grant_test_endpoint_cancellation_and_reuse(void)
         )
     );
     return true;
+}
+
+bool grant_test_endpoint_cancellation_and_reuse(void)
+{
+    struct grant_test_fixture *fixture = grant_test_context();
+    struct grant_test_cancel_case work;
+
+    if (!grant_test_cancel_create_participants(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_cancel_prepare_source(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_cancel_reject_foreign_plans(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_cancel_commit_and_survivor(fixture, &work)) {
+        return false;
+    }
+    return grant_test_cancel_generation_reuse(fixture, &work);
 }
 
 bool grant_test_failed_ipc_close_preserves_cancel_plan(void)
