@@ -28,6 +28,11 @@ REGISTRY_FIELDS = (
     "initialization_magic", "max_threads_per_process", "max_harts", "live_process_count",
     "live_thread_count", "registered_hart_count", "processes", "threads", "harts",
 )
+MODEL_PROJECTION_PHASES = (
+    ("kernel_object_test_model_processes_match", ("fixture", "model"), "MICROS_PROCESS_CAPACITY"),
+    ("kernel_object_test_model_threads_match", ("fixture", "model"), "MICROS_THREAD_CAPACITY"),
+    ("kernel_object_test_model_harts_match", ("fixture",), "MICROS_HART_CAPACITY"),
+)
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
     "kernel/kernel_object_state.c",
@@ -151,7 +156,19 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
     for owner, names in owners.items() if owner != 0 for name in names
 )
 SYMBOL_OWNER_MIGRATION = ()
-FUNCTION_TASK_MIGRATION = REQUIRED_TASKS
+FUNCTION_TASK_MIGRATION = (
+    (0, "micros_hart_install_trap_stacks"),
+    (0, "micros_kernel_objects_validate_base"),
+    (1, "test_uninitialized_registry_rejects_every_operation"),
+    (1, "test_thread_execution_context_lifecycle_is_exact"),
+    (1, "test_generation_boundaries_and_quarantine"),
+    (1, "test_seeded_lifecycle_model"),
+    (2, "micros_kernel_object_runtime_run_self_test"),
+    (0, "micros_thread_attach_execution_context"),
+    (1, "test_fixed_capacities_report_exhaustion_atomically"),
+    (1, "test_process_address_space_lifecycle_is_exact"),
+    (1, "test_validator_rejects_corrupt_relationships"),
+)
 CORE_DAG = {
     0: {1}, 1: {2}, 2: set(), 3: set(), 4: {2},
     5: {1, 2}, 6: {1, 2, 3, 5}, 7: {2, 3, 5}, 8: {1, 2, 3},
@@ -323,6 +340,10 @@ def original_locations(family, texts=None):
     names = normal_names(family)
     locations = {}
     for (path, spelling), record in owned_records(family, texts).items():
+        if family == 1 and spelling in {phase[0] for phase in MODEL_PROJECTION_PHASES}:
+            if path != family_paths(1)[10]:
+                raise AssertionError("model projection passes have their exact file-local owner")
+            continue
         if family == 1 and spelling == "kernel_object_test_registry":
             if path != family_paths(1)[1]:
                 raise AssertionError("the sole native registry getter has one exact fixture owner")
@@ -416,9 +437,57 @@ def native_registry_body_tokens(original, body):
     return restore_registry_tokens(restored)
 
 
+def model_projection_body_tokens(caller, phases):
+    body = list(tokens(caller))
+    declaration = list(tokens("size_t index;"))
+    if body[:1] != ["{"] or "index" in body:
+        raise AssertionError("model root retains no duplicate or hidden loop counter")
+    guard = list(tokens(
+        "if (!" + " || !".join(
+            name + "(" + ", ".join(arguments) + ")"
+            for name, arguments, _ in MODEL_PROJECTION_PHASES
+        ) + ") { goto mismatch; }"
+    ))
+    positions = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+    if len(positions) != 1 or len(phases) != 3:
+        raise AssertionError("three model passes retain exact caller arguments, order and mismatch exit")
+    expanded = []
+    for (_, _, bound), phase in zip(MODEL_PROJECTION_PHASES, phases):
+        phase = list(tokens(phase))
+        success = list(tokens("return true;"))
+        if phase[:1 + len(declaration)] != ["{"] + declaration:
+            raise AssertionError("model passes own only their original size_t counter")
+        if phase[-len(success) - 1:] != success + ["}"]:
+            raise AssertionError("model passes retain one terminal helper success")
+        inner = phase[1 + len(declaration):-len(success) - 1]
+        head = list(tokens("for (index = 0; index < " + bound + "; ++index) {"))
+        if inner[:len(head)] != head or "goto" in inner:
+            raise AssertionError("each pass retains its original bound and cannot borrow a caller label")
+        index = 0
+        while index < len(inner):
+            if inner[index] == "return":
+                if inner[index:index + 3] != ["return", "false", ";"]:
+                    raise AssertionError("pass success cannot bypass remaining slots or caller validation")
+                expanded.extend(tokens("goto mismatch;"))
+                index += 3
+            else:
+                expanded.append(inner[index])
+                index += 1
+    start = positions[0]
+    body[start:start + len(guard)] = expanded
+    body[1:1] = declaration
+    return tuple(body)
+
+
 def original_body_digest(family, original, record):
     names = normal_names(family)
     body = tokens("{" + record.body + "}")
+    if family == 1 and original == "lifecycle_model_matches_registry" and (1, original) not in FUNCTION_TASK_MIGRATION:
+        owner = function_records(source(family_paths(1)[10]))
+        body = model_projection_body_tokens(
+            "{" + record.body + "}",
+            ["{" + owner[name].body + "}" for name, _, _ in MODEL_PROJECTION_PHASES],
+        )
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(name == "kernel_object_test_registry" for _, name in owned_records(1)):
         body = native_registry_body_tokens(original, body)
@@ -750,7 +819,8 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             expected = ("static struct micros_kernel_objects objects;",) if owner == path else ()
             self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(owner)))))
             self.assertNotRegex(source(owner), r'#include\s*"[^"]*kernel_object_private\.h"')
-        self.assertEqual(28, len(owned_records(1)))
+        completed = (1, "lifecycle_model_matches_registry") not in FUNCTION_TASK_MIGRATION
+        self.assertEqual(28 + 3 * completed, len(owned_records(1)))
 
     def test_registry_transport_retains_whole_snapshot_reset_extent_and_member_scope(self):
         current = (
@@ -852,6 +922,66 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual(len(declarations), len(set(declarations)))
         self.assertEqual(exports, set(declarations))
+
+    def test_model_projection_exposes_three_bounded_typed_passes(self):
+        records = function_records(source(family_paths(1)[10]))
+        for name, arguments, _ in MODEL_PROJECTION_PHASES:
+            with self.subTest(phase=name):
+                self.assertIn(name, records)
+                parameters = "const struct micros_kernel_objects *fixture"
+                if arguments == ("fixture", "model"):
+                    parameters += ", const struct lifecycle_model *model"
+                self.assertEqual(
+                    tokens("static bool " + name + "(" + parameters + ")"),
+                    tokens(records[name].signature),
+                )
+                self.assertLessEqual(records[name].lines, 120)
+        self.assertLessEqual(records[host_name("lifecycle_model_matches_registry")].lines, 120)
+
+    def test_model_projection_preserves_loop_bounds_first_mismatch_and_final_validation(self):
+        calls = " || !".join(
+            name + "(" + ", ".join(arguments) + ")" for name, arguments, _ in MODEL_PROJECTION_PHASES
+        )
+        caller = (
+            "{ if (bad_header()) { goto mismatch; } if (!" + calls + ") { goto mismatch; } "
+            "if (bad_complete_validation()) { goto mismatch; } return true; "
+            'mismatch: report("original mismatch"); return false; }'
+        )
+        phases = tuple(
+            "{ size_t index; for (index = 0; index < " + bound
+            + "; ++index) { if (bad_" + label + "(index)) { return false; } } return true; }"
+            for label, (_, _, bound) in zip(("process", "thread", "hart"), MODEL_PROJECTION_PHASES)
+        )
+        expected = (
+            "{ size_t index; if (bad_header()) { goto mismatch; } "
+            "for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) { if (bad_process(index)) { goto mismatch; } } "
+            "for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) { if (bad_thread(index)) { goto mismatch; } } "
+            "for (index = 0; index < MICROS_HART_CAPACITY; ++index) { if (bad_hart(index)) { goto mismatch; } } "
+            "if (bad_complete_validation()) { goto mismatch; } return true; "
+            'mismatch: report("original mismatch"); return false; }'
+        )
+        self.assertEqual(tokens(expected), model_projection_body_tokens(caller, phases))
+        for changed in (
+            caller.replace("(fixture, model)", "(fixture, other)", 1),
+            caller.replace("|| !kernel_object_test_model_threads_match", "&& !kernel_object_test_model_threads_match"),
+            caller.replace(") { goto mismatch; } if (bad_complete", ") { return true; } if (bad_complete"),
+            caller.replace("{ if (bad_header", "{ size_t index; if (bad_header", 1),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(changed, phases)
+        for changed in (
+            phases[0].replace("return false;", "return true;"),
+            phases[0].replace("index = 0", "index = 1"),
+            phases[0].replace("MICROS_PROCESS_CAPACITY", "MICROS_THREAD_CAPACITY"),
+            phases[0].replace("return false;", "goto mismatch;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                model_projection_body_tokens(caller, (changed, *phases[1:]))
+        self.assertNotEqual(
+            tokens(expected),
+            model_projection_body_tokens(caller.replace("bad_complete_validation", "weakened_validation"), phases),
+        )
 
 
 if __name__ == "__main__":

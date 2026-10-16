@@ -1,22 +1,11 @@
 #include "kernel_objects_test_internal.h"
 
-bool kernel_object_test_lifecycle_model_matches_registry(
+static bool kernel_object_test_model_processes_match(
     const struct micros_kernel_objects *fixture,
-    const struct lifecycle_model *model,
-    size_t step
+    const struct lifecycle_model *model
 )
 {
     size_t index;
-
-    if (
-        fixture->live_process_count != model->process_count
-        || fixture->live_thread_count != model->thread_count
-        || fixture->registered_hart_count != 2
-        || fixture->max_threads_per_process != 3
-        || fixture->max_harts != 2
-    ) {
-        goto mismatch;
-    }
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct lifecycle_model_process *expected =
@@ -38,9 +27,18 @@ bool kernel_object_test_lifecycle_model_matches_registry(
                 != MICROS_PROCESS_ENDPOINT_NONE
             || actual->privilege_profile != 0
         ) {
-            goto mismatch;
+            return false;
         }
     }
+    return true;
+}
+
+static bool kernel_object_test_model_threads_match(
+    const struct micros_kernel_objects *fixture,
+    const struct lifecycle_model *model
+)
+{
+    size_t index;
 
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct lifecycle_model_thread *expected =
@@ -56,7 +54,7 @@ bool kernel_object_test_lifecycle_model_matches_registry(
                 )
             || actual->generation != expected->generation
         ) {
-            goto mismatch;
+            return false;
         }
         if (
             expected->live
@@ -77,7 +75,7 @@ bool kernel_object_test_lifecycle_model_matches_registry(
                 )
             )
         ) {
-            goto mismatch;
+            return false;
         }
         if (
             !expected->live
@@ -94,9 +92,17 @@ bool kernel_object_test_lifecycle_model_matches_registry(
                 )
             )
         ) {
-            goto mismatch;
+            return false;
         }
     }
+    return true;
+}
+
+static bool kernel_object_test_model_harts_match(
+    const struct micros_kernel_objects *fixture
+)
+{
+    size_t index;
 
     for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
         const struct micros_hart *actual = &fixture->harts[index];
@@ -114,14 +120,40 @@ bool kernel_object_test_lifecycle_model_matches_registry(
                 || actual->timer.ticks != 0
                 || actual->current_thread.generation != 0
             ) {
-                goto mismatch;
+                return false;
             }
         } else if (
             actual->slot_state != MICROS_KERNEL_OBJECT_SLOT_FREE
             || actual->generation != 0
         ) {
-            goto mismatch;
+            return false;
         }
+    }
+    return true;
+}
+
+bool kernel_object_test_lifecycle_model_matches_registry(
+    const struct micros_kernel_objects *fixture,
+    const struct lifecycle_model *model,
+    size_t step
+)
+{
+    if (
+        fixture->live_process_count != model->process_count
+        || fixture->live_thread_count != model->thread_count
+        || fixture->registered_hart_count != 2
+        || fixture->max_threads_per_process != 3
+        || fixture->max_harts != 2
+    ) {
+        goto mismatch;
+    }
+
+    if (
+        !kernel_object_test_model_processes_match(fixture, model)
+        || !kernel_object_test_model_threads_match(fixture, model)
+        || !kernel_object_test_model_harts_match(fixture)
+    ) {
+        goto mismatch;
     }
 
     if (

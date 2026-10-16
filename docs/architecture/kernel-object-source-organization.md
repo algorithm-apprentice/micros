@@ -651,9 +651,14 @@ Actual assertion macros, reference types, complete bodies/signatures and
 the fifteen-case automatic `const` table reconstruct exactly. The active
 seventy-two-owner migration is now a literal empty tuple.
 
-All twelve semantic task dispositions remain pending, including the target
-entry. Only the target scenario unit remains declarations-only; no completed
-semantic outline is claimed by source movement alone.
+The first semantic slice outlines complete independent comparison into
+32/64/33-line process, thread and hart passes with a 41-line root. Their
+original counter types/bounds, first mismatch and one root diagnostic remain
+exact; the one complete combined validator still follows every pass.
+Finite scope-aware reconstruction and independent caller/bound/early-success
+mutants preserve the full original body. Eleven semantic task dispositions
+remain pending, including the target entry. Only the target scenario unit
+remains declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`
