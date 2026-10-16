@@ -87,13 +87,17 @@ metadata inspection. Preserve the existing unsupported diagnostic and
 fresh-without-receipt behavior. Existing complete repository-Python
 fingerprints continue to bind names, kinds, modes and bytes.
 
-The package remains the existing namespace package: no `tools/__init__.py`
-is added. Its initializer and legacy initializer bytecode stay explicitly
-absent. New helper modules must have no applicable cached or sourceless
-bytecode that could replace reviewed source; the bounded declaration
-rejects those loader inputs rather than interpreting or deleting them.
-The facade executes directly and is not imported back by helpers.
-No general import, bytecode, package or environment resolver is authorized.
+The package remains the existing namespace package: no initializer is added.
+Reject source, bytecode and native-extension initializers, same-stem helper
+package directories, native module alternatives and source-replacing
+bytecode. A matching `.py` digest does not establish Python's chosen loader.
+A fixed, source-free standard-loader metadata check after the existing
+workflow-interpreter resolution and before QEMU metadata must resolve only
+the repository namespace and nine expected source helpers. Reject concrete
+or merged foreign namespace/module origins and unknown layouts without
+importing or executing them. The facade executes directly and is not
+imported back by helpers. No general import, bytecode, package or environment
+resolver or replacement-code cleanup is authorized.
 
 This narrow code-family predicate is the only admission refinement.
 All compiler/QEMU default-config, firmware, environment, source identity,
@@ -130,5 +134,9 @@ recovery, generalized rule/import framework or validation-ledger redesign.
 
 ## Design review disposition
 
-Pending complete independent read-only design review and exact current
-documentation/structure/staged/worktree/branch-range author evidence.
+Initial complete independent read-only review found one substantive loader
+closure omission: same-stem packages or native extensions could shadow
+matching reviewed source. The proposal now rejects those alternatives and
+closes the fixed namespace/source origins before QEMU metadata.
+Updated exact current author evidence and independent correction review
+remain required before acceptance.

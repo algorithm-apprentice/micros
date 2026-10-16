@@ -52,6 +52,17 @@ retry, broader cleanup, missing-gate fallback or new identity check.
 New helper-source/loader admission is a bounded development-code closure
 transport, not a MINIX runtime feature.
 
+Independent design review identified a necessary Python-specific closure
+adaptation: standard `FileFinder` checks package initializers before sibling
+modules and native extensions before source. The active trusted CPython
+3.9.6 metadata reports `.cpython-39-darwin.so`, `.abi3.so` and `.so`.
+Therefore a matching helper-source hash cannot admit an ignored same-stem
+package or native replacement. The corrected bounded declaration rejects
+those alternatives and checks the fixed namespace/helper origins using
+source-free standard metadata from the admitted workflow interpreter.
+No replacement initializer, extension, MINIX runner or new guest behavior
+is executed by this design trace.
+
 The baseline is the currently merged TTY outcome
 `34f1048449c221b014530484bfec4b3c0ab51142`: 2,087 runner lines/46 functions/
 two classes/43 assignments, and 2,492 test lines/six classes/85 methods/

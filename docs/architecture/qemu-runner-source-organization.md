@@ -271,14 +271,41 @@ the exact ten production members above as ordinary nonsymlink files with
 reviewed content identities. Paths/digests are fixed reviewed metadata,
 never caller-selected, inferred from imports or discovered by a glob.
 
-The same bounded declaration requires the existing namespace package's
-`tools/__init__.py`, `tools/__init__.pyc` and `tools/__init__.pyo` to stay
-absent and the tools directory to remain ordinary. It rejects applicable
-source-replacing loader inputs for the nine new helper stems: adjacent
-legacy `.pyc`/`.pyo`, and matching entries in `tools/__pycache__`.
-Unreadable, linked or ambiguous cache metadata is ineligible. Do not follow,
-parse, execute, delete or repair bytecode. Root facade execution remains
-direct; helpers cannot import it back.
+The same bounded declaration rejects every same-stem package path for the
+nine helpers, including empty, linked or unreadable directories. A package
+initializer precedes a sibling source module; a reviewed `.py` hash alone
+does not close that choice. Adjacent legacy `.pyc`/`.pyo`, matching entries
+in `tools/__pycache__`, and every supported native-extension alternative
+are also ineligible. This includes tagged Darwin `.so`, `.abi3.so` and
+plain `.so` forms, not only the collector's current suffix.
+
+The existing namespace must remain the ordinary repository tools directory.
+Reject its source/bytecode/native-extension initializers and repository-root
+`tools` module alternatives. Do not assume a prepended namespace directory
+preempts a concrete package on another admitted Python search root.
+
+After the existing `DarwinTools` workflow-interpreter resolution, but still
+before `tools.qemu()` or any QEMU metadata, one bounded
+`_validate_qemu_runner_namespace(root, tools)` checks read-only standard
+loader metadata from that already-admitted workflow interpreter. It must
+observe only the standard supported CPython loader layout, a namespace
+whose resolved search locations are solely the repository tools directory,
+and exactly the nine expected ordinary source-module origins/loaders.
+Duplicate spellings of that same resolved directory are not another input
+root. Concrete/merged foreign packages, native or sourceless replacements,
+unknown loaders/layouts and unreadable/link/ambiguous metadata are ineligible.
+
+The probe is fixed to `tools` and those nine names and performs only
+source-free standard `PathFinder`/`FileFinder` metadata lookups. It never
+imports the target package/module, executes an initializer/extension or
+follows competing package contents. Native suffixes come from the admitted
+workflow interpreter's loader metadata, never environment guesses. No
+general module resolver is added. The early file/byte checks retain their
+original position; this additional loader check remains before every QEMU
+metadata invocation, including `-L help`.
+
+Do not read, execute, delete or repair replacement code/bytecode. Root
+facade execution remains direct; helpers cannot import it back.
 
 Existing `repository_python` complete tree identities already bind the
 member names/kinds/modes/bytes and loader-input membership. No receipt schema,
@@ -337,9 +364,12 @@ test IDs exactly once. Add focused deterministic CLI/error/order, symbol,
 serial short-write/timeout/cleanup and source-family mutation cases without
 sleeps or new guest behavior.
 
-Source mutations, missing/linked family members, initializer or loader-cache
-presence and wrong bindings must refuse reusable smoke evidence before QEMU
-metadata, including `-L help`. Exact good members retain actual eligibility.
+Source mutations, missing/linked family members, initializer/cache presence,
+same-stem package directories, native-extension alternatives, foreign
+namespace/module origins and wrong bindings must refuse reusable smoke
+evidence before QEMU metadata, including `-L help`. Cases include ignored
+package `__init__.pyc`, all admitted extension suffixes and linked/unreadable
+competitors. Exact good members retain actual eligibility.
 Ordinary metadata collection never builds or installs anything.
 
 Both original-move and long-task migrations must finish literal empty,

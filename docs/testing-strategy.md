@@ -308,8 +308,9 @@ implementation must freeze the original runner/file/AST/data, all 85 test
 IDs and fixture bodies, and prove finite actual-source restoration before
 the reviewed code-family source declaration changes. Retain the cohesive
 serial lifecycle, all first errors/outcomes, independent case expectations
-and every real guest/budget. New source-member/loader mutations must reject
-smoke reuse before QEMU metadata while all three supported workflows still
+and every real guest/budget. New source-member, bytecode, same-stem package,
+native-extension and foreign-namespace mutations must reject smoke reuse
+before QEMU metadata while all three supported workflows still
 demonstrate actual eligible original-producer reuse. Full current author
 and complete read-only implementation review remain mandatory.
 
