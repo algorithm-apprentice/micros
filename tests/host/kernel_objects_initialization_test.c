@@ -1,5 +1,32 @@
 #include "kernel_objects_test_internal.h"
 
+struct kernel_object_test_uninitialized_work {
+    struct micros_process_handle process;
+    struct micros_process_handle process_output;
+    struct micros_thread_handle thread;
+    struct micros_thread_handle thread_output;
+    struct micros_hart_handle hart;
+    struct micros_hart_handle hart_output;
+    const struct micros_process *resolved_process;
+    const struct micros_thread *resolved_thread;
+    const struct micros_hart *resolved_hart;
+    struct micros_user_context context;
+    struct micros_user_context context_output;
+    struct micros_user_context context_before;
+    uintptr_t stack_bottom;
+    uintptr_t stack_top;
+};
+
+struct kernel_object_test_capacity_work {
+    struct micros_process_handle processes[MICROS_PROCESS_CAPACITY];
+    struct micros_thread_handle threads[MICROS_THREAD_CAPACITY];
+    struct micros_hart_handle harts[MICROS_HART_CAPACITY];
+    struct micros_process_handle process_output;
+    struct micros_thread_handle thread_output;
+    struct micros_hart_handle hart_output;
+    size_t index;
+};
+
 bool kernel_object_test_initialization_is_checked_and_one_shot(void)
 {
     struct micros_kernel_objects *fixture = kernel_object_test_registry();
@@ -68,60 +95,28 @@ bool kernel_object_test_initialization_is_checked_and_one_shot(void)
     return true;
 }
 
-bool kernel_object_test_uninitialized_registry_rejects_every_operation(void)
+static bool kernel_object_test_uninitialized_process_operations(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_uninitialized_work *work
+)
 {
-    struct micros_kernel_objects *fixture = kernel_object_test_registry();
-    struct micros_process_handle process = {0, 1};
-    struct micros_process_handle process_output = {
-        UINT16_MAX,
-        UINT32_MAX,
-    };
-    struct micros_thread_handle thread = {0, 1};
-    struct micros_thread_handle thread_output = {
-        UINT16_MAX,
-        UINT32_MAX,
-    };
-    struct micros_hart_handle hart = {0, 1};
-    struct micros_hart_handle hart_output = {
-        UINT16_MAX,
-        UINT32_MAX,
-    };
-    const struct micros_process *resolved_process =
-        (const struct micros_process *)(uintptr_t)1;
-    const struct micros_thread *resolved_thread =
-        (const struct micros_thread *)(uintptr_t)1;
-    const struct micros_hart *resolved_hart =
-        (const struct micros_hart *)(uintptr_t)1;
-    struct micros_user_context context =
-        kernel_object_test_context_pattern(UINT64_C(0x1000));
-    struct micros_user_context context_output =
-        kernel_object_test_context_pattern(UINT64_C(0x2000));
-    struct micros_user_context context_before = context_output;
-    uintptr_t stack_bottom = UINTPTR_MAX;
-    uintptr_t stack_top = UINTPTR_MAX;
-
-    kernel_object_test_reset_objects(fixture);
-    EXPECT_ERROR(
-        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_kernel_objects_validate(fixture)
-    );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_process_create(fixture, &process_output)
+        micros_process_create(fixture, &work->process_output)
     );
     EXPECT_TRUE(
-        process_output.slot == UINT16_MAX
-        && process_output.generation == UINT32_MAX
+        work->process_output.slot == UINT16_MAX
+        && work->process_output.generation == UINT32_MAX
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_process_release(fixture, process)
+        micros_process_release(fixture, work->process)
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_process_attach_address_space(
             fixture,
-            process,
+            work->process,
             UINT64_C(0x1000)
         )
     );
@@ -129,7 +124,7 @@ bool kernel_object_test_uninitialized_registry_rejects_every_operation(void)
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_process_detach_address_space(
             fixture,
-            process,
+            work->process,
             UINT64_C(0x1000)
         )
     );
@@ -137,97 +132,113 @@ bool kernel_object_test_uninitialized_registry_rejects_every_operation(void)
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_process_resolve(
             fixture,
-            process,
-            &resolved_process
+            work->process,
+            &work->resolved_process
         )
     );
     EXPECT_TRUE(
-        resolved_process
+        work->resolved_process
         == (const struct micros_process *)(uintptr_t)1
     );
+    return true;
+}
+
+static bool kernel_object_test_uninitialized_thread_context_operations(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_uninitialized_work *work
+)
+{
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_thread_create(fixture, process, &thread_output)
+        micros_thread_create(fixture, work->process, &work->thread_output)
     );
     EXPECT_TRUE(
-        thread_output.slot == UINT16_MAX
-        && thread_output.generation == UINT32_MAX
+        work->thread_output.slot == UINT16_MAX
+        && work->thread_output.generation == UINT32_MAX
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_thread_release(fixture, thread)
+        micros_thread_release(fixture, work->thread)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_thread_resolve(fixture, thread, &resolved_thread)
+        micros_thread_resolve(fixture, work->thread, &work->resolved_thread)
     );
     EXPECT_TRUE(
-        resolved_thread
+        work->resolved_thread
         == (const struct micros_thread *)(uintptr_t)1
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_thread_attach_execution_context(
             fixture,
-            thread,
+            work->thread,
             UINT64_C(0x100000),
             UINT64_C(0x104000),
-            &context
+            &work->context
         )
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_thread_capture_execution_context(
             fixture,
-            thread,
-            &context
+            work->thread,
+            &work->context
         )
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_thread_inspect_execution_context(
             fixture,
-            thread,
-            &context_output,
-            &stack_bottom,
-            &stack_top
+            work->thread,
+            &work->context_output,
+            &work->stack_bottom,
+            &work->stack_top
         )
     );
-    EXPECT_TRUE(kernel_object_test_contexts_equal(&context_output, &context_before));
-    EXPECT_TRUE(stack_bottom == UINTPTR_MAX);
-    EXPECT_TRUE(stack_top == UINTPTR_MAX);
+    EXPECT_TRUE(kernel_object_test_contexts_equal(&work->context_output, &work->context_before));
+    EXPECT_TRUE(work->stack_bottom == UINTPTR_MAX);
+    EXPECT_TRUE(work->stack_top == UINTPTR_MAX);
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_thread_detach_execution_context(fixture, thread)
+        micros_thread_detach_execution_context(fixture, work->thread)
     );
+    return true;
+}
+
+static bool kernel_object_test_uninitialized_hart_operations(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_uninitialized_work *work
+)
+{
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_register(fixture, 0, &hart_output)
+        micros_hart_register(fixture, 0, &work->hart_output)
     );
     EXPECT_TRUE(
-        hart_output.slot == UINT16_MAX
-        && hart_output.generation == UINT32_MAX
+        work->hart_output.slot == UINT16_MAX
+        && work->hart_output.generation == UINT32_MAX
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
-        micros_hart_resolve(fixture, hart, &resolved_hart)
+        micros_hart_resolve(fixture, work->hart, &work->resolved_hart)
     );
     EXPECT_TRUE(
-        resolved_hart == (const struct micros_hart *)(uintptr_t)1
+        work->resolved_hart == (const struct micros_hart *)(uintptr_t)1
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_hart_resolve_context(
             fixture,
             (uintptr_t)&fixture->harts[0],
-            &resolved_hart
+            &work->resolved_hart
         )
     );
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_hart_install_trap_stacks(
             fixture,
-            hart,
+            work->hart,
             UINT64_C(0x1000),
             UINT64_C(0x5000),
             UINT64_C(0x6000),
@@ -238,55 +249,93 @@ bool kernel_object_test_uninitialized_registry_rejects_every_operation(void)
         MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
         micros_hart_current_thread(
             fixture,
-            hart,
-            &thread_output
+            work->hart,
+            &work->thread_output
         )
     );
     return true;
 }
 
-bool kernel_object_test_fixed_capacities_report_exhaustion_atomically(void)
+bool kernel_object_test_uninitialized_registry_rejects_every_operation(void)
 {
     struct micros_kernel_objects *fixture = kernel_object_test_registry();
-    struct micros_process_handle
-        processes[MICROS_PROCESS_CAPACITY];
-    struct micros_thread_handle threads[MICROS_THREAD_CAPACITY];
-    struct micros_hart_handle harts[MICROS_HART_CAPACITY];
-    struct micros_process_handle process_output = {
+    struct kernel_object_test_uninitialized_work work;
+    work.process = (struct micros_process_handle){0, 1};
+    work.process_output = (struct micros_process_handle){
         UINT16_MAX,
         UINT32_MAX,
     };
-    struct micros_thread_handle thread_output = {
+    work.thread = (struct micros_thread_handle){0, 1};
+    work.thread_output = (struct micros_thread_handle){
         UINT16_MAX,
         UINT32_MAX,
     };
-    struct micros_hart_handle hart_output = {
+    work.hart = (struct micros_hart_handle){0, 1};
+    work.hart_output = (struct micros_hart_handle){
         UINT16_MAX,
         UINT32_MAX,
     };
-    size_t index;
+    work.resolved_process = (const struct micros_process *)(uintptr_t)1;
+    work.resolved_thread = (const struct micros_thread *)(uintptr_t)1;
+    work.resolved_hart = (const struct micros_hart *)(uintptr_t)1;
+    work.context = kernel_object_test_context_pattern(UINT64_C(0x1000));
+    work.context_output = kernel_object_test_context_pattern(UINT64_C(0x2000));
+    work.context_before = work.context_output;
+    work.stack_bottom = UINTPTR_MAX;
+    work.stack_top = UINTPTR_MAX;
 
+    kernel_object_test_reset_objects(fixture);
+    EXPECT_ERROR(
+        MICROS_KERNEL_OBJECT_ERROR_NOT_INITIALIZED,
+        micros_kernel_objects_validate(fixture)
+    );
+    if (!kernel_object_test_uninitialized_process_operations(fixture, &work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_uninitialized_thread_context_operations(fixture, &work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_uninitialized_hart_operations(fixture, &work)) {
+        return false;
+    }
+    return true;
+}
+
+static bool kernel_object_test_process_capacity_refusal(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_capacity_work *work
+)
+{
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_initialize(fixture, 1, 1)
     );
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+    for (work->index = 0; work->index < MICROS_PROCESS_CAPACITY; ++work->index) {
         EXPECT_ERROR(
             MICROS_KERNEL_OBJECT_OK,
-            micros_process_create(fixture, &processes[index])
+            micros_process_create(fixture, &work->processes[work->index])
         );
-        EXPECT_TRUE(processes[index].slot == index);
+        EXPECT_TRUE(work->processes[work->index].slot == work->index);
     }
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_EXHAUSTED,
-        micros_process_create(fixture, &process_output)
+        micros_process_create(fixture, &work->process_output)
     );
     EXPECT_TRUE(
-        process_output.slot == UINT16_MAX
-        && process_output.generation == UINT32_MAX
+        work->process_output.slot == UINT16_MAX
+        && work->process_output.generation == UINT32_MAX
     );
+    return true;
+}
 
+static bool kernel_object_test_thread_capacity_refusal(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_capacity_work *work
+)
+{
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -298,35 +347,42 @@ bool kernel_object_test_fixed_capacities_report_exhaustion_atomically(void)
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &processes[0])
+        micros_process_create(fixture, &work->processes[0])
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
-        micros_process_create(fixture, &processes[1])
+        micros_process_create(fixture, &work->processes[1])
     );
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+    for (work->index = 0; work->index < MICROS_THREAD_CAPACITY; ++work->index) {
         struct micros_process_handle owner =
-            processes[index % 2];
+            work->processes[work->index % 2];
 
         EXPECT_ERROR(
             MICROS_KERNEL_OBJECT_OK,
-            micros_thread_create(fixture, owner, &threads[index])
+            micros_thread_create(fixture, owner, &work->threads[work->index])
         );
-        EXPECT_TRUE(threads[index].slot == index);
+        EXPECT_TRUE(work->threads[work->index].slot == work->index);
     }
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_EXHAUSTED,
         micros_thread_create(
             fixture,
-            processes[0],
-            &thread_output
+            work->processes[0],
+            &work->thread_output
         )
     );
     EXPECT_TRUE(
-        thread_output.slot == UINT16_MAX
-        && thread_output.generation == UINT32_MAX
+        work->thread_output.slot == UINT16_MAX
+        && work->thread_output.generation == UINT32_MAX
     );
+    return true;
+}
 
+static bool kernel_object_test_hart_capacity_refusal(
+    struct micros_kernel_objects *fixture,
+    struct kernel_object_test_capacity_work *work
+)
+{
     kernel_object_test_reset_objects(fixture);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
@@ -336,28 +392,59 @@ bool kernel_object_test_fixed_capacities_report_exhaustion_atomically(void)
             MICROS_HART_CAPACITY
         )
     );
-    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
+    for (work->index = 0; work->index < MICROS_HART_CAPACITY; ++work->index) {
         EXPECT_ERROR(
             MICROS_KERNEL_OBJECT_OK,
-            micros_hart_register(fixture, index, &harts[index])
+            micros_hart_register(fixture, work->index, &work->harts[work->index])
         );
-        EXPECT_TRUE(harts[index].slot == index);
+        EXPECT_TRUE(work->harts[work->index].slot == work->index);
     }
     EXPECT_ERROR_UNCHANGED(
         MICROS_KERNEL_OBJECT_ERROR_POLICY,
         micros_hart_register(
             fixture,
             MICROS_HART_CAPACITY,
-            &hart_output
+            &work->hart_output
         )
     );
     EXPECT_TRUE(
-        hart_output.slot == UINT16_MAX
-        && hart_output.generation == UINT32_MAX
+        work->hart_output.slot == UINT16_MAX
+        && work->hart_output.generation == UINT32_MAX
     );
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(fixture)
     );
+    return true;
+}
+
+bool kernel_object_test_fixed_capacities_report_exhaustion_atomically(void)
+{
+    struct micros_kernel_objects *fixture = kernel_object_test_registry();
+    struct kernel_object_test_capacity_work work;
+    work.process_output = (struct micros_process_handle){
+        UINT16_MAX,
+        UINT32_MAX,
+    };
+    work.thread_output = (struct micros_thread_handle){
+        UINT16_MAX,
+        UINT32_MAX,
+    };
+    work.hart_output = (struct micros_hart_handle){
+        UINT16_MAX,
+        UINT32_MAX,
+    };
+
+    if (!kernel_object_test_process_capacity_refusal(fixture, &work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_thread_capacity_refusal(fixture, &work)) {
+        return false;
+    }
+
+    if (!kernel_object_test_hart_capacity_refusal(fixture, &work)) {
+        return false;
+    }
     return true;
 }

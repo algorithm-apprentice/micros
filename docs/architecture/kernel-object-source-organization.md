@@ -683,9 +683,19 @@ overlap order and exact count-increment positions from current code.
 Independent nested fixtures and actual-source type/predicate/witness/order
 mutants protect the complete original byte hash.
 
-All three portable semantic dispositions are complete. Eight native/target
-dispositions remain pending. Only the target scenario unit remains
-declarations-only; source movement alone does not complete the task.
+All three portable semantic dispositions are complete. Native uninitialized
+admission now has a 46-line root and 47/62/49-line process/thread-context/
+hart tasks; capacity evidence has a 30-line root and 27/46/39-line independent
+fill/refusal tasks. Their automatic work contains exactly the original
+fourteen/seven objects, with only original explicit initializers in order.
+Finite typed-field and checked-call reconstruction restores both complete
+original bodies; independent fixtures reject blanket zeroing, copies,
+extra fields, changed extents/types, reordered initializers and early success.
+The three capacity resets and original macro snapshots stay at their exact
+execution boundaries.
+
+Six native/target dispositions remain pending. Only the target scenario unit
+remains declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

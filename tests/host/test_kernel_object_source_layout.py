@@ -112,6 +112,51 @@ BASE_VALIDATION_PASSES = (
         "MICROS_HART_CAPACITY", "observed_hart_count",
     ),
 )
+NATIVE_CASE_TASKS = {
+    "test_uninitialized_registry_rejects_every_operation": {
+        "owner": 2,
+        "work": "kernel_object_test_uninitialized_work",
+        "fields": (
+            ("struct micros_process_handle process;", "aggregate"),
+            ("struct micros_process_handle process_output;", "aggregate"),
+            ("struct micros_thread_handle thread;", "aggregate"),
+            ("struct micros_thread_handle thread_output;", "aggregate"),
+            ("struct micros_hart_handle hart;", "aggregate"),
+            ("struct micros_hart_handle hart_output;", "aggregate"),
+            ("const struct micros_process *resolved_process;", "value"),
+            ("const struct micros_thread *resolved_thread;", "value"),
+            ("const struct micros_hart *resolved_hart;", "value"),
+            ("struct micros_user_context context;", "value"),
+            ("struct micros_user_context context_output;", "value"),
+            ("struct micros_user_context context_before;", "value"),
+            ("uintptr_t stack_bottom;", "value"),
+            ("uintptr_t stack_top;", "value"),
+        ),
+        "phases": (
+            "kernel_object_test_uninitialized_process_operations",
+            "kernel_object_test_uninitialized_thread_context_operations",
+            "kernel_object_test_uninitialized_hart_operations",
+        ),
+    },
+    "test_fixed_capacities_report_exhaustion_atomically": {
+        "owner": 2,
+        "work": "kernel_object_test_capacity_work",
+        "fields": (
+            ("struct micros_process_handle processes[MICROS_PROCESS_CAPACITY];", None),
+            ("struct micros_thread_handle threads[MICROS_THREAD_CAPACITY];", None),
+            ("struct micros_hart_handle harts[MICROS_HART_CAPACITY];", None),
+            ("struct micros_process_handle process_output;", "aggregate"),
+            ("struct micros_thread_handle thread_output;", "aggregate"),
+            ("struct micros_hart_handle hart_output;", "aggregate"),
+            ("size_t index;", None),
+        ),
+        "phases": (
+            "kernel_object_test_process_capacity_refusal",
+            "kernel_object_test_thread_capacity_refusal",
+            "kernel_object_test_hart_capacity_refusal",
+        ),
+    },
+}
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
     "kernel/kernel_object_state.c",
@@ -236,12 +281,10 @@ INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
 )
 SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
-    (1, "test_uninitialized_registry_rejects_every_operation"),
     (1, "test_thread_execution_context_lifecycle_is_exact"),
     (1, "test_generation_boundaries_and_quarantine"),
     (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
-    (1, "test_fixed_capacities_report_exhaustion_atomically"),
     (1, "test_process_address_space_lifecycle_is_exact"),
     (1, "test_validator_rejects_corrupt_relationships"),
 )
@@ -419,10 +462,17 @@ def original_locations(family, texts=None):
         phase[0]: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for phase in phases
     }
     stack_owners.update({name: CORE_SOURCES[8] for name in BASE_VALIDATION_SIGNATURES})
+    case_owners = {
+        name: family_paths(1)[spec["owner"]] for spec in NATIVE_CASE_TASKS.values() for name in spec["phases"]
+    }
     for (path, spelling), record in owned_records(family, texts).items():
         if family == 0 and spelling in stack_owners:
             if path != stack_owners[spelling]:
                 raise AssertionError("stack conflict passes have their exact file-local owner")
+            continue
+        if family == 1 and spelling in case_owners:
+            if path != case_owners[spelling]:
+                raise AssertionError("native case tasks have their exact file-local owner")
             continue
         if family == 1 and spelling in {phase[0] for phase in MODEL_PROJECTION_PHASES}:
             if path != family_paths(1)[10]:
@@ -720,6 +770,110 @@ def checked_phase_bodies(records, parameters):
     return {name: records[name].body for name in parameters}
 
 
+def case_work_declarations(owner, tag, fields):
+    lexical = c_lexical_text(owner)
+    starts = tuple(re.finditer(r"\bstruct " + tag + r"\s*\{", lexical))
+    if len(starts) != 1:
+        raise AssertionError("each native case has one exact file-local automatic-work type")
+    opening = lexical.index("{", starts[0].start())
+    closing = matching_lexical(lexical, opening, "{", "}")
+    actual = tuple(tokens(part + ";") for part in lexical[opening + 1:closing].split(";") if part.strip())
+    if actual != tuple(tokens(declaration) for declaration, _ in fields):
+        raise AssertionError("native work contains exactly the original fields, order, complete types and extents")
+    return actual
+
+
+def outline_boolean_case_tokens(caller, phases, calls):
+    body = list(tokens(caller))
+    positions = []
+    expansions = []
+    if set(phases) != {name for name, _ in calls}:
+        raise AssertionError("case outlines admit only their exact named tasks")
+    for name, arguments in calls:
+        guard = list(tokens("if (!" + name + "(" + ", ".join(arguments) + ")) { return false; }"))
+        starts = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+        if len(starts) != 1:
+            raise AssertionError("case tasks retain exact borrowed registry/work bindings and checked first failure")
+        phase = list(tokens(phases[name]))
+        if phase[:1] != ["{"] or phase[-4:] != ["return", "true", ";", "}"] or "return" in phase[1:-4]:
+            raise AssertionError("case task success replaces only its sole terminal success, never a partial attempt")
+        positions.append(starts[0])
+        expansions.append((starts[0], len(guard), phase[1:-4]))
+    if positions != sorted(positions) or len(set(positions)) != len(positions):
+        raise AssertionError("native case tasks retain their exact original statement order")
+    for start, length, replacement in reversed(expansions):
+        body[start:start + length] = replacement
+    return tuple(body)
+
+
+def restore_case_work_tokens(caller, tag, fields, declarations):
+    body = list(caller)
+    borrow = list(tokens("struct micros_kernel_objects *fixture = kernel_object_test_registry();"))
+    work = list(tokens("struct " + tag + " work;"))
+    prefix = ["{"] + borrow + work
+    if body[:len(prefix)] != prefix:
+        raise AssertionError("case work is one uninitialized automatic root object after the sole registry borrow")
+    del body[1 + len(borrow):len(prefix)]
+    names = tuple(
+        declaration[declaration.index("[") - 1] if "[" in declaration else declaration[-2]
+        for declaration in declarations
+    )
+    restored = []
+    index = 0
+    while index < len(body):
+        if body[index] == "work":
+            if (
+                body[index + 1:index + 2] not in (["."], ["->"])
+                or body[index + 2:index + 3] not in ([name] for name in names)
+                or (index and body[index - 1] in (".", "->"))
+            ):
+                raise AssertionError("work transport admits only exact original fields, never a copy, reset or borrowed pointer")
+            restored.append(body[index + 2])
+            index += 3
+        else:
+            restored.append(body[index])
+            index += 1
+    start = 1 + len(borrow)
+    initializers = []
+    for (declaration, kind), actual, name in zip(fields, declarations, names):
+        if tuple(actual) != tokens(declaration):
+            raise AssertionError("each original declaration comes from its verified actual work field")
+        if kind is None:
+            initializers.extend(actual)
+            continue
+        if restored[start:start + 2] != [name, "="]:
+            raise AssertionError("only original explicit initializers run, in their original declaration order")
+        end = restored.index(";", start)
+        value = restored[start + 2:end]
+        if kind == "aggregate":
+            cast = ["(", *actual[:-2], ")"]
+            if value[:len(cast) + 1] != cast + ["{"]:
+                raise AssertionError("aggregate assignment uses the exact actual original field type")
+            value = value[len(cast):]
+        elif kind != "value":
+            raise AssertionError("unreviewed case initializer transport")
+        initializers.extend((*actual[:-1], "=", *value, ";"))
+        del restored[start:end + 1]
+    restored[start:start] = initializers
+    return tuple(restored)
+
+
+def native_case_body_tokens(original, record, owner=None):
+    spec = NATIVE_CASE_TASKS[original]
+    owner = source(family_paths(1)[spec["owner"]]) if owner is None else owner
+    declarations = case_work_declarations(owner, spec["work"], spec["fields"])
+    parameters = {
+        name: "struct micros_kernel_objects *fixture, struct " + spec["work"] + " *work"
+        for name in spec["phases"]
+    }
+    phases = checked_phase_bodies(function_records(owner), parameters)
+    body = outline_boolean_case_tokens(
+        "{" + record.body + "}", {name: "{" + phase + "}" for name, phase in phases.items()},
+        tuple((name, ("fixture", "&work")) for name in spec["phases"]),
+    )
+    return restore_case_work_tokens(body, spec["work"], spec["fields"], declarations)
+
+
 def core_body_text(original, record, texts=None):
     if original in STACK_CONFLICT_TASKS and (0, original) not in FUNCTION_TASK_MIGRATION:
         index, pointer, phases = STACK_CONFLICT_TASKS[original]
@@ -747,6 +901,8 @@ def original_body_digest(family, original, record):
             "{" + record.body + "}",
             ["{" + owner[name].body + "}" for name, _, _ in MODEL_PROJECTION_PHASES],
         )
+    if family == 1 and original in NATIVE_CASE_TASKS and (1, original) not in FUNCTION_TASK_MIGRATION:
+        body = native_case_body_tokens(original, record)
     body = tuple(names.get(token, token) for token in body)
     if family == 1 and any(name == "kernel_object_test_registry" for _, name in owned_records(1)):
         body = native_registry_body_tokens(original, body)
@@ -1083,7 +1239,10 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             self.assertEqual(tuple(map(tokens, expected)), tuple(map(tokens, file_scope_objects(source(owner)))))
             self.assertNotRegex(source(owner), r'#include\s*"[^"]*kernel_object_private\.h"')
         completed = (1, "lifecycle_model_matches_registry") not in FUNCTION_TASK_MIGRATION
-        self.assertEqual(28 + 3 * completed, len(owned_records(1)))
+        case_phases = sum(
+            len(spec["phases"]) for name, spec in NATIVE_CASE_TASKS.items() if (1, name) not in FUNCTION_TASK_MIGRATION
+        )
+        self.assertEqual(28 + 3 * completed + case_phases, len(owned_records(1)))
 
     def test_registry_transport_retains_whole_snapshot_reset_extent_and_member_scope(self):
         current = (
@@ -1757,6 +1916,109 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         changed_peer = peer.replace(first, "__first_pair__", 1).replace(second, first, 1).replace("__first_pair__", second, 1)
         with self.assertRaises(AssertionError):
             restored_kernel_objects_source({**current, path: text.replace(peer, changed_peer, 1)})
+
+    def test_native_initialization_cases_expose_exact_typed_original_work_and_tasks(self):
+        for original, specification in NATIVE_CASE_TASKS.items():
+            owner = source(family_paths(1)[specification["owner"]])
+            records = function_records(owner)
+            work = specification["work"]
+            self.assertRegex(owner, r"\bstruct " + work + r"\s*\{")
+            for name in specification["phases"]:
+                with self.subTest(case=original, phase=name):
+                    self.assertIn(name, set(records))
+                    self.assertEqual(
+                        tokens("static bool " + name + "(struct micros_kernel_objects *fixture, struct " + work + " *work)"),
+                        tokens(records[name].signature),
+                    )
+                    self.assertLessEqual(records[name].lines, 120)
+            self.assertLessEqual(records[host_name(original)].lines, 120)
+
+    def test_case_work_inverse_preserves_types_uninitialized_fields_sentinels_and_initializer_order(self):
+        fields = (
+            ("struct handle input;", "aggregate"),
+            ("const struct item *sentinel;", "value"),
+            ("size_t index;", None),
+            ("struct context observed;", "value"),
+            ("struct context before;", "value"),
+        )
+        owner = (
+            "struct fixture_work { struct handle input; const struct item *sentinel; "
+            "size_t index; struct context observed; struct context before; };"
+        )
+        declarations = case_work_declarations(owner, "fixture_work", fields)
+        caller = (
+            "{ struct micros_kernel_objects *fixture = kernel_object_test_registry(); "
+            "struct fixture_work work; work.input = (struct handle){0, 1}; "
+            "work.sentinel = (const struct item *)(uintptr_t)1; "
+            "work.observed = pattern(UINT64_C(0x1000)); work.before = work.observed; "
+            "reset(fixture); use(&work.input, &work->sentinel, work.index, "
+            "&work.observed, sizeof(work.before)); return true; }"
+        )
+        expected = (
+            "{ struct micros_kernel_objects *fixture = kernel_object_test_registry(); "
+            "struct handle input = {0, 1}; const struct item *sentinel = (const struct item *)(uintptr_t)1; "
+            "size_t index; struct context observed = pattern(UINT64_C(0x1000)); "
+            "struct context before = observed; reset(fixture); "
+            "use(&input, &sentinel, index, &observed, sizeof(before)); return true; }"
+        )
+        self.assertEqual(tokens(expected), restore_case_work_tokens(tokens(caller), "fixture_work", fields, declarations))
+        for changed in (
+            caller.replace("struct fixture_work work;", "struct fixture_work work = {0};"),
+            caller.replace("(struct handle){0, 1}", "(struct other_handle){0, 1}"),
+            caller.replace("work.sentinel = (const struct item *)(uintptr_t)1; ", ""),
+            caller.replace("work.before = work.observed;", "work.observed = work.before;"),
+            caller.replace("reset(fixture);", "memset(&work, 0, sizeof(work)); reset(fixture);"),
+            caller.replace("work.index,", "other.work.index,"),
+            caller.replace("work.index,", "work.extra,"),
+            caller.replace("reset(fixture);", "copy = work; reset(fixture);"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore_case_work_tokens(tokens(changed), "fixture_work", fields, declarations)
+        for changed in (
+            owner.replace("size_t index;", "uint16_t index;"),
+            owner.replace("const struct item *sentinel;", "struct item *sentinel;"),
+            owner.replace("struct context before;", "struct context before; bool extra;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                case_work_declarations(changed, "fixture_work", fields)
+        self.assertNotEqual(
+            tokens(expected),
+            restore_case_work_tokens(tokens(caller.replace("(uintptr_t)1", "(uintptr_t)0")), "fixture_work", fields, declarations),
+        )
+
+    def test_boolean_case_inverse_preserves_original_scope_and_first_failure(self):
+        caller = (
+            "{ setup(); if (!first(fixture, &work)) { return false; } "
+            "if (!second(fixture, &work)) { return false; } final_validation(); return true; }"
+        )
+        phases = {
+            "first": "{ EXPECT_ERROR(error, create(fixture, &work.output)); return true; }",
+            "second": "{ for (work.index = 0; work.index < CAPACITY; ++work.index) { "
+            "struct handle owner = work.handles[work.index % 2]; EXPECT_TRUE(owner.slot == work.index); } return true; }",
+        }
+        calls = (("first", ("fixture", "&work")), ("second", ("fixture", "&work")))
+        expected = (
+            "{ setup(); EXPECT_ERROR(error, create(fixture, &work.output)); "
+            "for (work.index = 0; work.index < CAPACITY; ++work.index) { "
+            "struct handle owner = work.handles[work.index % 2]; EXPECT_TRUE(owner.slot == work.index); } "
+            "final_validation(); return true; }"
+        )
+        self.assertEqual(tokens(expected), outline_boolean_case_tokens(caller, phases, calls))
+        for changed in (
+            caller.replace("first(fixture, &work)", "first(other, &work)"),
+            caller.replace("first(fixture, &work)", "first(fixture, &copy)"),
+            caller.replace("return false;", "return true;", 1),
+            caller.replace("first(", "temporary(").replace("second(", "first(").replace("temporary(", "second("),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                outline_boolean_case_tokens(changed, phases, calls)
+        with self.assertRaises(AssertionError):
+            outline_boolean_case_tokens(
+                caller, {**phases, "first": "{ if (skip()) { return true; } EXPECT_TRUE(check()); return true; }"}, calls,
+            )
+        self.assertNotEqual(
+            tokens(expected), outline_boolean_case_tokens(caller.replace("final_validation", "weakened"), phases, calls),
+        )
 
 
 if __name__ == "__main__":
