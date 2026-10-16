@@ -1,5 +1,121 @@
 #include "grant_syscall_test_internal.h"
 
+static bool grant_syscall_test_effect_copy_from_cross(
+    struct grant_syscall_test_fixture *fixture
+)
+{
+    return (
+        grant_syscall_test_pattern_matches(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_SECOND_ADDRESS - 32,
+            128,
+            UINT8_C(0x10)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_SECOND_ADDRESS - 33,
+            1,
+            UINT8_C(0xcc)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_SECOND_ADDRESS + 96,
+            1,
+            UINT8_C(0xcc)
+        )
+    );
+}
+
+static bool grant_syscall_test_effect_copy_to_cross(
+    struct grant_syscall_test_fixture *fixture
+)
+{
+    return (
+        grant_syscall_test_pattern_matches(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS - 48,
+            96,
+            UINT8_C(0x50)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS - 49,
+            1,
+            UINT8_C(0xdd)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS + 48,
+            1,
+            UINT8_C(0xdd)
+        )
+    );
+}
+
+static bool grant_syscall_test_effect_copy_from_local(
+    struct grant_syscall_test_fixture *fixture
+)
+{
+    return (
+        grant_syscall_test_pattern_matches(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_ADDRESS + UINT64_C(0x100),
+            32,
+            UINT8_C(0x90)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_ADDRESS + UINT64_C(0x0ff),
+            1,
+            UINT8_C(0xcc)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTEE,
+            TEST_DATA_ADDRESS + UINT64_C(0x120),
+            1,
+            UINT8_C(0xcc)
+        )
+    );
+}
+
+static bool grant_syscall_test_effect_copy_to_local(
+    struct grant_syscall_test_fixture *fixture
+)
+{
+    return (
+        grant_syscall_test_pattern_matches(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS + UINT64_C(0x40),
+            32,
+            UINT8_C(0xa0)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS + UINT64_C(0x3f),
+            1,
+            UINT8_C(0xee)
+        )
+        && grant_syscall_test_range_is_value(
+            fixture,
+            GRANT_SYSCALL_GRANTOR,
+            TEST_DATA_SECOND_ADDRESS + UINT64_C(0x60),
+            1,
+            UINT8_C(0xee)
+        )
+    );
+}
+
 bool grant_syscall_test_validate_command_effect(
     struct grant_syscall_test_fixture *fixture,
     size_t actor,
@@ -53,101 +169,13 @@ bool grant_syscall_test_validate_command_effect(
             && fixture->stale_grant != fixture->unmapped_grant
         );
     case GRANT_COMMAND_COPY_FROM_CROSS:
-        return (
-            grant_syscall_test_pattern_matches(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_SECOND_ADDRESS - 32,
-                128,
-                UINT8_C(0x10)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_SECOND_ADDRESS - 33,
-                1,
-                UINT8_C(0xcc)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_SECOND_ADDRESS + 96,
-                1,
-                UINT8_C(0xcc)
-            )
-        );
+        return grant_syscall_test_effect_copy_from_cross(fixture);
     case GRANT_COMMAND_COPY_TO_CROSS:
-        return (
-            grant_syscall_test_pattern_matches(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS - 48,
-                96,
-                UINT8_C(0x50)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS - 49,
-                1,
-                UINT8_C(0xdd)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS + 48,
-                1,
-                UINT8_C(0xdd)
-            )
-        );
+        return grant_syscall_test_effect_copy_to_cross(fixture);
     case GRANT_COMMAND_COPY_FROM_LOCAL:
-        return (
-            grant_syscall_test_pattern_matches(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_ADDRESS + UINT64_C(0x100),
-                32,
-                UINT8_C(0x90)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_ADDRESS + UINT64_C(0x0ff),
-                1,
-                UINT8_C(0xcc)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTEE,
-                TEST_DATA_ADDRESS + UINT64_C(0x120),
-                1,
-                UINT8_C(0xcc)
-            )
-        );
+        return grant_syscall_test_effect_copy_from_local(fixture);
     case GRANT_COMMAND_COPY_TO_LOCAL:
-        return (
-            grant_syscall_test_pattern_matches(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x40),
-                32,
-                UINT8_C(0xa0)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x3f),
-                1,
-                UINT8_C(0xee)
-            )
-            && grant_syscall_test_range_is_value(
-                fixture,
-                GRANT_SYSCALL_GRANTOR,
-                TEST_DATA_SECOND_ADDRESS + UINT64_C(0x60),
-                1,
-                UINT8_C(0xee)
-            )
-        );
+        return grant_syscall_test_effect_copy_to_local(fixture);
     case GRANT_COMMAND_REVOKE_STALE:
     case GRANT_COMMAND_REVOKE_READ:
     case GRANT_COMMAND_REVOKE_WRITE:

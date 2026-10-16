@@ -615,3 +615,15 @@ raw arming/control are fixture leaves. All forty-two target bodies/signatures
 reconstruct completely. Six semantic dispositions remain pending, and the
 future copy-command file is still declarations-only until its real templates
 are outlined.
+
+Setup, finish, supervisor-control and effect roots now have 115, 80, 62 and
+74 lines. Nine file-local phases separate actor preparation, endpoint closure,
+resource release, switch/reuse control and four byte/canary observations.
+Borrowed original actor/stage scalars and the root expected-context object
+retain their exact types, lvalues, lifetimes, failure labels and enum returns.
+Actual root profiles/`sizeof`, payload checks, IRQ/fatal paths, assembly
+capture/entry and supervisor stack/status restoration remain in root.
+Notification, five token publications, revoke/reuse checks and effect-default
+`true` remain exact. Complete-body reconstruction and independent borrowed-
+lvalue/context/exit fixtures preserve these four outlines. Only command
+arming and post-return transitions remain as semantic migrations.

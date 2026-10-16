@@ -176,6 +176,84 @@ bool micros_grant_syscall_test_after_return(
     return true;
 }
 
+static enum micros_grant_syscall_test_control_result grant_syscall_test_switch_control(
+    struct grant_syscall_test_fixture *fixture,
+    struct micros_kernel_objects *objects,
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    size_t actor,
+    struct micros_user_context *expected
+)
+{
+    const struct micros_thread *next =
+        &objects->threads[fixture->threads[fixture->control_next_actor].slot];
+
+    grant_syscall_test_copy_bytes(expected, &next->user_context, sizeof(*expected));
+    if (
+        (
+            next->scheduler_assigned
+            ? micros_thread_runtime_flags_unset(
+                objects,
+                fixture->threads[fixture->control_next_actor],
+                MICROS_THREAD_RTS_INACTIVE
+            )
+            : micros_thread_scheduler_admit(
+                objects,
+                micros_kernel_object_runtime_boot_hart_handle(),
+                fixture->threads[fixture->control_next_actor],
+                MICROS_SCHEDULER_PRIORITY_DEFAULT_USER,
+                UINT64_MAX,
+                true
+            )
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_scheduler_hold(
+            objects,
+            fixture->threads[actor]
+        ) != MICROS_KERNEL_OBJECT_OK
+        || micros_scheduler_select_user_return(hart, frame)
+            != MICROS_SCHEDULER_OK
+        || grant_syscall_test_current_actor(fixture, hart) != fixture->control_next_actor
+        || !grant_syscall_test_bytes_equal(frame, expected, sizeof(*expected))
+        || !grant_syscall_test_scheduler_state_valid(
+            fixture,
+            hart,
+            fixture->control_next_actor,
+            true
+        )
+    ) {
+        return MICROS_GRANT_SYSCALL_TEST_CONTROL_MISMATCH;
+    }
+    fixture->control_action = GRANT_CONTROL_NONE;
+    return MICROS_GRANT_SYSCALL_TEST_CONTROL_USER_RETURN;
+}
+
+static enum micros_grant_syscall_test_control_result grant_syscall_test_reuse_control(
+    struct grant_syscall_test_fixture *fixture,
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    size_t actor
+)
+{
+    if (
+        actor != GRANT_SYSCALL_GRANTEE
+        || !grant_syscall_test_reuse_grantor(fixture)
+        || !grant_syscall_test_arm_command(
+            fixture,
+            actor,
+            (struct micros_user_context *)frame,
+            fixture->control_next_command
+        )
+        || micros_scheduler_select_user_return(hart, frame)
+            != MICROS_SCHEDULER_OK
+        || grant_syscall_test_current_actor(fixture, hart) != actor
+        || !grant_syscall_test_scheduler_state_valid(fixture, hart, actor, true)
+    ) {
+        return MICROS_GRANT_SYSCALL_TEST_CONTROL_MISMATCH;
+    }
+    fixture->control_action = GRANT_CONTROL_NONE;
+    return MICROS_GRANT_SYSCALL_TEST_CONTROL_USER_RETURN;
+}
+
 enum micros_grant_syscall_test_control_result
 micros_grant_syscall_test_handle_control_trap(
     struct micros_hart *hart,
@@ -216,66 +294,10 @@ micros_grant_syscall_test_handle_control_trap(
         return MICROS_GRANT_SYSCALL_TEST_CONTROL_MISMATCH;
     }
     if (fixture->control_action == GRANT_CONTROL_SWITCH) {
-        const struct micros_thread *next =
-            &objects->threads[fixture->threads[fixture->control_next_actor].slot];
-
-        grant_syscall_test_copy_bytes(&expected, &next->user_context, sizeof(expected));
-        if (
-            (
-                next->scheduler_assigned
-                ? micros_thread_runtime_flags_unset(
-                    objects,
-                    fixture->threads[fixture->control_next_actor],
-                    MICROS_THREAD_RTS_INACTIVE
-                )
-                : micros_thread_scheduler_admit(
-                    objects,
-                    micros_kernel_object_runtime_boot_hart_handle(),
-                    fixture->threads[fixture->control_next_actor],
-                    MICROS_SCHEDULER_PRIORITY_DEFAULT_USER,
-                    UINT64_MAX,
-                    true
-                )
-            ) != MICROS_KERNEL_OBJECT_OK
-            || micros_thread_scheduler_hold(
-                objects,
-                fixture->threads[actor]
-            ) != MICROS_KERNEL_OBJECT_OK
-            || micros_scheduler_select_user_return(hart, frame)
-                != MICROS_SCHEDULER_OK
-            || grant_syscall_test_current_actor(fixture, hart) != fixture->control_next_actor
-            || !grant_syscall_test_bytes_equal(frame, &expected, sizeof(expected))
-            || !grant_syscall_test_scheduler_state_valid(
-                fixture,
-                hart,
-                fixture->control_next_actor,
-                true
-            )
-        ) {
-            return MICROS_GRANT_SYSCALL_TEST_CONTROL_MISMATCH;
-        }
-        fixture->control_action = GRANT_CONTROL_NONE;
-        return MICROS_GRANT_SYSCALL_TEST_CONTROL_USER_RETURN;
+        return grant_syscall_test_switch_control(fixture, objects, hart, frame, actor, &expected);
     }
     if (fixture->control_action == GRANT_CONTROL_REUSE_GRANTOR) {
-        if (
-            actor != GRANT_SYSCALL_GRANTEE
-            || !grant_syscall_test_reuse_grantor(fixture)
-            || !grant_syscall_test_arm_command(
-                fixture,
-                actor,
-                (struct micros_user_context *)frame,
-                fixture->control_next_command
-            )
-            || micros_scheduler_select_user_return(hart, frame)
-                != MICROS_SCHEDULER_OK
-            || grant_syscall_test_current_actor(fixture, hart) != actor
-            || !grant_syscall_test_scheduler_state_valid(fixture, hart, actor, true)
-        ) {
-            return MICROS_GRANT_SYSCALL_TEST_CONTROL_MISMATCH;
-        }
-        fixture->control_action = GRANT_CONTROL_NONE;
-        return MICROS_GRANT_SYSCALL_TEST_CONTROL_USER_RETURN;
+        return grant_syscall_test_reuse_control(fixture, hart, frame, actor);
     }
     if (
         fixture->control_action != GRANT_CONTROL_FINISH

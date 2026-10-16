@@ -4,6 +4,52 @@ uintptr_t micros_grant_syscall_test_saved_sp;
 uintptr_t micros_grant_syscall_test_saved_gp;
 uintptr_t micros_grant_syscall_test_saved_tp;
 
+static bool grant_syscall_test_prepare_actors(
+    struct grant_syscall_test_fixture *fixture,
+    struct micros_kernel_objects *objects,
+    size_t payload_size,
+    size_t *actor
+)
+{
+    for (
+        *actor = 0;
+        *actor < GRANT_SYSCALL_PROCESS_COUNT;
+        ++*actor
+    ) {
+        if (
+            micros_process_create(objects, &fixture->processes[*actor])
+                != MICROS_KERNEL_OBJECT_OK
+            || micros_endpoint_reserve(
+                fixture->endpoint_registry,
+                objects,
+                fixture->processes[*actor],
+                &fixture->endpoints[*actor]
+            ) != MICROS_ENDPOINT_OK
+            || micros_endpoint_install_profile(
+                fixture->endpoint_registry,
+                objects,
+                fixture->processes[*actor],
+                (uint8_t)(*actor + 1)
+            ) != MICROS_ENDPOINT_OK
+            || micros_endpoint_activate(
+                fixture->endpoint_registry,
+                objects,
+                fixture->endpoints[*actor]
+            ) != MICROS_ENDPOINT_OK
+            || !grant_syscall_test_prepare_process(
+                fixture,
+                objects,
+                *actor,
+                micros_grant_syscall_payload_start,
+                payload_size
+            )
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
 _Noreturn void micros_grant_syscall_runtime_run_self_test(void)
 {
     struct grant_syscall_test_fixture *fixture = grant_syscall_test_context();
@@ -68,41 +114,8 @@ _Noreturn void micros_grant_syscall_runtime_run_self_test(void)
     ) {
         goto failure;
     }
-    for (
-        actor = 0;
-        actor < GRANT_SYSCALL_PROCESS_COUNT;
-        ++actor
-    ) {
-        if (
-            micros_process_create(objects, &fixture->processes[actor])
-                != MICROS_KERNEL_OBJECT_OK
-            || micros_endpoint_reserve(
-                fixture->endpoint_registry,
-                objects,
-                fixture->processes[actor],
-                &fixture->endpoints[actor]
-            ) != MICROS_ENDPOINT_OK
-            || micros_endpoint_install_profile(
-                fixture->endpoint_registry,
-                objects,
-                fixture->processes[actor],
-                (uint8_t)(actor + 1)
-            ) != MICROS_ENDPOINT_OK
-            || micros_endpoint_activate(
-                fixture->endpoint_registry,
-                objects,
-                fixture->endpoints[actor]
-            ) != MICROS_ENDPOINT_OK
-            || !grant_syscall_test_prepare_process(
-                fixture,
-                objects,
-                actor,
-                micros_grant_syscall_payload_start,
-                payload_size
-            )
-        ) {
-            goto failure;
-        }
+    if (!grant_syscall_test_prepare_actors(fixture, objects, payload_size, &actor)) {
+        goto failure;
     }
     if (
         !grant_syscall_test_arm_command(
@@ -153,6 +166,53 @@ failure:
     }
 }
 
+static bool grant_syscall_test_close_all_endpoints(
+    struct grant_syscall_test_fixture *fixture,
+    struct micros_kernel_objects *objects,
+    size_t *actor,
+    uint64_t *failure_stage
+)
+{
+    for (
+        *actor = 0;
+        *actor < GRANT_SYSCALL_PROCESS_COUNT;
+        ++*actor
+    ) {
+        if (!grant_syscall_test_close_endpoint(fixture, objects, *actor)) {
+            *failure_stage = UINT64_C(0x10) + *actor;
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool grant_syscall_test_release_all_resources(
+    struct grant_syscall_test_fixture *fixture,
+    struct micros_kernel_objects *objects,
+    size_t *actor,
+    uint64_t *failure_stage
+)
+{
+    for (
+        *actor = 0;
+        *actor < GRANT_SYSCALL_PROCESS_COUNT;
+        ++*actor
+    ) {
+        if (
+            !grant_syscall_test_release_thread(fixture, objects, *actor)
+            || !grant_syscall_test_release_address_space(fixture, objects, *actor)
+            || micros_frame_ownership_runtime_release_process(
+                objects,
+                fixture->processes[*actor]
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            *failure_stage = UINT64_C(0x20) + *actor;
+            return false;
+        }
+    }
+    return true;
+}
+
 _Noreturn void micros_grant_syscall_test_finish(void)
 {
     struct grant_syscall_test_fixture *fixture = grant_syscall_test_context();
@@ -175,33 +235,12 @@ _Noreturn void micros_grant_syscall_test_finish(void)
     ) {
         goto failure;
     }
-    for (
-        actor = 0;
-        actor < GRANT_SYSCALL_PROCESS_COUNT;
-        ++actor
-    ) {
-        if (!grant_syscall_test_close_endpoint(fixture, objects, actor)) {
-            failure_stage = UINT64_C(0x10) + actor;
-            goto failure;
-        }
+    if (!grant_syscall_test_close_all_endpoints(fixture, objects, &actor, &failure_stage)) {
+        goto failure;
     }
     failure_stage = 2;
-    for (
-        actor = 0;
-        actor < GRANT_SYSCALL_PROCESS_COUNT;
-        ++actor
-    ) {
-        if (
-            !grant_syscall_test_release_thread(fixture, objects, actor)
-            || !grant_syscall_test_release_address_space(fixture, objects, actor)
-            || micros_frame_ownership_runtime_release_process(
-                objects,
-                fixture->processes[actor]
-            ) != MICROS_KERNEL_OBJECT_OK
-        ) {
-            failure_stage = UINT64_C(0x20) + actor;
-            goto failure;
-        }
+    if (!grant_syscall_test_release_all_resources(fixture, objects, &actor, &failure_stage)) {
+        goto failure;
     }
     failure_stage = 3;
     if (

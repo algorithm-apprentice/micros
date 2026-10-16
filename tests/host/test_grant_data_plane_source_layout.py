@@ -458,6 +458,39 @@ TARGET_SAVED_OBJECTS = tuple(
 TARGET_TYPES_DIGEST = "126262b93b4bcb61beaa1cc8ec449c5626b9dae669d24c5bd711b3f56a098ce1"
 TARGET_CONSTANTS_DIGEST = "deded705274f60d65ef06aae677c737cf0e2026971b38e6ec04b6e47077299e7"
 TARGET_EXTERNS_DIGEST = "2da61971c68bcd102a5c344ee3c8ad6be9d5c6131e61b1bcd773601c781fce66"
+TARGET_SETUP_PHASE = "grant_syscall_test_prepare_actors"
+TARGET_FINISH_PHASES = ("grant_syscall_test_close_all_endpoints", "grant_syscall_test_release_all_resources")
+TARGET_CONTROL_PHASES = ("grant_syscall_test_switch_control", "grant_syscall_test_reuse_control")
+TARGET_EFFECT_PHASES = (
+    ("GRANT_COMMAND_COPY_FROM_CROSS", "grant_syscall_test_effect_copy_from_cross"),
+    ("GRANT_COMMAND_COPY_TO_CROSS", "grant_syscall_test_effect_copy_to_cross"),
+    ("GRANT_COMMAND_COPY_FROM_LOCAL", "grant_syscall_test_effect_copy_from_local"),
+    ("GRANT_COMMAND_COPY_TO_LOCAL", "grant_syscall_test_effect_copy_to_local"),
+)
+TARGET_BOUND_PHASES = {
+    TARGET_SETUP_PHASE: (
+        0, "static bool", "struct grant_syscall_test_fixture *fixture, struct micros_kernel_objects *objects, "
+        "size_t payload_size, size_t *actor",
+    ),
+    **{
+        name: (0, "static bool", "struct grant_syscall_test_fixture *fixture, struct micros_kernel_objects *objects, "
+               "size_t *actor, uint64_t *failure_stage")
+        for name in TARGET_FINISH_PHASES
+    },
+    TARGET_CONTROL_PHASES[0]: (
+        6, "static enum micros_grant_syscall_test_control_result",
+        "struct grant_syscall_test_fixture *fixture, struct micros_kernel_objects *objects, "
+        "struct micros_hart *hart, struct micros_trap_frame *frame, size_t actor, struct micros_user_context *expected",
+    ),
+    TARGET_CONTROL_PHASES[1]: (
+        6, "static enum micros_grant_syscall_test_control_result",
+        "struct grant_syscall_test_fixture *fixture, struct micros_hart *hart, struct micros_trap_frame *frame, size_t actor",
+    ),
+    **{
+        name: (5, "static bool", "struct grant_syscall_test_fixture *fixture")
+        for _, name in TARGET_EFFECT_PHASES
+    },
+}
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -554,10 +587,6 @@ SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (3, "arm_command"),
     (3, "transition_after_return"),
-    (3, "validate_command_effect"),
-    (3, "micros_grant_syscall_runtime_run_self_test"),
-    (3, "micros_grant_syscall_test_handle_control_trap"),
-    (3, "micros_grant_syscall_test_finish"),
 )
 
 # Immutable oracle literals are inserted from the offline reviewed Git manifest.
@@ -847,6 +876,10 @@ def original_locations(family, texts=None):
             if path != SYSCALL_TEST_SOURCES[1]:
                 raise AssertionError("the target fixture getter has its one original state owner")
             continue
+        if family == 3 and spelling in TARGET_BOUND_PHASES:
+            if path != SYSCALL_TEST_SOURCES[TARGET_BOUND_PHASES[spelling][0]]:
+                raise AssertionError("target boundary phases remain in their original root/hook/effect owner")
+            continue
         if family == 4 and any(spelling in specification[3] for specification in NATIVE_CASE_OUTLINES.values()):
             paths = tuple(
                 specification[0] for specification in NATIVE_CASE_OUTLINES.values() if spelling in specification[3]
@@ -915,6 +948,11 @@ def original_body_digest(family, original, record):
     if family == 2 and original == "micros_grant_runtime_run_self_test" and (2, original) not in FUNCTION_TASK_MIGRATION:
         body = mechanism_actual_body_tokens(record)
     if family == 3 and (3, "copy_bytes") not in SYMBOL_OWNER_MIGRATION:
+        if original in (
+            "micros_grant_syscall_runtime_run_self_test", "micros_grant_syscall_test_finish",
+            "micros_grant_syscall_test_handle_control_trap", "validate_command_effect",
+        ) and (3, original) not in FUNCTION_TASK_MIGRATION:
+            body = target_boundary_actual_body_tokens(original, record)
         body = target_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
     if family == 4 and (4, "setup_fixture") not in SYMBOL_OWNER_MIGRATION:
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
@@ -1457,6 +1495,89 @@ def mechanism_actual_body_tokens(record, owner=None):
     return tuple(body)
 
 
+def borrowed_phase_body_tokens(caller, binding, phase, dereferences=(), addresses=(), failure=None, success=False):
+    phase = list(tokens(phase))
+    if phase[:1] != ["{"] or phase[-1:] != ["}"]:
+        raise AssertionError("borrowed phases retain their complete original function scope")
+    if success:
+        if phase[-4:] != ["return", "true", ";", "}"]:
+            raise AssertionError("a borrowed teardown/setup phase finishes its original ordered task before success")
+        inner = phase[1:-4]
+    else:
+        inner = phase[1:-1]
+    restored = []
+    index = 0
+    while index < len(inner):
+        token = inner[index]
+        if token == "*" and inner[index + 1:index + 2] in ([name] for name in (*dereferences, *addresses)):
+            restored.append(inner[index + 1])
+            index += 2
+        elif token in dereferences:
+            raise AssertionError("a borrowed scalar is only its original caller-owned lvalue, never a retained pointer")
+        elif token in addresses and (not index or inner[index - 1] not in (".", "->")):
+            restored.extend(("&", token))
+            index += 1
+        elif token == "return" and failure is not None:
+            if inner[index:index + 3] != ["return", "false", ";"]:
+                raise AssertionError("setup/teardown failure preserves only its original common fatal exit")
+            restored.extend(tokens("goto " + failure + ";"))
+            index += 3
+        else:
+            restored.append(token)
+            index += 1
+    return bound_body_tokens(caller, binding, "{ " + " ".join(restored) + " }")
+
+
+def target_boundary_actual_body_tokens(original, record, owner=None):
+    owner_index = (
+        0 if original in ("micros_grant_syscall_runtime_run_self_test", "micros_grant_syscall_test_finish")
+        else 6 if original == "micros_grant_syscall_test_handle_control_trap" else 5
+    )
+    owner = source(SYSCALL_TEST_SOURCES[owner_index]) if owner is None else owner
+    records = function_records(owner)
+    names = (
+        (TARGET_SETUP_PHASE,) if original == "micros_grant_syscall_runtime_run_self_test"
+        else TARGET_FINISH_PHASES if original == "micros_grant_syscall_test_finish"
+        else TARGET_CONTROL_PHASES if original == "micros_grant_syscall_test_handle_control_trap"
+        else tuple(name for _, name in TARGET_EFFECT_PHASES)
+    )
+    for name in names:
+        _, result, parameters = TARGET_BOUND_PHASES[name]
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens(result + " " + name + "(" + parameters + ")"):
+            raise AssertionError("actual target boundary helpers retain all exact pointer/scalar/status types")
+    body = tokens("{" + record.body + "}")
+    if original == "micros_grant_syscall_runtime_run_self_test":
+        name = TARGET_SETUP_PHASE
+        return borrowed_phase_body_tokens(
+            body, "if (!" + name + "(fixture, objects, payload_size, &actor)) { goto failure; }",
+            "{" + records[name].body + "}", ("actor",), failure="failure", success=True,
+        )
+    if original == "micros_grant_syscall_test_finish":
+        for name in TARGET_FINISH_PHASES:
+            body = borrowed_phase_body_tokens(
+                body, "if (!" + name + "(fixture, objects, &actor, &failure_stage)) { goto failure; }",
+                "{" + records[name].body + "}", ("actor", "failure_stage"), failure="failure", success=True,
+            )
+        return body
+    if original == "micros_grant_syscall_test_handle_control_trap":
+        switch, reuse = TARGET_CONTROL_PHASES
+        body = borrowed_phase_body_tokens(
+            body, "return " + switch + "(fixture, objects, hart, frame, actor, &expected);",
+            "{" + records[switch].body + "}", addresses=("expected",),
+        )
+        return borrowed_phase_body_tokens(
+            body, "return " + reuse + "(fixture, hart, frame, actor);", "{" + records[reuse].body + "}",
+        )
+    for label, name in TARGET_EFFECT_PHASES:
+        phase = records[name].body
+        body = bound_body_tokens(
+            body, "case " + label + ": return " + name + "(fixture);",
+            "{ case " + label + ": " + phase + " }",
+        )
+    return body
+
+
 def copy_execution_actual_body_tokens(record, owner=None):
     owner = source(COPY_SOURCES[0]) if owner is None else owner
     declarations = copy_execution_declarations(owner)
@@ -1715,6 +1836,80 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_target_setup_finish_control_and_effect_expose_exact_bounded_domains(self):
+        for name, (owner, result, parameters) in TARGET_BOUND_PHASES.items():
+            with self.subTest(phase=name):
+                record = function_records(source(SYSCALL_TEST_SOURCES[owner]))[name]
+                self.assertEqual(tokens(result + " " + name + "(" + parameters + ")"), tokens(record.signature))
+                self.assertLessEqual(record.lines, 120)
+        for owner, name in (
+            (0, "micros_grant_syscall_runtime_run_self_test"), (0, "micros_grant_syscall_test_finish"),
+            (6, "micros_grant_syscall_test_handle_control_trap"), (5, "grant_syscall_test_validate_command_effect"),
+        ):
+            self.assertLessEqual(function_records(source(SYSCALL_TEST_SOURCES[owner]))[name].lines, 120)
+
+    def test_borrowed_target_scalars_keep_actual_actor_stage_loops_and_fatal_root_exit(self):
+        caller = "{ if (!release(fixture, objects, &actor, &failure_stage)) { goto failure; } original_root_report(); }"
+        phase = (
+            "{ for (*actor = 0; *actor < 3; ++*actor) { "
+            "if (!original_release(*actor)) { *failure_stage = 0x20 + *actor; return false; } } return true; }"
+        )
+        expected = (
+            "{ for (actor = 0; actor < 3; ++actor) { "
+            "if (!original_release(actor)) { failure_stage = 0x20 + actor; goto failure; } } original_root_report(); }"
+        )
+        binding = "if (!release(fixture, objects, &actor, &failure_stage)) { goto failure; }"
+        self.assertEqual(tokens(expected), borrowed_phase_body_tokens(
+            tokens(caller), binding, phase, ("actor", "failure_stage"), failure="failure", success=True,
+        ))
+        for changed in (
+            caller.replace("&actor", "actor"),
+            caller.replace("&failure_stage", "&other"),
+            caller.replace("goto failure;", "return false;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                borrowed_phase_body_tokens(
+                    tokens(changed), binding, phase, ("actor", "failure_stage"), failure="failure", success=True,
+                )
+        for changed in (
+            phase.replace("original_release(*actor)", "original_release(actor)"),
+            phase.replace("return false;", "return true;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                borrowed_phase_body_tokens(
+                    tokens(caller), binding, changed, ("actor", "failure_stage"), failure="failure", success=True,
+                )
+
+    def test_borrowed_control_context_keeps_root_expected_object_and_supervisor_boundary(self):
+        caller = (
+            "{ if (action == SWITCH) { return switch_control(fixture, objects, hart, frame, actor, &expected); } "
+            "frame->sp = saved_sp; frame->sstatus &= ~control_mask; return SUPERVISOR; }"
+        )
+        phase = (
+            "{ original_copy(expected, &next->context, sizeof(*expected)); "
+            "if (!original_compare(frame, expected, sizeof(*expected))) { return MISMATCH; } return USER; }"
+        )
+        expected = (
+            "{ if (action == SWITCH) { original_copy(&expected, &next->context, sizeof(expected)); "
+            "if (!original_compare(frame, &expected, sizeof(expected))) { return MISMATCH; } return USER; } "
+            "frame->sp = saved_sp; frame->sstatus &= ~control_mask; return SUPERVISOR; }"
+        )
+        binding = "return switch_control(fixture, objects, hart, frame, actor, &expected);"
+        self.assertEqual(
+            tokens(expected), borrowed_phase_body_tokens(tokens(caller), binding, phase, addresses=("expected",)),
+        )
+        for changed in (
+            caller.replace("&expected", "&copy"),
+            caller.replace("actor, &expected", "other_actor, &expected"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                borrowed_phase_body_tokens(tokens(changed), binding, phase, addresses=("expected",))
+        self.assertNotEqual(
+            tokens(expected), borrowed_phase_body_tokens(
+                tokens(caller.replace("~control_mask", "0")), binding, phase, addresses=("expected",),
+            ),
+        )
+
     def test_syscall_fixture_owns_exact_38_fields_but_not_root_assembly_save_objects(self):
         header = source(PRIVATE_HEADERS[2])
         work_declarations(header, TARGET_FIXTURE_TAG, TARGET_FIELDS)
