@@ -1,6 +1,6 @@
 # ADR-0070: TTY Function and Evidence Decomposition
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-16
 - Refines: ADR-0012, ADR-0025, ADR-0047, ADR-0051, ADR-0064,
   ADR-0065, and ADR-0069
@@ -128,3 +128,14 @@ and the complete current author and actual original-producer reuse gates
 pass. Review is complete and read-only, without routine gate reruns.
 Exact reviewed-head squash/tree equality, main fast-forward and protected
 obsolete local/remote branch cleanup close the outcome.
+
+## Design review disposition
+
+Independent complete read-only design review inspected the eight-document
+proposal, relevant Accepted authority, actual TTY/source/consumer contracts,
+fixed MINIX evidence and exact current four-command author evidence.
+It reported: "No significant issues found in the reviewed changes."
+No substantive correction or targeted reproduction was reported.
+
+Acceptance records that clean design result. It does not start or complete
+the paired implementation; separate design merge remains its prerequisite.

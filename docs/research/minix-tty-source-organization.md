@@ -2,7 +2,7 @@
 
 ## Reference and scope
 
-This is the ADR-0025 responsibility trace for the Proposed
+This is the ADR-0025 responsibility trace for the Accepted
 [TTY source contract](../architecture/tty-source-organization.md), not another
 terminal design. Accepted ADR-0012 and ADR-0047 retain authority. The earlier
 [TTY/console/IRQ behavioral study](minix-tty-console-and-irq.md) remains the

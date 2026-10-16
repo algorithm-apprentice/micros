@@ -2,10 +2,11 @@
 
 ## Status and scope
 
-This is the Proposed exact contract for
+This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
-It is design-only; implementation remains pending until independent design
-review, acceptance and separate merge. Accepted ADR-0047 remains the authority
+Independent complete read-only design review is clean. This outcome is
+design-only; implementation remains pending until separate design merge.
+Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
 ```text

@@ -267,10 +267,11 @@ scope/row/helper expansion. Independent positive and negative fixtures
 precede C outlines; literal-empty migrations and all 22 real bounded owners
 close source work, not final author/reuse or independent-review acceptance.
 
-The next TTY source correction is Proposed
+The next TTY source correction is Accepted
 [ADR-0070](adr/0070-tty-function-and-evidence-decomposition.md) and its exact
 [source contract](architecture/tty-source-organization.md). Design authors
-documentation only. After separate review and merge, implementation must
+documentation only and complete independent design review is clean.
+After separate merge, implementation must
 start with immutable 156-body/type, seven-long-C and Python-renderer facts,
 structural Red and independent typed state/scope/AST/data fixtures.
 Existing native and real UART/TTY/RAMFS/VFS/ELF evidence remains required:

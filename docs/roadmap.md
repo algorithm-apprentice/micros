@@ -403,15 +403,15 @@ same-original-producer three-profile reuse and independent review passed.
 Implementation #140 is merged with identical reviewed squash tree, clean
 main fast-forward and exact local/remote branch cleanup.
 
-The next single maintenance design is Proposed
+The next single maintenance design is Accepted
 [ADR-0070](adr/0070-tty-function-and-evidence-decomposition.md), with the exact
 [TTY source contract](architecture/tty-source-organization.md).
 It preserves cohesive terminal/UART/control behavior while defining runtime,
 service, model, native-double and generator responsibilities: 26 C owners,
 five private headers/sets, eight consumer operands, 116 moves and eight
 over-limit C/Python dispositions. This phase contains documentation only;
-implementation remains pending until independent design review, acceptance
-and separate merge. These corrections add no runtime node, clock/deadline,
+complete independent design review is clean and implementation remains
+pending until separate merge. These corrections add no runtime node, clock/deadline,
 application startup or shell behavior.
 
 ## v0.1 completion goal
