@@ -1,0 +1,6 @@
+#ifndef MICROS_KERNEL_GRANT_SYSCALL_TEST_INTERNAL_H
+#define MICROS_KERNEL_GRANT_SYSCALL_TEST_INTERNAL_H
+
+#include "grant_syscall_test.h"
+
+#endif

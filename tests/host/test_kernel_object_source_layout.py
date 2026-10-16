@@ -8,6 +8,7 @@ import re
 import unittest
 
 from tests.host.c_source_records import function_records, matching_lexical
+from tests.host.test_grant_data_plane_source_layout import grant_data_plane_cmake_projection
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
@@ -1384,6 +1385,7 @@ def alias_rows():
 
 
 def kernel_object_cmake_projection(text):
+    text = grant_data_plane_cmake_projection(text)
     blocks = [(name, paths, cmake_commands(text, "set", name)) for name, paths in SOURCE_SETS.items()]
     if not any(found for _, _, found in blocks):
         if any("${" + name + "}" in text for name in SOURCE_SETS):

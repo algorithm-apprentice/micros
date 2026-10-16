@@ -270,8 +270,11 @@ fourteen long and five shorter task dispositions. Registry/core/runtime/ABI
 and public boundaries stay unchanged. The fixed MINIX trace, actual
 fixture/script/model state and independent validation dimensions precede
 implementation. Independent complete design review is clean. This phase
-contains documentation only; its paired implementation remains pending until
-the separate Accepted design merges.
+contains documentation only and design #139 is separately merged.
+Implementation begins from that outcome with immutable inventories and
+structural Red; its current range-only slice moves two original definitions
+and wires the final source sets without claiming the other owners or
+semantic tasks complete.
 
 ### TTY
 

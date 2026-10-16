@@ -1014,6 +1014,39 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
             "tests/host/scheduler_model_internal.h",
         ),
     ),
+    (
+        "kernel/grant_copy.c",
+        (
+            "kernel/grant_copy_range.c",
+            "kernel/grant_copy_internal.h",
+        ),
+    ),
+    (
+        "tests/host/grant_test.c",
+        (
+            "tests/host/grant_test_fixture.c",
+            "tests/host/grant_lifecycle_test.c",
+            "tests/host/grant_validation_test.c",
+            "tests/host/grant_model_test.c",
+            "tests/host/grant_model_reference.c",
+            "tests/host/grant_model_operations.c",
+            "tests/host/grant_model_copy.c",
+            "tests/host/grant_test_internal.h",
+        ),
+    ),
+    (
+        "kernel/grant_syscall_test.c",
+        (
+            "kernel/grant_syscall_test_fixture.c",
+            "kernel/grant_syscall_test_commands.c",
+            "kernel/grant_syscall_test_copy_commands.c",
+            "kernel/grant_syscall_test_transitions.c",
+            "kernel/grant_syscall_test_effects.c",
+            "kernel/grant_syscall_test_hooks.c",
+            "kernel/grant_syscall_test_lifecycle.c",
+            "kernel/grant_syscall_test_internal.h",
+        ),
+    ),
 )
 
 HOST_UNIT_ONLY_INPUTS = (
@@ -1037,6 +1070,7 @@ HOST_UNIT_ONLY_INPUTS = (
     "tests/host/test_ramfs_source_layout.py",
     "tests/host/test_endpoint_source_layout.py",
     "tests/host/test_kernel_object_source_layout.py",
+    "tests/host/test_grant_data_plane_source_layout.py",
     "tests/host/c_source_records.py",
     "tests/host/test_kernel_bootstrap_source_layout.py",
     "tests/host/test_elf_spawn_model_layout.py",

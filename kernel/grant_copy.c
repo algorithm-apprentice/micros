@@ -1,5 +1,7 @@
 #include "micros/grant_copy.h"
 
+#include "grant_copy_internal.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,119 +16,6 @@ _Static_assert(
     MICROS_GRANT_COPY_MAX == MICROS_SV39_PAGE_SIZE,
     "grant copy maximum must remain one page"
 );
-
-static enum micros_grant_error map_address_error(
-    enum micros_user_address_space_error error
-)
-{
-    switch (error) {
-    case MICROS_USER_ADDRESS_SPACE_OK:
-        return MICROS_GRANT_OK;
-    case MICROS_USER_ADDRESS_SPACE_ERROR_RANGE:
-    case MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED:
-    case MICROS_USER_ADDRESS_SPACE_ERROR_PERMISSION:
-        return MICROS_GRANT_ERROR_FAULT;
-    case MICROS_USER_ADDRESS_SPACE_ERROR_PHASE:
-        return MICROS_GRANT_ERROR_PHASE;
-    default:
-        return MICROS_GRANT_ERROR_INVARIANT;
-    }
-}
-
-static enum micros_grant_error plan_range(
-    struct micros_process_handle process,
-    uintptr_t address,
-    size_t length,
-    uint32_t required_permission,
-    const struct micros_tty_device_authority *device_authority,
-    struct micros_grant_copy_range_plan *plan
-)
-{
-    struct micros_grant_copy_range_plan candidate = {0};
-    uintptr_t current = address;
-    size_t remaining = length;
-    bool device_fault = false;
-
-    while (remaining != 0) {
-        uint64_t physical_address;
-        uint32_t permissions;
-        size_t contiguous;
-        size_t chunk_length;
-        enum micros_user_address_space_error address_error;
-
-        if (
-            device_authority != NULL
-            && micros_tty_device_range_intersects(
-                device_authority,
-                process,
-                current,
-                1
-            )
-        ) {
-            address_error =
-                micros_user_address_space_validate_tty_uart_mapping(
-                    process,
-                    device_authority->root_physical_address
-                );
-            if (
-                address_error
-                    == MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
-            ) {
-                return MICROS_GRANT_ERROR_PHASE;
-            }
-            if (
-                address_error
-                    != MICROS_USER_ADDRESS_SPACE_OK
-            ) {
-                return MICROS_GRANT_ERROR_INVARIANT;
-            }
-            chunk_length =
-                (
-                    (uintptr_t)MICROS_TTY_UART_VIRTUAL_BASE
-                    + MICROS_TTY_UART_MAPPED_LENGTH
-                ) - current;
-            if (chunk_length > remaining) {
-                chunk_length = remaining;
-            }
-            current += chunk_length;
-            remaining -= chunk_length;
-            device_fault = true;
-            continue;
-        }
-        if (candidate.chunk_count >= 2) {
-            return MICROS_GRANT_ERROR_INVARIANT;
-        }
-        address_error = micros_user_address_space_translate(
-            process,
-            current,
-            &physical_address,
-            &permissions,
-            &contiguous
-        );
-        if (address_error != MICROS_USER_ADDRESS_SPACE_OK) {
-            return map_address_error(address_error);
-        }
-        if ((permissions & required_permission) == 0) {
-            return MICROS_GRANT_ERROR_FAULT;
-        }
-        chunk_length = contiguous < remaining
-            ? contiguous
-            : remaining;
-        candidate.chunks[candidate.chunk_count] =
-            (struct micros_grant_copy_chunk){
-                .physical_address = physical_address,
-                .length = chunk_length,
-            };
-        ++candidate.chunk_count;
-        current += chunk_length;
-        remaining -= chunk_length;
-    }
-    if (device_fault) {
-        return MICROS_GRANT_ERROR_FAULT;
-    }
-    *plan = candidate;
-    return MICROS_GRANT_OK;
-}
 
 static enum micros_grant_error copy_grant(
     const struct micros_grant_registry *grant_registry,
@@ -230,7 +119,7 @@ static enum micros_grant_error copy_grant(
         goto done;
     }
 
-    remote_error = plan_range(
+    remote_error = grant_copy_plan_range(
         authority.grantor,
         authority.remote_address,
         length,
@@ -242,7 +131,7 @@ static enum micros_grant_error copy_grant(
             : NULL,
         &remote_plan
     );
-    local_error = plan_range(
+    local_error = grant_copy_plan_range(
         authority.grantee,
         local_address,
         length,
@@ -382,7 +271,7 @@ enum micros_grant_error micros_grant_validate_range(
         error = MICROS_GRANT_ERROR_INVARIANT;
         goto done;
     }
-    error = plan_range(
+    error = grant_copy_plan_range(
         authority.grantor,
         authority.remote_address,
         length,

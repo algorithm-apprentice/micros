@@ -5,7 +5,9 @@
 This is the exact Accepted design for
 [ADR-0069](../adr/0069-grant-data-plane-source-decomposition.md).
 Independent complete design review is clean. The paired implementation
-remains pending until this separate Accepted design is merged.
+starts from separately merged design #139,
+`a71253e88b367d9cc4fe494395b76c7f16d39540`. Current progress below separates
+actual definition ownership from once-only future source wiring.
 
 ```text
 reviewed micros base: 6269d9247de6beafed2448aa0ffd6904de5e8833
@@ -29,8 +31,8 @@ single maintenance outcome, not another runtime-DAG node.
 | `tests/host/grant_syscall_core_test.c` | 400 | 3 | 1 |
 | **Total** | **8,018** | **95** | **14** |
 
-Names below are required future owners, not claims that files, tests or
-implementation already exist.
+Names below define final owners. Source wiring alone is not a claim that
+their actual tasks or semantic outlines are complete.
 
 ## Preserved authority
 
@@ -470,3 +472,28 @@ without routine gate reruns. Only a minimal targeted concrete reproduction
 is permitted. Fix justified findings, re-review to clean, squash only that
 head, verify identical tree, fast-forward main and delete its exact obsolete
 local/remote branch. No later TTY/runner/layout/init/shell work is folded in.
+
+## Current implementation progress
+
+The initial structural Red found `plan_range` still in its facade rather
+than the required range owner. Before any C rewrite, all 95 complete bodies,
+seven signature families, original declaration/data inventories, fourteen
+long functions, 25 stable neighbors, complete recipe and shared/tool AST
+facts were frozen from immutable Git `6269d924`, not rewritten output.
+
+The first green slice moves only the two original range definitions.
+`grant_copy_plan_range` is the sole necessary private production export;
+the address-error mapper remains file-local in that leaf. All 95 complete
+bodies/types and 25 stable artifacts remain exact. Sixty-three original
+owner moves and all nineteen semantic dispositions remain pending.
+
+All 22 future C paths, three private headers/sets and four consumer operands
+are wired once. Fourteen future native/syscall units are explicitly
+declarations-only migration owners, not duplicate state or completed tasks.
+Three family aliases and one host-only structural input retain all four
+classification dimensions; planner/context algorithms remain unchanged.
+The actual complete grant recipe inverse restores `44d8a861...` before
+maintaining only the admitted current digest
+`4e370ba5578b0b114a51d2d5ae738320ce7503a3d51bd7c2e6fb2623284981b3`.
+Earlier source/recipe/planner expected values remain unchanged under only
+that finite delta. This is not final author/reuse or review completion.
