@@ -1590,7 +1590,10 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertEqual(18, len(STABLE_HASHES))
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()))
+                from tests.host.test_qemu_runner_source_layout import restored_runner_source
+
+                value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else (ROOT / path).read_bytes()
+                self.assertEqual(expected, digest_bytes(value))
 
     def test_all_four_classification_dimensions_and_two_host_only_inputs_are_exact(self):
         qemu = [

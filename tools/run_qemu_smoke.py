@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Optional
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+
 PANIC_MARKER = "MICROS_PANIC"
 FAILURE_MARKER = "MICROS_TEST_FAILURE"
 TRAP_READY_MARKER = "MICROS_TRAP_READY"
@@ -1350,31 +1353,7 @@ def classify_smoke(
     return SmokeOutcome.UNEXPECTED_EXIT
 
 
-def build_qemu_command(*, qemu, kernel, memory="128M"):
-    return [
-        qemu,
-        "-machine",
-        "virt,aia=none",
-        "-cpu",
-        "rv64",
-        "-smp",
-        "1",
-        "-m",
-        memory,
-        "-display",
-        "none",
-        "-monitor",
-        "none",
-        "-serial",
-        "stdio",
-        "-nic",
-        "none",
-        "-bios",
-        "default",
-        "-kernel",
-        kernel,
-        "-no-reboot",
-    ]
+from tools.qemu_smoke_command import build_qemu_command
 
 
 def _decode_output(output):

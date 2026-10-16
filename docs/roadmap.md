@@ -436,8 +436,11 @@ It exposes existing outcome/report, argv, process/serial, CLI and host-case
 owners without changing accepted markers, commands or budgets. The exact
 source-family declaration transports the existing closed argument builder;
 no gate, receipt, default-config or cross-HEAD rule is relaxed.
-Complete independent design/correction review is clean. Only documentation
-design is active; implementation stays pending until separate design merge.
+Complete independent design/correction and acceptance-only reviews are clean.
+Design #145 separately merged as `934faa9` with its exact reviewed tree and
+obsolete branches removed. The fresh implementation is now the single
+active task, beginning with frozen original facts, structural Red and
+independent source/binding/closure fixtures rather than invented policy.
 
 ## v0.1 completion goal
 

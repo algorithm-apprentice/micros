@@ -303,9 +303,10 @@ reviewed tree and obsolete branches removed.
 The next correction is Accepted
 [ADR-0072](adr/0072-qemu-runner-source-decomposition.md) and its exact
 [runner source contract](architecture/qemu-runner-source-organization.md).
-Design remains documentation only and independent design/correction review
-is clean. After separate design merge,
-implementation must freeze the original runner/file/AST/data, all 85 test
+Design #145 contains documentation only and independent design/correction/
+acceptance-only reviews are clean; its separate merge is complete.
+The fresh implementation must
+freeze the original runner/file/AST/data, all 85 test
 IDs and fixture bodies, and prove finite actual-source restoration before
 the reviewed code-family source declaration changes. Retain the cohesive
 serial lifecycle, all first errors/outcomes, independent case expectations

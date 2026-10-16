@@ -3,12 +3,13 @@
 ## Status, baseline and phase
 
 This is the Accepted exact contract for
-[ADR-0072](../adr/0072-qemu-runner-source-decomposition.md). Only
-`qemu-tooling-decomposition-design` is active.
-`qemu-tooling-decomposition-implementation` remains pending until independent
-design review, acceptance and separate merge. Complete independent design
-and correction review is clean; only separate design merge remains before
-implementation. This phase contains documents only and adds no runtime-DAG node.
+[ADR-0072](../adr/0072-qemu-runner-source-decomposition.md).
+Independent complete design/correction and acceptance-only reviews are clean.
+Design #145 separately merged as
+`934faa9fd0e9e406758c0f2e336fb28af57739db`, with its exact reviewed tree.
+Only `qemu-tooling-decomposition-implementation` is active, on a fresh branch
+from that main. Current progress below distinguishes real owners from
+explicit future migration paths. This adds no runtime-DAG node.
 
 ```text
 reviewed micros base: 34f1048449c221b014530484bfec4b3c0ab51142
@@ -385,3 +386,34 @@ No accepted report, command interface, guest budget, serial/process error or
 cleanup behavior changes. No configuration/default flag workaround, new
 eligible workflow, generalized parser/import/bytecode/rule engine,
 cross-HEAD reuse, kernel layout or production init/shell work is included.
+
+## Current implementation progress
+
+Before any rewrite, immutable Git `934faa9` facts froze the complete runner,
+46 functions/two classes/43 assignments and six aggregate classes/85 methods/
+36 independent fixtures, plus context/planner/recipe and retained oracles.
+The runtime gate contains only immutable hashes/order/whitespace metadata,
+not an unchecked legacy body archive.
+
+Structural Red first found the original argument builder still in the
+facade. Independent exact actual-node raw/AST/whitespace and facade-binding
+fixtures preceded its complete 25-line move into the command owner.
+The actual complete original `9e54f744...` file and module AST reconstruct
+before either current source digest changes.
+
+All ten production paths are present; eight future modules are explicitly
+single-docstring migration owners, not completed responsibilities.
+The original other 45 functions, two classes and data still remain in the
+facade; all 85 original cases still execute through their unchanged root.
+There are 211 original node/method/data moves and all three long-function
+dispositions remaining.
+
+The reviewed ten-member code declaration, exact early package/cache/source
+checks and fixed source-free admitted-interpreter namespace/helper-origin
+checks are wired. Actual installed native/smoke/TTY-image metadata closure
+remains eligible; no dirty-iteration workflow receipt or reuse is claimed.
+The original full context AST and all prior runner byte/text expectations
+restore before retained checks. Current narrow evidence passes 223 primary
+checks, four other retained source checks and the real unchanged-budget
+smoke guest. Final full author/reuse and independent implementation review
+are not claimed complete.

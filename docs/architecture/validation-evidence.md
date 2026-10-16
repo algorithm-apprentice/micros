@@ -270,8 +270,10 @@ builder. Its [exact source contract](qemu-runner-source-organization.md)
 requires complete original runner byte/AST restoration before the single
 file declaration becomes a fixed ten-member family with narrowly closed
 loader inputs. This is not implemented by the design alone: complete independent design/
-correction review is clean, but the existing declaration remains
-authoritative until separate design merge. All other profile, default-config, coverage,
+correction and acceptance-only reviews are clean, and separate design #145
+is merged. Its fresh implementation transports the declaration only after
+the required actual-source proof; design status alone is not execution or
+reuse evidence. All other profile, default-config, coverage,
 provenance and failure rules stay unchanged.
 
 The already required native shim/import closure also distinguishes declared

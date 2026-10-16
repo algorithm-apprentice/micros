@@ -22,6 +22,118 @@ class ValidationContextTests(unittest.TestCase):
     def digest(self):
         return validation_context.fingerprint_tree(self.root, (self.root,))
 
+    def qemu_family_fixture(self):
+        paths = (
+            "tools/run_qemu_smoke.py", "tools/qemu_smoke_records.py", "tools/qemu_smoke_platform.py",
+            "tools/qemu_smoke_objects.py", "tools/qemu_smoke_faults.py", "tools/qemu_smoke_command.py",
+            "tools/qemu_smoke_execution.py", "tools/qemu_smoke_outcome.py",
+            "tools/qemu_smoke_arguments.py", "tools/qemu_smoke_cli.py",
+        )
+        expected = {}
+        for index, name in enumerate(paths):
+            path = self.root / name
+            path.parent.mkdir(exist_ok=True)
+            raw = ("fixed reviewed source member " + str(index) + "\n").encode()
+            path.write_bytes(raw)
+            expected[name] = hashlib.sha256(raw).hexdigest()
+        return expected
+
+    def test_qemu_source_family_refuses_package_shadowing_before_metadata(self):
+        expected = self.qemu_family_fixture()
+        shadow = self.root / "tools/qemu_smoke_command"
+        shadow.mkdir()
+        (shadow / "__init__.pyc").write_bytes(b"ignored replacement code, never executed")
+        tools = mock.Mock()
+        tools.qemu.side_effect = AssertionError("QEMU metadata ran before source-family refusal")
+        with mock.patch.multiple(
+            validation_context,
+            resolve_preset=mock.Mock(return_value=mock.Mock(target_build=True)),
+            validate_environment=mock.Mock(), platform_identity=mock.Mock(return_value={}),
+            _cache=mock.Mock(return_value={}), DarwinTools=mock.Mock(return_value=tools),
+            RECIPE_DIGESTS={},
+            QEMU_RUNNER_DIGEST=expected["tools/run_qemu_smoke.py"],
+        ), mock.patch.object(validation_context, "QEMU_RUNNER_SOURCE_DIGESTS", expected, create=True):
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context.collect(self.root, "test-qemu-smoke")
+        tools.qemu.assert_not_called()
+
+    def qemu_loader_fixture(self):
+        names = (
+            "qemu_smoke_records", "qemu_smoke_platform", "qemu_smoke_objects", "qemu_smoke_faults",
+            "qemu_smoke_command", "qemu_smoke_execution", "qemu_smoke_outcome",
+            "qemu_smoke_arguments", "qemu_smoke_cli",
+        )
+        return {
+            "implementation": "cpython", "source": [".py"], "bytecode": [".pyc"],
+            "extensions": [".cpython-39-darwin.so", ".abi3.so", ".so"],
+            "namespace": {"origin": None, "loader": None, "locations": [str(self.root / "tools")]},
+            "helpers": {
+                name: {"origin": str(self.root / "tools" / (name + ".py")), "loader": "SourceFileLoader", "locations": []}
+                for name in names
+            },
+        }
+
+    def test_qemu_source_family_requires_all_fixed_members_and_refuses_loader_files(self):
+        expected = self.qemu_family_fixture()
+        with mock.patch.object(validation_context, "QEMU_RUNNER_SOURCE_DIGESTS", expected, create=True):
+            validation_context._validate_qemu_runner_family(self.root)
+            changed = self.root / "tools/qemu_smoke_command.py"
+            original = changed.read_bytes()
+            changed.write_bytes(original + b"changed")
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context._validate_qemu_runner_family(self.root)
+            changed.write_bytes(original)
+            for relative in ("tools/__init__.py", "tools/qemu_smoke_command.pyc", "tools.py"):
+                path = self.root / relative
+                path.write_bytes(b"unreviewed loader input")
+                with self.subTest(relative=relative), self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context._validate_qemu_runner_family(self.root)
+                path.unlink()
+            cache = self.root / "tools/__pycache__"
+            cache.mkdir()
+            (cache / "qemu_smoke_command.cpython-39.pyc").write_bytes(b"cached replacement, never executed")
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context._validate_qemu_runner_family(self.root)
+            (cache / "qemu_smoke_command.cpython-39.pyc").unlink()
+            changed.unlink()
+            changed.symlink_to(self.root / "tools/qemu_smoke_records.py")
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context._validate_qemu_runner_family(self.root)
+
+    def test_qemu_namespace_accepts_only_standard_workflow_source_origins_without_importing(self):
+        self.qemu_family_fixture()
+        tools = mock.Mock(python=Path("/verified/workflow-python"))
+        information = self.qemu_loader_fixture()
+        with mock.patch("tools.validation_context._run", return_value=json.dumps(information).encode()) as run:
+            validation_context._validate_qemu_runner_namespace(self.root, tools)
+        self.assertEqual(tools.python, run.call_args.args[0][0])
+        self.assertEqual(("-B", "-c"), run.call_args.args[0][1:3])
+        information["namespace"]["locations"].append(str(self.root / "foreign-tools"))
+        with mock.patch("tools.validation_context._run", return_value=json.dumps(information).encode()):
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_context._validate_qemu_runner_namespace(self.root, tools)
+
+    def test_qemu_namespace_refuses_package_native_sourceless_and_initializer_replacements(self):
+        self.qemu_family_fixture()
+        tools = mock.Mock(python=Path("/verified/workflow-python"))
+        original = self.qemu_loader_fixture()
+        for loader in ("SourcelessFileLoader", "ExtensionFileLoader", "UnknownLoader"):
+            value = copy.deepcopy(original)
+            value["helpers"]["qemu_smoke_command"]["loader"] = loader
+            with mock.patch("tools.validation_context._run", return_value=json.dumps(value).encode()):
+                with self.subTest(loader=loader), self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context._validate_qemu_runner_namespace(self.root, tools)
+        with mock.patch("tools.validation_context._run", return_value=json.dumps(original).encode()):
+            for relative in (
+                "tools/qemu_smoke_command.cpython-39-darwin.so", "tools/qemu_smoke_command.abi3.so",
+                "tools/qemu_smoke_command.so", "tools/__init__.so", "tools.so",
+            ):
+                path = self.root / relative
+                path.write_bytes(b"native replacement metadata fixture, never loaded")
+                with self.subTest(relative=relative), self.assertRaises(validation_context.UnsupportedContext):
+                    validation_context._validate_qemu_runner_namespace(self.root, tools)
+                path.unlink()
+
     def test_content_changes_are_detected_even_with_equal_size_and_mtime(self):
         path = self.root / "input"
         path.write_bytes(b"first")
