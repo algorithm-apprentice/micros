@@ -316,6 +316,24 @@ before QEMU metadata while all three supported workflows still
 demonstrate actual eligible original-producer reuse. Full current author
 and complete read-only implementation review remain mandatory.
 
+Implementation #146 is merged after complete original and bounded
+correction review. Its final candidate passed the complete 47-command
+fresh author plan, including 35 CTests/943 Python cases/all 38 QEMU
+workflows/four images, plus actual same-original-full-producer bounded
+reuse. Its reviewed squash tree and obsolete-branch cleanup are verified;
+those pre-squash receipts are historical on the new main.
+
+The next directory-only design is Accepted
+[ADR-0073](adr/0073-kernel-directory-layout.md), with its
+[exact kernel directory contract](architecture/kernel-directory-layout.md).
+It preserves the existing executions while defining a closed 373-file
+physical transport, canonical source/line diagnostics, actual-source and
+generated-include inverses, complete CMake reconstruction and independent
+four-field classification equality. Design authors no executable artifact.
+After separate design merge, structural Red and narrow existing gates
+precede one complete current fresh author plan, actual original-full-
+producer three-profile reuse and independent implementation review.
+
 ## Test layers
 
 | Layer | Environment | Primary purpose | Expected cadence |
