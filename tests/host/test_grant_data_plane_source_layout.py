@@ -204,6 +204,38 @@ NATIVE_CASE_OUTLINES = {
     ),
 }
 NATIVE_FIXTURE_ONLY_PHASES = ("grant_test_boundary_capacity_output",)
+COPY_CASE_OUTLINES = {
+    "test_copy_authority_and_bounds": (
+        "grant_copy_authority_case",
+        (
+            ("struct micros_grant_copy_authority authority;", False),
+            ("micros_grant_t read_grant;", False),
+            ("micros_grant_t write_grant;", False),
+            ("micros_grant_t both_grant;", False),
+        ),
+        (
+            "grant_copy_test_directional_grants", "grant_copy_test_authority_and_end_zero",
+            "grant_copy_test_participant_bounds_shape", "grant_copy_test_revoked_precedence",
+        ),
+    ),
+    "test_copy_plan_and_commit": (
+        "grant_copy_plan_case",
+        (
+            ("unsigned char source[16];", False),
+            ("unsigned char destination[16];", False),
+            ("unsigned char unchanged[16];", False),
+            ("struct micros_grant_copy_range_plan source_plan;", True),
+            ("struct micros_grant_copy_range_plan destination_plan;", True),
+            ("size_t index;", False),
+        ),
+        (
+            "grant_copy_test_prepare_chunks", "grant_copy_test_commit_bytes",
+            "grant_copy_test_reject_physical_plans",
+        ),
+    ),
+}
+COPY_TEST_PREFIX_DIGEST = "fd0ea2f64d076a9bac07b143b51da77591218e477dbd6e91bd1168c1789f7a0c"
+ABI_TEST_PREFIX_DIGEST = "aa1a887385bd5f3887691e793b430882e527eb795a7d11d44152c2b2e032b86c"
 ORIGINAL_FUNCTIONS = {
     0: {
         0: "copy_grant micros_grant_validate_range micros_grant_copy_from micros_grant_copy_to".split(),
@@ -300,9 +332,7 @@ FUNCTION_TASK_MIGRATION = (
     (3, "validate_command_effect"),
     (3, "micros_grant_syscall_runtime_run_self_test"),
     (4, "test_grant_model"),
-    (5, "test_copy_authority_and_bounds"),
     (6, "micros_grant_syscall_core_test_run"),
-    (5, "test_copy_plan_and_commit"),
     (3, "micros_grant_syscall_test_handle_control_trap"),
     (3, "micros_grant_syscall_test_finish"),
 )
@@ -597,6 +627,10 @@ def original_locations(family, texts=None):
             if paths != (path,):
                 raise AssertionError("native case phases have one exact file-local domain owner")
             continue
+        if family == 5 and any(spelling in specification[2] for specification in COPY_CASE_OUTLINES.values()):
+            if path != FAMILY_PATHS[5][0]:
+                raise AssertionError("copy evidence phases remain in their separate original fixture")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -633,6 +667,8 @@ def original_body_digest(family, original, record):
         if original in NATIVE_CASE_OUTLINES and (4, original) not in FUNCTION_TASK_MIGRATION:
             body = native_case_actual_body_tokens(original, record)
         body = native_fixture_body_tokens(original, tuple(names.get(token, token) for token in body))
+    if family == 5 and original in COPY_CASE_OUTLINES and (5, original) not in FUNCTION_TASK_MIGRATION:
+        body = copy_case_actual_body_tokens(original, record)
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
@@ -716,14 +752,14 @@ def restore_automatic_work_tokens(body, tag, fields, declarations):
     if body[:len(prefix)] != prefix:
         raise AssertionError("execution work is one original uninitialized automatic root object")
     del body[1:len(prefix)]
-    names = tuple(declaration[-2] for declaration in declarations)
+    names = tuple(declaration_name(declaration) for declaration in declarations)
     restored = list(restore_state_members(body, "work", names))
     initializers = []
     for actual, (_, initialized) in zip(declarations, fields):
         if not initialized:
             initializers.extend(actual)
             continue
-        name = actual[-2]
+        name = declaration_name(actual)
         if restored[1:3] != [name, "="]:
             raise AssertionError("only original explicit plan initializers execute, in original order")
         end = restored.index(";", 3)
@@ -739,6 +775,10 @@ def restore_automatic_work_tokens(body, tag, fields, declarations):
         del restored[1:end + 1]
     restored[1:1] = initializers
     return tuple(restored)
+
+
+def declaration_name(declaration):
+    return declaration[declaration.index("[") - 1] if "[" in declaration else declaration[-2]
 
 
 def restore_state_members(body, variable, names, access=(".", "->")):
@@ -851,6 +891,23 @@ def native_case_actual_body_tokens(original, record, owner=None):
     body = list(restore_automatic_work_tokens(boolean_case_body_tokens(body, phases), tag, fields, declarations))
     body[1:1] = borrow
     return tuple(body)
+
+
+def copy_case_actual_body_tokens(original, record, owner=None):
+    tag, fields, names = COPY_CASE_OUTLINES[original]
+    owner = source(FAMILY_PATHS[5][0]) if owner is None else owner
+    declarations = work_declarations(owner, tag, fields)
+    records = function_records(owner)
+    phases = []
+    for index, name in enumerate(names):
+        phase = records[name]
+        if phase.guards or tokens(phase.signature) != tokens(
+            "static bool " + name + "(struct " + tag + " *work)"
+        ):
+            raise AssertionError("local copy phases retain original typed buffer/authority work and no other state")
+        phases.append((name, "&work", "{" + phase.body + "}", index == len(names) - 1))
+    body = boolean_case_body_tokens(tokens("{" + record.body + "}"), phases)
+    return restore_automatic_work_tokens(body, tag, fields, declarations)
 
 
 def copy_execution_actual_body_tokens(record, owner=None):
@@ -1111,6 +1168,21 @@ def context_ast_without_recipe_pin(text):
 
 
 class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
+    def test_native_copy_cases_expose_typed_array_chunk_and_authority_phases(self):
+        owner = source(FAMILY_PATHS[5][0])
+        records = function_records(owner)
+        first = next(iter(records.values()))
+        prefix = owner[:owner.index(first.signature)]
+        self.assertEqual(COPY_TEST_PREFIX_DIGEST, digest_tokens(tokens(prefix)))
+        self.assertEqual(tuple(file_scope_objects(prefix)), tuple(file_scope_objects(owner)))
+        for original, (tag, fields, phases) in COPY_CASE_OUTLINES.items():
+            with self.subTest(original=original):
+                work_declarations(owner, tag, fields)
+                for phase in phases:
+                    self.assertIn(phase, records)
+                    self.assertLessEqual(records[phase].lines, 120)
+                self.assertLessEqual(records[original].lines, 120)
+
     def test_native_deterministic_cases_expose_ordered_bounded_domain_phases(self):
         for original, (path, tag, fields, phases) in NATIVE_CASE_OUTLINES.items():
             owner = source(path)
@@ -1155,6 +1227,48 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             ("fill", "fixture, &work", first.replace("0xa5", "0"), False), phases[1],
         )
         self.assertNotEqual(tokens(expected), boolean_case_body_tokens(tokens(caller), changed))
+
+    def test_array_work_inverse_preserves_extents_initializers_sizeof_and_original_commit_bytes(self):
+        fields = (
+            ("unsigned char bytes[16];", False),
+            ("struct plan retained;", True),
+            ("size_t index;", False),
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in fields)
+        caller = (
+            "{ struct copy_case work; work.retained = (struct plan){0}; "
+            "if (!seed(&work)) { return false; } return check(&work); }"
+        )
+        phases = (
+            ("seed", "&work", "{ for (work->index = 0; work->index < sizeof(work->bytes); ++work->index) "
+             "{ work->bytes[work->index] = 0xcc; } return true; }", False),
+            ("check", "&work", "{ original_commit(&work->retained, work->bytes); return work->bytes[12] == 0xcc; }", True),
+        )
+        expected = (
+            "{ unsigned char bytes[16]; struct plan retained = {0}; size_t index; "
+            "for (index = 0; index < sizeof(bytes); ++index) { bytes[index] = 0xcc; } "
+            "original_commit(&retained, bytes); return bytes[12] == 0xcc; }"
+        )
+        self.assertEqual(
+            tokens(expected), restore_automatic_work_tokens(
+                boolean_case_body_tokens(tokens(caller), phases), "copy_case", fields, declarations,
+            ),
+        )
+        for changed in (
+            caller.replace("struct copy_case work;", "struct copy_case work = {0};"),
+            caller.replace("(struct plan){0}", "(struct other_plan){0}"),
+            caller.replace("return check", "copy = work; return check"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                restore_automatic_work_tokens(
+                    boolean_case_body_tokens(tokens(changed), phases), "copy_case", fields, declarations,
+                )
+        changed = (phases[0], ("check", "&work", phases[1][2].replace("bytes[12]", "bytes[11]"), True))
+        self.assertNotEqual(
+            tokens(expected), restore_automatic_work_tokens(
+                boolean_case_body_tokens(tokens(caller), changed), "copy_case", fields, declarations,
+            ),
+        )
 
     def test_native_fixture_has_only_nine_original_fields_and_nonresetting_storage(self):
         header = source(PRIVATE_HEADERS[1])

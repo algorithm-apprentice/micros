@@ -557,3 +557,12 @@ returns. The capacity-only phase borrows the fixture without an unused work
 parameter. Actual complete-body reconstruction retains the original fourteen
 long and five shorter inventories unchanged. Forty target moves and eleven
 semantic dispositions remain pending.
+
+Separate native copy evidence now has a 15-line authority/bounds root and
+14-line chunk/commit root. Seven local phases keep the six-field copy fixture
+separate from registry/model evidence, preserve the three actual 16-byte
+arrays and their `sizeof`, initialize only the original two plans, and retain
+the complete original byte, overflow, overlap and precedence checks.
+Independent array/type/binding/initializer fixtures protect the shared typed
+work inverse. Forty original target moves and nine semantic dispositions
+remain pending.
