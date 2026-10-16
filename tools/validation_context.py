@@ -52,7 +52,9 @@ def metadata(spec):
     return {"origin": spec.origin,
             "loader": type(spec.loader).__name__ if spec.loader is not None else None,
             "locations": list(spec.submodule_search_locations or ())}
-namespace = m.PathFinder.find_spec("tools", [root, *[value or root for value in sys.path]])
+namespace = m.PathFinder.find_spec(
+    "tools", [root, root + "/tools", *[value or root for value in sys.path]],
+)
 helpers = {name: metadata(m.PathFinder.find_spec("tools." + name, [root + "/tools"])) for name in names}
 print(json.dumps({"implementation": sys.implementation.name,
                   "source": m.SOURCE_SUFFIXES, "bytecode": m.BYTECODE_SUFFIXES,

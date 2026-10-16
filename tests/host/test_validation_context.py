@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -112,6 +114,51 @@ class ValidationContextTests(unittest.TestCase):
         with mock.patch("tools.validation_context._run", return_value=json.dumps(information).encode()):
             with self.assertRaises(validation_context.UnsupportedContext):
                 validation_context._validate_qemu_runner_namespace(self.root, tools)
+
+    def test_qemu_namespace_models_script_directory_before_any_qemu_metadata(self):
+        expected = self.qemu_family_fixture()
+        tools = mock.Mock(python=Path(sys.executable))
+        tools.qemu.side_effect = AssertionError("QEMU metadata ran before script-directory refusal")
+
+        def probe(command, *, cwd):
+            self.assertEqual((tools.python, "-B", "-c"), command[:3])
+            completed = subprocess.run(
+                (*command[:2], "-I", "-S", *command[2:]), cwd=cwd,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+            )
+            return completed.stdout
+
+        with mock.patch.object(validation_context, "_run", side_effect=probe):
+            validation_context._validate_qemu_runner_namespace(self.root, tools)
+            for relative, directory in (
+                ("tools.pyc", False), ("tools.so", False),
+                ("tools/__init__.pyc", False), ("tools", True),
+            ):
+                path = self.root / "tools" / relative
+                if directory:
+                    path.mkdir()
+                else:
+                    path.parent.mkdir(exist_ok=True)
+                    path.write_bytes(b"replacement metadata fixture, never imported or executed")
+                try:
+                    with self.subTest(relative=relative), mock.patch.multiple(
+                        validation_context,
+                        resolve_preset=mock.Mock(return_value=mock.Mock(target_build=True)),
+                        validate_environment=mock.Mock(), platform_identity=mock.Mock(return_value={}),
+                        _cache=mock.Mock(return_value={}), DarwinTools=mock.Mock(return_value=tools),
+                        RECIPE_DIGESTS={}, QEMU_RUNNER_DIGEST=expected["tools/run_qemu_smoke.py"],
+                        QEMU_RUNNER_SOURCE_DIGESTS=expected,
+                    ):
+                        with self.assertRaises(validation_context.UnsupportedContext):
+                            validation_context.collect(self.root, "test-qemu-smoke")
+                        tools.qemu.assert_not_called()
+                finally:
+                    if directory:
+                        path.rmdir()
+                    else:
+                        path.unlink()
+                        if path.parent != self.root / "tools":
+                            path.parent.rmdir()
 
     def test_qemu_namespace_refuses_package_native_sourceless_and_initializer_replacements(self):
         self.qemu_family_fixture()

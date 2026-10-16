@@ -295,6 +295,10 @@ and exactly the nine expected ordinary source-module origins/loaders.
 Duplicate spellings of that same resolved directory are not another input
 root. Concrete/merged foreign packages, native or sourceless replacements,
 unknown loaders/layouts and unreadable/link/ambiguous metadata are ineligible.
+The namespace lookup includes the direct runner's retained script directory
+immediately after its prepended repository root. A `-c` probe must not omit
+that actual search root: ignored `tools/tools.pyc`, native `tools/tools.so`,
+and concrete or merged `tools/tools` packages must also refuse admission.
 
 The probe is fixed to `tools` and those nine names and performs only
 source-free standard `PathFinder`/`FileFinder` metadata lookups. It never
@@ -414,7 +418,7 @@ QEMU metadata, and the original CMake recipe and shared inspection,
 input, manifest, execution and evidence libraries are byte-exact.
 
 Structural and collector Reds preceded transport. Narrow green evidence
-includes 311 source/closure/planner/original-case checks, independent
+includes 312 source/closure/planner/original-case checks, independent
 binding/body/order/discovery/loader mutations, CLI first errors, symbol
 failures and deterministic serial short-write/timeout custody. Real smoke,
 timer, object/IPC, symbol-resolved trap panic, serial-triggered TTY,
