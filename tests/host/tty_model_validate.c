@@ -1,12 +1,78 @@
 #include "tty_model_internal.h"
 
+struct tty_model_validation_work {
+    const struct micros_tty_state *terminal;
+    const struct model_reference *reference;
+    size_t index;
+};
+
+static bool tty_model_compare_resident_buffers(
+    struct tty_model *model,
+    struct tty_model_validation_work *work
+)
+{
+    MODEL_EXPECT(
+        model,
+        work->terminal->input_head == work->reference->input_head
+        && work->terminal->input_count == work->reference->input_count
+        && work->terminal->current_line_length
+            == work->reference->current_line_length
+        && work->terminal->completed_line_count
+            == work->reference->completed_line_count
+        && work->terminal->input_drop_count
+            == work->reference->input_drop_count
+    );
+    for (work->index = 0; work->index < MICROS_TTY_INPUT_CAPACITY; ++work->index) {
+        MODEL_EXPECT(
+            model,
+            work->terminal->input[work->index].byte
+                == work->reference->input[work->index].byte
+            && work->terminal->input[work->index].flags
+                == work->reference->input[work->index].flags
+        );
+    }
+    MODEL_EXPECT(
+        model,
+        work->terminal->echo_head == work->reference->echo_head
+        && work->terminal->echo_count == work->reference->echo_count
+        && work->terminal->echo_drop_count == work->reference->echo_drop_count
+        && memcmp(
+            work->terminal->echo,
+            work->reference->echo,
+            sizeof(work->reference->echo)
+        ) == 0
+    );
+    MODEL_EXPECT(
+        model,
+        work->terminal->write_length == work->reference->write_length
+        && work->terminal->write_cursor == work->reference->write_cursor
+        && work->terminal->write_resident == work->reference->write_resident
+        && work->terminal->write_pending_lf
+            == work->reference->write_pending_lf
+        && work->terminal->transmit_interrupt_enabled
+            == work->reference->transmit_interrupt_enabled
+        && work->terminal->write_retry_armed
+            == work->reference->write_retry_armed
+    );
+    if (work->reference->write_resident) {
+        MODEL_EXPECT(
+            model,
+            memcmp(
+                work->terminal->write,
+                work->reference->write,
+                work->reference->write_length
+            ) == 0
+        );
+    }
+    return true;
+}
+
 bool tty_model_validate(struct tty_model *model)
 {
-    const struct micros_tty_state *terminal =
-        &model->service.terminal;
-    const struct model_reference *reference = &model->reference;
-    size_t index;
+    struct tty_model_validation_work work;
 
+    work.terminal = &model->service.terminal;
+    work.reference = &model->reference;
     MODEL_EXPECT(
         model,
         micros_tty_service_validate(&model->service)
@@ -14,7 +80,7 @@ bool tty_model_validate(struct tty_model *model)
     );
     MODEL_EXPECT(
         model,
-        micros_tty_uart_validate(&model->uart, terminal)
+        micros_tty_uart_validate(&model->uart, work.terminal)
             == MICROS_TTY_UART_OK
     );
     MODEL_EXPECT(model, !model->bus.failed && !model->copy.failed);
@@ -30,7 +96,7 @@ bool tty_model_validate(struct tty_model *model)
             == (
                 MODEL_IER_BASE
                 | (
-                    reference->transmit_interrupt_enabled
+                    work.reference->transmit_interrupt_enabled
                     ? MODEL_IER_TRANSMIT_EMPTY
                     : 0
                 )
@@ -40,131 +106,81 @@ bool tty_model_validate(struct tty_model *model)
         model,
         model->bus.interrupt_enable == model->uart.interrupt_enable
     );
-    MODEL_EXPECT(
-        model,
-        terminal->input_head == reference->input_head
-        && terminal->input_count == reference->input_count
-        && terminal->current_line_length
-            == reference->current_line_length
-        && terminal->completed_line_count
-            == reference->completed_line_count
-        && terminal->input_drop_count
-            == reference->input_drop_count
-    );
-    for (index = 0; index < MICROS_TTY_INPUT_CAPACITY; ++index) {
-        MODEL_EXPECT(
-            model,
-            terminal->input[index].byte
-                == reference->input[index].byte
-            && terminal->input[index].flags
-                == reference->input[index].flags
-        );
-    }
-    MODEL_EXPECT(
-        model,
-        terminal->echo_head == reference->echo_head
-        && terminal->echo_count == reference->echo_count
-        && terminal->echo_drop_count == reference->echo_drop_count
-        && memcmp(
-            terminal->echo,
-            reference->echo,
-            sizeof(reference->echo)
-        ) == 0
-    );
-    MODEL_EXPECT(
-        model,
-        terminal->write_length == reference->write_length
-        && terminal->write_cursor == reference->write_cursor
-        && terminal->write_resident == reference->write_resident
-        && terminal->write_pending_lf
-            == reference->write_pending_lf
-        && terminal->transmit_interrupt_enabled
-            == reference->transmit_interrupt_enabled
-        && terminal->write_retry_armed
-            == reference->write_retry_armed
-    );
-    if (reference->write_resident) {
-        MODEL_EXPECT(
-            model,
-            memcmp(
-                terminal->write,
-                reference->write,
-                reference->write_length
-            ) == 0
-        );
+    if (!tty_model_compare_resident_buffers(model, &work)) {
+        return false;
     }
     MODEL_EXPECT(
         model,
         model->service.last_accepted_request_id
-            == reference->last_accepted_request_id
+            == work.reference->last_accepted_request_id
     );
     MODEL_EXPECT(
         model,
         model->service.pending_read.active
-            == reference->pending_read
+            == work.reference->pending_read
     );
-    if (reference->pending_read) {
+    if (work.reference->pending_read) {
         MODEL_EXPECT(
             model,
             model->service.pending_read.request_id
-                == reference->pending_read_request_id
+                == work.reference->pending_read_request_id
             && model->service.pending_read.grant
                 == MODEL_READ_GRANT
             && model->service.pending_read.grant_offset == 0
             && model->service.pending_read.count
-                == reference->pending_read_count
+                == work.reference->pending_read_count
         );
     }
     MODEL_EXPECT(
         model,
         model->service.read_completion.active
-            == reference->read_completion.active
+            == work.reference->read_completion.active
     );
-    if (reference->read_completion.active) {
+    if (work.reference->read_completion.active) {
         MODEL_EXPECT(
             model,
             model->service.read_completion.result
-                == reference->read_completion.result
+                == work.reference->read_completion.result
             && model->service.read_completion.request_id
-                == reference->read_completion.request_id
+                == work.reference->read_completion.request_id
             && model->service.read_completion.transferred_count
-                == reference->read_completion.transferred_count
+                == work.reference->read_completion.transferred_count
         );
     }
     MODEL_EXPECT(
         model,
         model->service.write_completion.active
-            == reference->write_completion.active
+            == work.reference->write_completion.active
     );
-    if (reference->write_completion.active) {
+    if (work.reference->write_completion.active) {
         MODEL_EXPECT(
             model,
             model->service.write_completion.result
-                == reference->write_completion.result
+                == work.reference->write_completion.result
             && model->service.write_completion.request_id
-                == reference->write_completion.request_id
+                == work.reference->write_completion.request_id
             && model->service.write_completion.transferred_count
-                == reference->write_completion.transferred_count
+                == work.reference->write_completion.transferred_count
         );
     }
     MODEL_EXPECT(
         model,
         (
-            reference->rejected_read_request_id == 0
+            work.reference->rejected_read_request_id == 0
             || (
-                reference->pending_read
-                && reference->rejected_read_request_id
-                    == reference->pending_read_request_id
+                work.reference->pending_read
+                && work.reference->rejected_read_request_id
+                    == work.reference->pending_read_request_id
             )
         )
     );
     MODEL_EXPECT(
         model,
-        !reference->write_pending_lf || model->bus.expect_lf
+        !work.reference->write_pending_lf || model->bus.expect_lf
     );
     MODEL_EXPECT(
         model,
-        !model->bus.expect_lf || tty_model_reference_output_pending(reference)
+        !model->bus.expect_lf || tty_model_reference_output_pending(work.reference)
     );
     return true;
 }

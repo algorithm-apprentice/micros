@@ -585,3 +585,13 @@ reverse or mutation dependencies. The current native model retains the
 original seed, 8,194 recorded steps and `0xd962296c803b3115` output hash.
 There are 39 original moves, six declarations-only C owners and six
 semantic dispositions remaining.
+
+Model validation now has a 117-line root and a 60-line file-local resident
+input/echo/write comparison phase. Caller work retains the original two
+typed pointer initializers and uninitialized loop index. A plain boolean
+guard propagates failure without adding a second `MODEL_EXPECT` diagnostic;
+production/callback checks precede the phase and original request, CR/LF and
+final reference-output observations follow it. Complete original-body
+restoration and independent scope/order/failure fixtures precede C changes.
+Current model trace is unchanged. There are 39 moves and five semantic
+dispositions remaining.
