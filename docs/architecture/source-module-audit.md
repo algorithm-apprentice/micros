@@ -296,8 +296,10 @@ and the [exact TTY contract](tty-source-organization.md) define 26 C owners,
 five private headers/sets, eight consumer operands and 116 original moves.
 The runtime state leaf prevents a facade/validation cycle; existing terminal,
 UART, handoff/control, public ABI and test-double interfaces remain intact.
-Complete independent design review is clean. This is documentation-only
-design; its paired implementation stays pending until separate merge.
+Complete independent design review is clean and design #141 is separately
+merged. The initial implementation slice moves only two byte primitives
+and wires exact future owners; remaining ownership and semantic work stays
+explicit in the canonical contract's progress section.
 
 ### QEMU runner tooling
 

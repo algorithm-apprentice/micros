@@ -150,6 +150,55 @@ PLANNER_INPUTS = (
 
 PATH_CLASSIFICATION_EQUIVALENTS = (
     (
+        'kernel/tty_handoff_runtime.c',
+        (
+            'kernel/tty_handoff_runtime_state.c',
+            'kernel/tty_handoff_runtime_validate.c',
+            'kernel/tty_handoff_runtime_transitions.c',
+            'kernel/tty_handoff_runtime_internal.h',
+        ),
+    ),
+    (
+        'servers/tty/tty_service_core.c',
+        (
+            'servers/tty/tty_service_validate.c',
+            'servers/tty/tty_service_read.c',
+            'servers/tty/tty_service_write.c',
+            'servers/tty/tty_service_request.c',
+            'servers/tty/tty_service_internal.h',
+        ),
+    ),
+    (
+        'tests/host/tty_model_test.c',
+        (
+            'tests/host/tty_model_common.c',
+            'tests/host/tty_model_reference.c',
+            'tests/host/tty_model_io.c',
+            'tests/host/tty_model_protocol.c',
+            'tests/host/tty_model_operations.c',
+            'tests/host/tty_model_validate.c',
+            'tests/host/tty_model_internal.h',
+        ),
+    ),
+    (
+        'tests/host/tty_handoff_test.c',
+        (
+            'tests/host/tty_handoff_test_fixture.c',
+            'tests/host/tty_handoff_device_test.c',
+            'tests/host/tty_handoff_runtime_test.c',
+            'tests/host/tty_handoff_test_internal.h',
+        ),
+    ),
+    (
+        'tests/host/tty_control_syscall_test.c',
+        (
+            'tests/host/tty_control_syscall_test_fixture.c',
+            'tests/host/tty_control_syscall_test_observe.c',
+            'tests/host/tty_control_syscall_test_controller.c',
+            'tests/host/tty_control_syscall_test_internal.h',
+        ),
+    ),
+    (
         "kernel/kernel_objects.c",
         (
             "kernel/kernel_object_state.c",
@@ -1050,6 +1099,7 @@ PATH_CLASSIFICATION_EQUIVALENTS = (
 )
 
 HOST_UNIT_ONLY_INPUTS = (
+    'tests/host/test_tty_source_layout.py',
     "tests/host/elf_spawn_client_test.c",
     "tests/host/elf_spawn_resource_test.c",
     "tests/host/elf_spawn_fixture_test_internal.h",

@@ -4,9 +4,10 @@
 
 This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
-Independent complete read-only design review is clean. This outcome is
-design-only; implementation remains pending until separate design merge.
-Accepted ADR-0047 remains the authority
+Independent complete read-only design review is clean. The design merged
+separately as #141, `0cef6e82fa855af4448ce6aeee29c987e6567eed`.
+Current implementation progress below distinguishes actual source ownership
+from once-only future wiring. Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
 ```text
@@ -504,3 +505,29 @@ ownership, readiness, deadline, timer, interrupt, model, topology or output
 change. No new public contract, allocation, concurrency, recovery, worker,
 retry loop, rollback, generalized framework, path migration, QEMU tooling,
 production application startup or shell work is included.
+
+## Current implementation progress
+
+Structural Red first found `clear_bytes` and `copy_bytes` still in the runtime
+facade. Before any C rewrite, all 156 complete bodies/seven signature families,
+original orders/storage, seven long C tasks, three Python ASTs/data, 37 stable
+neighbors, complete current recipe and shared/tool ASTs were frozen from
+immutable Git `ac94a211`, not newly rewritten output.
+
+The first source slice moves only those two complete byte primitives into
+the runtime state leaf, with their necessary typed private declarations.
+The two original authoritative mutable objects still remain in the facade
+until the explicit context-ownership slice; there is no duplicate state.
+All 156 complete bodies and signatures remain exact.
+
+All 26 future C paths, five private headers/sets and eight consumer operands
+are wired once. Eighteen future C units are explicitly declarations-only
+migration owners, not completed responsibilities. Five exact family aliases
+and one host-only structural input preserve all four original validation
+dimensions. The complete recipe inverse restores `4e370ba5...` before
+maintaining only new current digest
+`730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab`.
+Prior source/recipe/planner expected values remain unchanged under only
+that additional finite composition. There are 114 original owner moves and
+all eight semantic dispositions still pending; final author/reuse and
+independent implementation review are not claimed complete.

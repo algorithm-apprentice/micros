@@ -262,6 +262,50 @@ set(
 )
 
 set(
+    MICROS_TTY_HANDOFF_RUNTIME_SOURCES
+    kernel/tty_handoff_runtime.c
+    kernel/tty_handoff_runtime_state.c
+    kernel/tty_handoff_runtime_validate.c
+    kernel/tty_handoff_runtime_transitions.c
+)
+
+set(
+    MICROS_TTY_SERVICE_CORE_SOURCES
+    servers/tty/tty_service_core.c
+    servers/tty/tty_service_validate.c
+    servers/tty/tty_service_read.c
+    servers/tty/tty_service_write.c
+    servers/tty/tty_service_request.c
+)
+
+set(
+    MICROS_TTY_MODEL_TEST_SOURCES
+    tests/host/tty_model_test.c
+    tests/host/tty_model_common.c
+    tests/host/tty_model_reference.c
+    tests/host/tty_model_io.c
+    tests/host/tty_model_protocol.c
+    tests/host/tty_model_operations.c
+    tests/host/tty_model_validate.c
+)
+
+set(
+    MICROS_TTY_HANDOFF_HOST_TEST_SOURCES
+    tests/host/tty_handoff_test.c
+    tests/host/tty_handoff_test_fixture.c
+    tests/host/tty_handoff_device_test.c
+    tests/host/tty_handoff_runtime_test.c
+)
+
+set(
+    MICROS_TTY_CONTROL_SYSCALL_HOST_TEST_SOURCES
+    tests/host/tty_control_syscall_test.c
+    tests/host/tty_control_syscall_test_fixture.c
+    tests/host/tty_control_syscall_test_observe.c
+    tests/host/tty_control_syscall_test_controller.c
+)
+
+set(
     MICROS_GRANT_COPY_TARGET_SOURCES
     kernel/grant_copy.c
     kernel/grant_copy_range.c
@@ -1584,18 +1628,18 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty_control_core.c
         kernel/tty_control_syscall_core.c
         kernel/tty_handoff_core.c
-        kernel/tty_handoff_runtime.c
+        ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
         kernel/uart_console_core.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
         tests/host/tty_control_test.c
-        tests/host/tty_handoff_test.c
+        ${MICROS_TTY_HANDOFF_HOST_TEST_SOURCES}
         tests/host/tty_test.c
     )
     add_executable(
         tty_service_test
         servers/tty/tty_core.c
-        servers/tty/tty_service_core.c
+        ${MICROS_TTY_SERVICE_CORE_SOURCES}
         tests/host/tty_service_test.c
     )
     add_executable(
@@ -1607,9 +1651,9 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         tty_model_test
         servers/tty/tty_core.c
-        servers/tty/tty_service_core.c
+        ${MICROS_TTY_SERVICE_CORE_SOURCES}
         servers/tty/tty_uart.c
-        tests/host/tty_model_test.c
+        ${MICROS_TTY_MODEL_TEST_SOURCES}
     )
     add_executable(
         tty_service_control_test
@@ -1634,7 +1678,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty_control_core.c
         kernel/tty_control_syscall.c
         kernel/tty_handoff_core.c
-        tests/host/tty_control_syscall_test.c
+        ${MICROS_TTY_CONTROL_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_fault_test
@@ -3209,7 +3253,7 @@ if(
             servers/tty/tty_control.c
             servers/tty/tty_core.c
             servers/tty/tty_service.c
-            servers/tty/tty_service_core.c
+            ${MICROS_TTY_SERVICE_CORE_SOURCES}
             servers/tty/tty_uart.c
         )
         if(MICROS_BUILD_TTY_SERVICE_TEST)
@@ -3926,7 +3970,7 @@ add_executable(
     kernel/tty_control_syscall_core.c
     kernel/tty_fault.c
     kernel/tty_handoff_core.c
-    kernel/tty_handoff_runtime.c
+    ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
     kernel/tty_interrupt.c
     kernel/uart_console_core.c
     ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}

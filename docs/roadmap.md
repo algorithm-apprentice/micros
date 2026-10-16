@@ -409,9 +409,11 @@ The next single maintenance design is Accepted
 It preserves cohesive terminal/UART/control behavior while defining runtime,
 service, model, native-double and generator responsibilities: 26 C owners,
 five private headers/sets, eight consumer operands, 116 moves and eight
-over-limit C/Python dispositions. This phase contains documentation only;
-complete independent design review is clean and implementation remains
-pending until separate merge. These corrections add no runtime node, clock/deadline,
+over-limit C/Python dispositions. The independently reviewed documentation-only
+design merged separately as #141. Fresh implementation starts with immutable
+source/AST facts, structural Red and two complete byte-primitive moves plus
+once-only future wiring; remaining tasks are not claimed complete.
+These corrections add no runtime node, clock/deadline,
 application startup or shell behavior.
 
 ## v0.1 completion goal
