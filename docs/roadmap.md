@@ -387,7 +387,7 @@ owners and twelve semantic dispositions, both migrations literal empty and
 actual same-producer three-profile reuse, identical reviewed squash tree and
 local/remote branch cleanup close this maintenance outcome.
 
-The next selected maintenance design is Accepted
+The grant maintenance correction follows Accepted
 [ADR-0069](adr/0069-grant-data-plane-source-decomposition.md), with the exact
 [grant data-plane source contract](architecture/grant-data-plane-source-organization.md).
 It preserves the cohesive grant registry and existing Step 7 authority while
@@ -398,11 +398,21 @@ This independently reviewed design contains documentation only and merged
 separately as #139. Implementation #140 has all 22 real owners, 217 definitions
 bounded by 115 physical lines, all 65 original moves and nineteen semantic
 dispositions, and literal-empty migrations under immutable original-body/type
-facts. Narrow native/model and real target checks are green; complete current
-author/reuse acceptance and independent review are required before merge and
-recorded in that implementation pull request. Neither
-correction adds a runtime node, clock/deadline, application startup or shell
-behavior.
+facts. Complete current 47-command fresh author acceptance, actual
+same-original-producer three-profile reuse and independent review passed.
+Implementation #140 is merged with identical reviewed squash tree, clean
+main fast-forward and exact local/remote branch cleanup.
+
+The next single maintenance design is Accepted
+[ADR-0070](adr/0070-tty-function-and-evidence-decomposition.md), with the exact
+[TTY source contract](architecture/tty-source-organization.md).
+It preserves cohesive terminal/UART/control behavior while defining runtime,
+service, model, native-double and generator responsibilities: 26 C owners,
+five private headers/sets, eight consumer operands, 116 moves and eight
+over-limit C/Python dispositions. This phase contains documentation only;
+complete independent design review is clean and implementation remains
+pending until separate merge. These corrections add no runtime node, clock/deadline,
+application startup or shell behavior.
 
 ## v0.1 completion goal
 
