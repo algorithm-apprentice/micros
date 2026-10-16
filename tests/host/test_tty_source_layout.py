@@ -158,7 +158,7 @@ SYMBOL_OWNER_MIGRATION = tuple(
 )
 FUNCTION_TASK_MIGRATION = (
     (1, "micros_uart_console_runtime_run_self_test"),
-    (2, "handle_submit_write"), (3, "model_validate"),
+    (3, "model_validate"),
     (4, "test_device_leaf_classification"), (4, "test_runtime_lifecycle_validation"),
     (6, "test_syscall_authority"), (7, "render_fixture"),
 )
@@ -190,6 +190,17 @@ SERVICE_PRIVATE_EXPORTS = (
     "handle_submit_read", "handle_submit_write", "prepare_protocol_reply", "prepare_reply", "validate_submit",
 )
 SERVICE_MAGIC_DIGEST = "66be1b9eddf34c6e64e89c838b272dc5c86320c15bedaac301d570cda2c4f3d1"
+WRITE_WORK_TAG = "tty_service_write_work"
+WRITE_PHASE = "tty_service_publish_write"
+WRITE_FIELDS = (
+    ("enum micros_tty_service_copy_result copy_result;", False),
+    ("enum micros_tty_service_error error;", False),
+    ("struct micros_tty_effects effects;", False),
+)
+WRITE_PARAMETERS = (
+    "struct micros_tty_service_state *state, const struct micros_tty_request *request, "
+    "struct micros_tty_service_reply_action *action, struct tty_service_write_work *work"
+)
 
 # Immutable literals below are generated only from the offline reviewed Git manifest.
 BASELINE_BODIES = {0: {'binding_identity_matches': '5e5b9be177a57862b16e65927f297e4eaeee783aceed6efddec7707a6cd92185',
@@ -588,6 +599,10 @@ def original_locations(family):
     locations = {}
     for path in FAMILY_PATHS[family]:
         for spelling, record in function_records(source(path)).items():
+            if family == 2 and spelling == WRITE_PHASE:
+                if path != SERVICE_SOURCES[3]:
+                    raise AssertionError("accepted-write publication has its exact private write owner")
+                continue
             if family == 0 and spelling == LIVE_PHASE:
                 if path != RUNTIME_SOURCES[2]:
                     raise AssertionError("live-binding predicate phase has its exact private validation owner")
@@ -626,6 +641,8 @@ def original_body_digest(family, record):
     body = tokens("{" + record.body + "}")
     if family == 0 and record.name == "tty_handoff_live_binding_matches" and (0, "live_binding_matches") not in FUNCTION_TASK_MIGRATION:
         body = live_binding_actual_body_tokens(record)
+    if family == 2 and record.name == "tty_service_handle_submit_write" and (2, "handle_submit_write") not in FUNCTION_TASK_MIGRATION:
+        body = write_actual_body_tokens(record)
     body = tuple(names.get(token, token) for token in body)
     if family == 0 and (0, "live_binding_matches") not in SYMBOL_OWNER_MIGRATION:
         body = runtime_context_body_tokens(names.get(record.name, record.name), body)
@@ -694,6 +711,26 @@ def live_binding_actual_body_tokens(record, owner=None):
     if phase.guards or tokens(phase.signature) != tokens("static void " + LIVE_PHASE + "(" + LIVE_PARAMETERS + ")"):
         raise AssertionError("the live predicate phase preserves every exact typed context/binding/transition/work input")
     return live_binding_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
+
+
+def write_body_tokens(caller, phase, declarations):
+    from tests.host.test_grant_data_plane_source_layout import restore_automatic_work_tokens, bound_body_tokens
+
+    if set(tokens(phase)) & {"return", "goto", "break", "continue"}:
+        raise AssertionError("write publication cannot bypass the original caller return or rejection boundaries")
+    body = bound_body_tokens(tokens(caller), WRITE_PHASE + "(state, request, action, &work);", phase)
+    return restore_automatic_work_tokens(body, WRITE_WORK_TAG, WRITE_FIELDS, declarations)
+
+
+def write_actual_body_tokens(record, owner=None):
+    from tests.host.test_grant_data_plane_source_layout import work_declarations
+
+    owner = source(SERVICE_SOURCES[3]) if owner is None else owner
+    declarations = work_declarations(owner, WRITE_WORK_TAG, WRITE_FIELDS)
+    phase = function_records(owner)[WRITE_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens("static void " + WRITE_PHASE + "(" + WRITE_PARAMETERS + ")"):
+        raise AssertionError("publication binds the exact original state/request/reply and caller automatic work")
+    return write_body_tokens("{" + record.body + "}", "{" + phase.body + "}", declarations)
 
 
 def source_set_block(name, paths):
@@ -767,6 +804,65 @@ def context_ast_without_recipe_pin(text):
 
 
 class TtySourceLayoutTest(unittest.TestCase):
+    def test_write_publication_has_one_typed_void_phase_after_all_original_rejections(self):
+        records = function_records(source(SERVICE_SOURCES[3]))
+        self.assertIn(WRITE_PHASE, set(records))
+        self.assertEqual(tokens("static void " + WRITE_PHASE + "(" + WRITE_PARAMETERS + ")"), tokens(records[WRITE_PHASE].signature))
+        self.assertLessEqual(records["tty_service_handle_submit_write"].lines, 120)
+        self.assertLessEqual(records[WRITE_PHASE].lines, 120)
+
+    def test_write_inverse_preserves_busy_retry_preflight_copy_accept_and_publication_order(self):
+        caller = (
+            "{ struct tty_service_write_work work; work.error = original_submit(state, request); "
+            "if (work.error != OK) { return work.error; } "
+            "if (completion_active(state)) { return original_completion_busy(state); } "
+            "if (resident_only(state)) { original_retry(state); return original_resident_busy(state); } "
+            "work.copy_result = original_grant_copy(io, NULL, 0); original_invariant(state); "
+            "work.copy_result = original_grant_copy(io, state->write, request->count); "
+            "original_accept(state, &work.effects); "
+            "tty_service_publish_write(state, request, action, &work); return work.error; }"
+        )
+        phase = (
+            "{ state->last_id = request->id; original_completion(state, request); "
+            "work->error = original_reply(action); "
+            "if (work->error == OK) { action->effects = work->effects; action->event = COMPLETION; } }"
+        )
+        expected = (
+            "{ enum micros_tty_service_copy_result copy_result; enum micros_tty_service_error error; "
+            "struct micros_tty_effects effects; error = original_submit(state, request); "
+            "if (error != OK) { return error; } "
+            "if (completion_active(state)) { return original_completion_busy(state); } "
+            "if (resident_only(state)) { original_retry(state); return original_resident_busy(state); } "
+            "copy_result = original_grant_copy(io, NULL, 0); original_invariant(state); "
+            "copy_result = original_grant_copy(io, state->write, request->count); "
+            "original_accept(state, &effects); state->last_id = request->id; original_completion(state, request); "
+            "error = original_reply(action); "
+            "if (error == OK) { action->effects = effects; action->event = COMPLETION; } return error; }"
+        )
+        declarations = tuple(tokens(declaration) for declaration, _ in WRITE_FIELDS)
+        self.assertEqual(tokens(expected), write_body_tokens(caller, phase, declarations))
+        for changed in (
+            caller.replace("struct tty_service_write_work work;", "struct tty_service_write_work work = {0};"),
+            caller.replace("state, request, action, &work", "state, request, action, &copy"),
+            caller.replace("state, request, action, &work", "state, other, action, &work"),
+            caller.replace("return work.error; }", "retain(&work); return work.error; }"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                write_body_tokens(changed, phase, declarations)
+        with self.assertRaises(AssertionError):
+            write_body_tokens(caller, phase.replace("state->last_id", "return; state->last_id"), declarations)
+        with self.assertRaises(AssertionError):
+            write_body_tokens(caller, phase, (tokens("uint64_t copy_result;"), *declarations[1:]))
+        for changed in (
+            phase.replace("request->id", "0"),
+            phase.replace("action->event = COMPLETION;", "action->event = READY;"),
+            phase.replace("work->error == OK", "work->error != OK"),
+        ):
+            self.assertNotEqual(tokens(expected), write_body_tokens(caller, changed, declarations))
+        binding = "tty_service_publish_write(state, request, action, &work);"
+        reordered = caller.replace(binding, "").replace("original_accept(state, &work.effects);", binding + " original_accept(state, &work.effects);")
+        self.assertNotEqual(tokens(expected), write_body_tokens(reordered, phase, declarations))
+
     def test_service_private_symbols_do_not_collide_with_retained_real_elf_neighbors(self):
         paths = (
             *SERVICE_SOURCES, "servers/tty/tty_service.c", "servers/tty/tty_control.c",
@@ -1010,7 +1106,7 @@ class TtySourceLayoutTest(unittest.TestCase):
         self.assertEqual(3, len(GENERATOR_FUNCTIONS))
         self.assertEqual(37, len(STABLE_HASHES))
         self.assertEqual(set(SYMBOL_OWNER_MIGRATION), {item for item in INITIAL_SYMBOL_OWNER_MIGRATION if item[0] not in (0, 2)})
-        self.assertEqual(set(REQUIRED_TASKS) - {(0, "live_binding_matches")}, set(FUNCTION_TASK_MIGRATION))
+        self.assertEqual(set(REQUIRED_TASKS) - {(0, "live_binding_matches"), (2, "handle_submit_write")}, set(FUNCTION_TASK_MIGRATION))
 
     def test_all_156_original_bodies_signatures_and_current_owners_remain_exact(self):
         for family, owners in ORIGINAL_FUNCTIONS.items():

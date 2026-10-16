@@ -565,3 +565,14 @@ avoid the retained real service entry's local symbol; actual ELF admission
 and the original QEMU TTY scenario pass without weakening either check.
 There are 72 original moves, twelve declarations-only future C owners and
 seven semantic dispositions remaining, including the original write body.
+
+Write submission now retains all original submit, completion-busy,
+resident-retry, zero-length preflight, invariant, full-copy and acceptance
+checks in a 106-line root. A 29-line file-local void phase performs only the
+original accepted ID/completion/reply/effects publication. One caller-owned
+work object has exactly the original three uninitialized typed locals;
+the original return remains in root. Whole-body restoration and independent
+wrong-binding/type/initialization/early-exit/publication-order fixtures
+precede the outline. The native service, unchanged mixed-model trace and
+real TTY guest pass. There are 72 original moves and six semantic
+dispositions remaining.
