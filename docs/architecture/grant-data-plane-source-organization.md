@@ -507,3 +507,13 @@ direction/physical validation/commit and the common restoration remain
 exact. Independent typed-work/binding/return/initializer/IRQ mutants and
 full original-body reconstruction protect that outline. Sixty-three owner
 moves and eighteen semantic dispositions remain pending.
+
+Range planning now has a 78-line page-walk/publication root and a 40-line
+device-span task. Its four original initialized range objects and five
+original loop locals remain in their exact caller lifetime. Typed borrowed
+lvalues preserve device validation, phase/invariant precedence, bounded
+advancement, deferred fault and original `continue`; the candidate still
+publishes only after complete ordinary planning and the final device-fault
+check. Independent pointer/switch/success/fault mutants and complete-body
+reconstruction retain the original range behavior without another IRQ
+scope or mutable state. Seventeen semantic dispositions remain pending.

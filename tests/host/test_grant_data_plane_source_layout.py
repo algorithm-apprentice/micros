@@ -56,6 +56,12 @@ PRIVATE_HEADERS = (
 COPY_EXECUTION_TAG = "grant_copy_execution"
 COPY_EXECUTION_PHASE = "grant_copy_prepare_participant_plans"
 COPY_LOCAL_RANGE_PHASE = "grant_copy_local_range_is_valid"
+RANGE_DEVICE_PHASE = "grant_copy_plan_device_span"
+RANGE_DEVICE_PARAMETERS = (
+    "struct micros_process_handle process, const struct micros_tty_device_authority *device_authority, "
+    "uintptr_t *current, size_t *remaining, bool *device_fault, "
+    "enum micros_user_address_space_error *address_error, size_t *chunk_length"
+)
 COPY_EXECUTION_FIELDS = (
     ("const struct micros_frame_ownership *ledger;", False),
     ("struct micros_grant_copy_authority authority;", False),
@@ -168,7 +174,6 @@ FUNCTION_TASK_MIGRATION = (
     (4, "test_grant_model"),
     (5, "test_copy_authority_and_bounds"),
     (6, "micros_grant_syscall_core_test_run"),
-    (0, "plan_range"),
     (0, "micros_grant_validate_range"),
     (5, "test_copy_plan_and_commit"),
     (3, "micros_grant_syscall_test_handle_control_trap"),
@@ -446,6 +451,10 @@ def original_locations(family, texts=None):
             if path != COPY_SOURCES[0]:
                 raise AssertionError("the private participant-plan phase has its exact copy owner")
             continue
+        if family == 0 and spelling == RANGE_DEVICE_PHASE:
+            if path != COPY_SOURCES[1]:
+                raise AssertionError("the device-span phase has only its original range owner")
+            continue
         original = names.get(spelling, spelling)
         if original not in BASELINE_BODIES[family] or original in locations:
             raise AssertionError("unknown/duplicate original or unreviewed phase: " + spelling)
@@ -470,6 +479,8 @@ def original_body_digest(family, original, record):
     body = tokens("{" + record.body + "}")
     if family == 0 and original == "copy_grant" and (0, original) not in FUNCTION_TASK_MIGRATION:
         body = copy_execution_actual_body_tokens(record)
+    if family == 0 and original == "plan_range" and (0, original) not in FUNCTION_TASK_MIGRATION:
+        body = range_device_actual_body_tokens(record)
     return digest_tokens(tuple(names.get(token, token) for token in body))
 
 
@@ -595,6 +606,57 @@ def copy_execution_actual_body_tokens(record, owner=None):
     return copy_execution_body_tokens(
         "{" + record.body + "}", "{" + phase.body + "}", declarations, "{" + local.body + "}",
     )
+
+
+def range_device_body_tokens(caller, phase):
+    body = list(tokens(caller))
+    guard = list(tokens(
+        "switch (" + RANGE_DEVICE_PHASE
+        + "(process, device_authority, &current, &remaining, &device_fault, &address_error, &chunk_length)) {"
+        "case MICROS_GRANT_OK: continue;"
+        "case MICROS_GRANT_ERROR_PHASE: return MICROS_GRANT_ERROR_PHASE;"
+        "case MICROS_GRANT_ERROR_INVARIANT: return MICROS_GRANT_ERROR_INVARIANT;"
+        "default: return MICROS_GRANT_ERROR_INVARIANT; }"
+    ))
+    positions = [index for index in range(len(body)) if body[index:index + len(guard)] == guard]
+    phase = list(tokens(phase))
+    if len(positions) != 1 or phase[:1] != ["{"] or phase[-4:] != ["return", "MICROS_GRANT_OK", ";", "}"]:
+        raise AssertionError("device span binds the exact original caller objects and checked success/failure scope")
+    inner = phase[1:-4]
+    if {"goto", "break", "continue"} & set(inner):
+        raise AssertionError("device span cannot borrow an unverified loop or exit label")
+    for index, token in enumerate(inner):
+        if token == "return" and (
+            inner[index + 1:index + 2] not in (["MICROS_GRANT_ERROR_PHASE"], ["MICROS_GRANT_ERROR_INVARIANT"])
+            or inner[index + 2:index + 3] != [";"]
+        ):
+            raise AssertionError("device success occurs only after original validation and deferred-fault advancement")
+    mutable = {"current", "remaining", "device_fault", "address_error", "chunk_length"}
+    restored = []
+    index = 0
+    while index < len(inner):
+        if inner[index] == "*" and inner[index + 1:index + 2] and inner[index + 1] in mutable:
+            restored.append(inner[index + 1])
+            index += 2
+        else:
+            if inner[index] in mutable:
+                raise AssertionError("the original range objects are borrowed typed lvalues, not copied pointer state")
+            restored.append(inner[index])
+            index += 1
+    restored.extend(tokens("continue;"))
+    start = positions[0]
+    body[start:start + len(guard)] = restored
+    return tuple(body)
+
+
+def range_device_actual_body_tokens(record, owner=None):
+    owner = source(COPY_SOURCES[1]) if owner is None else owner
+    phase = function_records(owner)[RANGE_DEVICE_PHASE]
+    if phase.guards or tokens(phase.signature) != tokens(
+        "static enum micros_grant_error " + RANGE_DEVICE_PHASE + "(" + RANGE_DEVICE_PARAMETERS + ")"
+    ):
+        raise AssertionError("actual device span retains every complete original pointer/handle type")
+    return range_device_body_tokens("{" + record.body + "}", "{" + phase.body + "}")
 
 
 def source_set_block(name, paths):
@@ -972,6 +1034,82 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         self.assertEqual(declarations, copy_execution_declarations(owner))
         with self.assertRaises(AssertionError):
             copy_execution_declarations(owner.replace("enum micros_grant_error remote_error;", "uint32_t remote_error;"))
+
+    def test_range_planner_exposes_typed_device_span_without_new_state_or_irq(self):
+        records = function_records(source(COPY_SOURCES[1]))
+        self.assertIn(RANGE_DEVICE_PHASE, set(records))
+        phase = records[RANGE_DEVICE_PHASE]
+        self.assertEqual(
+            tokens("static enum micros_grant_error " + RANGE_DEVICE_PHASE + "(" + RANGE_DEVICE_PARAMETERS + ")"),
+            tokens(phase.signature),
+        )
+        root = records["grant_copy_plan_range"]
+        self.assertLess(root.lines, 94)
+        self.assertNotIn("riscv_irq_", phase.body)
+        for declaration in (
+            "struct micros_grant_copy_range_plan candidate = {0};", "uintptr_t current = address;",
+            "size_t remaining = length;", "bool device_fault = false;",
+            "uint64_t physical_address;", "uint32_t permissions;", "size_t contiguous;",
+            "size_t chunk_length;", "enum micros_user_address_space_error address_error;",
+        ):
+            self.assertIn(declaration, root.body)
+
+    def test_device_span_inverse_preserves_original_lvalues_deferred_fault_and_continue(self):
+        caller = (
+            "{ candidate_init(); while (remaining != 0) { original_five_locals(); "
+            "if (device_authority != NULL && intersects(device_authority, process, current, 1)) { "
+            "switch (grant_copy_plan_device_span(process, device_authority, &current, &remaining, "
+            "&device_fault, &address_error, &chunk_length)) { "
+            "case MICROS_GRANT_OK: continue; "
+            "case MICROS_GRANT_ERROR_PHASE: return MICROS_GRANT_ERROR_PHASE; "
+            "case MICROS_GRANT_ERROR_INVARIANT: return MICROS_GRANT_ERROR_INVARIANT; "
+            "default: return MICROS_GRANT_ERROR_INVARIANT; } } "
+            "original_regular_page_plan(); } "
+            "if (device_fault) { return MICROS_GRANT_ERROR_FAULT; } *plan = candidate; return MICROS_GRANT_OK; }"
+        )
+        phase = (
+            "{ *address_error = validate_device(process, device_authority->root_physical_address); "
+            "if (*address_error == ADDRESS_PHASE) { return MICROS_GRANT_ERROR_PHASE; } "
+            "if (*address_error != ADDRESS_OK) { return MICROS_GRANT_ERROR_INVARIANT; } "
+            "*chunk_length = (DEVICE_BASE + DEVICE_LENGTH) - *current; "
+            "if (*chunk_length > *remaining) { *chunk_length = *remaining; } "
+            "*current += *chunk_length; *remaining -= *chunk_length; *device_fault = true; return MICROS_GRANT_OK; }"
+        )
+        expected = (
+            "{ candidate_init(); while (remaining != 0) { original_five_locals(); "
+            "if (device_authority != NULL && intersects(device_authority, process, current, 1)) { "
+            "address_error = validate_device(process, device_authority->root_physical_address); "
+            "if (address_error == ADDRESS_PHASE) { return MICROS_GRANT_ERROR_PHASE; } "
+            "if (address_error != ADDRESS_OK) { return MICROS_GRANT_ERROR_INVARIANT; } "
+            "chunk_length = (DEVICE_BASE + DEVICE_LENGTH) - current; "
+            "if (chunk_length > remaining) { chunk_length = remaining; } "
+            "current += chunk_length; remaining -= chunk_length; device_fault = true; continue; } "
+            "original_regular_page_plan(); } "
+            "if (device_fault) { return MICROS_GRANT_ERROR_FAULT; } *plan = candidate; return MICROS_GRANT_OK; }"
+        )
+        self.assertEqual(tokens(expected), range_device_body_tokens(caller, phase))
+        for changed in (
+            caller.replace("&current, &remaining", "&other_current, &remaining"),
+            caller.replace("case MICROS_GRANT_OK: continue;", "case MICROS_GRANT_OK: return MICROS_GRANT_OK;"),
+            caller.replace("default: return MICROS_GRANT_ERROR_INVARIANT;", "default: return MICROS_GRANT_OK;"),
+        ):
+            self.assertNotEqual(caller, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                range_device_body_tokens(changed, phase)
+        for changed in (
+            phase.replace("return MICROS_GRANT_ERROR_PHASE;", "return MICROS_GRANT_OK;"),
+            phase.replace("*current +=", "current +="),
+            phase.replace("return MICROS_GRANT_OK; }", "continue; }"),
+            phase.replace("return MICROS_GRANT_ERROR_INVARIANT;", "goto done;"),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                range_device_body_tokens(caller, changed)
+        self.assertNotEqual(
+            tokens(expected), range_device_body_tokens(caller, phase.replace("*device_fault = true", "*device_fault = false")),
+        )
+        self.assertNotEqual(
+            tokens(expected), range_device_body_tokens(caller.replace("if (device_fault)", "if (false)"), phase),
+        )
 
 
 if __name__ == "__main__":

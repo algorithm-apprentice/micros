@@ -23,6 +23,47 @@ static enum micros_grant_error grant_copy_map_address_error(
     }
 }
 
+static enum micros_grant_error grant_copy_plan_device_span(
+    struct micros_process_handle process,
+    const struct micros_tty_device_authority *device_authority,
+    uintptr_t *current,
+    size_t *remaining,
+    bool *device_fault,
+    enum micros_user_address_space_error *address_error,
+    size_t *chunk_length
+)
+{
+    *address_error =
+        micros_user_address_space_validate_tty_uart_mapping(
+            process,
+            device_authority->root_physical_address
+        );
+    if (
+        *address_error
+            == MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
+    ) {
+        return MICROS_GRANT_ERROR_PHASE;
+    }
+    if (
+        *address_error
+            != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        return MICROS_GRANT_ERROR_INVARIANT;
+    }
+    *chunk_length =
+        (
+            (uintptr_t)MICROS_TTY_UART_VIRTUAL_BASE
+            + MICROS_TTY_UART_MAPPED_LENGTH
+        ) - *current;
+    if (*chunk_length > *remaining) {
+        *chunk_length = *remaining;
+    }
+    *current += *chunk_length;
+    *remaining -= *chunk_length;
+    *device_fault = true;
+    return MICROS_GRANT_OK;
+}
+
 enum micros_grant_error grant_copy_plan_range(
     struct micros_process_handle process,
     uintptr_t address,
@@ -53,35 +94,19 @@ enum micros_grant_error grant_copy_plan_range(
                 1
             )
         ) {
-            address_error =
-                micros_user_address_space_validate_tty_uart_mapping(
-                    process,
-                    device_authority->root_physical_address
-                );
-            if (
-                address_error
-                    == MICROS_USER_ADDRESS_SPACE_ERROR_PHASE
-            ) {
+            switch (grant_copy_plan_device_span(
+                process, device_authority, &current, &remaining,
+                &device_fault, &address_error, &chunk_length
+            )) {
+            case MICROS_GRANT_OK:
+                continue;
+            case MICROS_GRANT_ERROR_PHASE:
                 return MICROS_GRANT_ERROR_PHASE;
-            }
-            if (
-                address_error
-                    != MICROS_USER_ADDRESS_SPACE_OK
-            ) {
+            case MICROS_GRANT_ERROR_INVARIANT:
+                return MICROS_GRANT_ERROR_INVARIANT;
+            default:
                 return MICROS_GRANT_ERROR_INVARIANT;
             }
-            chunk_length =
-                (
-                    (uintptr_t)MICROS_TTY_UART_VIRTUAL_BASE
-                    + MICROS_TTY_UART_MAPPED_LENGTH
-                ) - current;
-            if (chunk_length > remaining) {
-                chunk_length = remaining;
-            }
-            current += chunk_length;
-            remaining -= chunk_length;
-            device_fault = true;
-            continue;
         }
         if (candidate.chunk_count >= 2) {
             return MICROS_GRANT_ERROR_INVARIANT;
