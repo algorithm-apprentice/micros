@@ -711,9 +711,17 @@ scheduler plans remain in their separate original blocks; independent
 scope fixtures and full-body reconstruction reject hoisting or combining
 them.
 
-Three native/target dispositions remain pending. Only the target scenario
-unit remains declarations-only; source movement alone does not complete
-the task.
+Corruption evidence now has a 27-line root and 37/22/26/37-line preparation
+and mutation-stream tasks. The six original objects and sole snapshot are
+unchanged. Mutation groups remain exactly 1-8, 9-14 and 15-21. The actual
+macro's bytes are verified against immutable pre-outline owner evidence
+under only snapshot-field transport; its one definition encloses all
+scenario definitions and its one undef precedes the root. Reconstruction
+restores its original in-case scope and full original body. No final
+snapshot restoration or successful validation is added.
+
+Two native/target dispositions remain pending. Only the target scenario unit
+remains declarations-only; source movement alone does not complete the task.
 
 The complete current portable source restores the original
 `453c3cfbfb02d1c014226a315106a157676a7b195be06f561bb3abbda042db4a`

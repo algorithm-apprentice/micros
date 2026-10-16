@@ -24,6 +24,7 @@ SHARED_INSPECTION_PATH = "tests/host/c_source_records.py"
 HOST_MACROS_DIGEST = "cef5a866a045d5de47e43507e2dd21dc9c609dd30f096224ae36301633b972a1"
 MODEL_TYPES_DIGEST = "d8e00a14a902b448209ed4f27d866534d4ef32a46baeb2d5407c83fff825a444"
 HOST_CASE_TABLE_DIGEST = "b3566dbd412d23b759fc2fd7c3efaf6f083bb0dfd9617fce9fa35c84a164bf90"
+CORRUPTION_MACRO_DIGEST = "84ac83b95d4899eafe2ef63f372e85a5e6257eb742ce778d3472aeb300bda545"
 REGISTRY_FIELDS = (
     "initialization_magic", "max_threads_per_process", "max_harts", "live_process_count",
     "live_thread_count", "registered_hart_count", "processes", "threads", "harts",
@@ -259,6 +260,24 @@ NATIVE_CASE_TASKS = {
             ),
         },
     },
+    "test_validator_rejects_corrupt_relationships": {
+        "owner": 7,
+        "work": "kernel_object_test_corruption_work",
+        "fields": (
+            ("struct micros_process_handle owner;", "aggregate"),
+            ("struct micros_thread_handle first;", "aggregate"),
+            ("struct micros_thread_handle second;", "aggregate"),
+            ("struct micros_hart_handle hart_zero;", "aggregate"),
+            ("struct micros_hart_handle hart_one;", "aggregate"),
+            ("struct micros_kernel_objects snapshot;", None),
+        ),
+        "phases": (
+            "kernel_object_test_prepare_corruption_snapshot",
+            "kernel_object_test_corrupt_relationships_and_counts",
+            "kernel_object_test_corrupt_generations_and_context",
+            "kernel_object_test_corrupt_released_payload_and_hart",
+        ),
+    },
 }
 CORE_SOURCES = (
     "kernel/kernel_objects.c",
@@ -386,7 +405,6 @@ SYMBOL_OWNER_MIGRATION = ()
 FUNCTION_TASK_MIGRATION = (
     (1, "test_seeded_lifecycle_model"),
     (2, "micros_kernel_object_runtime_run_self_test"),
-    (1, "test_validator_rejects_corrupt_relationships"),
 )
 CORE_DAG = {
     0: {1}, 1: {2}, 2: set(), 3: set(), 4: {2},
@@ -971,17 +989,52 @@ def restore_case_work_tokens(caller, tag, fields, declarations, constants=()):
     return tuple(restored)
 
 
+def native_corruption_macro(owner, records, phases):
+    definitions = tuple(re.finditer(
+        r"(?m)^#define EXPECT_CORRUPTION\(statement\) \\\n(?:[^\n]*\\\n)*[^\n]*", owner,
+    ))
+    undefs = tuple(re.finditer(r"(?m)^#undef EXPECT_CORRUPTION$", owner))
+    if len(definitions) != 1 or len(undefs) != 1:
+        raise AssertionError("one actual corruption macro has one exact definition and undef lifetime")
+    definition, undef = definitions[0], undefs[0]
+    value = definition.group()
+    if value.count("work->snapshot") != 1:
+        raise AssertionError("corruption restores only its single original automatic snapshot")
+    restored = value.replace("work->snapshot", "snapshot", 1)
+    if digest_bytes(restored.encode()) != CORRUPTION_MACRO_DIGEST:
+        raise AssertionError("actual corruption macro bytes retain restore, mutation and combined validation order")
+    for name in phases:
+        record = records[name]
+        start = owner.index(record.signature)
+        end = start + len(record.signature) + 1 + len(record.body) + 1
+        if not definition.end() < start < end < undef.start():
+            raise AssertionError("the file-local corruption macro encloses each actual scenario definition")
+    root = records[host_name("test_validator_rejects_corrupt_relationships")]
+    if undef.end() >= owner.index(root.signature):
+        raise AssertionError("corruption macro is undefined before the root and cannot leak beyond its scenario owner")
+    return restored, undef.group()
+
+
 def native_case_body_tokens(original, record, owner=None):
     spec = NATIVE_CASE_TASKS[original]
     owner = source(family_paths(1)[spec["owner"]]) if owner is None else owner
     declarations = case_work_declarations(owner, spec["work"], spec["fields"])
     parameters = {name: case_phase_contract(spec, name)[0] for name in spec["phases"]}
-    phases = checked_phase_bodies(function_records(owner), parameters)
+    records = function_records(owner)
+    phases = checked_phase_bodies(records, parameters)
     body = outline_boolean_case_tokens(
         "{" + record.body + "}", {name: "{" + phase + "}" for name, phase in phases.items()},
         tuple((name, case_phase_contract(spec, name)[1]) for name in spec["phases"]),
     )
-    return restore_case_work_tokens(body, spec["work"], spec["fields"], declarations, spec.get("constants", ()))
+    body = restore_case_work_tokens(body, spec["work"], spec["fields"], declarations, spec.get("constants", ()))
+    if original == "test_validator_rejects_corrupt_relationships":
+        macro, undef = native_corruption_macro(owner, records, spec["phases"])
+        reset = tokens("kernel_object_test_reset_objects(fixture);")
+        positions = [index for index in range(len(body)) if body[index:index + len(reset)] == reset]
+        if len(positions) != 1 or body[-4:] != ("return", "true", ";", "}"):
+            raise AssertionError("corruption retains its original sole setup, macro scope and final registry state")
+        body = (*body[:positions[0]], *tokens(macro), *body[positions[0]:-4], *tokens(undef), *body[-4:])
+    return body
 
 
 def core_body_text(original, record, texts=None):
@@ -2207,6 +2260,52 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertEqual(13, len(specification["fields"]))
         self.assertEqual(8, len(specification["constants"]))
         self.assertFalse(any("plan" in tokens(declaration) for declaration, _ in specification["fields"]))
+
+    def test_corruption_macro_actual_bytes_and_file_local_lifetime_are_preserved(self):
+        macro = r"""#define EXPECT_CORRUPTION(statement) \
+    do { \
+        *fixture = work->snapshot; \
+        statement; \
+        EXPECT_ERROR( \
+            MICROS_KERNEL_OBJECT_ERROR_INVARIANT, \
+            micros_kernel_objects_validate(fixture) \
+        ); \
+    } while (false)"""
+        spec = NATIVE_CASE_TASKS["test_validator_rejects_corrupt_relationships"]
+        definitions = "\n\n".join(
+            "static bool " + name + "(void)\n{\n    return true;\n}" for name in spec["phases"]
+        )
+        root = "bool kernel_object_test_validator_rejects_corrupt_relationships(void)\n{\n    return true;\n}\n"
+        owner = macro + "\n\n" + definitions + "\n\n#undef EXPECT_CORRUPTION\n\n" + root
+        expected = macro.replace("work->snapshot", "snapshot")
+        self.assertEqual(
+            (expected, "#undef EXPECT_CORRUPTION"), native_corruption_macro(owner, function_records(owner), spec["phases"]),
+        )
+        for changed in (
+            owner.replace("*fixture = work->snapshot;", "*fixture = *fixture;"),
+            owner.replace("MICROS_KERNEL_OBJECT_ERROR_INVARIANT", "MICROS_KERNEL_OBJECT_OK"),
+            owner.replace("micros_kernel_objects_validate(fixture)", "weakened_validate(fixture)"),
+            owner.replace("#undef EXPECT_CORRUPTION\n\n" + root, root + "\n#undef EXPECT_CORRUPTION\n"),
+            owner.replace("\n\n" + definitions, "\n#undef EXPECT_CORRUPTION\n\n" + definitions),
+        ):
+            self.assertNotEqual(owner, changed)
+            with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                native_corruption_macro(changed, function_records(changed), spec["phases"])
+        first = spec["phases"][0]
+        changed = owner.replace("#undef EXPECT_CORRUPTION\n\n", "").replace(
+            "static bool " + first, "#undef EXPECT_CORRUPTION\n\nstatic bool " + first, 1,
+        )
+        with self.assertRaises(AssertionError):
+            native_corruption_macro(changed, function_records(changed), spec["phases"])
+
+    def test_corruption_tasks_keep_the_original_8_6_7_stream_and_single_snapshot(self):
+        spec = NATIVE_CASE_TASKS["test_validator_rejects_corrupt_relationships"]
+        owner = source(family_paths(1)[spec["owner"]])
+        records = function_records(owner)
+        self.assertEqual(
+            (8, 6, 7), tuple(records[name].body.count("EXPECT_CORRUPTION(") for name in spec["phases"][1:]),
+        )
+        self.assertEqual(1, owner.count("work->snapshot = *fixture;"))
 
 
 if __name__ == "__main__":
