@@ -6,10 +6,11 @@ This is the Accepted exact contract for
 [ADR-0070](../adr/0070-tty-function-and-evidence-decomposition.md).
 Independent complete read-only design review is clean and design #141 is
 separately merged. Implementation #142 is blocked and abandoned after the
-model graph omission described by Proposed
+model graph omission described by Accepted
 [ADR-0071](../adr/0071-tty-model-validation-reference-dependency.md).
 Only that documentation-only corrective design is active; implementation
-must restart from current `main` after its review, acceptance and merge.
+must restart from current `main` after its separate merge. Complete
+independent corrective-design review is clean.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
 
@@ -289,8 +290,8 @@ control observation/controller doubles -> non-resetting fixture
 control root -> fixture
 ```
 
-The validation -> reference edge is the narrowly Proposed ADR-0071
-correction, effective only after its independent acceptance and merge.
+The validation -> reference edge is the narrowly Accepted ADR-0071
+correction, effective only after its separate merge.
 It preserves the original final `reference_output_pending` call after the
 CR/LF comparison. The predicate remains in the reference owner with its
 existing required declaration; it does not call back into validation.

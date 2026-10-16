@@ -282,9 +282,9 @@ that evidence without routinely rerunning it.
 
 Implementation #142 exposed the model validator's existing final dependency
 on `reference_output_pending`, omitted by the private graph. Its structural
-failure blocks implementation despite unchanged native behavior. Proposed
+failure blocks implementation despite unchanged native behavior. Accepted
 [ADR-0071](adr/0071-tty-model-validation-reference-dependency.md) corrects
-only that necessary acyclic edge. After independent design acceptance and
+only that necessary acyclic edge; independent design review is clean. After
 separate merge, restart from current `main` and prove the exact final
 comparison, all other owner directions and the original model identity.
 Historical abandoned-candidate results do not satisfy restarted acceptance.

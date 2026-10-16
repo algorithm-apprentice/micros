@@ -1,6 +1,6 @@
 # ADR-0071: TTY Model Validation Reference Dependency
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-16
 - Refines: ADR-0033, ADR-0047, and ADR-0070
 - Supersedes: ADR-0070's source-contract graph only where it omits the
@@ -87,5 +87,12 @@ behavior or widen a correction that needs only one existing private edge.
 
 ## Design review disposition
 
-Pending independent complete read-only design review and current
-documentation/structure/staged/worktree/branch-range author evidence.
+Independent complete read-only design review inspected the six-document
+proposal, original predicate and final validator call, relevant Accepted
+authority, unchanged acceptance contracts and exact current four-command
+author evidence. It reported: "No significant issues found in the reviewed
+changes." Static evidence establishes the necessary acyclic edge; no targeted
+reproduction or validation rerun was needed. No substantive issue remains.
+
+Acceptance records that clean review result only. The implementation remains
+blocked until this corrective design separately merges.
