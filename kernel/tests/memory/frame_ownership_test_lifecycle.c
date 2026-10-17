@@ -1,4 +1,4 @@
-#include "frame_ownership_test_internal.h"
+#include "kernel/tests/memory/frame_ownership_test_internal.h"
 
 bool micros_frame_ownership_test_prepare_runtime_baseline(
     struct micros_frame_ownership_test_context *context

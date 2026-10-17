@@ -6,7 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/user_address_space_test_internal.h"
+#include "kernel/tests/memory/user_address_space_test_internal.h"
 
 #define MICROS_SCAUSE_INTERRUPT (UINT64_C(1) << 63)
 #define MICROS_SCAUSE_CODE_MASK (MICROS_SCAUSE_INTERRUPT - 1)

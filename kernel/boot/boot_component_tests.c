@@ -10,7 +10,7 @@
 #include "micros/trap.h"
 
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
-#include "kernel/address_space_handoff_test.h"
+#include "kernel/tests/memory/address_space_handoff_test.h"
 #endif
 #if defined(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST) \
     || defined(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST) \

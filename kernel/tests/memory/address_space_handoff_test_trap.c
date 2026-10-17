@@ -1,4 +1,4 @@
-#include "kernel/address_space_handoff_test_internal.h"
+#include "kernel/tests/memory/address_space_handoff_test_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

@@ -1,4 +1,4 @@
-#include "frame_ownership_test_internal.h"
+#include "kernel/tests/memory/frame_ownership_test_internal.h"
 
 #include <stdbool.h>
 

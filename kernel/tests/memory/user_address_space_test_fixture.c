@@ -1,4 +1,4 @@
-#include "kernel/user_address_space_test_internal.h"
+#include "kernel/tests/memory/user_address_space_test_internal.h"
 
 #include "micros/kernel_object_runtime.h"
 #include "micros/sv39.h"

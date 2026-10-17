@@ -1,4 +1,4 @@
-#include "kernel/address_space_handoff_test_internal.h"
+#include "kernel/tests/memory/address_space_handoff_test_internal.h"
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"

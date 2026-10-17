@@ -725,11 +725,11 @@ set(
 
 set(
     MICROS_USER_ADDRESS_SPACE_QEMU_TEST_SOURCES
-    kernel/user_address_space_test.c
-    kernel/user_address_space_test_fixture.c
-    kernel/user_address_space_test_lifecycle.c
-    kernel/user_address_space_test_mapping.c
-    kernel/user_address_space_test_validation.c
+    kernel/tests/memory/user_address_space_test.c
+    kernel/tests/memory/user_address_space_test_fixture.c
+    kernel/tests/memory/user_address_space_test_lifecycle.c
+    kernel/tests/memory/user_address_space_test_mapping.c
+    kernel/tests/memory/user_address_space_test_validation.c
 )
 
 set(
@@ -772,10 +772,10 @@ set(
 
 set(
     MICROS_FRAME_OWNERSHIP_QEMU_TEST_SOURCES
-    kernel/frame_ownership_test.c
-    kernel/frame_ownership_test_fixture.c
-    kernel/frame_ownership_test_lifecycle.c
-    kernel/frame_ownership_test_handoff.c
+    kernel/tests/memory/frame_ownership_test.c
+    kernel/tests/memory/frame_ownership_test_fixture.c
+    kernel/tests/memory/frame_ownership_test_lifecycle.c
+    kernel/tests/memory/frame_ownership_test_handoff.c
 )
 
 set(
@@ -838,15 +838,15 @@ set(
 
 set(
     MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES
-    kernel/address_space_handoff_test.c
-    kernel/address_space_handoff_test_fixture.c
-    kernel/address_space_handoff_test_setup.c
-    kernel/address_space_handoff_test_snapshot.c
-    kernel/address_space_handoff_test_handoff.c
-    kernel/address_space_handoff_test_runtime.c
-    kernel/address_space_handoff_test_syscall.c
-    kernel/address_space_handoff_test_tty.c
-    kernel/address_space_handoff_test_trap.c
+    kernel/tests/memory/address_space_handoff_test.c
+    kernel/tests/memory/address_space_handoff_test_fixture.c
+    kernel/tests/memory/address_space_handoff_test_setup.c
+    kernel/tests/memory/address_space_handoff_test_snapshot.c
+    kernel/tests/memory/address_space_handoff_test_handoff.c
+    kernel/tests/memory/address_space_handoff_test_runtime.c
+    kernel/tests/memory/address_space_handoff_test_syscall.c
+    kernel/tests/memory/address_space_handoff_test_tty.c
+    kernel/tests/memory/address_space_handoff_test_trap.c
 )
 
 set(
@@ -4362,7 +4362,7 @@ if(MICROS_BUILD_MMU_TEST)
         micros
         PRIVATE
             arch/riscv64/mmu_test.S
-            kernel/mmu_test.c
+            kernel/tests/memory/mmu_test.c
     )
 endif()
 

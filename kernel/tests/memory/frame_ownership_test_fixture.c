@@ -1,4 +1,4 @@
-#include "frame_ownership_test_internal.h"
+#include "kernel/tests/memory/frame_ownership_test_internal.h"
 
 static struct micros_frame_ownership_test_context test_context;
 

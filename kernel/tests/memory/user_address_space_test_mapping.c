@@ -1,4 +1,4 @@
-#include "kernel/user_address_space_test_internal.h"
+#include "kernel/tests/memory/user_address_space_test_internal.h"
 
 #include "arch/riscv64/mmu.h"
 #include "micros/ipc_buffer.h"
