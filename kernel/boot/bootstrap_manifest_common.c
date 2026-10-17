@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_manifest_internal.h"
+#include "kernel/boot/bootstrap_manifest_internal.h"
 
 void bootstrap_manifest_copy_bytes(
     void *destination,

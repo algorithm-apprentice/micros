@@ -1,4 +1,4 @@
-#include "kernel/boot_internal.h"
+#include "kernel/boot/boot_internal.h"
 
 void kernel_main(uintptr_t hart_id, uintptr_t fdt_address);
 

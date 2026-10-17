@@ -7,7 +7,7 @@
 
 #include "arch/riscv64/trap_context.h"
 #include "kernel/address_space_handoff_test.h"
-#include "kernel/bootstrap_control_internal.h"
+#include "kernel/boot/bootstrap_control_internal.h"
 #include "kernel/grant/grant_runtime_internal.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"

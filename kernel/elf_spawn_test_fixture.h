@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "kernel/bootstrap_image.h"
+#include "kernel/boot/bootstrap_image.h"
 #include "micros/bootstrap.h"
 #include "tests/qemu/elf_spawn_protocol.h"
 

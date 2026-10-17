@@ -1,4 +1,4 @@
-#include "kernel/boot_internal.h"
+#include "kernel/boot/boot_internal.h"
 
 #include "arch/riscv64/platform.h"
 #include "micros/bootstrap_memory.h"

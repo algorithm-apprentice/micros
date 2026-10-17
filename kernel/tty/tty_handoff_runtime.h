@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_TTY_HANDOFF_RUNTIME_H
 #define MICROS_KERNEL_TTY_HANDOFF_RUNTIME_H
 
-#include "kernel/bootstrap_control_internal.h"
+#include "kernel/boot/bootstrap_control_internal.h"
 #include "kernel/tty/tty_handoff_core.h"
 
 struct micros_tty_handoff_runtime_state {

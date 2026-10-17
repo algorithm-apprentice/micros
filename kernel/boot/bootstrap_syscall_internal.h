@@ -1,8 +1,8 @@
 #ifndef MICROS_KERNEL_BOOTSTRAP_SYSCALL_INTERNAL_H
 #define MICROS_KERNEL_BOOTSTRAP_SYSCALL_INTERNAL_H
 
-#include "kernel/bootstrap_runtime.h"
-#include "kernel/bootstrap_syscall.h"
+#include "kernel/boot/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_syscall.h"
 
 _Noreturn void bootstrap_syscall_panic_bootstrap_syscall(
     struct micros_hart *hart,

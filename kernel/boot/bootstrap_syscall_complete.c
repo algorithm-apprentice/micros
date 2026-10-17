@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_syscall_internal.h"
+#include "kernel/boot/bootstrap_syscall_internal.h"
 
 #include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"

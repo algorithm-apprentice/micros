@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_VFS_SERVICE_TEST_FIXTURE_H
 #define MICROS_KERNEL_VFS_SERVICE_TEST_FIXTURE_H
 
-#include "kernel/bootstrap_image.h"
+#include "kernel/boot/bootstrap_image.h"
 #include "micros/ramfs.h"
 #include "micros/tty.h"
 #include "micros/vfs.h"

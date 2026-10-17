@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_control_internal.h"
+#include "kernel/boot/bootstrap_control_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

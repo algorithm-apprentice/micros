@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_manifest_internal.h"
+#include "kernel/boot/bootstrap_manifest_internal.h"
 
 #include <limits.h>
 #include <stddef.h>

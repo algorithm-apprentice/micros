@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_runtime_internal.h"
+#include "kernel/boot/bootstrap_runtime_internal.h"
 
 #include "arch/riscv64/interrupt.h"
 #include "kernel/endpoint/endpoint_internal.h"

@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_manifest_internal.h"
+#include "kernel/boot/bootstrap_manifest_internal.h"
 
 struct role_profile_ids {
     uint8_t vm_profile_id;

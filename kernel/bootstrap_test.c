@@ -6,7 +6,7 @@
 
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/bootstrap_test_fixture.h"
 #include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"

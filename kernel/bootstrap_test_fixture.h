@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_BOOTSTRAP_TEST_FIXTURE_H
 #define MICROS_KERNEL_BOOTSTRAP_TEST_FIXTURE_H
 
-#include "kernel/bootstrap_image.h"
+#include "kernel/boot/bootstrap_image.h"
 #include "tests/qemu/bootstrap_protocol.h"
 
 extern const struct micros_bootstrap_manifest

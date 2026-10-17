@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_runtime_internal.h"
+#include "kernel/boot/bootstrap_runtime_internal.h"
 
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"

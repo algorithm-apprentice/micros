@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_runtime_internal.h"
+#include "kernel/boot/bootstrap_runtime_internal.h"
 
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"

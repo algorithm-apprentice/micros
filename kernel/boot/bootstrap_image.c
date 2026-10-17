@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_image.h"
+#include "kernel/boot/bootstrap_image.h"
 
 #include <stddef.h>
 #include <stdint.h>

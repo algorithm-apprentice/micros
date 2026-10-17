@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/pm/pm_control_core.h"
 #include "kernel/vm/vm_handoff_core.h"
 #include "kernel/vm_scratch_preemption_test.h"

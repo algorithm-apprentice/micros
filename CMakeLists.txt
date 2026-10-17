@@ -1077,43 +1077,43 @@ set(
 
 set(
     MICROS_BOOTSTRAP_MANIFEST_SOURCES
-    kernel/bootstrap_manifest.c
-    kernel/bootstrap_manifest_common.c
-    kernel/bootstrap_manifest_profiles.c
-    kernel/bootstrap_transitions.c
+    kernel/boot/bootstrap_manifest.c
+    kernel/boot/bootstrap_manifest_common.c
+    kernel/boot/bootstrap_manifest_profiles.c
+    kernel/boot/bootstrap_transitions.c
 )
 
 set(
     MICROS_BOOTSTRAP_IMAGE_SOURCES
-    kernel/bootstrap_image.c
+    kernel/boot/bootstrap_image.c
 )
 
 set(
     MICROS_BOOTSTRAP_RUNTIME_SOURCES
-    kernel/bootstrap_runtime.c
-    kernel/bootstrap_runtime_state.c
-    kernel/bootstrap_preparation.c
-    kernel/bootstrap_preparation_image.c
-    kernel/bootstrap_preparation_rollback.c
-    kernel/bootstrap_runtime_validation.c
-    kernel/bootstrap_diagnostics.c
+    kernel/boot/bootstrap_runtime.c
+    kernel/boot/bootstrap_runtime_state.c
+    kernel/boot/bootstrap_preparation.c
+    kernel/boot/bootstrap_preparation_image.c
+    kernel/boot/bootstrap_preparation_rollback.c
+    kernel/boot/bootstrap_runtime_validation.c
+    kernel/boot/bootstrap_diagnostics.c
 )
 
 set(
     MICROS_BOOTSTRAP_SYSCALL_SOURCES
-    kernel/bootstrap_syscall.c
-    kernel/bootstrap_syscall_common.c
-    kernel/bootstrap_syscall_release.c
-    kernel/bootstrap_syscall_ready.c
-    kernel/bootstrap_syscall_complete.c
-    kernel/bootstrap_syscall_failure.c
+    kernel/boot/bootstrap_syscall.c
+    kernel/boot/bootstrap_syscall_common.c
+    kernel/boot/bootstrap_syscall_release.c
+    kernel/boot/bootstrap_syscall_ready.c
+    kernel/boot/bootstrap_syscall_complete.c
+    kernel/boot/bootstrap_syscall_failure.c
 )
 
 set(
     MICROS_BOOT_FOUNDATION_SOURCES
-    kernel/main.c
-    kernel/boot_foundation.c
-    kernel/boot_component_tests.c
+    kernel/boot/main.c
+    kernel/boot/boot_foundation.c
+    kernel/boot/boot_component_tests.c
 )
 
 set(
@@ -1363,8 +1363,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         bootstrap_control_test
-        kernel/bootstrap_control.c
-        kernel/bootstrap_control_core.c
+        kernel/boot/bootstrap_control.c
+        kernel/boot/bootstrap_control_core.c
         ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
         ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
@@ -3998,8 +3998,8 @@ add_executable(
     arch/riscv64/uart.c
     arch/riscv64/user_entry.S
     ${MICROS_KERNEL_ADDRESS_SPACE_SOURCES}
-    kernel/bootstrap_control.c
-    kernel/bootstrap_control_core.c
+    kernel/boot/bootstrap_control.c
+    kernel/boot/bootstrap_control_core.c
     ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
     ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
     kernel/memory/bootstrap_memory.c

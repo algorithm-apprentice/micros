@@ -1,6 +1,6 @@
 #include "kernel/pm/pm_control_syscall.h"
 
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/pm/pm_control_runtime.h"
 #include "kernel/pm/pm_control_syscall_internal.h"

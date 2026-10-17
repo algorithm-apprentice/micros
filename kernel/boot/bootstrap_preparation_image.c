@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_runtime_internal.h"
+#include "kernel/boot/bootstrap_runtime_internal.h"
 
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"

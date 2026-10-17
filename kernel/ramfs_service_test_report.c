@@ -5,7 +5,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/ramfs_service_test_fixture.h"

@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_manifest_internal.h"
+#include "kernel/boot/bootstrap_manifest_internal.h"
 
 static struct micros_bootstrap_runtime_entry *runtime_entry(
     struct micros_bootstrap_runtime *runtime,

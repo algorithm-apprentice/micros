@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "micros/panic.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"

@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_ELF_SPAWN_TEST_INTERNAL_H
 #define MICROS_KERNEL_ELF_SPAWN_TEST_INTERNAL_H
 
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/elf_spawn_test.h"
 #include "kernel/elf_spawn_test_fixture.h"
 #include "tests/qemu/elf_spawn_resources.h"

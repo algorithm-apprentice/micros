@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "kernel/bootstrap_control_internal.h"
+#include "kernel/boot/bootstrap_control_internal.h"
 #include "kernel/pm/pm_control_runtime.h"
 #include "kernel/pm/pm_control_syscall.h"
 #include "kernel/pm/pm_control_syscall_core.h"

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #include "arch/riscv64/platform.h"
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "micros/panic.h"
 

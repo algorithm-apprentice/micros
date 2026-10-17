@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "kernel/bootstrap_runtime.h"
+#include "kernel/boot/bootstrap_runtime.h"
 #include "micros/panic.h"
 #include "micros/scheduler.h"
 

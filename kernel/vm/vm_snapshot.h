@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/bootstrap_control_internal.h"
+#include "kernel/boot/bootstrap_control_internal.h"
 #include "micros/vm_bootstrap.h"
 
 struct micros_vm_snapshot_result {

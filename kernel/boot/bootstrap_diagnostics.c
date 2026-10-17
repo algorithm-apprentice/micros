@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_runtime_internal.h"
+#include "kernel/boot/bootstrap_runtime_internal.h"
 
 #include "arch/riscv64/platform.h"
 #include "kernel/tty/tty_handoff_runtime.h"
