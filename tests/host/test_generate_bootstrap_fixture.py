@@ -5,6 +5,15 @@ import unittest
 from tests.host.test_check_user_elf import build_elf
 from tools import check_user_elf
 from tools import generate_bootstrap_fixture
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_bootstrap_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_bootstrap_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def bootstrap_image():
@@ -31,7 +40,7 @@ def bootstrap_image():
 
 class BootstrapFixtureGeneratorTest(unittest.TestCase):
     def test_renders_catalog_and_permuted_manifest(self):
-        output = generate_bootstrap_fixture.render_fixture(
+        output = _render_fixture(
             bootstrap_image(),
             bootstrap_image(),
         )
@@ -70,7 +79,7 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_bootstrap_fixture.render_fixture(image, bootstrap_image())
+            _render_fixture(image, bootstrap_image())
 
     def test_rejects_nonzero_file_backed_configuration(self):
         image = bootstrap_image()
@@ -89,7 +98,7 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_bootstrap_fixture.render_fixture(image, bootstrap_image())
+            _render_fixture(image, bootstrap_image())
 
 
 if __name__ == "__main__":

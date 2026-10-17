@@ -15,7 +15,7 @@
 #if defined(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST) \
     || defined(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST) \
     || defined(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
-#include "kernel/bootstrap_test.h"
+#include "kernel/tests/boot/bootstrap_test.h"
 #endif
 #if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
     || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \

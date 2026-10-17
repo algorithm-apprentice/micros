@@ -4117,7 +4117,7 @@ if(
         micros
         PRIVATE
             "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
-            kernel/bootstrap_test.c
+            kernel/tests/boot/bootstrap_test.c
     )
 endif()
 

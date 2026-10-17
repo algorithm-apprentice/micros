@@ -7,6 +7,15 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_tty_service_fixture
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_tty_service_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_tty_service_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def vfs_image():
@@ -24,7 +33,7 @@ def vfs_image():
 
 class TtyServiceFixtureGeneratorTest(unittest.TestCase):
     def test_retains_complete_original_fixture_utf8_bytes(self):
-        output = generate_tty_service_fixture.render_fixture(
+        output = _render_fixture(
             bootstrap_image(), vm_image(), bootstrap_image(),
             bootstrap_image(), vfs_image(),
         ).encode("utf-8")
@@ -38,7 +47,7 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
     def test_retains_descriptor_validation_order_before_metadata_checks(self):
         owner = generate_tty_service_fixture.generate_bootstrap_fixture
         with patch.object(owner, "_validated_descriptor", wraps=owner._validated_descriptor) as validated:
-            generate_tty_service_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(), vm_image(), bootstrap_image(),
                 bootstrap_image(), vfs_image(),
             )
@@ -60,28 +69,28 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
 
         with patch.object(owner, "_validated_descriptor", side_effect=with_tty_bound_overlap):
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "VM image has no boot-information object"):
-                generate_tty_service_fixture.render_fixture(
+                _render_fixture(
                     bootstrap_image(), bootstrap_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "non-VM image has VM boot-information metadata"):
-                generate_tty_service_fixture.render_fixture(
+                _render_fixture(
                     vm_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "missing TTY service report symbol"):
-                generate_tty_service_fixture.render_fixture(
+                _render_fixture(
                     bootstrap_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "TTY image overlaps its fixed UART mapping"):
-                generate_tty_service_fixture.render_fixture(
+                _render_fixture(
                     bootstrap_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), vfs_image(),
                 )
 
     def test_renders_tty_topology_mapping_and_report(self):
-        output = generate_tty_service_fixture.render_fixture(
+        output = _render_fixture(
             bootstrap_image(),
             vm_image(),
             bootstrap_image(),
@@ -97,7 +106,7 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_vfs_without_report_symbol(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_tty_service_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -122,7 +131,7 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_tty_service_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),

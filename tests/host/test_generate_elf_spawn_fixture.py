@@ -15,6 +15,15 @@ from tests.host.test_generate_vfs_service_fixture import image_with_page_count
 from tools import generate_elf_spawn_fixture
 from tools.user_elf_format import ElfFormatError, ElfSymbol, SYMBOL_BIND_GLOBAL, USER_BASE
 from tools.user_elf_parse import parse_elf
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_elf_spawn_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_elf_spawn_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def service_image(role):
@@ -52,7 +61,7 @@ class ElfSpawnFixtureTest(unittest.TestCase):
 
     def test_renders_exactly_six_production_images_and_dynamic_report_metadata(self):
         images = self.images()
-        output = generate_elf_spawn_fixture.render_fixture(images)
+        output = _render_fixture(images)
         self.assertIn("micros_elf_spawn_test_images", output)
         self.assertEqual(6, output.count(".version = MICROS_BOOTSTRAP_IMAGE_VERSION"))
         self.assertEqual(6, output.count(".stack_page_count = 1,"))
@@ -64,7 +73,7 @@ class ElfSpawnFixtureTest(unittest.TestCase):
         self.assertIn("MICROS_ELF_SPAWN_OBJECT_TTY_UART", output)
         self.assertIn("micros_elf_spawn_report_addresses", output)
         self.assertIn("UINT64_C(0x0000000040000024)", output)
-        self.assertEqual(output, generate_elf_spawn_fixture.render_fixture(images))
+        self.assertEqual(output, _render_fixture(images))
 
     def test_rejects_extra_missing_or_misplaced_service_roles(self):
         for change in ("extra", "missing", "foreign-vm"):
@@ -76,7 +85,7 @@ class ElfSpawnFixtureTest(unittest.TestCase):
             else:
                 images["vfs"] = images["vm"]
             with self.subTest(change=change), self.assertRaises(ElfFormatError):
-                generate_elf_spawn_fixture.render_fixture(images)
+                _render_fixture(images)
 
     def test_requires_checked_writable_state_objects(self):
         for role in ("vm", "pm", "tty", "ramfs", "vfs"):
@@ -87,7 +96,7 @@ class ElfSpawnFixtureTest(unittest.TestCase):
                 symbol for symbol in image.symbols if symbol.name not in names
             ))
             with self.subTest(role=role), self.assertRaises(ElfFormatError):
-                generate_elf_spawn_fixture.render_fixture(images)
+                _render_fixture(images)
         images = self.images()
         images["vfs"] = replace(images["vfs"], symbols=tuple(
             replace(symbol, value=USER_BASE + 0x1000)
@@ -95,7 +104,7 @@ class ElfSpawnFixtureTest(unittest.TestCase):
             for symbol in images["vfs"].symbols
         ))
         with self.assertRaises(ElfFormatError):
-            generate_elf_spawn_fixture.render_fixture(images)
+            _render_fixture(images)
 
     def test_requires_exact_bounded_report_instructions_for_both_applications(self):
         for role in ("init", "child"):
@@ -119,23 +128,23 @@ class ElfSpawnFixtureTest(unittest.TestCase):
                     image = replace(image, data=bytes(data))
                 images[role] = image
                 with self.subTest(role=role, change=change), self.assertRaises(ElfFormatError):
-                    generate_elf_spawn_fixture.render_fixture(images)
+                    _render_fixture(images)
 
     def test_enforces_each_fixed_production_service_budget(self):
         for role, limit in (("pm", 32), ("vm", 160), ("ramfs", 192), ("vfs", 80)):
             images = self.images()
             images[role] = image_with_page_count(images[role], limit)
             with self.subTest(role=role), self.assertRaises(ElfFormatError):
-                generate_elf_spawn_fixture.render_fixture(images)
+                _render_fixture(images)
 
     def test_accepts_exact_fixed_limits_but_rejects_aggregate_excess(self):
         images = self.images()
         for role, limit in (("pm", 32), ("vm", 160), ("ramfs", 192), ("vfs", 80)):
             images[role] = image_with_page_count(images[role], limit - 1)
-        self.assertIn(".user_page_limit = 192", generate_elf_spawn_fixture.render_fixture(images))
+        self.assertIn(".user_page_limit = 192", _render_fixture(images))
         images["launcher"] = image_with_page_count(images["launcher"], 4096)
         with self.assertRaisesRegex(ElfFormatError, "aggregate"):
-            generate_elf_spawn_fixture.render_fixture(images)
+            _render_fixture(images)
 
     def test_requires_uart_state_and_excludes_the_tty_device_leaf(self):
         images = self.images()
@@ -143,11 +152,11 @@ class ElfSpawnFixtureTest(unittest.TestCase):
             symbol for symbol in images["tty"].symbols if symbol.name != "tty_uart"
         ))
         with self.assertRaisesRegex(ElfFormatError, "tty_uart"):
-            generate_elf_spawn_fixture.render_fixture(images)
+            _render_fixture(images)
         images = self.images()
         images["tty"] = image_with_page_count(images["tty"], 0x3ffff)
         with self.assertRaisesRegex(ElfFormatError, "UART"):
-            generate_elf_spawn_fixture.render_fixture(images)
+            _render_fixture(images)
 
     def test_cli_failure_preserves_existing_output(self):
         with tempfile.TemporaryDirectory() as temporary:

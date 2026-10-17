@@ -1,4 +1,4 @@
-#include "kernel/bootstrap_test.h"
+#include "kernel/tests/boot/bootstrap_test.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -7,7 +7,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/boot/bootstrap_runtime.h"
-#include "kernel/bootstrap_test_fixture.h"
+#include "kernel/tests/boot/bootstrap_test_fixture.h"
 #include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"

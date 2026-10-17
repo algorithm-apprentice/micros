@@ -3936,9 +3936,6 @@ KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/address_space_handoff_test.c',
  'kernel/address_space_handoff_test_syscall.c',
  'kernel/address_space_handoff_test_trap.c',
  'kernel/address_space_handoff_test_tty.c',
- 'kernel/bootstrap_test.c',
- 'kernel/bootstrap_test.h',
- 'kernel/bootstrap_test_fixture.h',
  'kernel/elf_spawn_test.c',
  'kernel/elf_spawn_test.h',
  'kernel/elf_spawn_test_capture.c',
@@ -15845,6 +15842,35 @@ def _restored_generator_bytes(path: Path, relative: str) -> bytes:
     if hashlib.sha256(payload).hexdigest() != expected_ast:
         raise AssertionError(f"generator AST mismatch: {relative}")
     return restored
+
+
+def restore_generated_fixture(relative: str, output):
+    if relative not in GENERATOR_FILE_FACTS:
+        raise AssertionError(f"unknown generated fixture owner: {relative}")
+    _, _, transports = GENERATOR_FILE_FACTS[relative]
+    if len(transports) != 1:
+        raise AssertionError(f"unexpected generated include count: {relative}")
+    _, target, old_source_line, new_source_line = transports[0]
+    old_literal = old_source_line.strip()
+    new_literal = new_source_line.strip()
+    if old_literal.endswith(","):
+        old_literal = old_literal[:-1]
+    if new_literal.endswith(","):
+        new_literal = new_literal[:-1]
+    old_include = ast.literal_eval(old_literal)
+    new_include = ast.literal_eval(new_literal)
+    expected = (
+        old_include
+        if target in KERNEL_PHYSICAL_OWNER_MIGRATION
+        else new_include
+    )
+    was_bytes = isinstance(output, bytes)
+    text = output.decode("utf-8") if was_bytes else output
+    if text.count(expected) != 1:
+        raise AssertionError(f"generated include transport mismatch: {relative}")
+    if expected != old_include:
+        text = text.replace(expected, old_include)
+    return text.encode("utf-8") if was_bytes else text
 
 
 def _source_offsets(source: str) -> list[int]:

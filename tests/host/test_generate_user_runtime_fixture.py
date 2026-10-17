@@ -5,6 +5,15 @@ import unittest
 from tests.host.test_check_user_elf import build_elf
 from tools import check_user_elf
 from tools import generate_user_runtime_fixture
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_user_runtime_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_user_runtime_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def fixture_image():
@@ -49,7 +58,7 @@ def fixture_image():
 
 class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
     def test_renders_checked_segments_and_symbol_addresses(self):
-        output = generate_user_runtime_fixture.render_fixture(
+        output = _render_fixture(
             fixture_image()
         )
 
@@ -83,7 +92,7 @@ class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_user_runtime_fixture.render_fixture(image)
+            _render_fixture(image)
 
     def test_rejects_fixture_symbol_in_wrong_permission_class(self):
         image = fixture_image()
@@ -101,7 +110,7 @@ class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_user_runtime_fixture.render_fixture(image)
+            _render_fixture(image)
 
     def test_preserves_fixture_permission_error_order(self):
         cases = (
@@ -143,7 +152,7 @@ class UserRuntimeFixtureGeneratorTest(unittest.TestCase):
             )
             with self.subTest(offsets=offsets):
                 with self.assertRaises(check_user_elf.ElfFormatError) as raised:
-                    generate_user_runtime_fixture.render_fixture(image)
+                    _render_fixture(image)
                 self.assertEqual(expected_error, str(raised.exception))
 
 

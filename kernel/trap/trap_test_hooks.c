@@ -7,7 +7,7 @@
 #include "kernel/address_space_handoff_test.h"
 #endif
 #ifdef MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST
-#include "kernel/bootstrap_test.h"
+#include "kernel/tests/boot/bootstrap_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
 #include "kernel/ipc_ecall_test.h"
