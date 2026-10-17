@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "kernel/bootstrap_control_internal.h"
-#include "kernel/pm_control_core.h"
+#include "kernel/pm/pm_control_core.h"
 #include "kernel/syscall.h"
 #include "kernel/vm/vm_handoff_core.h"
 #include "micros/bootstrap.h"

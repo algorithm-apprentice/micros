@@ -1,6 +1,6 @@
-#include "kernel/pm_control_syscall_internal.h"
+#include "kernel/pm/pm_control_syscall_internal.h"
 
-#include "kernel/pm_control_internal.h"
+#include "kernel/pm/pm_control_internal.h"
 #include "micros/user_execution.h"
 
 static enum micros_syscall_return handle_prepare_execution(

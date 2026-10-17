@@ -1,4 +1,4 @@
-#include "kernel/pm_control_internal.h"
+#include "kernel/pm/pm_control_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

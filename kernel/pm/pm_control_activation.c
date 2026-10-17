@@ -1,4 +1,4 @@
-#include "kernel/pm_control_internal.h"
+#include "kernel/pm/pm_control_internal.h"
 
 #include "kernel/vm/vm_handoff_core.h"
 #include "micros/scheduler_core.h"

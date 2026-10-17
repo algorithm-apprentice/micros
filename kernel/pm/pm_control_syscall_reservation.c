@@ -1,6 +1,6 @@
-#include "kernel/pm_control_syscall_internal.h"
+#include "kernel/pm/pm_control_syscall_internal.h"
 
-#include "kernel/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_runtime_core.h"
 
 static enum micros_syscall_return handle_reserve(
     const struct micros_pm_control_syscall_runtime *runtime,

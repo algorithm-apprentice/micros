@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_PM_CONTROL_RUNTIME_CORE_H
 #define MICROS_KERNEL_PM_CONTROL_RUNTIME_CORE_H
 
-#include "kernel/pm_control_core.h"
+#include "kernel/pm/pm_control_core.h"
 #include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 

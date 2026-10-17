@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/pm_control_runtime.h"
+#include "kernel/pm/pm_control_runtime.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"

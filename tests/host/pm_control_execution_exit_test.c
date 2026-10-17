@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "kernel/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_runtime_core.h"
 #include "micros/ipc_core.h"
 #include "micros/spawn.h"
 

@@ -851,26 +851,26 @@ set(
 
 set(
     MICROS_PM_CONTROL_CORE_SOURCES
-    kernel/pm_control_core.c
-    kernel/pm_control_abi.c
-    kernel/pm_control_validation.c
-    kernel/pm_control_reservation.c
-    kernel/pm_control_execution.c
-    kernel/pm_control_activation.c
-    kernel/pm_control_exit.c
-    kernel/pm_control_runtime_core.c
-    kernel/pm_control_syscall_core.c
+    kernel/pm/pm_control_core.c
+    kernel/pm/pm_control_abi.c
+    kernel/pm/pm_control_validation.c
+    kernel/pm/pm_control_reservation.c
+    kernel/pm/pm_control_execution.c
+    kernel/pm/pm_control_activation.c
+    kernel/pm/pm_control_exit.c
+    kernel/pm/pm_control_runtime_core.c
+    kernel/pm/pm_control_syscall_core.c
 )
 
 set(
     MICROS_PM_CONTROL_TARGET_SOURCES
-    kernel/pm_control_runtime.c
-    kernel/pm_control_syscall.c
-    kernel/pm_control_syscall_runtime.c
-    kernel/pm_control_syscall_reservation.c
-    kernel/pm_control_syscall_execution.c
-    kernel/pm_control_syscall_activation.c
-    kernel/pm_control_syscall_exit.c
+    kernel/pm/pm_control_runtime.c
+    kernel/pm/pm_control_syscall.c
+    kernel/pm/pm_control_syscall_runtime.c
+    kernel/pm/pm_control_syscall_reservation.c
+    kernel/pm/pm_control_syscall_execution.c
+    kernel/pm/pm_control_syscall_activation.c
+    kernel/pm/pm_control_syscall_exit.c
 )
 
 set(

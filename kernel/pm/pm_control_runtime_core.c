@@ -1,4 +1,4 @@
-#include "kernel/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_runtime_core.h"
 
 #include <stdbool.h>
 #include <stddef.h>

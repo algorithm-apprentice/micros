@@ -1,9 +1,9 @@
-#include "kernel/pm_control_runtime.h"
+#include "kernel/pm/pm_control_runtime.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_runtime_core.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 

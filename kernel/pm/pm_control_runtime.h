@@ -2,7 +2,7 @@
 #define MICROS_KERNEL_PM_CONTROL_RUNTIME_H
 
 #include "kernel/bootstrap_control_internal.h"
-#include "kernel/pm_control_core.h"
+#include "kernel/pm/pm_control_core.h"
 
 enum micros_pm_control_error micros_pm_control_runtime_prepare(
     const struct micros_bootstrap_binding *binding,

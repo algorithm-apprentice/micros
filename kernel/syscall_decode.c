@@ -1,7 +1,7 @@
 #include "kernel/syscall_internal.h"
 
 #include "arch/riscv64/trap_context.h"
-#include "kernel/pm_control_core.h"
+#include "kernel/pm/pm_control_core.h"
 #include "kernel/tty/tty_control_core.h"
 #include "kernel/vm/vm_handoff_core.h"
 #include "micros/bootstrap_control.h"

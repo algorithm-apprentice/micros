@@ -2,7 +2,7 @@
 
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
-#include "kernel/pm_control_runtime.h"
+#include "kernel/pm/pm_control_runtime.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/bootstrap_memory.h"

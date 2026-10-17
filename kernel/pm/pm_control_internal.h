@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "kernel/pm_control_core.h"
+#include "kernel/pm/pm_control_core.h"
 
 #define MICROS_PM_CONTROL_MAGIC UINT64_C(0x4d4943524f535043)
 

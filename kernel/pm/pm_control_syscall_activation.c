@@ -1,4 +1,4 @@
-#include "kernel/pm_control_syscall_internal.h"
+#include "kernel/pm/pm_control_syscall_internal.h"
 
 enum micros_syscall_return
 micros_pm_control_syscall_handle_activation(

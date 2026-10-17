@@ -11,7 +11,7 @@
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
-#include "kernel/pm_control_runtime.h"
+#include "kernel/pm/pm_control_runtime.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
