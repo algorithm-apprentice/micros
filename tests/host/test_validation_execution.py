@@ -87,10 +87,25 @@ class ValidationExecutionTests(unittest.TestCase):
         self.assertEqual(1, len(reports), output.getvalue())
         return result, reports[0], output.getvalue()
 
+    def test_only_the_exact_selected_documentation_command_is_canonical(self):
+        validation_execution._validate_commands(
+            [validation_plan.DOCS],
+            WORKFLOWS,
+        )
+        for command in (
+            ("python3.15", *validation_plan.DOCS[1:]),
+            (validation_plan.DOCS[0], "-S", "-E", "-B", "tools/check_docs.py"),
+            (*validation_plan.DOCS[:-1], "tools/other.py"),
+        ):
+            with self.subTest(command=command), self.assertRaises(
+                validation_execution.ExecutionError
+            ):
+                validation_execution._validate_commands([command], WORKFLOWS)
+
     def test_exact_second_plan_reuses_all_three_workflows_but_not_docs_or_diffs(self):
         commands = [
             *(workflow(name) for name in WORKFLOWS),
-            ("python3", "tools/check_docs.py"),
+            validation_plan.DOCS,
             *validation_plan.diff_commands("base"),
         ]
         first_status, first, _ = self.execute(commands)
@@ -129,7 +144,7 @@ class ValidationExecutionTests(unittest.TestCase):
         )
         commands = [
             *(workflow(name) for name in WORKFLOWS),
-            ("python3", "tools/check_docs.py"),
+            validation_plan.DOCS,
         ]
         sentinel = self.root / "build/validation-evidence/v1/sentinel"
         sentinel.parent.mkdir(parents=True)
@@ -196,7 +211,7 @@ class ValidationExecutionTests(unittest.TestCase):
     def test_ready_producer_executes_all_commands_fresh_with_one_run_id(self):
         commands = [
             *(workflow(name) for name in WORKFLOWS),
-            ("python3", "tools/check_docs.py"),
+            validation_plan.DOCS,
         ]
         status, report, _ = self.execute(commands, producer=True)
         self.assertEqual(0, status)
@@ -225,7 +240,7 @@ class ValidationExecutionTests(unittest.TestCase):
         status, report, _ = self.execute(
             [
                 workflow("test-unit"),
-                ("python3", "tools/check_docs.py"),
+                validation_plan.DOCS,
             ],
             producer=True,
         )
@@ -480,7 +495,7 @@ class ValidationExecutionTests(unittest.TestCase):
         ):
             validation_execution.execute_plan(
                 self.root,
-                [("python3", "tools/check_docs.py")],
+                [validation_plan.DOCS],
                 WORKFLOWS,
                 producer=True,
             )
@@ -647,7 +662,7 @@ class ValidationExecutionTests(unittest.TestCase):
         for commands, options in (
             ([workflow("test-unit")], {"gate_only": True, "reuse": True}),
             ([workflow("test-unit"), workflow("test-qemu-smoke")], {"gate_only": True}),
-            ([("python3", "tools/check_docs.py")], {"gate_only": True}),
+            ([validation_plan.DOCS], {"gate_only": True}),
         ):
             with self.subTest(commands=commands, options=options):
                 with self.assertRaises(validation_execution.ExecutionError):

@@ -14,8 +14,8 @@ if __package__ in (None, ""):
 
 from tools import validation_build_impact, validation_context, validation_execution
 from tools.python_host_runtime import (
-    PYTHON_ARGS,
     UnsupportedPythonRuntime,
+    documentation_command,
     require_current_runtime,
 )
 
@@ -27,11 +27,7 @@ TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 VFS_MODEL = ("cmake", "--workflow", "--preset", "test-vfs-model")
 ELF_SPAWN_MODEL = ("cmake", "--workflow", "--preset", "test-elf-spawn-model")
-DOCS = (
-    os.environ.get("MICROS_PYTHON") or sys.executable,
-    *PYTHON_ARGS,
-    "tools/check_docs.py",
-)
+DOCS = documentation_command()
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
 QEMU_WORKFLOWS = (

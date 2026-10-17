@@ -15554,11 +15554,13 @@ PRODUCER_VALIDATION_CONTEXT_SHA256 = '4f4e0b570c01ffecfe7fbde99e8996ec10b47466c6
 PYTHON315_VALIDATION_CONTEXT_SHA256 = '9faf65b3308b24beceb61134c4d3426e74852dbe730a1f231ddbb84cf7154670'
 BASE_VALIDATION_PLAN_SHA256 = '60a5e656a28b18bb21a02c65fc46c2ec18f4100580b3d3d05a09b346ae36a619'
 PRODUCER_VALIDATION_PLAN_SHA256 = '28437d4bcfc669e982632e920cc71f344d5993ff43fd5b7decec4c4b8a611aab'
-PYTHON315_VALIDATION_PLAN_SHA256 = '15bfe89542eda31219674d8dfc69e6277a038c7e7f9ab9f57053c980399d55d1'
+PYTHON315_VALIDATION_PLAN_SHA256 = '8521203bd2d627de572f06856a796283ae62bb721a786da31c07d450fb6104af'
 BASE_VALIDATION_BUILD_IMPACT_SHA256 = '24e9fabf4a4750c56508a94c26a37e398edc49a75c8d6b8b2efdeeee01c0d270'
 PYTHON315_VALIDATION_BUILD_IMPACT_SHA256 = 'f35893bb948d21eb9e8670c99a8dc8176f4cd39f451baf97cbd129cd5e02865e'
 BASE_VALIDATION_INPUTS_SHA256 = 'ff5f513282f94dfbe106096ab5c21d888b3af33cd995c36355426aea1068b4e0'
 PYTHON315_VALIDATION_INPUTS_SHA256 = '438c3938c2d5d8930d6c656de4990d4ca6680ffa8663acc28f3edd60d1f067ef'
+BASE_VALIDATION_EXECUTION_SHA256 = '19041e0171c6c70d24bbd38e0ffd9361eedd7d8081a8ba41cb1d96409677e3c9'
+PYTHON315_VALIDATION_EXECUTION_SHA256 = '45041ba61136e0eef9e13f0df6ab0c89cfe25fe631d2a8b8ac0d0b363f742bad'
 BASE_FRAME_VALIDATION_SHA256 = 'dfe2aaa76500b3725ca5437889f71877b9adbaafa915ff044ba8d888451b0445'
 BOUNDED_FRAME_VALIDATION_SHA256 = '448f61074bb3c5d52631660b9537e45a8bb9cca266a645edd503457b6fa03694'
 ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
@@ -15973,18 +15975,14 @@ def restore_validation_plan_source(source: str) -> str:
                 ),
                 (
                     "from tools.python_host_runtime import (\n"
-                    "    PYTHON_ARGS,\n"
                     "    UnsupportedPythonRuntime,\n"
+                    "    documentation_command,\n"
                     "    require_current_runtime,\n"
                     ")\n",
                     "",
                 ),
                 (
-                    'DOCS = (\n'
-                    '    os.environ.get("MICROS_PYTHON") or sys.executable,\n'
-                    '    *PYTHON_ARGS,\n'
-                    '    "tools/check_docs.py",\n'
-                    ')\n',
+                    "DOCS = documentation_command()\n",
                     'DOCS = ("python3", "tools/check_docs.py")\n',
                 ),
                 (
@@ -16194,6 +16192,34 @@ def restore_validation_inputs_source(source: str) -> str:
     )
     if hashlib.sha256(source.encode()).hexdigest() != BASE_VALIDATION_INPUTS_SHA256:
         raise AssertionError("validation inputs source did not restore")
+    return source
+
+
+def restore_validation_execution_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_VALIDATION_EXECUTION_SHA256:
+        return source
+    if digest != PYTHON315_VALIDATION_EXECUTION_SHA256:
+        raise AssertionError("unexpected validation execution source")
+    source = _restore_exact_source_transports(
+        source,
+        (
+            (
+                "from tools.python_host_runtime import documentation_command\n",
+                "",
+            ),
+            (
+                "            documentation_command(),\n",
+                '            ("python3", "tools/check_docs.py"),\n',
+            ),
+        ),
+        "Python validation execution",
+    )
+    if (
+        hashlib.sha256(source.encode()).hexdigest()
+        != BASE_VALIDATION_EXECUTION_SHA256
+    ):
+        raise AssertionError("validation execution source did not restore")
     return source
 
 
@@ -16697,6 +16723,10 @@ def read_bytes_path(path: Path) -> bytes:
         ).encode()
     if relative == "tools/validation_inputs.py":
         return restore_validation_inputs_source(
+            path.read_text(encoding="utf-8")
+        ).encode()
+    if relative == "tools/validation_execution.py":
+        return restore_validation_execution_source(
             path.read_text(encoding="utf-8")
         ).encode()
     raw = path.read_bytes()

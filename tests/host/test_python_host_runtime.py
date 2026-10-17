@@ -226,6 +226,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
     def test_python_process_construction_has_one_reviewed_owner_inventory(self):
         expected = {
             "tools/validation_context.py",
+            "tools/validation_execution.py",
             "tools/validation_plan.py",
             "tests/host/qemu_smoke_execution_cases.py",
             "tests/host/test_check_application_elf.py",

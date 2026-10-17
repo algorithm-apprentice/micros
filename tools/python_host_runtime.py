@@ -211,6 +211,14 @@ def selected_executable(environment=None):
     return selected
 
 
+def documentation_command(environment=None):
+    return (
+        str(selected_executable(environment)),
+        *PYTHON_ARGS,
+        "tools/check_docs.py",
+    )
+
+
 def require_current_runtime(selected=None, *, environment=None):
     environment = os.environ if environment is None else environment
     validate_environment(environment)
