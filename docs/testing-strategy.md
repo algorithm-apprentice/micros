@@ -544,7 +544,45 @@ sleep, followed by one complete producer.
 The implementation's structural Red, sanitizer-backed native boundary and
 per-field corruption guards, frame-ownership QEMU component, and exact
 no-retry VFS-to-ELF sequence are green. Complete producer/reuse evidence
-remains the final author gate before implementation review closes.
+and clean independent review closed implementation #153.
+
+### Complete VM boot-database timeout correction
+
+After the frame correction merged, the blocked CPython implementation exposed
+a separate guest deadline threshold before VM readiness. The exact same
+candidate and unchanged ELF-spawn images passed one complete producer, then
+failed the bounded reuse sequence with service 2 still `STARTING`.
+The panic `sepc` maps to
+`vm_core_boot_database_is_immutable()` immediately after its out-of-line
+initial-free bitmap query.
+
+Accepted
+[ADR-0077](adr/0077-bounded-complete-vm-boot-database-validation.md) requires a
+deterministic structural work-shape Red. It proves the canonical digest path:
+
+- bounds the matched managed-frame count before every count-derived access;
+- hashes the immutable prefix in bounded chunks;
+- loads one initial-free bitmap word for each active 64-frame chunk;
+- makes no per-frame bitmap helper call;
+- checks inactive frame-state bytes plus the partial bitmap boundary and every
+  contiguous full word beginning at the exact first fully inactive word; and
+- advances the unchanged FNV digest over proven zero bytes with a
+  count-halving logarithmic loop.
+
+Existing VM-core lifecycle and corruption tests remain green semantic guards.
+New native cases cover counts `1`, `63`, `64`, `65`, `28,904`, maximum minus
+one, and maximum; first/final inactive frame bytes; the partial bitmap bit;
+word 1 at aligned count 64; word 2 after partial count 65; the final inactive
+bitmap bit; active bitmap corruption; immutable prefix/nonfree state
+corruption; exact digest equivalence; and coherent zero/maximum-plus-one
+header/summary counts rejected under sanitizers before any derived access.
+Structural negative evidence removes or moves the dominating count guard,
+shifts the full-word start, and skips or truncates the contiguous scan.
+
+Final target acceptance is the exact `test-qemu-vfs` then
+`test-qemu-elf-spawn` sequence once, without retry, sleep, deadline/timeout
+increase, optimization-flag change, or runner relaxation. One complete current
+producer and exact selected receipt reuse follow before implementation review.
 
 ### ELF spawn Step 14 evidence
 

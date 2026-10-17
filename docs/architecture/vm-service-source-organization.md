@@ -130,6 +130,38 @@ selection but do not call one another.
 common primitives used by at least two accepted owners and the public
 `micros_vm_state_initialize` entry.
 
+## Accepted bounded complete boot-database validation
+
+Accepted
+[ADR-0077](../adr/0077-bounded-complete-vm-boot-database-validation.md)
+preserves the complete `vm_validation.c` authority while correcting the
+measured fixed-capacity execution shape before VM readiness.
+
+`vm_core_boot_database_is_immutable()` remains a read-only private predicate
+inside complete state validation. Before any count-derived access, it requires
+the already matched `managed_frame_count` to be nonzero and at most
+`MICROS_VM_MAX_MANAGED_FRAMES`; matching header/summary corruption is not a
+range proof. It then computes the identical imported digest through explicit
+segments:
+
+- immutable bytes before and after the zeroed header digest field;
+- active frame states canonicalized from one loaded initial-free bitmap word
+  per 64-frame chunk; and
+- a proven-zero inactive frame-state tail advanced through the FNV digest with
+  logarithmic exponentiation.
+
+The same owner directly rejects nonzero inactive frame-state bytes, high bits
+in the partial initial-free bitmap word, and every later nonzero bitmap word.
+The full-word scan begins exactly at `managed_frame_count / 64` for an aligned
+boundary or the following word for a partial boundary, then advances
+contiguously through the fixed bitmap capacity. It makes no call to
+`vm_core_initial_frame_is_free()` from the canonical digest path.
+
+The public VM state, boot object, digest, frame encodings, service interface,
+and validation call graph remain unchanged. `vm_core.c` retains the shared
+bitmap query for unrelated frame and lifecycle owners. No validation cache,
+epoch, duplicate boot database, or generalized digest framework is introduced.
+
 ## Stable public VM-core symbol ownership
 
 | Owner | Public symbols |
