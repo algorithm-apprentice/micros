@@ -506,6 +506,15 @@ bitmap-word active scan, complete inactive tail checks, and logarithmic FNV
 zero-run advancement. The Python implementation remains blocked until the
 separate design and implementation pass the exact no-retry acceptance sequence.
 
+Implementation planning then found one design-evidence defect before code:
+ADR-0077's valid managed-count-1 case cannot construct the existing complete
+two-space/three-mapping VM fixture, whose first free frame is index 6.
+Accepted
+[ADR-0078](adr/0078-valid-vm-boot-database-boundary-evidence.md) supersedes only
+that native case with valid count 6 while retaining 63/64/65, the observed
+shape, maximum boundaries, and coherent zero/maximum-plus-one corruption. It
+changes no production contract.
+
 ## v0.1 completion goal
 
 The independent validation-efficiency task follows Accepted
