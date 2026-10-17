@@ -16358,6 +16358,51 @@ class _RestoreGateAdapter(ast.NodeTransformer):
             )
         return node
 
+    def visit_Assign(self, node: ast.Assign) -> ast.AST:
+        self.generic_visit(node)
+        if (
+            len(node.targets) != 1
+            or not isinstance(node.targets[0], ast.Name)
+            or node.targets[0].id != "PRIVATE_FUNCTION_OWNERS"
+            or not isinstance(node.value, ast.Dict)
+        ):
+            return node
+        for index, key in enumerate(node.value.keys):
+            if (
+                isinstance(key, ast.Constant)
+                and key.value == "servers/vm/vm_validation.c"
+            ):
+                value = node.value.values[index]
+                if not isinstance(value, ast.Tuple):
+                    raise AssertionError(
+                        "invalid VM validation helper inventory"
+                    )
+                names = tuple(
+                    item.value
+                    for item in value.elts
+                    if isinstance(item, ast.Constant)
+                    and isinstance(item.value, str)
+                )
+                current = (
+                    "vm_validation_digest_bytes",
+                    "vm_validation_digest_zero_bytes",
+                    "vm_validation_digest_active_frame_states",
+                    "vm_validation_initial_free_tail_is_zero",
+                    "vm_core_validate_state",
+                )
+                original = ("vm_core_validate_state",)
+                if names == current:
+                    node.value.values[index] = ast.Tuple(
+                        elts=[ast.Constant(original[0])],
+                        ctx=ast.Load(),
+                    )
+                elif names != original:
+                    raise AssertionError(
+                        "unsupported VM validation helper inventory"
+                    )
+                return node
+        raise AssertionError("missing VM validation helper inventory")
+
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)
         function = node.func
