@@ -90,3 +90,4 @@ to make the project appear more consistent than it was.
 | [0072](0072-qemu-runner-source-decomposition.md) | QEMU runner source decomposition | Accepted |
 | [0073](0073-kernel-directory-layout.md) | Kernel directory layout | Accepted |
 | [0074](0074-fail-fast-validation-producer-readiness.md) | Fail-fast validation producer readiness | Accepted |
+| [0075](0075-cpython-3-15-host-automation-floor.md) | CPython 3.15 host automation floor | Accepted |

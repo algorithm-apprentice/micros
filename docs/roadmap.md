@@ -463,9 +463,20 @@ Accepted
 [ADR-0074](adr/0074-fail-fast-validation-producer-readiness.md) defines a
 separate fail-fast producer-readiness design. Independent design/correction
 review is clean. It changes no runtime-DAG node, coverage, receipt identity,
-or default fresh behavior. The separately merged design now unblocks the
-dependent implementation, which adds the exact producer barrier and host
-regressions without starting Python-version or node-Q work in parallel.
+or default fresh behavior. Implementation #150 is separately merged with its
+exact reviewed tree, real blocked-producer evidence, current producer/reuse
+evidence, main fast-forward, and branch cleanup.
+
+The next host-tooling design follows the user-selected latest stable Python
+policy. Accepted
+[ADR-0075](adr/0075-cpython-3-15-host-automation-floor.md) pins CPython 3.15
+final rather than a rolling latest version, replaces the Xcode Python reuse
+profile with a closed Homebrew 3.15 runtime, disables site/OpenSSL/environment
+inputs, closes every child interpreter, and defines a stable project-owned AST
+evidence format without digest rebaselining. It adds no runtime-DAG node.
+Independent design review is clean after closure of OpenSSL, child-process,
+AST-evidence, and consumed-launcher boundaries. Implementation remains pending
+until this design merges separately.
 
 ## v0.1 completion goal
 
