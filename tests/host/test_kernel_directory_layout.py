@@ -166,6 +166,30 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                 )
                 self.assertEqual(expected, observed, path)
 
+    def test_cmake_transport_is_exact_and_fully_reversible(self) -> None:
+        actual = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertEqual(30, len(kernel_layout_source.KERNEL_DESTINATIONS))
+        self.assertEqual(21, len(kernel_layout_source.NATIVE_DIAGNOSTIC_CONSUMERS))
+        self.assertEqual(
+            1,
+            actual.count(kernel_layout_source.CMAKE_NATIVE_DIAGNOSTIC_BLOCK),
+        )
+        self.assertEqual(
+            1,
+            actual.count(kernel_layout_source.CMAKE_TARGET_DIAGNOSTIC_BLOCK),
+        )
+        for target, (old, new) in kernel_layout_source.CMAKE_INCLUDE_TRANSPORTS.items():
+            self.assertEqual(0, actual.count(old), target)
+            self.assertEqual(1, actual.count(new), target)
+        restored = kernel_layout_source.read_path(
+            ROOT / "CMakeLists.txt",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            kernel_layout_source.BASE_CMAKE_SHA256,
+            hashlib.sha256(restored.encode()).hexdigest(),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

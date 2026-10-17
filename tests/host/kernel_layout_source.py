@@ -15434,6 +15434,110 @@ ORIGINAL_PLANNER_ASSIGNMENTS = {'PATH_CLASSIFICATION_EQUIVALENTS': 'PATH_CLASSIF
 
 ORIGINAL_PLANNER_AST_SHA256 = 'd4cfa1dfb9e1e84cf2eb76bbadafcb67be70d70076845f203e77dff5dfa32a49'
 
+KERNEL_DESTINATIONS = ('boot',
+ 'diagnostic',
+ 'endpoint',
+ 'execution',
+ 'grant',
+ 'ipc',
+ 'memory',
+ 'objects',
+ 'platform',
+ 'pm',
+ 'scheduler',
+ 'trap',
+ 'tty',
+ 'vm',
+ 'tests/boot',
+ 'tests/endpoint',
+ 'tests/execution',
+ 'tests/grant',
+ 'tests/ipc',
+ 'tests/memory',
+ 'tests/objects',
+ 'tests/pm',
+ 'tests/ramfs',
+ 'tests/runtime',
+ 'tests/scheduler',
+ 'tests/spawn',
+ 'tests/trap',
+ 'tests/tty',
+ 'tests/vfs',
+ 'tests/vm')
+
+NATIVE_DIAGNOSTIC_CONSUMERS = ('bootstrap_control_test',
+ 'bootstrap_test',
+ 'elf_spawn_fixture_test',
+ 'elf_spawn_model_test',
+ 'endpoint_test',
+ 'fdt_test',
+ 'frame_allocator_test',
+ 'frame_ownership_test',
+ 'ipc_model_test',
+ 'kernel_objects_test',
+ 'pm_test',
+ 'scheduler_test',
+ 'sv39_test',
+ 'trap_route_test',
+ 'tty_control_syscall_test',
+ 'tty_fault_test',
+ 'tty_interrupt_test',
+ 'tty_test',
+ 'vm_bootstrap_test',
+ 'vm_core_test',
+ 'vm_handoff_syscall_test')
+
+CMAKE_INCLUDE_TRANSPORTS = {'kernel_objects_test': ('    target_include_directories(\n'
+                         '        kernel_objects_test\n'
+                         '        PRIVATE\n'
+                         '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                         '    )',
+                         '    target_include_directories(\n'
+                         '        kernel_objects_test\n'
+                         '        PRIVATE\n'
+                         '            "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+                         '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                         '    )'),
+ 'frame_ownership_test': ('    target_include_directories(\n'
+                          '        frame_ownership_test\n'
+                          '        PRIVATE\n'
+                          '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                          '    )',
+                          '    target_include_directories(\n'
+                          '        frame_ownership_test\n'
+                          '        PRIVATE\n'
+                          '            "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+                          '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                          '    )'),
+ 'endpoint_test': ('    target_include_directories(\n'
+                   '        endpoint_test\n'
+                   '        PRIVATE\n'
+                   '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                   '    )',
+                   '    target_include_directories(\n'
+                   '        endpoint_test\n'
+                   '        PRIVATE\n'
+                   '            "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+                   '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                   '    )'),
+ 'ipc_model_test': ('    target_include_directories(\n'
+                    '        ipc_model_test\n'
+                    '        PRIVATE\n'
+                    '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                    '    )',
+                    '    target_include_directories(\n'
+                    '        ipc_model_test\n'
+                    '        PRIVATE\n'
+                    '            "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+                    '            "${CMAKE_CURRENT_SOURCE_DIR}/include"\n'
+                    '    )')}
+
+CMAKE_NATIVE_DIAGNOSTIC_BLOCK = '    foreach(\n        kernel_consumer\n        IN ITEMS\n            bootstrap_control_test\n            bootstrap_test\n            elf_spawn_fixture_test\n            elf_spawn_model_test\n            endpoint_test\n            fdt_test\n            frame_allocator_test\n            frame_ownership_test\n            ipc_model_test\n            kernel_objects_test\n            pm_test\n            scheduler_test\n            sv39_test\n            trap_route_test\n            tty_control_syscall_test\n            tty_fault_test\n            tty_interrupt_test\n            tty_test\n            vm_bootstrap_test\n            vm_core_test\n            vm_handoff_syscall_test\n    )\n        foreach(\n            kernel_directory\n            IN ITEMS\n                boot\n                diagnostic\n                endpoint\n                execution\n                grant\n                ipc\n                memory\n                objects\n                platform\n                pm\n                scheduler\n                trap\n                tty\n                vm\n                tests/boot\n                tests/endpoint\n                tests/execution\n                tests/grant\n                tests/ipc\n                tests/memory\n                tests/objects\n                tests/pm\n                tests/ramfs\n                tests/runtime\n                tests/scheduler\n                tests/spawn\n                tests/trap\n                tests/tty\n                tests/vfs\n                tests/vm\n        )\n            target_compile_options(\n                "${kernel_consumer}"\n                PRIVATE\n                    "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=${CMAKE_CURRENT_SOURCE_DIR}/kernel/>"\n            )\n        endforeach()\n    endforeach()'
+
+CMAKE_TARGET_DIAGNOSTIC_BLOCK = 'foreach(\n    kernel_directory\n    IN ITEMS\n        boot\n        diagnostic\n        endpoint\n        execution\n        grant\n        ipc\n        memory\n        objects\n        platform\n        pm\n        scheduler\n        trap\n        tty\n        vm\n        tests/boot\n        tests/endpoint\n        tests/execution\n        tests/grant\n        tests/ipc\n        tests/memory\n        tests/objects\n        tests/pm\n        tests/ramfs\n        tests/runtime\n        tests/scheduler\n        tests/spawn\n        tests/trap\n        tests/tty\n        tests/vfs\n        tests/vm\n)\n    target_compile_options(\n        micros\n        PRIVATE\n            "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=kernel/>"\n    )\nendforeach()'
+
+BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab'
+
 
 def _relative_path(path: Path) -> str:
     candidate = path if path.is_absolute() else REPOSITORY_ROOT / path
@@ -15625,6 +15729,24 @@ def original_host_unit_only_inputs(paths):
     return ORIGINAL_HOST_UNIT_ONLY_INPUTS
 
 
+def restore_cmake_source(source: str) -> str:
+    for logical, physical in KERNEL_LOGICAL_TO_PHYSICAL.items():
+        source = source.replace(physical, logical)
+    for target, (old, new) in CMAKE_INCLUDE_TRANSPORTS.items():
+        if source.count(new) == 1:
+            source = source.replace(new, old)
+        elif source.count(old) != 1:
+            raise AssertionError(f"unexpected CMake include transport: {target}")
+    for block in (CMAKE_NATIVE_DIAGNOSTIC_BLOCK, CMAKE_TARGET_DIAGNOSTIC_BLOCK):
+        if source.count(block) == 1:
+            source = source.replace(block + "\n\n", "")
+        elif block in source:
+            raise AssertionError("duplicate CMake diagnostic transport")
+    if hashlib.sha256(source.encode()).hexdigest() != BASE_CMAKE_SHA256:
+        raise AssertionError("CMake directory transport did not restore")
+    return source
+
+
 def read_bytes_path(path: Path) -> bytes:
     logical = _logical_from_path(path)
     if logical is not None:
@@ -15633,6 +15755,8 @@ def read_bytes_path(path: Path) -> bytes:
         relative = _relative_path(path)
     except ValueError:
         relative = None
+    if relative == "CMakeLists.txt":
+        return restore_cmake_source(path.read_text(encoding="utf-8")).encode()
     if relative == "tools/validation_plan.py":
         return restore_validation_plan_source(path.read_text(encoding="utf-8")).encode()
     return path.read_bytes()

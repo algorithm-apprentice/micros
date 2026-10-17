@@ -1798,11 +1798,13 @@ if(MICROS_BUILD_HOST_TESTS)
     target_include_directories(
         kernel_objects_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
         frame_ownership_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
@@ -1814,11 +1816,13 @@ if(MICROS_BUILD_HOST_TESTS)
     target_include_directories(
         endpoint_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
         ipc_model_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
@@ -2569,6 +2573,73 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
     endif()
+
+    foreach(
+        kernel_consumer
+        IN ITEMS
+            bootstrap_control_test
+            bootstrap_test
+            elf_spawn_fixture_test
+            elf_spawn_model_test
+            endpoint_test
+            fdt_test
+            frame_allocator_test
+            frame_ownership_test
+            ipc_model_test
+            kernel_objects_test
+            pm_test
+            scheduler_test
+            sv39_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
+            tty_interrupt_test
+            tty_test
+            vm_bootstrap_test
+            vm_core_test
+            vm_handoff_syscall_test
+    )
+        foreach(
+            kernel_directory
+            IN ITEMS
+                boot
+                diagnostic
+                endpoint
+                execution
+                grant
+                ipc
+                memory
+                objects
+                platform
+                pm
+                scheduler
+                trap
+                tty
+                vm
+                tests/boot
+                tests/endpoint
+                tests/execution
+                tests/grant
+                tests/ipc
+                tests/memory
+                tests/objects
+                tests/pm
+                tests/ramfs
+                tests/runtime
+                tests/scheduler
+                tests/spawn
+                tests/trap
+                tests/tty
+                tests/vfs
+                tests/vm
+        )
+            target_compile_options(
+                "${kernel_consumer}"
+                PRIVATE
+                    "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=${CMAKE_CURRENT_SOURCE_DIR}/kernel/>"
+            )
+        endforeach()
+    endforeach()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
     add_test(NAME frame-allocator COMMAND frame_allocator_test)
@@ -5639,6 +5710,47 @@ target_compile_options(
         "$<$<COMPILE_LANGUAGE:C>:-std=c17;-ffreestanding;-fno-builtin;-fno-common;-fno-pic;-fno-pie;-fno-stack-protector;-fno-unwind-tables;-fno-asynchronous-unwind-tables;-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=>"
         "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wpedantic;-Wmissing-prototypes;-Wstrict-prototypes>"
 )
+
+foreach(
+    kernel_directory
+    IN ITEMS
+        boot
+        diagnostic
+        endpoint
+        execution
+        grant
+        ipc
+        memory
+        objects
+        platform
+        pm
+        scheduler
+        trap
+        tty
+        vm
+        tests/boot
+        tests/endpoint
+        tests/execution
+        tests/grant
+        tests/ipc
+        tests/memory
+        tests/objects
+        tests/pm
+        tests/ramfs
+        tests/runtime
+        tests/scheduler
+        tests/spawn
+        tests/trap
+        tests/tty
+        tests/vfs
+        tests/vm
+)
+    target_compile_options(
+        micros
+        PRIVATE
+            "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=kernel/>"
+    )
+endforeach()
 
 target_link_options(
     micros
