@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "kernel/grant_runtime_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 
 static enum micros_syscall_abi_result preflight_runtime(
     struct micros_hart *hart,

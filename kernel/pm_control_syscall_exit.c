@@ -1,7 +1,7 @@
 #include "kernel/pm_control_syscall_internal.h"
 
 #include "kernel/grant_runtime_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_core.h"
 

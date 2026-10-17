@@ -8,7 +8,7 @@
 #include "arch/riscv64/platform.h"
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/grant_syscall.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm_snapshot.h"

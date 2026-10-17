@@ -1,4 +1,4 @@
-#include "ipc_internal.h"
+#include "kernel/ipc/ipc_internal.h"
 
 static enum micros_ipc_error resolve_dependency_endpoint(
     const struct micros_endpoint_registry *registry,

@@ -1,4 +1,4 @@
-#include "ipc_syscall_internal.h"
+#include "kernel/ipc/ipc_syscall_internal.h"
 
 #include "micros/ipc_buffer.h"
 

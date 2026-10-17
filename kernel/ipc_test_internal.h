@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler_core.h"

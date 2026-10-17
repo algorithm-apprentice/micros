@@ -6,7 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_abi.h"
 #include "micros/ipc_runtime.h"

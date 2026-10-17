@@ -1,4 +1,4 @@
-#include "ipc_internal.h"
+#include "kernel/ipc/ipc_internal.h"
 
 #include "kernel/endpoint/endpoint_internal.h"
 

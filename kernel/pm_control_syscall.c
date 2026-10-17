@@ -1,7 +1,7 @@
 #include "kernel/pm_control_syscall.h"
 
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/pm_control_runtime.h"
 #include "kernel/pm_control_syscall_internal.h"
 #include "kernel/vm_handoff_runtime.h"

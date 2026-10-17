@@ -8,7 +8,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/endpoint/endpoint_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/pm_control_runtime.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"

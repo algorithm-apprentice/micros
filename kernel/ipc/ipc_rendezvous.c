@@ -1,4 +1,4 @@
-#include "ipc_internal.h"
+#include "kernel/ipc/ipc_internal.h"
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 

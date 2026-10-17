@@ -3,7 +3,7 @@
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
 #include "kernel/grant_runtime_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_core.h"

@@ -1,4 +1,4 @@
-#include "ipc_internal.h"
+#include "kernel/ipc/ipc_internal.h"
 
 bool ipc_reply_token_is_available(
     const struct micros_kernel_objects *objects,

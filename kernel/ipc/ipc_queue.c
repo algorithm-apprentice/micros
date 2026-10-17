@@ -1,4 +1,4 @@
-#include "ipc_internal.h"
+#include "kernel/ipc/ipc_internal.h"
 
 enum micros_ipc_error ipc_resolve_queue_tail(
     struct micros_kernel_objects *objects,

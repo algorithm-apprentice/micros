@@ -8,7 +8,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty_control_core.h"
 #include "kernel/tty_control_syscall_core.h"

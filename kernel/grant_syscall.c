@@ -5,7 +5,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "grant_internal.h"
 #include "kernel/grant_runtime_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "tty_handoff_runtime.h"
 #include "micros/grant_copy.h"
 #include "micros/grant_runtime.h"

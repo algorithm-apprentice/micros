@@ -571,23 +571,23 @@ set(
 
 set(
     MICROS_IPC_CORE_SOURCES
-    kernel/ipc_common.c
-    kernel/ipc_queue.c
-    kernel/ipc_completion.c
-    kernel/ipc_tokens.c
-    kernel/ipc_notifications.c
-    kernel/ipc_deadlock.c
-    kernel/ipc_rendezvous.c
-    kernel/ipc_close.c
-    kernel/ipc_reply.c
-    kernel/ipc.c
+    kernel/ipc/ipc_common.c
+    kernel/ipc/ipc_queue.c
+    kernel/ipc/ipc_completion.c
+    kernel/ipc/ipc_tokens.c
+    kernel/ipc/ipc_notifications.c
+    kernel/ipc/ipc_deadlock.c
+    kernel/ipc/ipc_rendezvous.c
+    kernel/ipc/ipc_close.c
+    kernel/ipc/ipc_reply.c
+    kernel/ipc/ipc.c
 )
 
 set(
     MICROS_IPC_SYSCALL_SOURCES
-    kernel/ipc_syscall_result.c
-    kernel/ipc_syscall_request.c
-    kernel/ipc_syscall.c
+    kernel/ipc/ipc_syscall_result.c
+    kernel/ipc/ipc_syscall_request.c
+    kernel/ipc/ipc_syscall.c
 )
 
 set(
@@ -1313,7 +1313,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant_syscall_core.c
         kernel/memory/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
-        kernel/ipc_abi.c
+        kernel/ipc/ipc_abi.c
         ${MICROS_IPC_CORE_SOURCES}
         tests/host/ipc_abi_test.c
         ${MICROS_IPC_CALL_HOST_TEST_SOURCES}
@@ -4016,10 +4016,10 @@ add_executable(
     kernel/grant_syscall_core.c
     kernel/grant_syscall.c
     kernel/grant_runtime.c
-    kernel/ipc_abi.c
+    kernel/ipc/ipc_abi.c
     ${MICROS_IPC_CORE_SOURCES}
-    kernel/ipc_buffer.c
-    kernel/ipc_runtime.c
+    kernel/ipc/ipc_buffer.c
+    kernel/ipc/ipc_runtime.c
     ${MICROS_IPC_SYSCALL_SOURCES}
     ${MICROS_SYSCALL_SOURCES}
     kernel/objects/kernel_object_runtime.c

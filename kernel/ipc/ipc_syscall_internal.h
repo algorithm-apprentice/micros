@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_IPC_SYSCALL_INTERNAL_H
 #define MICROS_KERNEL_IPC_SYSCALL_INTERNAL_H
 
-#include "kernel/ipc_syscall.h"
+#include "kernel/ipc/ipc_syscall.h"
 #include "micros/ipc_abi.h"
 #include "micros/ipc_buffer.h"
 #include "micros/ipc_core.h"

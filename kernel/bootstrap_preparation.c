@@ -1,6 +1,6 @@
 #include "kernel/bootstrap_runtime_internal.h"
 
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
 #include "kernel/pm_control_runtime.h"
 #include "kernel/tty_handoff_runtime.h"

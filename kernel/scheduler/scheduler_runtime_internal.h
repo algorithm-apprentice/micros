@@ -2,7 +2,7 @@
 #define MICROS_KERNEL_SCHEDULER_RUNTIME_INTERNAL_H
 
 #include "micros/scheduler.h"
-#include "kernel/ipc_buffer_internal.h"
+#include "kernel/ipc/ipc_buffer_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"
 
 struct scheduler_runtime_context {

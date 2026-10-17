@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "micros/kernel_object_runtime.h"
 
 static struct micros_endpoint_registry authoritative_registry;

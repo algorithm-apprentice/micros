@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "kernel/ipc_buffer_internal.h"
+#include "kernel/ipc/ipc_buffer_internal.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
 

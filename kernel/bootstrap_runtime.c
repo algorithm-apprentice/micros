@@ -2,7 +2,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "kernel/endpoint/endpoint_internal.h"
-#include "kernel/ipc_runtime_internal.h"
+#include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/bootstrap_memory.h"
