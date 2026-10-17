@@ -683,30 +683,30 @@ set(
 
 set(
     MICROS_KERNEL_ADDRESS_SPACE_SOURCES
-    kernel/address_space.c
-    kernel/address_space_validation.c
+    kernel/memory/address_space.c
+    kernel/memory/address_space_validation.c
 )
 
 set(
     MICROS_USER_ADDRESS_SPACE_CORE_SOURCES
-    kernel/user_address_space_core.c
-    kernel/user_address_space_vm_plan.c
+    kernel/memory/user_address_space_core.c
+    kernel/memory/user_address_space_vm_plan.c
 )
 
 set(
     MICROS_USER_ADDRESS_SPACE_SOURCES
-    kernel/user_address_space.c
-    kernel/user_address_space_runtime.c
-    kernel/user_address_space_table.c
-    kernel/user_address_space_validation.c
-    kernel/user_address_space_mapping.c
-    kernel/user_address_space_mutation.c
-    kernel/user_address_space_handoff.c
-    kernel/user_address_space_tty.c
-    kernel/user_address_space_vm_scratch.c
-    kernel/user_address_space_vm_freeze.c
-    kernel/user_address_space_vm_teardown.c
-    kernel/user_address_space_activation.c
+    kernel/memory/user_address_space.c
+    kernel/memory/user_address_space_runtime.c
+    kernel/memory/user_address_space_table.c
+    kernel/memory/user_address_space_validation.c
+    kernel/memory/user_address_space_mapping.c
+    kernel/memory/user_address_space_mutation.c
+    kernel/memory/user_address_space_handoff.c
+    kernel/memory/user_address_space_tty.c
+    kernel/memory/user_address_space_vm_scratch.c
+    kernel/memory/user_address_space_vm_freeze.c
+    kernel/memory/user_address_space_vm_teardown.c
+    kernel/memory/user_address_space_activation.c
 )
 
 set(
@@ -743,13 +743,13 @@ set(
 
 set(
     MICROS_FRAME_OWNERSHIP_SOURCES
-    kernel/frame_ownership.c
-    kernel/frame_ownership_validation.c
-    kernel/frame_ownership_bootstrap.c
-    kernel/frame_ownership_handoff.c
-    kernel/frame_ownership_vm_claim.c
-    kernel/frame_ownership_vm_freeze.c
-    kernel/frame_ownership_vm_release.c
+    kernel/memory/frame_ownership.c
+    kernel/memory/frame_ownership_validation.c
+    kernel/memory/frame_ownership_bootstrap.c
+    kernel/memory/frame_ownership_handoff.c
+    kernel/memory/frame_ownership_vm_claim.c
+    kernel/memory/frame_ownership_vm_freeze.c
+    kernel/memory/frame_ownership_vm_release.c
 )
 
 set(
@@ -1272,12 +1272,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         frame_allocator_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES}
     )
     add_executable(
         sv39_test
-        kernel/sv39.c
+        kernel/memory/sv39.c
         tests/host/sv39_test.c
     )
     add_executable(
@@ -1288,7 +1288,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         frame_ownership_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
@@ -1311,7 +1311,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant_abi.c
         kernel/grant_copy_core.c
         kernel/grant_syscall_core.c
-        kernel/sv39.c
+        kernel/memory/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
         kernel/ipc_abi.c
         ${MICROS_IPC_CORE_SOURCES}
@@ -1375,7 +1375,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_bootstrap_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
@@ -1385,7 +1385,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         pm_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
@@ -1532,7 +1532,7 @@ if(MICROS_BUILD_HOST_TESTS)
     endif()
     add_executable(
         vm_core_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
@@ -1548,7 +1548,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         elf_spawn_model_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
@@ -4002,12 +4002,12 @@ add_executable(
     kernel/bootstrap_control_core.c
     ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
     ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
-    kernel/bootstrap_memory.c
+    kernel/memory/bootstrap_memory.c
     ${MICROS_BOOTSTRAP_RUNTIME_SOURCES}
     ${MICROS_BOOTSTRAP_SYSCALL_SOURCES}
     ${MICROS_ENDPOINT_CORE_SOURCES}
     kernel/platform/fdt.c
-    kernel/frame_allocator.c
+    kernel/memory/frame_allocator.c
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
     kernel/grant.c
     kernel/grant_abi.c
@@ -4032,7 +4032,7 @@ add_executable(
     kernel/platform/plic_core.c
     ${MICROS_PM_CONTROL_CORE_SOURCES}
     ${MICROS_PM_CONTROL_TARGET_SOURCES}
-    kernel/sv39.c
+    kernel/memory/sv39.c
     kernel/platform/timer.c
     ${MICROS_TRAP_SOURCES}
     kernel/trap_route_core.c

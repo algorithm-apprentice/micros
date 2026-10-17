@@ -1,4 +1,4 @@
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

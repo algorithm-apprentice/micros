@@ -9,7 +9,7 @@
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty_handoff_runtime.h"
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vfs_service_test_fixture.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/bootstrap.h"

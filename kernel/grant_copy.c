@@ -7,7 +7,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "tty_handoff_runtime.h"
-#include "user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"

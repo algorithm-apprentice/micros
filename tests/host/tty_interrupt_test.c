@@ -12,7 +12,7 @@
 #include "kernel/tty_fault.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/tty_interrupt.h"
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 #include "micros/ipc_core.h"
 #include "micros/panic.h"
 

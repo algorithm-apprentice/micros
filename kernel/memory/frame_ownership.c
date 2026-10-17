@@ -1,4 +1,4 @@
-#include "frame_ownership_internal.h"
+#include "kernel/memory/frame_ownership_internal.h"
 
 #include <stdbool.h>
 #include <stddef.h>

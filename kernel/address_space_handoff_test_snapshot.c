@@ -10,7 +10,7 @@
 #include "kernel/grant_syscall.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/tty_handoff_runtime.h"
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm_snapshot.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_copy.h"

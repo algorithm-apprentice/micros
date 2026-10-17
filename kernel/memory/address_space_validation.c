@@ -1,4 +1,4 @@
-#include "kernel/address_space_internal.h"
+#include "kernel/memory/address_space_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

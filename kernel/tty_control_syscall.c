@@ -17,7 +17,7 @@
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tty_service_test.h"
 #endif
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 #include "micros/ipc_runtime.h"
 #include "micros/panic.h"
 #include "micros/user_address_space.h"

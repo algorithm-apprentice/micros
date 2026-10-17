@@ -6,7 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/address_space_internal.h"
+#include "kernel/memory/address_space_internal.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership_runtime.h"

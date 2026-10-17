@@ -1,4 +1,4 @@
-#include "kernel/user_address_space_internal.h"
+#include "kernel/memory/user_address_space_internal.h"
 
 #include "arch/riscv64/mmu.h"
 #include "kernel/vm_handoff_runtime.h"
