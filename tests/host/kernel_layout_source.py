@@ -3925,10 +3925,7 @@ KERNEL_ORIGINAL_SHA256 = {
     logical: fact[2] for logical, fact in KERNEL_FILE_FACTS.items()
 }
 
-KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/vfs_service_test.c',
- 'kernel/vfs_service_test.h',
- 'kernel/vfs_service_test_fixture.h',
- 'kernel/vm_handoff_test.c',
+KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/vm_handoff_test.c',
  'kernel/vm_handoff_test.h',
  'kernel/vm_handoff_test_fixture.h',
  'kernel/vm_scratch_preemption_test.c',

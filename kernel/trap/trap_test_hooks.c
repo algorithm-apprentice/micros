@@ -34,7 +34,7 @@
 #include "kernel/tests/runtime/user_runtime_test.h"
 #endif
 #ifdef MICROS_BUILD_VFS_SERVICE_TEST
-#include "kernel/vfs_service_test.h"
+#include "kernel/tests/vfs/vfs_service_test.h"
 #endif
 #if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \

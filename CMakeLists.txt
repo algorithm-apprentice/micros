@@ -4301,7 +4301,7 @@ if(MICROS_BUILD_VFS_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_VFS_SERVICE_FIXTURE_SOURCE}"
-            kernel/vfs_service_test.c
+            kernel/tests/vfs/vfs_service_test.c
     )
 endif()
 

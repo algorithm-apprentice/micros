@@ -1,4 +1,4 @@
-#include "kernel/vfs_service_test.h"
+#include "kernel/tests/vfs/vfs_service_test.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -10,7 +10,7 @@
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
-#include "kernel/vfs_service_test_fixture.h"
+#include "kernel/tests/vfs/vfs_service_test_fixture.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/bootstrap.h"
 #include "micros/grant_runtime.h"
