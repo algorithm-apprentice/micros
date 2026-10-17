@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 static bool transition_client_send_one(
     struct ipc_syscall_test_context *fixture,

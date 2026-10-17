@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 _Noreturn void micros_ipc_syscall_runtime_run_self_test(void)
 {

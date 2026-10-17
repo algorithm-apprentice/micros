@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 bool ipc_syscall_test_prepare_process(
     struct ipc_syscall_test_context *fixture,

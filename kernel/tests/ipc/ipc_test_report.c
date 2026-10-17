@@ -1,4 +1,4 @@
-#include "ipc_test_internal.h"
+#include "kernel/tests/ipc/ipc_test_internal.h"
 
 bool ipc_test_cleanup_resources(
     struct ipc_test_context *fixture,

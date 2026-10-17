@@ -1,4 +1,4 @@
-#include "ipc_test_internal.h"
+#include "kernel/tests/ipc/ipc_test_internal.h"
 
 static bool initialize_trusted_ipc_authority_and_runtime(
     struct ipc_test_context *fixture,

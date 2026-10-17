@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 void ipc_syscall_test_arm_command(
     struct ipc_syscall_test_context *fixture,

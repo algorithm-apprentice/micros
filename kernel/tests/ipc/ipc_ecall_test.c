@@ -1,4 +1,4 @@
-#include "ipc_ecall_test_internal.h"
+#include "kernel/tests/ipc/ipc_ecall_test_internal.h"
 
 _Noreturn void micros_ipc_ecall_core_runtime_run_self_test(void)
 {

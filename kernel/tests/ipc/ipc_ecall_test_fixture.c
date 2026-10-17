@@ -1,4 +1,4 @@
-#include "ipc_ecall_test_internal.h"
+#include "kernel/tests/ipc/ipc_ecall_test_internal.h"
 
 const struct micros_privilege_profile ipc_ecall_test_profiles[2] = {
     {

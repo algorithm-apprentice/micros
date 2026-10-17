@@ -1,4 +1,4 @@
-#include "ipc_ecall_test_internal.h"
+#include "kernel/tests/ipc/ipc_ecall_test_internal.h"
 
 bool micros_ipc_ecall_core_test_finish_trap(
     struct micros_hart *hart,

@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_IPC_ECALL_TEST_INTERNAL_H
 #define MICROS_KERNEL_IPC_ECALL_TEST_INTERNAL_H
 
-#include "kernel/ipc_ecall_test.h"
+#include "kernel/tests/ipc/ipc_ecall_test.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "arch/riscv64/interrupt.h"

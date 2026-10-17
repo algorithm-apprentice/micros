@@ -1,4 +1,4 @@
-#include "ipc_test_internal.h"
+#include "kernel/tests/ipc/ipc_test_internal.h"
 
 static struct ipc_test_context test_context;
 static const struct micros_ipc_message zero_message;

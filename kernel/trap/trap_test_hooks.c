@@ -10,13 +10,13 @@
 #include "kernel/tests/boot/bootstrap_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_ECALL_CORE_TEST
-#include "kernel/ipc_ecall_test.h"
+#include "kernel/tests/ipc/ipc_ecall_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_TEST
-#include "kernel/ipc_syscall_test.h"
+#include "kernel/tests/ipc/ipc_syscall_test.h"
 #endif
 #ifdef MICROS_BUILD_IPC_SYSCALL_PANIC_TEST
-#include "kernel/ipc_syscall_panic_test.h"
+#include "kernel/tests/ipc/ipc_syscall_panic_test.h"
 #endif
 #ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
 #include "kernel/tests/grant/grant_syscall_test.h"

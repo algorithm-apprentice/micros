@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 static bool hold_syscall_fixture_threads(
     struct ipc_syscall_test_context *fixture,

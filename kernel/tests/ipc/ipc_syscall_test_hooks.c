@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 bool micros_ipc_syscall_test_before_ecall(
     struct micros_hart *hart,

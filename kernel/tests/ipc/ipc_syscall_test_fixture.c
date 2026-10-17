@@ -1,4 +1,4 @@
-#include "ipc_syscall_test_internal.h"
+#include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 
 uintptr_t micros_ipc_syscall_test_saved_sp;
 uintptr_t micros_ipc_syscall_test_saved_gp;

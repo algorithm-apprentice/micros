@@ -1,4 +1,4 @@
-#include "ipc_ecall_test_internal.h"
+#include "kernel/tests/ipc/ipc_ecall_test_internal.h"
 
 static bool prepare_ecall_runtime_and_endpoints(
     struct ipc_ecall_test_context *fixture,

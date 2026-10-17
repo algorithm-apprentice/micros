@@ -1,4 +1,4 @@
-#include "kernel/ipc_syscall_panic_test.h"
+#include "kernel/tests/ipc/ipc_syscall_panic_test.h"
 
 #include <stddef.h>
 #include <stdint.h>

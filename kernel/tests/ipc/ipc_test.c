@@ -1,4 +1,4 @@
-#include "ipc_test_internal.h"
+#include "kernel/tests/ipc/ipc_test_internal.h"
 
 bool micros_ipc_runtime_run_self_test(void)
 {

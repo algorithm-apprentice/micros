@@ -655,30 +655,30 @@ set(
 
 set(
     MICROS_IPC_QEMU_TEST_SOURCES
-    kernel/ipc_test.c
-    kernel/ipc_test_fixture.c
-    kernel/ipc_test_setup.c
-    kernel/ipc_test_scenarios.c
-    kernel/ipc_test_report.c
+    kernel/tests/ipc/ipc_test.c
+    kernel/tests/ipc/ipc_test_fixture.c
+    kernel/tests/ipc/ipc_test_setup.c
+    kernel/tests/ipc/ipc_test_scenarios.c
+    kernel/tests/ipc/ipc_test_report.c
 )
 
 set(
     MICROS_IPC_ECALL_QEMU_TEST_SOURCES
-    kernel/ipc_ecall_test.c
-    kernel/ipc_ecall_test_fixture.c
-    kernel/ipc_ecall_test_setup.c
-    kernel/ipc_ecall_test_report.c
+    kernel/tests/ipc/ipc_ecall_test.c
+    kernel/tests/ipc/ipc_ecall_test_fixture.c
+    kernel/tests/ipc/ipc_ecall_test_setup.c
+    kernel/tests/ipc/ipc_ecall_test_report.c
 )
 
 set(
     MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES
-    kernel/ipc_syscall_test.c
-    kernel/ipc_syscall_test_fixture.c
-    kernel/ipc_syscall_test_setup.c
-    kernel/ipc_syscall_test_commands.c
-    kernel/ipc_syscall_test_scenarios.c
-    kernel/ipc_syscall_test_hooks.c
-    kernel/ipc_syscall_test_report.c
+    kernel/tests/ipc/ipc_syscall_test.c
+    kernel/tests/ipc/ipc_syscall_test_fixture.c
+    kernel/tests/ipc/ipc_syscall_test_setup.c
+    kernel/tests/ipc/ipc_syscall_test_commands.c
+    kernel/tests/ipc/ipc_syscall_test_scenarios.c
+    kernel/tests/ipc/ipc_syscall_test_hooks.c
+    kernel/tests/ipc/ipc_syscall_test_report.c
 )
 
 set(
@@ -5578,7 +5578,7 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
         micros
         PRIVATE
             arch/riscv64/ipc_syscall_panic_test.S
-            kernel/ipc_syscall_panic_test.c
+            kernel/tests/ipc/ipc_syscall_panic_test.c
     )
 endif()
 
