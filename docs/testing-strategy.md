@@ -522,6 +522,25 @@ and `test-qemu-vfs`. The QEMU harness must send its configured input only after
 the exact VFS input-ready line, use no sleep, and accept only the exact final
 VFS pass marker.
 
+### Complete frame-validation timeout correction
+
+The blocked CPython implementation exposed a deterministic work-budget defect,
+not an acceptable flaky test. The exact ELF-spawn image could pass or cross
+its 180-second limit while QEMU monitor captures showed the hart actively
+scanning the inactive frame-ownership tail from user translation.
+
+Accepted
+[ADR-0076](adr/0076-bounded-complete-frame-ownership-validation.md) requires a
+deterministic structural work-shape Red before optimizing the complete
+validator. Existing boundary, corruption, and model tests are green semantic
+guards and must remain green while adding independent inactive generation,
+slot, kind, and reserved corruption plus the final
+`MAX_MANAGED_FRAMES - 1` partial-word case. The structural Red covers active
+and inactive raw-frame bitmap indexing and proves one loaded word supplies
+each active chunk. Target acceptance is the exact
+`test-qemu-vfs` then `test-qemu-elf-spawn` sequence, run once without retry or
+sleep, followed by one complete producer.
+
 ### ELF spawn Step 14 evidence
 
 The [application runtime implementation map](architecture/application-runtime.md)

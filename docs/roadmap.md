@@ -478,6 +478,16 @@ Independent design review is clean after closure of OpenSSL, child-process,
 AST-evidence, and consumed-launcher boundaries. Implementation remains pending
 until this design merges separately.
 
+The Python implementation gate then exposed a measured target hot-path defect:
+the ELF-spawn image can cross its timeout while the hart repeatedly scans the
+fixed 262,144-entry frame ledger from user translation. Accepted
+[ADR-0076](adr/0076-bounded-complete-frame-ownership-validation.md) preserves
+complete corruption detection and capacity while replacing per-frame inactive
+bitmap/helper work with a bounded word-aware scan. The Python implementation
+remains blocked until the separately reviewed implementation passes the
+no-retry VFS-to-ELF-spawn reproducer. Independent design/correction review is
+clean.
+
 ## v0.1 completion goal
 
 The independent validation-efficiency task follows Accepted
