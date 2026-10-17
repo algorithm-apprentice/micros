@@ -406,9 +406,9 @@ set(
 
 set(
     MICROS_ENDPOINT_QEMU_TEST_SOURCES
-    kernel/endpoint_test.c
-    kernel/endpoint_test_fixture.c
-    kernel/endpoint_test_scenarios.c
+    kernel/tests/endpoint/endpoint_test.c
+    kernel/tests/endpoint/endpoint_test_fixture.c
+    kernel/tests/endpoint/endpoint_test_scenarios.c
 )
 
 set(

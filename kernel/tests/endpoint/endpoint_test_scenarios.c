@@ -1,4 +1,4 @@
-#include "endpoint_test_internal.h"
+#include "kernel/tests/endpoint/endpoint_test_internal.h"
 
 #include "micros/grant_runtime.h"
 #include "micros/ipc_core.h"
