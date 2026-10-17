@@ -1545,7 +1545,12 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         guards = re.findall(r"if\(MICROS_BUILD_OBJECT_MODEL_TEST\)([\s\S]*?)\nendif\(\)", cmake)
         self.assertEqual(1, sum(target in guard for guard in guards))
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
-        self.assertEqual(digest_bytes(cmake.encode()), validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            digest_bytes(cmake.encode()),
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
 
     def test_portable_private_helpers_are_necessary_and_dependencies_stay_acyclic(self):
         current = owned_records(0)

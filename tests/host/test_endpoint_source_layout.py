@@ -1420,7 +1420,12 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         )
         self.assertEqual(1, sum("${MICROS_ENDPOINT_QEMU_TEST_SOURCES}" in block for block in guard))
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
-        self.assertEqual(digest_bytes(cmake.encode()), validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            digest_bytes(cmake.encode()),
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
 
     def test_private_includes_preserve_the_existing_native_search_roots(self):
         for family, paths in enumerate(SOURCE_SETS.values()):

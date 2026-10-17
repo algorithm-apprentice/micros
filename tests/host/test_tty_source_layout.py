@@ -2270,7 +2270,12 @@ def main(argv=None):
             self.assertTrue(kernel_layout_source.is_file_path(ROOT / header))
             self.assertEqual({}, function_records(source(header)))
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
-        self.assertEqual(digest_bytes(cmake.encode()), validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            digest_bytes(cmake.encode()),
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
         for target, variable in (
             ("micros", "MICROS_TTY_HANDOFF_RUNTIME_SOURCES"), ("tty_test", "MICROS_TTY_HANDOFF_RUNTIME_SOURCES"),
             ("tty_service_test", "MICROS_TTY_SERVICE_CORE_SOURCES"), ("tty_model_test", "MICROS_TTY_SERVICE_CORE_SOURCES"),

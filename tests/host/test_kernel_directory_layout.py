@@ -6,11 +6,14 @@ import ast
 from collections import Counter
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
 
 from tests.host import kernel_layout_source
-from tools import validation_plan
+from tools import validation_context, validation_plan
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +92,14 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
 
     def test_current_owner_state_is_exact(self) -> None:
         self.assertEqual((), kernel_layout_source.validate_current_layout(ROOT))
+        self.assertEqual(
+            (),
+            tuple(
+                path
+                for path in (ROOT / "kernel").iterdir()
+                if path.is_file() and path.suffix in (".c", ".h")
+            ),
+        )
 
     def test_every_current_source_restores_the_original_bytes(self) -> None:
         for logical in kernel_layout_source.KERNEL_LOGICAL_PATHS:
@@ -218,6 +229,91 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             kernel_layout_source.BASE_CMAKE_SHA256,
             hashlib.sha256(restored.encode()).hexdigest(),
         )
+        self.assertEqual(
+            hashlib.sha256(actual.encode()).hexdigest(),
+            validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
+        )
+
+    def test_layout_validation_rejects_missing_duplicate_and_linked_members(self) -> None:
+        logical = "kernel/panic.c"
+        physical = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[logical]
+        another = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[
+            "kernel/timer.c"
+        ]
+        mutations = {
+            "missing": lambda root: (root / physical).unlink(),
+            "duplicate": lambda root: (
+                (root / logical).parent.mkdir(parents=True, exist_ok=True),
+                shutil.copy2(root / physical, root / logical),
+            ),
+            "symlink": lambda root: (
+                (root / physical).unlink(),
+                (root / physical).symlink_to(root / another),
+            ),
+            "hardlink": lambda root: (
+                (root / physical).unlink(),
+                os.link(root / another, root / physical),
+            ),
+            "mode": lambda root: (root / physical).chmod(0o600),
+            "unexpected": lambda root: (
+                root / "kernel" / "unexpected.c"
+            ).write_text("int unexpected;\n"),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                shutil.copytree(ROOT / "kernel", root / "kernel")
+                mutate(root)
+                self.assertNotEqual(
+                    (),
+                    kernel_layout_source.validate_current_layout(root),
+                )
+
+    def test_source_transport_rejects_include_and_body_drift(self) -> None:
+        cases = (
+            (
+                "kernel/address_space.c",
+                '"kernel/memory/address_space_internal.h"',
+                '"kernel/memory/not_address_space_internal.h"',
+            ),
+            (
+                "kernel/panic.c",
+                '"MICROS_PANIC_SOURCE file="',
+                '"MICROS_PANIC_SOURCE changed="',
+            ),
+        )
+        for logical, before, after in cases:
+            with self.subTest(logical=logical), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                shutil.copytree(ROOT / "kernel", root / "kernel")
+                physical = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[logical]
+                path = root / physical
+                text = path.read_text(encoding="utf-8")
+                self.assertEqual(1, text.count(before))
+                path.write_text(text.replace(before, after), encoding="utf-8")
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.read_logical_bytes(root, logical)
+
+    def test_recipe_metadata_and_generated_output_fail_closed(self) -> None:
+        cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        with self.assertRaises(AssertionError):
+            kernel_layout_source.restore_cmake_source(
+                cmake.replace(
+                    "kernel/tests/vm/vm_handoff_test.c",
+                    "kernel/tests/vm/not_vm_handoff_test.c",
+                    1,
+                )
+            )
+        with self.assertRaises(AssertionError):
+            kernel_layout_source.original_path_classification_equivalents(
+                (*validation_plan.PATH_CLASSIFICATION_EQUIVALENTS, ("extra", ())),
+            )
+        generator = "tools/generate_vm_handoff_fixture.py"
+        with self.assertRaises(AssertionError):
+            kernel_layout_source.restore_generated_fixture(
+                generator,
+                "no reviewed include is present",
+            )
 
 
 if __name__ == "__main__":

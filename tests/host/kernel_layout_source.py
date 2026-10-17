@@ -15544,6 +15544,8 @@ CMAKE_NATIVE_DIAGNOSTIC_BLOCK = '    foreach(\n        kernel_consumer\n        
 CMAKE_TARGET_DIAGNOSTIC_BLOCK = 'foreach(\n    kernel_directory\n    IN ITEMS\n        boot\n        diagnostic\n        endpoint\n        execution\n        grant\n        ipc\n        memory\n        objects\n        platform\n        pm\n        scheduler\n        trap\n        tty\n        vm\n        tests/boot\n        tests/endpoint\n        tests/execution\n        tests/grant\n        tests/ipc\n        tests/memory\n        tests/objects\n        tests/pm\n        tests/ramfs\n        tests/runtime\n        tests/scheduler\n        tests/spawn\n        tests/trap\n        tests/tty\n        tests/vfs\n        tests/vm\n)\n    target_compile_options(\n        micros\n        PRIVATE\n            "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=kernel/>"\n    )\nendforeach()'
 
 BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab'
+FINAL_CMAKE_SHA256 = 'c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368'
+ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
 
 
 def _relative_path(path: Path) -> str:
@@ -15801,6 +15803,23 @@ def original_host_unit_only_inputs(paths):
     return ORIGINAL_HOST_UNIT_ONLY_INPUTS
 
 
+def original_cmake_recipe_digest(value: str) -> str:
+    if value not in (BASE_CMAKE_SHA256, FINAL_CMAKE_SHA256):
+        raise AssertionError("unexpected admitted CMake recipe digest")
+    return BASE_CMAKE_SHA256
+
+
+def restore_validation_context_source(source: str) -> str:
+    if source.count(FINAL_CMAKE_SHA256) == 1:
+        source = source.replace(FINAL_CMAKE_SHA256, BASE_CMAKE_SHA256)
+    elif source.count(BASE_CMAKE_SHA256) != 1:
+        raise AssertionError("unexpected validation context CMake recipe pin")
+    payload = ast.dump(ast.parse(source), include_attributes=False).encode()
+    if hashlib.sha256(payload).hexdigest() != ORIGINAL_VALIDATION_CONTEXT_AST_SHA256:
+        raise AssertionError("validation context AST did not restore")
+    return source
+
+
 def restore_cmake_source(source: str) -> str:
     for logical, physical in KERNEL_LOGICAL_TO_PHYSICAL.items():
         source = source.replace(physical, logical)
@@ -15833,6 +15852,10 @@ def read_bytes_path(path: Path) -> bytes:
         return _restored_generator_bytes(path, relative)
     if relative == "CMakeLists.txt":
         return restore_cmake_source(path.read_text(encoding="utf-8")).encode()
+    if relative == "tools/validation_context.py":
+        return restore_validation_context_source(
+            path.read_text(encoding="utf-8")
+        ).encode()
     if relative == "tools/validation_plan.py":
         return restore_validation_plan_source(path.read_text(encoding="utf-8")).encode()
     return path.read_bytes()
@@ -15917,6 +15940,7 @@ class _RestoreGateAdapter(ast.NodeTransformer):
                 keywords=[],
             )
         if function.attr in {
+            "original_cmake_recipe_digest",
             "original_host_unit_only_inputs",
             "original_path_classification_equivalents",
         }:

@@ -2578,7 +2578,12 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         cmake = source("CMakeLists.txt")
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
         expected = BASE_CMAKE_DIGEST if SYMBOL_OWNER_MIGRATION else digest_bytes(cmake.encode())
-        self.assertEqual(expected, validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            expected,
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
 
     def test_unreviewed_recipe_identity_is_rejected_before_any_build_metadata(self):
         with patch.dict("tools.validation_context.os.environ", {

@@ -2909,7 +2909,12 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
         guarded = re.findall(r"if\(MICROS_BUILD_GRANT_SYSCALL_TEST\)([\s\S]*?)\nendif\(\)", cmake)
         self.assertEqual(1, sum("${MICROS_GRANT_SYSCALL_QEMU_TEST_SOURCES}" in block for block in guarded))
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
-        self.assertEqual(digest_bytes(cmake.encode()), validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            digest_bytes(cmake.encode()),
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
 
     def test_registry_runtime_public_abi_payload_and_drivers_remain_byte_exact(self):
         self.assertEqual(25, len(STABLE_HASHES))
