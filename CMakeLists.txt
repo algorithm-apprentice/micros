@@ -320,21 +320,39 @@ set(
     "Exact CPython 3.15 host-automation executable"
     FORCE
 )
+string(
+    RANDOM
+    LENGTH 32
+    ALPHABET 0123456789abcdef
+    _MICROS_PYTHON_CHALLENGE
+)
 execute_process(
     COMMAND
         "${MICROS_PYTHON}"
         ${MICROS_PYTHON_ARGS}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/python_host_runtime.py"
         --selected "${MICROS_PYTHON}"
+        --challenge "${_MICROS_PYTHON_CHALLENGE}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     RESULT_VARIABLE MICROS_PYTHON_RESULT
     OUTPUT_VARIABLE MICROS_PYTHON_OUTPUT
     ERROR_VARIABLE MICROS_PYTHON_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 if(NOT MICROS_PYTHON_RESULT EQUAL 0)
     message(
         FATAL_ERROR
         "Unsupported MICROS_PYTHON:\n${MICROS_PYTHON_OUTPUT}${MICROS_PYTHON_ERROR}"
+    )
+endif()
+set(
+    _MICROS_PYTHON_EXPECTED_CHALLENGE
+    "{\"challenge\":\"${_MICROS_PYTHON_CHALLENGE}\",\"status\":\"validated\"}"
+)
+if(NOT MICROS_PYTHON_OUTPUT STREQUAL _MICROS_PYTHON_EXPECTED_CHALLENGE)
+    message(
+        FATAL_ERROR
+        "Unsupported MICROS_PYTHON: runtime validation challenge failed"
     )
 endif()
 

@@ -236,7 +236,9 @@ def python_command(executable, *arguments, environment=None):
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--selected")
-    parser.add_argument("--metadata", action="store_true")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--metadata", action="store_true")
+    output.add_argument("--challenge")
     return parser.parse_args(argv)
 
 
@@ -247,7 +249,22 @@ def main(argv=None):
     except (OSError, UnsupportedPythonRuntime) as error:
         print(f"unsupported Python runtime: {error}", file=sys.stderr)
         return 2
-    if arguments.metadata:
+    if arguments.challenge is not None:
+        if (
+            len(arguments.challenge) != 32
+            or any(
+                character not in "0123456789abcdef"
+                for character in arguments.challenge
+            )
+        ):
+            print("unsupported Python runtime: invalid challenge", file=sys.stderr)
+            return 2
+        print(json.dumps(
+            {"challenge": arguments.challenge, "status": "validated"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ))
+    elif arguments.metadata:
         print(json.dumps(metadata, sort_keys=True, separators=(",", ":")))
     return 0
 

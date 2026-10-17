@@ -15548,10 +15548,12 @@ CMAKE_TARGET_DIAGNOSTIC_BLOCK = 'foreach(\n    kernel_directory\n    IN ITEMS\n 
 BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab'
 FINAL_CMAKE_SHA256 = 'c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368'
 PYTHON315_CMAKE_SHA256 = '5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab'
+PYTHON315_CHALLENGE_CMAKE_SHA256 = '9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537'
 BASE_VALIDATION_CONTEXT_SHA256 = '7678be6bcd9c6da8575ff8fd9f28a7220db2ba152863869fd9f9d0b3966184f5'
 FINAL_VALIDATION_CONTEXT_SHA256 = 'ae5ffaeae172a8aadf5796580be3631f9804068c7033ab4ebbcde4775879be15'
 PRODUCER_VALIDATION_CONTEXT_SHA256 = '4f4e0b570c01ffecfe7fbde99e8996ec10b47466c692cd999541b87f0383cf88'
 PYTHON315_VALIDATION_CONTEXT_SHA256 = '9faf65b3308b24beceb61134c4d3426e74852dbe730a1f231ddbb84cf7154670'
+PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256 = '30309e78b64298764d8f176f08e1f0b563c31c0c8720805351ceb9008314aa74'
 BASE_VALIDATION_PLAN_SHA256 = '60a5e656a28b18bb21a02c65fc46c2ec18f4100580b3d3d05a09b346ae36a619'
 PRODUCER_VALIDATION_PLAN_SHA256 = '28437d4bcfc669e982632e920cc71f344d5993ff43fd5b7decec4c4b8a611aab'
 PYTHON315_VALIDATION_PLAN_SHA256 = '8521203bd2d627de572f06856a796283ae62bb721a786da31c07d450fb6104af'
@@ -16094,6 +16096,7 @@ def original_cmake_recipe_digest(value: str) -> str:
         BASE_CMAKE_SHA256,
         FINAL_CMAKE_SHA256,
         PYTHON315_CMAKE_SHA256,
+        PYTHON315_CHALLENGE_CMAKE_SHA256,
     ):
         raise AssertionError("unexpected admitted CMake recipe digest")
     return BASE_CMAKE_SHA256
@@ -16225,6 +16228,27 @@ def restore_validation_execution_source(source: str) -> str:
 
 def restore_validation_context_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    '"CMakeLists.txt": '
+                    '"9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537",',
+                    '"CMakeLists.txt": '
+                    '"5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab",',
+                ),
+            ),
+            "Python validation-context challenge",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PYTHON315_VALIDATION_CONTEXT_SHA256
+        ):
+            raise AssertionError(
+                "Python validation-context challenge did not restore"
+            )
+        digest = PYTHON315_VALIDATION_CONTEXT_SHA256
     if digest == PYTHON315_VALIDATION_CONTEXT_SHA256:
         source = _restore_exact_source_transports(
             source,
@@ -16661,6 +16685,52 @@ def restore_cmake_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == BASE_CMAKE_SHA256:
         return source
+    if digest == PYTHON315_CHALLENGE_CMAKE_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    "string(\n"
+                    "    RANDOM\n"
+                    "    LENGTH 32\n"
+                    "    ALPHABET 0123456789abcdef\n"
+                    "    _MICROS_PYTHON_CHALLENGE\n"
+                    ")\n",
+                    "",
+                ),
+                (
+                    '        --challenge "${_MICROS_PYTHON_CHALLENGE}"\n',
+                    "",
+                ),
+                (
+                    "    ERROR_VARIABLE MICROS_PYTHON_ERROR\n"
+                    "    OUTPUT_STRIP_TRAILING_WHITESPACE\n"
+                    ")\n",
+                    "    ERROR_VARIABLE MICROS_PYTHON_ERROR\n"
+                    ")\n",
+                ),
+                (
+                    "set(\n"
+                    "    _MICROS_PYTHON_EXPECTED_CHALLENGE\n"
+                    '    "{\\"challenge\\":\\"${_MICROS_PYTHON_CHALLENGE}\\",'
+                    '\\"status\\":\\"validated\\"}"\n'
+                    ")\n"
+                    "if(NOT MICROS_PYTHON_OUTPUT STREQUAL "
+                    "_MICROS_PYTHON_EXPECTED_CHALLENGE)\n"
+                    "    message(\n"
+                    "        FATAL_ERROR\n"
+                    '        "Unsupported MICROS_PYTHON: runtime validation '
+                    'challenge failed"\n'
+                    "    )\n"
+                    "endif()\n",
+                    "",
+                ),
+            ),
+            "Python CMake runtime challenge",
+        )
+        if hashlib.sha256(source.encode()).hexdigest() != PYTHON315_CMAKE_SHA256:
+            raise AssertionError("Python CMake challenge transport did not restore")
+        digest = PYTHON315_CMAKE_SHA256
     if digest == PYTHON315_CMAKE_SHA256:
         if source.count("${MICROS_PYTHON_ARGS}") != 62:
             raise AssertionError("unexpected Python command inventory")

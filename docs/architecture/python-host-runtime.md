@@ -195,6 +195,10 @@ old receipts cannot match accidentally.
 `MICROS_PYTHON` remains the selected executable cache entry. A central
 `MICROS_PYTHON_ARGS` owns `-E;-S;-B`.
 
+Configuration accepts that executable only after the runtime helper validates
+its own process and returns the exact response to a fresh per-configuration
+challenge. Exit zero without that challenge response is a failure.
+
 Every CMake command that executes Python must use:
 
 ```cmake

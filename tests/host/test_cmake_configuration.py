@@ -35,6 +35,13 @@ def python_environment():
     return environment
 
 
+def executable_fixture(directory, name, body):
+    executable = pathlib.Path(directory) / name
+    executable.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+    executable.chmod(0o755)
+    return executable
+
+
 class CMakeConfigurationTests(unittest.TestCase):
     def test_explicit_python_315_configures_with_exact_cache_spelling(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -67,16 +74,14 @@ class CMakeConfigurationTests(unittest.TestCase):
 
     def test_explicit_unsupported_python_does_not_fall_through(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
-            unsupported = pathlib.Path(temporary_directory) / "unsupported-python"
-            unsupported.write_text(
-                "#!/bin/sh\n"
+            unsupported = executable_fixture(
+                temporary_directory,
+                "unsupported-python",
                 "printf '%s\\n' "
                 "'unsupported Python runtime: "
                 "host automation requires CPython 3.15 final' >&2\n"
                 "exit 2\n",
-                encoding="utf-8",
             )
-            unsupported.chmod(0o755)
             build = pathlib.Path(temporary_directory) / "build"
             result = subprocess.run(
                 [
@@ -98,6 +103,37 @@ class CMakeConfigurationTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn(
             "host automation requires CPython 3.15 final",
+            result.stdout + result.stderr,
+        )
+
+    def test_exit_zero_non_python_fails_runtime_challenge(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            impostor = executable_fixture(
+                temporary_directory,
+                "python-noop",
+                "exit 0\n",
+            )
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(ROOT),
+                    "-B",
+                    str(pathlib.Path(temporary_directory) / "build"),
+                    "-G",
+                    "Ninja",
+                    f"-DMICROS_PYTHON={impostor}",
+                    "-DMICROS_BUILD_HOST_TESTS=ON",
+                ],
+                env=python_environment(),
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "runtime validation challenge failed",
             result.stdout + result.stderr,
         )
 
