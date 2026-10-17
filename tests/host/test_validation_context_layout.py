@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
+from tests.host.ast_evidence import ast_dump
 from tools import validation_build_manifest, validation_context, validation_inputs
 
 
@@ -36,7 +37,7 @@ class ValidationContextLayoutTests(unittest.TestCase):
             self.assertFalse(set(names) & remaining, path)
             for name in names:
                 self.assertNotIn(name, observed)
-                observed[name] = ast.dump(definitions[name], include_attributes=False)
+                observed[name] = ast_dump(definitions[name])
         self.assertEqual(
             "00c8141862492e630b8509eaeb639619336696367880617b5b5b2a9e58ba5a4c",
             hashlib.sha256(

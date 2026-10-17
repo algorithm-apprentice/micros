@@ -8,6 +8,7 @@ import re
 import unittest
 from unittest.mock import patch
 
+from tests.host.ast_evidence import ast_dump
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
@@ -991,7 +992,7 @@ def body_fingerprint(body: str) -> str:
 
 def python_body_hash(node: ast.FunctionDef) -> str:
     body = ast.Module(body=node.body, type_ignores=[])
-    return hashlib.sha256(ast.dump(body, include_attributes=False).encode()).hexdigest()
+    return hashlib.sha256(ast_dump(body).encode()).hexdigest()
 
 
 def helper_specs() -> tuple[tuple[str, str, str, str], ...]:

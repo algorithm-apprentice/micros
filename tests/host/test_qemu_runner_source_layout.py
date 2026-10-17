@@ -11,6 +11,8 @@ import sys
 from types import SimpleNamespace
 import unittest
 from unittest import mock
+
+from tests.host.ast_evidence import ast_dump
 from tests.host import kernel_layout_source
 
 
@@ -1092,7 +1094,7 @@ def digest(raw):
 
 
 def ast_digest(node):
-    return digest(ast.dump(node, include_attributes=False).encode())
+    return digest(ast_dump(node).encode())
 
 
 def definitions(text):

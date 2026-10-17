@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import unittest
 
+from tests.host.ast_evidence import ast_dump
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
     c_lexical_text,
@@ -2442,7 +2443,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
     def test_relocated_literal_token_utility_has_the_entire_original_ast(self):
         module = ast.parse(source("tests/host/test_frame_ownership_source_layout.py"))
         node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "tokens")
-        self.assertEqual(BASE_CTOKENS_AST, digest_bytes(ast.dump(node, include_attributes=False).encode()))
+        self.assertEqual(BASE_CTOKENS_AST, digest_bytes(ast_dump(node).encode()))
         self.assertEqual(('"a b"', "'/'"), tokens('"a b" /* ignored */ \'/\''))
         self.assertNotEqual(tokens("a + + b"), tokens("a ++ b"))
         self.assertNotEqual(tokens("x->field"), tokens("x - > field"))

@@ -9,6 +9,8 @@ from pathlib import Path
 import stat
 from typing import Optional
 
+from tests.host.ast_evidence import ast_dump
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 REVIEWED_BASE = "469a9733eab03080b554f8b144a8c1bc276b1e05"
@@ -15873,10 +15875,7 @@ def _restored_generator_bytes(path: Path, relative: str) -> bytes:
         expected_sha256,
         transports,
     )
-    payload = ast.dump(
-        ast.parse(restored.decode("utf-8")),
-        include_attributes=False,
-    ).encode()
+    payload = ast_dump(ast.parse(restored.decode("utf-8"))).encode()
     if hashlib.sha256(payload).hexdigest() != expected_ast:
         raise AssertionError(f"generator AST mismatch: {relative}")
     return restored
@@ -16013,7 +16012,7 @@ def restore_validation_plan_source(source: str) -> str:
         replacements.append((start, end, ORIGINAL_PLANNER_ASSIGNMENTS[name]))
     for start, end, replacement in sorted(replacements, reverse=True):
         source = source[:start] + replacement + source[end:]
-    payload = ast.dump(ast.parse(source), include_attributes=False).encode()
+    payload = ast_dump(ast.parse(source)).encode()
     if hashlib.sha256(payload).hexdigest() != ORIGINAL_PLANNER_AST_SHA256:
         raise AssertionError("validation planner AST did not restore")
     return source
@@ -16410,6 +16409,21 @@ class _RestoreGateAdapter(ast.NodeTransformer):
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)
         function = node.func
+        if isinstance(function, ast.Name) and function.id == "ast_dump":
+            return ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(id="ast", ctx=ast.Load()),
+                    attr="dump",
+                    ctx=ast.Load(),
+                ),
+                args=node.args,
+                keywords=[
+                    ast.keyword(
+                        arg="include_attributes",
+                        value=ast.Constant(False),
+                    ),
+                ],
+            )
         if not (
             isinstance(function, ast.Attribute)
             and isinstance(function.value, ast.Name)
@@ -16455,17 +16469,72 @@ class _RestoreGateAdapter(ast.NodeTransformer):
         return node
 
 
-def _restore_gate_ast(tree: ast.Module) -> ast.Module:
-    tree.body = [
-        statement
-        for statement in tree.body
-        if not (
-            isinstance(statement, ast.ImportFrom)
-            and statement.module == "tests.host"
-            and len(statement.names) == 1
-            and statement.names[0].name == "kernel_layout_source"
+def _restore_user_elf_ast_helpers(tree: ast.Module, names: set[str]) -> None:
+    names.discard("ast_dump")
+    if names != {"ast_digest", "ast_key"}:
+        if names:
+            raise AssertionError("unsupported AST evidence helper projection")
+        return
+    helpers = {
+        node.name: node
+        for node in ast.parse(
+            """
+def ast_key(value):
+    if isinstance(value, ast.AST):
+        if getattr(value, "type_params", ()):
+            raise AssertionError("unreviewed nonempty type parameters")
+        if type(value).__name__ == "Index":
+            return ast_key(value.value)
+        return (
+            type(value).__name__,
+            tuple(
+                (name, ast_key(child))
+                for name, child in ast.iter_fields(value)
+                if name != "type_params"
+            ),
         )
-    ]
+    if isinstance(value, (list, tuple)):
+        return tuple(ast_key(child) for child in value)
+    if isinstance(value, bytes):
+        return ("bytes", value.hex())
+    if value is Ellipsis:
+        return ("ellipsis",)
+    return value
+
+
+def ast_digest(node):
+    encoded = json.dumps(ast_key(node), separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("ascii")).hexdigest()
+"""
+        ).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    parse_index = next(
+        index
+        for index, node in enumerate(tree.body)
+        if isinstance(node, ast.FunctionDef) and node.name == "parse_source"
+    )
+    tree.body.insert(parse_index, helpers["ast_key"])
+    tree.body.insert(parse_index + 2, helpers["ast_digest"])
+
+
+def _restore_gate_ast(tree: ast.Module) -> ast.Module:
+    ast_evidence_names = set()
+    retained = []
+    for statement in tree.body:
+        if isinstance(statement, ast.ImportFrom):
+            if (
+                statement.module == "tests.host"
+                and len(statement.names) == 1
+                and statement.names[0].name == "kernel_layout_source"
+            ):
+                continue
+            if statement.module == "tests.host.ast_evidence":
+                ast_evidence_names.update(alias.name for alias in statement.names)
+                continue
+        retained.append(statement)
+    tree.body = retained
+    _restore_user_elf_ast_helpers(tree, ast_evidence_names)
     restored = _RestoreGateAdapter().visit(tree)
     ast.fix_missing_locations(restored)
     return restored
@@ -16474,5 +16543,5 @@ def _restore_gate_ast(tree: ast.Module) -> ast.Module:
 def restored_gate_ast_sha256(root: Path, relative: str) -> str:
     source = (root / relative).read_text(encoding="utf-8")
     tree = _restore_gate_ast(ast.parse(source))
-    payload = ast.dump(tree, include_attributes=False).encode()
+    payload = ast_dump(tree).encode()
     return hashlib.sha256(payload).hexdigest()
