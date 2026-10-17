@@ -3925,8 +3925,7 @@ KERNEL_ORIGINAL_SHA256 = {
     logical: fact[2] for logical, fact in KERNEL_FILE_FACTS.items()
 }
 
-KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/trap_test.c',
- 'kernel/tty_service_test.c',
+KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/tty_service_test.c',
  'kernel/tty_service_test.h',
  'kernel/tty_service_test_fixture.h',
  'kernel/uart_console_test.c',

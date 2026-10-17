@@ -1225,7 +1225,7 @@ set(
     kernel/trap/trap_interrupt.c
     kernel/trap/trap_syscall.c
     kernel/trap/trap_fault.c
-    kernel/trap_test.c
+    kernel/tests/trap/trap_test.c
     kernel/trap/trap_test_hooks.c
 )
 
