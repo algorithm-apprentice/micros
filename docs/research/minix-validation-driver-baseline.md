@@ -90,3 +90,24 @@ not executable design prototypes or successful workflow receipts.
 
 These are compatible development-only extensions under ADR-0025. No MINIX
 runner mechanism or operating-system behavior is changed.
+
+## Producer-readiness correction evidence
+
+Kernel-directory implementation #148 exposed an orchestration gap without
+changing the MINIX classification above. One exact candidate passed all
+47 required commands in 996.79 seconds, but two reusable profiles lacked a
+complete pre-execution output identity and therefore correctly published no
+receipt. A later bounded consumer spent 446.81 seconds proving the missing
+provenance. The unchanged candidate needed a second full producer only after a
+35.77-second read-only profile probe established all three eligible closures.
+
+The avoidable 1,443.60-second cost is not evidence for skipping a selected
+test or publishing from postflight alone. MINIX's explicit selected-test list
+and per-test outcomes remain the baseline. The required adaptation is to
+refuse an explicitly requested reusable producer before any test starts when
+its selected receipt profiles cannot be published safely.
+
+Accepted
+[ADR-0074](../adr/0074-fail-fast-validation-producer-readiness.md) therefore
+adds producer intent and a fail-fast readiness barrier while retaining every
+current command, result, receipt, and failure rule.
