@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "kernel/endpoint/endpoint_internal.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/endpoint.h"
 #include "micros/scheduler_core.h"
 #include "micros/spawn.h"

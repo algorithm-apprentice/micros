@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_objects.h"

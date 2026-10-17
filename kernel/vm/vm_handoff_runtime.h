@@ -5,8 +5,8 @@
 
 #include "kernel/bootstrap_control_internal.h"
 #include "kernel/bootstrap_image.h"
-#include "kernel/vm_handoff_core.h"
-#include "kernel/vm_snapshot.h"
+#include "kernel/vm/vm_handoff_core.h"
+#include "kernel/vm/vm_snapshot.h"
 #include "micros/user_address_space_core.h"
 
 enum micros_vm_scratch_authority_status {

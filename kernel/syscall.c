@@ -6,7 +6,7 @@
 #include "kernel/ipc/ipc_syscall.h"
 #include "kernel/pm_control_syscall.h"
 #include "kernel/tty/tty_control_syscall.h"
-#include "kernel/vm_handoff_syscall.h"
+#include "kernel/vm/vm_handoff_syscall.h"
 
 static struct micros_syscall_arguments capture_arguments(
     const struct micros_trap_frame *frame

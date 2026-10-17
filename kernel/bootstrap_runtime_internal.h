@@ -2,7 +2,7 @@
 #define MICROS_KERNEL_BOOTSTRAP_RUNTIME_INTERNAL_H
 
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/vm_snapshot.h"
+#include "kernel/vm/vm_snapshot.h"
 
 struct micros_frame_allocator;
 

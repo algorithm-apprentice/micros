@@ -5,7 +5,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
 #include "kernel/pm_control_runtime.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/ipc_runtime.h"
 #include "micros/scheduler.h"
 #include "micros/sv39.h"

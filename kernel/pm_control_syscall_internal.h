@@ -7,7 +7,7 @@
 #include "kernel/pm_control_runtime.h"
 #include "kernel/pm_control_syscall.h"
 #include "kernel/pm_control_syscall_core.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 
 struct micros_pm_control_syscall_runtime {

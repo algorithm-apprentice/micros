@@ -1,4 +1,4 @@
-#include "kernel/vm_snapshot_internal.h"
+#include "kernel/vm/vm_snapshot_internal.h"
 
 #include <stdbool.h>
 #include <stddef.h>

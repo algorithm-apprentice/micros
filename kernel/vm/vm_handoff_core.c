@@ -1,4 +1,4 @@
-#include "kernel/vm_handoff_internal.h"
+#include "kernel/vm/vm_handoff_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

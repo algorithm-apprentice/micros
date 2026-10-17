@@ -6,7 +6,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "kernel/vm_handoff_test_fixture.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"

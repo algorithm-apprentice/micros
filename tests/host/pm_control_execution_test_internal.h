@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "kernel/pm_control_core.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/endpoint.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership.h"

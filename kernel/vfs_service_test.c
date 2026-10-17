@@ -11,7 +11,7 @@
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vfs_service_test_fixture.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/bootstrap.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_runtime.h"

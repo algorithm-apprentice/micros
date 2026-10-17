@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "kernel/pm_control_runtime_core.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 
 static struct micros_pm_control_state control_state;

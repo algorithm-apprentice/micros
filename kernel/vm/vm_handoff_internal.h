@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 
 #define MICROS_VM_HANDOFF_MAGIC UINT64_C(0x4d4943524f535648)
 

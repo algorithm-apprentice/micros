@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 #include "arch/riscv64/trap_context.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/vm.h"
 

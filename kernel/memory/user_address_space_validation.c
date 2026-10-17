@@ -1,7 +1,7 @@
 #include "kernel/memory/user_address_space_internal.h"
 
 #include "kernel/tty/tty_handoff_runtime.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_runtime.h"
 #include "micros/kernel_object_runtime.h"

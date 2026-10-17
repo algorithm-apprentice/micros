@@ -8,7 +8,7 @@
 #include "kernel/bootstrap_control_internal.h"
 #include "kernel/pm_control_core.h"
 #include "kernel/syscall.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/bootstrap.h"
 #include "micros/endpoint.h"
 #include "micros/frame_ownership.h"

@@ -780,32 +780,32 @@ set(
 
 set(
     MICROS_VM_HANDOFF_CORE_SOURCES
-    kernel/vm_handoff_core.c
-    kernel/vm_handoff_abi.c
-    kernel/vm_handoff_boot.c
-    kernel/vm_handoff_load.c
-    kernel/vm_handoff_scratch.c
-    kernel/vm_handoff_freeze.c
-    kernel/vm_handoff_commit.c
-    kernel/vm_handoff_release.c
+    kernel/vm/vm_handoff_core.c
+    kernel/vm/vm_handoff_abi.c
+    kernel/vm/vm_handoff_boot.c
+    kernel/vm/vm_handoff_load.c
+    kernel/vm/vm_handoff_scratch.c
+    kernel/vm/vm_handoff_freeze.c
+    kernel/vm/vm_handoff_commit.c
+    kernel/vm/vm_handoff_release.c
 )
 
 set(
     MICROS_VM_HANDOFF_SYSCALL_SOURCES
-    kernel/vm_handoff_syscall.c
-    kernel/vm_handoff_syscall_runtime.c
-    kernel/vm_handoff_syscall_memory.c
-    kernel/vm_handoff_syscall_boot.c
-    kernel/vm_handoff_syscall_load.c
-    kernel/vm_handoff_syscall_scratch.c
-    kernel/vm_handoff_syscall_freeze.c
-    kernel/vm_handoff_syscall_release.c
+    kernel/vm/vm_handoff_syscall.c
+    kernel/vm/vm_handoff_syscall_runtime.c
+    kernel/vm/vm_handoff_syscall_memory.c
+    kernel/vm/vm_handoff_syscall_boot.c
+    kernel/vm/vm_handoff_syscall_load.c
+    kernel/vm/vm_handoff_syscall_scratch.c
+    kernel/vm/vm_handoff_syscall_freeze.c
+    kernel/vm/vm_handoff_syscall_release.c
 )
 
 set(
     MICROS_VM_SNAPSHOT_SOURCES
-    kernel/vm_snapshot.c
-    kernel/vm_snapshot_validation.c
+    kernel/vm/vm_snapshot.c
+    kernel/vm/vm_snapshot_validation.c
 )
 
 set(
@@ -1377,7 +1377,7 @@ if(MICROS_BUILD_HOST_TESTS)
         vm_bootstrap_test
         kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES}
@@ -1534,7 +1534,7 @@ if(MICROS_BUILD_HOST_TESTS)
         vm_core_test
         kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
@@ -1550,7 +1550,7 @@ if(MICROS_BUILD_HOST_TESTS)
         elf_spawn_model_test
         kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
@@ -4047,9 +4047,9 @@ add_executable(
     ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
     ${MICROS_USER_ADDRESS_SPACE_SOURCES}
     ${MICROS_USER_EXECUTION_SOURCES}
-    kernel/vm_bootstrap.c
+    kernel/vm/vm_bootstrap.c
     ${MICROS_VM_HANDOFF_CORE_SOURCES}
-    kernel/vm_handoff_runtime.c
+    kernel/vm/vm_handoff_runtime.c
     ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
     ${MICROS_VM_SNAPSHOT_SOURCES}
     ${MICROS_VM_BOOT_VALIDATION_SOURCES}

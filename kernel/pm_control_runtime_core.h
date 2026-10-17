@@ -2,7 +2,7 @@
 #define MICROS_KERNEL_PM_CONTROL_RUNTIME_CORE_H
 
 #include "kernel/pm_control_core.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 
 enum micros_pm_control_error

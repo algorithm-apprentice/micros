@@ -1,7 +1,7 @@
 #include "kernel/elf_spawn_test_internal.h"
 
 #include "kernel/pm_control_runtime.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"

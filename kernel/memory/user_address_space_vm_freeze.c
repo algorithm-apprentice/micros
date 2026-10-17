@@ -1,7 +1,7 @@
 #include "kernel/memory/user_address_space_internal.h"
 
 #include "arch/riscv64/mmu.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 

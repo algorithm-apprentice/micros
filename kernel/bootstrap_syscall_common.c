@@ -10,7 +10,7 @@
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
-#include "kernel/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/panic.h"
 
 _Noreturn void bootstrap_syscall_panic_bootstrap_syscall(
