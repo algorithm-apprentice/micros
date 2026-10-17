@@ -541,6 +541,11 @@ each active chunk. Target acceptance is the exact
 `test-qemu-vfs` then `test-qemu-elf-spawn` sequence, run once without retry or
 sleep, followed by one complete producer.
 
+The implementation's structural Red, sanitizer-backed native boundary and
+per-field corruption guards, frame-ownership QEMU component, and exact
+no-retry VFS-to-ELF sequence are green. Complete producer/reuse evidence
+remains the final author gate before implementation review closes.
+
 ### ELF spawn Step 14 evidence
 
 The [application runtime implementation map](architecture/application-runtime.md)

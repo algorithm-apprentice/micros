@@ -488,6 +488,12 @@ remains blocked until the separately reviewed implementation passes the
 no-retry VFS-to-ELF-spawn reproducer. Independent design/correction review is
 clean.
 
+The dependent implementation now uses bitmap-word active traversal and a
+direct inactive owner/target plus bitmap-word tail scan. Native semantic
+guards, the frame-ownership QEMU component, and the no-retry VFS-to-ELF-spawn
+reproducer are green; merge remains conditional on complete producer/reuse
+evidence and clean independent implementation review.
+
 ## v0.1 completion goal
 
 The independent validation-efficiency task follows Accepted
