@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "kernel/plic_core.h"
+#include "kernel/platform/plic_core.h"
 
 bool micros_plic_initialize(void);
 bool micros_plic_prepare_tty(void);

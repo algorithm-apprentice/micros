@@ -7,7 +7,7 @@
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/tty_fault.h"
 #include "kernel/tty_handoff_runtime.h"
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST

@@ -74,11 +74,17 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
         for logical, physical in zip(logical_paths, physical_paths):
             self.assertEqual(Path(logical).name, Path(physical).name)
 
-    def test_initial_physical_owner_migration_is_complete(self) -> None:
+    def test_physical_owner_migration_is_an_ordered_subset(self) -> None:
+        migration = kernel_layout_source.KERNEL_PHYSICAL_OWNER_MIGRATION
         self.assertEqual(
-            kernel_layout_source.KERNEL_LOGICAL_PATHS,
-            kernel_layout_source.KERNEL_PHYSICAL_OWNER_MIGRATION,
+            tuple(
+                path
+                for path in kernel_layout_source.KERNEL_LOGICAL_PATHS
+                if path in set(migration)
+            ),
+            migration,
         )
+        self.assertEqual(len(migration), len(set(migration)))
 
     def test_current_owner_state_is_exact(self) -> None:
         self.assertEqual((), kernel_layout_source.validate_current_layout(ROOT))

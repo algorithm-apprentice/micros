@@ -4,7 +4,7 @@
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "micros/kernel_object_runtime.h"
 
 static volatile uint8_t *test_uart_interrupt_enable(void)

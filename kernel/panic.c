@@ -5,7 +5,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/tty_handoff_runtime.h"
 
 #ifndef MICROS_VERSION

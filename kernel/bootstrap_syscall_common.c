@@ -7,7 +7,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/endpoint_internal.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/user_address_space_internal.h"
 #include "kernel/vm_handoff_runtime.h"

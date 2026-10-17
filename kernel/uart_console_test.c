@@ -4,7 +4,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "micros/panic.h"
 #include "micros/tty.h"

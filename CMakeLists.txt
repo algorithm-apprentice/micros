@@ -1267,7 +1267,7 @@ if(MICROS_BUILD_HOST_TESTS)
 
     add_executable(
         fdt_test
-        kernel/fdt.c
+        kernel/platform/fdt.c
         ${MICROS_FDT_HOST_TEST_SOURCES}
     )
     add_executable(
@@ -1624,7 +1624,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
-        kernel/plic_core.c
+        kernel/platform/plic_core.c
         kernel/tty_control_core.c
         kernel/tty_control_syscall_core.c
         kernel/tty_handoff_core.c
@@ -4006,7 +4006,7 @@ add_executable(
     ${MICROS_BOOTSTRAP_RUNTIME_SOURCES}
     ${MICROS_BOOTSTRAP_SYSCALL_SOURCES}
     ${MICROS_ENDPOINT_CORE_SOURCES}
-    kernel/fdt.c
+    kernel/platform/fdt.c
     kernel/frame_allocator.c
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
     kernel/grant.c
@@ -4028,12 +4028,12 @@ add_executable(
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
     kernel/panic.c
-    kernel/plic.c
-    kernel/plic_core.c
+    kernel/platform/plic.c
+    kernel/platform/plic_core.c
     ${MICROS_PM_CONTROL_CORE_SOURCES}
     ${MICROS_PM_CONTROL_TARGET_SOURCES}
     kernel/sv39.c
-    kernel/timer.c
+    kernel/platform/timer.c
     ${MICROS_TRAP_SOURCES}
     kernel/trap_route_core.c
     kernel/tty_control_core.c

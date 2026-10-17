@@ -1,4 +1,4 @@
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 
 #include <stdbool.h>
 #include <stdint.h>

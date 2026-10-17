@@ -7,7 +7,7 @@
 #include "arch/riscv64/platform.h"
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc_runtime_internal.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/ramfs_service_test_fixture.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/user_address_space_internal.h"

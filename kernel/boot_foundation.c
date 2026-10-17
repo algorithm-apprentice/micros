@@ -1,7 +1,7 @@
 #include "kernel/boot_internal.h"
 
 #include "arch/riscv64/platform.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_address_space.h"

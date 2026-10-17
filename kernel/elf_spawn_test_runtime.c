@@ -2,7 +2,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "kernel/pm_control_runtime.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/vm_handoff_runtime.h"

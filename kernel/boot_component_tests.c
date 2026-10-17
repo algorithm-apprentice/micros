@@ -5,7 +5,7 @@
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "micros/timer.h"
 #include "micros/trap.h"
 

@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/platform.h"
-#include "kernel/plic.h"
+#include "kernel/platform/plic.h"
 #include "micros/ipc_core.h"
 #include "micros/sv39.h"
 
