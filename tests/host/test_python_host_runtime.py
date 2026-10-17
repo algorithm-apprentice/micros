@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import sys
 import unittest
+from unittest import mock
 
 from tests.host.ast_evidence import ast_dump, ast_key
 from tools import python_host_runtime
@@ -130,13 +131,39 @@ class PythonHostRuntimeTests(unittest.TestCase):
                 )
 
     def test_current_process_satisfies_the_exact_runtime_contract(self):
-        metadata = python_host_runtime.require_current_runtime(
-            os.environ["MICROS_PYTHON"]
-        )
+        with mock.patch.dict(os.environ, self.environment(), clear=True):
+            metadata = python_host_runtime.require_current_runtime()
         self.assertEqual([3, 15], metadata["version"][:2])
         self.assertGreaterEqual(metadata["version"], [3, 15, 0])
         self.assertEqual("cpython-315", metadata["cache_tag"])
         self.assertEqual(0, metadata["certificate_count"])
+
+    def test_documented_reusable_commands_export_runtime_before_use(self):
+        building = (ROOT / "docs/development/building.md").read_text(
+            encoding="utf-8"
+        )
+        blocks = re.findall(r"```bash\n(.*?)\n```", building, flags=re.DOTALL)
+        exports = (
+            "export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15",
+            "export OPENSSL_CONF=/dev/null",
+            "export SSL_CERT_FILE=/dev/null",
+            "export SSL_CERT_DIR=/dev/null",
+            "export CLANG_NO_DEFAULT_CONFIG=1",
+            "export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang",
+            "export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld",
+        )
+        for marker in (
+            "--execute --producer",
+            "--execute --reuse",
+            "--record-workflow test-unit",
+        ):
+            block = next((item for item in blocks if marker in item), None)
+            with self.subTest(marker=marker):
+                self.assertIsNotNone(block)
+                command_index = block.index('"${MICROS_PYTHON}"')
+                for export in exports:
+                    self.assertIn(export, block)
+                    self.assertLess(block.index(export), command_index)
 
     def test_environment_and_child_execution_fail_closed(self):
         python_host_runtime.validate_environment(self.environment())

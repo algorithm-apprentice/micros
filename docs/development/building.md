@@ -355,11 +355,13 @@ When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:
 
 ```bash
-MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15 \
-OPENSSL_CONF=/dev/null SSL_CERT_FILE=/dev/null SSL_CERT_DIR=/dev/null \
-CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py \
   --tier pr --base origin/main --execute --producer
 ```
@@ -396,11 +398,13 @@ spellings must match the configured cache, not merely resolve to the same
 executable:
 
 ```bash
-MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15 \
-OPENSSL_CONF=/dev/null SSL_CERT_FILE=/dev/null SSL_CERT_DIR=/dev/null \
-CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --execute --reuse
 ```
 
@@ -417,11 +421,13 @@ failure code defined by ADR-0074. Non-producer reports omit that object.
 One exact canonical workflow can also be executed and recorded fresh:
 
 ```bash
-MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15 \
-OPENSSL_CONF=/dev/null SSL_CERT_FILE=/dev/null SSL_CERT_DIR=/dev/null \
-CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --record-workflow test-unit
 ```
 
