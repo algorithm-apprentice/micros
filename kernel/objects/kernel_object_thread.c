@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 enum micros_kernel_object_error micros_thread_resolve(
     const struct micros_kernel_objects *objects,

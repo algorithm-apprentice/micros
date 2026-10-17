@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 static bool kernel_object_context_stack_avoids_threads(
     const struct micros_kernel_objects *objects,

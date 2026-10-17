@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 static bool bytes_are_zero(const void *storage, size_t size)
 {

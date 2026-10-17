@@ -6,7 +6,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc_runtime_internal.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty_fault.h"
 #include "kernel/tty_handoff_runtime.h"

@@ -4,7 +4,7 @@
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 enum micros_kernel_object_error micros_kernel_objects_initialize(
     struct micros_kernel_objects *objects,

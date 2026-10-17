@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 bool kernel_object_stack_range_is_valid(
     uintptr_t bottom,

@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 

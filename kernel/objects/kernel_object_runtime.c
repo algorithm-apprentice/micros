@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 
 static struct micros_kernel_objects kernel_objects;
 static struct micros_hart_handle boot_hart_handle;

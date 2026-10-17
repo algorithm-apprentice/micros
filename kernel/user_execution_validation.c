@@ -6,7 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"

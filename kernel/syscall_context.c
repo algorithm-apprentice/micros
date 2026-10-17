@@ -1,7 +1,7 @@
 #include "kernel/syscall_internal.h"
 
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 

@@ -5,7 +5,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 

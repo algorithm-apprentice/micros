@@ -2,7 +2,7 @@
 
 #include "arch/riscv64/platform.h"
 #include "kernel/ipc_runtime_internal.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "kernel/tty_handoff_runtime.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"

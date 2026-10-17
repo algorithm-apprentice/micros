@@ -1,4 +1,4 @@
-#include "kernel_object_private.h"
+#include "kernel/objects/kernel_object_private.h"
 
 bool kernel_object_process_handle_is_valid(
     struct micros_process_handle handle

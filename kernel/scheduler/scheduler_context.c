@@ -4,7 +4,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/scheduler_context.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/panic.h"
 #include "micros/user_address_space.h"
 #include "micros/user_execution.h"

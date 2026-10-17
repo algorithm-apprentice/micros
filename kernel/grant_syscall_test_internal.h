@@ -12,7 +12,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc_runtime_internal.h"
-#include "kernel/kernel_object_runtime_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/bootstrap_control.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_copy.h"

@@ -337,15 +337,15 @@ set(
 
 set(
     MICROS_KERNEL_OBJECT_CORE_SOURCES
-    kernel/kernel_objects.c
-    kernel/kernel_object_state.c
-    kernel/kernel_object_identity.c
-    kernel/kernel_object_stack.c
-    kernel/kernel_object_process.c
-    kernel/kernel_object_thread.c
-    kernel/kernel_object_context.c
-    kernel/kernel_object_hart.c
-    kernel/kernel_object_validation.c
+    kernel/objects/kernel_objects.c
+    kernel/objects/kernel_object_state.c
+    kernel/objects/kernel_object_identity.c
+    kernel/objects/kernel_object_stack.c
+    kernel/objects/kernel_object_process.c
+    kernel/objects/kernel_object_thread.c
+    kernel/objects/kernel_object_context.c
+    kernel/objects/kernel_object_hart.c
+    kernel/objects/kernel_object_validation.c
 )
 
 set(
@@ -4022,7 +4022,7 @@ add_executable(
     kernel/ipc_runtime.c
     ${MICROS_IPC_SYSCALL_SOURCES}
     ${MICROS_SYSCALL_SOURCES}
-    kernel/kernel_object_runtime.c
+    kernel/objects/kernel_object_runtime.c
     ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
     ${MICROS_SCHEDULER_CORE_SOURCES}
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
