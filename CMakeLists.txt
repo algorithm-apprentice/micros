@@ -4027,7 +4027,7 @@ add_executable(
     ${MICROS_SCHEDULER_CORE_SOURCES}
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
-    kernel/panic.c
+    kernel/diagnostic/panic.c
     kernel/platform/plic.c
     kernel/platform/plic_core.c
     ${MICROS_PM_CONTROL_CORE_SOURCES}
