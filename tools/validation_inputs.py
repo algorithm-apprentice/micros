@@ -41,9 +41,10 @@ def _file_digest(path):
     return digest.hexdigest()
 
 
-def fingerprint_tree(path, admitted_roots):
+def fingerprint_tree(path, admitted_roots, *, inert_link_roots=()):
     path = Path(path)
     roots = tuple(Path(root).resolve() for root in admitted_roots)
+    inert_roots = tuple(Path(root).resolve() for root in inert_link_roots)
     digest = hashlib.sha256()
 
     def visit(selected, relative):
@@ -55,7 +56,10 @@ def fingerprint_tree(path, admitted_roots):
                 resolved = selected.resolve(strict=True)
             except (OSError, RuntimeError) as error:
                 raise UnsupportedContext("unresolved manifest link") from error
-            if not _inside(resolved, (*roots, *SYSTEM_ROOTS)):
+            if (
+                not _inside(resolved, (*roots, *SYSTEM_ROOTS))
+                and not _inside(selected, inert_roots)
+            ):
                 raise UnsupportedContext("manifest link escapes admitted roots")
             entry.extend(("link", os.readlink(selected), str(resolved)))
         elif stat.S_ISREG(mode):

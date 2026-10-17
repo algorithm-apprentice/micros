@@ -11,6 +11,7 @@ import plistlib
 import re
 import shutil
 import stat
+import sys
 from typing import Optional
 
 from tools.validation_build_manifest import (
@@ -24,9 +25,14 @@ from tools.validation_inputs import (
     SYSTEM_ROOTS, UnsupportedContext, _absent_paths, _file_digest, _file_identity,
     _inside, _json_digest, _run, fingerprint_tree,
 )
+from tools.python_host_runtime import (
+    PYTHON_ARGS,
+    UnsupportedPythonRuntime,
+    validate_environment as validate_python_environment,
+)
 
 
-PROFILE_NAME = "darwin-arm64-ninja-v1"
+PROFILE_NAME = "darwin-arm64-ninja-python315-v2"
 PREPARATION_REASON_CODES = (
     SelectedOutputAbsent.reason_code,
     DeclaredOutputAbsent.reason_code,
@@ -43,10 +49,10 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368",
+    "CMakeLists.txt": "5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
-QEMU_RUNNER_DIGEST = "e5cc208fff305dae0279816fdb9ad45f86b48da4e19cb700fc5dbac3365341c4"
+QEMU_RUNNER_DIGEST = "c48d0bcac58f6bd28695cfa3cf49967052849c58974f3f8f4ac75526c224bc3f"
 QEMU_RUNNER_SOURCE_DIGESTS = {
     "tools/run_qemu_smoke.py": QEMU_RUNNER_DIGEST,
     "tools/qemu_smoke_records.py": "c1ddf036528c55ac93dda15522558d37cdd5efb09ed57675f3dea976bb96f8ec",
@@ -79,10 +85,6 @@ print(json.dumps({"implementation": sys.implementation.name,
                   "namespace": metadata(namespace), "helpers": helpers}))
 """
 STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))
-VENDOR_STARTUP = {
-    "Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth":
-        "7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373",
-}
 
 
 @dataclass(frozen=True)
@@ -133,7 +135,15 @@ def _validate_qemu_runner_namespace(root, tools):
     root = Path(root)
     names = tuple(Path(name).stem for name in QEMU_RUNNER_SOURCE_DIGESTS if name != "tools/run_qemu_smoke.py")
     information = json.loads(_run(
-        (tools.python, "-B", "-c", QEMU_LOADER_PROBE, str(root), json.dumps(names)), cwd=root,
+        (
+            tools.python,
+            *PYTHON_ARGS,
+            "-c",
+            QEMU_LOADER_PROBE,
+            str(root),
+            json.dumps(names),
+        ),
+        cwd=root,
     ))
     if not isinstance(information, dict) or set(information) != {
         "implementation", "source", "bytecode", "extensions", "namespace", "helpers",
@@ -180,8 +190,10 @@ def environment_digest(environment):
 
 
 def validate_environment(environment, *, target):
-    if environment.get("PYTHONNOUSERSITE") != "1":
-        raise UnsupportedContext("profile requires PYTHONNOUSERSITE=1")
+    try:
+        validate_python_environment(environment)
+    except UnsupportedPythonRuntime as error:
+        raise UnsupportedContext(str(error)) from error
     if environment.get("CLANG_NO_DEFAULT_CONFIG") != "1":
         raise UnsupportedContext("profile requires CLANG_NO_DEFAULT_CONFIG=1")
     forbidden = {
@@ -194,7 +206,7 @@ def validate_environment(environment, *, target):
         "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE",
         "CC", "CXX", "AS", "LD", "AR", "RANLIB", "NM",
         "BASH_ENV", "ENV", "SHELLOPTS", "IFS", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR",
-        "_PYTHON_SYSCONFIGDATA_NAME",
+        "_PYTHON_SYSCONFIGDATA_NAME", "MICROS_PYTHON_ROOT",
         "CCC_OVERRIDE_OPTIONS", "CCC_ADD_ARGS",
     }
     rejected = [
@@ -233,17 +245,6 @@ def validate_sdk_environment(environment, sdk, toolchain):
             path = Path(spelling).resolve(strict=True)
             if not path.is_dir() or not _inside(path, (sdk, toolchain)):
                 raise UnsupportedContext(f"{name} escapes the declared SDK/toolchain roots")
-
-
-def validate_python_startup(framework, environment):
-    if environment.get("SETUPTOOLS_USE_DISTUTILS", "stdlib") != "stdlib":
-        raise UnsupportedContext("vendor distutils import redirection is unsupported")
-    if any(framework.rglob("sitecustomize.py")) or any(framework.rglob("usercustomize.py")):
-        raise UnsupportedContext("Python import customization is unsupported")
-    for path in framework.rglob("*.pth"):
-        expected = VENDOR_STARTUP.get(str(path.relative_to(framework)))
-        if path.is_symlink() or expected is None or _file_digest(path) != expected:
-            raise UnsupportedContext("unreviewed Python startup declaration")
 
 
 def platform_identity(*, system=None, machine=None):
@@ -627,7 +628,11 @@ class DarwinTools:
         if not path.is_file() or not os.access(path, os.X_OK):
             raise UnsupportedContext("required tool is not executable")
         self.executables[role] = {"path": str(requested), "resolved": str(path)}
-        version = _run((requested, "--version"))
+        version = _run((
+            requested,
+            *(PYTHON_ARGS if role in ("python", "python-runtime") else ()),
+            "--version",
+        ))
         self.versions[role] = {"sha256": hashlib.sha256(version).hexdigest()}
         if role in ("compiler", "assembler", "native-compiler"):
             self.versions[role].update(compiler_version(
@@ -643,33 +648,74 @@ class DarwinTools:
         requested = self.cache.get("MICROS_PYTHON")
         if not requested:
             raise UnsupportedContext("configured Python cannot be resolved")
-        if Path(requested).resolve() != Path("/usr/bin/python3"):
-            raise UnsupportedContext("initial profile requires the active Xcode Python shim")
-        declared_framework = self.developer / "Library/Frameworks/Python3.framework"
-        validate_python_startup(declared_framework, self.environment)
+        selected = Path(requested)
+        if (
+            not selected.is_absolute()
+            or self.environment.get("MICROS_PYTHON") != requested
+            or selected.resolve(strict=True) != Path(sys.executable).resolve(strict=True)
+        ):
+            raise UnsupportedContext(
+                "reusable profile requires one explicit current MICROS_PYTHON"
+            )
         information = json.loads(_run((
-            requested, "-B", "-c",
-            "import json,sys,site; print(json.dumps({"
-            "'executable':sys.executable,'prefix':sys.prefix,'paths':sys.path,"
-            "'user_site':site.ENABLE_USER_SITE}))",
+            requested,
+            *PYTHON_ARGS,
+            str(self.root / "tools/python_host_runtime.py"),
+            "--selected",
+            requested,
+            "--metadata",
         ), cwd=self.root))
+        expected = {
+            "implementation", "version", "releaselevel", "cache_tag",
+            "gil_enabled", "py_gil_disabled", "flags", "executable",
+            "base_executable", "prefix", "base_prefix", "stdlib", "paths",
+            "cafile", "capath", "certificate_count",
+        }
+        if set(information) != expected:
+            raise UnsupportedContext("Python runtime metadata is incomplete")
         prefix = Path(information["prefix"]).resolve()
-        framework = next((path for path in (prefix, *prefix.parents) if path.name == "Python3.framework"), None)
-        if framework is None or information["user_site"] is not False:
-            raise UnsupportedContext("unclosed Python framework/user-site resolution")
+        framework = next(
+            (
+                path
+                for path in (prefix, *prefix.parents)
+                if path.name == "Python.framework"
+            ),
+            None,
+        )
+        if framework is None:
+            raise UnsupportedContext("unclosed Python framework resolution")
         self.python = Path(information["executable"]).resolve()
-        self.roots.add(framework)
-        self.roots.add(self.python)
+        installation = _cellar_root(self.python)
+        if installation.parent.name != "python@3.15":
+            raise UnsupportedContext("Python is outside the versioned python@3.15 Cellar")
+        self.framework = framework
+        self.python_installation = installation
+        self.python_inert_roots = (
+            installation / "lib/python3.15/site-packages",
+            framework / "Versions/3.15/lib/python3.15/site-packages",
+        )
+        self.roots.add(installation)
         self.python_paths = []
         for spelling in information["paths"]:
-            path = (self.root if not spelling else Path(spelling)).resolve()
-            if path != self.root and not _inside(path, (framework,)):
+            path = Path(spelling).resolve()
+            if not _inside(path, (self.root, framework)):
                 raise UnsupportedContext("unclosed Python import-search directory")
-            if path.name in ("sitecustomize.py", "usercustomize.py"):
-                raise UnsupportedContext("Python import customization is unsupported")
             self.python_paths.append({"path": str(path), "exists": path.exists()})
-        if any(framework.rglob("sitecustomize.py")) or any(framework.rglob("usercustomize.py")):
-            raise UnsupportedContext("Python import customization is unsupported")
+        spellings = [selected]
+        formula = next(
+            (
+                path
+                for path in selected.parents
+                if path.name == "python@3.15" and path.parent.name == "opt"
+            ),
+            None,
+        )
+        if formula is not None:
+            spellings.append(formula)
+        self.python_spellings = {
+            str(path): fingerprint_tree(path, (installation, framework))
+            for path in spellings
+        }
         self._tool("python", requested)
         self._tool("python-runtime", self.python)
 
@@ -794,13 +840,12 @@ class DarwinTools:
             self.libraries(Path(tool["resolved"]))
         for path in native_executables:
             self.libraries(path)
-        framework = next(path for path in self.roots if path.name == "Python3.framework")
         commands = _run(("/usr/bin/otool", "-l", "-arch", "arm64", self.python)).decode()
         inherited = tuple(
             self._expand(value, self.python, self.python)
             for value in re.findall(r"cmd LC_RPATH\s+cmdsize \d+\s+path (.+?) \(offset \d+\)", commands)
         )
-        for extension in sorted(framework.rglob("*.so")):
+        for extension in sorted(self.framework.rglob("*.so")):
             self.libraries(self.python, loader=extension.resolve(), inherited=inherited)
 
     def qemu(self):
@@ -872,9 +917,18 @@ def collect(root, workflow, *, preparation=None):
             native = tuple(path for path in native if path.is_file())
         tools.close_libraries(native)
         roots = tuple(sorted(tools.roots))
-        inputs["external_roots"] = {
-            str(path): fingerprint_tree(path, roots) for path in roots
-        }
+        inputs["external_roots"] = {}
+        for path in roots:
+            inputs["external_roots"][str(path)] = fingerprint_tree(
+                path,
+                roots,
+                inert_link_roots=(
+                    tools.python_inert_roots
+                    if path == tools.python_installation
+                    else ()
+                ),
+            )
+        inputs["python_spellings"] = tools.python_spellings
         python_roots = (root / "tools", root / "tests/host")
         inputs["repository_python"] = {
             str(path.relative_to(root)): fingerprint_tree(path, (*roots, *python_roots))

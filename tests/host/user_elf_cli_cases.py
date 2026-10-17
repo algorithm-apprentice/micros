@@ -11,6 +11,7 @@ import tempfile
 
 from tests.host.user_elf_test_fixture import build_elf
 from tools import check_user_elf
+from tools.python_host_runtime import python_command
 
 
 class UserElfCliCases:
@@ -18,9 +19,11 @@ class UserElfCliCases:
         root = Path(__file__).resolve().parents[2]
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
-        command = [sys.executable, "-B"]
+        command = list(python_command(
+            sys.executable,
+            environment=environment,
+        ))
         if module:
-            environment["PYTHONPATH"] = str(root)
             command.extend(("-m", "tools.check_user_elf"))
         else:
             command.append(str(root / "tools/check_user_elf.py"))
@@ -30,7 +33,7 @@ class UserElfCliCases:
                 image.write_bytes(data)
             return subprocess.run(
                 [*command, "--elf", str(image), *arguments],
-                cwd=temporary,
+                cwd=root if module else temporary,
                 env=environment,
                 text=True,
                 capture_output=True,

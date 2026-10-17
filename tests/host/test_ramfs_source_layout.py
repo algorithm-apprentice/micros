@@ -2587,7 +2587,10 @@ class RamfsSourceLayoutTest(unittest.TestCase):
 
     def test_unreviewed_recipe_identity_is_rejected_before_any_build_metadata(self):
         with patch.dict("tools.validation_context.os.environ", {
-            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1",
+            "OPENSSL_CONF": "/dev/null",
+            "SSL_CERT_FILE": "/dev/null",
+            "SSL_CERT_DIR": "/dev/null",
+            "CLANG_NO_DEFAULT_CONFIG": "1",
         }, clear=True), \
                 patch("tools.validation_context.platform_identity", return_value={}), \
                 patch("tools.validation_context._file_digest", return_value="unreviewed-recipe-bytes"), \

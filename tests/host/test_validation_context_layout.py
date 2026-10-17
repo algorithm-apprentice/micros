@@ -39,11 +39,11 @@ class ValidationContextLayoutTests(unittest.TestCase):
                 self.assertNotIn(name, observed)
                 observed[name] = ast_dump(definitions[name])
         self.assertEqual(
-            "00c8141862492e630b8509eaeb639619336696367880617b5b5b2a9e58ba5a4c",
+            "91f79abda93a6bb2e847013ca9fda8aecc8b1179e78147a20e955c25b8748cc3",
             hashlib.sha256(
                 json.dumps(observed, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
-            "shared input owners must match Accepted ADR-0074",
+            "shared input owners must match Accepted ADR-0074 and ADR-0075",
         )
 
     def test_private_dependency_direction_and_error_identity_are_acyclic(self):

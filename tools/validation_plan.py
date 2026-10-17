@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3.15 -E -S -B
 
 import argparse
 import json
@@ -13,6 +13,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tools import validation_build_impact, validation_context, validation_execution
+from tools.python_host_runtime import (
+    PYTHON_ARGS,
+    UnsupportedPythonRuntime,
+    require_current_runtime,
+)
 
 
 UNIT_FAST = ("cmake", "--workflow", "--preset", "test-unit-fast")
@@ -22,7 +27,11 @@ TTY_MODEL = ("cmake", "--workflow", "--preset", "test-tty-model")
 RAMFS_MODEL = ("cmake", "--workflow", "--preset", "test-ramfs-model")
 VFS_MODEL = ("cmake", "--workflow", "--preset", "test-vfs-model")
 ELF_SPAWN_MODEL = ("cmake", "--workflow", "--preset", "test-elf-spawn-model")
-DOCS = ("python3", "tools/check_docs.py")
+DOCS = (
+    os.environ.get("MICROS_PYTHON") or sys.executable,
+    *PYTHON_ARGS,
+    "tools/check_docs.py",
+)
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
 
 QEMU_WORKFLOWS = (
@@ -144,6 +153,8 @@ PLANNER_INPUTS = (
     "tools/validation_inputs.py",
     "tools/validation_build_manifest.py",
     "tests/host/test_validation_context_layout.py",
+    "tools/python_host_runtime.py",
+    "tests/host/test_python_host_runtime.py",
     "docs/adr/0032-fail-closed-change-aware-validation.md",
     "docs/adr/0064-fail-closed-validation-evidence-reuse.md",
 )
@@ -2678,6 +2689,7 @@ def main(argv=None):
     arguments = parse_arguments(argv)
     root = planner_root()
     try:
+        require_current_runtime(DOCS[0])
         expected_source = (
             validation_context.capture_candidate(root)
             if arguments.execute or arguments.record_workflow else None
@@ -2697,7 +2709,7 @@ def main(argv=None):
             for path in arguments.path
         ]
         paths = combine_paths(discovered, explicit)
-    except ValueError as error:
+    except (ValueError, UnsupportedPythonRuntime) as error:
         raise SystemExit(str(error)) from error
     commands = repository_plan(root, paths, arguments.tier, arguments.base)
 

@@ -1,6 +1,8 @@
+import os
 import pathlib
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -20,7 +22,101 @@ def qemu_target_timeout(target):
     return int(match.group(1))
 
 
+def python_environment():
+    environment = os.environ.copy()
+    environment.update({
+        "MICROS_PYTHON": sys.executable,
+        "OPENSSL_CONF": "/dev/null",
+        "SSL_CERT_FILE": "/dev/null",
+        "SSL_CERT_DIR": "/dev/null",
+    })
+    environment.pop("PYTHONEXECUTABLE", None)
+    environment.pop("__PYVENV_LAUNCHER__", None)
+    return environment
+
+
 class CMakeConfigurationTests(unittest.TestCase):
+    def test_explicit_python_315_configures_with_exact_cache_spelling(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(ROOT),
+                    "-B",
+                    temporary_directory,
+                    "-G",
+                    "Ninja",
+                    f"-DMICROS_PYTHON={sys.executable}",
+                    "-DMICROS_BUILD_HOST_TESTS=ON",
+                ],
+                env=python_environment(),
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            cache = (
+                pathlib.Path(temporary_directory) / "CMakeCache.txt"
+            ).read_text(encoding="utf-8")
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn(
+            f"MICROS_PYTHON:FILEPATH={sys.executable}",
+            cache,
+        )
+
+    def test_explicit_unsupported_python_does_not_fall_through(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(ROOT),
+                    "-B",
+                    temporary_directory,
+                    "-G",
+                    "Ninja",
+                    "-DMICROS_PYTHON=/usr/bin/python3",
+                ],
+                env=python_environment(),
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "host automation requires CPython 3.15 final",
+            result.stdout + result.stderr,
+        )
+
+    def test_preexec_virtual_environment_launcher_is_rejected(self):
+        environment = python_environment()
+        environment["__PYVENV_LAUNCHER__"] = "/tmp/fake"
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(ROOT),
+                    "-B",
+                    temporary_directory,
+                    "-G",
+                    "Ninja",
+                    f"-DMICROS_PYTHON={sys.executable}",
+                ],
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "__PYVENV_LAUNCHER__ is unsupported",
+            result.stdout + result.stderr,
+        )
+
     def test_ramfs_service_target_is_exclusive(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             result = subprocess.run(

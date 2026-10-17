@@ -9,6 +9,7 @@ import unittest
 
 from tests.host.application_elf_test_fixture import build_application_elf
 from tools import check_application_elf
+from tools.python_host_runtime import python_command
 from tools.user_elf_format import (
     ElfSymbol,
     PAGE_SIZE,
@@ -28,9 +29,11 @@ class ApplicationElfCheckerTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
-        command = [sys.executable, "-B"]
+        command = list(python_command(
+            sys.executable,
+            environment=environment,
+        ))
         if module:
-            environment["PYTHONPATH"] = str(root)
             command.extend(("-m", "tools.check_application_elf"))
         else:
             command.append(str(root / "tools/check_application_elf.py"))
@@ -44,7 +47,7 @@ class ApplicationElfCheckerTest(unittest.TestCase):
                 artifact.write_bytes(runtime)
                 command.extend(("--runtime-elf", str(artifact)))
             return subprocess.run(
-                command, cwd=temporary, env=environment, text=True,
+                command, cwd=root if module else temporary, env=environment, text=True,
                 capture_output=True, timeout=10, check=False,
             )
 

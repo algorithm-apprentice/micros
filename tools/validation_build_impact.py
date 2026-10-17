@@ -13,12 +13,12 @@ TEMPLATES = {
     "test-qemu-smoke": (
         (),
         ("test-qemu-smoke",),
-        "9c577637989e9a55c4d4e4c131425f64a5cec8baebb9695acba2d768b621cb38",
+        "7e0612c122cc577c91ede6be8877fc97cf80a2bc2f99d33c472e3dfc8127645a",
     ),
     "test-qemu-panic": (
         (("MICROS_BUILD_PANIC_TEST",),),
         ("test-qemu-panic",),
-        "d4b638a0507daba11e1293fbb3caa0a88d39f37223be5ad66502e1e21bcf3d47",
+        "7cc475000e95f9d1d20148c0c9745b5dd5b949eaa2f20ce5bbbc5443356bcbdc",
     ),
     "test-qemu-scheduler-invalid-context": (
         ((
@@ -30,7 +30,7 @@ TEMPLATES = {
             "test-qemu-scheduler-invalid-outgoing",
             "test-qemu-scheduler-invalid-next",
         ),
-        "5e3f0e38f8fc0a3230fbae4afaf63ee6e031473cd05a6b409e88d704de736b36",
+        "772d293d6252819e24a3294c5f331f60f5a8f47e2db0dc9b40fed3adda5bd20f",
     ),
 }
 

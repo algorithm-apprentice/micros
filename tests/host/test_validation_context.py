@@ -9,7 +9,11 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tools import validation_build_manifest, validation_context
+from tools import (
+    python_host_runtime,
+    validation_build_manifest,
+    validation_context,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +24,15 @@ class ValidationContextTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
+
+    def environment(self, **values):
+        return {
+            "OPENSSL_CONF": "/dev/null",
+            "SSL_CERT_FILE": "/dev/null",
+            "SSL_CERT_DIR": "/dev/null",
+            "CLANG_NO_DEFAULT_CONFIG": "1",
+            **values,
+        }
 
     def digest(self):
         return validation_context.fingerprint_tree(self.root, (self.root,))
@@ -67,7 +80,14 @@ class ValidationContextTests(unittest.TestCase):
         )
         return {
             "implementation": "cpython", "source": [".py"], "bytecode": [".pyc"],
-            "extensions": [".cpython-39-darwin.so", ".abi3.so", ".so"],
+            "extensions": [
+                ".cpython-315-darwin.so",
+                ".abi3-darwin.so",
+                ".abi3.so",
+                ".abi3t-darwin.so",
+                ".abi3t.so",
+                ".so",
+            ],
             "namespace": {"origin": None, "loader": None, "locations": [str(self.root / "tools")]},
             "helpers": {
                 name: {"origin": str(self.root / "tools" / (name + ".py")), "loader": "SourceFileLoader", "locations": []}
@@ -93,10 +113,10 @@ class ValidationContextTests(unittest.TestCase):
                 path.unlink()
             cache = self.root / "tools/__pycache__"
             cache.mkdir()
-            (cache / "qemu_smoke_command.cpython-39.pyc").write_bytes(b"cached replacement, never executed")
+            (cache / "qemu_smoke_command.cpython-315.pyc").write_bytes(b"cached replacement, never executed")
             with self.assertRaises(validation_context.UnsupportedContext):
                 validation_context._validate_qemu_runner_family(self.root)
-            (cache / "qemu_smoke_command.cpython-39.pyc").unlink()
+            (cache / "qemu_smoke_command.cpython-315.pyc").unlink()
             changed.unlink()
             changed.symlink_to(self.root / "tools/qemu_smoke_records.py")
             with self.assertRaises(validation_context.UnsupportedContext):
@@ -109,7 +129,7 @@ class ValidationContextTests(unittest.TestCase):
         with mock.patch("tools.validation_context._run", return_value=json.dumps(information).encode()) as run:
             validation_context._validate_qemu_runner_namespace(self.root, tools)
         self.assertEqual(tools.python, run.call_args.args[0][0])
-        self.assertEqual(("-B", "-c"), run.call_args.args[0][1:3])
+        self.assertEqual(("-E", "-S", "-B", "-c"), run.call_args.args[0][1:5])
         information["namespace"]["locations"].append(str(self.root / "foreign-tools"))
         with mock.patch("tools.validation_context._run", return_value=json.dumps(information).encode()):
             with self.assertRaises(validation_context.UnsupportedContext):
@@ -121,9 +141,9 @@ class ValidationContextTests(unittest.TestCase):
         tools.qemu.side_effect = AssertionError("QEMU metadata ran before script-directory refusal")
 
         def probe(command, *, cwd):
-            self.assertEqual((tools.python, "-B", "-c"), command[:3])
+            self.assertEqual((tools.python, "-E", "-S", "-B", "-c"), command[:5])
             completed = subprocess.run(
-                (*command[:2], "-I", "-S", *command[2:]), cwd=cwd,
+                command, cwd=cwd,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
             )
             return completed.stdout
@@ -172,8 +192,14 @@ class ValidationContextTests(unittest.TestCase):
                     validation_context._validate_qemu_runner_namespace(self.root, tools)
         with mock.patch("tools.validation_context._run", return_value=json.dumps(original).encode()):
             for relative in (
-                "tools/qemu_smoke_command.cpython-39-darwin.so", "tools/qemu_smoke_command.abi3.so",
-                "tools/qemu_smoke_command.so", "tools/__init__.so", "tools.so",
+                "tools/qemu_smoke_command.cpython-315-darwin.so",
+                "tools/qemu_smoke_command.abi3-darwin.so",
+                "tools/qemu_smoke_command.abi3.so",
+                "tools/qemu_smoke_command.abi3t-darwin.so",
+                "tools/qemu_smoke_command.abi3t.so",
+                "tools/qemu_smoke_command.so",
+                "tools/__init__.so",
+                "tools.so",
             ):
                 path = self.root / relative
                 path.write_bytes(b"native replacement metadata fixture, never loaded")
@@ -215,6 +241,39 @@ class ValidationContextTests(unittest.TestCase):
         with self.assertRaisesRegex(validation_context.UnsupportedContext, "link"):
             self.digest()
 
+    def test_inert_site_link_records_spelling_without_admitting_target_bytes(self):
+        installation = self.root / "python"
+        site = installation / "lib/python3.15/site-packages"
+        target = self.root / "external-cert.pem"
+        site.mkdir(parents=True)
+        target.write_bytes(b"external trust bytes")
+        link = site / "cacert.pem"
+        link.symlink_to(target)
+        first = validation_context.fingerprint_tree(
+            installation,
+            (installation,),
+            inert_link_roots=(site,),
+        )
+        target.write_bytes(b"changed inactive trust bytes")
+        self.assertEqual(
+            first,
+            validation_context.fingerprint_tree(
+                installation,
+                (installation,),
+                inert_link_roots=(site,),
+            ),
+        )
+        link.unlink()
+        link.symlink_to("../../../../external-cert.pem")
+        self.assertNotEqual(
+            first,
+            validation_context.fingerprint_tree(
+                installation,
+                (installation,),
+                inert_link_roots=(site,),
+            ),
+        )
+
     def test_link_to_another_explicit_root_is_closed_without_following_cycles(self):
         first = self.root / "first"
         second = self.root / "second"
@@ -228,7 +287,7 @@ class ValidationContextTests(unittest.TestCase):
         )
 
     def test_environment_fingerprint_includes_unlisted_inherited_values(self):
-        first = {"PYTHONNOUSERSITE": "1", "ordinary": "private-value-one"}
+        first = {**self.environment(), "ordinary": "private-value-one"}
         second = {**first, "ordinary": "private-value-two"}
         digest = validation_context.environment_digest(first)
         self.assertNotEqual(digest, validation_context.environment_digest(second))
@@ -238,22 +297,29 @@ class ValidationContextTests(unittest.TestCase):
     def test_injection_and_unclosed_import_or_compiler_environment_is_unsupported(self):
         for variable in (
             "DYLD_INSERT_LIBRARIES", "LD_PRELOAD", "PYTHONPATH", "PYTHONHOME",
+            "PYTHONEXECUTABLE", "__PYVENV_LAUNCHER__", "OPENSSL_MODULES",
+            "RANDFILE", "CTLOG_FILE", "MICROS_PYTHON_ROOT",
             "CPATH", "C_INCLUDE_PATH", "CFLAGS", "LDFLAGS",
             "CMAKE_PROJECT_INCLUDE", "QEMU_FIRMWAREPATH",
         ):
             with self.subTest(variable=variable):
                 with self.assertRaises(validation_context.UnsupportedContext):
                     validation_context.validate_environment(
-                        {
-                            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1",
-                            variable: "injected",
-                        }, target=False
+                        self.environment(**{variable: "injected"}),
+                        target=False,
                     )
-        with self.assertRaisesRegex(validation_context.UnsupportedContext, "PYTHONNOUSERSITE"):
-            validation_context.validate_environment({}, target=False)
+        for name in ("OPENSSL_CONF", "SSL_CERT_FILE", "SSL_CERT_DIR"):
+            environment = self.environment()
+            environment.pop(name)
+            with self.subTest(name=name), self.assertRaisesRegex(
+                validation_context.UnsupportedContext,
+                name,
+            ):
+                validation_context.validate_environment(environment, target=False)
         with self.assertRaisesRegex(validation_context.UnsupportedContext, "MICROS_CLANG"):
             validation_context.validate_environment(
-                {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}, target=True
+                self.environment(),
+                target=True,
             )
 
     def test_only_active_sdk_derived_shim_paths_are_admitted(self):
@@ -261,10 +327,11 @@ class ValidationContextTests(unittest.TestCase):
         toolchain = self.root / "toolchain"
         for path in (sdk / "usr/include", sdk / "usr/lib", toolchain):
             path.mkdir(parents=True)
-        environment = {
-            "PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1", "SDKROOT": str(sdk),
-            "CPATH": str(sdk / "usr/include"), "LIBRARY_PATH": str(sdk / "usr/lib"),
-        }
+        environment = self.environment(
+            SDKROOT=str(sdk),
+            CPATH=str(sdk / "usr/include"),
+            LIBRARY_PATH=str(sdk / "usr/lib"),
+        )
         validation_context.validate_environment(environment, target=False)
         validation_context.validate_sdk_environment(environment, sdk, toolchain)
         with self.assertRaises(validation_context.UnsupportedContext):
@@ -272,23 +339,70 @@ class ValidationContextTests(unittest.TestCase):
                 {**environment, "CPATH": str(self.root)}, sdk, toolchain
             )
 
-    def test_only_the_reviewed_inactive_vendor_startup_declaration_is_allowed(self):
-        framework = self.root / "Python3.framework"
-        startup = framework / "Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth"
+    def test_inert_site_customization_remains_fingerprinted_not_allowlisted(self):
+        framework = self.root / "Python.framework"
+        startup = framework / "Versions/3.15/lib/python3.15/sitecustomize.py"
         startup.parent.mkdir(parents=True)
-        startup.write_bytes(b"vendor fixture, not executable startup text")
+        startup.write_bytes(b"inert under -S")
+        first = validation_context.fingerprint_tree(framework, (framework,))
+        startup.write_bytes(b"changed but still inert under -S")
+        self.assertNotEqual(
+            first,
+            validation_context.fingerprint_tree(framework, (framework,)),
+        )
+
+    def test_reusable_python_matches_cache_environment_and_current_process(self):
+        metadata = python_host_runtime.current_metadata()
+        selected = str(Path(sys.executable))
+        tools = validation_context.DarwinTools.__new__(
+            validation_context.DarwinTools
+        )
+        tools.root = ROOT
+        tools.cache = {"MICROS_PYTHON": selected}
+        tools.environment = self.environment(MICROS_PYTHON=selected)
+        tools.roots = set()
+        tools._tool = mock.Mock()
         with mock.patch(
-            "tools.validation_context._file_digest",
-            return_value="7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373",
+            "tools.validation_context._run",
+            return_value=json.dumps(metadata).encode(),
+        ) as run, mock.patch(
+            "tools.validation_context.fingerprint_tree",
+            return_value="closed-python-spelling",
         ):
-            validation_context.validate_python_startup(framework, {})
-            with self.assertRaises(validation_context.UnsupportedContext):
-                validation_context.validate_python_startup(
-                    framework, {"SETUPTOOLS_USE_DISTUTILS": "local"}
-                )
-            (startup.parent / "unexpected.pth").write_bytes(b"unreviewed")
-            with self.assertRaises(validation_context.UnsupportedContext):
-                validation_context.validate_python_startup(framework, {})
+            tools._python()
+        self.assertEqual(
+            (
+                selected,
+                "-E",
+                "-S",
+                "-B",
+                str(ROOT / "tools/python_host_runtime.py"),
+                "--selected",
+                selected,
+                "--metadata",
+            ),
+            run.call_args.args[0],
+        )
+        self.assertEqual(Path(metadata["executable"]).resolve(), tools.python)
+        self.assertTrue(tools.python_spellings)
+        tools._tool.assert_has_calls([
+            mock.call("python", selected),
+            mock.call("python-runtime", tools.python),
+        ])
+
+        for cache, environment in (
+            ({"MICROS_PYTHON": selected}, self.environment()),
+            (
+                {"MICROS_PYTHON": "/usr/bin/python3"},
+                self.environment(MICROS_PYTHON="/usr/bin/python3"),
+            ),
+        ):
+            tools.cache = cache
+            tools.environment = environment
+            with self.subTest(cache=cache), self.assertRaises(
+                validation_context.UnsupportedContext
+            ):
+                tools._python()
 
     def preset_fixture(self):
         value = json.loads((ROOT / "CMakePresets.json").read_text())
@@ -763,13 +877,15 @@ class ValidationContextTests(unittest.TestCase):
 
     def test_automatic_compiler_configuration_must_be_explicitly_disabled(self):
         for value in (None, "", "0", "true"):
-            environment = {"PYTHONNOUSERSITE": "1"}
+            environment = self.environment()
             if value is not None:
                 environment["CLANG_NO_DEFAULT_CONFIG"] = value
+            else:
+                environment.pop("CLANG_NO_DEFAULT_CONFIG")
             with self.subTest(value=value):
                 with self.assertRaisesRegex(validation_context.UnsupportedContext, "CLANG_NO_DEFAULT_CONFIG"):
                     validation_context.validate_environment(environment, target=False)
-        environment = {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}
+        environment = self.environment()
         validation_context.validate_environment(environment, target=False)
         with self.assertRaises(validation_context.UnsupportedContext):
             validation_context.validate_environment(
@@ -1071,7 +1187,7 @@ class ValidationContextTests(unittest.TestCase):
                 validation_context.capture_candidate(self.root)
 
     def test_sanitizer_override_inputs_are_ineligible_not_untracked_dependencies(self):
-        baseline = {"PYTHONNOUSERSITE": "1", "CLANG_NO_DEFAULT_CONFIG": "1"}
+        baseline = self.environment()
         for name, value in (
             ("ASAN_OPTIONS", "include=/external/options"),
             ("UBSAN_OPTIONS", "suppressions=/external/suppressions"),
