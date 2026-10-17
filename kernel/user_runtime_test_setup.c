@@ -1,6 +1,6 @@
 #include "kernel/user_runtime_test_internal.h"
 
-#include "kernel/grant_runtime_internal.h"
+#include "kernel/grant/grant_runtime_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/user_runtime_image.h"
 #include "micros/frame_ownership_runtime.h"

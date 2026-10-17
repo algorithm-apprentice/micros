@@ -2,7 +2,7 @@
 
 #include "arch/riscv64/trap_context.h"
 #include "kernel/bootstrap_syscall.h"
-#include "kernel/grant_syscall.h"
+#include "kernel/grant/grant_syscall.h"
 #include "kernel/ipc/ipc_syscall.h"
 #include "kernel/pm_control_syscall.h"
 #include "kernel/tty/tty_control_syscall.h"

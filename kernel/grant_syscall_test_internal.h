@@ -10,7 +10,7 @@
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
-#include "kernel/grant_runtime_internal.h"
+#include "kernel/grant/grant_runtime_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/bootstrap_control.h"

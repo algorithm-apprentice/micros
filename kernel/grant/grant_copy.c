@@ -1,6 +1,6 @@
 #include "micros/grant_copy.h"
 
-#include "grant_copy_internal.h"
+#include "kernel/grant/grant_copy_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

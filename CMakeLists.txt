@@ -307,8 +307,8 @@ set(
 
 set(
     MICROS_GRANT_COPY_TARGET_SOURCES
-    kernel/grant_copy.c
-    kernel/grant_copy_range.c
+    kernel/grant/grant_copy.c
+    kernel/grant/grant_copy_range.c
 )
 
 set(
@@ -1307,10 +1307,10 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
-        kernel/grant.c
-        kernel/grant_abi.c
-        kernel/grant_copy_core.c
-        kernel/grant_syscall_core.c
+        kernel/grant/grant.c
+        kernel/grant/grant_abi.c
+        kernel/grant/grant_copy_core.c
+        kernel/grant/grant_syscall_core.c
         kernel/memory/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
         kernel/ipc/ipc_abi.c
@@ -1338,8 +1338,8 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
-        kernel/grant.c
-        kernel/grant_copy_core.c
+        kernel/grant/grant.c
+        kernel/grant/grant_copy_core.c
         ${MICROS_IPC_CORE_SOURCES}
         ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
         ${MICROS_GRANT_HOST_TEST_SOURCES}
@@ -4009,13 +4009,13 @@ add_executable(
     kernel/platform/fdt.c
     kernel/memory/frame_allocator.c
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
-    kernel/grant.c
-    kernel/grant_abi.c
+    kernel/grant/grant.c
+    kernel/grant/grant_abi.c
     ${MICROS_GRANT_COPY_TARGET_SOURCES}
-    kernel/grant_copy_core.c
-    kernel/grant_syscall_core.c
-    kernel/grant_syscall.c
-    kernel/grant_runtime.c
+    kernel/grant/grant_copy_core.c
+    kernel/grant/grant_syscall_core.c
+    kernel/grant/grant_syscall.c
+    kernel/grant/grant_runtime.c
     kernel/ipc/ipc_abi.c
     ${MICROS_IPC_CORE_SOURCES}
     kernel/ipc/ipc_buffer.c

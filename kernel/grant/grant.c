@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "grant_internal.h"
+#include "kernel/grant/grant_internal.h"
 #include "micros/user_address_space.h"
 
 #define MICROS_GRANT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534752)

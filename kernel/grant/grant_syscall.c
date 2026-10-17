@@ -1,10 +1,10 @@
-#include "kernel/grant_syscall.h"
+#include "kernel/grant/grant_syscall.h"
 
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
-#include "grant_internal.h"
-#include "kernel/grant_runtime_internal.h"
+#include "kernel/grant/grant_internal.h"
+#include "kernel/grant/grant_runtime_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "micros/grant_copy.h"

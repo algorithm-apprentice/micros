@@ -1,4 +1,4 @@
-#include "grant_copy_internal.h"
+#include "kernel/grant/grant_copy_internal.h"
 
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
