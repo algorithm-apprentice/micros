@@ -1,4 +1,4 @@
-#include "grant_syscall_test_internal.h"
+#include "kernel/tests/grant/grant_syscall_test_internal.h"
 
 bool grant_syscall_test_release_address_space(
     struct grant_syscall_test_fixture *fixture,

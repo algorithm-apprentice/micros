@@ -19,7 +19,7 @@
 #include "kernel/ipc_syscall_panic_test.h"
 #endif
 #ifdef MICROS_BUILD_GRANT_SYSCALL_TEST
-#include "kernel/grant_syscall_test.h"
+#include "kernel/tests/grant/grant_syscall_test.h"
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/pm_service_test.h"

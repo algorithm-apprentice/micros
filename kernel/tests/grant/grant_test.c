@@ -1,4 +1,4 @@
-#include "kernel/grant_test.h"
+#include "kernel/tests/grant/grant_test.h"
 
 #include <stddef.h>
 #include <stdint.h>

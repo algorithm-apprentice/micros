@@ -1,4 +1,4 @@
-#include "grant_syscall_test_internal.h"
+#include "kernel/tests/grant/grant_syscall_test_internal.h"
 
 bool micros_grant_syscall_test_before_ecall(
     struct micros_hart *hart,

@@ -1,4 +1,4 @@
-#include "grant_syscall_test_internal.h"
+#include "kernel/tests/grant/grant_syscall_test_internal.h"
 
 static bool grant_syscall_test_arm_ipc_notify(
     struct grant_syscall_test_fixture *fixture,

@@ -1,4 +1,4 @@
-#include "grant_syscall_test_internal.h"
+#include "kernel/tests/grant/grant_syscall_test_internal.h"
 
 const uint64_t TEST_CODE_ADDRESS =
     MICROS_USER_VIRTUAL_BASE;

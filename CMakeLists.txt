@@ -325,14 +325,14 @@ set(
 
 set(
     MICROS_GRANT_SYSCALL_QEMU_TEST_SOURCES
-    kernel/grant_syscall_test.c
-    kernel/grant_syscall_test_fixture.c
-    kernel/grant_syscall_test_commands.c
-    kernel/grant_syscall_test_copy_commands.c
-    kernel/grant_syscall_test_transitions.c
-    kernel/grant_syscall_test_effects.c
-    kernel/grant_syscall_test_hooks.c
-    kernel/grant_syscall_test_lifecycle.c
+    kernel/tests/grant/grant_syscall_test.c
+    kernel/tests/grant/grant_syscall_test_fixture.c
+    kernel/tests/grant/grant_syscall_test_commands.c
+    kernel/tests/grant/grant_syscall_test_copy_commands.c
+    kernel/tests/grant/grant_syscall_test_transitions.c
+    kernel/tests/grant/grant_syscall_test_effects.c
+    kernel/tests/grant/grant_syscall_test_hooks.c
+    kernel/tests/grant/grant_syscall_test_lifecycle.c
 )
 
 set(
@@ -4479,7 +4479,7 @@ if(MICROS_BUILD_GRANT_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/grant_test.c
+            kernel/tests/grant/grant_test.c
     )
 endif()
 

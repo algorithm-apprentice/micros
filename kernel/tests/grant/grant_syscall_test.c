@@ -1,4 +1,4 @@
-#include "grant_syscall_test_internal.h"
+#include "kernel/tests/grant/grant_syscall_test_internal.h"
 
 uintptr_t micros_grant_syscall_test_saved_sp;
 uintptr_t micros_grant_syscall_test_saved_gp;
