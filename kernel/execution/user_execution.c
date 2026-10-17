@@ -6,7 +6,7 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
-#include "kernel/user_execution_internal.h"
+#include "kernel/execution/user_execution_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"

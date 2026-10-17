@@ -711,9 +711,9 @@ set(
 
 set(
     MICROS_USER_EXECUTION_SOURCES
-    kernel/user_execution.c
-    kernel/user_execution_validation.c
-    kernel/user_execution_trap.c
+    kernel/execution/user_execution.c
+    kernel/execution/user_execution_validation.c
+    kernel/execution/user_execution_trap.c
 )
 
 set(
