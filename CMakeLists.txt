@@ -734,11 +734,11 @@ set(
 
 set(
     MICROS_USER_EXECUTION_QEMU_TEST_SOURCES
-    kernel/user_execution_test.c
-    kernel/user_execution_test_fixture.c
-    kernel/user_execution_test_prepare.c
-    kernel/user_execution_test_trap.c
-    kernel/user_execution_test_lifecycle.c
+    kernel/tests/execution/user_execution_test.c
+    kernel/tests/execution/user_execution_test_fixture.c
+    kernel/tests/execution/user_execution_test_prepare.c
+    kernel/tests/execution/user_execution_test_trap.c
+    kernel/tests/execution/user_execution_test_lifecycle.c
 )
 
 set(

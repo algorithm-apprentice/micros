@@ -1,4 +1,4 @@
-#include "kernel/user_execution_test_internal.h"
+#include "kernel/tests/execution/user_execution_test_internal.h"
 
 #include "micros/sv39.h"
 

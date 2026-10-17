@@ -6,7 +6,7 @@
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
-#include "kernel/user_execution_test_internal.h"
+#include "kernel/tests/execution/user_execution_test_internal.h"
 #include "micros/scheduler.h"
 
 _Noreturn void micros_user_execution_test_enter_production(

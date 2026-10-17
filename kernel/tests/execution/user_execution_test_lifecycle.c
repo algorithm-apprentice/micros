@@ -1,4 +1,4 @@
-#include "kernel/user_execution_test_internal.h"
+#include "kernel/tests/execution/user_execution_test_internal.h"
 
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler.h"

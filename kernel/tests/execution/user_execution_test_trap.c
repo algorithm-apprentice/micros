@@ -1,4 +1,4 @@
-#include "kernel/user_execution_test_internal.h"
+#include "kernel/tests/execution/user_execution_test_internal.h"
 
 #include "arch/riscv64/mmu.h"
 #include "arch/riscv64/platform.h"
