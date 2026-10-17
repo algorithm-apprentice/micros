@@ -37,6 +37,53 @@ class ValidationContextTests(unittest.TestCase):
     def digest(self):
         return validation_context.fingerprint_tree(self.root, (self.root,))
 
+    def python_runtime_fixture(self):
+        installation = self.root / "Cellar/python@3.15/3.15.0"
+        framework = installation / "Frameworks/Python.framework"
+        prefix = framework / "Versions/3.15"
+        executable = installation / "bin/python3.15"
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"python fixture")
+        base_executable = prefix / "bin/python3.15"
+        base_executable.parent.mkdir(parents=True)
+        base_executable.write_bytes(b"framework python fixture")
+        stdlib = prefix / "lib/python3.15"
+        (stdlib / "lib-dynload").mkdir(parents=True)
+        formula = self.root / "opt/python@3.15"
+        formula.parent.mkdir(parents=True)
+        formula.symlink_to(installation, target_is_directory=True)
+        selected = formula / "bin/python3.15"
+        metadata = {
+            "implementation": "cpython",
+            "version": [3, 15, 0],
+            "releaselevel": "final",
+            "cache_tag": "cpython-315",
+            "gil_enabled": True,
+            "py_gil_disabled": 0,
+            "flags": {
+                "ignore_environment": 1,
+                "no_site": 1,
+                "dont_write_bytecode": 1,
+                "isolated": 0,
+                "safe_path": 0,
+            },
+            "executable": str(selected),
+            "base_executable": str(base_executable),
+            "prefix": str(prefix),
+            "base_prefix": str(prefix),
+            "stdlib": str(stdlib),
+            "paths": [
+                str(ROOT),
+                str(prefix / "lib/python315.zip"),
+                str(stdlib),
+                str(stdlib / "lib-dynload"),
+            ],
+            "cafile": None,
+            "capath": None,
+            "certificate_count": 0,
+        }
+        return selected, executable, installation, metadata
+
     def qemu_family_fixture(self):
         paths = (
             "tools/run_qemu_smoke.py", "tools/qemu_smoke_records.py", "tools/qemu_smoke_platform.py",
@@ -352,49 +399,59 @@ class ValidationContextTests(unittest.TestCase):
         )
 
     def test_reusable_python_matches_cache_environment_and_current_process(self):
-        metadata = python_host_runtime.current_metadata()
-        selected = str(Path(sys.executable))
+        selected, executable, installation, metadata = (
+            self.python_runtime_fixture()
+        )
         tools = validation_context.DarwinTools.__new__(
             validation_context.DarwinTools
         )
         tools.root = ROOT
-        tools.cache = {"MICROS_PYTHON": selected}
-        tools.environment = self.environment(MICROS_PYTHON=selected)
+        tools.cache = {"MICROS_PYTHON": str(selected)}
+        tools.environment = self.environment(MICROS_PYTHON=str(selected))
         tools.roots = set()
         tools._tool = mock.Mock()
         with mock.patch(
             "tools.validation_context._run",
             return_value=json.dumps(metadata).encode(),
-        ) as run, mock.patch(
+        ) as run, mock.patch.object(
+            validation_context.sys,
+            "executable",
+            str(selected),
+        ), mock.patch(
+            "tools.validation_context._cellar_root",
+            return_value=installation,
+        ), mock.patch(
             "tools.validation_context.fingerprint_tree",
             return_value="closed-python-spelling",
         ):
             tools._python()
         self.assertEqual(
             (
-                selected,
+                str(selected),
                 "-E",
                 "-S",
                 "-B",
                 str(ROOT / "tools/python_host_runtime.py"),
                 "--selected",
-                selected,
+                str(selected),
                 "--metadata",
             ),
             run.call_args.args[0],
         )
-        self.assertEqual(Path(metadata["executable"]).resolve(), tools.python)
+        self.assertEqual(executable, tools.python)
         self.assertTrue(tools.python_spellings)
         tools._tool.assert_has_calls([
-            mock.call("python", selected),
+            mock.call("python", str(selected)),
             mock.call("python-runtime", tools.python),
         ])
 
+        other = self.root / "other-python"
+        other.write_bytes(b"other python fixture")
         for cache, environment in (
-            ({"MICROS_PYTHON": selected}, self.environment()),
+            ({"MICROS_PYTHON": str(selected)}, self.environment()),
             (
-                {"MICROS_PYTHON": "/usr/bin/python3"},
-                self.environment(MICROS_PYTHON="/usr/bin/python3"),
+                {"MICROS_PYTHON": str(other)},
+                self.environment(MICROS_PYTHON=str(other)),
             ),
         ):
             tools.cache = cache

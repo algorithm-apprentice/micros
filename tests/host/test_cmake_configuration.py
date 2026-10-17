@@ -67,16 +67,27 @@ class CMakeConfigurationTests(unittest.TestCase):
 
     def test_explicit_unsupported_python_does_not_fall_through(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
+            unsupported = pathlib.Path(temporary_directory) / "unsupported-python"
+            unsupported.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' "
+                "'unsupported Python runtime: "
+                "host automation requires CPython 3.15 final' >&2\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            unsupported.chmod(0o755)
+            build = pathlib.Path(temporary_directory) / "build"
             result = subprocess.run(
                 [
                     "cmake",
                     "-S",
                     str(ROOT),
                     "-B",
-                    temporary_directory,
+                    str(build),
                     "-G",
                     "Ninja",
-                    "-DMICROS_PYTHON=/usr/bin/python3",
+                    f"-DMICROS_PYTHON={unsupported}",
                 ],
                 env=python_environment(),
                 capture_output=True,
