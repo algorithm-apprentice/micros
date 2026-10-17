@@ -39,7 +39,7 @@
 #include "kernel/vfs_service_test.h"
 #endif
 #ifdef MICROS_BUILD_ELF_SPAWN_TEST
-#include "kernel/elf_spawn_test.h"
+#include "kernel/tests/spawn/elf_spawn_test.h"
 #endif
 #ifdef MICROS_BUILD_UART_CONSOLE_TEST
 #include "kernel/uart_console_test.h"

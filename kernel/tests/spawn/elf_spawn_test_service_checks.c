@@ -1,4 +1,4 @@
-#include "kernel/elf_spawn_test_internal.h"
+#include "kernel/tests/spawn/elf_spawn_test_internal.h"
 
 static const struct micros_vfs_process_record *elf_spawn_vfs_process(
     const struct micros_vfs_state *state, micros_endpoint_t endpoint

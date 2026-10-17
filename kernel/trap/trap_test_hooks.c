@@ -1,7 +1,7 @@
 #include "kernel/trap/trap_internal.h"
 
 #ifdef MICROS_BUILD_ELF_SPAWN_TEST
-#include "kernel/elf_spawn_test.h"
+#include "kernel/tests/spawn/elf_spawn_test.h"
 #endif
 #ifdef MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST
 #include "kernel/tests/memory/address_space_handoff_test.h"

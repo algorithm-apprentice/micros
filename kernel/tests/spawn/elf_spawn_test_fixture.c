@@ -1,4 +1,4 @@
-#include "kernel/elf_spawn_test_internal.h"
+#include "kernel/tests/spawn/elf_spawn_test_internal.h"
 
 #include "micros/tty.h"
 

@@ -1,4 +1,4 @@
-#include "kernel/elf_spawn_test_internal.h"
+#include "kernel/tests/spawn/elf_spawn_test_internal.h"
 
 #include "servers/pm/pm_service_internal.h"
 #include "tests/qemu/vm_server_internal.h"

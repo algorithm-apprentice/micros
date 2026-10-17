@@ -930,8 +930,8 @@ set(
 
 set(
     MICROS_ELF_SPAWN_RESOURCE_SOURCES
-    kernel/elf_spawn_test_compare.c
-    kernel/elf_spawn_test_service_compare.c
+    kernel/tests/spawn/elf_spawn_test_compare.c
+    kernel/tests/spawn/elf_spawn_test_service_compare.c
 )
 
 set(
@@ -3775,7 +3775,7 @@ if(
                     ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/kernel/elf_spawn_test_fixture.h"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/kernel/tests/spawn/elf_spawn_test_fixture.h"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
                 VERBATIM
             )
@@ -4270,13 +4270,13 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
         micros
         PRIVATE
             "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
-            kernel/elf_spawn_test.c
-            kernel/elf_spawn_test_fixture.c
-            kernel/elf_spawn_test_runtime.c
-            kernel/elf_spawn_test_capture.c
-            kernel/elf_spawn_test_services.c
-            kernel/elf_spawn_test_service_checks.c
-            kernel/elf_spawn_test_report.c
+            kernel/tests/spawn/elf_spawn_test.c
+            kernel/tests/spawn/elf_spawn_test_fixture.c
+            kernel/tests/spawn/elf_spawn_test_runtime.c
+            kernel/tests/spawn/elf_spawn_test_capture.c
+            kernel/tests/spawn/elf_spawn_test_services.c
+            kernel/tests/spawn/elf_spawn_test_service_checks.c
+            kernel/tests/spawn/elf_spawn_test_report.c
             ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
     )
 endif()
