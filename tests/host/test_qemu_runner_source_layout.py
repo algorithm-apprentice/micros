@@ -11,6 +11,7 @@ import sys
 from types import SimpleNamespace
 import unittest
 from unittest import mock
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1083,7 +1084,7 @@ LONG_TASK_MIGRATION = ()
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest(raw):
@@ -1443,7 +1444,7 @@ def restored_runner_source(text=None, owners=None):
     if owners is not None:
         texts.update(owners)
     else:
-        texts.update({path: source(path) for path in PRODUCTION_PATHS[1:] if (ROOT / path).is_file()})
+        texts.update({path: source(path) for path in PRODUCTION_PATHS[1:] if kernel_layout_source.is_file_path(ROOT / path)})
     layout = {key: (gap, raw_hash, ast_hash) for key, gap, raw_hash, ast_hash in ORIGINAL_NODE_LAYOUT}
     original_by_ast = {
         ast_hash: key for key, _, _, ast_hash in ORIGINAL_NODE_LAYOUT
@@ -1615,7 +1616,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
     def test_planner_families_keep_all_four_original_metadata_dimensions_and_plans(self):
         from tools import validation_plan as planner
 
-        aliases = dict(planner.PATH_CLASSIFICATION_EQUIVALENTS)
+        aliases = dict(kernel_layout_source.original_path_classification_equivalents(planner.PATH_CLASSIFICATION_EQUIVALENTS))
         for old, paths in alias_rows():
             self.assertEqual(paths, aliases.get(old), old)
             self.assertTrue(planner.requires_full_tier([old]))
@@ -1628,7 +1629,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
                     self.assertEqual(classify([old]), classify([path]), path + ":" + classify.__name__)
                 for tier in ("fast", "pr", "full"):
                     self.assertEqual(planner.plan([old], tier, "main"), planner.plan([path], tier, "main"))
-        self.assertEqual(1, planner.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(planner.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertFalse(planner.requires_full_tier([STRUCTURAL_TEST_PATH]))
         for classify in (planner.affected_workflows, planner.affected_slow_models, planner.affected_image_workflows):
             self.assertEqual([], classify([STRUCTURAL_TEST_PATH]))
@@ -1668,11 +1669,11 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
     def test_build_recipe_and_existing_shared_inspection_execution_libraries_are_unchanged(self):
         self.assertEqual(BASE_CMAKE_DIGEST, digest(source("CMakeLists.txt").encode()))
         for path, expected in PROTECTED_SOURCE_HASHES.items():
-            self.assertEqual(expected, digest((ROOT / path).read_bytes()), path)
+            self.assertEqual(expected, digest(kernel_layout_source.read_bytes_path(ROOT / path)), path)
 
     def test_all_test_owners_preserve_complete_original_ast_and_single_discovery(self):
         for path in TEST_PATHS:
-            self.assertTrue((ROOT / path).is_file(), path)
+            self.assertTrue(kernel_layout_source.is_file_path(ROOT / path), path)
         self.assertEqual(ORIGINAL_TEST_AST, ast_digest(restored_test_ast()))
         from tests.host import test_run_qemu_smoke as cases
 

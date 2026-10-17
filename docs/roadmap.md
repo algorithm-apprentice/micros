@@ -444,14 +444,15 @@ correction. Complete current fresh author and actual same-original-producer
 reuse passed; the squash tree equals the reviewed tree, main fast-forwarded
 clean and exact obsolete branches are removed.
 
-The remaining registered maintenance outcome is the kernel directory layout
-in Accepted [ADR-0073](adr/0073-kernel-directory-layout.md) and its
+The kernel directory maintenance outcome follows Accepted
+[ADR-0073](adr/0073-kernel-directory-layout.md) and its
 [exact source contract](architecture/kernel-directory-layout.md).
-Complete independent design review is clean. Only its documentation-only
-design remains active through separate merge; implementation stays pending.
-It preserves existing logical source owners and evidence while changing physical
-placement, and adds no runtime-DAG node. Production init/shell remains
-the later node Q, not part of this maintenance task.
+Complete independent design review is clean and design #147 is separately
+merged. Implementation #148 moves all 373 files into fourteen production and
+sixteen target-evidence directories, preserves logical source owners,
+diagnostics and evidence, and finishes its physical-owner migration empty.
+It adds no runtime-DAG node. Production init/shell remains the later node Q,
+not part of this maintenance task.
 
 ## v0.1 completion goal
 

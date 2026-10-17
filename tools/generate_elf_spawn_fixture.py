@@ -186,7 +186,7 @@ def render_fixture(images):
     descriptors, limits = _service_descriptors(images)
     reports = [_application_report(images[role], role) for role in APPLICATIONS]
     output = [
-        '#include "kernel/elf_spawn_test_fixture.h"',
+        '#include "kernel/tests/spawn/elf_spawn_test_fixture.h"',
         '#include "micros/tty.h"',
         "",
     ]

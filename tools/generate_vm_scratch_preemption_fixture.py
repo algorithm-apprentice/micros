@@ -246,7 +246,7 @@ def render_fixture(launcher_image, vm_image, pm_image, driver_image):
     )
     limits = _resident_limits(*descriptors)
     output = [
-        '#include "kernel/vm_scratch_preemption_test_fixture.h"',
+        '#include "kernel/tests/vm/vm_scratch_preemption_test_fixture.h"',
         "",
     ]
     output.extend(_render_images(descriptors))

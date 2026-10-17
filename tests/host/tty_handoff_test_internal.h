@@ -1,10 +1,10 @@
 #ifndef MICROS_TESTS_HOST_TTY_HANDOFF_TEST_INTERNAL_H
 #define MICROS_TESTS_HOST_TTY_HANDOFF_TEST_INTERNAL_H
 
-#include "kernel/tty_handoff_core.h"
-#include "kernel/tty_handoff_runtime.h"
-#include "kernel/tty_control_syscall_core.h"
-#include "kernel/uart_console_core.h"
+#include "kernel/tty/tty_handoff_core.h"
+#include "kernel/tty/tty_handoff_runtime.h"
+#include "kernel/tty/tty_control_syscall_core.h"
+#include "kernel/tty/uart_console_core.h"
 
 #include <stdbool.h>
 #include <stdint.h>

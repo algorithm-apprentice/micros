@@ -196,7 +196,7 @@ def render_fixture(
         + vfs_limit
     )
     output = [
-        '#include "kernel/tty_service_test_fixture.h"',
+        '#include "kernel/tests/tty/tty_service_test_fixture.h"',
         "",
     ]
     for descriptor in (launcher, vm, pm, tty, vfs):

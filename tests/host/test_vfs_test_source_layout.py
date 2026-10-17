@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 import re
 import unittest
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -357,13 +358,13 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in required
-            if not (REPOSITORY_ROOT / path).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
 
         self.assertEqual([], missing)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for source_set_name, expected_sources in SOURCE_SETS.items():
             with self.subTest(source_set=source_set_name):
@@ -385,7 +386,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, cmake.count(source), source)
 
     def test_native_consumers_use_exact_source_sets_once(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         expected_sets = {
             "vfs_test": (
                 "MICROS_VFS_TEST_FIXTURE_SOURCES",
@@ -413,7 +414,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
                     )
 
     def test_probe_consumes_exact_probe_source_set(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         block = cmake_command(
             cmake,
             "micros_add_bootstrap_user",
@@ -439,7 +440,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         }
 
         for relative_path, context_type in contexts.items():
-            text = (REPOSITORY_ROOT / relative_path).read_text(
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative_path,
                 encoding="utf-8"
             )
             with self.subTest(path=relative_path):
@@ -454,10 +455,10 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
 
         for relative_path in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             selected = c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative_path] = selected
@@ -473,7 +474,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
             for path in (REPOSITORY_ROOT / root).rglob("*"):
                 if path.suffix not in {".c", ".h", ".S"}:
                     continue
-                text = path.read_text(encoding="utf-8")
+                text = kernel_layout_source.read_path(path, encoding="utf-8")
                 for private_path in PRIVATE_HEADERS:
                     if private_path in text:
                         violations.append(
@@ -493,7 +494,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         for relative_path in model_sources:
             if relative_path == "tests/host/vfs_model_context.c":
                 continue
-            text = (REPOSITORY_ROOT / relative_path).read_text(
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative_path,
                 encoding="utf-8"
             )
             self.assertEqual(
@@ -525,17 +526,17 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
 
         for relative_path in c_paths:
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for function_name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative_path, function_name)] = line_count
 
         generator_path = "tools/generate_vfs_service_fixture.py"
         for function_name, line_count in python_function_definitions(
-            (REPOSITORY_ROOT / generator_path).read_text(encoding="utf-8")
+            kernel_layout_source.read_path(REPOSITORY_ROOT / generator_path, encoding="utf-8")
         ).items():
             if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                 oversized[(generator_path, function_name)] = line_count

@@ -1,7 +1,7 @@
 #include "arch/riscv64/platform.h"
 
 #include "arch/riscv64/interrupt.h"
-#include "kernel/uart_console_core.h"
+#include "kernel/tty/uart_console_core.h"
 #include "micros/panic.h"
 
 enum {

@@ -11,6 +11,7 @@ from unittest import mock
 
 from tests.host.test_kernel_address_space_source_layout import cmake_command
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -650,8 +651,8 @@ class UserElfSourceLayoutTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.texts = {
-            path: (ROOT / path).read_text()
-            for path in (*PRODUCTION, *HOST) if (ROOT / path).is_file()
+            path: kernel_layout_source.read_path(ROOT / path)
+            for path in (*PRODUCTION, *HOST) if kernel_layout_source.is_file_path(ROOT / path)
         }
 
     def test_exact_source_families_exist(self):
@@ -668,7 +669,7 @@ class UserElfSourceLayoutTest(unittest.TestCase):
         self.assertEqual([], ownership_errors(self.texts))
 
     def test_literal_migrations_are_bounded(self):
-        tree = ast.parse(Path(__file__).read_text())
+        tree = ast.parse(kernel_layout_source.read_path(Path(__file__)))
         initial = set(PRODUCTION[1:]) | {FIXTURE, PARSE_CASES, STRUCTURE_CASES, POLICY_CASES}
         for name, permitted in (
             ("SYMBOL_OWNER_MIGRATION", initial),
@@ -698,7 +699,7 @@ class UserElfSourceLayoutTest(unittest.TestCase):
             self.assertIs(getattr(facade, name), getattr(module, name), name)
 
     def test_complete_cmake_dependency_inputs(self):
-        self.assertEqual([], build_errors((ROOT / "CMakeLists.txt").read_text()))
+        self.assertEqual([], build_errors(kernel_layout_source.read_path(ROOT / "CMakeLists.txt")))
 
     def test_exact_four_dimensional_classification(self):
         for path in PRODUCTION:
@@ -706,7 +707,7 @@ class UserElfSourceLayoutTest(unittest.TestCase):
         for path in HOST:
             self.assertEqual((False, ("test-qemu-user-runtime",), (), ()), metadata(path), path)
         self.assertEqual((False, (), (), ()), metadata(GATE))
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(GATE))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(GATE))
 
     def test_missing_image_expansion_fails_despite_preserved_qemu_aliases(self):
         unexpanded = {
@@ -989,7 +990,7 @@ def _validate_symbols(image, loads):
                 self.assertEqual([], import_errors(texts))
 
     def test_incomplete_transitive_dependency_fails(self):
-        cmake = (ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(ROOT / "CMakeLists.txt")
         if "${MICROS_USER_ELF_CHECKER_SOURCES}" in cmake:
             broken = cmake.replace("${MICROS_USER_ELF_CHECKER_SOURCES}", "", 1)
             self.assertTrue(build_errors(broken))

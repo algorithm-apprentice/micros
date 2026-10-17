@@ -18,6 +18,7 @@ from tests.host.test_kernel_pm_control_source_layout import macro_definition_tex
 from tests.host.test_pm_service_source_layout import static_local_storage
 from tests.host.test_vm_service_source_layout import c_declaration_text, file_scope_objects
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -633,7 +634,7 @@ def discovered_family_paths() -> tuple[str, ...]:
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in ("kernel/ipc*.[ch]", "tests/host/ipc*.[ch]",
                         "include/micros/ipc*.h", "arch/riscv64/ipc*.S")
-        for path in REPOSITORY_ROOT.glob(pattern)
+        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
     }))
 
 
@@ -647,7 +648,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
 def storage_inventory(roots: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
     inventory = {}
     for path in sorted({dependency for root in roots for dependency in vm_layout.local_include_closure(root)}):
-        objects = file_scope_objects((REPOSITORY_ROOT / path).read_text())
+        objects = file_scope_objects(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
         if objects:
             inventory[path] = objects
     return inventory
@@ -656,7 +657,7 @@ def storage_inventory(roots: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
 def owner_dependency_text(relative: str) -> str:
     selected = []
     for dependency in vm_layout.local_include_closure(relative):
-        text = (REPOSITORY_ROOT / dependency).read_text()
+        text = kernel_layout_source.read_path(REPOSITORY_ROOT / dependency)
         if dependency in DECLARATION_ONLY_HEADERS and dependency != relative:
             text = macro_definition_text(text)
         selected.append(re.sub(
@@ -669,7 +670,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.definitions = {
-            path: c_function_definitions((REPOSITORY_ROOT / path).read_text())
+            path: c_function_definitions(kernel_layout_source.read_path(REPOSITORY_ROOT / path))
             for path in all_sources()
         }
 
@@ -716,20 +717,20 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             [],
             [path for path in (*all_sources(), *PRIVATE_HEADERS.values())
-             if not (REPOSITORY_ROOT / path).is_file()],
+             if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)],
         )
         self.assertEqual(accepted_family_paths(), discovered_family_paths())
 
     def test_public_support_and_assembly_surfaces_are_unchanged(self) -> None:
         self.assertEqual(
             STABLE_HASHES,
-            {path: hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest()
+            {path: hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)).hexdigest()
              for path in STABLE_HASHES},
         )
 
     def test_private_headers_have_no_function_or_storage_definitions(self) -> None:
         for path in PRIVATE_HEADERS.values():
-            text = (REPOSITORY_ROOT / path).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             self.assertEqual({}, c_function_definitions(text), path)
             self.assertEqual((), file_scope_objects(text), path)
             self.assertNotRegex(c_declaration_text(text), r"\bstatic\b", path)
@@ -755,7 +756,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
     def test_static_local_storage_and_macros_cannot_add_hidden_state(self) -> None:
         observed = {}
         for path in compiled_source_header_closure():
-            text = (REPOSITORY_ROOT / path).read_text()
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / path)
             local = static_local_storage(text)
             if local:
                 observed[path] = hashlib.sha256("\n".join(local).encode()).hexdigest()
@@ -773,7 +774,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                 symbols.setdefault(name, set()).add(path)
         private_core = set(re.findall(
             r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(",
-            c_declaration_text((REPOSITORY_ROOT / "kernel/ipc_internal.h").read_text()),
+            c_declaration_text(kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/ipc_internal.h")),
         ))
         for path in all_sources():
             text = owner_dependency_text(path)
@@ -798,7 +799,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                 )
         for path in compiled_source_header_closure():
             self.assertNotRegex(
-                (REPOSITORY_ROOT / path).read_text(),
+                kernel_layout_source.read_path(REPOSITORY_ROOT / path),
                 r'(?m)^\s*#\s*include\s*[<"][^">]+\.(?:c|py)[">]', path,
             )
 
@@ -851,7 +852,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(expected, observed, path)
         for path in PRIVATE_HEADERS.values():
             names = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(",
-                               c_declaration_text((REPOSITORY_ROOT / path).read_text()))
+                               c_declaration_text(kernel_layout_source.read_path(REPOSITORY_ROOT / path)))
             for name in names:
                 if name != "_Alignas":
                     owners = [source for source in all_sources()
@@ -861,9 +862,9 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
     def test_native_case_labels_order_and_existing_executions_are_retained(self) -> None:
         for family, expected in CASE_LABELS.items():
             path = REPOSITORY_ROOT / f"tests/host/ipc_{family}_test.c"
-            observed = tuple(re.findall(r'\{\s*"([^"\n]+)"\s*,\s*(test_[A-Za-z_]+)', path.read_text()))
+            observed = tuple(re.findall(r'\{\s*"([^"\n]+)"\s*,\s*(test_[A-Za-z_]+)', kernel_layout_source.read_path(path)))
             self.assertEqual(expected, observed, family)
-        operation = (REPOSITORY_ROOT / "tests/host/ipc_operation_test.c").read_text()
+        operation = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_operation_test.c")
         self.assertEqual(
             (
                 "test_authorized_send_blocks_with_snapshot", "test_authorized_send_matches_first_receiver",
@@ -872,17 +873,17 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             ),
             tuple(re.findall(r"\b(test_[A-Za-z_]+)\s*\(", operation)),
         )
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         self.assertEqual(1, cmake.count("NAME endpoint-profile"))
         self.assertEqual(1, cmake.count("NAME ipc-model"))
 
     def test_acceptance_model_seed_draw_trace_and_comparison_order_are_retained(self) -> None:
-        runner = (REPOSITORY_ROOT / "tests/host/ipc_model_test.c").read_text()
-        actions = (REPOSITORY_ROOT / "tests/host/ipc_model_test_actions.c").read_text()
-        prelude = c_declaration_text((REPOSITORY_ROOT / "tests/host/ipc_model_test_prelude.c").read_text())
-        step = (REPOSITORY_ROOT / "tests/host/ipc_model_test_step.c").read_text()
-        trace = (REPOSITORY_ROOT / "tests/host/ipc_model_test_trace.c").read_text()
-        fixture = (REPOSITORY_ROOT / MODEL_FIXTURE).read_text()
+        runner = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_model_test.c")
+        actions = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_model_test_actions.c")
+        prelude = c_declaration_text(kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_model_test_prelude.c"))
+        step = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_model_test_step.c")
+        trace = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_model_test_trace.c")
+        fixture = kernel_layout_source.read_path(REPOSITORY_ROOT / MODEL_FIXTURE)
         self.assertIn("UINT32_C(0x30accee5)", runner)
         self.assertIn("struct model_state model;", runner)
         self.assertIn("struct model_coverage coverage;", runner)
@@ -906,7 +907,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             "^ action->endpoint", "^ action->source", "^ action->value", "^ (uint64_t)result",
         ):
             self.assertIn(fragment, trace)
-        compare = (REPOSITORY_ROOT / MODEL_REFERENCE).read_text()
+        compare = kernel_layout_source.read_path(REPOSITORY_ROOT / MODEL_REFERENCE)
         body = compare[compare.index("bool ipc_model_matches_production("):]
         comparisons = (
             "compare_acceptance_aggregates", "compare_acceptance_processes",
@@ -917,8 +918,8 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                          [body.index(name) for name in comparisons])
 
     def test_small_models_keep_original_counts_draws_and_forced_prefix(self) -> None:
-        notify = (REPOSITORY_ROOT / "tests/host/ipc_notify_model_test.c").read_text()
-        close = (REPOSITORY_ROOT / "tests/host/ipc_close_model_test.c").read_text()
+        notify = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_notify_model_test.c")
+        close = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/ipc_close_model_test.c")
         self.assertIn("UINT32_C(0x30c0a1e5)", notify)
         self.assertIn("state.step < NOTIFY_MODEL_STEPS", notify)
         self.assertEqual(3, len(re.findall(r"\bnotify_model_next_random\s*\(", notify)))
@@ -937,7 +938,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         self.assertLess(record, setup)
 
     def test_target_script_capture_and_evidence_identities_remain_exact(self) -> None:
-        fixture = (REPOSITORY_ROOT / "kernel/ipc_syscall_test_fixture.c").read_text()
+        fixture = kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/ipc_syscall_test_fixture.c")
         threads = re.search(r"ipc_syscall_test_scenario_threads\[21\]\s*=\s*\{(.*?)\};", fixture, re.DOTALL)
         commands = re.search(r"ipc_syscall_test_scenario_commands\[21\]\s*=\s*\{(.*?)\};", fixture, re.DOTALL)
         self.assertIsNotNone(threads)
@@ -950,18 +951,18 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         self.assertIn("_Static_assert(", fixture)
         for family, entry in (("ecall", "micros_scheduler_test_enter_without_timer"),
                               ("syscall", "micros_scheduler_start")):
-            facade = (REPOSITORY_ROOT / f"kernel/ipc_{family}_test.c").read_text()
+            facade = kernel_layout_source.read_path(REPOSITORY_ROOT / f"kernel/ipc_{family}_test.c")
             self.assertEqual(1, facade.count('"mv %0, sp'))
             self.assertLess(facade.index('"mv %0, sp'), facade.index(entry))
             for path in SOURCE_SETS[
                 "MICROS_IPC_ECALL_QEMU_TEST_SOURCES" if family == "ecall"
                 else "MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES"
             ][1:]:
-                self.assertNotIn('"mv %0, sp', (REPOSITORY_ROOT / path).read_text(), path)
-            owner = (REPOSITORY_ROOT / f"kernel/ipc_{family}_test_fixture.c").read_text()
+                self.assertNotIn('"mv %0, sp', kernel_layout_source.read_path(REPOSITORY_ROOT / path), path)
+            owner = kernel_layout_source.read_path(REPOSITORY_ROOT / f"kernel/ipc_{family}_test_fixture.c")
             for register in ("sp", "gp", "tp"):
                 self.assertEqual(1, owner.count(f"uintptr_t micros_ipc_{family}_test_saved_{register};"))
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         markers = {
             "test-qemu-ipc": "MICROS_IPC_TEST_PASS endpoints=generation-safe queues=blocking calls=tokenized notifications=coalesced kernel-events=injected deadlock=rejected",
             "test-qemu-ipc-ecall-core": "MICROS_IPC_ECALL_CORE_TEST_PASS dispatch=production guard=transactional completion=returned errors=stable registers=preserved",
@@ -973,19 +974,19 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             self.assertIn(marker, block)
             self.assertRegex(block, r"--timeout\s+8\b")
             self.assertEqual(1, cmake.count(marker))
-        negative = (REPOSITORY_ROOT / "kernel/ipc_syscall_test_fixture.c").read_text()
+        negative = kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/ipc_syscall_test_fixture.c")
         self.assertEqual(
             {"accounting_owner", "accounting_started_at", "kernel_counter_ticks"},
             set(re.findall(r"negative_objects_candidate\.harts\s*\[[^]]+\]\s*\.\s*(\w+)\s*=", negative)),
         )
         self.assertIn("].user_context", negative)
         self.assertIn("].accounted_thread", negative)
-        hooks = (REPOSITORY_ROOT / "kernel/ipc_syscall_test_hooks.c").read_text()
+        hooks = kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/ipc_syscall_test_hooks.c")
         self.assertIn("fixture->timer_completion_started", hooks)
         self.assertIn("fixture->timer_expected_context", hooks)
 
     def test_source_sets_and_current_consumers_are_exact(self) -> None:
-        cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text()
+        cmake = kernel_layout_source.read_path(REPOSITORY_ROOT / "CMakeLists.txt")
         for name, expected in SOURCE_SETS.items():
             block = cmake_command(cmake, "set", name)
             self.assertEqual(
@@ -1043,7 +1044,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         current = {name: owner for owner, _, name in SYMBOL_OWNER_MIGRATION}
         definitions = {}
         for path in all_sources():
-            if (REPOSITORY_ROOT / path).is_file():
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path):
                 for name in self.definitions[path]:
                     definitions.setdefault(name, []).append(path)
         for owner, names in FINAL_OWNER_GROUPS.items():
@@ -1056,7 +1057,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             else paths[0]
             for name, paths in SOURCE_SETS.items()
         }
-        observed = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        observed = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for name, baseline in baselines.items():
             self.assertEqual(
                 tuple(path for path in (*SOURCE_SETS[name], PRIVATE_HEADERS[name])
@@ -1073,14 +1074,14 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             "tests/host/test_kernel_ipc_source_layout.py",
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_long_migration_matches_every_actual_signal(self) -> None:
         self.assertEqual(42, len(INITIAL_LONG_FUNCTION_MIGRATION))
         oversized = {
             (path, name)
-            for path in all_sources() if (REPOSITORY_ROOT / path).is_file()
+            for path in all_sources() if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
             for name, size in self.definitions[path].items()
             if size > FUNCTION_REVIEW_LINE_LIMIT
         }

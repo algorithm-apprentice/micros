@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "kernel/pm_control_core.h"
-#include "kernel/vm_handoff_core.h"
+#include "kernel/pm/pm_control_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 #include "micros/grant.h"
 #include "servers/pm/pm_coordinator.h"

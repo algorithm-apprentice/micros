@@ -323,16 +323,24 @@ workflows/four images, plus actual same-original-full-producer bounded
 reuse. Its reviewed squash tree and obsolete-branch cleanup are verified;
 those pre-squash receipts are historical on the new main.
 
-The next directory-only design is Accepted
+The kernel directory-only outcome follows Accepted
 [ADR-0073](adr/0073-kernel-directory-layout.md), with its
 [exact kernel directory contract](architecture/kernel-directory-layout.md).
 It preserves the existing executions while defining a closed 373-file
 physical transport, canonical source/line diagnostics, actual-source and
 generated-include inverses, complete CMake reconstruction and independent
-four-field classification equality. Design authors no executable artifact.
-After separate design merge, structural Red and narrow existing gates
-precede one complete current fresh author plan, actual original-full-
-producer three-profile reuse and independent implementation review.
+four-field classification equality. Design #147 authored no executable
+artifact and merged separately after clean review. Implementation #148 starts
+from structural Red, moves every production/evidence family in green slices,
+retains the old source and fixture oracles, and closes the 373-entry migration
+empty. Its final structural evidence rejects linked roots/descendants and
+mixed old/new generated includes, and invokes the selected native and target
+compilers to prove canonical source/line diagnostics. The reusable native
+profile requires an explicit target compiler and fingerprints it with its
+closed installation inputs; automatic discovery is fresh-only. Final
+acceptance still requires one complete current fresh author plan, actual
+original-full-producer three-profile reuse and clean independent implementation
+review.
 
 ## Test layers
 

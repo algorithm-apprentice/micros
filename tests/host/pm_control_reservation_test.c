@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "kernel/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_runtime_core.h"
 #include "micros/endpoint.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership.h"

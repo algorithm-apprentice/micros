@@ -1,6 +1,6 @@
 #include "bootstrap_control_test_internal.h"
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 struct control_transition_fixture {
     struct micros_bootstrap_control_state state;

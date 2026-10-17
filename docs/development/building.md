@@ -339,6 +339,13 @@ Other workflows still execute fresh; a receipt never removes a required gate.
 Explicit full tier rejects `--reuse`. Documentation and all three diff
 checks always execute fresh.
 
+`test-unit` includes the kernel-layout native/target preprocessing fixture.
+Its reusable identity therefore fingerprints the selected target Clang,
+versioned LLVM installation and compiler-configuration alias in addition to
+the native compiler. Reusable collection requires explicit `MICROS_CLANG` or
+`MICROS_LLVM_ROOT`; automatic discovery is fresh-only. Invalid explicit
+compiler overrides fail closed rather than selecting a fallback.
+
 For the supported Homebrew/Xcode configuration, use the same explicit
 environment for the producer and consumer. Compiler paths must match the
 configured cache, not merely resolve to the same multicall executable:

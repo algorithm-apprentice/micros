@@ -257,7 +257,7 @@ def render_fixture(launcher_image, probe_image):
     probe_limit = probe["page_count"] + 1
     total_limit = launcher_limit + 2 * probe_limit
     output = [
-        '#include "kernel/bootstrap_test_fixture.h"',
+        '#include "kernel/tests/boot/bootstrap_test_fixture.h"',
         "",
         '#include "tests/qemu/bootstrap_protocol.h"',
         "",

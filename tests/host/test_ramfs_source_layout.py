@@ -20,6 +20,7 @@ from tests.host.test_vm_service_source_layout import file_scope_objects
 from tests.host.test_user_elf_source_layout import ast_digest
 from tools.check_docs import topological_order
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -721,7 +722,7 @@ BASELINE_GENERATOR_OUTPUT = 'feca6c3c32b0f87883c6ef7a67cf4b410445550e2314b10c174
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest_bytes(value):
@@ -799,7 +800,7 @@ def alias_rows():
 def owned_definitions(family):
     return {
         (path, name): lines
-        for path in family_paths(family) if (ROOT / path).is_file()
+        for path in family_paths(family) if kernel_layout_source.is_file_path(ROOT / path)
         for name, lines in c_function_definitions(source(path)).items()
     }
 
@@ -1576,11 +1577,11 @@ def original_body_digest(family, name, text):
             text, c_function_body(owner, "observe_pre_ready_report"),
             c_function_body(owner, "validate_reported_runtime"),
         )
-    if family in FIXTURE_TRANSPORTS and (ROOT / PRIVATE_HEADERS[family]).exists():
+    if family in FIXTURE_TRANSPORTS and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[family]):
         tokens = fixture_transport_tokens(family, name, tokens)
-    if family == 3 and (ROOT / PRIVATE_HEADERS[3]).exists():
+    if family == 3 and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[3]):
         tokens = model_transport_tokens(name, tokens)
-    if family == 4 and (ROOT / PRIVATE_HEADERS[4]).exists():
+    if family == 4 and kernel_layout_source.exists_path(ROOT / PRIVATE_HEADERS[4]):
         tokens = peer_read_tokens(name, tokens)
     renames = normal_names(family)
     if family in DATA_RENAMES:
@@ -1803,9 +1804,9 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 for entry in INITIAL_SYMBOL_OWNER_MIGRATION if entry[0] == family
             )
             with self.subTest(family=family):
-                present = tuple(path for path in paths if (ROOT / path).is_file())
+                present = tuple(path for path in paths if kernel_layout_source.is_file_path(ROOT / path))
                 self.assertEqual(paths if active else paths[:1], present)
-                self.assertEqual(active, (ROOT / PRIVATE_HEADERS[family]).is_file())
+                self.assertEqual(active, kernel_layout_source.is_file_path(ROOT / PRIVATE_HEADERS[family]))
                 blocks = cmake_commands(cmake, "set", name)
                 if not active:
                     self.assertEqual((), blocks)
@@ -2499,10 +2500,10 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         self.assertEqual(17, len(STABLE_HASHES))
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
-                self.assertEqual(expected, digest_bytes((ROOT / path).read_bytes()), REVIEWED_BASE)
+                self.assertEqual(expected, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / path)), REVIEWED_BASE)
         self.assertEqual(
             {"servers/ramfs/seed/etc/motd"},
-            {str(path.relative_to(ROOT)) for path in (ROOT / "servers/ramfs/seed").rglob("*") if path.is_file()},
+            {str(path.relative_to(ROOT)) for path in (ROOT / "servers/ramfs/seed").rglob("*") if kernel_layout_source.is_file_path(path)},
         )
         self.assertFalse(any(path.is_symlink() for path in (ROOT / "servers/ramfs/seed").rglob("*")))
 
@@ -2528,9 +2529,12 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         from tests.host.test_generate_vm_handoff_fixture import vm_image
         from tools.generate_ramfs_service_fixture import render_fixture
 
-        output = render_fixture(
-            bootstrap_image(), vm_image(), bootstrap_image(),
-            bootstrap_image(), bootstrap_image(), vfs_image(),
+        output = kernel_layout_source.restore_generated_fixture(
+            GENERATOR_PATH,
+            render_fixture(
+                bootstrap_image(), vm_image(), bootstrap_image(),
+                bootstrap_image(), bootstrap_image(), vfs_image(),
+            ),
         )
         self.assertEqual(BASELINE_GENERATOR_OUTPUT, digest_bytes(output.encode()))
 
@@ -2552,7 +2556,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 validation_plan.affected_slow_models([original]),
                 validation_plan.affected_image_workflows([original]),
             ))
-            self.assertEqual(1, validation_plan.PATH_CLASSIFICATION_EQUIVALENTS.count((original, aliases)))
+            self.assertEqual(1, kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS).count((original, aliases)))
             for path in aliases:
                 with self.subTest(path=path):
                     self.assertEqual(expected, (
@@ -2563,7 +2567,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                     ))
 
     def test_structural_gate_is_explicitly_host_unit_only(self):
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertFalse(validation_plan.requires_full_tier([STRUCTURAL_TEST_PATH]))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
@@ -2574,7 +2578,12 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         cmake = source("CMakeLists.txt")
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
         expected = BASE_CMAKE_DIGEST if SYMBOL_OWNER_MIGRATION else digest_bytes(cmake.encode())
-        self.assertEqual(expected, validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            expected,
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
 
     def test_unreviewed_recipe_identity_is_rejected_before_any_build_metadata(self):
         with patch.dict("tools.validation_context.os.environ", {

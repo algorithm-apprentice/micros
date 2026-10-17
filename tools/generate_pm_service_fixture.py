@@ -183,7 +183,7 @@ def render_fixture(launcher_image, vm_image, pm_image, probe_image):
     )
     limits = _resident_limits(*descriptors)
     output = [
-        '#include "kernel/pm_service_test_fixture.h"',
+        '#include "kernel/tests/pm/pm_service_test_fixture.h"',
         "",
     ]
     output.extend(_render_images(descriptors))

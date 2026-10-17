@@ -17,6 +17,7 @@ from tests.host.test_frame_ownership_source_layout import (
     static_definition_paths,
 )
 from tests.host.test_kernel_pm_control_source_layout import macro_definition_text
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -559,7 +560,7 @@ def discovered_family_paths() -> tuple[str, ...]:
     discovered = {
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in patterns
-        for path in REPOSITORY_ROOT.glob(pattern)
+        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
     }
     discovered.add("include/micros/vm_bootstrap.h")
     discovered.add(GENERATOR_PATH)
@@ -573,7 +574,7 @@ def resolve_local_include(source: Path, include: str) -> Path | None:
         REPOSITORY_ROOT / "include" / include,
     )
     for candidate in candidates:
-        if candidate.is_file():
+        if kernel_layout_source.is_file_path(candidate):
             return candidate.resolve()
     return None
 
@@ -601,7 +602,7 @@ def local_include_closure(relative: str) -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            path.read_text(encoding="utf-8")
+            kernel_layout_source.read_path(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -618,7 +619,7 @@ def local_include_closure(relative: str) -> tuple[str, ...]:
 def owner_dependency_text(relative: str) -> str:
     selected = []
     for dependency in local_include_closure(relative):
-        text = (REPOSITORY_ROOT / dependency).read_text(encoding="utf-8")
+        text = kernel_layout_source.read_path(REPOSITORY_ROOT / dependency, encoding="utf-8")
         if dependency in DECLARATION_ONLY_HEADERS and dependency != relative:
             text = macro_definition_text(text)
         lexical = c_lexical_text(text)
@@ -731,7 +732,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         missing = [
             relative
             for relative in (*all_source_set_paths(), *PRIVATE_HEADERS)
-            if not (REPOSITORY_ROOT / relative).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / relative)
         ]
         self.assertEqual([], missing)
         self.assertEqual(
@@ -742,14 +743,14 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
     def test_stable_headers_are_byte_exact(self) -> None:
         observed = {
             path: hashlib.sha256(
-                (REPOSITORY_ROOT / path).read_bytes()
+                kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
             ).hexdigest()
             for path in STABLE_HEADER_HASHES
         }
         self.assertEqual(STABLE_HEADER_HASHES, observed)
 
     def test_cmake_source_sets_and_consumers_are_exact(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for name, expected in SOURCE_SETS.items():
             with self.subTest(source_set=name):
@@ -862,9 +863,9 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
 
         for relative in DECLARATION_ONLY_HEADERS:
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             selected = c_function_definitions(text)
             if selected:
                 definitions[relative] = selected
@@ -891,9 +892,9 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
 
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             if source_include.search(text):
                 source_violations.append(relative)
         for relative in production_sources():
@@ -918,10 +919,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             expected_current[symbol] = current
         for relative in all_source_set_paths():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for symbol in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 definitions.setdefault(symbol, []).append(relative)
         for symbol, final in FINAL_SYMBOL_OWNERS.items():
@@ -935,7 +936,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         definitions = {}
         for relative in compiled_source_header_closure():
             for name in c_function_definitions(
-                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
             ):
                 definitions.setdefault(name, []).append(relative)
         for relative, names in {
@@ -949,7 +950,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(
                     expected,
                     tuple(c_function_definitions(
-                        (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                        kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
                     )),
                 )
 
@@ -957,7 +958,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         symbol_owners = {}
         for relative in PERMITTED_OWNER_DEPENDENCIES:
             for name in c_function_definitions(
-                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
             ):
                 symbol_owners.setdefault(name, set()).add(relative)
         for relative, dependencies in PERMITTED_OWNER_DEPENDENCIES.items():
@@ -976,7 +977,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         observed = {}
         for relative in compiled_source_header_closure():
             objects = file_scope_objects(
-                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
             )
             if objects:
                 observed[relative] = objects
@@ -1046,7 +1047,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                 )
                 self.assertEqual(
                     1, len(file_scope_objects(
-                        (root / "nested.h").read_text(encoding="utf-8")
+                        kernel_layout_source.read_path(root / "nested.h", encoding="utf-8")
                     )),
                 )
 
@@ -1095,7 +1096,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         )
         for relative in compiled_source_header_closure():
             text = c_lexical_text(
-                (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
             )
             contexts.extend(
                 (relative, match.group(1))
@@ -1114,16 +1115,10 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         )
 
     def test_evidence_identities_and_orders_remain_stable(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
-        host = (
-            REPOSITORY_ROOT / "tests/host/vm_core_test.c"
-        ).read_text(encoding="utf-8")
-        service = (
-            REPOSITORY_ROOT / "tests/qemu/vm_server.c"
-        ).read_text(encoding="utf-8")
-        generator = (
-            REPOSITORY_ROOT / GENERATOR_PATH
-        ).read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        host = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_core_test.c", encoding="utf-8")
+        service = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/qemu/vm_server.c", encoding="utf-8")
+        generator = kernel_layout_source.read_path(REPOSITORY_ROOT / GENERATOR_PATH, encoding="utf-8")
         scratch_marker = (
             "MICROS_VM_SCRATCH_PREEMPTION_TEST_PASS "
             "map=real timer=preempted roots=distinct "
@@ -1192,7 +1187,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, generator.count(f'"{symbol}"'), symbol)
 
     def test_ordinary_service_control_is_wired_before_readiness(self) -> None:
-        facade = (REPOSITORY_ROOT / "tests/qemu/vm_server.c").read_text(encoding="utf-8")
+        facade = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/qemu/vm_server.c", encoding="utf-8")
         self.assertIn("vm_server_configure_control(context)", facade)
         handoff = facade.index("vm_server_complete_handoff")
         configure = facade.index("vm_server_configure_control")
@@ -1200,7 +1195,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         self.assertLess(handoff, configure)
         self.assertLess(configure, ready)
         self.assertIn("vm_server_serve_control(context, &message)", facade)
-        public = (REPOSITORY_ROOT / "servers/vm/vm_service_core.h").read_text(encoding="utf-8")
+        public = kernel_layout_source.read_path(REPOSITORY_ROOT / "servers/vm/vm_service_core.h", encoding="utf-8")
         self.assertIn("struct micros_vm_state *state;", public)
         self.assertNotIn("executable_bytes[", public)
         self.assertNotIn("request_bytes[", public)
@@ -1208,7 +1203,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                      *SOURCE_SETS["MICROS_VM_SERVICE_BACKEND_SOURCES"]):
             self.assertNotIn(
                 '#include "servers/vm/vm_internal.h"',
-                (REPOSITORY_ROOT / path).read_text(encoding="utf-8"),
+                kernel_layout_source.read_path(REPOSITORY_ROOT / path, encoding="utf-8"),
             )
 
     def test_validation_plan_inherits_path_classification(self) -> None:
@@ -1218,7 +1213,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         }
         observed = tuple(
             item
-            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if item[0] in baselines
         )
         self.assertEqual(
@@ -1243,7 +1238,7 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_long_function_migration_matches_review_signal(self) -> None:
@@ -1258,11 +1253,11 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             for name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative, name)] = line_count
-        generator = (REPOSITORY_ROOT / GENERATOR_PATH).read_text(
+        generator = kernel_layout_source.read_path(REPOSITORY_ROOT / GENERATOR_PATH,
             encoding="utf-8"
         )
         for name, line_count in python_function_definitions(

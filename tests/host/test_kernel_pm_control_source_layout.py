@@ -12,6 +12,7 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_command,
     static_definition_paths,
 )
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -480,7 +481,7 @@ def discovered_family_paths() -> tuple[str, ...]:
     discovered = {
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in patterns
-        for path in REPOSITORY_ROOT.glob(pattern)
+        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
     }
     discovered.add("include/micros/pm.h")
     return tuple(sorted(discovered))
@@ -496,7 +497,7 @@ def resolve_local_include(
         REPOSITORY_ROOT / "include" / include,
     )
     for candidate in candidates:
-        if candidate.is_file():
+        if kernel_layout_source.is_file_path(candidate):
             return candidate.resolve()
     return None
 
@@ -505,7 +506,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
     pending = [
         (REPOSITORY_ROOT / relative).resolve()
         for relative in accepted_family_paths()
-        if (REPOSITORY_ROOT / relative).is_file()
+        if kernel_layout_source.is_file_path(REPOSITORY_ROOT / relative)
     ]
     observed = set()
     include_pattern = re.compile(
@@ -518,7 +519,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            path.read_text(encoding="utf-8")
+            kernel_layout_source.read_path(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -545,7 +546,7 @@ def local_include_closure(relative: str) -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            path.read_text(encoding="utf-8")
+            kernel_layout_source.read_path(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -586,7 +587,7 @@ def owner_dependency_text(relative: str) -> str:
     selected = []
 
     for dependency in local_include_closure(relative):
-        text = (REPOSITORY_ROOT / dependency).read_text(
+        text = kernel_layout_source.read_path(REPOSITORY_ROOT / dependency,
             encoding="utf-8"
         )
         if dependency in declaration_only and dependency != relative:
@@ -651,7 +652,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in (*all_source_set_paths(), *PRIVATE_HEADERS)
-            if not (REPOSITORY_ROOT / path).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
         self.assertEqual([], missing)
 
@@ -664,14 +665,14 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
     def test_stable_headers_are_byte_exact(self) -> None:
         observed = {
             path: hashlib.sha256(
-                (REPOSITORY_ROOT / path).read_bytes()
+                kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
             ).hexdigest()
             for path in STABLE_HEADER_HASHES
         }
         self.assertEqual(STABLE_HEADER_HASHES, observed)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for name, expected in SOURCE_SETS.items():
             with self.subTest(source_set=name):
@@ -688,7 +689,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, cmake.count(source), source)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         consumers = {
             "pm-test": (
                 cmake_command(cmake, "add_executable", "pm_test"),
@@ -727,9 +728,9 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
 
         for relative in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             selected = c_function_definitions(text)
             objects = private_header_object_definitions(text)
             static = re.findall(
@@ -756,9 +757,9 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
 
         for relative in (*all_source_set_paths(), *PRIVATE_HEADERS):
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             if c_include.search(text):
                 c_violations.append(relative)
             if relative in production_sources():
@@ -780,7 +781,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         adapter_symbols = set(SYSCALL_ADAPTER_ENTRY_OWNERS)
 
         for relative, expected in EXPECTED_PM_INCLUDES.items():
-            text = (REPOSITORY_ROOT / relative).read_text(
+            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative,
                 encoding="utf-8"
             )
             with self.subTest(source=relative, dependency="include"):
@@ -858,10 +859,10 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
 
         for relative in all_source_set_paths():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for symbol in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 definitions.setdefault(symbol, []).append(relative)
 
@@ -894,7 +895,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             lexical = c_lexical_text(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             )
             for _ in static_state.finditer(lexical):
                 state_definitions.append(relative)
@@ -925,7 +926,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             for context_type in context_pattern.findall(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 context_definitions.append((relative, context_type))
         self.assertEqual(
@@ -946,19 +947,11 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         )
 
     def test_evidence_identities_and_case_order_remain_stable(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
-        state_entry = (
-            REPOSITORY_ROOT / "tests/host/pm_control_test.c"
-        ).read_text(encoding="utf-8")
-        execution_entry = (
-            REPOSITORY_ROOT / "tests/host/pm_control_execution_test.c"
-        ).read_text(encoding="utf-8")
-        pm_entry = (
-            REPOSITORY_ROOT / "tests/host/pm_test.c"
-        ).read_text(encoding="utf-8")
-        qemu_entry = (
-            REPOSITORY_ROOT / "kernel/pm_service_test_report.c"
-        ).read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        state_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_control_test.c", encoding="utf-8")
+        execution_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_control_execution_test.c", encoding="utf-8")
+        pm_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_test.c", encoding="utf-8")
+        qemu_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/pm_service_test_report.c", encoding="utf-8")
         marker = (
             "MICROS_PM_SERVICE_TEST_PASS "
             "handoff=complete readiness=acknowledged protocol=stable "
@@ -1032,7 +1025,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         }
         observed = tuple(
             item
-            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if item[0] in baselines
         )
         self.assertEqual(PM_PATH_CLASSIFICATION_EQUIVALENTS, observed)
@@ -1054,7 +1047,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_long_function_migration_matches_review_signal(self) -> None:
@@ -1068,7 +1061,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             for name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative, name)] = line_count

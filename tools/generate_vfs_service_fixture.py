@@ -140,7 +140,7 @@ def _calculate_limits(descriptors):
 
 def _render_segments_and_images(descriptors):
     output = [
-        '#include "kernel/vfs_service_test_fixture.h"',
+        '#include "kernel/tests/vfs/vfs_service_test_fixture.h"',
         "",
     ]
     for name in (

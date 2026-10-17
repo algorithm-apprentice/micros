@@ -25,6 +25,7 @@ from tests.host.test_vm_service_source_layout import (
     python_function_definitions,
 )
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -895,7 +896,7 @@ for family, fixture, production in (
 
 
 def read_source(relative: str) -> str:
-    return (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+    return kernel_layout_source.read_path(REPOSITORY_ROOT / relative, encoding="utf-8")
 
 
 def compact(text: str) -> str:
@@ -924,7 +925,7 @@ def discovered_family_paths() -> set[str]:
     )
     return {
         str(path.relative_to(REPOSITORY_ROOT))
-        for pattern in patterns for path in REPOSITORY_ROOT.glob(pattern)
+        for pattern in patterns for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
     }
 
 
@@ -1083,7 +1084,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.texts = {
             path: read_source(path) for path in all_sources()
-            if (REPOSITORY_ROOT / path).is_file()
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         }
         cls.definitions = {
             path: c_function_definitions(text) for path, text in cls.texts.items()
@@ -1141,7 +1142,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         self.assertEqual(
             [],
             sorted(path for path in accepted_family_paths()
-                   if not (REPOSITORY_ROOT / path).is_file()),
+                   if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)),
             "ADR-0060 requires the complete source/header skeleton before extraction",
         )
         self.assertEqual(accepted_family_paths(), discovered_family_paths())
@@ -1151,7 +1152,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
                 self.assertEqual(
-                    expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(),
+                    expected, hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)).hexdigest(),
                     REVIEWED_BASE,
                 )
         core = c_function_definitions(read_source("kernel/bootstrap_control_core.c"))
@@ -1330,7 +1331,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             "bootstrap_control_test_", "fdt_test_",
         )
         for path in PRIVATE_HEADERS:
-            if not (REPOSITORY_ROOT / path).is_file():
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path):
                 continue
             text = read_source(path)
             with self.subTest(header=path):
@@ -1379,7 +1380,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                     self.assertIn(path, EXISTING_INLINE_HEADERS)
                     self.assertEqual(
                         EXISTING_INLINE_HEADERS[path],
-                        hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(),
+                        hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)).hexdigest(),
                     )
 
     def test_parser_checks_reject_alias_array_and_hidden_macro_state_without_files(self) -> None:
@@ -1440,7 +1441,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, len(mutable[RUNTIME_STATE]))
             context_type, object_name = scalar_context(mutable[RUNTIME_STATE][0])
             definitions = [
-                body for path in (*self.texts, *PRIVATE_HEADERS) if (REPOSITORY_ROOT / path).is_file()
+                body for path in (*self.texts, *PRIVATE_HEADERS) if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
                 for body in type_bodies(read_source(path), context_type)
             ]
             self.assertEqual(1, len(definitions), context_type)
@@ -1498,7 +1499,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, len(file_objects[owner]))
             context_type, _ = scalar_context(file_objects[owner][0])
             bodies = [
-                body for path in (*host_paths, *PRIVATE_HEADERS) if (REPOSITORY_ROOT / path).is_file()
+                body for path in (*host_paths, *PRIVATE_HEADERS) if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
                 for body in type_bodies(read_source(path), context_type)
             ]
             self.assertEqual(1, len(bodies))
@@ -1544,7 +1545,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
     def test_existing_record_fixture_reference_and_trace_field_layouts_are_preserved(self) -> None:
         texts = [
             read_source(path) for path in (*self.texts, *PRIVATE_HEADERS)
-            if (REPOSITORY_ROOT / path).is_file()
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
         for name, expected in TYPE_LAYOUT_HASHES.items():
             with self.subTest(type=name):
@@ -1574,7 +1575,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         self.assertNotRegex(c_declaration_text(body), rf"\bstatic\b[^;]*\b{re.escape(object_name)}\b")
         bodies = [
             fields for source in (*self.texts, *PRIVATE_HEADERS)
-            if (REPOSITORY_ROOT / source).is_file()
+            if kernel_layout_source.is_file_path(REPOSITORY_ROOT / source)
             for fields in type_bodies(read_source(source), context_type)
         ]
         self.assertEqual(1, len(bodies))
@@ -1990,8 +1991,8 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
 
     def test_all_six_current_generator_importers_keep_the_shared_helper_contract(self) -> None:
         observed = {}
-        for path in REPOSITORY_ROOT.glob("tools/*.py"):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, "tools/*.py"):
+            tree = ast.parse(kernel_layout_source.read_path(path, encoding="utf-8"))
             aliases = set()
             direct = {}
             for node in ast.walk(tree):
@@ -2066,7 +2067,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             self.assertIn(compact(includes), allowed)
         self.assertEqual(
             "eae6c86ce5ac8f0e1b39605ebbd6816135558f0b4f8ea293b3680d7ecb79df86",
-            hashlib.sha256((REPOSITORY_ROOT / "CMakePresets.json").read_bytes()).hexdigest(),
+            hashlib.sha256(kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / "CMakePresets.json")).hexdigest(),
         )
         presets = json.loads(read_source("CMakePresets.json"))
         self.assertEqual(
@@ -2116,7 +2117,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             ))
 
     def test_new_paths_inherit_the_exact_original_classification_without_narrowing_native(self) -> None:
-        equivalents = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        equivalents = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for family, paths in SOURCE_SETS.items():
             expected = (*paths[1:], *FAMILY_HEADERS[family])
             if not expected:
@@ -2141,7 +2142,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                         )
 
     def test_this_structural_gate_itself_is_host_unit_only(self) -> None:
-        self.assertIn(STRUCTURAL_TEST_PATH, validation_plan.HOST_UNIT_ONLY_INPUTS)
+        self.assertIn(STRUCTURAL_TEST_PATH, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
             validation_plan.plan([STRUCTURAL_TEST_PATH], "fast", "main"),

@@ -5,6 +5,7 @@ import re
 import unittest
 
 from tools import validation_plan
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -716,8 +717,8 @@ def static_definition_paths(
     for relative_path in sources:
         path = REPOSITORY_ROOT / relative_path
         if (
-            path.is_file()
-            and pattern.search(path.read_text(encoding="utf-8"))
+            kernel_layout_source.is_file_path(path)
+            and pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
         ):
             matches.append(relative_path)
 
@@ -730,13 +731,13 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in required
-            if not (REPOSITORY_ROOT / path).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
 
         self.assertEqual([], missing)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for source_set_name, expected_sources in SOURCE_SETS.items():
             with self.subTest(source_set=source_set_name):
@@ -758,7 +759,7 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, cmake.count(source), source)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         main = cmake_command(cmake, "add_executable", "micros")
         endpoint = cmake_command(cmake, "add_executable", "endpoint_test")
         address_test = "\n".join(
@@ -829,10 +830,10 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
 
         for relative_path in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             selected = c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative_path] = selected
@@ -846,9 +847,9 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
 
         for relative_path in production_sources():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             for private_path in TEST_PRIVATE_HEADERS:
                 if (
                     private_path in text
@@ -870,8 +871,8 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
         ):
             path = REPOSITORY_ROOT / relative_path
             if (
-                path.is_file()
-                and include.search(path.read_text(encoding="utf-8"))
+                kernel_layout_source.is_file_path(path)
+                and include.search(kernel_layout_source.read_path(path, encoding="utf-8"))
             ):
                 violations.append(relative_path)
 
@@ -901,10 +902,10 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
 
         for relative_path in symbol_scan_sources():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for symbol in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 definitions.setdefault(symbol, []).append(relative_path)
 
@@ -937,8 +938,8 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
             for relative_path in production_sources():
                 path = REPOSITORY_ROOT / relative_path
                 if (
-                    path.is_file()
-                    and pattern.search(path.read_text(encoding="utf-8"))
+                    kernel_layout_source.is_file_path(path)
+                    and pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
                 ):
                     owners.append(relative_path)
             with self.subTest(storage=name):
@@ -993,8 +994,8 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
             for relative_path in sources:
                 path = REPOSITORY_ROOT / relative_path
                 if (
-                    path.is_file()
-                    and pattern.search(path.read_text(encoding="utf-8"))
+                    kernel_layout_source.is_file_path(path)
+                    and pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
                 ):
                     observed.append(relative_path)
             if observed:
@@ -1003,7 +1004,7 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
     def test_evidence_identities_and_markers_remain_stable(self) -> None:
         from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         runner = restored_runner_source()
         address_marker = (
             "MICROS_USER_ADDRESS_SPACE_TEST_PASS "
@@ -1039,7 +1040,7 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
         }
         observed = tuple(
             item
-            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if item[0] in baselines
         )
 
@@ -1071,7 +1072,7 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
 
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
         self.assertEqual(
             [
@@ -1108,10 +1109,10 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
 
         for relative_path in all_source_set_paths():
             path = REPOSITORY_ROOT / relative_path
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for function_name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative_path, function_name)] = line_count

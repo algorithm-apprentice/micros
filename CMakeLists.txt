@@ -263,10 +263,10 @@ set(
 
 set(
     MICROS_TTY_HANDOFF_RUNTIME_SOURCES
-    kernel/tty_handoff_runtime.c
-    kernel/tty_handoff_runtime_state.c
-    kernel/tty_handoff_runtime_validate.c
-    kernel/tty_handoff_runtime_transitions.c
+    kernel/tty/tty_handoff_runtime.c
+    kernel/tty/tty_handoff_runtime_state.c
+    kernel/tty/tty_handoff_runtime_validate.c
+    kernel/tty/tty_handoff_runtime_transitions.c
 )
 
 set(
@@ -307,8 +307,8 @@ set(
 
 set(
     MICROS_GRANT_COPY_TARGET_SOURCES
-    kernel/grant_copy.c
-    kernel/grant_copy_range.c
+    kernel/grant/grant_copy.c
+    kernel/grant/grant_copy_range.c
 )
 
 set(
@@ -325,27 +325,27 @@ set(
 
 set(
     MICROS_GRANT_SYSCALL_QEMU_TEST_SOURCES
-    kernel/grant_syscall_test.c
-    kernel/grant_syscall_test_fixture.c
-    kernel/grant_syscall_test_commands.c
-    kernel/grant_syscall_test_copy_commands.c
-    kernel/grant_syscall_test_transitions.c
-    kernel/grant_syscall_test_effects.c
-    kernel/grant_syscall_test_hooks.c
-    kernel/grant_syscall_test_lifecycle.c
+    kernel/tests/grant/grant_syscall_test.c
+    kernel/tests/grant/grant_syscall_test_fixture.c
+    kernel/tests/grant/grant_syscall_test_commands.c
+    kernel/tests/grant/grant_syscall_test_copy_commands.c
+    kernel/tests/grant/grant_syscall_test_transitions.c
+    kernel/tests/grant/grant_syscall_test_effects.c
+    kernel/tests/grant/grant_syscall_test_hooks.c
+    kernel/tests/grant/grant_syscall_test_lifecycle.c
 )
 
 set(
     MICROS_KERNEL_OBJECT_CORE_SOURCES
-    kernel/kernel_objects.c
-    kernel/kernel_object_state.c
-    kernel/kernel_object_identity.c
-    kernel/kernel_object_stack.c
-    kernel/kernel_object_process.c
-    kernel/kernel_object_thread.c
-    kernel/kernel_object_context.c
-    kernel/kernel_object_hart.c
-    kernel/kernel_object_validation.c
+    kernel/objects/kernel_objects.c
+    kernel/objects/kernel_object_state.c
+    kernel/objects/kernel_object_identity.c
+    kernel/objects/kernel_object_stack.c
+    kernel/objects/kernel_object_process.c
+    kernel/objects/kernel_object_thread.c
+    kernel/objects/kernel_object_context.c
+    kernel/objects/kernel_object_hart.c
+    kernel/objects/kernel_object_validation.c
 )
 
 set(
@@ -366,22 +366,22 @@ set(
 
 set(
     MICROS_KERNEL_OBJECT_QEMU_TEST_SOURCES
-    kernel/object_model_test.c
-    kernel/object_model_test_scenarios.c
+    kernel/tests/objects/object_model_test.c
+    kernel/tests/objects/object_model_test_scenarios.c
 )
 
 set(
     MICROS_ENDPOINT_CORE_SOURCES
-    kernel/endpoint.c
-    kernel/endpoint_codec.c
-    kernel/endpoint_identity.c
-    kernel/endpoint_registry.c
-    kernel/endpoint_privilege.c
-    kernel/endpoint_completion_validation.c
-    kernel/endpoint_queue_validation.c
-    kernel/endpoint_object_validation.c
-    kernel/endpoint_publication.c
-    kernel/endpoint_close.c
+    kernel/endpoint/endpoint.c
+    kernel/endpoint/endpoint_codec.c
+    kernel/endpoint/endpoint_identity.c
+    kernel/endpoint/endpoint_registry.c
+    kernel/endpoint/endpoint_privilege.c
+    kernel/endpoint/endpoint_completion_validation.c
+    kernel/endpoint/endpoint_queue_validation.c
+    kernel/endpoint/endpoint_object_validation.c
+    kernel/endpoint/endpoint_publication.c
+    kernel/endpoint/endpoint_close.c
 )
 
 set(
@@ -406,9 +406,9 @@ set(
 
 set(
     MICROS_ENDPOINT_QEMU_TEST_SOURCES
-    kernel/endpoint_test.c
-    kernel/endpoint_test_fixture.c
-    kernel/endpoint_test_scenarios.c
+    kernel/tests/endpoint/endpoint_test.c
+    kernel/tests/endpoint/endpoint_test_fixture.c
+    kernel/tests/endpoint/endpoint_test_scenarios.c
 )
 
 set(
@@ -462,9 +462,9 @@ set(
 
 set(
     MICROS_RAMFS_QEMU_REPORT_SOURCES
-    kernel/ramfs_service_test.c
-    kernel/ramfs_service_test_fixture.c
-    kernel/ramfs_service_test_report.c
+    kernel/tests/ramfs/ramfs_service_test.c
+    kernel/tests/ramfs/ramfs_service_test_fixture.c
+    kernel/tests/ramfs/ramfs_service_test_report.c
 )
 
 set(
@@ -571,23 +571,23 @@ set(
 
 set(
     MICROS_IPC_CORE_SOURCES
-    kernel/ipc_common.c
-    kernel/ipc_queue.c
-    kernel/ipc_completion.c
-    kernel/ipc_tokens.c
-    kernel/ipc_notifications.c
-    kernel/ipc_deadlock.c
-    kernel/ipc_rendezvous.c
-    kernel/ipc_close.c
-    kernel/ipc_reply.c
-    kernel/ipc.c
+    kernel/ipc/ipc_common.c
+    kernel/ipc/ipc_queue.c
+    kernel/ipc/ipc_completion.c
+    kernel/ipc/ipc_tokens.c
+    kernel/ipc/ipc_notifications.c
+    kernel/ipc/ipc_deadlock.c
+    kernel/ipc/ipc_rendezvous.c
+    kernel/ipc/ipc_close.c
+    kernel/ipc/ipc_reply.c
+    kernel/ipc/ipc.c
 )
 
 set(
     MICROS_IPC_SYSCALL_SOURCES
-    kernel/ipc_syscall_result.c
-    kernel/ipc_syscall_request.c
-    kernel/ipc_syscall.c
+    kernel/ipc/ipc_syscall_result.c
+    kernel/ipc/ipc_syscall_request.c
+    kernel/ipc/ipc_syscall.c
 )
 
 set(
@@ -655,65 +655,65 @@ set(
 
 set(
     MICROS_IPC_QEMU_TEST_SOURCES
-    kernel/ipc_test.c
-    kernel/ipc_test_fixture.c
-    kernel/ipc_test_setup.c
-    kernel/ipc_test_scenarios.c
-    kernel/ipc_test_report.c
+    kernel/tests/ipc/ipc_test.c
+    kernel/tests/ipc/ipc_test_fixture.c
+    kernel/tests/ipc/ipc_test_setup.c
+    kernel/tests/ipc/ipc_test_scenarios.c
+    kernel/tests/ipc/ipc_test_report.c
 )
 
 set(
     MICROS_IPC_ECALL_QEMU_TEST_SOURCES
-    kernel/ipc_ecall_test.c
-    kernel/ipc_ecall_test_fixture.c
-    kernel/ipc_ecall_test_setup.c
-    kernel/ipc_ecall_test_report.c
+    kernel/tests/ipc/ipc_ecall_test.c
+    kernel/tests/ipc/ipc_ecall_test_fixture.c
+    kernel/tests/ipc/ipc_ecall_test_setup.c
+    kernel/tests/ipc/ipc_ecall_test_report.c
 )
 
 set(
     MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES
-    kernel/ipc_syscall_test.c
-    kernel/ipc_syscall_test_fixture.c
-    kernel/ipc_syscall_test_setup.c
-    kernel/ipc_syscall_test_commands.c
-    kernel/ipc_syscall_test_scenarios.c
-    kernel/ipc_syscall_test_hooks.c
-    kernel/ipc_syscall_test_report.c
+    kernel/tests/ipc/ipc_syscall_test.c
+    kernel/tests/ipc/ipc_syscall_test_fixture.c
+    kernel/tests/ipc/ipc_syscall_test_setup.c
+    kernel/tests/ipc/ipc_syscall_test_commands.c
+    kernel/tests/ipc/ipc_syscall_test_scenarios.c
+    kernel/tests/ipc/ipc_syscall_test_hooks.c
+    kernel/tests/ipc/ipc_syscall_test_report.c
 )
 
 set(
     MICROS_KERNEL_ADDRESS_SPACE_SOURCES
-    kernel/address_space.c
-    kernel/address_space_validation.c
+    kernel/memory/address_space.c
+    kernel/memory/address_space_validation.c
 )
 
 set(
     MICROS_USER_ADDRESS_SPACE_CORE_SOURCES
-    kernel/user_address_space_core.c
-    kernel/user_address_space_vm_plan.c
+    kernel/memory/user_address_space_core.c
+    kernel/memory/user_address_space_vm_plan.c
 )
 
 set(
     MICROS_USER_ADDRESS_SPACE_SOURCES
-    kernel/user_address_space.c
-    kernel/user_address_space_runtime.c
-    kernel/user_address_space_table.c
-    kernel/user_address_space_validation.c
-    kernel/user_address_space_mapping.c
-    kernel/user_address_space_mutation.c
-    kernel/user_address_space_handoff.c
-    kernel/user_address_space_tty.c
-    kernel/user_address_space_vm_scratch.c
-    kernel/user_address_space_vm_freeze.c
-    kernel/user_address_space_vm_teardown.c
-    kernel/user_address_space_activation.c
+    kernel/memory/user_address_space.c
+    kernel/memory/user_address_space_runtime.c
+    kernel/memory/user_address_space_table.c
+    kernel/memory/user_address_space_validation.c
+    kernel/memory/user_address_space_mapping.c
+    kernel/memory/user_address_space_mutation.c
+    kernel/memory/user_address_space_handoff.c
+    kernel/memory/user_address_space_tty.c
+    kernel/memory/user_address_space_vm_scratch.c
+    kernel/memory/user_address_space_vm_freeze.c
+    kernel/memory/user_address_space_vm_teardown.c
+    kernel/memory/user_address_space_activation.c
 )
 
 set(
     MICROS_USER_EXECUTION_SOURCES
-    kernel/user_execution.c
-    kernel/user_execution_validation.c
-    kernel/user_execution_trap.c
+    kernel/execution/user_execution.c
+    kernel/execution/user_execution_validation.c
+    kernel/execution/user_execution_trap.c
 )
 
 set(
@@ -725,31 +725,31 @@ set(
 
 set(
     MICROS_USER_ADDRESS_SPACE_QEMU_TEST_SOURCES
-    kernel/user_address_space_test.c
-    kernel/user_address_space_test_fixture.c
-    kernel/user_address_space_test_lifecycle.c
-    kernel/user_address_space_test_mapping.c
-    kernel/user_address_space_test_validation.c
+    kernel/tests/memory/user_address_space_test.c
+    kernel/tests/memory/user_address_space_test_fixture.c
+    kernel/tests/memory/user_address_space_test_lifecycle.c
+    kernel/tests/memory/user_address_space_test_mapping.c
+    kernel/tests/memory/user_address_space_test_validation.c
 )
 
 set(
     MICROS_USER_EXECUTION_QEMU_TEST_SOURCES
-    kernel/user_execution_test.c
-    kernel/user_execution_test_fixture.c
-    kernel/user_execution_test_prepare.c
-    kernel/user_execution_test_trap.c
-    kernel/user_execution_test_lifecycle.c
+    kernel/tests/execution/user_execution_test.c
+    kernel/tests/execution/user_execution_test_fixture.c
+    kernel/tests/execution/user_execution_test_prepare.c
+    kernel/tests/execution/user_execution_test_trap.c
+    kernel/tests/execution/user_execution_test_lifecycle.c
 )
 
 set(
     MICROS_FRAME_OWNERSHIP_SOURCES
-    kernel/frame_ownership.c
-    kernel/frame_ownership_validation.c
-    kernel/frame_ownership_bootstrap.c
-    kernel/frame_ownership_handoff.c
-    kernel/frame_ownership_vm_claim.c
-    kernel/frame_ownership_vm_freeze.c
-    kernel/frame_ownership_vm_release.c
+    kernel/memory/frame_ownership.c
+    kernel/memory/frame_ownership_validation.c
+    kernel/memory/frame_ownership_bootstrap.c
+    kernel/memory/frame_ownership_handoff.c
+    kernel/memory/frame_ownership_vm_claim.c
+    kernel/memory/frame_ownership_vm_freeze.c
+    kernel/memory/frame_ownership_vm_release.c
 )
 
 set(
@@ -772,40 +772,40 @@ set(
 
 set(
     MICROS_FRAME_OWNERSHIP_QEMU_TEST_SOURCES
-    kernel/frame_ownership_test.c
-    kernel/frame_ownership_test_fixture.c
-    kernel/frame_ownership_test_lifecycle.c
-    kernel/frame_ownership_test_handoff.c
+    kernel/tests/memory/frame_ownership_test.c
+    kernel/tests/memory/frame_ownership_test_fixture.c
+    kernel/tests/memory/frame_ownership_test_lifecycle.c
+    kernel/tests/memory/frame_ownership_test_handoff.c
 )
 
 set(
     MICROS_VM_HANDOFF_CORE_SOURCES
-    kernel/vm_handoff_core.c
-    kernel/vm_handoff_abi.c
-    kernel/vm_handoff_boot.c
-    kernel/vm_handoff_load.c
-    kernel/vm_handoff_scratch.c
-    kernel/vm_handoff_freeze.c
-    kernel/vm_handoff_commit.c
-    kernel/vm_handoff_release.c
+    kernel/vm/vm_handoff_core.c
+    kernel/vm/vm_handoff_abi.c
+    kernel/vm/vm_handoff_boot.c
+    kernel/vm/vm_handoff_load.c
+    kernel/vm/vm_handoff_scratch.c
+    kernel/vm/vm_handoff_freeze.c
+    kernel/vm/vm_handoff_commit.c
+    kernel/vm/vm_handoff_release.c
 )
 
 set(
     MICROS_VM_HANDOFF_SYSCALL_SOURCES
-    kernel/vm_handoff_syscall.c
-    kernel/vm_handoff_syscall_runtime.c
-    kernel/vm_handoff_syscall_memory.c
-    kernel/vm_handoff_syscall_boot.c
-    kernel/vm_handoff_syscall_load.c
-    kernel/vm_handoff_syscall_scratch.c
-    kernel/vm_handoff_syscall_freeze.c
-    kernel/vm_handoff_syscall_release.c
+    kernel/vm/vm_handoff_syscall.c
+    kernel/vm/vm_handoff_syscall_runtime.c
+    kernel/vm/vm_handoff_syscall_memory.c
+    kernel/vm/vm_handoff_syscall_boot.c
+    kernel/vm/vm_handoff_syscall_load.c
+    kernel/vm/vm_handoff_syscall_scratch.c
+    kernel/vm/vm_handoff_syscall_freeze.c
+    kernel/vm/vm_handoff_syscall_release.c
 )
 
 set(
     MICROS_VM_SNAPSHOT_SOURCES
-    kernel/vm_snapshot.c
-    kernel/vm_snapshot_validation.c
+    kernel/vm/vm_snapshot.c
+    kernel/vm/vm_snapshot_validation.c
 )
 
 set(
@@ -838,39 +838,39 @@ set(
 
 set(
     MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES
-    kernel/address_space_handoff_test.c
-    kernel/address_space_handoff_test_fixture.c
-    kernel/address_space_handoff_test_setup.c
-    kernel/address_space_handoff_test_snapshot.c
-    kernel/address_space_handoff_test_handoff.c
-    kernel/address_space_handoff_test_runtime.c
-    kernel/address_space_handoff_test_syscall.c
-    kernel/address_space_handoff_test_tty.c
-    kernel/address_space_handoff_test_trap.c
+    kernel/tests/memory/address_space_handoff_test.c
+    kernel/tests/memory/address_space_handoff_test_fixture.c
+    kernel/tests/memory/address_space_handoff_test_setup.c
+    kernel/tests/memory/address_space_handoff_test_snapshot.c
+    kernel/tests/memory/address_space_handoff_test_handoff.c
+    kernel/tests/memory/address_space_handoff_test_runtime.c
+    kernel/tests/memory/address_space_handoff_test_syscall.c
+    kernel/tests/memory/address_space_handoff_test_tty.c
+    kernel/tests/memory/address_space_handoff_test_trap.c
 )
 
 set(
     MICROS_PM_CONTROL_CORE_SOURCES
-    kernel/pm_control_core.c
-    kernel/pm_control_abi.c
-    kernel/pm_control_validation.c
-    kernel/pm_control_reservation.c
-    kernel/pm_control_execution.c
-    kernel/pm_control_activation.c
-    kernel/pm_control_exit.c
-    kernel/pm_control_runtime_core.c
-    kernel/pm_control_syscall_core.c
+    kernel/pm/pm_control_core.c
+    kernel/pm/pm_control_abi.c
+    kernel/pm/pm_control_validation.c
+    kernel/pm/pm_control_reservation.c
+    kernel/pm/pm_control_execution.c
+    kernel/pm/pm_control_activation.c
+    kernel/pm/pm_control_exit.c
+    kernel/pm/pm_control_runtime_core.c
+    kernel/pm/pm_control_syscall_core.c
 )
 
 set(
     MICROS_PM_CONTROL_TARGET_SOURCES
-    kernel/pm_control_runtime.c
-    kernel/pm_control_syscall.c
-    kernel/pm_control_syscall_runtime.c
-    kernel/pm_control_syscall_reservation.c
-    kernel/pm_control_syscall_execution.c
-    kernel/pm_control_syscall_activation.c
-    kernel/pm_control_syscall_exit.c
+    kernel/pm/pm_control_runtime.c
+    kernel/pm/pm_control_syscall.c
+    kernel/pm/pm_control_syscall_runtime.c
+    kernel/pm/pm_control_syscall_reservation.c
+    kernel/pm/pm_control_syscall_execution.c
+    kernel/pm/pm_control_syscall_activation.c
+    kernel/pm/pm_control_syscall_exit.c
 )
 
 set(
@@ -930,8 +930,8 @@ set(
 
 set(
     MICROS_ELF_SPAWN_RESOURCE_SOURCES
-    kernel/elf_spawn_test_compare.c
-    kernel/elf_spawn_test_service_compare.c
+    kernel/tests/spawn/elf_spawn_test_compare.c
+    kernel/tests/spawn/elf_spawn_test_service_compare.c
 )
 
 set(
@@ -981,9 +981,9 @@ set(
 
 set(
     MICROS_PM_SERVICE_QEMU_TEST_SOURCES
-    kernel/pm_service_test.c
-    kernel/pm_service_test_fixture.c
-    kernel/pm_service_test_report.c
+    kernel/tests/pm/pm_service_test.c
+    kernel/tests/pm/pm_service_test_fixture.c
+    kernel/tests/pm/pm_service_test_report.c
 )
 
 set(
@@ -1068,52 +1068,52 @@ set(
 
 set(
     MICROS_VM_SCRATCH_PREEMPTION_QEMU_TEST_SOURCES
-    kernel/vm_scratch_preemption_test.c
-    kernel/vm_scratch_preemption_test_fixture.c
-    kernel/vm_scratch_preemption_test_runtime.c
-    kernel/vm_scratch_preemption_test_report.c
-    kernel/vm_scratch_preemption_test_trap.c
+    kernel/tests/vm/vm_scratch_preemption_test.c
+    kernel/tests/vm/vm_scratch_preemption_test_fixture.c
+    kernel/tests/vm/vm_scratch_preemption_test_runtime.c
+    kernel/tests/vm/vm_scratch_preemption_test_report.c
+    kernel/tests/vm/vm_scratch_preemption_test_trap.c
 )
 
 set(
     MICROS_BOOTSTRAP_MANIFEST_SOURCES
-    kernel/bootstrap_manifest.c
-    kernel/bootstrap_manifest_common.c
-    kernel/bootstrap_manifest_profiles.c
-    kernel/bootstrap_transitions.c
+    kernel/boot/bootstrap_manifest.c
+    kernel/boot/bootstrap_manifest_common.c
+    kernel/boot/bootstrap_manifest_profiles.c
+    kernel/boot/bootstrap_transitions.c
 )
 
 set(
     MICROS_BOOTSTRAP_IMAGE_SOURCES
-    kernel/bootstrap_image.c
+    kernel/boot/bootstrap_image.c
 )
 
 set(
     MICROS_BOOTSTRAP_RUNTIME_SOURCES
-    kernel/bootstrap_runtime.c
-    kernel/bootstrap_runtime_state.c
-    kernel/bootstrap_preparation.c
-    kernel/bootstrap_preparation_image.c
-    kernel/bootstrap_preparation_rollback.c
-    kernel/bootstrap_runtime_validation.c
-    kernel/bootstrap_diagnostics.c
+    kernel/boot/bootstrap_runtime.c
+    kernel/boot/bootstrap_runtime_state.c
+    kernel/boot/bootstrap_preparation.c
+    kernel/boot/bootstrap_preparation_image.c
+    kernel/boot/bootstrap_preparation_rollback.c
+    kernel/boot/bootstrap_runtime_validation.c
+    kernel/boot/bootstrap_diagnostics.c
 )
 
 set(
     MICROS_BOOTSTRAP_SYSCALL_SOURCES
-    kernel/bootstrap_syscall.c
-    kernel/bootstrap_syscall_common.c
-    kernel/bootstrap_syscall_release.c
-    kernel/bootstrap_syscall_ready.c
-    kernel/bootstrap_syscall_complete.c
-    kernel/bootstrap_syscall_failure.c
+    kernel/boot/bootstrap_syscall.c
+    kernel/boot/bootstrap_syscall_common.c
+    kernel/boot/bootstrap_syscall_release.c
+    kernel/boot/bootstrap_syscall_ready.c
+    kernel/boot/bootstrap_syscall_complete.c
+    kernel/boot/bootstrap_syscall_failure.c
 )
 
 set(
     MICROS_BOOT_FOUNDATION_SOURCES
-    kernel/main.c
-    kernel/boot_foundation.c
-    kernel/boot_component_tests.c
+    kernel/boot/main.c
+    kernel/boot/boot_foundation.c
+    kernel/boot/boot_component_tests.c
 )
 
 set(
@@ -1157,45 +1157,45 @@ set(
 
 set(
     MICROS_SCHEDULER_CORE_SOURCES
-    kernel/scheduler_core.c
-    kernel/scheduler_core_queue.c
-    kernel/scheduler_core_validate.c
-    kernel/scheduler_core_policy.c
-    kernel/scheduler_core_ipc.c
-    kernel/scheduler_core_ipc_transition.c
-    kernel/scheduler_core_return_plan.c
-    kernel/scheduler_core_return.c
-    kernel/scheduler_core_accounting.c
+    kernel/scheduler/scheduler_core.c
+    kernel/scheduler/scheduler_core_queue.c
+    kernel/scheduler/scheduler_core_validate.c
+    kernel/scheduler/scheduler_core_policy.c
+    kernel/scheduler/scheduler_core_ipc.c
+    kernel/scheduler/scheduler_core_ipc_transition.c
+    kernel/scheduler/scheduler_core_return_plan.c
+    kernel/scheduler/scheduler_core_return.c
+    kernel/scheduler/scheduler_core_accounting.c
 )
 
 set(
     MICROS_SCHEDULER_RUNTIME_SOURCES
-    kernel/scheduler.c
-    kernel/scheduler_context.c
-    kernel/scheduler_completion.c
-    kernel/scheduler_return.c
-    kernel/scheduler_interrupt.c
-    kernel/scheduler_idle.c
-    kernel/scheduler_test_support.c
+    kernel/scheduler/scheduler.c
+    kernel/scheduler/scheduler_context.c
+    kernel/scheduler/scheduler_completion.c
+    kernel/scheduler/scheduler_return.c
+    kernel/scheduler/scheduler_interrupt.c
+    kernel/scheduler/scheduler_idle.c
+    kernel/tests/scheduler/scheduler_test_support.c
 )
 
 set(
     MICROS_SCHEDULER_QEMU_TEST_SOURCES
-    kernel/scheduler_test.c
-    kernel/scheduler_test_state.c
-    kernel/scheduler_test_fixture.c
-    kernel/scheduler_test_completion.c
-    kernel/scheduler_test_interrupt.c
-    kernel/scheduler_test_trap.c
-    kernel/scheduler_test_finish.c
+    kernel/tests/scheduler/scheduler_test.c
+    kernel/tests/scheduler/scheduler_test_state.c
+    kernel/tests/scheduler/scheduler_test_fixture.c
+    kernel/tests/scheduler/scheduler_test_completion.c
+    kernel/tests/scheduler/scheduler_test_interrupt.c
+    kernel/tests/scheduler/scheduler_test_trap.c
+    kernel/tests/scheduler/scheduler_test_finish.c
 )
 
 set(
     MICROS_SCHEDULER_INVALID_QEMU_TEST_SOURCES
-    kernel/scheduler_invalid_test.c
-    kernel/scheduler_invalid_test_state.c
-    kernel/scheduler_invalid_test_fixture.c
-    kernel/scheduler_invalid_test_observation.c
+    kernel/tests/scheduler/scheduler_invalid_test.c
+    kernel/tests/scheduler/scheduler_invalid_test_state.c
+    kernel/tests/scheduler/scheduler_invalid_test_fixture.c
+    kernel/tests/scheduler/scheduler_invalid_test_observation.c
 )
 
 set(
@@ -1219,32 +1219,32 @@ set(
 
 set(
     MICROS_TRAP_SOURCES
-    kernel/trap.c
-    kernel/trap_context.c
-    kernel/trap_user.c
-    kernel/trap_interrupt.c
-    kernel/trap_syscall.c
-    kernel/trap_fault.c
-    kernel/trap_test.c
-    kernel/trap_test_hooks.c
+    kernel/trap/trap.c
+    kernel/trap/trap_context.c
+    kernel/trap/trap_user.c
+    kernel/trap/trap_interrupt.c
+    kernel/trap/trap_syscall.c
+    kernel/trap/trap_fault.c
+    kernel/tests/trap/trap_test.c
+    kernel/trap/trap_test_hooks.c
 )
 
 set(
     MICROS_SYSCALL_SOURCES
-    kernel/syscall.c
-    kernel/syscall_decode.c
-    kernel/syscall_context.c
+    kernel/trap/syscall.c
+    kernel/trap/syscall_decode.c
+    kernel/trap/syscall_context.c
 )
 
 set(
     MICROS_USER_RUNTIME_KERNEL_TEST_SOURCES
-    kernel/user_runtime_test.c
-    kernel/user_runtime_test_state.c
-    kernel/user_runtime_test_image.c
-    kernel/user_runtime_test_setup.c
-    kernel/user_runtime_test_trap.c
-    kernel/user_runtime_test_cleanup.c
-    kernel/user_runtime_test_report.c
+    kernel/tests/runtime/user_runtime_test.c
+    kernel/tests/runtime/user_runtime_test_state.c
+    kernel/tests/runtime/user_runtime_test_image.c
+    kernel/tests/runtime/user_runtime_test_setup.c
+    kernel/tests/runtime/user_runtime_test_trap.c
+    kernel/tests/runtime/user_runtime_test_cleanup.c
+    kernel/tests/runtime/user_runtime_test_report.c
 )
 
 set(
@@ -1267,17 +1267,17 @@ if(MICROS_BUILD_HOST_TESTS)
 
     add_executable(
         fdt_test
-        kernel/fdt.c
+        kernel/platform/fdt.c
         ${MICROS_FDT_HOST_TEST_SOURCES}
     )
     add_executable(
         frame_allocator_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_ALLOCATOR_HOST_TEST_SOURCES}
     )
     add_executable(
         sv39_test
-        kernel/sv39.c
+        kernel/memory/sv39.c
         tests/host/sv39_test.c
     )
     add_executable(
@@ -1288,7 +1288,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         frame_ownership_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
@@ -1307,13 +1307,13 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
-        kernel/grant.c
-        kernel/grant_abi.c
-        kernel/grant_copy_core.c
-        kernel/grant_syscall_core.c
-        kernel/sv39.c
+        kernel/grant/grant.c
+        kernel/grant/grant_abi.c
+        kernel/grant/grant_copy_core.c
+        kernel/grant/grant_syscall_core.c
+        kernel/memory/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
-        kernel/ipc_abi.c
+        kernel/ipc/ipc_abi.c
         ${MICROS_IPC_CORE_SOURCES}
         tests/host/ipc_abi_test.c
         ${MICROS_IPC_CALL_HOST_TEST_SOURCES}
@@ -1338,8 +1338,8 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
-        kernel/grant.c
-        kernel/grant_copy_core.c
+        kernel/grant/grant.c
+        kernel/grant/grant_copy_core.c
         ${MICROS_IPC_CORE_SOURCES}
         ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
         ${MICROS_GRANT_HOST_TEST_SOURCES}
@@ -1363,8 +1363,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         bootstrap_control_test
-        kernel/bootstrap_control.c
-        kernel/bootstrap_control_core.c
+        kernel/boot/bootstrap_control.c
+        kernel/boot/bootstrap_control_core.c
         ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
         ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
@@ -1375,9 +1375,9 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_bootstrap_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES}
@@ -1385,7 +1385,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         pm_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
         ${MICROS_IPC_CORE_SOURCES}
@@ -1532,9 +1532,9 @@ if(MICROS_BUILD_HOST_TESTS)
     endif()
     add_executable(
         vm_core_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
@@ -1548,9 +1548,9 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         elf_spawn_model_test
-        kernel/frame_allocator.c
+        kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
-        kernel/vm_bootstrap.c
+        kernel/vm/vm_bootstrap.c
         ${MICROS_VM_BOOT_VALIDATION_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES}
         ${MICROS_VM_CORE_SOURCES}
@@ -1624,12 +1624,12 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
-        kernel/plic_core.c
-        kernel/tty_control_core.c
-        kernel/tty_control_syscall_core.c
-        kernel/tty_handoff_core.c
+        kernel/platform/plic_core.c
+        kernel/tty/tty_control_core.c
+        kernel/tty/tty_control_syscall_core.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
-        kernel/uart_console_core.c
+        kernel/tty/uart_console_core.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
         tests/host/tty_control_test.c
@@ -1662,32 +1662,32 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_handoff_syscall_test
-        kernel/tty_handoff_core.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
         ${MICROS_VM_HANDOFF_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_interrupt_test
-        kernel/tty_handoff_core.c
-        kernel/tty_interrupt.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_interrupt.c
         tests/host/tty_interrupt_test.c
     )
     add_executable(
         tty_control_syscall_test
-        kernel/tty_control_core.c
-        kernel/tty_control_syscall.c
-        kernel/tty_handoff_core.c
+        kernel/tty/tty_control_core.c
+        kernel/tty/tty_control_syscall.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_TTY_CONTROL_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_fault_test
-        kernel/tty_fault.c
+        kernel/tty/tty_fault.c
         tests/host/tty_fault_test.c
     )
     add_executable(
         trap_route_test
-        kernel/trap_route_core.c
+        kernel/trap/trap_route_core.c
         tests/host/trap_route_test.c
     )
     target_include_directories(
@@ -1798,11 +1798,13 @@ if(MICROS_BUILD_HOST_TESTS)
     target_include_directories(
         kernel_objects_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
         frame_ownership_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
@@ -1814,11 +1816,13 @@ if(MICROS_BUILD_HOST_TESTS)
     target_include_directories(
         endpoint_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
         ipc_model_test
         PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_include_directories(
@@ -2569,6 +2573,73 @@ if(MICROS_BUILD_HOST_TESTS)
                 -fsanitize=address,undefined
         )
     endif()
+
+    foreach(
+        kernel_consumer
+        IN ITEMS
+            bootstrap_control_test
+            bootstrap_test
+            elf_spawn_fixture_test
+            elf_spawn_model_test
+            endpoint_test
+            fdt_test
+            frame_allocator_test
+            frame_ownership_test
+            ipc_model_test
+            kernel_objects_test
+            pm_test
+            scheduler_test
+            sv39_test
+            trap_route_test
+            tty_control_syscall_test
+            tty_fault_test
+            tty_interrupt_test
+            tty_test
+            vm_bootstrap_test
+            vm_core_test
+            vm_handoff_syscall_test
+    )
+        foreach(
+            kernel_directory
+            IN ITEMS
+                boot
+                diagnostic
+                endpoint
+                execution
+                grant
+                ipc
+                memory
+                objects
+                platform
+                pm
+                scheduler
+                trap
+                tty
+                vm
+                tests/boot
+                tests/endpoint
+                tests/execution
+                tests/grant
+                tests/ipc
+                tests/memory
+                tests/objects
+                tests/pm
+                tests/ramfs
+                tests/runtime
+                tests/scheduler
+                tests/spawn
+                tests/trap
+                tests/tty
+                tests/vfs
+                tests/vm
+        )
+            target_compile_options(
+                "${kernel_consumer}"
+                PRIVATE
+                    "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=${CMAKE_CURRENT_SOURCE_DIR}/kernel/>"
+            )
+        endforeach()
+    endforeach()
 
     add_test(NAME fdt-parser COMMAND fdt_test)
     add_test(NAME frame-allocator COMMAND frame_allocator_test)
@@ -3704,7 +3775,7 @@ if(
                     ${MICROS_APPLICATION_ELF_CHECKER_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_fixture.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/kernel/elf_spawn_test_fixture.h"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/kernel/tests/spawn/elf_spawn_test_fixture.h"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
                 VERBATIM
             )
@@ -3927,58 +3998,58 @@ add_executable(
     arch/riscv64/uart.c
     arch/riscv64/user_entry.S
     ${MICROS_KERNEL_ADDRESS_SPACE_SOURCES}
-    kernel/bootstrap_control.c
-    kernel/bootstrap_control_core.c
+    kernel/boot/bootstrap_control.c
+    kernel/boot/bootstrap_control_core.c
     ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
     ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
-    kernel/bootstrap_memory.c
+    kernel/memory/bootstrap_memory.c
     ${MICROS_BOOTSTRAP_RUNTIME_SOURCES}
     ${MICROS_BOOTSTRAP_SYSCALL_SOURCES}
     ${MICROS_ENDPOINT_CORE_SOURCES}
-    kernel/fdt.c
-    kernel/frame_allocator.c
+    kernel/platform/fdt.c
+    kernel/memory/frame_allocator.c
     ${MICROS_FRAME_OWNERSHIP_SOURCES}
-    kernel/grant.c
-    kernel/grant_abi.c
+    kernel/grant/grant.c
+    kernel/grant/grant_abi.c
     ${MICROS_GRANT_COPY_TARGET_SOURCES}
-    kernel/grant_copy_core.c
-    kernel/grant_syscall_core.c
-    kernel/grant_syscall.c
-    kernel/grant_runtime.c
-    kernel/ipc_abi.c
+    kernel/grant/grant_copy_core.c
+    kernel/grant/grant_syscall_core.c
+    kernel/grant/grant_syscall.c
+    kernel/grant/grant_runtime.c
+    kernel/ipc/ipc_abi.c
     ${MICROS_IPC_CORE_SOURCES}
-    kernel/ipc_buffer.c
-    kernel/ipc_runtime.c
+    kernel/ipc/ipc_buffer.c
+    kernel/ipc/ipc_runtime.c
     ${MICROS_IPC_SYSCALL_SOURCES}
     ${MICROS_SYSCALL_SOURCES}
-    kernel/kernel_object_runtime.c
+    kernel/objects/kernel_object_runtime.c
     ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
     ${MICROS_SCHEDULER_CORE_SOURCES}
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
-    kernel/panic.c
-    kernel/plic.c
-    kernel/plic_core.c
+    kernel/diagnostic/panic.c
+    kernel/platform/plic.c
+    kernel/platform/plic_core.c
     ${MICROS_PM_CONTROL_CORE_SOURCES}
     ${MICROS_PM_CONTROL_TARGET_SOURCES}
-    kernel/sv39.c
-    kernel/timer.c
+    kernel/memory/sv39.c
+    kernel/platform/timer.c
     ${MICROS_TRAP_SOURCES}
-    kernel/trap_route_core.c
-    kernel/tty_control_core.c
-    kernel/tty_control_syscall.c
-    kernel/tty_control_syscall_core.c
-    kernel/tty_fault.c
-    kernel/tty_handoff_core.c
+    kernel/trap/trap_route_core.c
+    kernel/tty/tty_control_core.c
+    kernel/tty/tty_control_syscall.c
+    kernel/tty/tty_control_syscall_core.c
+    kernel/tty/tty_fault.c
+    kernel/tty/tty_handoff_core.c
     ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
-    kernel/tty_interrupt.c
-    kernel/uart_console_core.c
+    kernel/tty/tty_interrupt.c
+    kernel/tty/uart_console_core.c
     ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
     ${MICROS_USER_ADDRESS_SPACE_SOURCES}
     ${MICROS_USER_EXECUTION_SOURCES}
-    kernel/vm_bootstrap.c
+    kernel/vm/vm_bootstrap.c
     ${MICROS_VM_HANDOFF_CORE_SOURCES}
-    kernel/vm_handoff_runtime.c
+    kernel/vm/vm_handoff_runtime.c
     ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
     ${MICROS_VM_SNAPSHOT_SOURCES}
     ${MICROS_VM_BOOT_VALIDATION_SOURCES}
@@ -3993,7 +4064,7 @@ if(MICROS_BUILD_UART_CONSOLE_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/uart_console_test.c
+            kernel/tests/tty/uart_console_test.c
     )
 endif()
 
@@ -4046,7 +4117,7 @@ if(
         micros
         PRIVATE
             "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
-            kernel/bootstrap_test.c
+            kernel/tests/boot/bootstrap_test.c
     )
 endif()
 
@@ -4091,7 +4162,7 @@ if(
         micros
         PRIVATE
             "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
-            kernel/vm_handoff_test.c
+            kernel/tests/vm/vm_handoff_test.c
     )
 endif()
 
@@ -4155,7 +4226,7 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
-            kernel/tty_service_test.c
+            kernel/tests/tty/tty_service_test.c
     )
 endif()
 
@@ -4199,13 +4270,13 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
         micros
         PRIVATE
             "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
-            kernel/elf_spawn_test.c
-            kernel/elf_spawn_test_fixture.c
-            kernel/elf_spawn_test_runtime.c
-            kernel/elf_spawn_test_capture.c
-            kernel/elf_spawn_test_services.c
-            kernel/elf_spawn_test_service_checks.c
-            kernel/elf_spawn_test_report.c
+            kernel/tests/spawn/elf_spawn_test.c
+            kernel/tests/spawn/elf_spawn_test_fixture.c
+            kernel/tests/spawn/elf_spawn_test_runtime.c
+            kernel/tests/spawn/elf_spawn_test_capture.c
+            kernel/tests/spawn/elf_spawn_test_services.c
+            kernel/tests/spawn/elf_spawn_test_service_checks.c
+            kernel/tests/spawn/elf_spawn_test_report.c
             ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
     )
 endif()
@@ -4230,7 +4301,7 @@ if(MICROS_BUILD_VFS_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_VFS_SERVICE_FIXTURE_SOURCE}"
-            kernel/vfs_service_test.c
+            kernel/tests/vfs/vfs_service_test.c
     )
 endif()
 
@@ -4291,7 +4362,7 @@ if(MICROS_BUILD_MMU_TEST)
         micros
         PRIVATE
             arch/riscv64/mmu_test.S
-            kernel/mmu_test.c
+            kernel/tests/memory/mmu_test.c
     )
 endif()
 
@@ -4408,7 +4479,7 @@ if(MICROS_BUILD_GRANT_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/grant_test.c
+            kernel/tests/grant/grant_test.c
     )
 endif()
 
@@ -5507,7 +5578,7 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
         micros
         PRIVATE
             arch/riscv64/ipc_syscall_panic_test.S
-            kernel/ipc_syscall_panic_test.c
+            kernel/tests/ipc/ipc_syscall_panic_test.c
     )
 endif()
 
@@ -5639,6 +5710,47 @@ target_compile_options(
         "$<$<COMPILE_LANGUAGE:C>:-std=c17;-ffreestanding;-fno-builtin;-fno-common;-fno-pic;-fno-pie;-fno-stack-protector;-fno-unwind-tables;-fno-asynchronous-unwind-tables;-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=>"
         "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wpedantic;-Wmissing-prototypes;-Wstrict-prototypes>"
 )
+
+foreach(
+    kernel_directory
+    IN ITEMS
+        boot
+        diagnostic
+        endpoint
+        execution
+        grant
+        ipc
+        memory
+        objects
+        platform
+        pm
+        scheduler
+        trap
+        tty
+        vm
+        tests/boot
+        tests/endpoint
+        tests/execution
+        tests/grant
+        tests/ipc
+        tests/memory
+        tests/objects
+        tests/pm
+        tests/ramfs
+        tests/runtime
+        tests/scheduler
+        tests/spawn
+        tests/trap
+        tests/tty
+        tests/vfs
+        tests/vm
+)
+    target_compile_options(
+        micros
+        PRIVATE
+            "$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/kernel/${kernel_directory}/=kernel/>"
+    )
+endforeach()
 
 target_link_options(
     micros

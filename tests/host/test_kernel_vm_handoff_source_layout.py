@@ -12,6 +12,7 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_if_blocks,
     static_definition_paths,
 )
+from tests.host import kernel_layout_source
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -626,7 +627,7 @@ def discovered_family_paths() -> tuple[str, ...]:
             {
                 str(path.relative_to(REPOSITORY_ROOT))
                 for pattern in patterns
-                for path in REPOSITORY_ROOT.glob(pattern)
+                for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
             }
         )
     )
@@ -642,7 +643,7 @@ def resolve_local_include(
         REPOSITORY_ROOT / "include" / include,
     )
     for candidate in candidates:
-        if candidate.is_file():
+        if kernel_layout_source.is_file_path(candidate):
             return candidate.resolve()
     return None
 
@@ -664,7 +665,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            path.read_text(encoding="utf-8")
+            kernel_layout_source.read_path(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -684,7 +685,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in (*all_source_set_paths(), *PRIVATE_HEADERS)
-            if not (REPOSITORY_ROOT / path).is_file()
+            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
         ]
         self.assertEqual([], missing)
 
@@ -697,14 +698,14 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
     def test_stable_headers_are_byte_exact(self) -> None:
         observed = {
             path: hashlib.sha256(
-                (REPOSITORY_ROOT / path).read_bytes()
+                kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
             ).hexdigest()
             for path in STABLE_HEADER_HASHES
         }
         self.assertEqual(STABLE_HEADER_HASHES, observed)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
 
         for name, expected in SOURCE_SETS.items():
             with self.subTest(source_set=name):
@@ -723,7 +724,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         self.assertEqual(1, cmake.count("kernel/vm_handoff_test.c"))
 
     def test_consumers_do_not_list_split_sources_directly(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         blocks = (
             cmake_command(cmake, "add_executable", "vm_bootstrap_test"),
             cmake_command(cmake, "add_executable", "pm_test"),
@@ -749,7 +750,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         self.assertEqual([], direct)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
         consumers = {
             "vm-bootstrap": (
                 cmake_command(cmake, "add_executable", "vm_bootstrap_test"),
@@ -809,10 +810,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         definitions = {}
         for relative in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             selected = c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative] = selected
@@ -827,9 +828,9 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
 
         for relative in (*all_source_set_paths(), *PRIVATE_HEADERS):
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
-            text = path.read_text(encoding="utf-8")
+            text = kernel_layout_source.read_path(path, encoding="utf-8")
             if c_include.search(text):
                 c_violations.append(relative)
             if relative in production_sources():
@@ -854,10 +855,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
 
         for relative in symbol_scan_sources():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for symbol in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 definitions.setdefault(symbol, []).append(relative)
 
@@ -876,10 +877,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         )
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for context_type in generic_context.findall(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ):
                 context_definitions.append((relative, context_type))
         self.assertEqual(
@@ -910,8 +911,8 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         for relative in SOURCE_SETS["MICROS_VM_SNAPSHOT_SOURCES"]:
             path = REPOSITORY_ROOT / relative
             if (
-                path.is_file()
-                and snapshot_pattern.search(path.read_text(encoding="utf-8"))
+                kernel_layout_source.is_file_path(path)
+                and snapshot_pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
             ):
                 snapshot_owners.append(relative)
         self.assertEqual(["kernel/vm_snapshot.c"], snapshot_owners)
@@ -944,16 +945,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                 )
 
     def test_evidence_identities_and_case_order_remain_stable(self) -> None:
-        cmake = CMAKE_PATH.read_text(encoding="utf-8")
-        core_entry = (
-            REPOSITORY_ROOT / "tests/host/vm_handoff_test.c"
-        ).read_text(encoding="utf-8")
-        bootstrap_entry = (
-            REPOSITORY_ROOT / "tests/host/vm_bootstrap_test.c"
-        ).read_text(encoding="utf-8")
-        syscall_entry = (
-            REPOSITORY_ROOT / "tests/host/vm_handoff_syscall_test.c"
-        ).read_text(encoding="utf-8")
+        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        core_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_handoff_test.c", encoding="utf-8")
+        bootstrap_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_bootstrap_test.c", encoding="utf-8")
+        syscall_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_handoff_syscall_test.c", encoding="utf-8")
         markers = {
             (
                 "MICROS_VM_HANDOFF_TEST_PASS "
@@ -1025,7 +1020,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         }
         observed = tuple(
             item
-            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if item[0] in baselines
         )
         self.assertEqual(VM_PATH_CLASSIFICATION_EQUIVALENTS, observed)
@@ -1047,7 +1042,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_long_function_migration_matches_review_signal(self) -> None:
@@ -1060,10 +1055,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         self.assertTrue(migration <= initial)
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
-            if not path.is_file():
+            if not kernel_layout_source.is_file_path(path):
                 continue
             for name, line_count in c_function_definitions(
-                path.read_text(encoding="utf-8")
+                kernel_layout_source.read_path(path, encoding="utf-8")
             ).items():
                 if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                     oversized[(relative, name)] = line_count

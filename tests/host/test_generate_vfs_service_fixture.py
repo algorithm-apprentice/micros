@@ -5,6 +5,15 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_vfs_service_fixture
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_vfs_service_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_vfs_service_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def application_image():
@@ -77,7 +86,7 @@ class VfsServiceFixtureGeneratorTest(unittest.TestCase):
             vfs = bootstrap_image()
         if application is None:
             application = application_image()
-        return generate_vfs_service_fixture.render_fixture(
+        return _render_fixture(
             bootstrap_image(),
             vm_image(),
             bootstrap_image(),
@@ -155,7 +164,7 @@ class VfsServiceFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "non-VM image",
         ):
-            generate_vfs_service_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -182,7 +191,7 @@ class VfsServiceFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_vfs_service_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -275,7 +284,7 @@ class VfsServiceFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "aggregate user page limit",
         ):
-            generate_vfs_service_fixture.render_fixture(
+            _render_fixture(
                 launcher,
                 vm,
                 pm,

@@ -5,6 +5,15 @@ import unittest
 from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tools import check_user_elf
 from tools import generate_vm_handoff_fixture
+from tests.host import kernel_layout_source
+
+GENERATOR_PATH = "tools/generate_vm_handoff_fixture.py"
+
+def _render_fixture(*args, **kwargs):
+    return kernel_layout_source.restore_generated_fixture(
+        GENERATOR_PATH,
+        generate_vm_handoff_fixture.render_fixture(*args, **kwargs),
+    )
 
 
 def vm_image():
@@ -76,7 +85,7 @@ def probe_image():
 
 class VmHandoffFixtureGeneratorTest(unittest.TestCase):
     def test_renders_vm_metadata_and_topology(self):
-        output = generate_vm_handoff_fixture.render_fixture(
+        output = _render_fixture(
             bootstrap_image(),
             vm_image(),
             probe_image(),
@@ -100,7 +109,7 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_vm_without_boot_object(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            generate_vm_handoff_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(),
                 bootstrap_image(),
                 probe_image(),
@@ -126,7 +135,7 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
                     check_user_elf.ElfFormatError,
                     "VM boot information has wrong size or alignment",
                 ):
-                    generate_vm_handoff_fixture.render_fixture(
+                    _render_fixture(
                         bootstrap_image(), image, probe_image()
                     )
 
@@ -148,7 +157,7 @@ class VmHandoffFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "VM boot information overlaps bootstrap configuration",
         ):
-            generate_vm_handoff_fixture.render_fixture(
+            _render_fixture(
                 bootstrap_image(), image, probe_image()
             )
 

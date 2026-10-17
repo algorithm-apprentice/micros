@@ -12,6 +12,7 @@ from tests.host.test_frame_ownership_source_layout import tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools import validation_context, validation_plan
+from tests.host import kernel_layout_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -725,7 +726,7 @@ CONTEXT_AST_DIGEST = 'da82678bf0371477e724a109153bd4008d2c8b755c9a531a9e04dc40ae
 
 
 def source(path):
-    return (ROOT / path).read_text()
+    return kernel_layout_source.read_path(ROOT / path)
 
 
 def digest_bytes(value):
@@ -2203,10 +2204,10 @@ def main(argv=None):
         )
 
     def test_runtime_byte_primitives_have_their_sole_state_leaf_owner(self):
-        facade = function_records((ROOT / "kernel/tty_handoff_runtime.c").read_text())
+        facade = function_records(kernel_layout_source.read_path(ROOT / "kernel/tty_handoff_runtime.c"))
         for name in ("clear_bytes", "copy_bytes"):
             self.assertNotIn(name, set(facade))
-        state = function_records((ROOT / "kernel/tty_handoff_runtime_state.c").read_text())
+        state = function_records(kernel_layout_source.read_path(ROOT / "kernel/tty_handoff_runtime_state.c"))
         self.assertIn("tty_handoff_clear_bytes", state)
         self.assertIn("tty_handoff_copy_bytes", state)
 
@@ -2253,23 +2254,28 @@ def main(argv=None):
         for path, expected in STABLE_HASHES.items():
             from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
-            value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else (ROOT / path).read_bytes()
+            value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
             self.assertEqual(expected, digest_bytes(value), path)
-        self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes((ROOT / "tests/host/c_source_records.py").read_bytes()))
+        self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / "tests/host/c_source_records.py")))
 
     def test_exact_source_sets_private_headers_consumers_and_recipe_inverse(self):
         self.assertEqual(26, sum(map(len, FAMILY_PATHS)))
         cmake = source("CMakeLists.txt")
         for paths in FAMILY_PATHS:
             for path in paths:
-                self.assertTrue((ROOT / path).is_file(), path)
+                self.assertTrue(kernel_layout_source.is_file_path(ROOT / path), path)
         for name, paths in SOURCE_SETS.items():
             self.assertEqual((source_set_block(name, paths),), cmake_commands(cmake, "set", name))
         for header in PRIVATE_HEADERS:
-            self.assertTrue((ROOT / header).is_file())
+            self.assertTrue(kernel_layout_source.is_file_path(ROOT / header))
             self.assertEqual({}, function_records(source(header)))
         self.assertEqual(BASE_CMAKE_DIGEST, digest_bytes(restored_cmake(cmake).encode()))
-        self.assertEqual(digest_bytes(cmake.encode()), validation_context.RECIPE_DIGESTS["CMakeLists.txt"])
+        self.assertEqual(
+            digest_bytes(cmake.encode()),
+            kernel_layout_source.original_cmake_recipe_digest(
+                validation_context.RECIPE_DIGESTS["CMakeLists.txt"]
+            ),
+        )
         for target, variable in (
             ("micros", "MICROS_TTY_HANDOFF_RUNTIME_SOURCES"), ("tty_test", "MICROS_TTY_HANDOFF_RUNTIME_SOURCES"),
             ("tty_service_test", "MICROS_TTY_SERVICE_CORE_SOURCES"), ("tty_model_test", "MICROS_TTY_SERVICE_CORE_SOURCES"),

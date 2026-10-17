@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "kernel/vm_handoff_core.h"
+#include "kernel/vm/vm_handoff_core.h"
 #include "micros/sv39.h"
 
 struct micros_vm_boot_summary vm_handoff_test_valid_summary(void);
