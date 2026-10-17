@@ -1,4 +1,4 @@
-#include "kernel/tty_handoff_runtime_internal.h"
+#include "kernel/tty/tty_handoff_runtime_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

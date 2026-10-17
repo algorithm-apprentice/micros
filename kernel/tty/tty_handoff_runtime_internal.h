@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_TTY_HANDOFF_RUNTIME_INTERNAL_H
 #define MICROS_KERNEL_TTY_HANDOFF_RUNTIME_INTERNAL_H
 
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 
 struct tty_handoff_context {
     struct micros_tty_handoff_runtime_state tty_handoff_state;

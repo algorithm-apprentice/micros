@@ -1,7 +1,7 @@
 #include "kernel/memory/user_address_space_internal.h"
 
 #include "arch/riscv64/mmu.h"
-#include "kernel/tty_handoff_core.h"
+#include "kernel/tty/tty_handoff_core.h"
 #include "micros/frame_ownership_runtime.h"
 
 static void clear_bytes(void *storage, size_t size)

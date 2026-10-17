@@ -5,7 +5,7 @@
 
 #include "kernel/bootstrap_control_internal.h"
 #include "kernel/syscall.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "micros/bootstrap.h"
 #include "micros/endpoint.h"
 

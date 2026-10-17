@@ -1,6 +1,6 @@
 #include "kernel/memory/user_address_space_internal.h"
 
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_runtime.h"

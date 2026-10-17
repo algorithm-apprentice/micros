@@ -1,4 +1,4 @@
-#include "kernel/tty_control_syscall.h"
+#include "kernel/tty/tty_control_syscall.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,10 +10,10 @@
 #include "kernel/bootstrap_runtime.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
-#include "kernel/tty_control_core.h"
-#include "kernel/tty_control_syscall_core.h"
-#include "kernel/tty_fault.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_control_core.h"
+#include "kernel/tty/tty_control_syscall_core.h"
+#include "kernel/tty/tty_fault.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tty_service_test.h"
 #endif

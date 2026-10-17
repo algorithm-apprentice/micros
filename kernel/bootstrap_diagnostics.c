@@ -1,7 +1,7 @@
 #include "kernel/bootstrap_runtime_internal.h"
 
 #include "arch/riscv64/platform.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "micros/panic.h"
 
 static const char *diagnostic_reason_name(

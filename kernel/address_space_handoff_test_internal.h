@@ -9,7 +9,7 @@
 #include "kernel/address_space_handoff_test.h"
 #include "kernel/bootstrap_control_internal.h"
 #include "kernel/grant_runtime_internal.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm_snapshot.h"
 #include "micros/frame_ownership_runtime.h"

@@ -1,4 +1,4 @@
-#include "kernel/tty_control_core.h"
+#include "kernel/tty/tty_control_core.h"
 
 #include <stddef.h>
 #include <stdint.h>

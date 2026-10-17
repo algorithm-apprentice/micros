@@ -13,7 +13,7 @@
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/pm_control_runtime.h"
 #include "kernel/platform/plic.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "kernel/vm_handoff_syscall.h"

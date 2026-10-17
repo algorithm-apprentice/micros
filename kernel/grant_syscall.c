@@ -6,7 +6,7 @@
 #include "grant_internal.h"
 #include "kernel/grant_runtime_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
-#include "tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "micros/grant_copy.h"
 #include "micros/grant_runtime.h"
 #include "micros/grant_syscall_core.h"

@@ -4,8 +4,8 @@
 
 #include "arch/riscv64/platform.h"
 #include "kernel/bootstrap_runtime.h"
-#include "kernel/tty_fault.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_fault.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/ipc_runtime.h"

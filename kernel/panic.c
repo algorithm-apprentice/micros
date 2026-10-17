@@ -6,7 +6,7 @@
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/platform/plic.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"

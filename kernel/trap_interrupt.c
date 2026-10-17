@@ -1,6 +1,6 @@
 #include "kernel/trap_internal.h"
 
-#include "kernel/tty_interrupt.h"
+#include "kernel/tty/tty_interrupt.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/scheduler.h"

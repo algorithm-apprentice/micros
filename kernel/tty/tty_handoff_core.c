@@ -1,4 +1,4 @@
-#include "kernel/tty_handoff_core.h"
+#include "kernel/tty/tty_handoff_core.h"
 
 #include <stddef.h>
 

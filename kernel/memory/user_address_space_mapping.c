@@ -1,6 +1,6 @@
 #include "kernel/memory/user_address_space_internal.h"
 
-#include "kernel/tty_handoff_core.h"
+#include "kernel/tty/tty_handoff_core.h"
 
 static struct micros_user_address_space_page_table *table_at(
     uint64_t physical_address

@@ -263,10 +263,10 @@ set(
 
 set(
     MICROS_TTY_HANDOFF_RUNTIME_SOURCES
-    kernel/tty_handoff_runtime.c
-    kernel/tty_handoff_runtime_state.c
-    kernel/tty_handoff_runtime_validate.c
-    kernel/tty_handoff_runtime_transitions.c
+    kernel/tty/tty_handoff_runtime.c
+    kernel/tty/tty_handoff_runtime_state.c
+    kernel/tty/tty_handoff_runtime_validate.c
+    kernel/tty/tty_handoff_runtime_transitions.c
 )
 
 set(
@@ -1625,11 +1625,11 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         tty_test
         kernel/platform/plic_core.c
-        kernel/tty_control_core.c
-        kernel/tty_control_syscall_core.c
-        kernel/tty_handoff_core.c
+        kernel/tty/tty_control_core.c
+        kernel/tty/tty_control_syscall_core.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
-        kernel/uart_console_core.c
+        kernel/tty/uart_console_core.c
         servers/tty/tty_core.c
         tests/host/plic_test.c
         tests/host/tty_control_test.c
@@ -1662,27 +1662,27 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_handoff_syscall_test
-        kernel/tty_handoff_core.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
         ${MICROS_VM_HANDOFF_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_interrupt_test
-        kernel/tty_handoff_core.c
-        kernel/tty_interrupt.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_interrupt.c
         tests/host/tty_interrupt_test.c
     )
     add_executable(
         tty_control_syscall_test
-        kernel/tty_control_core.c
-        kernel/tty_control_syscall.c
-        kernel/tty_handoff_core.c
+        kernel/tty/tty_control_core.c
+        kernel/tty/tty_control_syscall.c
+        kernel/tty/tty_handoff_core.c
         ${MICROS_TTY_CONTROL_SYSCALL_HOST_TEST_SOURCES}
     )
     add_executable(
         tty_fault_test
-        kernel/tty_fault.c
+        kernel/tty/tty_fault.c
         tests/host/tty_fault_test.c
     )
     add_executable(
@@ -4036,14 +4036,14 @@ add_executable(
     kernel/platform/timer.c
     ${MICROS_TRAP_SOURCES}
     kernel/trap_route_core.c
-    kernel/tty_control_core.c
-    kernel/tty_control_syscall.c
-    kernel/tty_control_syscall_core.c
-    kernel/tty_fault.c
-    kernel/tty_handoff_core.c
+    kernel/tty/tty_control_core.c
+    kernel/tty/tty_control_syscall.c
+    kernel/tty/tty_control_syscall_core.c
+    kernel/tty/tty_fault.c
+    kernel/tty/tty_handoff_core.c
     ${MICROS_TTY_HANDOFF_RUNTIME_SOURCES}
-    kernel/tty_interrupt.c
-    kernel/uart_console_core.c
+    kernel/tty/tty_interrupt.c
+    kernel/tty/uart_console_core.c
     ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
     ${MICROS_USER_ADDRESS_SPACE_SOURCES}
     ${MICROS_USER_EXECUTION_SOURCES}

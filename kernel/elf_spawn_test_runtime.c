@@ -4,7 +4,7 @@
 #include "arch/riscv64/platform.h"
 #include "kernel/platform/plic.h"
 #include "kernel/pm_control_runtime.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"

@@ -1,4 +1,4 @@
-#include "kernel/uart_console_core.h"
+#include "kernel/tty/uart_console_core.h"
 
 #include <stddef.h>
 

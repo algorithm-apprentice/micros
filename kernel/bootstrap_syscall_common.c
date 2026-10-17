@@ -8,7 +8,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/platform/plic.h"
-#include "kernel/tty_handoff_runtime.h"
+#include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm_handoff_runtime.h"
 #include "micros/panic.h"
