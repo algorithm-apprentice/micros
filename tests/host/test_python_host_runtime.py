@@ -2,7 +2,9 @@ import ast
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -171,6 +173,10 @@ class PythonHostRuntimeTests(unittest.TestCase):
             ("PYTHONPATH", "/external"),
             ("PYTHONEXECUTABLE", "/tmp/fake"),
             ("__PYVENV_LAUNCHER__", "/tmp/fake"),
+            ("_PYTHON_SYSCONFIGDATA_NAME", "_sysconfigdata_external"),
+            ("_PYTHON_SYSCONFIGDATA_PATH", "/external"),
+            ("_PYTHON_PROJECT_BASE", "/external"),
+            ("_PYTHON_HOST_PLATFORM", "external-platform"),
             ("OPENSSL_MODULES", "/external"),
             ("SSL_CERT_FILE", "/external"),
             ("RANDFILE", "/tmp/random"),
@@ -190,6 +196,46 @@ class PythonHostRuntimeTests(unittest.TestCase):
                 environment=self.environment(),
             ),
         )
+
+    def test_sysconfig_overrides_fail_before_external_module_import(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            marker = temporary / "imported"
+            module_name = "_sysconfigdata_micros_external"
+            (temporary / f"{module_name}.py").write_text(
+                "from pathlib import Path\n"
+                f"Path({str(marker)!r}).write_text("
+                "'imported', encoding='utf-8')\n"
+                "build_time_vars = {'Py_GIL_DISABLED': 0}\n",
+                encoding="utf-8",
+            )
+            environment = {
+                **os.environ,
+                **self.environment(),
+                "_PYTHON_SYSCONFIGDATA_NAME": module_name,
+                "_PYTHON_SYSCONFIGDATA_PATH": str(temporary),
+            }
+            command = python_host_runtime.python_command(
+                sys.executable,
+                str(ROOT / "tools/python_host_runtime.py"),
+                "--selected",
+                sys.executable,
+                "--metadata",
+                environment=self.environment(),
+            )
+            result = subprocess.run(
+                command,
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            imported = marker.exists()
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("_PYTHON_SYSCONFIGDATA_NAME", result.stderr)
+        self.assertIn("_PYTHON_SYSCONFIGDATA_PATH", result.stderr)
+        self.assertFalse(imported)
 
     def test_darwin_framework_identity_is_platform_scoped(self):
         metadata = self.metadata()

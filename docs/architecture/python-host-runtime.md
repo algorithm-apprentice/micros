@@ -128,6 +128,12 @@ and `PYTHONSTARTUP` remains. The previous `PYTHONNOUSERSITE=1` requirement is
 removed because `-S` establishes the stronger no-site boundary and `-E`
 ignores Python environment configuration.
 
+CPython's internal `_PYTHON_SYSCONFIGDATA_NAME`,
+`_PYTHON_SYSCONFIGDATA_PATH`, `_PYTHON_PROJECT_BASE`, and
+`_PYTHON_HOST_PLATFORM` controls are also rejected. The runtime helper imports
+`sysconfig` only after this shared environment validation, so an external
+sysconfig module cannot execute before rejection.
+
 Python standard extensions use OpenSSL. Supported execution additionally
 requires:
 

@@ -9,7 +9,6 @@ from pathlib import Path
 import platform
 import stat
 import sys
-import sysconfig
 
 
 PYTHON_ARGS = ("-E", "-S", "-B")
@@ -51,6 +50,10 @@ def validate_environment(environment):
         "PYTHONSTARTUP",
         "PYTHONEXECUTABLE",
         "__PYVENV_LAUNCHER__",
+        "_PYTHON_SYSCONFIGDATA_NAME",
+        "_PYTHON_SYSCONFIGDATA_PATH",
+        "_PYTHON_PROJECT_BASE",
+        "_PYTHON_HOST_PLATFORM",
         "RANDFILE",
         "CTLOG_FILE",
     }
@@ -163,8 +166,11 @@ def validate_runtime_metadata(
         _validate_darwin_framework(metadata)
 
 
-def current_metadata():
+def current_metadata(environment=None):
+    validate_environment(os.environ if environment is None else environment)
+
     import ssl
+    import sysconfig
 
     verify_paths = ssl.get_default_verify_paths()
     return {
@@ -221,9 +227,8 @@ def documentation_command(environment=None):
 
 def require_current_runtime(selected=None, *, environment=None):
     environment = os.environ if environment is None else environment
-    validate_environment(environment)
     selected = selected_executable(environment) if selected is None else selected
-    metadata = current_metadata()
+    metadata = current_metadata(environment)
     validate_runtime_metadata(metadata, selected)
     return metadata
 
