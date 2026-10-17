@@ -203,7 +203,12 @@ resolver. Unsupported platforms/configurations retain fresh validation.
 
 ### Initial supported profile: Darwin arm64 with Ninja
 
-The v1 reusable inventory is exactly the following three rows. Other
+This subsection records the superseded `darwin-arm64-ninja-v1` profile so its
+evidence history remains auditable. ADR-0075 and the implemented correction
+below replace its Xcode Python and `PYTHONNOUSERSITE` requirements; they are no
+longer active policy.
+
+The v1 reusable inventory was exactly the following three rows. Other
 canonical workflows may still be recorded as fresh, ineligible executions;
 they cannot publish reusable receipts. Expanding eligibility requires a
 separately reviewed declaration and matching independent closure tests.
@@ -274,7 +279,7 @@ For this profile, these are the authoritative resolution rules:
   selection, import, compiler, loader and CMake override variables must
   resolve within the rules above; injection/preload, nonempty compiler flag
   overrides, nonstandard package/import paths and user-site loading are
-  ineligible. The profile requires `PYTHONNOUSERSITE=1`; absent ordinary
+  ineligible. The v1 profile required `PYTHONNOUSERSITE=1`; absent ordinary
   standard-library zip/search locations have explicit absent identities.
   Native Python test subprocesses are the current reviewed
   Python CLI and CMake configuration probes; their runtime/tool closure is
@@ -350,8 +355,9 @@ The already required native shim/import closure also distinguishes declared
 SDK paths from arbitrary include/library overrides. Active SDK/toolchain
 paths are fully hashed. Standard `/usr/local/include` and `/usr/local/lib`
 fallback locations may have explicit absent identities only; their presence
-is not permission to admit another input root. `PYTHONNOUSERSITE=1` remains
-mandatory. The inactive standard Xcode Python startup declaration
+is not permission to admit another input root. In v1,
+`PYTHONNOUSERSITE=1` remained mandatory. The inactive standard Xcode Python
+startup declaration
 `Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth` may be
 recognized only at SHA-256
 `7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373`
@@ -364,10 +370,10 @@ The complete framework tree is still fingerprinted.
 Accepted
 [ADR-0075](../adr/0075-cpython-3-15-host-automation-floor.md) replaces the
 Xcode CPython 3.9 reusable runtime with the exact
-[CPython 3.15 host contract](python-host-runtime.md). The dependent
-implementation has not started.
+[CPython 3.15 host contract](python-host-runtime.md). The active profile
+identity is `darwin-arm64-ninja-python315-v2`.
 
-The planned profile requires an explicit reusable `MICROS_PYTHON`, matching
+The implemented profile requires an explicit reusable `MICROS_PYTHON`, matching
 the CMake cache and current validation-plan process, and exact
 `-E -S -B` invocation. It fingerprints the selected Homebrew
 `python@3.15` Cellar/framework, standard library, extension modules, and
@@ -388,6 +394,12 @@ Homebrew OpenSSL configuration/trust inputs are explicitly disabled, provider
 libraries remain in the versioned closure, and all override variables fail
 closed. Every CMake and non-CMake child interpreter uses the exact selected
 prefix without `PYTHONPATH`.
+
+The complete Python Cellar remains fingerprinted even though `-S` makes its
+bundled `site-packages` inert. Links from that inert subtree record their
+name, mode, spelling, and resolved path without admitting target bytes as
+runtime inputs. Active framework, standard-library, extension, provider, and
+Mach-O dependencies retain the ordinary no-escape rule.
 
 Existing AST expected digests do not change. Direct AST evidence moves to the
 project-owned stable serializer defined by ADR-0075, which removes only new
@@ -485,7 +497,7 @@ setters, control-flow changes, malformed tokens or ambiguous boundaries
 escalate to full validation. Merely adding region comments is not proof.
 
 The immutable template permits only its existing
-`"${MICROS_PYTHON}" -B` runner,
+`"${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}` runner,
 `"${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"`,
 `"${MICROS_QEMU}"`, `"$<TARGET_FILE:micros>"`, existing literal arguments,
 `${PROJECT_VERSION}` and, only in the scheduler row,

@@ -383,7 +383,8 @@ Use the documented native unittest invocation for focused checker, structural,
 and affected fixture-generator cases. No native C model or target execution
 identity is replaced.
 Before independent implementation review, run
-`python3 tools/validation_plan.py --tier pr --execute` against the complete
+`"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --execute`
+against the complete
 clean staged candidate. The shared CMake/planner delta currently requires
 all 45 commands: complete native tests, 37 QEMU workflows, three service
 images, documentation, and three diff layers.

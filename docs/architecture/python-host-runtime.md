@@ -93,7 +93,8 @@ Darwin Homebrew profile below.
 
 `sys.path` contains only:
 
-- the reviewed repository/script root required by the invocation form;
+- the reviewed repository, script, and test-discovery roots required by the
+  invocation form;
 - the selected installation's standard-library zip spelling;
 - its `lib/python3.15`; and
 - its `lib/python3.15/lib-dynload`.
@@ -179,6 +180,12 @@ OpenSSL configuration and trust paths under `/opt/homebrew/etc` are not
 admitted. Configuration and default trust loading are disabled by the required
 environment above. Provider/module binaries remain within the fingerprinted
 versioned OpenSSL installation.
+
+The complete Cellar includes an inert `site-packages` subtree that is absent
+from active `sys.path` under `-S`. Its links retain membership, mode, spelling,
+and resolved-path identity, but an external link target's bytes are not
+admitted as runtime inputs. Active standard-library, extension, provider, and
+Mach-O links remain fail-closed under the ordinary closure rule.
 
 The reusable profile identity advances from the Xcode-Python declaration so
 old receipts cannot match accidentally.
@@ -276,6 +283,22 @@ remain rejected before QEMU metadata.
 Each permanent commit remains green. AST serializer transport is separate from
 tool selection/profile code so review can distinguish evidence format from
 runtime closure.
+
+## Implementation realization
+
+The implementation owns:
+
+- selection and exact CMake argv in `CMakeLists.txt`;
+- metadata, environment, path, GIL, launcher-effect, and OpenSSL checks in
+  `tools/python_host_runtime.py`;
+- planner command identity and reusable closure in
+  `tools/validation_plan.py`, `tools/validation_context.py`, and
+  `tools/validation_inputs.py`;
+- exact child-process construction in the ELF/QEMU host cases; and
+- stable AST text/key evidence in `tests/host/ast_evidence.py`.
+
+The reusable identity is `darwin-arm64-ninja-python315-v2`. Existing v1
+receipts cannot match it.
 
 ## Acceptance
 

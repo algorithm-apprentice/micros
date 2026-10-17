@@ -601,11 +601,11 @@ the raw-range regression rejects that loss independently.
 The narrow implementation loop is:
 
 ```bash
-python3 -m unittest tests.host.test_ramfs_source_layout
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_ramfs_source_layout
 cmake --preset host-debug
 cmake --build build/host-debug --target ramfs_seed_test ramfs_test ramfs_model_test
 ctest --test-dir build/host-debug --output-on-failure -R '^ramfs-(seed|core|model)$'
-python3 -m unittest tests.host.test_generate_ramfs_service_fixture
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_generate_ramfs_service_fixture
 ```
 
 Retain `ramfs-seed`, `ramfs-core`, `ramfs-model`,

@@ -59,7 +59,7 @@ the unchanged behavioral cases and target scenarios.
 The focused structural command is:
 
 ```bash
-python3 -m unittest tests.host.test_pm_service_source_layout
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_pm_service_source_layout
 ```
 
 The authoritative final PR plan remains the gate described below.
@@ -595,7 +595,7 @@ After this design is reviewed and merged, use small green slices:
 8. independent implementation review.
 
 Each extraction runs only its narrow existing gate. The final
-`python3 tools/validation_plan.py --tier pr --base <review-base> --execute`
+`"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --base <review-base> --execute`
 result is authoritative; selected workflows are not rerun separately.
 Reviewers inspect author evidence rather than repeating suites.
 

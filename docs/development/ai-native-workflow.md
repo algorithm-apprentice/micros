@@ -292,8 +292,8 @@ same Accepted ADRs and task contract.
 The initial reproducible documentation gate is:
 
 ```bash
-python3 -m unittest discover -s tests/host -p 'test_*.py'
-python3 tools/check_docs.py
+"${MICROS_PYTHON}" -E -S -B -m unittest discover -s tests/host -p 'test_*.py'
+"${MICROS_PYTHON}" -E -S -B tools/check_docs.py
 git add <intended-files>
 git diff --quiet
 git diff --check

@@ -349,7 +349,7 @@ The first lifecycle slice uses the existing configured native graph:
 ```bash
 cmake --build build/host-debug --target pm_test --parallel
 ctest --test-dir build/host-debug --output-on-failure -R '^pm-lifecycle$'
-python3 -m unittest tests.host.test_pm_service_source_layout
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_pm_service_source_layout
 ```
 
 Coordinator configuration and later deterministic transaction cases use:
@@ -365,7 +365,7 @@ failure boundaries, and real operation-12 backend use the existing VM suite:
 ```bash
 cmake --build build/host-debug --target vm_core_test --parallel
 ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
-python3 -m unittest tests.host.test_vm_service_source_layout tests.host.test_pm_service_source_layout tests.host.test_validation_plan
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_vm_service_source_layout tests.host.test_pm_service_source_layout tests.host.test_validation_plan
 ```
 
 The persistent composed lifecycle gate runs separately from the fast loop:
