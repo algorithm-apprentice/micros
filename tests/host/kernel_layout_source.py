@@ -3925,17 +3925,7 @@ KERNEL_ORIGINAL_SHA256 = {
     logical: fact[2] for logical, fact in KERNEL_FILE_FACTS.items()
 }
 
-KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/vm_handoff_test.c',
- 'kernel/vm_handoff_test.h',
- 'kernel/vm_handoff_test_fixture.h',
- 'kernel/vm_scratch_preemption_test.c',
- 'kernel/vm_scratch_preemption_test.h',
- 'kernel/vm_scratch_preemption_test_fixture.c',
- 'kernel/vm_scratch_preemption_test_fixture.h',
- 'kernel/vm_scratch_preemption_test_internal.h',
- 'kernel/vm_scratch_preemption_test_report.c',
- 'kernel/vm_scratch_preemption_test_runtime.c',
- 'kernel/vm_scratch_preemption_test_trap.c')
+KERNEL_PHYSICAL_OWNER_MIGRATION = ()
 
 EXTERNAL_SOURCE_FACTS = {'arch/riscv64/uart.c': ('100644',
                          'ab1cf1dbb1bc4b7183b1a533765970389f69c97972378a6d3604f32bae7c5432',

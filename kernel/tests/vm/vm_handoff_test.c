@@ -1,4 +1,4 @@
-#include "kernel/vm_handoff_test.h"
+#include "kernel/tests/vm/vm_handoff_test.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -7,7 +7,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/vm/vm_handoff_runtime.h"
-#include "kernel/vm_handoff_test_fixture.h"
+#include "kernel/tests/vm/vm_handoff_test_fixture.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_runtime.h"

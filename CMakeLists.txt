@@ -1068,11 +1068,11 @@ set(
 
 set(
     MICROS_VM_SCRATCH_PREEMPTION_QEMU_TEST_SOURCES
-    kernel/vm_scratch_preemption_test.c
-    kernel/vm_scratch_preemption_test_fixture.c
-    kernel/vm_scratch_preemption_test_runtime.c
-    kernel/vm_scratch_preemption_test_report.c
-    kernel/vm_scratch_preemption_test_trap.c
+    kernel/tests/vm/vm_scratch_preemption_test.c
+    kernel/tests/vm/vm_scratch_preemption_test_fixture.c
+    kernel/tests/vm/vm_scratch_preemption_test_runtime.c
+    kernel/tests/vm/vm_scratch_preemption_test_report.c
+    kernel/tests/vm/vm_scratch_preemption_test_trap.c
 )
 
 set(
@@ -4162,7 +4162,7 @@ if(
         micros
         PRIVATE
             "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
-            kernel/vm_handoff_test.c
+            kernel/tests/vm/vm_handoff_test.c
     )
 endif()
 

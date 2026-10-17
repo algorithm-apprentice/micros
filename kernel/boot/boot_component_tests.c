@@ -21,13 +21,13 @@
     || defined(MICROS_BUILD_VM_READY_EARLY_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
-#include "kernel/vm_handoff_test.h"
+#include "kernel/tests/vm/vm_handoff_test.h"
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
 #include "kernel/tests/pm/pm_service_test.h"
 #endif
 #ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
-#include "kernel/vm_scratch_preemption_test.h"
+#include "kernel/tests/vm/vm_scratch_preemption_test.h"
 #endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
 #include "kernel/tests/tty/tty_service_test.h"

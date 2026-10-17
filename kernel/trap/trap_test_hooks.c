@@ -39,10 +39,10 @@
 #if defined(MICROS_BUILD_VM_HANDOFF_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_TEST) \
     || defined(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
-#include "kernel/vm_handoff_test.h"
+#include "kernel/tests/vm/vm_handoff_test.h"
 #endif
 #ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
-#include "kernel/vm_scratch_preemption_test.h"
+#include "kernel/tests/vm/vm_scratch_preemption_test.h"
 #endif
 #include "micros/kernel_address_space.h"
 #include "micros/kernel_object_runtime.h"

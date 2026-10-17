@@ -49,7 +49,7 @@ def render_fixture(launcher_image, vm_image, probe_image):
     probe_limit = probe["page_count"] + 1
     total_limit = launcher_limit + vm_limit + probe_limit
     output = [
-        '#include "kernel/vm_handoff_test_fixture.h"',
+        '#include "kernel/tests/vm/vm_handoff_test_fixture.h"',
         "",
     ]
     output.extend(generate_bootstrap_fixture._render_segment_bytes(launcher))

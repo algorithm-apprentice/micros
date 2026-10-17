@@ -7,8 +7,8 @@
 #include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/pm/pm_control_core.h"
 #include "kernel/vm/vm_handoff_core.h"
-#include "kernel/vm_scratch_preemption_test.h"
-#include "kernel/vm_scratch_preemption_test_fixture.h"
+#include "kernel/tests/vm/vm_scratch_preemption_test.h"
+#include "kernel/tests/vm/vm_scratch_preemption_test_fixture.h"
 
 enum {
     MICROS_TEST_EXCEPTION_BREAKPOINT = 3,

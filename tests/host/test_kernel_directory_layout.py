@@ -76,6 +76,7 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
 
     def test_physical_owner_migration_is_an_ordered_subset(self) -> None:
         migration = kernel_layout_source.KERNEL_PHYSICAL_OWNER_MIGRATION
+        self.assertEqual((), migration)
         self.assertEqual(
             tuple(
                 path
