@@ -1,4 +1,4 @@
-#include "kernel/pm_service_test_internal.h"
+#include "kernel/tests/pm/pm_service_test_internal.h"
 
 _Noreturn void micros_pm_service_test_launch(void)
 {

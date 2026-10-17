@@ -22,7 +22,7 @@
 #include "kernel/tests/grant/grant_syscall_test.h"
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
-#include "kernel/pm_service_test.h"
+#include "kernel/tests/pm/pm_service_test.h"
 #endif
 #ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
 #include "kernel/ramfs_service_test.h"

@@ -981,9 +981,9 @@ set(
 
 set(
     MICROS_PM_SERVICE_QEMU_TEST_SOURCES
-    kernel/pm_service_test.c
-    kernel/pm_service_test_fixture.c
-    kernel/pm_service_test_report.c
+    kernel/tests/pm/pm_service_test.c
+    kernel/tests/pm/pm_service_test_fixture.c
+    kernel/tests/pm/pm_service_test_report.c
 )
 
 set(

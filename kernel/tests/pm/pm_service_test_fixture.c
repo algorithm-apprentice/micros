@@ -1,4 +1,4 @@
-#include "kernel/pm_service_test_internal.h"
+#include "kernel/tests/pm/pm_service_test_internal.h"
 
 static const struct micros_bootstrap_expected_service
     expected_services[] = {

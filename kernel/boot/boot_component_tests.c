@@ -24,7 +24,7 @@
 #include "kernel/vm_handoff_test.h"
 #endif
 #ifdef MICROS_BUILD_PM_SERVICE_TEST
-#include "kernel/pm_service_test.h"
+#include "kernel/tests/pm/pm_service_test.h"
 #endif
 #ifdef MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST
 #include "kernel/vm_scratch_preemption_test.h"
