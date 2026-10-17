@@ -514,6 +514,120 @@ class ValidationContextTests(unittest.TestCase):
                 with self.assertRaises(validation_context.UnsupportedContext):
                     validation_context.compiler_version(value, target=target)
 
+    def test_target_compiler_selection_matches_toolchain_precedence(self):
+        explicit = self.root / "explicit-clang"
+        explicit.write_bytes(b"explicit compiler")
+        explicit.chmod(0o755)
+        llvm_root = self.root / "llvm"
+        llvm_compiler = llvm_root / "bin/clang"
+        llvm_compiler.parent.mkdir(parents=True)
+        llvm_compiler.write_bytes(b"root compiler")
+        llvm_compiler.chmod(0o755)
+        fallback = self.root / "path-clang"
+        fallback.write_bytes(b"path compiler")
+        fallback.chmod(0o755)
+
+        self.assertEqual(
+            explicit,
+            validation_context.target_compiler(
+                {
+                    "MICROS_CLANG": str(explicit),
+                    "MICROS_LLVM_ROOT": str(llvm_root),
+                },
+                system="Darwin",
+            ),
+        )
+        with mock.patch.object(
+            validation_context.shutil,
+            "which",
+            return_value=str(fallback),
+        ):
+            with self.assertRaisesRegex(
+                validation_context.UnsupportedContext,
+                "MICROS_CLANG",
+            ):
+                validation_context.target_compiler(
+                    {"MICROS_CLANG": str(self.root / "missing")},
+                    system="Darwin",
+                )
+        self.assertEqual(
+            llvm_compiler,
+            validation_context.target_compiler(
+                {"MICROS_LLVM_ROOT": str(llvm_root)},
+                system="Darwin",
+            ),
+        )
+        with mock.patch.object(
+            validation_context.shutil,
+            "which",
+            side_effect=lambda name: str(fallback) if name == "clang" else None,
+        ):
+            self.assertEqual(
+                fallback,
+                validation_context.target_compiler({}, system="Linux"),
+            )
+
+    def test_test_unit_target_preprocessor_is_fingerprinted(self):
+        compiler = self.root / "clang"
+        compiler.write_bytes(b"compiler fixture")
+        compiler.chmod(0o755)
+        installation = self.root / "Cellar/llvm/23.1.3"
+        installation.mkdir(parents=True)
+        configuration_root = self.root / "etc/clang"
+        configuration_root.mkdir(parents=True)
+        configuration = {"policy": "automatic-disabled"}
+        tools = validation_context.DarwinTools.__new__(
+            validation_context.DarwinTools
+        )
+        tools.environment = {"MICROS_CLANG": str(compiler)}
+        tools.roots = set()
+        tools.executables = {}
+        tools.versions = {}
+
+        tools.environment = {}
+        with mock.patch.object(
+            validation_context,
+            "target_compiler",
+            side_effect=AssertionError(
+                "fallback discovery ran in a reusable profile"
+            ),
+        ):
+            with self.assertRaisesRegex(
+                validation_context.UnsupportedContext,
+                "explicit",
+            ):
+                tools.target_preprocessor()
+
+        tools.environment = {"MICROS_CLANG": str(compiler)}
+        with mock.patch.multiple(
+            validation_context,
+            target_compiler=mock.Mock(return_value=compiler),
+            _cellar_root=mock.Mock(return_value=installation),
+            compiler_configuration=mock.Mock(
+                return_value=(configuration, (configuration_root,))
+            ),
+            _run=mock.Mock(return_value=b"Homebrew clang version 23.1.3\n"),
+        ):
+            self.assertEqual(
+                configuration,
+                tools.target_preprocessor(),
+            )
+
+        self.assertEqual(
+            {
+                "path": str(compiler),
+                "resolved": str(compiler.resolve()),
+            },
+            tools.executables["target-preprocessor"],
+        )
+        self.assertEqual(
+            "LLVMClang",
+            tools.versions["target-preprocessor"]["family"],
+        )
+        self.assertEqual(23, tools.versions["target-preprocessor"]["major"])
+        self.assertIn(installation, tools.roots)
+        self.assertIn(configuration_root, tools.roots)
+
     def compiler_fixture(self):
         installation = self.root / "Cellar/llvm/23.1.3"
         (installation / "etc").mkdir(parents=True)

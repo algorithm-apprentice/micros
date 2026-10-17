@@ -254,6 +254,17 @@ same-prefix `etc/clang` directory as opaque, completely fingerprinted data.
 No other escaping package link is admitted. Raw config bytes are not logged;
 disabled automatic loading is not inferred merely from a successful marker.
 
+Accepted
+[ADR-0073](../adr/0073-kernel-directory-layout.md) adds a real target-Clang
+preprocessing fixture to the native `test-unit` command. Its reusable profile
+therefore requires an explicit `MICROS_CLANG` or `MICROS_LLVM_ROOT` and records
+the selected executable, version, LLVM installation tree and same-prefix
+configuration alias. Automatic Homebrew/PATH discovery remains available to
+fresh execution only; it cannot produce or reuse a `test-unit` receipt. An
+invalid explicit selection fails instead of falling through to another
+compiler. This closes the new test input; it does not add a reusable workflow
+or permit cross-context evidence.
+
 The QEMU profile additionally requires both its versioned-installation and
 same-prefix `etc/qemu/qemu.conf` locations to remain absent, with explicit
 checked absence identities, and likewise requires `qemu-bundle` beside the

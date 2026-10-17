@@ -15545,6 +15545,8 @@ CMAKE_TARGET_DIAGNOSTIC_BLOCK = 'foreach(\n    kernel_directory\n    IN ITEMS\n 
 
 BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab'
 FINAL_CMAKE_SHA256 = 'c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368'
+BASE_VALIDATION_CONTEXT_SHA256 = '7678be6bcd9c6da8575ff8fd9f28a7220db2ba152863869fd9f9d0b3966184f5'
+FINAL_VALIDATION_CONTEXT_SHA256 = 'ae5ffaeae172a8aadf5796580be3631f9804068c7033ab4ebbcde4775879be15'
 ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
 
 
@@ -15598,6 +15600,15 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
     errors = []
     seen_inodes = {}
     expected = set()
+    kernel_root = root / "kernel"
+    try:
+        kernel_status = kernel_root.lstat()
+    except FileNotFoundError:
+        return ("missing kernel root",)
+    if stat.S_ISLNK(kernel_status.st_mode):
+        return ("linked kernel root",)
+    if not stat.S_ISDIR(kernel_status.st_mode):
+        return ("non-directory kernel root",)
     for logical in KERNEL_LOGICAL_PATHS:
         errors.extend(_member_errors(root, logical))
         selected = current_path(root, logical)
@@ -15616,11 +15627,24 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
             else:
                 seen_inodes[identity] = selected.relative_to(root).as_posix()
 
-    observed = {
-        path.relative_to(root).as_posix()
-        for path in (root / "kernel").rglob("*")
-        if path.is_file() and path.suffix in (".c", ".h")
-    }
+    observed = set()
+    for path in kernel_root.rglob("*"):
+        relative = path.relative_to(root).as_posix()
+        try:
+            status = path.lstat()
+        except FileNotFoundError:
+            errors.append(f"vanished kernel entry: {relative}")
+            continue
+        if stat.S_ISLNK(status.st_mode):
+            errors.append(f"linked kernel entry: {relative}")
+        elif stat.S_ISDIR(status.st_mode):
+            continue
+        elif not stat.S_ISREG(status.st_mode):
+            errors.append(f"non-ordinary kernel entry: {relative}")
+        elif path.suffix in (".c", ".h"):
+            observed.add(relative)
+        else:
+            errors.append(f"unexpected kernel entry: {relative}")
     for path in sorted(expected - observed):
         errors.append(f"missing inventoried member: {path}")
     for path in sorted(observed - expected):
@@ -15728,9 +15752,15 @@ def restore_generated_fixture(relative: str, output):
         if target in KERNEL_PHYSICAL_OWNER_MIGRATION
         else new_include
     )
+    alternate = new_include if expected == old_include else old_include
     was_bytes = isinstance(output, bytes)
     text = output.decode("utf-8") if was_bytes else output
-    if text.count(expected) != 1:
+    if (
+        old_include == new_include
+        or text.count(expected) != 1
+        or text.splitlines().count(expected) != 1
+        or text.count(alternate) != 0
+    ):
         raise AssertionError(f"generated include transport mismatch: {relative}")
     if expected != old_include:
         text = text.replace(expected, old_include)
@@ -15810,17 +15840,102 @@ def original_cmake_recipe_digest(value: str) -> str:
 
 
 def restore_validation_context_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_VALIDATION_CONTEXT_SHA256:
+        return source
+    if digest != FINAL_VALIDATION_CONTEXT_SHA256:
+        raise AssertionError("unexpected validation context source")
     if source.count(FINAL_CMAKE_SHA256) == 1:
         source = source.replace(FINAL_CMAKE_SHA256, BASE_CMAKE_SHA256)
     elif source.count(BASE_CMAKE_SHA256) != 1:
         raise AssertionError("unexpected validation context CMake recipe pin")
-    payload = ast.dump(ast.parse(source), include_attributes=False).encode()
-    if hashlib.sha256(payload).hexdigest() != ORIGINAL_VALIDATION_CONTEXT_AST_SHA256:
-        raise AssertionError("validation context AST did not restore")
+
+    tree = ast.parse(source)
+    selected = {}
+
+    def select(label: str, node: ast.AST) -> None:
+        if label in selected:
+            raise AssertionError(
+                f"duplicate validation context layout node: {label}"
+            )
+        selected[label] = node
+
+    for statement in tree.body:
+        if (
+            isinstance(statement, ast.FunctionDef)
+            and statement.name in {
+                "_selected_target_compiler",
+                "target_compiler",
+            }
+        ):
+            select(statement.name, statement)
+        elif isinstance(statement, ast.ClassDef) and statement.name == "DarwinTools":
+            for member in statement.body:
+                if (
+                    isinstance(member, ast.FunctionDef)
+                    and member.name == "target_preprocessor"
+                ):
+                    select("DarwinTools.target_preprocessor", member)
+        elif isinstance(statement, ast.FunctionDef) and statement.name == "collect":
+            for node in ast.walk(statement):
+                if (
+                    isinstance(node, ast.Assign)
+                    and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id
+                        == "target_preprocessor_configuration"
+                ):
+                    select("collect.target_preprocessor", node)
+                elif isinstance(node, ast.If):
+                    names = {
+                        child.id
+                        for child in ast.walk(node.test)
+                        if isinstance(child, ast.Name)
+                    }
+                    if "target_preprocessor_configuration" in names:
+                        select("collect.target_preprocessor_input", node)
+
+    expected = {
+        "_selected_target_compiler",
+        "target_compiler",
+        "DarwinTools.target_preprocessor",
+        "collect.target_preprocessor",
+        "collect.target_preprocessor_input",
+    }
+    if set(selected) != expected:
+        raise AssertionError("missing validation context layout nodes")
+    offsets = _source_offsets(source)
+    trailing_blank_lines = {
+        "_selected_target_compiler": 2,
+        "target_compiler": 2,
+        "DarwinTools.target_preprocessor": 1,
+    }
+    spans = []
+    for label, node in selected.items():
+        start = offsets[node.lineno - 1]
+        end_line = node.end_lineno + trailing_blank_lines.get(label, 0)
+        end = (
+            offsets[end_line]
+            if end_line < len(offsets)
+            else len(source)
+        )
+        spans.append((start, end))
+    for start, end in sorted(spans, reverse=True):
+        source = source[:start] + source[end:]
+    if (
+        hashlib.sha256(source.encode()).hexdigest()
+        != BASE_VALIDATION_CONTEXT_SHA256
+    ):
+        raise AssertionError("validation context source did not restore")
     return source
 
 
 def restore_cmake_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_CMAKE_SHA256:
+        return source
+    if digest != FINAL_CMAKE_SHA256:
+        raise AssertionError("unexpected current CMake recipe")
     for logical, physical in KERNEL_LOGICAL_TO_PHYSICAL.items():
         source = source.replace(physical, logical)
     for target, (old, new) in CMAKE_INCLUDE_TRANSPORTS.items():

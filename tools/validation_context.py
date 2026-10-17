@@ -468,6 +468,51 @@ def compiler_version(text, *, target):
     return {"family": "LLVMClang" if target else "AppleClang", "major": int(match[1])}
 
 
+def _selected_target_compiler(path, variable):
+    selected = Path(path)
+    if (
+        not selected.is_absolute()
+        or not selected.is_file()
+        or not os.access(selected, os.X_OK)
+    ):
+        raise UnsupportedContext(f"{variable} does not select an executable")
+    return selected
+
+
+def target_compiler(environment, *, system=None):
+    selected = environment.get("MICROS_CLANG")
+    if selected:
+        return _selected_target_compiler(selected, "MICROS_CLANG")
+    root = environment.get("MICROS_LLVM_ROOT")
+    if root:
+        return _selected_target_compiler(
+            Path(root) / "bin/clang",
+            "MICROS_LLVM_ROOT",
+        )
+    system = platform.system() if system is None else system
+    if system == "Darwin":
+        brew = shutil.which("brew")
+        if brew is not None:
+            try:
+                root = Path(
+                    _run((brew, "--prefix", "llvm")).decode().strip()
+                )
+            except UnsupportedContext:
+                pass
+            else:
+                candidate = root / "bin/clang"
+                if candidate.exists():
+                    return _selected_target_compiler(
+                        candidate,
+                        "Homebrew LLVM",
+                    )
+    for name in ("clang", "clang-23", "clang-22"):
+        selected = shutil.which(name)
+        if selected is not None:
+            return _selected_target_compiler(selected, "PATH")
+    raise UnsupportedContext("RISC-V Clang cannot be resolved")
+
+
 def compiler_configuration(installation):
     alias = installation / "etc/clang"
     metadata = {"policy": "automatic-disabled", "alias": {"path": str(alias)}}
@@ -632,6 +677,33 @@ class DarwinTools:
         ):
             raise UnsupportedContext("native compiler differs from the active Xcode selection")
 
+    def target_preprocessor(self):
+        if not (
+            self.environment.get("MICROS_CLANG")
+            or self.environment.get("MICROS_LLVM_ROOT")
+        ):
+            raise UnsupportedContext(
+                "test-unit reuse requires an explicit target compiler"
+            )
+        requested = target_compiler(self.environment)
+        resolved = requested.resolve(strict=True)
+        configuration, additional = compiler_configuration(
+            _cellar_root(resolved)
+        )
+        self.roots.update(additional)
+        path = self._admit(requested)
+        role = "target-preprocessor"
+        self.executables[role] = {
+            "path": str(requested),
+            "resolved": str(path),
+        }
+        version = _run((requested, "--version"))
+        self.versions[role] = {
+            "sha256": hashlib.sha256(version).hexdigest(),
+            **compiler_version(version.decode(), target=True),
+        }
+        return configuration
+
     def _expand(self, spelling, loader, executable):
         if spelling == "@loader_path":
             return loader.parent
@@ -749,12 +821,21 @@ def collect(root, workflow):
             raise UnsupportedContext("repository-root files would expand the native discovery pattern")
         cache = _cache(root, profile)
         tools = DarwinTools(root, profile, cache, environment)
+        target_preprocessor_configuration = (
+            tools.target_preprocessor()
+            if workflow == "test-unit"
+            else None
+        )
         if workflow == "test-qemu-smoke":
             _validate_qemu_runner_namespace(root, tools)
         qemu = tools.qemu() if workflow == "test-qemu-smoke" else None
         inputs, paths = _build_manifest(root, profile, tools)
         inputs["standard_search_roots"] = _absent_paths(STANDARD_SEARCH_ROOTS)
         inputs["compiler_configuration"] = tools.configuration
+        if target_preprocessor_configuration is not None:
+            inputs["target_preprocessor_configuration"] = (
+                target_preprocessor_configuration
+            )
         native = native_runtime_executables(inputs["ctest"]) if not profile.target_build else ()
         tools.close_libraries(native)
         roots = tuple(sorted(tools.roots))

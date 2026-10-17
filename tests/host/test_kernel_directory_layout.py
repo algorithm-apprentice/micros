@@ -9,8 +9,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from tests.host import kernel_layout_source
 from tools import validation_context, validation_plan
@@ -53,6 +55,81 @@ EXPECTED_DIRECTORY_COUNTS = {
 
 
 class KernelDirectoryLayoutTest(unittest.TestCase):
+    def _native_compiler(self) -> str:
+        xcrun = Path("/usr/bin/xcrun")
+        if xcrun.is_file():
+            result = subprocess.run(
+                (str(xcrun), "--find", "clang"),
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        for name in ("cc", "clang"):
+            compiler = shutil.which(name)
+            if compiler is not None:
+                return compiler
+        self.fail("native C compiler is unavailable")
+
+    def _target_compiler(self) -> str:
+        try:
+            return str(validation_context.target_compiler(dict(os.environ)))
+        except validation_context.UnsupportedContext as error:
+            self.fail(str(error))
+
+    def _preprocessed_panic_location(
+        self,
+        compiler: str,
+        arguments: list[str],
+    ) -> tuple[str, int]:
+        source = ROOT / "kernel/boot/boot_component_tests.c"
+        result = subprocess.run(
+            (compiler, *arguments, str(source)),
+            cwd=ROOT,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        lines = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if "intentional-test" in line
+        ]
+        self.assertEqual(1, len(lines), result.stdout)
+        prefix, separator, remainder = lines[0].partition(
+            '", (uint32_t)'
+        )
+        self.assertTrue(separator, lines[0])
+        file_name = prefix.rsplit('"', 1)[-1]
+        line_number = remainder.partition(")")[0]
+        self.assertTrue(line_number.isdigit(), lines[0])
+        return file_name, int(line_number)
+
+    @staticmethod
+    def _diagnostic_maps(replacement: str) -> list[str]:
+        return [
+            (
+                f"-fmacro-prefix-map={ROOT / 'kernel' / directory}/="
+                f"{replacement}"
+            )
+            for directory in kernel_layout_source.KERNEL_DESTINATIONS
+        ]
+
+    @staticmethod
+    def _preprocessor_arguments() -> list[str]:
+        return [
+            "-E",
+            "-P",
+            "-std=c17",
+            "-DMICROS_BUILD_PANIC_TEST=1",
+            f"-I{ROOT}",
+            f"-I{ROOT / 'include'}",
+        ]
+
     def test_closed_manifest_is_the_exact_partition(self) -> None:
         logical_paths = kernel_layout_source.KERNEL_LOGICAL_PATHS
         physical_paths = tuple(
@@ -234,6 +311,75 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
         )
 
+    def test_native_compiler_preserves_logical_diagnostic_location(self) -> None:
+        common = self._preprocessor_arguments()
+        native_replacement = f"{ROOT / 'kernel'}/"
+        native_maps = self._diagnostic_maps(native_replacement)
+        native_compiler = self._native_compiler()
+        self.assertEqual(
+            (str(ROOT / "kernel/boot_component_tests.c"), 107),
+            self._preprocessed_panic_location(
+                native_compiler,
+                [*common, *native_maps],
+            ),
+        )
+        native_wrong = self._diagnostic_maps(f"{ROOT / 'wrong'}/")
+        self.assertEqual(
+            (str(ROOT / "wrong/boot_component_tests.c"), 107),
+            self._preprocessed_panic_location(
+                native_compiler,
+                [*common, *native_wrong],
+            ),
+        )
+
+    def test_target_compiler_preserves_logical_diagnostic_location(self) -> None:
+        target_compiler = self._target_compiler()
+        target_maps = self._diagnostic_maps("kernel/")
+        target_common = [
+            "--target=riscv64-unknown-elf",
+            "-ffreestanding",
+            *self._preprocessor_arguments(),
+            f"-ffile-prefix-map={ROOT}/=",
+        ]
+        self.assertEqual(
+            ("kernel/boot_component_tests.c", 107),
+            self._preprocessed_panic_location(
+                target_compiler,
+                [*target_common, *target_maps],
+            ),
+        )
+        target_wrong = self._diagnostic_maps("wrong/")
+        self.assertEqual(
+            ("wrong/boot_component_tests.c", 107),
+            self._preprocessed_panic_location(
+                target_compiler,
+                [*target_common, *target_wrong],
+            ),
+        )
+        target_without_boot = [
+            option
+            for directory, option in zip(
+                kernel_layout_source.KERNEL_DESTINATIONS,
+                target_maps,
+            )
+            if directory != "boot"
+        ]
+        self.assertEqual(
+            ("kernel/boot/boot_component_tests.c", 107),
+            self._preprocessed_panic_location(
+                target_compiler,
+                [*target_common, *target_without_boot],
+            ),
+        )
+
+    def test_diagnostic_maps_apply_only_to_c_sources(self) -> None:
+        cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertEqual(
+            2,
+            cmake.count("$<$<COMPILE_LANGUAGE:C>:-fmacro-prefix-map="),
+        )
+        self.assertNotIn("COMPILE_LANGUAGE:ASM>:-fmacro-prefix-map=", cmake)
+
     def test_layout_validation_rejects_missing_duplicate_and_linked_members(self) -> None:
         logical = "kernel/panic.c"
         physical = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[logical]
@@ -258,6 +404,19 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             "unexpected": lambda root: (
                 root / "kernel" / "unexpected.c"
             ).write_text("int unexpected;\n"),
+            "unexpected-dangling-symlink": lambda root: (
+                root / "kernel" / "dangling.c"
+            ).symlink_to("missing.c"),
+            "unexpected-directory-symlink": lambda root: (
+                root / "kernel" / "legacy"
+            ).symlink_to("boot", target_is_directory=True),
+            "kernel-root-symlink": lambda root: (
+                shutil.rmtree(root / "kernel"),
+                (root / "kernel").symlink_to(
+                    ROOT / "kernel",
+                    target_is_directory=True,
+                ),
+            ),
         }
         for name, mutate in mutations.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
@@ -294,7 +453,7 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     kernel_layout_source.read_logical_bytes(root, logical)
 
-    def test_recipe_metadata_and_generated_output_fail_closed(self) -> None:
+    def test_cmake_transport_rejects_recipe_drift(self) -> None:
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         with self.assertRaises(AssertionError):
             kernel_layout_source.restore_cmake_source(
@@ -304,16 +463,109 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                     1,
                 )
             )
+        for name, block in (
+            ("native", kernel_layout_source.CMAKE_NATIVE_DIAGNOSTIC_BLOCK),
+            ("target", kernel_layout_source.CMAKE_TARGET_DIAGNOSTIC_BLOCK),
+        ):
+            with self.subTest(block=name, mutation="missing"):
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_cmake_source(
+                        cmake.replace(block + "\n\n", "", 1)
+                    )
+            with self.subTest(block=name, mutation="misplaced"):
+                without_block = cmake.replace(block + "\n\n", "", 1)
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_cmake_source(
+                        block + "\n\n" + without_block
+                    )
+        with self.assertRaises(AssertionError):
+            kernel_layout_source.restore_cmake_source(
+                cmake.replace(
+                    "COMPILE_LANGUAGE:C>:-fmacro-prefix-map=",
+                    "COMPILE_LANGUAGE:ASM>:-fmacro-prefix-map=",
+                    1,
+                )
+            )
+
+    def test_validation_metadata_rejects_unreviewed_rows(self) -> None:
         with self.assertRaises(AssertionError):
             kernel_layout_source.original_path_classification_equivalents(
                 (*validation_plan.PATH_CLASSIFICATION_EQUIVALENTS, ("extra", ())),
             )
-        generator = "tools/generate_vm_handoff_fixture.py"
-        with self.assertRaises(AssertionError):
-            kernel_layout_source.restore_generated_fixture(
-                generator,
-                "no reviewed include is present",
+
+    def test_validation_context_transport_rejects_closure_drift(self) -> None:
+        source = (ROOT / "tools/validation_context.py").read_text(
+            encoding="utf-8"
+        )
+        with mock.patch.object(
+            ast,
+            "unparse",
+            side_effect=AssertionError("Python 3.8 has no ast.unparse"),
+            create=True,
+        ):
+            restored = (
+                kernel_layout_source.restore_validation_context_source(
+                    source
+                )
             )
+        self.assertEqual(
+            kernel_layout_source.BASE_VALIDATION_CONTEXT_SHA256,
+            hashlib.sha256(restored.encode()).hexdigest(),
+        )
+        with self.assertRaises(AssertionError):
+            kernel_layout_source.restore_validation_context_source(
+                source.replace(
+                    "target_preprocessor",
+                    "changed_target_preprocessor",
+                    1,
+                )
+            )
+
+    def test_generated_output_rejects_unreviewed_includes(self) -> None:
+        for generator, (_, _, transports) in (
+            kernel_layout_source.GENERATOR_FILE_FACTS.items()
+        ):
+            self.assertEqual(1, len(transports), generator)
+            _, target, old_source_line, new_source_line = transports[0]
+            old_include = ast.literal_eval(old_source_line.strip().rstrip(","))
+            new_include = ast.literal_eval(new_source_line.strip().rstrip(","))
+            expected = (
+                old_include
+                if target in kernel_layout_source.KERNEL_PHYSICAL_OWNER_MIGRATION
+                else new_include
+            )
+            self.assertEqual(
+                f"{old_include}\n",
+                kernel_layout_source.restore_generated_fixture(
+                    generator,
+                    f"{expected}\n",
+                ),
+                generator,
+            )
+            with self.subTest(generator=generator, mutation="missing"):
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_generated_fixture(
+                        generator,
+                        "no reviewed include is present",
+                    )
+            with self.subTest(generator=generator, mutation="duplicate"):
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_generated_fixture(
+                        generator,
+                        f"{expected}\n{expected}\n",
+                    )
+            with self.subTest(generator=generator, mutation="old-and-new"):
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_generated_fixture(
+                        generator,
+                        f"{old_include}\n{new_include}\n",
+                    )
+            with self.subTest(generator=generator, mutation="wrong"):
+                with self.assertRaises(AssertionError):
+                    kernel_layout_source.restore_generated_fixture(
+                        generator,
+                        '#include "kernel/not_reviewed_fixture.h"\n',
+                    )
 
 
 if __name__ == "__main__":

@@ -333,9 +333,14 @@ four-field classification equality. Design #147 authored no executable
 artifact and merged separately after clean review. Implementation #148 starts
 from structural Red, moves every production/evidence family in green slices,
 retains the old source and fixture oracles, and closes the 373-entry migration
-empty. Its final acceptance still requires one complete current fresh author
-plan, actual original-full-producer three-profile reuse and independent
-implementation review.
+empty. Its final structural evidence rejects linked roots/descendants and
+mixed old/new generated includes, and invokes the selected native and target
+compilers to prove canonical source/line diagnostics. The reusable native
+profile requires an explicit target compiler and fingerprints it with its
+closed installation inputs; automatic discovery is fresh-only. Final
+acceptance still requires one complete current fresh author plan, actual
+original-full-producer three-profile reuse and clean independent implementation
+review.
 
 ## Test layers
 

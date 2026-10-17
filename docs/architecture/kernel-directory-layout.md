@@ -35,7 +35,15 @@ the flat `kernel/` root.
 Implementation #148 realizes that complete partition. Its bounded helper reads
 only each actual current owner, restores only frozen include/path transport,
 and keeps the complete original source-gate ASTs and shared C inspector
-unchanged. The literal physical-owner migration is empty.
+unchanged. The literal physical-owner migration is empty. Its structural gate
+also rejects a linked `kernel/` root, every linked or non-ordinary descendant,
+and mixed old/new generated includes. A real Apple/target Clang preprocessing
+fixture proves the original native/target source spelling and line number.
+Because that target compiler is now an input to `test-unit`, reusable evidence
+closes its executable, version, LLVM installation and compiler-configuration
+alias rather than trusting environment spelling alone. Reusable collection
+requires an explicit `MICROS_CLANG` or `MICROS_LLVM_ROOT`; automatic discovery
+remains fresh-only.
 
 ## Closed exact partition
 
