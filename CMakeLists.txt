@@ -1176,26 +1176,26 @@ set(
     kernel/scheduler/scheduler_return.c
     kernel/scheduler/scheduler_interrupt.c
     kernel/scheduler/scheduler_idle.c
-    kernel/scheduler_test_support.c
+    kernel/tests/scheduler/scheduler_test_support.c
 )
 
 set(
     MICROS_SCHEDULER_QEMU_TEST_SOURCES
-    kernel/scheduler_test.c
-    kernel/scheduler_test_state.c
-    kernel/scheduler_test_fixture.c
-    kernel/scheduler_test_completion.c
-    kernel/scheduler_test_interrupt.c
-    kernel/scheduler_test_trap.c
-    kernel/scheduler_test_finish.c
+    kernel/tests/scheduler/scheduler_test.c
+    kernel/tests/scheduler/scheduler_test_state.c
+    kernel/tests/scheduler/scheduler_test_fixture.c
+    kernel/tests/scheduler/scheduler_test_completion.c
+    kernel/tests/scheduler/scheduler_test_interrupt.c
+    kernel/tests/scheduler/scheduler_test_trap.c
+    kernel/tests/scheduler/scheduler_test_finish.c
 )
 
 set(
     MICROS_SCHEDULER_INVALID_QEMU_TEST_SOURCES
-    kernel/scheduler_invalid_test.c
-    kernel/scheduler_invalid_test_state.c
-    kernel/scheduler_invalid_test_fixture.c
-    kernel/scheduler_invalid_test_observation.c
+    kernel/tests/scheduler/scheduler_invalid_test.c
+    kernel/tests/scheduler/scheduler_invalid_test_state.c
+    kernel/tests/scheduler/scheduler_invalid_test_fixture.c
+    kernel/tests/scheduler/scheduler_invalid_test_observation.c
 )
 
 set(

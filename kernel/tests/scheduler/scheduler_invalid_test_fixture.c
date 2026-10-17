@@ -1,4 +1,4 @@
-#include "kernel/scheduler_invalid_test_internal.h"
+#include "kernel/tests/scheduler/scheduler_invalid_test_internal.h"
 
 #include "micros/kernel_object_runtime.h"
 #include "micros/sv39.h"

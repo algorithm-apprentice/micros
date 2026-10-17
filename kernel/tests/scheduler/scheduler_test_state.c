@@ -1,4 +1,4 @@
-#include "kernel/scheduler_test_internal.h"
+#include "kernel/tests/scheduler/scheduler_test_internal.h"
 
 #include "arch/riscv64/platform.h"
 #include "micros/user_address_space.h"

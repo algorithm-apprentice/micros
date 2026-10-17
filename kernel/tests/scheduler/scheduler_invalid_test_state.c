@@ -1,4 +1,4 @@
-#include "kernel/scheduler_invalid_test_internal.h"
+#include "kernel/tests/scheduler/scheduler_invalid_test_internal.h"
 
 #include "micros/user_address_space.h"
 
