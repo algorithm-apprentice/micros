@@ -570,12 +570,15 @@ deterministic structural work-shape Red. It proves the canonical digest path:
   count-halving logarithmic loop.
 
 Existing VM-core lifecycle and corruption tests remain green semantic guards.
-New native cases cover counts `1`, `63`, `64`, `65`, `28,904`, maximum minus
-one, and maximum; first/final inactive frame bytes; the partial bitmap bit;
-word 1 at aligned count 64; word 2 after partial count 65; the final inactive
-bitmap bit; active bitmap corruption; immutable prefix/nonfree state
-corruption; exact digest equivalence; and coherent zero/maximum-plus-one
-header/summary counts rejected under sanitizers before any derived access.
+New native cases follow Accepted
+[ADR-0078](adr/0078-valid-vm-boot-database-boundary-evidence.md) and cover the
+smallest valid existing fixture count `6`, then `63`, `64`, `65`, `28,904`,
+maximum minus one, and maximum; first/final inactive frame bytes; the partial
+bitmap bit; word 1 at aligned count 64; word 2 after partial count 65; the
+final inactive bitmap bit; active bitmap corruption; immutable
+prefix/nonfree state corruption; exact digest equivalence; and coherent
+zero/maximum-plus-one header/summary counts rejected under sanitizers before
+any derived access.
 Structural negative evidence removes or moves the dominating count guard,
 shifts the full-word start, and skips or truncates the contiguous scan.
 
