@@ -14,8 +14,10 @@ OWNERS = {
         "_absent_paths", "_run", "_file_identity",
     ),
     "tools/validation_build_manifest.py": (
-        "graph_nodes", "command_tools", "native_outputs", "native_runtime_executables",
-        "_generator_inputs", "_dependency_inputs", "_build_manifest",
+        "_regular_output_state", "graph_nodes", "command_tools",
+        "native_outputs", "native_runtime_executables", "_generator_inputs",
+        "_dependency_inputs", "_selected_graph_files", "_target_outputs",
+        "_build_manifest",
     ),
 }
 
@@ -36,11 +38,11 @@ class ValidationContextLayoutTests(unittest.TestCase):
                 self.assertNotIn(name, observed)
                 observed[name] = ast.dump(definitions[name], include_attributes=False)
         self.assertEqual(
-            "0f657ec2cea9f326ccd05c3ce18b00a1db7e3a5c158a630b5f53e93c035f265f",
+            "00c8141862492e630b8509eaeb639619336696367880617b5b5b2a9e58ba5a4c",
             hashlib.sha256(
                 json.dumps(observed, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
-            "moved bodies must match the independent 278898d predecessor",
+            "shared input owners must match Accepted ADR-0074",
         )
 
     def test_private_dependency_direction_and_error_identity_are_acyclic(self):

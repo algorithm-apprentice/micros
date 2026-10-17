@@ -68,8 +68,9 @@ subprocess execution.
 Accepted
 [ADR-0074](../adr/0074-fail-fast-validation-producer-readiness.md) defines a
 separate producer intent for tasks that require later same-run receipt reuse.
-The dependent implementation has not started; no `--producer` interface exists
-yet.
+The dependent implementation adds `--producer` only with authoritative
+`--execute`; merge remains conditional on its exact author and independent
+review evidence.
 
 The planned mode computes the ordinary required plan first, then derives only
 the reusable workflows already selected by that plan. Before opening the
@@ -111,6 +112,11 @@ Default fresh, explicit fresh, reuse, gate-only recording, plan-only output,
 coverage selection, stop-on-failure, invalidation, locking, and reviewer rules
 remain unchanged. In particular, the correction never publishes from
 postflight alone and never runs a preparation command automatically.
+
+The implementation owns preparation with three distinct typed failures in the
+build-manifest layer, not text matching. It preserves older validation source
+oracles through exact current-source admission and bounded inverses before
+their historical AST checks.
 
 ## Local evidence identity
 

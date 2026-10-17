@@ -393,6 +393,27 @@ precedence. Final independent review concluded:
 Targeted reproduction: `None`. Acceptance records that clean design result;
 it does not claim the dependent CLI, code, tests, or producer behavior exists.
 
+## Separate implementation disposition
+
+The dependent implementation adds the exact `--producer` interface, readiness
+outcomes, report schema, failure ordering, and regression matrix above without
+changing required coverage or ordinary fresh/reuse behavior.
+
+Its context collector represents the three preparation conditions with
+distinct typed failures, accumulates only generated output/dependency
+conditions, and lets every ordinary closure failure override preparation.
+Execution completes the full barrier before opening the evidence store,
+rechecks context/inputs before each selected workflow, executes the unchanged
+plan fresh, and requires one shared run ID across every selected receipt.
+
+Historical validation source oracles retain their prior ASTs through bounded
+exact-current-source inverses; separately Accepted validation helper bodies
+receive new complete identities rather than weakening the older checks.
+Merge remains conditional on the implementation Red/Green evidence, one
+current exact-candidate producer, bounded actual reuse, complete independent
+implementation review, identical squash tree, main fast-forward, and branch
+cleanup.
+
 ## Alternatives considered
 
 ### Publish a receipt after successful postflight without preflight

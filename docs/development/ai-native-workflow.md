@@ -273,6 +273,15 @@ attributed reuse of exact current-candidate evidence. Separate implementation
 the closed-profile contract and never narrows the required plan or substitutes
 for independent review.
 
+Accepted
+[ADR-0074](../adr/0074-fail-fast-validation-producer-readiness.md) adds a
+separate author intent for tasks that require same-run reusable receipts.
+Such a task uses authoritative producer mode for its final fresh plan rather
+than first running an ordinary full plan and discovering receipt ineligibility
+afterward. Producer readiness occurs before any planned command or ledger
+mutation; failure keeps the plan `NOT_RUN`. Reviewers still inspect the
+author's resulting producer/reuse evidence and do not rerun it routinely.
+
 ## Evolution
 
 As implementation begins, the repository will add deterministic build presets,

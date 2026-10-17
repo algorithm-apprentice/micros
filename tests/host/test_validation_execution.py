@@ -6,7 +6,12 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tools import validation_context, validation_execution, validation_plan
+from tools import (
+    validation_context,
+    validation_evidence,
+    validation_execution,
+    validation_plan,
+)
 
 
 WORKFLOWS = ("test-unit", "test-qemu-smoke", "build-tty-service-image")
@@ -35,6 +40,11 @@ class ValidationExecutionTests(unittest.TestCase):
         self.collect = mock.patch(
             "tools.validation_context.collect", side_effect=self.manifest
         ).start()
+        self.readiness = mock.patch(
+            "tools.validation_context.collect_readiness",
+            side_effect=self.ready,
+            create=True,
+        ).start()
         self.run = mock.patch(
             "tools.validation_execution.subprocess.run", side_effect=self.subprocess
         ).start()
@@ -53,6 +63,15 @@ class ValidationExecutionTests(unittest.TestCase):
         if options.get("stdout") is not None:
             options["stdout"].write(b"actual fixture subprocess output\n")
         return mock.Mock(returncode=self.state["exit_code"])
+
+    def ready(self, root, name):
+        return mock.Mock(
+            outcome="READY",
+            reason_code="ready",
+            profile=self.manifest(root, name),
+            preparation_argv=None,
+            detail=None,
+        )
 
     def execute(self, commands, **options):
         output = io.StringIO()
@@ -98,6 +117,374 @@ class ValidationExecutionTests(unittest.TestCase):
         _, report, _ = self.execute(commands)
         self.assertEqual(commands * 2, self.calls)
         self.assertEqual("FRESH", report["commands"][0]["status"])
+        self.assertNotIn("producer", report)
+
+    def test_blocked_producer_runs_no_canonical_command_or_store(self):
+        self.readiness.side_effect = lambda root, name: mock.Mock(
+            outcome="PREPARE",
+            reason_code="selected-output-absent",
+            profile=None,
+            preparation_argv=workflow(name),
+            detail="selected output is absent",
+        )
+        commands = [
+            *(workflow(name) for name in WORKFLOWS),
+            ("python3", "tools/check_docs.py"),
+        ]
+        sentinel = self.root / "build/validation-evidence/v1/sentinel"
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_bytes(b"unchanged")
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore",
+            side_effect=AssertionError("blocked producer opened the store"),
+        ):
+            status, report, output = self.execute(commands, producer=True)
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertEqual(
+            ["NOT_RUN"] * len(commands),
+            [entry["status"] for entry in report["commands"]],
+        )
+        self.assertEqual(
+            {
+                "selected_workflows": list(WORKFLOWS),
+                "readiness": [
+                    {
+                        "workflow": name,
+                        "outcome": "PREPARE",
+                        "reason_code": "selected-output-absent",
+                        "preparation_argv": list(workflow(name)),
+                    }
+                    for name in WORKFLOWS
+                ],
+                "barrier_passed": False,
+                "run_id": None,
+                "complete": False,
+                "failure_code": "readiness-blocked",
+            },
+            report["producer"],
+        )
+        self.assertFalse(report["final_candidate"])
+        self.assertIn("PREPARE", output)
+        self.assertEqual(b"unchanged", sentinel.read_bytes())
+
+    def test_unsupported_producer_has_no_preparation_advice(self):
+        self.readiness.side_effect = lambda root, name: mock.Mock(
+            outcome="UNSUPPORTED",
+            reason_code="profile-unsupported",
+            profile=None,
+            preparation_argv=None,
+            detail="unclosed tool",
+        )
+        status, report, output = self.execute(
+            [workflow("test-unit")],
+            producer=True,
+        )
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertEqual(
+            {
+                "workflow": "test-unit",
+                "outcome": "UNSUPPORTED",
+                "reason_code": "profile-unsupported",
+                "preparation_argv": None,
+            },
+            report["producer"]["readiness"][0],
+        )
+        self.assertNotIn("PREPARE cmake", output)
+
+    def test_ready_producer_executes_all_commands_fresh_with_one_run_id(self):
+        commands = [
+            *(workflow(name) for name in WORKFLOWS),
+            ("python3", "tools/check_docs.py"),
+        ]
+        status, report, _ = self.execute(commands, producer=True)
+        self.assertEqual(0, status)
+        self.assertEqual(commands, self.calls)
+        self.assertEqual(
+            ["FRESH"] * len(commands),
+            [entry["status"] for entry in report["commands"]],
+        )
+        producer = report["producer"]
+        self.assertEqual(list(WORKFLOWS), producer["selected_workflows"])
+        self.assertTrue(producer["barrier_passed"])
+        self.assertTrue(producer["complete"])
+        self.assertIsNone(producer["failure_code"])
+        self.assertRegex(producer["run_id"], r"^[0-9a-f]{32}$")
+        self.assertEqual(
+            {producer["run_id"]},
+            {
+                entry["producer"]["run_id"]
+                for entry in report["commands"]
+                if entry["command"][-1] in WORKFLOWS
+            },
+        )
+        self.assertTrue(report["final_candidate"])
+
+    def test_producer_checks_only_reusable_workflows_selected_by_the_plan(self):
+        status, report, _ = self.execute(
+            [
+                workflow("test-unit"),
+                ("python3", "tools/check_docs.py"),
+            ],
+            producer=True,
+        )
+        self.assertEqual(0, status)
+        self.assertEqual(
+            [mock.call(self.root, "test-unit")],
+            self.readiness.call_args_list,
+        )
+        self.assertEqual(
+            ["test-unit"],
+            report["producer"]["selected_workflows"],
+        )
+
+    def test_candidate_mutation_during_readiness_starts_no_command(self):
+        ready = self.ready
+
+        def changed(root, name):
+            result = ready(root, name)
+            source = {**self.candidate.source, "tree": "d" * 40}
+            self.candidate = validation_context.Candidate(
+                self.candidate.repository,
+                source,
+                True,
+            )
+            return result
+
+        self.readiness.side_effect = changed
+        output = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(output):
+            status = validation_execution.execute_plan(
+                self.root,
+                [workflow("test-unit")],
+                WORKFLOWS,
+                producer=True,
+            )
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertNotIn("VALIDATION_REPORT ", output.getvalue())
+
+    def test_interrupted_partial_readiness_emits_no_report(self):
+        calls = 0
+        ready = self.ready
+
+        def interrupted(root, name):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise KeyboardInterrupt()
+            return ready(root, name)
+
+        self.readiness.side_effect = interrupted
+        output = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(output):
+            status = validation_execution.execute_plan(
+                self.root,
+                [workflow(name) for name in WORKFLOWS],
+                WORKFLOWS,
+                producer=True,
+            )
+        self.assertEqual(130, status)
+        self.assertEqual([], self.calls)
+        self.assertNotIn("VALIDATION_REPORT ", output.getvalue())
+
+    def test_interruption_after_barrier_is_plan_failed(self):
+        self.run.side_effect = KeyboardInterrupt()
+        status, report, _ = self.execute(
+            [workflow("test-unit"), workflow("test-qemu-smoke")],
+            producer=True,
+        )
+        self.assertEqual(130, status)
+        self.assertEqual("FAILED", report["commands"][0]["status"])
+        self.assertEqual("NOT_RUN", report["commands"][1]["status"])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+        self.assertTrue(report["producer"]["barrier_passed"])
+
+    def test_producer_never_consults_existing_receipts(self):
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore.lookup",
+            side_effect=AssertionError("producer consulted an old receipt"),
+        ):
+            status, report, _ = self.execute(
+                [workflow("test-unit")],
+                producer=True,
+            )
+        self.assertEqual(0, status)
+        self.assertEqual("FRESH", report["commands"][0]["status"])
+        self.assertTrue(report["producer"]["complete"])
+        self.assertTrue(report["final_candidate"])
+
+    def test_producer_profile_drift_fails_before_workflow_launch(self):
+        snapshot = self.manifest(self.root, "test-unit")
+        self.readiness.side_effect = lambda root, name: mock.Mock(
+            outcome="READY",
+            reason_code="ready",
+            profile=snapshot,
+            preparation_argv=None,
+            detail=None,
+        )
+        self.state["context"] = "changed"
+        commands = [workflow("test-unit"), workflow("test-qemu-smoke")]
+        identity = {
+            "repository": self.candidate.repository,
+            "candidate": self.candidate.source,
+            **snapshot,
+        }
+        with validation_evidence.EvidenceStore(self.root, WORKFLOWS) as store:
+            attempt = store.start("test-unit")
+            attempt.log.write(b"prior success\n")
+            store.complete(attempt, identity, 0)
+        receipt = (
+            self.root
+            / "build/validation-evidence/v1/test-unit.json"
+        )
+        self.assertTrue(receipt.exists())
+        status, report, _ = self.execute(commands, producer=True)
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertEqual(
+            ["FAILED", "NOT_RUN"],
+            [entry["status"] for entry in report["commands"]],
+        )
+        self.assertNotIn("exit_code", report["commands"][0])
+        self.assertEqual(
+            "profile-changed-before-launch",
+            report["producer"]["failure_code"],
+        )
+        self.assertTrue(report["producer"]["barrier_passed"])
+        self.assertFalse(report["producer"]["complete"])
+        self.assertFalse(report["final_candidate"])
+        self.assertTrue(receipt.exists())
+
+    def test_producer_postflight_failure_is_plan_failed(self):
+        runner = self.subprocess
+
+        def changed(command, **options):
+            result = runner(command, **options)
+            self.state["context"] = "changed"
+            return result
+
+        self.run.side_effect = changed
+        status, report, _ = self.execute(
+            [workflow("test-unit"), workflow("test-qemu-smoke")],
+            producer=True,
+        )
+        self.assertNotEqual(0, status)
+        self.assertEqual(
+            ["FAILED", "NOT_RUN"],
+            [entry["status"] for entry in report["commands"]],
+        )
+        self.assertEqual(0, report["commands"][0]["exit_code"])
+        self.assertIn("log", report["commands"][0])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+        self.assertFalse(report["final_candidate"])
+
+    def test_producer_receipt_publication_failure_has_specific_code(self):
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore._publish",
+            side_effect=OSError("injected receipt publication failure"),
+        ):
+            status, report, _ = self.execute(
+                [workflow("test-unit"), workflow("test-qemu-smoke")],
+                producer=True,
+            )
+        self.assertNotEqual(0, status)
+        self.assertEqual(
+            ["FAILED", "NOT_RUN"],
+            [entry["status"] for entry in report["commands"]],
+        )
+        first = report["commands"][0]
+        self.assertEqual(0, first["exit_code"])
+        self.assertIn("log", first)
+        self.assertNotIn("candidate", first)
+        self.assertEqual(
+            "receipt-not-published",
+            report["producer"]["failure_code"],
+        )
+        self.assertFalse(report["final_candidate"])
+
+    def test_producer_log_finalization_failure_is_plan_failed(self):
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore._finish_log",
+            side_effect=OSError("injected log finalization failure"),
+        ):
+            status, report, _ = self.execute(
+                [workflow("test-unit"), workflow("test-qemu-smoke")],
+                producer=True,
+            )
+        self.assertNotEqual(0, status)
+        self.assertEqual(
+            ["FAILED", "NOT_RUN"],
+            [entry["status"] for entry in report["commands"]],
+        )
+        self.assertEqual(0, report["commands"][0]["exit_code"])
+        self.assertNotIn("log", report["commands"][0])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+
+    def test_producer_store_lock_failure_starts_no_canonical_command(self):
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore.__enter__",
+            side_effect=validation_evidence.EvidenceError("store busy"),
+        ):
+            status, report, _ = self.execute(
+                [workflow("test-unit")],
+                producer=True,
+            )
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertEqual("NOT_RUN", report["commands"][0]["status"])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+        self.assertTrue(report["producer"]["barrier_passed"])
+        self.assertIsNone(report["producer"]["run_id"])
+
+    def test_producer_cleanup_failure_cannot_retain_complete_success(self):
+        cleanup = validation_evidence.EvidenceStore.__exit__
+
+        def interrupted(store, *arguments):
+            cleanup(store, *arguments)
+            raise OSError("injected cleanup failure")
+
+        with mock.patch(
+            "tools.validation_evidence.EvidenceStore.__exit__",
+            new=interrupted,
+        ):
+            status, report, _ = self.execute(
+                [workflow("test-unit")],
+                producer=True,
+            )
+        self.assertNotEqual(0, status)
+        self.assertFalse(report["producer"]["complete"])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+        self.assertFalse(report["final_candidate"])
+
+    def test_producer_subprocess_failure_is_plan_failed(self):
+        self.state["exit_code"] = 7
+        status, report, _ = self.execute(
+            [workflow("test-unit"), workflow("test-qemu-smoke")],
+            producer=True,
+        )
+        self.assertNotEqual(0, status)
+        self.assertEqual(
+            ["FAILED", "NOT_RUN"],
+            [entry["status"] for entry in report["commands"]],
+        )
+        self.assertEqual(7, report["commands"][0]["exit_code"])
+        self.assertIn("log", report["commands"][0])
+        self.assertEqual("plan-failed", report["producer"]["failure_code"])
+
+    def test_producer_requires_at_least_one_selected_reusable_workflow(self):
+        with self.assertRaisesRegex(
+            validation_execution.ExecutionError,
+            "reusable workflow",
+        ):
+            validation_execution.execute_plan(
+                self.root,
+                [("python3", "tools/check_docs.py")],
+                WORKFLOWS,
+                producer=True,
+            )
+        self.assertEqual([], self.calls)
 
     def test_changed_environment_or_artifact_forces_fresh(self):
         commands = [workflow("test-unit")]
@@ -306,11 +693,34 @@ class ValidationExecutionTests(unittest.TestCase):
         self.assertEqual("NOT_RUN", report["commands"][0]["status"])
         self.assertEqual([], self.calls)
 
+    def test_producer_candidate_race_emits_no_report(self):
+        expected = self.candidate
+        self.candidate = validation_context.Candidate(
+            expected.repository,
+            {**expected.source, "tree": "d" * 40},
+            True,
+        )
+        output = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(output):
+            status = validation_execution.execute_plan(
+                self.root,
+                [workflow("test-unit")],
+                WORKFLOWS,
+                producer=True,
+                expected_source=expected,
+            )
+        self.assertNotEqual(0, status)
+        self.assertEqual([], self.calls)
+        self.assertNotIn("VALIDATION_REPORT ", output.getvalue())
+
 
 class ValidationExecutionArgumentsTests(unittest.TestCase):
     def test_supported_modes_are_explicit(self):
         self.assertTrue(validation_plan.parse_arguments(["--execute", "--reuse"]).reuse)
         self.assertTrue(validation_plan.parse_arguments(["--execute", "--fresh"]).fresh)
+        self.assertTrue(
+            validation_plan.parse_arguments(["--execute", "--producer"]).producer
+        )
         self.assertEqual(
             "test-unit",
             validation_plan.parse_arguments(["--record-workflow", "test-unit"]).record_workflow,
@@ -318,9 +728,13 @@ class ValidationExecutionArgumentsTests(unittest.TestCase):
 
     def test_conflicting_or_nonexecuting_options_are_errors(self):
         for arguments in (
-            ["--reuse"], ["--fresh"], ["--execute", "--reuse", "--fresh"],
+            ["--reuse"], ["--fresh"], ["--producer"],
+            ["--execute", "--reuse", "--fresh"],
+            ["--execute", "--reuse", "--producer"],
+            ["--execute", "--fresh", "--producer"],
             ["--execute", "--reuse", "--tier", "full"],
             ["--record-workflow", "test-unit", "--execute"],
+            ["--record-workflow", "test-unit", "--producer"],
             ["--record-workflow", "test-unit", "--reuse"],
             ["--record-workflow", "test-unit", "--path", "kernel/ipc.c"],
             ["--record-workflow", "test-unit", "--tier", "pr"],
@@ -372,6 +786,22 @@ class ValidationPlanningIdentityTests(unittest.TestCase):
     def test_execution_receives_the_candidate_captured_before_discovery(self):
         validation_plan.main(["--tier", "pr", "--execute"])
         self.assertEqual(self.before, self.execute.call_args.kwargs["expected_source"])
+
+    def test_producer_mode_is_forwarded_only_for_a_clean_candidate(self):
+        validation_plan.main(["--tier", "pr", "--execute", "--producer"])
+        self.assertTrue(self.execute.call_args.kwargs["producer"])
+        self.execute.reset_mock()
+        self.current = validation_context.Candidate(
+            self.before.repository,
+            self.before.source,
+            False,
+        )
+        with redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                validation_plan.main(
+                    ["--tier", "pr", "--execute", "--producer"]
+                )
+        self.execute.assert_not_called()
 
     def test_plan_only_remains_nonexecuting_and_does_not_capture_write_tree(self):
         with redirect_stdout(io.StringIO()):

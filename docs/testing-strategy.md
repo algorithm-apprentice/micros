@@ -351,7 +351,10 @@ explicit producer mode to check every selected reusable profile before any
 planned command or evidence-store mutation. A blocked producer keeps all
 commands `NOT_RUN`; a ready producer still executes the unchanged complete
 plan fresh and must publish all selected receipts under one run ID. The
-implementation remains pending until the separately reviewed design merges.
+separately reviewed design is merged. The dependent implementation begins with
+host Reds for blocked execution, exact reason precedence, report schema,
+prelaunch drift, invalidation timing, same-run publication, and postflight
+versus receipt-publication failure codes; no new runtime test is invented.
 
 ## Test layers
 

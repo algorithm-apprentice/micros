@@ -11,8 +11,15 @@ import plistlib
 import re
 import shutil
 import stat
+from typing import Optional
 
-from tools.validation_build_manifest import _build_manifest, native_runtime_executables
+from tools.validation_build_manifest import (
+    DeclaredOutputAbsent,
+    SelectedDependencyStale,
+    SelectedOutputAbsent,
+    _build_manifest,
+    native_runtime_executables,
+)
 from tools.validation_inputs import (
     SYSTEM_ROOTS, UnsupportedContext, _absent_paths, _file_digest, _file_identity,
     _inside, _json_digest, _run, fingerprint_tree,
@@ -20,6 +27,16 @@ from tools.validation_inputs import (
 
 
 PROFILE_NAME = "darwin-arm64-ninja-v1"
+PREPARATION_REASON_CODES = (
+    SelectedOutputAbsent.reason_code,
+    DeclaredOutputAbsent.reason_code,
+    SelectedDependencyStale.reason_code,
+)
+PREPARATION_TYPES = (
+    SelectedOutputAbsent,
+    DeclaredOutputAbsent,
+    SelectedDependencyStale,
+)
 PROFILES = {
     "test-unit": ("host-debug", "test-unit", False),
     "test-qemu-smoke": ("riscv64-debug", "test-qemu-smoke", True),
@@ -75,6 +92,15 @@ class Profile:
     target: str
     target_build: bool
     cache_variables: dict
+
+
+@dataclass(frozen=True)
+class ProfileReadiness:
+    outcome: str
+    reason_code: str
+    profile: Optional[dict]
+    preparation_argv: Optional[tuple]
+    detail: Optional[str]
 
 
 def _validate_qemu_runner_family(root):
@@ -804,7 +830,7 @@ class DarwinTools:
         }
 
 
-def collect(root, workflow):
+def collect(root, workflow, *, preparation=None):
     """Resolve one reviewed profile completely, or explain why it is ineligible."""
     root = Path(root).resolve()
     try:
@@ -829,7 +855,12 @@ def collect(root, workflow):
         if workflow == "test-qemu-smoke":
             _validate_qemu_runner_namespace(root, tools)
         qemu = tools.qemu() if workflow == "test-qemu-smoke" else None
-        inputs, paths = _build_manifest(root, profile, tools)
+        inputs, paths = _build_manifest(
+            root,
+            profile,
+            tools,
+            preparation=preparation,
+        )
         inputs["standard_search_roots"] = _absent_paths(STANDARD_SEARCH_ROOTS)
         inputs["compiler_configuration"] = tools.configuration
         if target_preprocessor_configuration is not None:
@@ -837,6 +868,8 @@ def collect(root, workflow):
                 target_preprocessor_configuration
             )
         native = native_runtime_executables(inputs["ctest"]) if not profile.target_build else ()
+        if preparation is not None:
+            native = tuple(path for path in native if path.is_file())
         tools.close_libraries(native)
         roots = tuple(sorted(tools.roots))
         inputs["external_roots"] = {
@@ -859,7 +892,37 @@ def collect(root, workflow):
             "outputs": {
                 str(path.relative_to(root)): _file_identity(path)
                 for path in sorted(paths)
+                if preparation is None or path.is_file()
             },
         }
     except (OSError, UnicodeError, json.JSONDecodeError, KeyError) as error:
         raise UnsupportedContext(f"unclosed profile metadata: {type(error).__name__}") from error
+
+
+def collect_readiness(root, workflow):
+    preparation = []
+    try:
+        profile = collect(root, workflow, preparation=preparation)
+    except UnsupportedContext as error:
+        return ProfileReadiness(
+            "UNSUPPORTED",
+            "profile-unsupported",
+            None,
+            None,
+            str(error),
+        )
+    if preparation:
+        condition = next(
+            item
+            for kind in PREPARATION_TYPES
+            for item in preparation
+            if isinstance(item, kind)
+        )
+        return ProfileReadiness(
+            "PREPARE",
+            condition.reason_code,
+            None,
+            ("cmake", "--workflow", "--preset", workflow),
+            str(condition),
+        )
+    return ProfileReadiness("READY", "ready", profile, None, None)

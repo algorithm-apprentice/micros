@@ -463,8 +463,9 @@ Accepted
 [ADR-0074](adr/0074-fail-fast-validation-producer-readiness.md) defines a
 separate fail-fast producer-readiness design. Independent design/correction
 review is clean. It changes no runtime-DAG node, coverage, receipt identity,
-or default fresh behavior. Its dependent implementation remains blocked until
-this design is merged.
+or default fresh behavior. The separately merged design now unblocks the
+dependent implementation, which adds the exact producer barrier and host
+regressions without starting Python-version or node-Q work in parallel.
 
 ## v0.1 completion goal
 

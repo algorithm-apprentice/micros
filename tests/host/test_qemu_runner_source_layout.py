@@ -1043,9 +1043,9 @@ ORIGINAL_PLANNER_AST = 'eb053b1f9026e6783117ab1272450017cfd8aaeb77edbae787fc6ece
 
 PROTECTED_SOURCE_HASHES = {'tests/host/c_source_records.py': 'efab84d99e3d5c49fc416a161816431b9e54615ac23af9aef3e9f0e995bc2e0d',
  'tools/validation_build_impact.py': '24e9fabf4a4750c56508a94c26a37e398edc49a75c8d6b8b2efdeeee01c0d270',
- 'tools/validation_build_manifest.py': 'dc723095d1c30c3501e8273affd6575c2d592772150a065a5dda8644daf282e3',
+ 'tools/validation_build_manifest.py': '2d88c2e829f615acb39afff9cbbd59e6638565bd0cac0ed09e4963ab915f0344',
  'tools/validation_evidence.py': 'd14cdb1ecf86ec6096e4e4bb37377a821597cce383ef48478c1e341710a3d34d',
- 'tools/validation_execution.py': '17e2e475894978291c087e66fb800637a7939e99b52b412eec55cd98c0f3f80d',
+ 'tools/validation_execution.py': '19041e0171c6c70d24bbd38e0ffd9361eedd7d8081a8ba41cb1d96409677e3c9',
  'tools/validation_inputs.py': 'ff5f513282f94dfbe106096ab5c21d888b3af33cd995c36355426aea1068b4e0'}
 
 ORIGINAL_RETAINED_GATE_ASTS = {'tests/host/test_endpoint_source_layout.py': '746b2ffbe7c9aa6e5661db879f5c04b5e3f7a7a53380a3fd83b8e354f77c58d5',
@@ -1666,7 +1666,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         self.assertNotEqual(project(baseline), project(current.replace("old_alias", "changed_old_alias")))
         self.assertEqual(ORIGINAL_PLANNER_AST, project(source("tools/validation_plan.py")))
 
-    def test_build_recipe_and_existing_shared_inspection_execution_libraries_are_unchanged(self):
+    def test_build_recipe_and_shared_validation_libraries_match_reviewed_identities(self):
         self.assertEqual(BASE_CMAKE_DIGEST, digest(source("CMakeLists.txt").encode()))
         for path, expected in PROTECTED_SOURCE_HASHES.items():
             self.assertEqual(expected, digest(kernel_layout_source.read_bytes_path(ROOT / path)), path)
