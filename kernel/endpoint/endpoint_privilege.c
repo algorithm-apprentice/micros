@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 enum micros_endpoint_error micros_privilege_profile_resolve(
     const struct micros_endpoint_registry *registry,

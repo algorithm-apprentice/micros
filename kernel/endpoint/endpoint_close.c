@@ -1,5 +1,5 @@
-#include "endpoint_private.h"
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_private.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 static bool endpoint_is_pending_notification_source(
     const struct micros_endpoint_registry *registry,

@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "micros/sv39.h"
 
 static bool tty_handoff_process_handles_equal(

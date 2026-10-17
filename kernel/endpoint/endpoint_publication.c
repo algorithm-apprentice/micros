@@ -1,5 +1,5 @@
-#include "endpoint_private.h"
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_private.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 enum micros_endpoint_error micros_endpoint_reserve(
     struct micros_endpoint_registry *registry,

@@ -1,6 +1,6 @@
 #include "kernel/bootstrap_syscall_internal.h"
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"
 
 enum micros_syscall_return bootstrap_syscall_handle_complete(

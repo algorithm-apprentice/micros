@@ -372,16 +372,16 @@ set(
 
 set(
     MICROS_ENDPOINT_CORE_SOURCES
-    kernel/endpoint.c
-    kernel/endpoint_codec.c
-    kernel/endpoint_identity.c
-    kernel/endpoint_registry.c
-    kernel/endpoint_privilege.c
-    kernel/endpoint_completion_validation.c
-    kernel/endpoint_queue_validation.c
-    kernel/endpoint_object_validation.c
-    kernel/endpoint_publication.c
-    kernel/endpoint_close.c
+    kernel/endpoint/endpoint.c
+    kernel/endpoint/endpoint_codec.c
+    kernel/endpoint/endpoint_identity.c
+    kernel/endpoint/endpoint_registry.c
+    kernel/endpoint/endpoint_privilege.c
+    kernel/endpoint/endpoint_completion_validation.c
+    kernel/endpoint/endpoint_queue_validation.c
+    kernel/endpoint/endpoint_object_validation.c
+    kernel/endpoint/endpoint_publication.c
+    kernel/endpoint/endpoint_close.c
 )
 
 set(

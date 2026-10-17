@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 _Static_assert(
     MICROS_PROCESS_CAPACITY <= (1U << MICROS_ENDPOINT_SLOT_BITS),

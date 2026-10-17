@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 bool endpoint_storage_is_zero(
     const struct micros_endpoint_registry *registry

@@ -1,6 +1,6 @@
 #include "ipc_internal.h"
 
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"
 
 enum ipc_close_thread_action {

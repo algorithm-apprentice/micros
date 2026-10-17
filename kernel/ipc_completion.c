@@ -1,6 +1,6 @@
 #include "ipc_internal.h"
 
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 void ipc_stage_no_message_completion(
     struct micros_thread *thread,

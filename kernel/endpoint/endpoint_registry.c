@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 static bool prepare_profile_candidates(
     const struct micros_privilege_profile *profiles,

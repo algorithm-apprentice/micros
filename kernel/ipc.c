@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/scheduler/scheduler_core_internal.h"
 
 enum micros_ipc_error micros_ipc_send(

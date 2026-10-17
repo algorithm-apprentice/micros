@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "micros/frame_ownership_runtime.h"
 
 static struct micros_vm_handoff_state handoff_state;

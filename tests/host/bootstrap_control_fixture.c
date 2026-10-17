@@ -1,6 +1,6 @@
 #include "bootstrap_control_test_internal.h"
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "micros/scheduler_core.h"
 
 struct control_fixture_preparation {

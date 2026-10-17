@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "arch/riscv64/trap_context.h"
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/vm_handoff_core.h"
 #include "micros/endpoint.h"
 #include "micros/scheduler_core.h"

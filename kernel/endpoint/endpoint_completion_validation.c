@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 #include "micros/bootstrap_control.h"
 
 bool endpoint_delivery_state_is_clear(

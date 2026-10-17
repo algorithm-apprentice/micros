@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 enum micros_endpoint_error micros_endpoint_resolve_internal(
     const struct micros_endpoint_registry *registry,

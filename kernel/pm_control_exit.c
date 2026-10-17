@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/vm_handoff_core.h"
 #include "micros/endpoint.h"
 #include "micros/scheduler_core.h"

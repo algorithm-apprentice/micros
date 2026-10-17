@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 static bool thread_has_no_ipc_flags(
     const struct micros_thread *thread

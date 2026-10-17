@@ -1,6 +1,6 @@
 #include "ipc_internal.h"
 
-#include "endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 void ipc_copy_bytes(void *destination, const void *source, size_t size)
 {

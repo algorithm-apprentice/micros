@@ -1,4 +1,4 @@
-#include "endpoint_private.h"
+#include "kernel/endpoint/endpoint_private.h"
 
 static bool sender_queue_state_is_valid(
     const struct micros_endpoint_registry *registry,

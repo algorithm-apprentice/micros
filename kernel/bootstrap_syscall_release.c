@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "arch/riscv64/platform.h"
-#include "kernel/endpoint_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty_handoff_runtime.h"
