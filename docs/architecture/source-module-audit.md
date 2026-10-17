@@ -331,10 +331,11 @@ Accepted [ADR-0073](../adr/0073-kernel-directory-layout.md) and the
 [exact kernel directory contract](kernel-directory-layout.md) define the
 physical hierarchy, include/diagnostic identity and retained-source/build/
 metadata transport without changing accepted task ownership.
-`kernel-directory-layout-design` is the sole active task;
-`kernel-directory-layout-implementation` stays pending until separate design
-merge; complete independent design review is clean. This adds no runtime-DAG
-node and does not develop production init/shell in parallel.
+Design #147 separately merged after clean complete independent review.
+Implementation #148 moves the exact 373 members, leaves all prior semantic
+migrations empty, and closes its own physical-owner migration as a literal
+empty tuple. This adds no runtime-DAG node and does not develop production
+init/shell in parallel.
 
 ## Cohesive exceptions
 

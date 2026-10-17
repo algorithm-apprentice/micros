@@ -4,10 +4,9 @@
 
 This is the Accepted exact contract for
 [ADR-0073](../adr/0073-kernel-directory-layout.md).
-Complete independent read-only design review is clean. Only
-`kernel-directory-layout-design` remains active through its separate merge;
-the paired implementation stays pending until that merge. No
-implementation artifact belongs to this phase.
+Complete independent read-only design review is clean, and design #147 merged
+separately as `469a973`. Implementation #148 applies this contract; no
+implementation artifact belonged to the design phase.
 
 ```text
 reviewed predecessor: f524a234f7bef07c69f15eba6f388ca5d017625c
@@ -16,6 +15,8 @@ kernel subtree: b9258fb38f34e1b92fab8e64d64ee1d71d980091
 fixed MINIX: 4db99f4012570a577414fe2a43697b2f239b699e
 design: kernel-directory-layout-design
 implementation: kernel-directory-layout-implementation
+design merge: 469a9733eab03080b554f8b144a8c1bc276b1e05
+implementation pull request: #148
 ```
 
 QEMU implementation #146 is independently reviewed and merged with its
@@ -30,6 +31,11 @@ basenames, accepted logical owners, bodies, interfaces and evidence.
 The 231 production files occupy fourteen directories; 142 target-evidence
 files occupy sixteen. No C/header file or compatibility alias remains in
 the flat `kernel/` root.
+
+Implementation #148 realizes that complete partition. Its bounded helper reads
+only each actual current owner, restores only frozen include/path transport,
+and keeps the complete original source-gate ASTs and shared C inspector
+unchanged. The literal physical-owner migration is empty.
 
 ## Closed exact partition
 

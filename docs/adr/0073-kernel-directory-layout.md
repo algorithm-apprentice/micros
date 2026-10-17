@@ -33,7 +33,8 @@ requirements for `micros`.
 
 After independent design review, acceptance and separate merge, apply the
 exact [kernel directory contract](../architecture/kernel-directory-layout.md).
-Only the design task is active now; its paired implementation stays pending.
+At this design acceptance point, only the design task was active and its
+paired implementation remained pending.
 
 Move the closed 373-file inventory without renaming basenames, moving
 functions between their accepted logical owners, changing bodies or
@@ -156,4 +157,22 @@ the reviewed changes. No substantive design issue remains."
 Targeted reproduction: None.
 
 Acceptance records that clean design result, not implementation completion.
-The paired implementation stays pending until this separate design merges.
+The paired implementation remained pending until this separate design merged.
+
+## Separate implementation disposition
+
+Implementation #148 applies this Accepted decision without changing runtime
+behavior. It moves the exact 373-file inventory into all thirty final
+directories, finishes the physical-owner migration as a literal empty tuple,
+updates only exact private include and CMake operands, preserves logical
+source/line diagnostics through fixed C-only prefix maps, and retains every
+older source, generated-byte, recipe, and validation oracle through bounded
+actual-source inverses.
+
+The implementation adds the two specified host-only structural paths, expands
+the existing one-pass validation metadata to 421 rows, and updates the sole
+admitted current CMake recipe digest only after reconstructing the complete
+pre-layout recipe. Its merge remains conditional on the complete fresh author
+plan, actual same-original-producer native/smoke/TTY-image reuse, clean
+independent implementation review, reviewed-tree equality, main
+fast-forward, and obsolete-branch cleanup.

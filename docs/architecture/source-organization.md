@@ -211,13 +211,14 @@ new VFS behavior into the refactor.
 
 ## Kernel directory contract
 
-The completed source owners remain in one flat 373-file kernel directory.
-The separately reviewed design in Accepted
+The completed logical source owners now occupy the exact thirty-directory,
+373-file physical hierarchy. Accepted
 [ADR-0073](../adr/0073-kernel-directory-layout.md) and its
-[exact directory contract](kernel-directory-layout.md) defines physical
-placement only. It preserves all existing logical authorities, functions,
+[exact directory contract](kernel-directory-layout.md) define physical
+placement only. They preserve all existing logical authorities, functions,
 private directions, runtime locations and evidence. Complete independent
-design review is clean; implementation stays pending the separate merge.
+design review is clean. Implementation #148 applies the contract with a
+literal-empty physical-owner migration and no semantic source split.
 
 ## Repository adoption
 
