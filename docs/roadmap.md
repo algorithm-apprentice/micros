@@ -475,8 +475,9 @@ profile with a closed Homebrew 3.15 runtime, disables site/OpenSSL/environment
 inputs, closes every child interpreter, and defines a stable project-owned AST
 evidence format without digest rebaselining. It adds no runtime-DAG node.
 Independent design review is clean after closure of OpenSSL, child-process,
-AST-evidence, and consumed-launcher boundaries. Implementation remains pending
-until this design merges separately.
+AST-evidence, and consumed-launcher boundaries. Design #151 is merged; the
+dependent implementation started separately and remains blocked only by the
+target validation corrections described below.
 
 The Python implementation gate then exposed a measured target hot-path defect:
 the ELF-spawn image can cross its timeout while the hart repeatedly scans the
@@ -484,15 +485,26 @@ fixed 262,144-entry frame ledger from user translation. Accepted
 [ADR-0076](adr/0076-bounded-complete-frame-ownership-validation.md) preserves
 complete corruption detection and capacity while replacing per-frame inactive
 bitmap/helper work with a bounded word-aware scan. The Python implementation
-remains blocked until the separately reviewed implementation passes the
-no-retry VFS-to-ELF-spawn reproducer. Independent design/correction review is
-clean.
+was blocked until that separately reviewed implementation passed the no-retry
+VFS-to-ELF-spawn reproducer. Independent design/correction review is clean.
 
 The dependent implementation now uses bitmap-word active traversal and a
 direct inactive owner/target plus bitmap-word tail scan. Native semantic
 guards, the frame-ownership QEMU component, and the no-retry VFS-to-ELF-spawn
-reproducer are green; merge remains conditional on complete producer/reuse
-evidence and clean independent implementation review.
+reproducer, complete producer/reuse evidence, and clean independent review
+passed. Implementation #153 is merged with the exact reviewed tree and its
+task branches are removed.
+
+The resumed Python implementation then exposed a second distinct threshold in
+the same final acceptance sequence. The unchanged VM service could pass or
+hit its 10-second guest readiness deadline while executing
+`vm_core_boot_database_is_immutable()`. Accepted
+[ADR-0077](adr/0077-bounded-complete-vm-boot-database-validation.md) preserves
+the exact boot digest and complete VM-state validation while replacing
+262,144 per-frame bitmap helper calls and linear inactive-zero hashing with a
+bitmap-word active scan, complete inactive tail checks, and logarithmic FNV
+zero-run advancement. The Python implementation remains blocked until the
+separate design and implementation pass the exact no-retry acceptance sequence.
 
 ## v0.1 completion goal
 
