@@ -63,6 +63,55 @@ Reuse-enabled execution additionally reports each command as `FRESH`,
 `REUSED`, `FAILED` or `NOT_RUN`; it never labels a reused command as a new
 subprocess execution.
 
+## Accepted fail-fast producer-readiness correction
+
+Accepted
+[ADR-0074](../adr/0074-fail-fast-validation-producer-readiness.md) defines a
+separate producer intent for tasks that require later same-run receipt reuse.
+The dependent implementation has not started; no `--producer` interface exists
+yet.
+
+The planned mode computes the ordinary required plan first, then derives only
+the reusable workflows already selected by that plan. Before opening the
+evidence store or launching any planned command, it requires each selected
+profile to return one complete eligible context/input/output declaration for
+the exact clean candidate.
+
+Readiness is typed as `READY`, `PREPARE`, or `UNSUPPORTED` with the exact
+reason-code table and precedence in ADR-0074. Only exact absent selected
+outputs, absent declared outputs, and explicitly stale selected dependency
+records may produce `PREPARE`, and only after the existing cache, tool, graph,
+command, rule, declaration, source, and observable input checks pass. Missing
+cache/build/compiler metadata, malformed or ambiguous metadata, missing
+external inputs, and every ordinary closure failure are `UNSUPPORTED`.
+Unsupported failure overrides an accumulated preparation condition. Neither
+outcome is inferred from diagnostic text.
+
+Any non-ready result leaves all planned commands `NOT_RUN`, creates no attempt
+log, and leaves every receipt untouched. A ready producer still executes the
+complete plan fresh. Immediately before each reusable workflow, its context
+and inputs must agree with the readiness snapshot; ordinary postflight and
+receipt publication remain unchanged. Producer success additionally requires
+every selected reusable workflow to publish one receipt under the invocation's
+single run ID.
+
+Non-producer reports omit producer metadata. Producer reports use the exact
+optional object defined by ADR-0074: ordered selected names and readiness
+entries, fixed outcome/reason codes, optional four-element canonical
+preparation argv, barrier status, nullable store run ID, complete-publication
+status, and one fixed failure code. A barrier failure leaves every command
+`NOT_RUN`; immediate prelaunch profile drift marks that workflow `FAILED`
+without a workflow subprocess. Exit-zero postflight failure is `plan-failed`;
+`receipt-not-published` is reserved for successful postflight and complete-log
+finalization followed by receipt-publication failure. Producer-mode
+`final_candidate` is true only when that object reports complete same-run
+publication.
+
+Default fresh, explicit fresh, reuse, gate-only recording, plan-only output,
+coverage selection, stop-on-failure, invalidation, locking, and reviewer rules
+remain unchanged. In particular, the correction never publishes from
+postflight alone and never runs a preparation command automatically.
+
 ## Local evidence identity
 
 The ignored store is `build/validation-evidence/v1/` under the planner's

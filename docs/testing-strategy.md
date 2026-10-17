@@ -331,16 +331,27 @@ physical transport, canonical source/line diagnostics, actual-source and
 generated-include inverses, complete CMake reconstruction and independent
 four-field classification equality. Design #147 authored no executable
 artifact and merged separately after clean review. Implementation #148 starts
-from structural Red, moves every production/evidence family in green slices,
-retains the old source and fixture oracles, and closes the 373-entry migration
+from structural Red, moved every production/evidence family in green slices,
+retained the old source and fixture oracles, and closed the 373-entry migration
 empty. Its final structural evidence rejects linked roots/descendants and
 mixed old/new generated includes, and invokes the selected native and target
 compilers to prove canonical source/line diagnostics. The reusable native
 profile requires an explicit target compiler and fingerprints it with its
-closed installation inputs; automatic discovery is fresh-only. Final
-acceptance still requires one complete current fresh author plan, actual
-original-full-producer three-profile reuse and clean independent implementation
-review.
+closed installation inputs; automatic discovery is fresh-only. Complete
+47-command fresh acceptance, actual original-full-producer three-profile reuse,
+clean independent review, identical squash tree, main fast-forward, and branch
+cleanup are verified.
+
+That acceptance exposed a process defect, not a missing test: an exact
+candidate may pass the complete matrix while a reusable profile was
+ineligible before execution and therefore correctly publishes no receipt.
+Accepted
+[ADR-0074](adr/0074-fail-fast-validation-producer-readiness.md) requires an
+explicit producer mode to check every selected reusable profile before any
+planned command or evidence-store mutation. A blocked producer keeps all
+commands `NOT_RUN`; a ready producer still executes the unchanged complete
+plan fresh and must publish all selected receipts under one run ID. The
+implementation remains pending until the separately reviewed design merges.
 
 ## Test layers
 

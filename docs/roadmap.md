@@ -448,11 +448,23 @@ The kernel directory maintenance outcome follows Accepted
 [ADR-0073](adr/0073-kernel-directory-layout.md) and its
 [exact source contract](architecture/kernel-directory-layout.md).
 Complete independent design review is clean and design #147 is separately
-merged. Implementation #148 moves all 373 files into fourteen production and
+merged. Implementation #148 moved all 373 files into fourteen production and
 sixteen target-evidence directories, preserves logical source owners,
 diagnostics and evidence, and finishes its physical-owner migration empty.
-It adds no runtime-DAG node. Production init/shell remains the later node Q,
-not part of this maintenance task.
+Its complete fresh producer, bounded same-run reuse, independent correction
+review, identical squash tree, main fast-forward, and exact branch cleanup are
+verified. It adds no runtime-DAG node. Production init/shell remains the later
+node Q, not part of this maintenance task.
+
+The kernel-directory acceptance also exposed avoidable validation
+orchestration latency: a complete 47-command pass could not publish two
+required receipts because their profiles were not eligible before execution.
+Accepted
+[ADR-0074](adr/0074-fail-fast-validation-producer-readiness.md) defines a
+separate fail-fast producer-readiness design. Independent design/correction
+review is clean. It changes no runtime-DAG node, coverage, receipt identity,
+or default fresh behavior. Its dependent implementation remains blocked until
+this design is merged.
 
 ## v0.1 completion goal
 
