@@ -3,7 +3,7 @@
 
 #include "micros/scheduler.h"
 #include "kernel/ipc_buffer_internal.h"
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 struct scheduler_runtime_context {
     bool scheduler_initialized;

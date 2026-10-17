@@ -1,6 +1,6 @@
 #include "kernel_object_private.h"
 
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 static bool kernel_object_validation_process_slots_match(
     const struct micros_kernel_objects *objects,

@@ -4,7 +4,7 @@
 #include "kernel/endpoint_internal.h"
 #include "kernel/ipc_runtime_internal.h"
 #include "kernel/kernel_object_runtime_internal.h"
-#include "kernel/scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler.h"

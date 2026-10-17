@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 static bool current_ipc_guard_is_zero(
     const struct micros_scheduler_current_ipc_guard *guard

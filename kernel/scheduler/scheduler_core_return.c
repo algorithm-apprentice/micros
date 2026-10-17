@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 static bool plans_equal(
     const struct micros_scheduler_return_plan *left,

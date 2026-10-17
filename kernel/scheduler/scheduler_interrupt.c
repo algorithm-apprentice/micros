@@ -1,4 +1,4 @@
-#include "scheduler_runtime_internal.h"
+#include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"

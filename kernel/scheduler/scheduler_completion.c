@@ -1,4 +1,4 @@
-#include "scheduler_runtime_internal.h"
+#include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "micros/ipc_abi.h"
 #include "micros/ipc_runtime.h"

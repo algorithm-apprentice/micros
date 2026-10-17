@@ -1,6 +1,6 @@
 #include "ipc_internal.h"
 
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 static enum micros_ipc_error resolve_sender_destination(
     struct micros_endpoint_registry *registry,

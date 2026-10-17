@@ -1,7 +1,7 @@
 #include "ipc_internal.h"
 
 #include "endpoint_internal.h"
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 enum ipc_close_thread_action {
     IPC_CLOSE_THREAD_NONE = 0,

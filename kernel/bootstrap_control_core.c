@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "kernel/endpoint_internal.h"
-#include "kernel/scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/scheduler_core.h"
 
 static void copy_bytes(void *destination, const void *source, size_t size)

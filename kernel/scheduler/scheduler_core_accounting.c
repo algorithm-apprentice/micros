@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 enum micros_kernel_object_error micros_scheduler_accounting_initialize(
     struct micros_kernel_objects *objects,

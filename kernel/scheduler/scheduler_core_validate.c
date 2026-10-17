@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 static void initialize_validation_witnesses(
     bool *seen,

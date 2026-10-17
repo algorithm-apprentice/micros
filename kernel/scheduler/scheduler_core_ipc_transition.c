@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 struct scheduler_ipc_transition_candidate {
     struct micros_thread_handle handle;

@@ -1,4 +1,4 @@
-#include "scheduler_core_private.h"
+#include "kernel/scheduler/scheduler_core_private.h"
 
 bool scheduler_core_thread_handles_equal(
     struct micros_thread_handle left,

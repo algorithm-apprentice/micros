@@ -2,7 +2,7 @@
 #define MICROS_KERNEL_SCHEDULER_CORE_PRIVATE_H
 
 #include "micros/scheduler_core.h"
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 bool scheduler_core_thread_handles_equal(
     struct micros_thread_handle left,

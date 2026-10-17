@@ -1157,25 +1157,25 @@ set(
 
 set(
     MICROS_SCHEDULER_CORE_SOURCES
-    kernel/scheduler_core.c
-    kernel/scheduler_core_queue.c
-    kernel/scheduler_core_validate.c
-    kernel/scheduler_core_policy.c
-    kernel/scheduler_core_ipc.c
-    kernel/scheduler_core_ipc_transition.c
-    kernel/scheduler_core_return_plan.c
-    kernel/scheduler_core_return.c
-    kernel/scheduler_core_accounting.c
+    kernel/scheduler/scheduler_core.c
+    kernel/scheduler/scheduler_core_queue.c
+    kernel/scheduler/scheduler_core_validate.c
+    kernel/scheduler/scheduler_core_policy.c
+    kernel/scheduler/scheduler_core_ipc.c
+    kernel/scheduler/scheduler_core_ipc_transition.c
+    kernel/scheduler/scheduler_core_return_plan.c
+    kernel/scheduler/scheduler_core_return.c
+    kernel/scheduler/scheduler_core_accounting.c
 )
 
 set(
     MICROS_SCHEDULER_RUNTIME_SOURCES
-    kernel/scheduler.c
-    kernel/scheduler_context.c
-    kernel/scheduler_completion.c
-    kernel/scheduler_return.c
-    kernel/scheduler_interrupt.c
-    kernel/scheduler_idle.c
+    kernel/scheduler/scheduler.c
+    kernel/scheduler/scheduler_context.c
+    kernel/scheduler/scheduler_completion.c
+    kernel/scheduler/scheduler_return.c
+    kernel/scheduler/scheduler_interrupt.c
+    kernel/scheduler/scheduler_idle.c
     kernel/scheduler_test_support.c
 )
 

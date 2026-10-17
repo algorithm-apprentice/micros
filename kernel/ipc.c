@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "endpoint_internal.h"
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 enum micros_ipc_error micros_ipc_send(
     struct micros_endpoint_registry *registry,

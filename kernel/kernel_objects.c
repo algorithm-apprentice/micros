@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 #include "kernel_object_private.h"
 

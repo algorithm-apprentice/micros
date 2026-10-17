@@ -1,6 +1,6 @@
 #include "ipc_internal.h"
 
-#include "scheduler_core_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 static void canonicalize_notification(
     struct micros_ipc_message *message,
