@@ -92,6 +92,28 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                 logical,
             )
 
+    def test_external_consumers_and_generators_restore_exactly(self) -> None:
+        self.assertEqual(22, len(kernel_layout_source.EXTERNAL_SOURCE_FACTS))
+        self.assertEqual(
+            58,
+            sum(
+                len(fact[2])
+                for fact in kernel_layout_source.EXTERNAL_SOURCE_FACTS.values()
+            ),
+        )
+        for relative, (_, expected, _) in (
+            kernel_layout_source.EXTERNAL_SOURCE_FACTS.items()
+        ):
+            restored = kernel_layout_source.read_bytes_path(ROOT / relative)
+            self.assertEqual(expected, hashlib.sha256(restored).hexdigest(), relative)
+
+        self.assertEqual(9, len(kernel_layout_source.GENERATOR_FILE_FACTS))
+        for relative, (expected, _, _) in (
+            kernel_layout_source.GENERATOR_FILE_FACTS.items()
+        ):
+            restored = kernel_layout_source.read_bytes_path(ROOT / relative)
+            self.assertEqual(expected, hashlib.sha256(restored).hexdigest(), relative)
+
     def test_existing_source_gate_asts_are_still_the_frozen_modules(self) -> None:
         for path, expected in kernel_layout_source.ORIGINAL_GATE_AST_SHA256.items():
             self.assertEqual(

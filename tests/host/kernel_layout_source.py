@@ -4299,6 +4299,385 @@ KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/address_space.c',
  'kernel/vm_snapshot_internal.h',
  'kernel/vm_snapshot_validation.c')
 
+EXTERNAL_SOURCE_FACTS = {'arch/riscv64/uart.c': ('100644',
+                         'ab1cf1dbb1bc4b7183b1a533765970389f69c97972378a6d3604f32bae7c5432',
+                         ((4,
+                           'kernel/uart_console_core.h',
+                           '#include "kernel/uart_console_core.h"\n',
+                           '#include "kernel/tty/uart_console_core.h"\n'),)),
+ 'tests/host/bootstrap_control_fixture.c': ('100644',
+                                            'c747bee6cff9ead512133cac03cd8e503a135877f39f0585d83ef74d007d3c7a',
+                                            ((3,
+                                              'kernel/endpoint_internal.h',
+                                              '#include "kernel/endpoint_internal.h"\n',
+                                              '#include '
+                                              '"kernel/endpoint/endpoint_internal.h"\n'),)),
+ 'tests/host/bootstrap_control_lifecycle_test.c': ('100644',
+                                                   '28362f039237b999649fa13ea8f37eb7008797cdd095a0d39b3752ca794475f2',
+                                                   ((3,
+                                                     'kernel/endpoint_internal.h',
+                                                     '#include "kernel/endpoint_internal.h"\n',
+                                                     '#include '
+                                                     '"kernel/endpoint/endpoint_internal.h"\n'),)),
+ 'tests/host/bootstrap_control_test_internal.h': ('100644',
+                                                  'ee0a706f4ea7048be9f204e90d23e3ed5920b9981ac55ef917b2cf79e6529bec',
+                                                  ((4,
+                                                    'kernel/bootstrap_control_internal.h',
+                                                    '#include '
+                                                    '"kernel/bootstrap_control_internal.h"\n',
+                                                    '#include '
+                                                    '"kernel/boot/bootstrap_control_internal.h"\n'),
+                                                   (5,
+                                                    'kernel/bootstrap_image.h',
+                                                    '#include "kernel/bootstrap_image.h"\n',
+                                                    '#include "kernel/boot/bootstrap_image.h"\n'))),
+ 'tests/host/plic_test.c': ('100644',
+                            '98019127fb762abfab853772784280a6ac906104fb31690663a2acce8b2fe49f',
+                            ((1,
+                              'kernel/plic_core.h',
+                              '#include "kernel/plic_core.h"\n',
+                              '#include "kernel/platform/plic_core.h"\n'),)),
+ 'tests/host/pm_control_execution_exit_test.c': ('100644',
+                                                 '849118b8bc79069b71a7c5990fe1bcd9ba3475a87866f95addd4779fd56efe25',
+                                                 ((8,
+                                                   'kernel/pm_control_runtime_core.h',
+                                                   '#include "kernel/pm_control_runtime_core.h"\n',
+                                                   '#include '
+                                                   '"kernel/pm/pm_control_runtime_core.h"\n'),)),
+ 'tests/host/pm_control_execution_prepare_test.c': ('100644',
+                                                    '7ba5bcefb35d9bd60b4883bd8d64e1bd3cf6f27175c8bad67d8e0e58e8175bd2',
+                                                    ((9,
+                                                      'kernel/pm_control_runtime_core.h',
+                                                      '#include '
+                                                      '"kernel/pm_control_runtime_core.h"\n',
+                                                      '#include '
+                                                      '"kernel/pm/pm_control_runtime_core.h"\n'),
+                                                     (10,
+                                                      'kernel/vm_handoff_core.h',
+                                                      '#include "kernel/vm_handoff_core.h"\n',
+                                                      '#include "kernel/vm/vm_handoff_core.h"\n'))),
+ 'tests/host/pm_control_execution_test_fixture.c': ('100644',
+                                                    'fcd3d6c1555138fbdbac7f313bc82602db6aed56933db42f2b5077bee1bb3730',
+                                                    ((9,
+                                                      'kernel/pm_control_runtime_core.h',
+                                                      '#include '
+                                                      '"kernel/pm_control_runtime_core.h"\n',
+                                                      '#include '
+                                                      '"kernel/pm/pm_control_runtime_core.h"\n'),
+                                                     (10,
+                                                      'kernel/vm_handoff_core.h',
+                                                      '#include "kernel/vm_handoff_core.h"\n',
+                                                      '#include "kernel/vm/vm_handoff_core.h"\n'))),
+ 'tests/host/pm_control_execution_test_internal.h': ('100644',
+                                                     '8c8d9727cfcc84039af0d2ebbc33c79c1b2008c6a5fb899d5ad1a2a0d92d7495',
+                                                     ((7,
+                                                       'kernel/pm_control_core.h',
+                                                       '#include "kernel/pm_control_core.h"\n',
+                                                       '#include "kernel/pm/pm_control_core.h"\n'),
+                                                      (8,
+                                                       'kernel/vm_handoff_core.h',
+                                                       '#include "kernel/vm_handoff_core.h"\n',
+                                                       '#include '
+                                                       '"kernel/vm/vm_handoff_core.h"\n'))),
+ 'tests/host/pm_control_execution_token_test.c': ('100644',
+                                                  '5797c0b9f9312b1a5bb32a83af43192501abc404cfb5bc32671611b306812f54',
+                                                  ((9,
+                                                    'kernel/pm_control_runtime_core.h',
+                                                    '#include "kernel/pm_control_runtime_core.h"\n',
+                                                    '#include '
+                                                    '"kernel/pm/pm_control_runtime_core.h"\n'),
+                                                   (10,
+                                                    'kernel/vm_handoff_core.h',
+                                                    '#include "kernel/vm_handoff_core.h"\n',
+                                                    '#include "kernel/vm/vm_handoff_core.h"\n'))),
+ 'tests/host/pm_control_reservation_test.c': ('100644',
+                                              '6bc6c54f653c39561850bcd369173e5e0c482ee9e018b949f71ce0779e4a9413',
+                                              ((8,
+                                                'kernel/pm_control_runtime_core.h',
+                                                '#include "kernel/pm_control_runtime_core.h"\n',
+                                                '#include '
+                                                '"kernel/pm/pm_control_runtime_core.h"\n'),)),
+ 'tests/host/pm_control_runtime_test.c': ('100644',
+                                          '99d7a77bb1de071dbf0e286f933178773b13f5c63d20cbc74c36762f37c398ce',
+                                          ((8,
+                                            'kernel/pm_control_runtime_core.h',
+                                            '#include "kernel/pm_control_runtime_core.h"\n',
+                                            '#include "kernel/pm/pm_control_runtime_core.h"\n'),)),
+ 'tests/host/pm_control_test_internal.h': ('100644',
+                                           '15850036f5800ac680046ef39b007af7aa54dad2a6f3d1eb5f073734577c4ab4',
+                                           ((8,
+                                             'kernel/pm_control_core.h',
+                                             '#include "kernel/pm_control_core.h"\n',
+                                             '#include "kernel/pm/pm_control_core.h"\n'),
+                                            (9,
+                                             'kernel/pm_control_syscall_core.h',
+                                             '#include "kernel/pm_control_syscall_core.h"\n',
+                                             '#include "kernel/pm/pm_control_syscall_core.h"\n'),
+                                            (10,
+                                             'kernel/vm_handoff_core.h',
+                                             '#include "kernel/vm_handoff_core.h"\n',
+                                             '#include "kernel/vm/vm_handoff_core.h"\n'))),
+ 'tests/host/trap_route_test.c': ('100644',
+                                  '99430a0ca39ef09dabd8e4c0c3ef181e22dc6f7d8ec9c073665a4cdf58e68c6c',
+                                  ((1,
+                                    'kernel/trap_route_core.h',
+                                    '#include "kernel/trap_route_core.h"\n',
+                                    '#include "kernel/trap/trap_route_core.h"\n'),)),
+ 'tests/host/tty_control_syscall_test_internal.h': ('100644',
+                                                    '901237db486455e759d1ade460fff2132b1ccacd6f7bbf25680ff1407f81060d',
+                                                    ((14,
+                                                      'kernel/bootstrap_runtime.h',
+                                                      '#include "kernel/bootstrap_runtime.h"\n',
+                                                      '#include '
+                                                      '"kernel/boot/bootstrap_runtime.h"\n'),
+                                                     (15,
+                                                      'kernel/ipc_runtime_internal.h',
+                                                      '#include "kernel/ipc_runtime_internal.h"\n',
+                                                      '#include '
+                                                      '"kernel/ipc/ipc_runtime_internal.h"\n'),
+                                                     (16,
+                                                      'kernel/plic.h',
+                                                      '#include "kernel/plic.h"\n',
+                                                      '#include "kernel/platform/plic.h"\n'),
+                                                     (17,
+                                                      'kernel/tty_control_syscall.h',
+                                                      '#include "kernel/tty_control_syscall.h"\n',
+                                                      '#include '
+                                                      '"kernel/tty/tty_control_syscall.h"\n'),
+                                                     (18,
+                                                      'kernel/tty_control_syscall_core.h',
+                                                      '#include '
+                                                      '"kernel/tty_control_syscall_core.h"\n',
+                                                      '#include '
+                                                      '"kernel/tty/tty_control_syscall_core.h"\n'),
+                                                     (19,
+                                                      'kernel/tty_fault.h',
+                                                      '#include "kernel/tty_fault.h"\n',
+                                                      '#include "kernel/tty/tty_fault.h"\n'),
+                                                     (20,
+                                                      'kernel/tty_handoff_runtime.h',
+                                                      '#include "kernel/tty_handoff_runtime.h"\n',
+                                                      '#include '
+                                                      '"kernel/tty/tty_handoff_runtime.h"\n'),
+                                                     (21,
+                                                      'kernel/user_address_space_internal.h',
+                                                      '#include '
+                                                      '"kernel/user_address_space_internal.h"\n',
+                                                      '#include '
+                                                      '"kernel/memory/user_address_space_internal.h"\n'))),
+ 'tests/host/tty_control_test.c': ('100644',
+                                   'eeca37c5cd0b6f074d35d295eef0bbacae7e7b60bde4841f1e664de20047a7dd',
+                                   ((1,
+                                     'kernel/tty_control_core.h',
+                                     '#include "kernel/tty_control_core.h"\n',
+                                     '#include "kernel/tty/tty_control_core.h"\n'),
+                                    (2,
+                                     'kernel/tty_control_syscall_core.h',
+                                     '#include "kernel/tty_control_syscall_core.h"\n',
+                                     '#include "kernel/tty/tty_control_syscall_core.h"\n'))),
+ 'tests/host/tty_fault_test.c': ('100644',
+                                 '8e2f2b361e980097b272e4a2f52a4ea50f43f9181eb1c243950fe15dbcdbcc4b',
+                                 ((7,
+                                   'kernel/bootstrap_runtime.h',
+                                   '#include "kernel/bootstrap_runtime.h"\n',
+                                   '#include "kernel/boot/bootstrap_runtime.h"\n'),
+                                  (8,
+                                   'kernel/tty_fault.h',
+                                   '#include "kernel/tty_fault.h"\n',
+                                   '#include "kernel/tty/tty_fault.h"\n'),
+                                  (9,
+                                   'kernel/tty_handoff_runtime.h',
+                                   '#include "kernel/tty_handoff_runtime.h"\n',
+                                   '#include "kernel/tty/tty_handoff_runtime.h"\n'))),
+ 'tests/host/tty_handoff_test_internal.h': ('100644',
+                                            'd2ab0274211c0cee4e5c16dce403b941f00dee5a252081085c59d809c6219f79',
+                                            ((4,
+                                              'kernel/tty_handoff_core.h',
+                                              '#include "kernel/tty_handoff_core.h"\n',
+                                              '#include "kernel/tty/tty_handoff_core.h"\n'),
+                                             (5,
+                                              'kernel/tty_handoff_runtime.h',
+                                              '#include "kernel/tty_handoff_runtime.h"\n',
+                                              '#include "kernel/tty/tty_handoff_runtime.h"\n'),
+                                             (6,
+                                              'kernel/tty_control_syscall_core.h',
+                                              '#include "kernel/tty_control_syscall_core.h"\n',
+                                              '#include "kernel/tty/tty_control_syscall_core.h"\n'),
+                                             (7,
+                                              'kernel/uart_console_core.h',
+                                              '#include "kernel/uart_console_core.h"\n',
+                                              '#include "kernel/tty/uart_console_core.h"\n'))),
+ 'tests/host/tty_interrupt_test.c': ('100644',
+                                     'db7bff54d49ddd409a56a3eccca105a750f2e5ff2333a20708159fc27b3d3fc3',
+                                     ((8,
+                                       'kernel/bootstrap_runtime.h',
+                                       '#include "kernel/bootstrap_runtime.h"\n',
+                                       '#include "kernel/boot/bootstrap_runtime.h"\n'),
+                                      (9,
+                                       'kernel/ipc_runtime_internal.h',
+                                       '#include "kernel/ipc_runtime_internal.h"\n',
+                                       '#include "kernel/ipc/ipc_runtime_internal.h"\n'),
+                                      (10,
+                                       'kernel/kernel_object_runtime_internal.h',
+                                       '#include "kernel/kernel_object_runtime_internal.h"\n',
+                                       '#include '
+                                       '"kernel/objects/kernel_object_runtime_internal.h"\n'),
+                                      (11,
+                                       'kernel/plic.h',
+                                       '#include "kernel/plic.h"\n',
+                                       '#include "kernel/platform/plic.h"\n'),
+                                      (12,
+                                       'kernel/tty_fault.h',
+                                       '#include "kernel/tty_fault.h"\n',
+                                       '#include "kernel/tty/tty_fault.h"\n'),
+                                      (13,
+                                       'kernel/tty_handoff_runtime.h',
+                                       '#include "kernel/tty_handoff_runtime.h"\n',
+                                       '#include "kernel/tty/tty_handoff_runtime.h"\n'),
+                                      (14,
+                                       'kernel/tty_interrupt.h',
+                                       '#include "kernel/tty_interrupt.h"\n',
+                                       '#include "kernel/tty/tty_interrupt.h"\n'),
+                                      (15,
+                                       'kernel/user_address_space_internal.h',
+                                       '#include "kernel/user_address_space_internal.h"\n',
+                                       '#include '
+                                       '"kernel/memory/user_address_space_internal.h"\n'))),
+ 'tests/host/vm_handoff_syscall_test_internal.h': ('100644',
+                                                   'ae6a7e94ba839cd71b045bc533a056fa7c166f9e08f69b66b0ba9adc5646abe2',
+                                                   ((11,
+                                                     'kernel/bootstrap_runtime.h',
+                                                     '#include "kernel/bootstrap_runtime.h"\n',
+                                                     '#include '
+                                                     '"kernel/boot/bootstrap_runtime.h"\n'),
+                                                    (12,
+                                                     'kernel/endpoint_internal.h',
+                                                     '#include "kernel/endpoint_internal.h"\n',
+                                                     '#include '
+                                                     '"kernel/endpoint/endpoint_internal.h"\n'),
+                                                    (13,
+                                                     'kernel/ipc_runtime_internal.h',
+                                                     '#include "kernel/ipc_runtime_internal.h"\n',
+                                                     '#include '
+                                                     '"kernel/ipc/ipc_runtime_internal.h"\n'),
+                                                    (14,
+                                                     'kernel/pm_control_runtime.h',
+                                                     '#include "kernel/pm_control_runtime.h"\n',
+                                                     '#include "kernel/pm/pm_control_runtime.h"\n'),
+                                                    (15,
+                                                     'kernel/plic.h',
+                                                     '#include "kernel/plic.h"\n',
+                                                     '#include "kernel/platform/plic.h"\n'),
+                                                    (16,
+                                                     'kernel/tty_handoff_runtime.h',
+                                                     '#include "kernel/tty_handoff_runtime.h"\n',
+                                                     '#include '
+                                                     '"kernel/tty/tty_handoff_runtime.h"\n'),
+                                                    (17,
+                                                     'kernel/user_address_space_internal.h',
+                                                     '#include '
+                                                     '"kernel/user_address_space_internal.h"\n',
+                                                     '#include '
+                                                     '"kernel/memory/user_address_space_internal.h"\n'),
+                                                    (18,
+                                                     'kernel/vm_handoff_runtime.h',
+                                                     '#include "kernel/vm_handoff_runtime.h"\n',
+                                                     '#include "kernel/vm/vm_handoff_runtime.h"\n'),
+                                                    (19,
+                                                     'kernel/vm_handoff_syscall.h',
+                                                     '#include "kernel/vm_handoff_syscall.h"\n',
+                                                     '#include '
+                                                     '"kernel/vm/vm_handoff_syscall.h"\n'))),
+ 'tests/host/vm_handoff_test_internal.h': ('100644',
+                                           'e8ea80fe94147a5995eb81f4a28ca4c2d2bcd646ca2f752a5cdc343ba7d534f4',
+                                           ((7,
+                                             'kernel/vm_handoff_core.h',
+                                             '#include "kernel/vm_handoff_core.h"\n',
+                                             '#include "kernel/vm/vm_handoff_core.h"\n'),)),
+ 'tests/qemu/elf_spawn_resources.h': ('100644',
+                                      '2af20b2cee54a2711cc35109a356a6fec21b8caa26819a4dd9efbeedb26df002',
+                                      ((7,
+                                        'kernel/pm_control_core.h',
+                                        '#include "kernel/pm_control_core.h"\n',
+                                        '#include "kernel/pm/pm_control_core.h"\n'),
+                                       (8,
+                                        'kernel/vm_handoff_core.h',
+                                        '#include "kernel/vm_handoff_core.h"\n',
+                                        '#include "kernel/vm/vm_handoff_core.h"\n')))}
+
+GENERATOR_FILE_FACTS = {'tools/generate_bootstrap_fixture.py': ('55eba716c11aa7b2d3d72fd055dcaea5bd9130728a55e1a6489dc0b7dd3a7533',
+                                         '5db89d7bdbcf2b36185ea2f571880147552b704c1891402f50e7f441bdad7ab6',
+                                         ((260,
+                                           'kernel/bootstrap_test_fixture.h',
+                                           "        '#include "
+                                           '"kernel/bootstrap_test_fixture.h"\',\n',
+                                           "        '#include "
+                                           '"kernel/tests/boot/bootstrap_test_fixture.h"\',\n'),)),
+ 'tools/generate_user_runtime_fixture.py': ('a4d0a715c30536401ca731090cf5e6e5d2948c1aaf8c57a0052ec97301ebfa22',
+                                            '1578648c42d092771a9a2346fb9a8d0303b96042f7b740ff83e9391933f766c4',
+                                            ((184,
+                                              'kernel/user_runtime_image.h',
+                                              "        '#include "
+                                              '"kernel/user_runtime_image.h"\',\n',
+                                              "        '#include "
+                                              '"kernel/tests/runtime/user_runtime_image.h"\',\n'),)),
+ 'tools/generate_vm_handoff_fixture.py': ('7788aed1bc970527246530672731a7bd0a624b87b59bd51592b78108591fb43d',
+                                          '72c6eb60f88ef0cab6171fb6e49f7bd2a7347c6893e3855b3fb0c1db52a538cc',
+                                          ((52,
+                                            'kernel/vm_handoff_test_fixture.h',
+                                            "        '#include "
+                                            '"kernel/vm_handoff_test_fixture.h"\',\n',
+                                            "        '#include "
+                                            '"kernel/tests/vm/vm_handoff_test_fixture.h"\',\n'),)),
+ 'tools/generate_pm_service_fixture.py': ('19aa5400ed57d9d73be041df0fa9bdeb993af9bcf8d382e53d5f32e8f1f8fb28',
+                                          'b27100a1edadcc8ae8db10384cc00e35dc848a46b652483fd33b7bb7ecd14c50',
+                                          ((186,
+                                            'kernel/pm_service_test_fixture.h',
+                                            "        '#include "
+                                            '"kernel/pm_service_test_fixture.h"\',\n',
+                                            "        '#include "
+                                            '"kernel/tests/pm/pm_service_test_fixture.h"\',\n'),)),
+ 'tools/generate_vm_scratch_preemption_fixture.py': ('3a15fa30990ae1507f624ba415e9db25b87cd7b7ff5132a061d6cc284ea5f82d',
+                                                     '18e0c66e2bc613e5e4fb776b921e8908ba35f83d0fb0bca8fb6d7ec56f06926c',
+                                                     ((249,
+                                                       'kernel/vm_scratch_preemption_test_fixture.h',
+                                                       "        '#include "
+                                                       '"kernel/vm_scratch_preemption_test_fixture.h"\',\n',
+                                                       "        '#include "
+                                                       '"kernel/tests/vm/vm_scratch_preemption_test_fixture.h"\',\n'),)),
+ 'tools/generate_tty_service_fixture.py': ('9f2be289dbab81b577a57900844edd0d9b70a0f2a5719b77ff65751190831758',
+                                           '740d852d6f2357fef2695bf66385440543a479c0fd9c59f48ecb74ab6e8dd7ab',
+                                           ((199,
+                                             'kernel/tty_service_test_fixture.h',
+                                             "        '#include "
+                                             '"kernel/tty_service_test_fixture.h"\',\n',
+                                             "        '#include "
+                                             '"kernel/tests/tty/tty_service_test_fixture.h"\',\n'),)),
+ 'tools/generate_ramfs_service_fixture.py': ('15de81f42047be626f164de7b735293df02cf0786bfd274f6fee56cc2221726a',
+                                             'ec6cff6bab14b0f065f8dffa12a3d514c147a9ecab4724df7c7ef1ef0985a93f',
+                                             ((369,
+                                               'kernel/ramfs_service_test_fixture.h',
+                                               "        '#include "
+                                               '"kernel/ramfs_service_test_fixture.h"\',\n',
+                                               "        '#include "
+                                               '"kernel/tests/ramfs/ramfs_service_test_fixture.h"\',\n'),)),
+ 'tools/generate_vfs_service_fixture.py': ('35357231120a6865b3d20557b2f37015952acbe467730cee17fa8ede31c8d639',
+                                           '48f21129382204f6c846d6dfdfe1c4f2882bb01ce171e173c95b655694ec3e4f',
+                                           ((143,
+                                             'kernel/vfs_service_test_fixture.h',
+                                             "        '#include "
+                                             '"kernel/vfs_service_test_fixture.h"\',\n',
+                                             "        '#include "
+                                             '"kernel/tests/vfs/vfs_service_test_fixture.h"\',\n'),)),
+ 'tools/generate_elf_spawn_fixture.py': ('fd999a7dc15c1e5c34b7d522494d40ac32342d3d439dcbaafd3ac97eaedfb7e8',
+                                         'cb35493b0f1ab7682198bde77461e27bf13954e75d9106698453005261811f10',
+                                         ((189,
+                                           'kernel/elf_spawn_test_fixture.h',
+                                           "        '#include "
+                                           '"kernel/elf_spawn_test_fixture.h"\',\n',
+                                           "        '#include "
+                                           '"kernel/tests/spawn/elf_spawn_test_fixture.h"\',\n'),))}
+
 ORIGINAL_GATE_AST_SHA256 = {'tests/host/test_endpoint_source_layout.py': '86f8da6f41af71c5a460de478cb1f6547dfb4eaa8cbbfb068d5ed10205a75e94',
  'tests/host/test_frame_ownership_source_layout.py': 'a1b42dc947e29650e0c4c778c8d6902944b51a2f5cd984487abf0b16c501db1e',
  'tests/host/test_grant_data_plane_source_layout.py': '4d221c1a530b5ef05fe2fedfa6783c188c810b699a354dc902597520c8d46ccc',
@@ -15624,10 +16003,19 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     del physical
     selected = current_path(root, logical)
     raw = selected.read_bytes()
+    return _restored_include_bytes(logical, raw, expected_sha256, transports)
+
+
+def _restored_include_bytes(
+    relative: str,
+    raw: bytes,
+    expected_sha256: str,
+    transports,
+) -> bytes:
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as error:
-        raise AssertionError(f"non-UTF-8 kernel source: {logical}") from error
+        raise AssertionError(f"non-UTF-8 source: {relative}") from error
     lines = text.splitlines(keepends=True)
     for line_number, target, old_line, new_line in transports:
         expected_line = (
@@ -15637,12 +16025,12 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
         )
         if line_number > len(lines) or lines[line_number - 1] != expected_line:
             raise AssertionError(
-                f"private include transport mismatch: {logical}:{line_number}"
+                f"private include transport mismatch: {relative}:{line_number}"
             )
         lines[line_number - 1] = old_line
     restored = "".join(lines).encode()
     if hashlib.sha256(restored).hexdigest() != expected_sha256:
-        raise AssertionError(f"original source mismatch: {logical}")
+        raise AssertionError(f"original source mismatch: {relative}")
     return restored
 
 
@@ -15661,6 +16049,33 @@ def _logical_from_path(path: Path) -> Optional[str]:
     if relative in KERNEL_FILE_FACTS:
         return relative
     return KERNEL_PHYSICAL_TO_LOGICAL.get(relative)
+
+
+def _restored_external_bytes(path: Path, relative: str) -> bytes:
+    _, expected_sha256, transports = EXTERNAL_SOURCE_FACTS[relative]
+    return _restored_include_bytes(
+        relative,
+        path.read_bytes(),
+        expected_sha256,
+        transports,
+    )
+
+
+def _restored_generator_bytes(path: Path, relative: str) -> bytes:
+    expected_sha256, expected_ast, transports = GENERATOR_FILE_FACTS[relative]
+    restored = _restored_include_bytes(
+        relative,
+        path.read_bytes(),
+        expected_sha256,
+        transports,
+    )
+    payload = ast.dump(
+        ast.parse(restored.decode("utf-8")),
+        include_attributes=False,
+    ).encode()
+    if hashlib.sha256(payload).hexdigest() != expected_ast:
+        raise AssertionError(f"generator AST mismatch: {relative}")
+    return restored
 
 
 def _source_offsets(source: str) -> list[int]:
@@ -15755,6 +16170,10 @@ def read_bytes_path(path: Path) -> bytes:
         relative = _relative_path(path)
     except ValueError:
         relative = None
+    if relative in EXTERNAL_SOURCE_FACTS:
+        return _restored_external_bytes(path, relative)
+    if relative in GENERATOR_FILE_FACTS:
+        return _restored_generator_bytes(path, relative)
     if relative == "CMakeLists.txt":
         return restore_cmake_source(path.read_text(encoding="utf-8")).encode()
     if relative == "tools/validation_plan.py":
