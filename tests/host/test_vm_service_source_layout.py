@@ -240,7 +240,13 @@ PRIVATE_FUNCTION_OWNERS = {
         "vm_core_physical_is_in_record_other_than", "vm_core_select_lowest_frames",
         "vm_core_selected_frames_match",
     ),
-    "servers/vm/vm_validation.c": ("vm_core_validate_state",),
+    "servers/vm/vm_validation.c": (
+        "vm_validation_digest_bytes",
+        "vm_validation_digest_zero_bytes",
+        "vm_validation_digest_active_frame_states",
+        "vm_validation_initial_free_tail_is_zero",
+        "vm_core_validate_state",
+    ),
     "servers/vm/vm_image.c": (
         "vm_image_read_u16_le", "vm_image_read_u32_le", "vm_image_read_u64_le",
         "vm_image_write_u64_le", "vm_image_zero_bytes", "vm_image_copy_bytes",

@@ -162,6 +162,11 @@ and validation call graph remain unchanged. `vm_core.c` retains the shared
 bitmap query for unrelated frame and lifecycle owners. No validation cache,
 epoch, duplicate boot database, or generalized digest framework is introduced.
 
+The separate implementation follows that contract with four file-local owners
+for bounded byte digestion, logarithmic zero advancement, active word/chunk
+canonicalization, and inactive bitmap-tail validation. The existing complete
+validator remains the only caller-facing owner.
+
 ## Stable public VM-core symbol ownership
 
 | Owner | Public symbols |

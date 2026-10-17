@@ -190,6 +190,20 @@ Final independent read-only review concluded:
 The reviewer ran no build, suite, model, or QEMU workflow. Acceptance records a
 corrected implementation evidence contract only.
 
+## Separate implementation disposition
+
+The implementation uses the existing complete fixture with valid managed
+counts:
+
+```text
+6, 63, 64, 65, 28,904, maximum - 1, maximum
+```
+
+Coherent zero and maximum-plus-one header/summary corruption remains invalid
+guard evidence. No second topology or test-only production entry point was
+added. The focused sanitizer-backed VM-core gate passes with the complete
+ADR-0077 boundary/corruption matrix.
+
 ## Consequences
 
 - Every native "valid" case now constructs a boot database accepted by the
