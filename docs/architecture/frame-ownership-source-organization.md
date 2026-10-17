@@ -171,6 +171,11 @@ Implementation evidence must preserve every existing corruption case and add:
 - one no-retry `test-qemu-vfs` then `test-qemu-elf-spawn` reproduction before
   the complete producer.
 
+The dependent implementation realizes this contract through file-local
+`validate_active_frames()` and `inactive_state_is_zero()` owners. No public
+symbol, private-header declaration, structure, capacity, or error mapping
+changes.
+
 ## Stable public-symbol ownership
 
 | Owner | Public symbols |

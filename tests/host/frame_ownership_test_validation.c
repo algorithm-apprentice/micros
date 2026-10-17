@@ -119,6 +119,24 @@ static bool expect_geometry_release_failure(
     return true;
 }
 
+static bool expect_inactive_owner_corruption(
+    struct frame_ownership_test_context *context,
+    struct micros_frame_owner owner
+)
+{
+    context->ownership.owners[TEST_FRAME_COUNT] = owner;
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
+        micros_frame_ownership_validate(&context->ownership)
+    );
+    memset(
+        &context->ownership.owners[TEST_FRAME_COUNT],
+        0,
+        sizeof(context->ownership.owners[TEST_FRAME_COUNT])
+    );
+    return true;
+}
+
 bool frame_ownership_test_rejects_geometry_changes_before_mutation(
     struct frame_ownership_test_context *context
 )
@@ -317,25 +335,6 @@ bool frame_ownership_test_validator_rejects_independent_corruption(
     );
     context->allocator.allocated_bitmap[0] |= UINT64_C(1);
 
-    context->ownership.owners[TEST_FRAME_COUNT] = process_user;
-    EXPECT_ERROR(
-        MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
-        micros_frame_ownership_validate(&context->ownership)
-    );
-    memset(
-        &context->ownership.owners[TEST_FRAME_COUNT],
-        0,
-        sizeof(context->ownership.owners[TEST_FRAME_COUNT])
-    );
-    context->ownership.handoff_targets[TEST_FRAME_COUNT] =
-        MICROS_FRAME_HANDOFF_VM_WIRED;
-    EXPECT_ERROR(
-        MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
-        micros_frame_ownership_validate(&context->ownership)
-    );
-    context->ownership.handoff_targets[TEST_FRAME_COUNT] =
-        MICROS_FRAME_HANDOFF_NONE;
-
     context->ownership.phase = (enum micros_frame_ownership_phase)99;
     EXPECT_ERROR(
         MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
@@ -353,6 +352,84 @@ bool frame_ownership_test_validator_rejects_independent_corruption(
         MICROS_FRAME_OWNERSHIP_OK,
         micros_frame_ownership_validate(&context->ownership)
     );
+    return true;
+}
+
+bool frame_ownership_test_rejects_inactive_corruption(
+    struct frame_ownership_test_context *context
+)
+{
+    EXPECT_TRUE(
+        frame_ownership_test_initialize_fixture(
+            context,
+            TEST_FRAME_COUNT
+        )
+    );
+    EXPECT_TRUE(
+        expect_inactive_owner_corruption(
+            context,
+            (struct micros_frame_owner){.generation = 1}
+        )
+        && expect_inactive_owner_corruption(
+            context,
+            (struct micros_frame_owner){.slot = 1}
+        )
+        && expect_inactive_owner_corruption(
+            context,
+            (struct micros_frame_owner){
+                .kind = MICROS_FRAME_OWNER_KERNEL_RETAINED,
+            }
+        )
+        && expect_inactive_owner_corruption(
+            context,
+            (struct micros_frame_owner){.reserved = 1}
+        )
+    );
+    context->ownership.handoff_targets[TEST_FRAME_COUNT] =
+        MICROS_FRAME_HANDOFF_VM_WIRED;
+    EXPECT_ERROR(
+        MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
+        micros_frame_ownership_validate(&context->ownership)
+    );
+    context->ownership.handoff_targets[TEST_FRAME_COUNT] =
+        MICROS_FRAME_HANDOFF_NONE;
+    return true;
+}
+
+bool frame_ownership_test_validates_bitmap_word_boundaries(
+    struct frame_ownership_test_context *context
+)
+{
+    static const uint64_t frame_counts[] = {
+        1,
+        63,
+        64,
+        65,
+        UINT64_C(28904),
+        MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES - 1,
+        MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
+    };
+    size_t index;
+
+    for (index = 0; index < sizeof(frame_counts) / sizeof(frame_counts[0]); ++index) {
+        uint64_t frame_count = frame_counts[index];
+
+        EXPECT_TRUE(frame_ownership_test_initialize_fixture(context, frame_count));
+        EXPECT_ERROR(
+            MICROS_FRAME_OWNERSHIP_OK,
+            micros_frame_ownership_validate(&context->ownership)
+        );
+        if (frame_count < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
+            context->allocator.allocated_bitmap[frame_count / 64]
+                |= UINT64_C(1) << (frame_count % 64);
+            EXPECT_ERROR(
+                MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
+                micros_frame_ownership_validate(&context->ownership)
+            );
+            context->allocator.allocated_bitmap[frame_count / 64]
+                &= ~(UINT64_C(1) << (frame_count % 64));
+        }
+    }
     return true;
 }
 

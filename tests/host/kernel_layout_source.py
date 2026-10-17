@@ -15550,6 +15550,8 @@ FINAL_VALIDATION_CONTEXT_SHA256 = 'ae5ffaeae172a8aadf5796580be3631f9804068c7033a
 PRODUCER_VALIDATION_CONTEXT_SHA256 = '4f4e0b570c01ffecfe7fbde99e8996ec10b47466c692cd999541b87f0383cf88'
 BASE_VALIDATION_PLAN_SHA256 = '60a5e656a28b18bb21a02c65fc46c2ec18f4100580b3d3d05a09b346ae36a619'
 PRODUCER_VALIDATION_PLAN_SHA256 = '28437d4bcfc669e982632e920cc71f344d5993ff43fd5b7decec4c4b8a611aab'
+BASE_FRAME_VALIDATION_SHA256 = 'dfe2aaa76500b3725ca5437889f71877b9adbaafa915ff044ba8d888451b0445'
+BOUNDED_FRAME_VALIDATION_SHA256 = '448f61074bb3c5d52631660b9537e45a8bb9cca266a645edd503457b6fa03694'
 ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
 
 
@@ -15655,11 +15657,156 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
     return tuple(errors)
 
 
+def restore_frame_validation_hot_path(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_FRAME_VALIDATION_SHA256:
+        return source
+    if digest != BOUNDED_FRAME_VALIDATION_SHA256:
+        raise AssertionError("unexpected frame validation source")
+
+    baseline = '''enum micros_frame_ownership_error micros_frame_ownership_validate(
+    const struct micros_frame_ownership *ownership
+)
+{
+    uint64_t observed_counts[MICROS_FRAME_OWNER_KIND_COUNT];
+    uint64_t observed_owned_count = 0;
+    uint64_t observed_allocated_count = 0;
+    uint64_t frame_index;
+    enum micros_frame_ownership_error error;
+
+    micros_frame_ownership_clear_bytes(observed_counts, sizeof(observed_counts));
+    error = micros_frame_ownership_require_initialized(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (
+        (
+            ownership->phase
+                != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
+            && ownership->phase
+                != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+        )
+        || !micros_frame_ownership_geometry_matches(ownership)
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+
+    for (
+        frame_index = 0;
+        frame_index < ownership->managed_frame_count;
+        ++frame_index
+    ) {
+        struct micros_frame_owner owner =
+            ownership->owners[frame_index];
+        uint8_t target = ownership->handoff_targets[frame_index];
+        bool allocated = micros_frame_ownership_allocator_bit_is_set(
+            ownership->allocator,
+            frame_index
+        );
+
+        if (
+            !micros_frame_owner_is_valid(owner)
+            || allocated
+                == (owner.kind == MICROS_FRAME_OWNER_FREE)
+            || !micros_frame_ownership_handoff_target_is_valid(owner, target)
+            || (
+                owner.kind == MICROS_FRAME_OWNER_FREE
+                && target != MICROS_FRAME_HANDOFF_NONE
+            )
+            || (
+                ownership->phase
+                    == MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+                && (
+                    target != MICROS_FRAME_HANDOFF_NONE
+                    || owner.kind
+                        == MICROS_FRAME_OWNER_KERNEL_TEMPORARY
+                    || owner.kind
+                        == MICROS_FRAME_OWNER_PROCESS_USER
+                )
+            )
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+        if (allocated) {
+            ++observed_allocated_count;
+        }
+        if (owner.kind != MICROS_FRAME_OWNER_FREE) {
+            ++observed_owned_count;
+            ++observed_counts[owner.kind];
+        }
+    }
+
+    for (
+        frame_index = ownership->managed_frame_count;
+        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
+        ++frame_index
+    ) {
+        if (
+            !micros_frame_owner_is_equal(
+                ownership->owners[frame_index],
+                (struct micros_frame_owner){0, 0, 0, 0}
+            )
+            || ownership->handoff_targets[frame_index]
+                != MICROS_FRAME_HANDOFF_NONE
+            || micros_frame_ownership_allocator_bit_is_set(
+                ownership->allocator,
+                frame_index
+            )
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+
+    if (
+        ownership->owner_counts[MICROS_FRAME_OWNER_FREE] != 0
+        || observed_owned_count != ownership->owned_frame_count
+        || observed_allocated_count != observed_owned_count
+        || ownership->allocator->managed_frame_count
+            - ownership->allocator->free_frame_count
+            != observed_owned_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    for (
+        frame_index = 0;
+        frame_index < MICROS_FRAME_OWNER_KIND_COUNT;
+        ++frame_index
+    ) {
+        if (
+            ownership->owner_counts[frame_index]
+                != observed_counts[frame_index]
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+'''
+    start = source.index(
+        "static enum micros_frame_ownership_error validate_active_frames("
+    )
+    end = source.index(
+        "\nenum micros_frame_ownership_error\n"
+        "micros_frame_ownership_vm_transition_preflight(",
+        start,
+    )
+    if not source[:start].endswith("\n\n"):
+        raise AssertionError("unexpected frame validation helper boundary")
+    restored = source[:start - 1] + baseline + source[end:]
+    if hashlib.sha256(restored.encode()).hexdigest() != BASE_FRAME_VALIDATION_SHA256:
+        raise AssertionError("frame validation hot path did not restore")
+    return restored
+
+
 def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     physical, _, expected_sha256, transports = KERNEL_FILE_FACTS[logical]
     del physical
     selected = current_path(root, logical)
     raw = selected.read_bytes()
+    if logical == "kernel/frame_ownership_validation.c":
+        raw = restore_frame_validation_hot_path(
+            raw.decode("utf-8")
+        ).encode()
     return _restored_include_bytes(logical, raw, expected_sha256, transports)
 
 

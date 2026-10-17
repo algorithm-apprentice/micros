@@ -231,6 +231,27 @@ recorded in the research note; the reviewer reran no broad suite. Acceptance
 records an implementation-ready design. It does not claim optimized production
 code or a passing ELF-spawn gate.
 
+## Separate implementation disposition
+
+The dependent implementation keeps the public validator and splits its
+complete work into two file-local owners:
+
+- `validate_active_frames()` loads one bitmap word for each active 64-frame
+  chunk, derives every bit locally, and preserves owner, handoff, phase, and
+  aggregate checks in frame order; and
+- `inactive_state_is_zero()` checks every inactive owner field and handoff
+  target directly, then checks one partial boundary mask and each later bitmap
+  word exactly once.
+
+The structural Red is green without compiler-optimization assumptions.
+Sanitizer-backed native guards cover every inactive owner field and the
+`MAX_MANAGED_FRAMES - 1` final partial word. The frame-ownership QEMU component
+and the exact no-retry `test-qemu-vfs` then `test-qemu-elf-spawn` sequence pass.
+
+Merge remains conditional on the complete current native/producer/reuse
+evidence, exact staged tree, clean independent implementation review, squash
+tree equality, main fast-forward, and branch cleanup.
+
 ## Non-goals
 
 This decision does not:

@@ -52,6 +52,14 @@ int main(void)
             frame_ownership_test_validator_rejects_independent_corruption,
         },
         {
+            "rejects inactive corruption",
+            frame_ownership_test_rejects_inactive_corruption,
+        },
+        {
+            "validates bitmap word boundaries",
+            frame_ownership_test_validates_bitmap_word_boundaries,
+        },
+        {
             "operates at maximum managed capacity",
             frame_ownership_test_operates_at_maximum_managed_capacity,
         },
