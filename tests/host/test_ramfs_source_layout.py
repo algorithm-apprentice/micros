@@ -2529,9 +2529,12 @@ class RamfsSourceLayoutTest(unittest.TestCase):
         from tests.host.test_generate_vm_handoff_fixture import vm_image
         from tools.generate_ramfs_service_fixture import render_fixture
 
-        output = render_fixture(
-            bootstrap_image(), vm_image(), bootstrap_image(),
-            bootstrap_image(), bootstrap_image(), vfs_image(),
+        output = kernel_layout_source.restore_generated_fixture(
+            GENERATOR_PATH,
+            render_fixture(
+                bootstrap_image(), vm_image(), bootstrap_image(),
+                bootstrap_image(), bootstrap_image(), vfs_image(),
+            ),
         )
         self.assertEqual(BASELINE_GENERATOR_OUTPUT, digest_bytes(output.encode()))
 

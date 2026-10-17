@@ -33,7 +33,7 @@
 #include "kernel/tty_service_test.h"
 #endif
 #ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
-#include "kernel/ramfs_service_test.h"
+#include "kernel/tests/ramfs/ramfs_service_test.h"
 #endif
 #ifdef MICROS_BUILD_VFS_SERVICE_TEST
 #include "kernel/vfs_service_test.h"

@@ -1,6 +1,6 @@
-#include "kernel/ramfs_service_test_internal.h"
+#include "kernel/tests/ramfs/ramfs_service_test_internal.h"
 
-#include "kernel/ramfs_service_test_fixture.h"
+#include "kernel/tests/ramfs/ramfs_service_test_fixture.h"
 
 static const struct micros_privilege_profile profiles[] = {
     {

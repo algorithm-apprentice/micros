@@ -366,7 +366,7 @@ def render_fixture(
         vfs,
     )
     output = [
-        '#include "kernel/ramfs_service_test_fixture.h"',
+        '#include "kernel/tests/ramfs/ramfs_service_test_fixture.h"',
         "",
     ]
     _render_images(output, launcher, vm, pm, tty, ramfs, vfs)

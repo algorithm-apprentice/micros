@@ -3937,12 +3937,6 @@ KERNEL_PHYSICAL_OWNER_MIGRATION = ('kernel/elf_spawn_test.c',
  'kernel/elf_spawn_test_service_checks.c',
  'kernel/elf_spawn_test_service_compare.c',
  'kernel/elf_spawn_test_services.c',
- 'kernel/ramfs_service_test.c',
- 'kernel/ramfs_service_test.h',
- 'kernel/ramfs_service_test_fixture.c',
- 'kernel/ramfs_service_test_fixture.h',
- 'kernel/ramfs_service_test_internal.h',
- 'kernel/ramfs_service_test_report.c',
  'kernel/scheduler_invalid_test.c',
  'kernel/scheduler_invalid_test_fixture.c',
  'kernel/scheduler_invalid_test_internal.h',
@@ -15984,6 +15978,10 @@ class _RestoreGateAdapter(ast.NodeTransformer):
             if len(node.args) != 1 or node.keywords:
                 raise AssertionError(f"invalid planner projection: {function.attr}")
             return node.args[0]
+        if function.attr == "restore_generated_fixture":
+            if len(node.args) != 2 or node.keywords:
+                raise AssertionError("invalid generated fixture projection")
+            return node.args[1]
         return node
 
 

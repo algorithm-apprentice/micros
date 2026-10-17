@@ -1,4 +1,4 @@
-#include "kernel/ramfs_service_test_internal.h"
+#include "kernel/tests/ramfs/ramfs_service_test_internal.h"
 
 _Noreturn void micros_ramfs_service_test_launch(void)
 {

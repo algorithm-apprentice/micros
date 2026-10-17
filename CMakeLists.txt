@@ -462,9 +462,9 @@ set(
 
 set(
     MICROS_RAMFS_QEMU_REPORT_SOURCES
-    kernel/ramfs_service_test.c
-    kernel/ramfs_service_test_fixture.c
-    kernel/ramfs_service_test_report.c
+    kernel/tests/ramfs/ramfs_service_test.c
+    kernel/tests/ramfs/ramfs_service_test_fixture.c
+    kernel/tests/ramfs/ramfs_service_test_report.c
 )
 
 set(
