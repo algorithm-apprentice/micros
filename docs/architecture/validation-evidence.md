@@ -359,6 +359,40 @@ with `SETUPTOOLS_USE_DISTUTILS` absent or exactly `stdlib`.
 Any other startup file, activation or import customization is ineligible.
 The complete framework tree is still fingerprinted.
 
+## Accepted CPython 3.15 profile correction
+
+Accepted
+[ADR-0075](../adr/0075-cpython-3-15-host-automation-floor.md) replaces the
+Xcode CPython 3.9 reusable runtime with the exact
+[CPython 3.15 host contract](python-host-runtime.md). The dependent
+implementation has not started.
+
+The planned profile requires an explicit reusable `MICROS_PYTHON`, matching
+the CMake cache and current validation-plan process, and exact
+`-E -S -B` invocation. It fingerprints the selected Homebrew
+`python@3.15` Cellar/framework, standard library, extension modules, and
+resolved non-system dylibs. `site`, Homebrew `sitecustomize`, global/user site
+packages, virtual environments, Python environment injection, and automatic
+Homebrew/PATH discovery are not reusable inputs.
+
+`PYTHONEXECUTABLE` and every observable pre-exec
+`__PYVENV_LAUNCHER__` fail explicitly. Because CPython consumes the latter
+before project Python code runs and Homebrew uses it internally, the running
+Darwin planner closes its effects through exact selected/resolved executable,
+framework-base, and prefix identity rather than claiming literal visibility.
+Other platforms retain fresh validation through platform-neutral executable
+and prefix identity without a framework requirement.
+
+The profile identity advances so existing Xcode-Python receipts cannot match.
+Homebrew OpenSSL configuration/trust inputs are explicitly disabled, provider
+libraries remain in the versioned closure, and all override variables fail
+closed. Every CMake and non-CMake child interpreter uses the exact selected
+prefix without `PYTHONPATH`.
+
+Existing AST expected digests do not change. Direct AST evidence moves to the
+project-owned stable serializer defined by ADR-0075, which removes only new
+default-empty/zero fields and rejects nondefault new syntax.
+
 Driver invocation spelling remains part of the command identity. Resolving
 `ld.lld` to its executable bytes must not replace it with the multicall name
 `lld` for execution or version queries. Runtime metadata refers to the active

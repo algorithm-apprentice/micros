@@ -355,6 +355,20 @@ separately reviewed design is merged. The dependent implementation begins with
 host Reds for blocked execution, exact reason precedence, report schema,
 prelaunch drift, invalidation timing, same-run publication, and postflight
 versus receipt-publication failure codes; no new runtime test is invented.
+Implementation #150 is merged after those tests, real fail-fast refusal,
+current producer/reuse evidence, and clean independent review.
+
+The Accepted CPython floor change is defined by
+[ADR-0075](adr/0075-cpython-3-15-host-automation-floor.md) and the
+[host-runtime contract](architecture/python-host-runtime.md). Its current
+read-only probe ran all 988 Python host cases under CPython 3.15 with
+`-E -S -B`; 46 failures were confined to interpreter-owned AST formatting.
+A project-owned serializer that removes only empty `type_params` and zero
+`is_lazy` made all 988 pass without changing an expected digest. Implementation
+must start from the version/site/OpenSSL/Darwin-launcher-effect/child-process
+Reds, preserve non-Darwin fresh validation, migrate every AST serialization
+site to that shared format, and retain all independent C/ELF/QEMU/protocol
+evidence.
 
 ## Test layers
 
