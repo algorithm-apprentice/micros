@@ -1,4 +1,4 @@
-#include "kernel/user_runtime_test_internal.h"
+#include "kernel/tests/runtime/user_runtime_test_internal.h"
 
 #include "micros/kernel_object_runtime.h"
 

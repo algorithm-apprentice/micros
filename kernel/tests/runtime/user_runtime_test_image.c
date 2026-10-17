@@ -1,6 +1,6 @@
-#include "kernel/user_runtime_test_internal.h"
+#include "kernel/tests/runtime/user_runtime_test_internal.h"
 
-#include "kernel/user_runtime_image.h"
+#include "kernel/tests/runtime/user_runtime_image.h"
 #include "micros/user_address_space.h"
 
 static uint32_t user_runtime_test_segment_permissions(uint32_t flags)

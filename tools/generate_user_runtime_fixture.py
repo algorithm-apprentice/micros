@@ -181,7 +181,7 @@ def _append_image_record(output, image, symbols, loads):
 def render_fixture(image):
     symbols, loads = _validated_fixture_inputs(image)
     output = [
-        '#include "kernel/user_runtime_image.h"',
+        '#include "kernel/tests/runtime/user_runtime_image.h"',
         "",
     ]
     _append_segment_bytes(output, image, loads)

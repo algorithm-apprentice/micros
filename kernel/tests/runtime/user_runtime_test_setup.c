@@ -1,8 +1,8 @@
-#include "kernel/user_runtime_test_internal.h"
+#include "kernel/tests/runtime/user_runtime_test_internal.h"
 
 #include "kernel/grant/grant_runtime_internal.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
-#include "kernel/user_runtime_image.h"
+#include "kernel/tests/runtime/user_runtime_image.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/grant_runtime.h"
 #include "micros/ipc_runtime.h"

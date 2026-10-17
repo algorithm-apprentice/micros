@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kernel/user_runtime_test.h"
+#include "kernel/tests/runtime/user_runtime_test.h"
 #include "micros/endpoint.h"
 #include "micros/frame_ownership.h"
 #include "micros/sv39.h"

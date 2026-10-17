@@ -1,4 +1,4 @@
-#include "kernel/user_runtime_test_internal.h"
+#include "kernel/tests/runtime/user_runtime_test_internal.h"
 
 #include "arch/riscv64/interrupt.h"
 #include "micros/frame_ownership_runtime.h"

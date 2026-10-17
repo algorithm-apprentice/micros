@@ -1238,13 +1238,13 @@ set(
 
 set(
     MICROS_USER_RUNTIME_KERNEL_TEST_SOURCES
-    kernel/user_runtime_test.c
-    kernel/user_runtime_test_state.c
-    kernel/user_runtime_test_image.c
-    kernel/user_runtime_test_setup.c
-    kernel/user_runtime_test_trap.c
-    kernel/user_runtime_test_cleanup.c
-    kernel/user_runtime_test_report.c
+    kernel/tests/runtime/user_runtime_test.c
+    kernel/tests/runtime/user_runtime_test_state.c
+    kernel/tests/runtime/user_runtime_test_image.c
+    kernel/tests/runtime/user_runtime_test_setup.c
+    kernel/tests/runtime/user_runtime_test_trap.c
+    kernel/tests/runtime/user_runtime_test_cleanup.c
+    kernel/tests/runtime/user_runtime_test_report.c
 )
 
 set(

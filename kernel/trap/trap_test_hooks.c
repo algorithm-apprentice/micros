@@ -31,7 +31,7 @@
 #include "kernel/tty_service_test.h"
 #endif
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST
-#include "kernel/user_runtime_test.h"
+#include "kernel/tests/runtime/user_runtime_test.h"
 #endif
 #ifdef MICROS_BUILD_VFS_SERVICE_TEST
 #include "kernel/vfs_service_test.h"

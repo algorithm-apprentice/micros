@@ -1,7 +1,7 @@
-#include "kernel/user_runtime_test_internal.h"
+#include "kernel/tests/runtime/user_runtime_test_internal.h"
 
 #include "arch/riscv64/trap_context.h"
-#include "kernel/user_runtime_image.h"
+#include "kernel/tests/runtime/user_runtime_image.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/scheduler.h"
 #include "micros/scheduler_core.h"
