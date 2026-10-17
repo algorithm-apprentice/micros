@@ -1057,7 +1057,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             else paths[0]
             for name, paths in SOURCE_SETS.items()
         }
-        observed = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        observed = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for name, baseline in baselines.items():
             self.assertEqual(
                 tuple(path for path in (*SOURCE_SETS[name], PRIVATE_HEADERS[name])
@@ -1074,7 +1074,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             "tests/host/test_kernel_ipc_source_layout.py",
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_long_migration_matches_every_actual_signal(self) -> None:

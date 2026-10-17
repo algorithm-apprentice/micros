@@ -2553,7 +2553,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                 validation_plan.affected_slow_models([original]),
                 validation_plan.affected_image_workflows([original]),
             ))
-            self.assertEqual(1, validation_plan.PATH_CLASSIFICATION_EQUIVALENTS.count((original, aliases)))
+            self.assertEqual(1, kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS).count((original, aliases)))
             for path in aliases:
                 with self.subTest(path=path):
                     self.assertEqual(expected, (
@@ -2564,7 +2564,7 @@ class RamfsSourceLayoutTest(unittest.TestCase):
                     ))
 
     def test_structural_gate_is_explicitly_host_unit_only(self):
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertFalse(validation_plan.requires_full_tier([STRUCTURAL_TEST_PATH]))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],

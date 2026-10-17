@@ -2409,7 +2409,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                 self.assertEqual([], validation_plan.affected_image_workflows([path]))
 
     def test_new_sources_and_headers_inherit_all_four_metadata_fields_and_plans(self) -> None:
-        equivalents = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        equivalents = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for family, paths in SOURCE_SETS.items():
             expected = (*paths[1:], FAMILY_HEADERS[family])
             old = paths[0]
@@ -2427,7 +2427,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
                         self.assertEqual(validation_plan.plan([old], tier, "main"), validation_plan.plan([path], tier, "main"))
 
     def test_structural_gate_is_explicitly_host_unit_only(self) -> None:
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
             validation_plan.plan([STRUCTURAL_TEST_PATH], "fast", "main"),

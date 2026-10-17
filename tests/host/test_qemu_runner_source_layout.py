@@ -1616,7 +1616,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
     def test_planner_families_keep_all_four_original_metadata_dimensions_and_plans(self):
         from tools import validation_plan as planner
 
-        aliases = dict(planner.PATH_CLASSIFICATION_EQUIVALENTS)
+        aliases = dict(kernel_layout_source.original_path_classification_equivalents(planner.PATH_CLASSIFICATION_EQUIVALENTS))
         for old, paths in alias_rows():
             self.assertEqual(paths, aliases.get(old), old)
             self.assertTrue(planner.requires_full_tier([old]))
@@ -1629,7 +1629,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
                     self.assertEqual(classify([old]), classify([path]), path + ":" + classify.__name__)
                 for tier in ("fast", "pr", "full"):
                     self.assertEqual(planner.plan([old], tier, "main"), planner.plan([path], tier, "main"))
-        self.assertEqual(1, planner.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(planner.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertFalse(planner.requires_full_tier([STRUCTURAL_TEST_PATH]))
         for classify in (planner.affected_workflows, planner.affected_slow_models, planner.affected_image_workflows):
             self.assertEqual([], classify([STRUCTURAL_TEST_PATH]))

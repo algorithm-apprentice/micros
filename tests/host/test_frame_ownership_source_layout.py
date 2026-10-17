@@ -894,7 +894,7 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
         }
         observed = tuple(
             item
-            for item in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if item[0] in baselines
         )
 
@@ -925,7 +925,7 @@ class FrameOwnershipSourceLayoutTest(unittest.TestCase):
 
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
         self.assertEqual(
             [

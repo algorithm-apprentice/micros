@@ -2419,7 +2419,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
             (False, [], ["test-ipc-model"], []), (False, ["test-qemu-endpoint"], [], []),
         )
         for family, row in enumerate(alias_rows()):
-            self.assertEqual(1, validation_plan.PATH_CLASSIFICATION_EQUIVALENTS.count(row))
+            self.assertEqual(1, kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS).count(row))
             for path in (row[0], *row[1]):
                 with self.subTest(path=path):
                     self.assertEqual(expected[family], (
@@ -2428,7 +2428,7 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                         validation_plan.affected_slow_models([path]),
                         validation_plan.affected_image_workflows([path]),
                     ))
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(STRUCTURAL_TEST_PATH))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(STRUCTURAL_TEST_PATH))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
             validation_plan.plan([STRUCTURAL_TEST_PATH], "fast", "main"),

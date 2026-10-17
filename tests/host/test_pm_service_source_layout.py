@@ -1117,7 +1117,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             "kernel/pm_service_test.c",
         }
         observed = [
-            entry for entry in validation_plan.PATH_CLASSIFICATION_EQUIVALENTS
+            entry for entry in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
             if entry[0] in baselines
         ]
         self.assertEqual(baselines, {baseline for baseline, _ in observed})
@@ -1144,7 +1144,7 @@ class PmServiceSourceLayoutTest(unittest.TestCase):
             )
         self.assertIn(
             "tests/host/test_pm_service_source_layout.py",
-            validation_plan.HOST_UNIT_ONLY_INPUTS,
+            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
         )
 
     def test_native_cases_and_existing_executions_remain_exact(self) -> None:

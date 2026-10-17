@@ -1874,7 +1874,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
 
     def test_validation_metadata_independent_exact_four_dimensions(self) -> None:
         self.assertEqual(QEMU_WORKFLOWS, validation_plan.QEMU_WORKFLOWS)
-        equivalences = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        equivalences = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for family, (source_set, paths) in enumerate(SOURCE_SETS.items()):
             expected_children = (*paths[1:], PRIVATE_HEADERS[family])
             with self.subTest(source_set=source_set):
@@ -1882,7 +1882,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             for path in (*paths, PRIVATE_HEADERS[family]):
                 with self.subTest(path=path):
                     self.assertEqual(FAMILY_METADATA[family], metadata_for(path))
-        self.assertIn(STRUCTURAL_TEST_PATH, validation_plan.HOST_UNIT_ONLY_INPUTS)
+        self.assertIn(STRUCTURAL_TEST_PATH, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS))
         self.assertEqual((False, (), (), ()), metadata_for(STRUCTURAL_TEST_PATH))
 
     def test_private_headers_are_declarations_only_and_family_qualified(self) -> None:

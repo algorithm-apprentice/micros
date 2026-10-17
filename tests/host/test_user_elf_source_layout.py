@@ -707,7 +707,7 @@ class UserElfSourceLayoutTest(unittest.TestCase):
         for path in HOST:
             self.assertEqual((False, ("test-qemu-user-runtime",), (), ()), metadata(path), path)
         self.assertEqual((False, (), (), ()), metadata(GATE))
-        self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(GATE))
+        self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(GATE))
 
     def test_missing_image_expansion_fails_despite_preserved_qemu_aliases(self):
         unexpanded = {

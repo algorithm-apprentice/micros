@@ -2117,7 +2117,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             ))
 
     def test_new_paths_inherit_the_exact_original_classification_without_narrowing_native(self) -> None:
-        equivalents = dict(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
+        equivalents = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for family, paths in SOURCE_SETS.items():
             expected = (*paths[1:], *FAMILY_HEADERS[family])
             if not expected:
@@ -2142,7 +2142,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                         )
 
     def test_this_structural_gate_itself_is_host_unit_only(self) -> None:
-        self.assertIn(STRUCTURAL_TEST_PATH, validation_plan.HOST_UNIT_ONLY_INPUTS)
+        self.assertIn(STRUCTURAL_TEST_PATH, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS))
         self.assertEqual(
             [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
             validation_plan.plan([STRUCTURAL_TEST_PATH], "fast", "main"),

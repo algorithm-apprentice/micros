@@ -1613,7 +1613,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             (False, ["test-qemu-object-model"], [], []),
         )
         for family, row in enumerate(alias_rows()):
-            self.assertEqual(1, validation_plan.PATH_CLASSIFICATION_EQUIVALENTS.count(row))
+            self.assertEqual(1, kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS).count(row))
             for path in (row[0], *row[1]):
                 with self.subTest(path=path):
                     self.assertEqual(expected[family], (
@@ -1623,7 +1623,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
                         validation_plan.affected_image_workflows([path]),
                     ))
         for path in (STRUCTURAL_TEST_PATH, SHARED_INSPECTION_PATH):
-            self.assertEqual(1, validation_plan.HOST_UNIT_ONLY_INPUTS.count(path))
+            self.assertEqual(1, kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS).count(path))
             self.assertEqual(
                 [validation_plan.UNIT_FAST, *validation_plan.diff_commands("main")],
                 validation_plan.plan([path], "fast", "main"),
