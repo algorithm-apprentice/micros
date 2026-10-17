@@ -1,4 +1,4 @@
-#include "object_model_test_internal.h"
+#include "kernel/tests/objects/object_model_test_internal.h"
 
 #include <stdbool.h>
 #include <stdint.h>

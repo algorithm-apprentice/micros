@@ -366,8 +366,8 @@ set(
 
 set(
     MICROS_KERNEL_OBJECT_QEMU_TEST_SOURCES
-    kernel/object_model_test.c
-    kernel/object_model_test_scenarios.c
+    kernel/tests/objects/object_model_test.c
+    kernel/tests/objects/object_model_test_scenarios.c
 )
 
 set(
