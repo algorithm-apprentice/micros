@@ -5,8 +5,43 @@ import json
 from pathlib import Path
 import re
 import shlex
+import stat
 
 from tools.validation_inputs import UnsupportedContext, _file_identity, _inside, _run
+
+
+class PreparationRequired(UnsupportedContext):
+    reason_code = None
+
+
+class SelectedOutputAbsent(PreparationRequired):
+    reason_code = "selected-output-absent"
+
+
+class DeclaredOutputAbsent(PreparationRequired):
+    reason_code = "declared-output-absent"
+
+
+class SelectedDependencyStale(PreparationRequired):
+    reason_code = "selected-dependency-stale"
+
+
+def _regular_output_state(path, directory):
+    directory = Path(directory).resolve(strict=True)
+    path = Path(path)
+    try:
+        information = path.lstat()
+    except FileNotFoundError:
+        if not _inside(path.parent.resolve(), (directory,)):
+            raise UnsupportedContext(
+                "absent selected output escapes its build directory"
+            )
+        return False
+    if not stat.S_ISREG(information.st_mode):
+        raise UnsupportedContext("selected output is not an ordinary file")
+    if not _inside(path.resolve(strict=True), (directory,)):
+        raise UnsupportedContext("selected output escapes its build directory")
+    return True
 
 
 def graph_nodes(content):
@@ -99,7 +134,7 @@ def command_tools(content, root, allowed):
     return tools
 
 
-def native_outputs(root, directory, inventory):
+def native_outputs(root, directory, inventory, *, preparation=None):
     source = (Path(root) / "CMakeLists.txt").read_text(encoding="utf-8")
     declared = re.findall(
         r"add_test\(\s*NAME\s+([A-Za-z0-9_-]+)\s+COMMAND\s+([A-Za-z0-9_]+)", source,
@@ -128,8 +163,22 @@ def native_outputs(root, directory, inventory):
             raise UnsupportedContext("slow CTest model inclusion differs from committed tests")
         for argument in command:
             path = Path(argument)
-            if not path.is_absolute() or not _inside(path.resolve(), (directory,)) or not path.is_file():
+            if not path.is_absolute():
                 raise UnsupportedContext("unclosed native executable or file argument")
+            if not _regular_output_state(path, directory):
+                if preparation is None:
+                    raise UnsupportedContext(
+                        "unclosed native executable or file argument"
+                    )
+                if not any(
+                    isinstance(item, DeclaredOutputAbsent)
+                    for item in preparation
+                ):
+                    preparation.append(
+                        DeclaredOutputAbsent(
+                            "declared native output is absent"
+                        )
+                    )
             outputs.add(path)
     return tuple(sorted(outputs))
 
@@ -160,7 +209,7 @@ def _generator_inputs(directory):
     return result
 
 
-def _dependency_inputs(tools, selected):
+def _dependency_inputs(tools, selected, *, preparation=None):
     content = _run((tools.executables["ninja"]["path"], "-C", tools.profile.directory, "-t", "deps")).decode()
     active = False
     dependencies = set()
@@ -169,7 +218,19 @@ def _dependency_inputs(tools, selected):
         if header:
             active = header[1] in selected
             if active and header[2] != "VALID":
-                raise UnsupportedContext("selected compiler dependency record is stale")
+                if preparation is None:
+                    raise UnsupportedContext(
+                        "selected compiler dependency record is stale"
+                    )
+                if not any(
+                    isinstance(item, SelectedDependencyStale)
+                    for item in preparation
+                ):
+                    preparation.append(
+                        SelectedDependencyStale(
+                            "selected dependency record is stale"
+                        )
+                    )
         elif line.startswith("    ") and active:
             spelling = line[4:]
             path = Path(spelling)
@@ -181,7 +242,94 @@ def _dependency_inputs(tools, selected):
     return dependencies
 
 
-def _build_manifest(root, profile, tools):
+def _selected_graph_files(root, profile, graph, rules, preparation):
+    outputs = set()
+    inputs = set()
+    for spelling in graph["files"]:
+        path = Path(spelling)
+        if not path.is_absolute():
+            path = profile.directory / path
+        try:
+            information = path.lstat()
+        except FileNotFoundError:
+            rule = rules.get(spelling)
+            if rule is None:
+                raise UnsupportedContext(
+                    "missing graph node has no reviewed producer rule"
+                )
+            if rule == "phony":
+                continue
+            if (
+                rule == "CUSTOM_COMMAND"
+                and re.fullmatch(r"CMakeFiles/[A-Za-z0-9_.+-]+", spelling)
+            ):
+                continue
+            if preparation is not None and not _regular_output_state(
+                path, profile.directory
+            ):
+                if not any(
+                    isinstance(item, SelectedOutputAbsent)
+                    for item in preparation
+                ):
+                    preparation.append(
+                        SelectedOutputAbsent(
+                            "selected build output is absent"
+                        )
+                    )
+                outputs.add(path)
+            else:
+                raise UnsupportedContext(
+                    "selected artifact/input is missing or unrecognized"
+                )
+        else:
+            if stat.S_ISREG(information.st_mode):
+                resolved = path.resolve(strict=True)
+                (
+                    outputs
+                    if _inside(resolved, (profile.directory,))
+                    else inputs
+                ).add(path)
+            elif (
+                stat.S_ISDIR(information.st_mode)
+                and path in (root, profile.directory)
+            ):
+                continue
+            else:
+                raise UnsupportedContext(
+                    "selected artifact/input is not an ordinary file"
+                )
+    return outputs, inputs
+
+
+def _target_outputs(profile, preparation):
+    prefix = (
+        "kernel/micros"
+        if profile.target == "test-qemu-smoke"
+        else "bootstrap/micros-tty-service"
+    )
+    declared = tuple(
+        profile.directory / (prefix + suffix)
+        for suffix in (".elf", ".map")
+    )
+    for path in declared:
+        if not _regular_output_state(path, profile.directory):
+            if preparation is None:
+                raise UnsupportedContext(
+                    "declared target output is absent"
+                )
+            if not any(
+                isinstance(item, DeclaredOutputAbsent)
+                for item in preparation
+            ):
+                preparation.append(
+                    DeclaredOutputAbsent(
+                        "declared target output is absent"
+                    )
+                )
+    return declared
+
+
+def _build_manifest(root, profile, tools, *, preparation=None):
     ninja = tools.executables["ninja"]["path"]
     graph = graph_nodes(_run((ninja, "-C", profile.directory, "-t", "graph", profile.target)).decode())
     if any(
@@ -201,33 +349,36 @@ def _build_manifest(root, profile, tools):
         if not separator:
             raise UnsupportedContext("unrecognized Ninja target metadata")
         rules[name] = rule
-    outputs = set()
-    inputs = set()
-    for spelling in graph["files"]:
-        path = Path(spelling)
-        if not path.is_absolute():
-            path = profile.directory / path
-        if path.is_file():
-            (outputs if _inside(path.resolve(), (profile.directory,)) else inputs).add(path)
-        elif path in (root, profile.directory) and path.is_dir():
-            continue
-        elif rules.get(spelling) not in ("phony", "CUSTOM_COMMAND"):
-            raise UnsupportedContext("selected artifact/input is missing or unrecognized")
+    outputs, inputs = _selected_graph_files(
+        root, profile, graph, rules, preparation,
+    )
     for spelling in rules:
         path = profile.directory / spelling
         if _inside(path.resolve(), (profile.directory,)) and path.is_file():
             outputs.add(path)
     selected = {str(path.relative_to(profile.directory)) for path in outputs}
-    inputs.update(_dependency_inputs(tools, selected))
+    inputs.update(
+        _dependency_inputs(
+            tools,
+            selected,
+            preparation=preparation,
+        )
+    )
     inventory = None
     if profile.target_build:
-        prefix = "kernel/micros" if profile.target == "test-qemu-smoke" else "bootstrap/micros-tty-service"
-        outputs.update(profile.directory / (prefix + suffix) for suffix in (".elf", ".map"))
+        outputs.update(_target_outputs(profile, preparation))
     else:
         inventory = json.loads(_run((
             tools.executables["ctest"]["path"], "--test-dir", profile.directory, "--show-only=json-v1",
         )))
-        outputs.update(native_outputs(root, profile.directory, inventory))
+        outputs.update(
+            native_outputs(
+                root,
+                profile.directory,
+                inventory,
+                preparation=preparation,
+            )
+        )
     regular_inputs = {}
     for path in sorted(inputs):
         resolved = path.resolve(strict=True)

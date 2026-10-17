@@ -2655,15 +2655,18 @@ def parse_arguments(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--reuse", action="store_true")
     mode.add_argument("--fresh", action="store_true")
+    mode.add_argument("--producer", action="store_true")
     parser.add_argument("--record-workflow", choices=canonical_workflows())
     arguments = parser.parse_args(argv)
-    if (arguments.reuse or arguments.fresh) and not arguments.execute:
-        parser.error("--reuse/--fresh requires authoritative --execute")
+    if (
+        arguments.reuse or arguments.fresh or arguments.producer
+    ) and not arguments.execute:
+        parser.error("--reuse/--fresh/--producer requires authoritative --execute")
     if arguments.reuse and arguments.tier == "full":
         parser.error("explicit full validation always executes fresh")
     if arguments.record_workflow and (
         arguments.execute or arguments.path or arguments.tier != "fast"
-        or arguments.base != "origin/main"
+        or arguments.base != "origin/main" or arguments.producer
     ):
         parser.error("gate-only recording cannot select a plan, paths, base or nondefault tier")
     if arguments.base.startswith("-"):
@@ -2703,10 +2706,15 @@ def main(argv=None):
             ensure_execution_ready(root)
             if validation_context.capture_candidate(root) != expected_source:
                 raise ValueError("source identity changed while selecting required validation coverage")
+            if arguments.producer and not expected_source.clean:
+                raise ValueError(
+                    "producer requires the exact clean staged candidate"
+                )
         except ValueError as error:
             raise SystemExit(str(error)) from error
         return validation_execution.execute_plan(
             root, commands, canonical_workflows(), reuse=arguments.reuse,
+            producer=arguments.producer,
             expected_source=expected_source,
         )
     for command in commands:

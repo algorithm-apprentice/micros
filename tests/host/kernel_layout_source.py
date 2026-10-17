@@ -15547,6 +15547,9 @@ BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c
 FINAL_CMAKE_SHA256 = 'c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368'
 BASE_VALIDATION_CONTEXT_SHA256 = '7678be6bcd9c6da8575ff8fd9f28a7220db2ba152863869fd9f9d0b3966184f5'
 FINAL_VALIDATION_CONTEXT_SHA256 = 'ae5ffaeae172a8aadf5796580be3631f9804068c7033ab4ebbcde4775879be15'
+PRODUCER_VALIDATION_CONTEXT_SHA256 = '4f4e0b570c01ffecfe7fbde99e8996ec10b47466c692cd999541b87f0383cf88'
+BASE_VALIDATION_PLAN_SHA256 = '60a5e656a28b18bb21a02c65fc46c2ec18f4100580b3d3d05a09b346ae36a619'
+PRODUCER_VALIDATION_PLAN_SHA256 = '28437d4bcfc669e982632e920cc71f344d5993ff43fd5b7decec4c4b8a611aab'
 ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
 
 
@@ -15791,7 +15794,61 @@ def _planner_assignment_spans(source: str) -> dict[str, tuple[int, int, object]]
     return selected
 
 
+def _restore_exact_source_transports(
+    source: str,
+    transports,
+    owner: str,
+) -> str:
+    for current, original in transports:
+        if source.count(current) != 1:
+            raise AssertionError(f"unexpected {owner} transport")
+        source = source.replace(current, original)
+    return source
+
+
 def restore_validation_plan_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == PRODUCER_VALIDATION_PLAN_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    '    mode.add_argument("--producer", action="store_true")\n',
+                    "",
+                ),
+                (
+                    '    if (\n'
+                    '        arguments.reuse or arguments.fresh or arguments.producer\n'
+                    '    ) and not arguments.execute:\n'
+                    '        parser.error("--reuse/--fresh/--producer requires authoritative --execute")\n',
+                    '    if (arguments.reuse or arguments.fresh) and not arguments.execute:\n'
+                    '        parser.error("--reuse/--fresh requires authoritative --execute")\n',
+                ),
+                (
+                    '        or arguments.base != "origin/main" or arguments.producer\n',
+                    '        or arguments.base != "origin/main"\n',
+                ),
+                (
+                    '            if arguments.producer and not expected_source.clean:\n'
+                    '                raise ValueError(\n'
+                    '                    "producer requires the exact clean staged candidate"\n'
+                    '                )\n',
+                    "",
+                ),
+                (
+                    '            root, commands, canonical_workflows(), reuse=arguments.reuse,\n'
+                    '            producer=arguments.producer,\n'
+                    '            expected_source=expected_source,\n',
+                    '            root, commands, canonical_workflows(), reuse=arguments.reuse,\n'
+                    '            expected_source=expected_source,\n',
+                ),
+            ),
+            "validation plan producer",
+        )
+        if hashlib.sha256(source.encode()).hexdigest() != BASE_VALIDATION_PLAN_SHA256:
+            raise AssertionError("validation plan producer transport did not restore")
+    elif digest != BASE_VALIDATION_PLAN_SHA256:
+        raise AssertionError("unexpected validation plan source")
     expected = {
         "PATH_CLASSIFICATION_EQUIVALENTS": FINAL_PATH_CLASSIFICATION_EQUIVALENTS,
         "HOST_UNIT_ONLY_INPUTS": FINAL_HOST_UNIT_ONLY_INPUTS,
@@ -15841,6 +15898,113 @@ def original_cmake_recipe_digest(value: str) -> str:
 
 def restore_validation_context_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == PRODUCER_VALIDATION_CONTEXT_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    'import stat\n'
+                    'from typing import Optional\n\n'
+                    'from tools.validation_build_manifest import (\n'
+                    '    DeclaredOutputAbsent,\n'
+                    '    SelectedDependencyStale,\n'
+                    '    SelectedOutputAbsent,\n'
+                    '    _build_manifest,\n'
+                    '    native_runtime_executables,\n'
+                    ')\n',
+                    'import stat\n\n'
+                    'from tools.validation_build_manifest import _build_manifest, native_runtime_executables\n',
+                ),
+                (
+                    'PROFILE_NAME = "darwin-arm64-ninja-v1"\n'
+                    'PREPARATION_REASON_CODES = (\n'
+                    '    SelectedOutputAbsent.reason_code,\n'
+                    '    DeclaredOutputAbsent.reason_code,\n'
+                    '    SelectedDependencyStale.reason_code,\n'
+                    ')\n'
+                    'PREPARATION_TYPES = (\n'
+                    '    SelectedOutputAbsent,\n'
+                    '    DeclaredOutputAbsent,\n'
+                    '    SelectedDependencyStale,\n'
+                    ')\n'
+                    'PROFILES = {',
+                    'PROFILE_NAME = "darwin-arm64-ninja-v1"\n'
+                    'PROFILES = {',
+                ),
+                (
+                    '\n\n@dataclass(frozen=True)\n'
+                    'class ProfileReadiness:\n'
+                    '    outcome: str\n'
+                    '    reason_code: str\n'
+                    '    profile: Optional[dict]\n'
+                    '    preparation_argv: Optional[tuple]\n'
+                    '    detail: Optional[str]\n',
+                    "",
+                ),
+                (
+                    'def collect(root, workflow, *, preparation=None):',
+                    'def collect(root, workflow):',
+                ),
+                (
+                    '        inputs, paths = _build_manifest(\n'
+                    '            root,\n'
+                    '            profile,\n'
+                    '            tools,\n'
+                    '            preparation=preparation,\n'
+                    '        )',
+                    '        inputs, paths = _build_manifest(root, profile, tools)',
+                ),
+                (
+                    '        if preparation is not None:\n'
+                    '            native = tuple(path for path in native if path.is_file())\n',
+                    "",
+                ),
+                (
+                    '                for path in sorted(paths)\n'
+                    '                if preparation is None or path.is_file()\n',
+                    '                for path in sorted(paths)\n',
+                ),
+                (
+                    '\n\ndef collect_readiness(root, workflow):\n'
+                    '    preparation = []\n'
+                    '    try:\n'
+                    '        profile = collect(root, workflow, preparation=preparation)\n'
+                    '    except UnsupportedContext as error:\n'
+                    '        return ProfileReadiness(\n'
+                    '            "UNSUPPORTED",\n'
+                    '            "profile-unsupported",\n'
+                    '            None,\n'
+                    '            None,\n'
+                    '            str(error),\n'
+                    '        )\n'
+                    '    if preparation:\n'
+                    '        condition = next(\n'
+                    '            item\n'
+                    '            for kind in PREPARATION_TYPES\n'
+                    '            for item in preparation\n'
+                    '            if isinstance(item, kind)\n'
+                    '        )\n'
+                    '        return ProfileReadiness(\n'
+                    '            "PREPARE",\n'
+                    '            condition.reason_code,\n'
+                    '            None,\n'
+                    '            ("cmake", "--workflow", "--preset", workflow),\n'
+                    '            str(condition),\n'
+                    '        )\n'
+                    '    return ProfileReadiness("READY", "ready", profile, None, None)\n',
+                    "",
+                ),
+            ),
+            "validation context producer",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != FINAL_VALIDATION_CONTEXT_SHA256
+        ):
+            raise AssertionError(
+                "validation context producer transport did not restore"
+            )
+        digest = FINAL_VALIDATION_CONTEXT_SHA256
     if digest == BASE_VALIDATION_CONTEXT_SHA256:
         return source
     if digest != FINAL_VALIDATION_CONTEXT_SHA256:
@@ -16020,6 +16184,32 @@ class _RestoreGateAdapter(ast.NodeTransformer):
         "is_file_path": "is_file",
         "exists_path": "exists",
     }
+    _CONSTANTS = {
+        "2d88c2e829f615acb39afff9cbbd59e6638565bd0cac0ed09e4963ab915f0344":
+            "dc723095d1c30c3501e8273affd6575c2d592772150a065a5dda8644daf282e3",
+        "19041e0171c6c70d24bbd38e0ffd9361eedd7d8081a8ba41cb1d96409677e3c9":
+            "17e2e475894978291c087e66fb800637a7939e99b52b412eec55cd98c0f3f80d",
+    }
+
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        if isinstance(node.value, str) and node.value in self._CONSTANTS:
+            return ast.copy_location(
+                ast.Constant(self._CONSTANTS[node.value]),
+                node,
+            )
+        return node
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        self.generic_visit(node)
+        if (
+            node.name
+            == "test_build_recipe_and_shared_validation_libraries_match_reviewed_identities"
+        ):
+            node.name = (
+                "test_build_recipe_and_existing_shared_inspection_"
+                "execution_libraries_are_unchanged"
+            )
+        return node
 
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)

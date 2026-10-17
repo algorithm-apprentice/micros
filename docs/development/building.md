@@ -329,6 +329,26 @@ python3 tools/validation_plan.py --tier pr --execute --fresh
 python3 tools/validation_plan.py --tier full --execute --fresh
 ```
 
+When a task additionally requires reusable receipts from the same complete
+fresh invocation, use producer mode:
+
+```bash
+PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
+MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
+MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
+python3 tools/validation_plan.py \
+  --tier pr --base origin/main --execute --producer
+```
+
+Producer mode computes the unchanged required plan, then checks every reusable
+workflow already selected by that plan before opening the evidence store or
+running a planned command. A blocked profile leaves every command `NOT_RUN`
+and prints either a fixed canonical preparation command for an exact generated
+output/dependency condition or an unsupported-profile reason. It never runs
+preparation automatically. A ready producer executes the complete plan fresh
+and succeeds only when every selected reusable workflow publishes a receipt
+under the invocation's one run ID.
+
 The opt-in local ledger follows
 [ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md),
 [ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
@@ -363,7 +383,9 @@ HEAD/tree and complete-log digest; it is not a new execution. No environment
 normalization, dependency installation or cross-tree reuse occurs.
 The ignored ledger and complete logs live in `build/validation-evidence/v1/`.
 `VALIDATION_REPORT` binds the required command sequence and outcomes to the
-current candidate.
+current candidate. Producer reports additionally contain the ordered readiness
+records, barrier result, shared run ID, complete-publication result, and fixed
+failure code defined by ADR-0074. Non-producer reports omit that object.
 
 One exact canonical workflow can also be executed and recorded fresh:
 

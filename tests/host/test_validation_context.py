@@ -431,6 +431,287 @@ class ValidationContextTests(unittest.TestCase):
                 with self.assertRaises(validation_context.UnsupportedContext):
                     validation_build_manifest.native_outputs(self.root, build, altered)
 
+    def test_missing_declared_native_output_is_typed_preparation(self):
+        build, inventory = self.native_fixture()
+        missing = build / "fast_test"
+        missing.unlink()
+        preparation = []
+        outputs = validation_build_manifest.native_outputs(
+            self.root,
+            build,
+            inventory,
+            preparation=preparation,
+        )
+        self.assertIn(missing, outputs)
+        self.assertEqual(
+            ["declared-output-absent"],
+            [item.reason_code for item in preparation],
+        )
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_build_manifest.native_outputs(
+                self.root,
+                build,
+                inventory,
+            )
+        missing.symlink_to(build / "model_test")
+        with self.assertRaises(validation_context.UnsupportedContext):
+            validation_build_manifest.native_outputs(
+                self.root,
+                build,
+                inventory,
+                preparation=[],
+            )
+
+    def test_stale_selected_dependency_is_typed_preparation(self):
+        build = self.root / "build"
+        build.mkdir()
+        source = self.root / "source.h"
+        source.write_bytes(b"header")
+        tools = mock.Mock(
+            executables={"ninja": {"path": "/tool/ninja"}},
+            profile=mock.Mock(directory=build),
+        )
+        metadata = (
+            "fast_test: #deps 1, deps mtime 0 (STALE)\n"
+            f"    {source}\n"
+        ).encode()
+        with mock.patch(
+            "tools.validation_build_manifest._run",
+            return_value=metadata,
+        ):
+            preparation = []
+            self.assertEqual(
+                {source},
+                validation_build_manifest._dependency_inputs(
+                    tools,
+                    {"fast_test"},
+                    preparation=preparation,
+                ),
+            )
+            self.assertEqual(
+                ["selected-dependency-stale"],
+                [item.reason_code for item in preparation],
+            )
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_build_manifest._dependency_inputs(
+                    tools,
+                    {"fast_test"},
+                )
+
+    def test_missing_selected_build_output_is_typed_preparation(self):
+        build = self.root / "build"
+        (build / "CMakeFiles/compiler").mkdir(parents=True)
+        (build / "CMakeCache.txt").write_text("cache")
+        (build / "build.ninja").write_text("")
+        (build / "CMakeFiles/compiler/CMakeCCompiler.cmake").write_text(
+            "compiler"
+        )
+        source = self.root / "source.c"
+        source.write_text("int source;\n")
+        profile = mock.Mock(
+            directory=build,
+            target="test-qemu-smoke",
+            target_build=True,
+        )
+        tools = mock.Mock(
+            executables={
+                "ninja": {"path": "/tool/ninja", "resolved": "/tool/ninja"},
+                "compiler": {
+                    "path": "/tool/compiler",
+                    "resolved": "/tool/compiler",
+                },
+            },
+            profile=profile,
+        )
+        graph = (
+            "digraph ninja {\n"
+            'rankdir="LR"\n'
+            f'"0x1" [label="{source}"]\n'
+            '"0x2" [label="C_COMPILER__test_Debug", shape=ellipse]\n'
+            '"0x3" [label="kernel/micros.elf"]\n'
+            '"0x1" -> "0x2" [arrowhead=none]\n'
+            '"0x2" -> "0x3"\n'
+            "}\n"
+        ).encode()
+
+        def metadata(command, **options):
+            del options
+            if command[-2:] == ("graph", profile.target):
+                return graph
+            if command[-2:] == ("commands", profile.target):
+                return b"/tool/compiler source.c\n"
+            if command[-2:] == ("targets", "all"):
+                return b"kernel/micros.elf: C_EXECUTABLE_LINKER__test_Debug\n"
+            if command[-2:] == ("-t", "deps"):
+                return b""
+            self.fail(command)
+
+        with mock.patch(
+            "tools.validation_build_manifest._run",
+            side_effect=metadata,
+        ):
+            preparation = []
+            _, outputs = validation_build_manifest._build_manifest(
+                self.root,
+                profile,
+                tools,
+                preparation=preparation,
+            )
+            self.assertIn(build / "kernel/micros.elf", outputs)
+            self.assertEqual(
+                [
+                    "selected-output-absent",
+                    "declared-output-absent",
+                ],
+                [item.reason_code for item in preparation],
+            )
+            with self.assertRaises(validation_context.UnsupportedContext):
+                validation_build_manifest._build_manifest(
+                    self.root,
+                    profile,
+                    tools,
+                )
+
+    def test_custom_output_utility_and_ambiguous_nodes_are_distinct(self):
+        build = self.root / "build"
+        (build / "CMakeFiles/compiler").mkdir(parents=True)
+        (build / "kernel").mkdir()
+        (build / "kernel/micros.elf").write_bytes(b"elf")
+        (build / "kernel/micros.map").write_bytes(b"map")
+        (build / "CMakeCache.txt").write_text("cache")
+        (build / "build.ninja").write_text("")
+        (build / "CMakeFiles/compiler/CMakeCCompiler.cmake").write_text(
+            "compiler"
+        )
+        source = self.root / "source.c"
+        source.write_text("int source;\n")
+        profile = mock.Mock(
+            directory=build,
+            target="test-qemu-smoke",
+            target_build=True,
+        )
+        tools = mock.Mock(
+            executables={
+                "ninja": {"path": "/tool/ninja", "resolved": "/tool/ninja"},
+                "compiler": {
+                    "path": "/tool/compiler",
+                    "resolved": "/tool/compiler",
+                },
+            },
+            profile=profile,
+        )
+
+        def graph(output):
+            return (
+                "digraph ninja {\n"
+                'rankdir="LR"\n'
+                f'"0x1" [label="{source}"]\n'
+                '"0x2" [label="CUSTOM_COMMAND", shape=ellipse]\n'
+                f'"0x3" [label="{output}"]\n'
+                '"0x4" [label="CMakeFiles/test-qemu-smoke"]\n'
+                '"0x1" -> "0x2" [arrowhead=none]\n'
+                '"0x2" -> "0x3"\n'
+                '"0x2" -> "0x4"\n'
+                "}\n"
+            ).encode()
+
+        def run_manifest(output, rules):
+            def metadata(command, **options):
+                del options
+                if command[-2:] == ("graph", profile.target):
+                    return graph(output)
+                if command[-2:] == ("commands", profile.target):
+                    return b"/tool/compiler source.c\n"
+                if command[-2:] == ("targets", "all"):
+                    return rules
+                if command[-2:] == ("-t", "deps"):
+                    return b""
+                self.fail(command)
+
+            with mock.patch(
+                "tools.validation_build_manifest._run",
+                side_effect=metadata,
+            ):
+                preparation = []
+                result = validation_build_manifest._build_manifest(
+                    self.root,
+                    profile,
+                    tools,
+                    preparation=preparation,
+                )
+            return result, [item.reason_code for item in preparation]
+
+        output = "generated/custom.bin"
+        rules = (
+            b"generated/custom.bin: CUSTOM_COMMAND\n"
+            b"CMakeFiles/test-qemu-smoke: CUSTOM_COMMAND\n"
+        )
+        (_, outputs), preparation = run_manifest(output, rules)
+        self.assertIn(build / output, outputs)
+        self.assertEqual(["selected-output-absent"], preparation)
+
+        with self.assertRaises(validation_context.UnsupportedContext):
+            run_manifest("generated/ambiguous.bin", rules)
+
+        generated = build / output
+        generated.parent.mkdir()
+        generated.mkdir()
+        with self.assertRaises(validation_context.UnsupportedContext):
+            run_manifest(output, rules)
+
+    def test_readiness_reason_precedence_and_unsupported_override(self):
+        profile = {"context": {}, "inputs": {}, "outputs": {}}
+
+        def prepared(root, workflow, *, preparation=None):
+            preparation.extend((
+                validation_build_manifest.SelectedDependencyStale(
+                    "stale"
+                ),
+                validation_build_manifest.DeclaredOutputAbsent(
+                    "declared"
+                ),
+                validation_build_manifest.SelectedOutputAbsent(
+                    "selected"
+                ),
+            ))
+            return profile
+
+        with mock.patch(
+            "tools.validation_context.collect",
+            side_effect=prepared,
+        ):
+            readiness = validation_context.collect_readiness(
+                self.root,
+                "test-unit",
+            )
+        self.assertEqual("PREPARE", readiness.outcome)
+        self.assertEqual("selected-output-absent", readiness.reason_code)
+        self.assertEqual(
+            ("cmake", "--workflow", "--preset", "test-unit"),
+            readiness.preparation_argv,
+        )
+        self.assertIsNone(readiness.profile)
+
+        def unsupported(root, workflow, *, preparation=None):
+            preparation.append(
+                validation_build_manifest.SelectedOutputAbsent(
+                    "selected"
+                )
+            )
+            raise validation_context.UnsupportedContext("unclosed tool")
+
+        with mock.patch(
+            "tools.validation_context.collect",
+            side_effect=unsupported,
+        ):
+            readiness = validation_context.collect_readiness(
+                self.root,
+                "test-unit",
+            )
+        self.assertEqual("UNSUPPORTED", readiness.outcome)
+        self.assertEqual("profile-unsupported", readiness.reason_code)
+        self.assertIsNone(readiness.preparation_argv)
+
     def test_macho_install_id_is_not_an_unresolved_runtime_dependency(self):
         library = self.root / "Python3"
         library.write_bytes(b"\xcf\xfa\xed\xfemetadata fixture")
