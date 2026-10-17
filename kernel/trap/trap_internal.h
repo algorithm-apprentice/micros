@@ -1,8 +1,8 @@
 #ifndef MICROS_KERNEL_TRAP_INTERNAL_H
 #define MICROS_KERNEL_TRAP_INTERNAL_H
 
-#include "kernel/syscall.h"
-#include "kernel/trap_route_core.h"
+#include "kernel/trap/syscall.h"
+#include "kernel/trap/trap_route_core.h"
 #include "micros/trap.h"
 
 #define MICROS_SCAUSE_INTERRUPT (UINT64_C(1) << 63)

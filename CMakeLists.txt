@@ -1219,21 +1219,21 @@ set(
 
 set(
     MICROS_TRAP_SOURCES
-    kernel/trap.c
-    kernel/trap_context.c
-    kernel/trap_user.c
-    kernel/trap_interrupt.c
-    kernel/trap_syscall.c
-    kernel/trap_fault.c
+    kernel/trap/trap.c
+    kernel/trap/trap_context.c
+    kernel/trap/trap_user.c
+    kernel/trap/trap_interrupt.c
+    kernel/trap/trap_syscall.c
+    kernel/trap/trap_fault.c
     kernel/trap_test.c
-    kernel/trap_test_hooks.c
+    kernel/trap/trap_test_hooks.c
 )
 
 set(
     MICROS_SYSCALL_SOURCES
-    kernel/syscall.c
-    kernel/syscall_decode.c
-    kernel/syscall_context.c
+    kernel/trap/syscall.c
+    kernel/trap/syscall_decode.c
+    kernel/trap/syscall_context.c
 )
 
 set(
@@ -1687,7 +1687,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         trap_route_test
-        kernel/trap_route_core.c
+        kernel/trap/trap_route_core.c
         tests/host/trap_route_test.c
     )
     target_include_directories(
@@ -4035,7 +4035,7 @@ add_executable(
     kernel/memory/sv39.c
     kernel/platform/timer.c
     ${MICROS_TRAP_SOURCES}
-    kernel/trap_route_core.c
+    kernel/trap/trap_route_core.c
     kernel/tty/tty_control_core.c
     kernel/tty/tty_control_syscall.c
     kernel/tty/tty_control_syscall_core.c

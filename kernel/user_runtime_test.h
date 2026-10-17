@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "kernel/syscall.h"
+#include "kernel/trap/syscall.h"
 
 struct micros_hart;
 struct micros_trap_frame;

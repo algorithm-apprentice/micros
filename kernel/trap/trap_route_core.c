@@ -1,4 +1,4 @@
-#include "kernel/trap_route_core.h"
+#include "kernel/trap/trap_route_core.h"
 
 #include <stdint.h>
 

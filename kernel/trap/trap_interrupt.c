@@ -1,4 +1,4 @@
-#include "kernel/trap_internal.h"
+#include "kernel/trap/trap_internal.h"
 
 #include "kernel/tty/tty_interrupt.h"
 #include "micros/kernel_object_runtime.h"

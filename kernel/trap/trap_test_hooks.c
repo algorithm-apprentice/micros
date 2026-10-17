@@ -1,4 +1,4 @@
-#include "kernel/trap_internal.h"
+#include "kernel/trap/trap_internal.h"
 
 #ifdef MICROS_BUILD_ELF_SPAWN_TEST
 #include "kernel/elf_spawn_test.h"

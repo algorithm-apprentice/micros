@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_IPC_SYSCALL_H
 #define MICROS_KERNEL_IPC_SYSCALL_H
 
-#include "kernel/syscall.h"
+#include "kernel/trap/syscall.h"
 
 enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
     struct micros_hart *hart,

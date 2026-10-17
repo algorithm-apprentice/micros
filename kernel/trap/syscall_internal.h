@@ -1,7 +1,7 @@
 #ifndef MICROS_KERNEL_SYSCALL_INTERNAL_H
 #define MICROS_KERNEL_SYSCALL_INTERNAL_H
 
-#include "kernel/syscall.h"
+#include "kernel/trap/syscall.h"
 
 _Noreturn void syscall_panic_syscall(
     struct micros_hart *hart,

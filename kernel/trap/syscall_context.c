@@ -1,4 +1,4 @@
-#include "kernel/syscall_internal.h"
+#include "kernel/trap/syscall_internal.h"
 
 #include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"

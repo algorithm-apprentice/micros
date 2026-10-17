@@ -1,4 +1,4 @@
-#include "kernel/syscall_internal.h"
+#include "kernel/trap/syscall_internal.h"
 
 #include "arch/riscv64/trap_context.h"
 #include "kernel/boot/bootstrap_syscall.h"

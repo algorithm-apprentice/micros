@@ -1,4 +1,4 @@
-#include "kernel/trap_internal.h"
+#include "kernel/trap/trap_internal.h"
 
 #include <stddef.h>
 
