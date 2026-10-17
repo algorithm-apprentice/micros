@@ -138,6 +138,39 @@ It may fill a caller-owned preflight plan only after complete read-only
 validation. It does not commit bootstrap, handoff, claim, freeze, or release
 operations.
 
+### Accepted complete-validation execution correction
+
+Accepted
+[ADR-0076](../adr/0076-bounded-complete-frame-ownership-validation.md)
+preserves this complete read-only authority while correcting its measured
+target execution shape.
+
+The active range remains frame-ordered but derives allocation bits from one
+loaded bitmap word per 64-frame chunk. The inactive range still checks every
+owner and handoff target, while allocator bits beyond the managed count are
+checked by a partial-word mask plus one check per later bitmap word.
+
+The inactive owner/handoff loop has no out-of-line calls. The validator does
+not cache success, skip inactive storage, lower the fixed capacity, or change
+its error result. `frame_ownership.c` retains the low-level allocator-bit and
+owner predicates for other owners; `frame_ownership_validation.c` owns the
+bounded complete scan.
+
+Implementation evidence must preserve every existing corruption case and add:
+
+- managed-count boundaries at 1, 63, 64, 65, the observed 28,904 frames,
+  maximum capacity minus one, and maximum capacity;
+- independent active owner/target/bit; inactive generation, slot, kind,
+  reserved, and target; and partial-word/final-partial-word/later-word
+  corruption;
+- a host structural proof that rejected per-frame helper calls or raw
+  frame-indexed active/inactive bitmap access cannot return, that one loaded
+  word supplies each active chunk, and that the boundary mask plus
+  word-indexed tail scan exists;
+  and
+- one no-retry `test-qemu-vfs` then `test-qemu-elf-spawn` reproduction before
+  the complete producer.
+
 ## Stable public-symbol ownership
 
 | Owner | Public symbols |
