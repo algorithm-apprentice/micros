@@ -1,4 +1,4 @@
-#include "kernel/uart_console_test.h"
+#include "kernel/tests/tty/uart_console_test.h"
 
 #include <stdint.h>
 

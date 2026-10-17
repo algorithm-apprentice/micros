@@ -1,4 +1,4 @@
-#include "kernel/tty_service_test.h"
+#include "kernel/tests/tty/tty_service_test.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -9,7 +9,7 @@
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
-#include "kernel/tty_service_test_fixture.h"
+#include "kernel/tests/tty/tty_service_test_fixture.h"
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/bootstrap.h"

@@ -6,7 +6,7 @@
 #include "kernel/scheduler/scheduler_core_internal.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
-#include "kernel/tty_service_test.h"
+#include "kernel/tests/tty/tty_service_test.h"
 #endif
 #include "micros/user_execution.h"
 

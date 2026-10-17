@@ -28,7 +28,7 @@
 #include "kernel/tests/ramfs/ramfs_service_test.h"
 #endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
-#include "kernel/tty_service_test.h"
+#include "kernel/tests/tty/tty_service_test.h"
 #endif
 #ifdef MICROS_BUILD_USER_RUNTIME_TEST
 #include "kernel/tests/runtime/user_runtime_test.h"

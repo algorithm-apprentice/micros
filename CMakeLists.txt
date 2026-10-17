@@ -4064,7 +4064,7 @@ if(MICROS_BUILD_UART_CONSOLE_TEST)
     target_sources(
         micros
         PRIVATE
-            kernel/uart_console_test.c
+            kernel/tests/tty/uart_console_test.c
     )
 endif()
 
@@ -4226,7 +4226,7 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
         micros
         PRIVATE
             "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
-            kernel/tty_service_test.c
+            kernel/tests/tty/tty_service_test.c
     )
 endif()
 

@@ -30,7 +30,7 @@
 #include "kernel/vm_scratch_preemption_test.h"
 #endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
-#include "kernel/tty_service_test.h"
+#include "kernel/tests/tty/tty_service_test.h"
 #endif
 #ifdef MICROS_BUILD_RAMFS_SERVICE_TEST
 #include "kernel/tests/ramfs/ramfs_service_test.h"
@@ -42,7 +42,7 @@
 #include "kernel/tests/spawn/elf_spawn_test.h"
 #endif
 #ifdef MICROS_BUILD_UART_CONSOLE_TEST
-#include "kernel/uart_console_test.h"
+#include "kernel/tests/tty/uart_console_test.h"
 #endif
 
 #ifdef MICROS_BUILD_OBJECT_MODEL_TEST

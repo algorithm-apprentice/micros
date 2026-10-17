@@ -15,7 +15,7 @@
 #include "kernel/tty/tty_fault.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
-#include "kernel/tty_service_test.h"
+#include "kernel/tests/tty/tty_service_test.h"
 #endif
 #include "kernel/memory/user_address_space_internal.h"
 #include "micros/ipc_runtime.h"
