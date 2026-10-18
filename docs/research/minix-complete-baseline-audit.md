@@ -255,7 +255,7 @@ ledgers but do not revise them silently.
 | B05 grants and user execution | Audited; six blocking findings | [B05 grant/user-execution audit](minix-complete-baseline-b05-grants-user-execution.md) |
 | B06 static bootstrap | Audited; four blocking findings | [B06 static-bootstrap audit](minix-complete-baseline-b06-static-bootstrap.md) |
 | B07 VM | Audited; six blocking findings | [B07 VM audit](minix-complete-baseline-b07-vm.md) |
-| B08 PM and spawn | Pending | N/A |
+| B08 PM and spawn | Audited; six blocking findings | [B08 PM/spawn audit](minix-complete-baseline-b08-pm-spawn.md) |
 | B09 TTY | Pending | N/A |
 | B10 RAMFS | Pending | N/A |
 | B11 VFS | Pending | N/A |
