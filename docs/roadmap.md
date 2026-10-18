@@ -515,6 +515,13 @@ that native case with valid count 6 while retaining 63/64/65, the observed
 shape, maximum boundaries, and coherent zero/maximum-plus-one corruption. It
 changes no production contract.
 
+The dependent implementation now uses segmented immutable-prefix hashing, one
+cached initial-free bitmap word per active chunk, exact inactive byte/bitmap
+tail checks, and logarithmic FNV zero-run advancement. The structural Red,
+sanitizer-backed VM-core semantics, VM-handoff component, and exact one-shot
+VFS-to-ELF sequence are green. Complete producer/reuse evidence and independent
+implementation review remain before merge.
+
 ## v0.1 completion goal
 
 The independent validation-efficiency task follows Accepted

@@ -587,6 +587,11 @@ Final target acceptance is the exact `test-qemu-vfs` then
 increase, optimization-flag change, or runner relaxation. One complete current
 producer and exact selected receipt reuse follow before implementation review.
 
+The implementation's nine-case structural gate, sanitizer-backed VM-core
+matrix, VM handoff component, and exact no-retry VFS-to-ELF sequence are green.
+Complete current producer/reuse evidence remains the final author gate before
+independent implementation review.
+
 ### ELF spawn Step 14 evidence
 
 The [application runtime implementation map](architecture/application-runtime.md)

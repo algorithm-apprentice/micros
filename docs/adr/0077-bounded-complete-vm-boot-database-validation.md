@@ -326,6 +326,37 @@ were established statically from the proposed algorithm and current source.
 Acceptance records an implementation-ready design, not optimized production
 code or a passing target gate.
 
+## Separate implementation disposition
+
+The dependent implementation keeps the public validators and all state layouts
+unchanged. `servers/vm/vm_validation.c` now owns four cohesive file-local
+helpers:
+
+- `vm_validation_digest_bytes()` hashes immutable byte segments in bounded
+  eight-byte chunks;
+- `vm_validation_digest_zero_bytes()` advances FNV over proven zero bytes with
+  exponentiation by squaring;
+- `vm_validation_digest_active_frame_states()` loads one initial-free bitmap
+  word per active 64-frame chunk and performs no helper call in its inner
+  loop; and
+- `vm_validation_initial_free_tail_is_zero()` checks the partial boundary and
+  every contiguous full inactive word.
+
+`vm_core_boot_database_is_immutable()` rejects zero or over-capacity matched
+counts before any derived access, orchestrates the exact canonical digest
+segments, independently checks the inactive frame-state bytes, and retains the
+same final digest comparison.
+
+The deterministic structural Red is green with realistic negative mutations.
+Sanitizer-backed native evidence uses ADR-0078's corrected valid boundary
+matrix and preserves coherent invalid-count, active/nonfree, inactive-byte,
+partial/aligned/next/final bitmap, and exact digest behavior.
+
+The VM handoff QEMU component and the exact no-retry
+`test-qemu-vfs` then `test-qemu-elf-spawn` sequence pass. Merge remains
+conditional on the complete current producer/reuse evidence, exact staged
+tree, and clean independent implementation review.
+
 ## Non-goals
 
 This decision does not:

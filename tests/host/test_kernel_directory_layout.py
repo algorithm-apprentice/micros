@@ -217,6 +217,39 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                 path,
             )
 
+    def test_vm_helper_inventory_inverse_rejects_nonliteral_elements(
+        self,
+    ) -> None:
+        relative = "tests/host/test_vm_service_source_layout.py"
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        marker = (
+            '        "vm_core_validate_state",\n'
+            "    ),\n"
+            '    "servers/vm/vm_image.c": (\n'
+        )
+        self.assertEqual(1, source.count(marker))
+        changed = source.replace(
+            marker,
+            '        "vm_core_validate_state",\n'
+            "        *(),\n"
+            "    ),\n"
+            '    "servers/vm/vm_image.c": (\n',
+            1,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_text(changed, encoding="utf-8")
+            with self.assertRaisesRegex(
+                AssertionError,
+                "invalid VM validation helper inventory",
+            ):
+                kernel_layout_source.restored_gate_ast_sha256(
+                    root,
+                    relative,
+                )
+
     def test_existing_source_gates_use_the_bounded_path_adapter(self) -> None:
         direct_methods = {"exists", "glob", "is_file", "read_bytes", "read_text"}
         for path in kernel_layout_source.ORIGINAL_GATE_AST_SHA256:

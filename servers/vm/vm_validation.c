@@ -3,6 +3,116 @@
 #include "micros/endpoint.h"
 #include "micros/sv39.h"
 
+static uint64_t vm_validation_digest_bytes(
+    uint64_t digest,
+    const uint8_t *bytes,
+    size_t size
+)
+{
+    while (size >= 8) {
+        digest = (digest ^ bytes[0]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[1]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[2]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[3]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[4]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[5]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[6]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        digest = (digest ^ bytes[7]) * MICROS_VM_PAGE_DIGEST_PRIME;
+        bytes += 8;
+        size -= 8;
+    }
+    while (size != 0) {
+        digest = (digest ^ *bytes++) * MICROS_VM_PAGE_DIGEST_PRIME;
+        --size;
+    }
+    return digest;
+}
+
+static uint64_t vm_validation_digest_zero_bytes(
+    uint64_t digest,
+    size_t zero_count
+)
+{
+    uint64_t factor = MICROS_VM_PAGE_DIGEST_PRIME;
+
+    while (zero_count != 0) {
+        if ((zero_count & 1) != 0) {
+            digest *= factor;
+        }
+        factor *= factor;
+        zero_count >>= 1;
+    }
+    return digest;
+}
+
+static uint64_t vm_validation_digest_active_frame_states(
+    const struct micros_vm_state *state,
+    size_t managed_frame_count,
+    uint64_t digest
+)
+{
+    size_t frame_index = 0;
+    size_t word_index;
+
+    for (
+        word_index = 0;
+        frame_index < managed_frame_count;
+        ++word_index
+    ) {
+        uint64_t initial_free_word =
+            state->initial_free_bitmap[word_index];
+        uint64_t bit = UINT64_C(1);
+
+        for (
+            ;
+            frame_index < managed_frame_count && bit != 0;
+            ++frame_index, bit <<= 1
+        ) {
+            uint8_t byte = (initial_free_word & bit) != 0
+                ? MICROS_VM_FRAME_FREE
+                : state->boot_info->frame_states[frame_index];
+
+            digest = (
+                digest ^ byte
+            ) * MICROS_VM_PAGE_DIGEST_PRIME;
+        }
+    }
+    return digest;
+}
+
+static bool vm_validation_initial_free_tail_is_zero(
+    const struct micros_vm_state *state,
+    size_t managed_frame_count
+)
+{
+    size_t first_word = managed_frame_count / 64;
+    size_t boundary_bit = managed_frame_count % 64;
+
+    if (boundary_bit != 0) {
+        uint64_t inactive_mask = UINT64_MAX << boundary_bit;
+
+        if (
+            (
+                state->initial_free_bitmap[first_word]
+                & inactive_mask
+            ) != 0
+        ) {
+            return false;
+        }
+        ++first_word;
+    }
+    for (
+        ;
+        first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS;
+        ++first_word
+    ) {
+        if (state->initial_free_bitmap[first_word] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool vm_core_boot_header_matches_summary(
     const struct micros_vm_state *state
 )
@@ -33,40 +143,66 @@ static bool vm_core_boot_database_is_immutable(
 )
 {
     const uint8_t *bytes = (const uint8_t *)state->boot_info;
+    uint64_t managed_frame_count =
+        state->boot_summary.managed_frame_count;
     size_t digest_offset =
         offsetof(struct micros_vm_boot_info, header.digest);
     size_t frame_state_offset =
         offsetof(struct micros_vm_boot_info, frame_states);
     uint64_t digest = MICROS_VM_PAGE_DIGEST_OFFSET;
-    size_t index;
+    size_t active_frame_count;
+    size_t inactive_frame_count;
 
-    for (index = 0; index < sizeof(*state->boot_info); ++index) {
-        uint8_t byte;
-
-        if (
-            index >= digest_offset
-            && index
-                < digest_offset
-                    + sizeof(state->boot_info->header.digest)
-        ) {
-            byte = 0;
-        } else if (
-            index >= frame_state_offset
-            && index
-                < frame_state_offset
-                    + sizeof(state->boot_info->frame_states)
-            && vm_core_initial_frame_is_free(
-                state,
-                index - frame_state_offset
-            )
-        ) {
-            byte = MICROS_VM_FRAME_FREE;
-        } else {
-            byte = bytes[index];
-        }
-        digest ^= byte;
-        digest *= MICROS_VM_PAGE_DIGEST_PRIME;
+    if (
+        managed_frame_count == 0
+        || managed_frame_count > MICROS_VM_MAX_MANAGED_FRAMES
+    ) {
+        return false;
     }
+    active_frame_count = (size_t)managed_frame_count;
+    inactive_frame_count =
+        MICROS_VM_MAX_MANAGED_FRAMES - active_frame_count;
+
+    digest = vm_validation_digest_bytes(
+        digest,
+        bytes,
+        digest_offset
+    );
+    digest = vm_validation_digest_zero_bytes(
+        digest,
+        sizeof(state->boot_info->header.digest)
+    );
+    digest = vm_validation_digest_bytes(
+        digest,
+        &bytes[
+            digest_offset
+            + sizeof(state->boot_info->header.digest)
+        ],
+        frame_state_offset
+            - digest_offset
+            - sizeof(state->boot_info->header.digest)
+    );
+    digest = vm_validation_digest_active_frame_states(
+        state,
+        active_frame_count,
+        digest
+    );
+    if (
+        !vm_core_bytes_are_zero(
+            &state->boot_info->frame_states[active_frame_count],
+            inactive_frame_count
+        )
+        || !vm_validation_initial_free_tail_is_zero(
+            state,
+            active_frame_count
+        )
+    ) {
+        return false;
+    }
+    digest = vm_validation_digest_zero_bytes(
+        digest,
+        inactive_frame_count
+    );
     return digest == state->boot_summary.digest;
 }
 
