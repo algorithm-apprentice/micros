@@ -90,6 +90,9 @@ This directory contains the design baseline for `micros`.
 - [Complete MINIX baseline audit contract](research/minix-complete-baseline-audit.md)
   pins the reviewed tree, assigns every runtime/evidence path and operation to
   a sequential audit unit, and blocks implementation until consolidation.
+- [B01 platform baseline audit](research/minix-complete-baseline-b01-platform.md)
+  audits entry, firmware memory discovery, early UART, panic, PLIC, and timer
+  mechanisms and records the first blocking findings.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

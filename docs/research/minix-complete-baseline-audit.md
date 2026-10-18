@@ -231,6 +231,26 @@ B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07
 One audit unit is active at a time. Later units may reference accepted earlier
 ledgers but do not revise them silently.
 
+## Audit progress
+
+| Unit | Status | Ledger |
+| --- | --- | --- |
+| B01 platform | Audited; six blocking findings | [B01 platform audit](minix-complete-baseline-b01-platform.md) |
+| B02 memory | Pending | N/A |
+| B03 objects and scheduler | Pending | N/A |
+| B04 endpoints and IPC | Pending | N/A |
+| B05 grants and user execution | Pending | N/A |
+| B06 static bootstrap | Pending | N/A |
+| B07 VM | Pending | N/A |
+| B08 PM and spawn | Pending | N/A |
+| B09 TTY | Pending | N/A |
+| B10 RAMFS | Pending | N/A |
+| B11 VFS | Pending | N/A |
+| B12 ELF spawn and application lifecycle | Pending | N/A |
+| B13 node-Q accepted design | Pending | N/A |
+| B14 executable evidence | Pending | N/A |
+| Consolidation | Pending | N/A |
+
 ## Complete-audit acceptance
 
 The read-only audit is complete only when:
