@@ -10,6 +10,7 @@ import unittest
 from unittest import mock
 
 from tests.host.test_kernel_address_space_source_layout import cmake_command
+from tests.host.ast_evidence import ast_digest, ast_key
 from tools import validation_plan
 from tests.host import kernel_layout_source
 
@@ -253,37 +254,9 @@ FIXTURE_BYTES = (
 )
 
 
-def ast_key(value):
-    if isinstance(value, ast.AST):
-        if getattr(value, "type_params", ()):
-            raise AssertionError("unreviewed nonempty type parameters")
-        if type(value).__name__ == "Index":
-            return ast_key(value.value)
-        return (
-            type(value).__name__,
-            tuple(
-                (name, ast_key(child))
-                for name, child in ast.iter_fields(value)
-                if name != "type_params"
-            ),
-        )
-    if isinstance(value, (list, tuple)):
-        return tuple(ast_key(child) for child in value)
-    if isinstance(value, bytes):
-        return ("bytes", value.hex())
-    if value is Ellipsis:
-        return ("ellipsis",)
-    return value
-
-
 @lru_cache(maxsize=64)
 def parse_source(text):
     return ast.parse(text)
-
-
-def ast_digest(node):
-    encoded = json.dumps(ast_key(node), separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(encoded.encode("ascii")).hexdigest()
 
 
 def definition_nodes(text, name):

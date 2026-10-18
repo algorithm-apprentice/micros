@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import unittest
 
+from tests.host.ast_evidence import ast_dump
 from tests.host.c_source_records import function_records
 from tests.host.test_frame_ownership_source_layout import tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
@@ -1297,8 +1298,8 @@ def parse_arguments(argv=None):
 def main(argv=None):
     return original_main(argv)
 '''
-        expected = ast.dump(ast.parse(original), include_attributes=False)
-        projected = lambda text: ast.dump(generator_module_projection(text), include_attributes=False)
+        expected = ast_dump(ast.parse(original))
+        projected = lambda text: ast_dump(generator_module_projection(text))
         self.assertEqual(expected, projected(outlined))
         for changed in (
             outlined.replace("    _append_tty_manifest(output,", "    _append_tty_manifest(copied_output,"),
@@ -2188,9 +2189,9 @@ def main(argv=None):
             "HOST_UNIT_ONLY_INPUTS = " + repr(("old_host", STRUCTURAL_TEST_PATH)) + "\n"
             "def algorithm(value):\n    return value + 1\n"
         )
-        fingerprint = lambda text: ast.dump(ast.parse(text), include_attributes=False)
-        self.assertEqual(fingerprint(expected), ast.dump(tty_planner_projection(ast.parse(current)), include_attributes=False))
-        self.assertEqual(fingerprint(expected), ast.dump(tty_planner_projection(ast.parse(expected)), include_attributes=False))
+        fingerprint = lambda text: ast_dump(ast.parse(text))
+        self.assertEqual(fingerprint(expected), ast_dump(tty_planner_projection(ast.parse(current))))
+        self.assertEqual(fingerprint(expected), ast_dump(tty_planner_projection(ast.parse(expected))))
         for changed in (
             current.replace("kernel/tty_handoff_runtime_state.c", "kernel/unknown_runtime.c"),
             current.replace(STRUCTURAL_TEST_PATH, "tests/host/other.py"),
@@ -2200,7 +2201,7 @@ def main(argv=None):
                 tty_planner_projection(ast.parse(changed))
         self.assertNotEqual(
             fingerprint(expected),
-            ast.dump(tty_planner_projection(ast.parse(current.replace("value + 1", "value - 1"))), include_attributes=False),
+            ast_dump(tty_planner_projection(ast.parse(current.replace("value + 1", "value - 1")))),
         )
 
     def test_runtime_byte_primitives_have_their_sole_state_leaf_owner(self):
@@ -2246,11 +2247,11 @@ def main(argv=None):
 
     def test_original_generator_neighbors_and_shared_inspector_remain_exact(self):
         generator = generator_module_projection(source(GENERATOR_PATH))
-        self.assertEqual(GENERATOR_AST_DIGEST, digest_bytes(ast.dump(generator, include_attributes=False).encode()))
+        self.assertEqual(GENERATOR_AST_DIGEST, digest_bytes(ast_dump(generator).encode()))
         functions = {node.name: node for node in generator.body if isinstance(node, ast.FunctionDef)}
         self.assertEqual(set(GENERATOR_FUNCTIONS), set(functions))
         for name, expected in GENERATOR_FUNCTIONS.items():
-            self.assertEqual(expected, digest_bytes(ast.dump(functions[name], include_attributes=False).encode()))
+            self.assertEqual(expected, digest_bytes(ast_dump(functions[name]).encode()))
         for path, expected in STABLE_HASHES.items():
             from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
@@ -2287,9 +2288,9 @@ def main(argv=None):
 
     def test_only_declared_tool_metadata_and_one_recipe_pin_change(self):
         planner = tty_planner_projection(ast.parse(source("tools/validation_plan.py")))
-        self.assertEqual(PLANNER_AST_DIGEST, digest_bytes(ast.dump(planner, include_attributes=False).encode()))
+        self.assertEqual(PLANNER_AST_DIGEST, digest_bytes(ast_dump(planner).encode()))
         context = context_ast_without_recipe_pin(source("tools/validation_context.py"))
-        self.assertEqual(CONTEXT_AST_DIGEST, digest_bytes(ast.dump(context, include_attributes=False).encode()))
+        self.assertEqual(CONTEXT_AST_DIGEST, digest_bytes(ast_dump(context).encode()))
 
     def test_each_alias_retains_all_four_independent_validation_dimensions(self):
         for representative, paths in alias_rows():

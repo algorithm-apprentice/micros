@@ -11,7 +11,10 @@ import sys
 from types import SimpleNamespace
 import unittest
 from unittest import mock
+
+from tests.host.ast_evidence import ast_dump
 from tests.host import kernel_layout_source
+from tools.python_host_runtime import python_command
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1092,7 +1095,7 @@ def digest(raw):
 
 
 def ast_digest(node):
-    return digest(ast.dump(node, include_attributes=False).encode())
+    return digest(ast_dump(node).encode())
 
 
 def definitions(text):
@@ -1297,6 +1300,7 @@ def test_case_methods(owner):
 
 
 def case_owner_methods(text, owner):
+    text = kernel_layout_source.restore_python_child_commands(text)
     expected = test_case_methods(owner)
     methods = {}
     imports = set()
@@ -1508,6 +1512,11 @@ def restored_runner_source(text=None, owners=None):
     root_nodes = ast.parse(root_text).body
     first = root_nodes[0]
     header = "".join(root_text.splitlines(keepends=True)[:first.lineno - 1])
+    header = header.replace(
+        "#!/usr/bin/env -S python3.15 -E -S -B\n",
+        "#!/usr/bin/env python3\n",
+        1,
+    )
     return assemble_raw_module(header, ORIGINAL_NODE_LAYOUT, fragments, "")
 
 
@@ -1607,7 +1616,12 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
-                [sys.executable, "-B", str(ROOT / RUNNER_PATH), "--help"], cwd=directory,
+                python_command(
+                    sys.executable,
+                    str(ROOT / RUNNER_PATH),
+                    "--help",
+                ),
+                cwd=directory,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
             )
         self.assertEqual((0, ""), (result.returncode, result.stderr))

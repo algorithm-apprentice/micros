@@ -9,6 +9,8 @@ from pathlib import Path
 import stat
 from typing import Optional
 
+from tests.host.ast_evidence import ast_dump
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 REVIEWED_BASE = "469a9733eab03080b554f8b144a8c1bc276b1e05"
@@ -15545,11 +15547,24 @@ CMAKE_TARGET_DIAGNOSTIC_BLOCK = 'foreach(\n    kernel_directory\n    IN ITEMS\n 
 
 BASE_CMAKE_SHA256 = '730a6dd6e29ff12cf191d3040ae607026da790be7945c94a6966c24f03c42fab'
 FINAL_CMAKE_SHA256 = 'c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368'
+PYTHON315_CMAKE_SHA256 = '5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab'
+PYTHON315_CHALLENGE_CMAKE_SHA256 = '9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537'
+PYTHON315_HOST_CMAKE_SHA256 = 'fa35a3f3a5ddc9259124a1ef6099952f7514d5038c11a39374cc00f21a23bc95'
 BASE_VALIDATION_CONTEXT_SHA256 = '7678be6bcd9c6da8575ff8fd9f28a7220db2ba152863869fd9f9d0b3966184f5'
 FINAL_VALIDATION_CONTEXT_SHA256 = 'ae5ffaeae172a8aadf5796580be3631f9804068c7033ab4ebbcde4775879be15'
 PRODUCER_VALIDATION_CONTEXT_SHA256 = '4f4e0b570c01ffecfe7fbde99e8996ec10b47466c692cd999541b87f0383cf88'
+PYTHON315_VALIDATION_CONTEXT_SHA256 = '9faf65b3308b24beceb61134c4d3426e74852dbe730a1f231ddbb84cf7154670'
+PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256 = '30309e78b64298764d8f176f08e1f0b563c31c0c8720805351ceb9008314aa74'
+PYTHON315_HOST_VALIDATION_CONTEXT_SHA256 = '516d9b64e28c5c8318f40d0be65313ece965e397dc83927bf062d2de64729d3f'
 BASE_VALIDATION_PLAN_SHA256 = '60a5e656a28b18bb21a02c65fc46c2ec18f4100580b3d3d05a09b346ae36a619'
 PRODUCER_VALIDATION_PLAN_SHA256 = '28437d4bcfc669e982632e920cc71f344d5993ff43fd5b7decec4c4b8a611aab'
+PYTHON315_VALIDATION_PLAN_SHA256 = '8521203bd2d627de572f06856a796283ae62bb721a786da31c07d450fb6104af'
+BASE_VALIDATION_BUILD_IMPACT_SHA256 = '24e9fabf4a4750c56508a94c26a37e398edc49a75c8d6b8b2efdeeee01c0d270'
+PYTHON315_VALIDATION_BUILD_IMPACT_SHA256 = 'f35893bb948d21eb9e8670c99a8dc8176f4cd39f451baf97cbd129cd5e02865e'
+BASE_VALIDATION_INPUTS_SHA256 = 'ff5f513282f94dfbe106096ab5c21d888b3af33cd995c36355426aea1068b4e0'
+PYTHON315_VALIDATION_INPUTS_SHA256 = '438c3938c2d5d8930d6c656de4990d4ca6680ffa8663acc28f3edd60d1f067ef'
+BASE_VALIDATION_EXECUTION_SHA256 = '19041e0171c6c70d24bbd38e0ffd9361eedd7d8081a8ba41cb1d96409677e3c9'
+PYTHON315_VALIDATION_EXECUTION_SHA256 = '45041ba61136e0eef9e13f0df6ab0c89cfe25fe631d2a8b8ac0d0b363f742bad'
 BASE_FRAME_VALIDATION_SHA256 = 'dfe2aaa76500b3725ca5437889f71877b9adbaafa915ff044ba8d888451b0445'
 BOUNDED_FRAME_VALIDATION_SHA256 = '448f61074bb3c5d52631660b9537e45a8bb9cca266a645edd503457b6fa03694'
 ORIGINAL_VALIDATION_CONTEXT_AST_SHA256 = 'd6ac20345a414a84cf74d0290698dc5ca05a5e38610c9145a3dc8a30084670d0'
@@ -15821,6 +15836,8 @@ def _restored_include_bytes(
     except UnicodeDecodeError as error:
         raise AssertionError(f"non-UTF-8 source: {relative}") from error
     lines = text.splitlines(keepends=True)
+    if lines and lines[0] == "#!/usr/bin/env -S python3.15 -E -S -B\n":
+        lines[0] = "#!/usr/bin/env python3\n"
     for line_number, target, old_line, new_line in transports:
         expected_line = (
             old_line
@@ -15873,10 +15890,7 @@ def _restored_generator_bytes(path: Path, relative: str) -> bytes:
         expected_sha256,
         transports,
     )
-    payload = ast.dump(
-        ast.parse(restored.decode("utf-8")),
-        include_attributes=False,
-    ).encode()
+    payload = ast_dump(ast.parse(restored.decode("utf-8"))).encode()
     if hashlib.sha256(payload).hexdigest() != expected_ast:
         raise AssertionError(f"generator AST mismatch: {relative}")
     return restored
@@ -15955,6 +15969,48 @@ def _restore_exact_source_transports(
 
 def restore_validation_plan_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == PYTHON315_VALIDATION_PLAN_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    "#!/usr/bin/env -S python3.15 -E -S -B\n",
+                    "#!/usr/bin/env python3\n",
+                ),
+                (
+                    "from tools.python_host_runtime import (\n"
+                    "    UnsupportedPythonRuntime,\n"
+                    "    documentation_command,\n"
+                    "    require_current_runtime,\n"
+                    ")\n",
+                    "",
+                ),
+                (
+                    "DOCS = documentation_command()\n",
+                    'DOCS = ("python3", "tools/check_docs.py")\n',
+                ),
+                (
+                    '    "tools/python_host_runtime.py",\n'
+                    '    "tests/host/test_python_host_runtime.py",\n',
+                    "",
+                ),
+                (
+                    "        require_current_runtime(DOCS[0])\n",
+                    "",
+                ),
+                (
+                    "    except (ValueError, UnsupportedPythonRuntime) as error:\n",
+                    "    except ValueError as error:\n",
+                ),
+            ),
+            "Python 3.15 validation planner",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PRODUCER_VALIDATION_PLAN_SHA256
+        ):
+            raise AssertionError("Python validation planner did not restore")
+        digest = PRODUCER_VALIDATION_PLAN_SHA256
     if digest == PRODUCER_VALIDATION_PLAN_SHA256:
         source = _restore_exact_source_transports(
             source,
@@ -16013,7 +16069,7 @@ def restore_validation_plan_source(source: str) -> str:
         replacements.append((start, end, ORIGINAL_PLANNER_ASSIGNMENTS[name]))
     for start, end, replacement in sorted(replacements, reverse=True):
         source = source[:start] + replacement + source[end:]
-    payload = ast.dump(ast.parse(source), include_attributes=False).encode()
+    payload = ast_dump(ast.parse(source)).encode()
     if hashlib.sha256(payload).hexdigest() != ORIGINAL_PLANNER_AST_SHA256:
         raise AssertionError("validation planner AST did not restore")
     return source
@@ -16038,13 +16094,432 @@ def original_host_unit_only_inputs(paths):
 
 
 def original_cmake_recipe_digest(value: str) -> str:
-    if value not in (BASE_CMAKE_SHA256, FINAL_CMAKE_SHA256):
+    if value not in (
+        BASE_CMAKE_SHA256,
+        FINAL_CMAKE_SHA256,
+        PYTHON315_CMAKE_SHA256,
+        PYTHON315_CHALLENGE_CMAKE_SHA256,
+        PYTHON315_HOST_CMAKE_SHA256,
+    ):
         raise AssertionError("unexpected admitted CMake recipe digest")
     return BASE_CMAKE_SHA256
 
 
+def original_validation_plan(commands):
+    restored = []
+    for command in commands:
+        if (
+            len(command) == 5
+            and tuple(command[1:4]) == ("-E", "-S", "-B")
+            and command[4] == "tools/check_docs.py"
+        ):
+            restored.append(("python3", "tools/check_docs.py"))
+        else:
+            restored.append(command)
+    return restored
+
+
+def restore_python_child_commands(source: str) -> str:
+    import_line = "from tools.python_host_runtime import python_command\n"
+    if import_line not in source:
+        if "python_command(" in source:
+            raise AssertionError("Python child command has no reviewed import")
+        return source
+    if source.count(import_line) != 1:
+        raise AssertionError("unexpected Python child-command import")
+    source = source.replace(import_line + "\n", "", 1)
+    if source.count("command = list(python_command(") != 3:
+        raise AssertionError("unexpected Python inline child inventory")
+    source = source.replace("command = list(python_command(", "command = [")
+    if source.count("        ))\n") != 3:
+        raise AssertionError("unexpected Python inline child terminator")
+    return source.replace("        ))\n", "        ]\n")
+
+
+def restore_validation_build_impact_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_VALIDATION_BUILD_IMPACT_SHA256:
+        return source
+    if digest != PYTHON315_VALIDATION_BUILD_IMPACT_SHA256:
+        raise AssertionError("unexpected validation build-impact source")
+    source = _restore_exact_source_transports(
+        source,
+        (
+            (
+                "7e0612c122cc577c91ede6be8877fc97cf80a2bc2f99d33c472e3dfc8127645a",
+                "9c577637989e9a55c4d4e4c131425f64a5cec8baebb9695acba2d768b621cb38",
+            ),
+            (
+                "7cc475000e95f9d1d20148c0c9745b5dd5b949eaa2f20ce5bbbc5443356bcbdc",
+                "d4b638a0507daba11e1293fbb3caa0a88d39f37223be5ad66502e1e21bcf3d47",
+            ),
+            (
+                "772d293d6252819e24a3294c5f331f60f5a8f47e2db0dc9b40fed3adda5bd20f",
+                "5e3f0e38f8fc0a3230fbae4afaf63ee6e031473cd05a6b409e88d704de736b36",
+            ),
+        ),
+        "Python validation build-impact",
+    )
+    if (
+        hashlib.sha256(source.encode()).hexdigest()
+        != BASE_VALIDATION_BUILD_IMPACT_SHA256
+    ):
+        raise AssertionError("validation build-impact source did not restore")
+    return source
+
+
+def restore_validation_inputs_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_VALIDATION_INPUTS_SHA256:
+        return source
+    if digest != PYTHON315_VALIDATION_INPUTS_SHA256:
+        raise AssertionError("unexpected validation inputs source")
+    source = _restore_exact_source_transports(
+        source,
+        (
+            (
+                "def fingerprint_tree(path, admitted_roots, *, inert_link_roots=()):\n"
+                "    path = Path(path)\n"
+                "    roots = tuple(Path(root).resolve() for root in admitted_roots)\n"
+                "    inert_roots = tuple(Path(root).resolve() for root in inert_link_roots)\n",
+                "def fingerprint_tree(path, admitted_roots):\n"
+                "    path = Path(path)\n"
+                "    roots = tuple(Path(root).resolve() for root in admitted_roots)\n",
+            ),
+            (
+                "            if (\n"
+                "                not _inside(resolved, (*roots, *SYSTEM_ROOTS))\n"
+                "                and not _inside(selected, inert_roots)\n"
+                "            ):\n",
+                "            if not _inside(resolved, (*roots, *SYSTEM_ROOTS)):\n",
+            ),
+        ),
+        "Python validation inputs",
+    )
+    if hashlib.sha256(source.encode()).hexdigest() != BASE_VALIDATION_INPUTS_SHA256:
+        raise AssertionError("validation inputs source did not restore")
+    return source
+
+
+def restore_validation_execution_source(source: str) -> str:
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == BASE_VALIDATION_EXECUTION_SHA256:
+        return source
+    if digest != PYTHON315_VALIDATION_EXECUTION_SHA256:
+        raise AssertionError("unexpected validation execution source")
+    source = _restore_exact_source_transports(
+        source,
+        (
+            (
+                "from tools.python_host_runtime import documentation_command\n",
+                "",
+            ),
+            (
+                "            documentation_command(),\n",
+                '            ("python3", "tools/check_docs.py"),\n',
+            ),
+        ),
+        "Python validation execution",
+    )
+    if (
+        hashlib.sha256(source.encode()).hexdigest()
+        != BASE_VALIDATION_EXECUTION_SHA256
+    ):
+        raise AssertionError("validation execution source did not restore")
+    return source
+
+
 def restore_validation_context_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest == PYTHON315_HOST_VALIDATION_CONTEXT_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    '"CMakeLists.txt": '
+                    '"fa35a3f3a5ddc9259124a1ef6099952f7514d5038c11a39374cc00f21a23bc95",',
+                    '"CMakeLists.txt": '
+                    '"9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537",',
+                ),
+                (
+                    "        expected_framework = (\n"
+                    '            installation / "Frameworks/Python.framework"\n'
+                    "        ).resolve(strict=True)\n"
+                    "        if framework != expected_framework:\n"
+                    "            raise UnsupportedContext(\n"
+                    '                "Python framework differs from the '
+                    'selected installation"\n'
+                    "            )\n",
+                    "",
+                ),
+            ),
+            "Python validation-context host closure",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256
+        ):
+            raise AssertionError(
+                "Python validation-context host closure did not restore"
+            )
+        digest = PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256
+    if digest == PYTHON315_CHALLENGE_VALIDATION_CONTEXT_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    '"CMakeLists.txt": '
+                    '"9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537",',
+                    '"CMakeLists.txt": '
+                    '"5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab",',
+                ),
+            ),
+            "Python validation-context challenge",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PYTHON315_VALIDATION_CONTEXT_SHA256
+        ):
+            raise AssertionError(
+                "Python validation-context challenge did not restore"
+            )
+        digest = PYTHON315_VALIDATION_CONTEXT_SHA256
+    if digest == PYTHON315_VALIDATION_CONTEXT_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    "import stat\nimport sys\nfrom typing import Optional\n",
+                    "import stat\nfrom typing import Optional\n",
+                ),
+                (
+                    "from tools.python_host_runtime import (\n"
+                    "    PYTHON_ARGS,\n"
+                    "    UnsupportedPythonRuntime,\n"
+                    "    validate_environment as validate_python_environment,\n"
+                    ")\n",
+                    "",
+                ),
+                (
+                    'PROFILE_NAME = "darwin-arm64-ninja-python315-v2"\n',
+                    'PROFILE_NAME = "darwin-arm64-ninja-v1"\n',
+                ),
+                (
+                    '"CMakeLists.txt": '
+                    '"5548beb5c9ad0fe295cb258a4dd9f3eee132f0c479ac148aee74d727a2fec4ab",',
+                    '"CMakeLists.txt": '
+                    '"c8d83418cc523ea2dd6b39ab3c5caccd288853022da610c24b3c215f57548368",',
+                ),
+                (
+                    'QEMU_RUNNER_DIGEST = '
+                    '"c48d0bcac58f6bd28695cfa3cf49967052849c58974f3f8f4ac75526c224bc3f"\n',
+                    'QEMU_RUNNER_DIGEST = '
+                    '"e5cc208fff305dae0279816fdb9ad45f86b48da4e19cb700fc5dbac3365341c4"\n',
+                ),
+                (
+                    'STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))\n\n\n',
+                    'STANDARD_SEARCH_ROOTS = (Path("/usr/local/include"), Path("/usr/local/lib"))\n'
+                    'VENDOR_STARTUP = {\n'
+                    '    "Versions/3.9/lib/python3.9/site-packages/distutils-precedence.pth":\n'
+                    '        "7ea7ffef3fe2a117ee12c68ed6553617f0d7fd2f0590257c25c484959a3b7373",\n'
+                    '}\n\n\n',
+                ),
+                (
+                    '    information = json.loads(_run(\n'
+                    '        (\n'
+                    '            tools.python,\n'
+                    '            *PYTHON_ARGS,\n'
+                    '            "-c",\n'
+                    '            QEMU_LOADER_PROBE,\n'
+                    '            str(root),\n'
+                    '            json.dumps(names),\n'
+                    '        ),\n'
+                    '        cwd=root,\n'
+                    '    ))\n',
+                    '    information = json.loads(_run(\n'
+                    '        (tools.python, "-B", "-c", QEMU_LOADER_PROBE, '
+                    'str(root), json.dumps(names)), cwd=root,\n'
+                    '    ))\n',
+                ),
+                (
+                    'def validate_environment(environment, *, target):\n'
+                    '    try:\n'
+                    '        validate_python_environment(environment)\n'
+                    '    except UnsupportedPythonRuntime as error:\n'
+                    '        raise UnsupportedContext(str(error)) from error\n',
+                    'def validate_environment(environment, *, target):\n'
+                    '    if environment.get("PYTHONNOUSERSITE") != "1":\n'
+                    '        raise UnsupportedContext("profile requires PYTHONNOUSERSITE=1")\n',
+                ),
+                (
+                    '        "_PYTHON_SYSCONFIGDATA_NAME", "MICROS_PYTHON_ROOT",\n',
+                    '        "_PYTHON_SYSCONFIGDATA_NAME",\n',
+                ),
+                (
+                    '\n\ndef platform_identity(*, system=None, machine=None):\n',
+                    '\n\ndef validate_python_startup(framework, environment):\n'
+                    '    if environment.get("SETUPTOOLS_USE_DISTUTILS", "stdlib") != "stdlib":\n'
+                    '        raise UnsupportedContext("vendor distutils import redirection is unsupported")\n'
+                    '    if any(framework.rglob("sitecustomize.py")) or any(framework.rglob("usercustomize.py")):\n'
+                    '        raise UnsupportedContext("Python import customization is unsupported")\n'
+                    '    for path in framework.rglob("*.pth"):\n'
+                    '        expected = VENDOR_STARTUP.get(str(path.relative_to(framework)))\n'
+                    '        if path.is_symlink() or expected is None or _file_digest(path) != expected:\n'
+                    '            raise UnsupportedContext("unreviewed Python startup declaration")\n'
+                    '\n\ndef platform_identity(*, system=None, machine=None):\n',
+                ),
+                (
+                    '        version = _run((\n'
+                    '            requested,\n'
+                    '            *(PYTHON_ARGS if role in ("python", "python-runtime") else ()),\n'
+                    '            "--version",\n'
+                    '        ))\n',
+                    '        version = _run((requested, "--version"))\n',
+                ),
+                (
+                    '    def _python(self):\n'
+                    '        requested = self.cache.get("MICROS_PYTHON")\n'
+                    '        if not requested:\n'
+                    '            raise UnsupportedContext("configured Python cannot be resolved")\n'
+                    '        selected = Path(requested)\n'
+                    '        if (\n'
+                    '            not selected.is_absolute()\n'
+                    '            or self.environment.get("MICROS_PYTHON") != requested\n'
+                    '            or selected.resolve(strict=True) != Path(sys.executable).resolve(strict=True)\n'
+                    '        ):\n'
+                    '            raise UnsupportedContext(\n'
+                    '                "reusable profile requires one explicit current MICROS_PYTHON"\n'
+                    '            )\n'
+                    '        information = json.loads(_run((\n'
+                    '            requested,\n'
+                    '            *PYTHON_ARGS,\n'
+                    '            str(self.root / "tools/python_host_runtime.py"),\n'
+                    '            "--selected",\n'
+                    '            requested,\n'
+                    '            "--metadata",\n'
+                    '        ), cwd=self.root))\n'
+                    '        expected = {\n'
+                    '            "implementation", "version", "releaselevel", "cache_tag",\n'
+                    '            "gil_enabled", "py_gil_disabled", "flags", "executable",\n'
+                    '            "base_executable", "prefix", "base_prefix", "stdlib", "paths",\n'
+                    '            "cafile", "capath", "certificate_count",\n'
+                    '        }\n'
+                    '        if set(information) != expected:\n'
+                    '            raise UnsupportedContext("Python runtime metadata is incomplete")\n'
+                    '        prefix = Path(information["prefix"]).resolve()\n'
+                    '        framework = next(\n'
+                    '            (\n'
+                    '                path\n'
+                    '                for path in (prefix, *prefix.parents)\n'
+                    '                if path.name == "Python.framework"\n'
+                    '            ),\n'
+                    '            None,\n'
+                    '        )\n'
+                    '        if framework is None:\n'
+                    '            raise UnsupportedContext("unclosed Python framework resolution")\n'
+                    '        self.python = Path(information["executable"]).resolve()\n'
+                    '        installation = _cellar_root(self.python)\n'
+                    '        if installation.parent.name != "python@3.15":\n'
+                    '            raise UnsupportedContext("Python is outside the versioned python@3.15 Cellar")\n'
+                    '        self.framework = framework\n'
+                    '        self.python_installation = installation\n'
+                    '        self.python_inert_roots = (\n'
+                    '            installation / "lib/python3.15/site-packages",\n'
+                    '            framework / "Versions/3.15/lib/python3.15/site-packages",\n'
+                    '        )\n'
+                    '        self.roots.add(installation)\n'
+                    '        self.python_paths = []\n'
+                    '        for spelling in information["paths"]:\n'
+                    '            path = Path(spelling).resolve()\n'
+                    '            if not _inside(path, (self.root, framework)):\n'
+                    '                raise UnsupportedContext("unclosed Python import-search directory")\n'
+                    '            self.python_paths.append({"path": str(path), "exists": path.exists()})\n'
+                    '        spellings = [selected]\n'
+                    '        formula = next(\n'
+                    '            (\n'
+                    '                path\n'
+                    '                for path in selected.parents\n'
+                    '                if path.name == "python@3.15" and path.parent.name == "opt"\n'
+                    '            ),\n'
+                    '            None,\n'
+                    '        )\n'
+                    '        if formula is not None:\n'
+                    '            spellings.append(formula)\n'
+                    '        self.python_spellings = {\n'
+                    '            str(path): fingerprint_tree(path, (installation, framework))\n'
+                    '            for path in spellings\n'
+                    '        }\n'
+                    '        self._tool("python", requested)\n'
+                    '        self._tool("python-runtime", self.python)\n',
+                    '    def _python(self):\n'
+                    '        requested = self.cache.get("MICROS_PYTHON")\n'
+                    '        if not requested:\n'
+                    '            raise UnsupportedContext("configured Python cannot be resolved")\n'
+                    '        if Path(requested).resolve() != Path("/usr/bin/python3"):\n'
+                    '            raise UnsupportedContext("initial profile requires the active Xcode Python shim")\n'
+                    '        declared_framework = self.developer / "Library/Frameworks/Python3.framework"\n'
+                    '        validate_python_startup(declared_framework, self.environment)\n'
+                    '        information = json.loads(_run((\n'
+                    '            requested, "-B", "-c",\n'
+                    '            "import json,sys,site; print(json.dumps({"\n'
+                    '            "\'executable\':sys.executable,\'prefix\':sys.prefix,\'paths\':sys.path,"\n'
+                    '            "\'user_site\':site.ENABLE_USER_SITE}))",\n'
+                    '        ), cwd=self.root))\n'
+                    '        prefix = Path(information["prefix"]).resolve()\n'
+                    '        framework = next((path for path in (prefix, *prefix.parents) if path.name == "Python3.framework"), None)\n'
+                    '        if framework is None or information["user_site"] is not False:\n'
+                    '            raise UnsupportedContext("unclosed Python framework/user-site resolution")\n'
+                    '        self.python = Path(information["executable"]).resolve()\n'
+                    '        self.roots.add(framework)\n'
+                    '        self.roots.add(self.python)\n'
+                    '        self.python_paths = []\n'
+                    '        for spelling in information["paths"]:\n'
+                    '            path = (self.root if not spelling else Path(spelling)).resolve()\n'
+                    '            if path != self.root and not _inside(path, (framework,)):\n'
+                    '                raise UnsupportedContext("unclosed Python import-search directory")\n'
+                    '            if path.name in ("sitecustomize.py", "usercustomize.py"):\n'
+                    '                raise UnsupportedContext("Python import customization is unsupported")\n'
+                    '            self.python_paths.append({"path": str(path), "exists": path.exists()})\n'
+                    '        if any(framework.rglob("sitecustomize.py")) or any(framework.rglob("usercustomize.py")):\n'
+                    '            raise UnsupportedContext("Python import customization is unsupported")\n'
+                    '        self._tool("python", requested)\n'
+                    '        self._tool("python-runtime", self.python)\n',
+                ),
+                (
+                    '        commands = _run(("/usr/bin/otool", "-l", "-arch", "arm64", self.python)).decode()\n',
+                    '        framework = next(path for path in self.roots if path.name == "Python3.framework")\n'
+                    '        commands = _run(("/usr/bin/otool", "-l", "-arch", "arm64", self.python)).decode()\n',
+                ),
+                (
+                    '        for extension in sorted(self.framework.rglob("*.so")):\n',
+                    '        for extension in sorted(framework.rglob("*.so")):\n',
+                ),
+                (
+                    '        inputs["external_roots"] = {}\n'
+                    '        for path in roots:\n'
+                    '            inputs["external_roots"][str(path)] = fingerprint_tree(\n'
+                    '                path,\n'
+                    '                roots,\n'
+                    '                inert_link_roots=(\n'
+                    '                    tools.python_inert_roots\n'
+                    '                    if path == tools.python_installation\n'
+                    '                    else ()\n'
+                    '                ),\n'
+                    '            )\n'
+                    '        inputs["python_spellings"] = tools.python_spellings\n',
+                    '        inputs["external_roots"] = {\n'
+                    '            str(path): fingerprint_tree(path, roots) for path in roots\n'
+                    '        }\n',
+                ),
+            ),
+            "Python 3.15 validation context",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PRODUCER_VALIDATION_CONTEXT_SHA256
+        ):
+            raise AssertionError("Python validation context did not restore")
+        digest = PRODUCER_VALIDATION_CONTEXT_SHA256
     if digest == PRODUCER_VALIDATION_CONTEXT_SHA256:
         source = _restore_exact_source_transports(
             source,
@@ -16245,6 +16720,88 @@ def restore_cmake_source(source: str) -> str:
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == BASE_CMAKE_SHA256:
         return source
+    if digest == PYTHON315_HOST_CMAKE_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    "elseif(CMAKE_HOST_APPLE)\n",
+                    "elseif(APPLE)\n",
+                ),
+            ),
+            "Python CMake host discovery",
+        )
+        if (
+            hashlib.sha256(source.encode()).hexdigest()
+            != PYTHON315_CHALLENGE_CMAKE_SHA256
+        ):
+            raise AssertionError(
+                "Python CMake host discovery did not restore"
+            )
+        digest = PYTHON315_CHALLENGE_CMAKE_SHA256
+    if digest == PYTHON315_CHALLENGE_CMAKE_SHA256:
+        source = _restore_exact_source_transports(
+            source,
+            (
+                (
+                    "string(\n"
+                    "    RANDOM\n"
+                    "    LENGTH 32\n"
+                    "    ALPHABET 0123456789abcdef\n"
+                    "    _MICROS_PYTHON_CHALLENGE\n"
+                    ")\n",
+                    "",
+                ),
+                (
+                    '        --challenge "${_MICROS_PYTHON_CHALLENGE}"\n',
+                    "",
+                ),
+                (
+                    "    ERROR_VARIABLE MICROS_PYTHON_ERROR\n"
+                    "    OUTPUT_STRIP_TRAILING_WHITESPACE\n"
+                    ")\n",
+                    "    ERROR_VARIABLE MICROS_PYTHON_ERROR\n"
+                    ")\n",
+                ),
+                (
+                    "set(\n"
+                    "    _MICROS_PYTHON_EXPECTED_CHALLENGE\n"
+                    '    "{\\"challenge\\":\\"${_MICROS_PYTHON_CHALLENGE}\\",'
+                    '\\"status\\":\\"validated\\"}"\n'
+                    ")\n"
+                    "if(NOT MICROS_PYTHON_OUTPUT STREQUAL "
+                    "_MICROS_PYTHON_EXPECTED_CHALLENGE)\n"
+                    "    message(\n"
+                    "        FATAL_ERROR\n"
+                    '        "Unsupported MICROS_PYTHON: runtime validation '
+                    'challenge failed"\n'
+                    "    )\n"
+                    "endif()\n",
+                    "",
+                ),
+            ),
+            "Python CMake runtime challenge",
+        )
+        if hashlib.sha256(source.encode()).hexdigest() != PYTHON315_CMAKE_SHA256:
+            raise AssertionError("Python CMake challenge transport did not restore")
+        digest = PYTHON315_CMAKE_SHA256
+    if digest == PYTHON315_CMAKE_SHA256:
+        if source.count("${MICROS_PYTHON_ARGS}") != 62:
+            raise AssertionError("unexpected Python command inventory")
+        source = source.replace("${MICROS_PYTHON_ARGS}", "-B")
+        start = source.index("set(MICROS_PYTHON_ARGS -E -S -B)")
+        end = source.index(
+            "\n\nset(\n    MICROS_USER_ELF_CHECKER_SOURCES",
+            start,
+        )
+        source = (
+            source[:start]
+            + "find_program(MICROS_PYTHON NAMES python3 REQUIRED)"
+            + source[end:]
+        )
+        if hashlib.sha256(source.encode()).hexdigest() != FINAL_CMAKE_SHA256:
+            raise AssertionError("Python CMake transport did not restore")
+        digest = FINAL_CMAKE_SHA256
     if digest != FINAL_CMAKE_SHA256:
         raise AssertionError("unexpected current CMake recipe")
     for logical, physical in KERNEL_LOGICAL_TO_PHYSICAL.items():
@@ -16284,7 +16841,27 @@ def read_bytes_path(path: Path) -> bytes:
         ).encode()
     if relative == "tools/validation_plan.py":
         return restore_validation_plan_source(path.read_text(encoding="utf-8")).encode()
-    return path.read_bytes()
+    if relative == "tools/validation_build_impact.py":
+        return restore_validation_build_impact_source(
+            path.read_text(encoding="utf-8")
+        ).encode()
+    if relative == "tools/validation_inputs.py":
+        return restore_validation_inputs_source(
+            path.read_text(encoding="utf-8")
+        ).encode()
+    if relative == "tools/validation_execution.py":
+        return restore_validation_execution_source(
+            path.read_text(encoding="utf-8")
+        ).encode()
+    raw = path.read_bytes()
+    if (
+        relative is not None
+        and relative.startswith("tools/")
+        and relative != "tools/python_host_runtime.py"
+        and raw.startswith(b"#!/usr/bin/env -S python3.15 -E -S -B\n")
+    ):
+        return b"#!/usr/bin/env python3\n" + raw.split(b"\n", 1)[1]
+    return raw
 
 
 def read_path(
@@ -16346,8 +16923,59 @@ class _RestoreGateAdapter(ast.NodeTransformer):
             )
         return node
 
+    def visit_Dict(self, node: ast.Dict) -> ast.AST:
+        self.generic_visit(node)
+        keys = [
+            key.value
+            for key in node.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        ]
+        if set(keys) == {
+            "OPENSSL_CONF",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
+            "CLANG_NO_DEFAULT_CONFIG",
+        }:
+            return ast.Dict(
+                keys=[
+                    ast.Constant("PYTHONNOUSERSITE"),
+                    ast.Constant("CLANG_NO_DEFAULT_CONFIG"),
+                ],
+                values=[ast.Constant("1"), ast.Constant("1")],
+            )
+        return node
+
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
         self.generic_visit(node)
+        if node.name == "restored_runner_source":
+            node.body = [
+                statement
+                for statement in node.body
+                if not (
+                    isinstance(statement, ast.Assign)
+                    and len(statement.targets) == 1
+                    and isinstance(statement.targets[0], ast.Name)
+                    and statement.targets[0].id == "header"
+                    and isinstance(statement.value, ast.Call)
+                    and isinstance(statement.value.func, ast.Attribute)
+                    and isinstance(statement.value.func.value, ast.Name)
+                    and statement.value.func.value.id == "header"
+                    and statement.value.func.attr == "replace"
+                )
+            ]
+        if node.name == "case_owner_methods":
+            node.body = [
+                statement
+                for statement in node.body
+                if not (
+                    isinstance(statement, ast.Assign)
+                    and len(statement.targets) == 1
+                    and isinstance(statement.targets[0], ast.Name)
+                    and statement.targets[0].id == "text"
+                    and isinstance(statement.value, ast.Name)
+                    and statement.value.id == "text"
+                )
+            ]
         if (
             node.name
             == "test_build_recipe_and_shared_validation_libraries_match_reviewed_identities"
@@ -16410,6 +17038,32 @@ class _RestoreGateAdapter(ast.NodeTransformer):
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)
         function = node.func
+        if isinstance(function, ast.Name) and function.id == "ast_dump":
+            return ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(id="ast", ctx=ast.Load()),
+                    attr="dump",
+                    ctx=ast.Load(),
+                ),
+                args=node.args,
+                keywords=[
+                    ast.keyword(
+                        arg="include_attributes",
+                        value=ast.Constant(False),
+                    ),
+                ],
+            )
+        if isinstance(function, ast.Name) and function.id == "python_command":
+            if node.keywords or not node.args:
+                raise AssertionError("invalid Python child-command projection")
+            return ast.List(
+                elts=[
+                    node.args[0],
+                    ast.Constant("-B"),
+                    *node.args[1:],
+                ],
+                ctx=ast.Load(),
+            )
         if not (
             isinstance(function, ast.Attribute)
             and isinstance(function.value, ast.Name)
@@ -16444,6 +17098,7 @@ class _RestoreGateAdapter(ast.NodeTransformer):
             "original_cmake_recipe_digest",
             "original_host_unit_only_inputs",
             "original_path_classification_equivalents",
+            "restore_python_child_commands",
         }:
             if len(node.args) != 1 or node.keywords:
                 raise AssertionError(f"invalid planner projection: {function.attr}")
@@ -16455,17 +17110,77 @@ class _RestoreGateAdapter(ast.NodeTransformer):
         return node
 
 
-def _restore_gate_ast(tree: ast.Module) -> ast.Module:
-    tree.body = [
-        statement
-        for statement in tree.body
-        if not (
-            isinstance(statement, ast.ImportFrom)
-            and statement.module == "tests.host"
-            and len(statement.names) == 1
-            and statement.names[0].name == "kernel_layout_source"
+def _restore_user_elf_ast_helpers(tree: ast.Module, names: set[str]) -> None:
+    names.discard("ast_dump")
+    if names != {"ast_digest", "ast_key"}:
+        if names:
+            raise AssertionError("unsupported AST evidence helper projection")
+        return
+    helpers = {
+        node.name: node
+        for node in ast.parse(
+            """
+def ast_key(value):
+    if isinstance(value, ast.AST):
+        if getattr(value, "type_params", ()):
+            raise AssertionError("unreviewed nonempty type parameters")
+        if type(value).__name__ == "Index":
+            return ast_key(value.value)
+        return (
+            type(value).__name__,
+            tuple(
+                (name, ast_key(child))
+                for name, child in ast.iter_fields(value)
+                if name != "type_params"
+            ),
         )
-    ]
+    if isinstance(value, (list, tuple)):
+        return tuple(ast_key(child) for child in value)
+    if isinstance(value, bytes):
+        return ("bytes", value.hex())
+    if value is Ellipsis:
+        return ("ellipsis",)
+    return value
+
+
+def ast_digest(node):
+    encoded = json.dumps(ast_key(node), separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("ascii")).hexdigest()
+"""
+        ).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    parse_index = next(
+        index
+        for index, node in enumerate(tree.body)
+        if isinstance(node, ast.FunctionDef) and node.name == "parse_source"
+    )
+    tree.body.insert(parse_index, helpers["ast_key"])
+    tree.body.insert(parse_index + 2, helpers["ast_digest"])
+
+
+def _restore_gate_ast(tree: ast.Module) -> ast.Module:
+    ast_evidence_names = set()
+    retained = []
+    for statement in tree.body:
+        if isinstance(statement, ast.ImportFrom):
+            if (
+                statement.module == "tests.host"
+                and len(statement.names) == 1
+                and statement.names[0].name == "kernel_layout_source"
+            ):
+                continue
+            if statement.module == "tests.host.ast_evidence":
+                ast_evidence_names.update(alias.name for alias in statement.names)
+                continue
+            if (
+                statement.module == "tools.python_host_runtime"
+                and [alias.name for alias in statement.names] == ["python_command"]
+            ):
+                continue
+        retained.append(statement)
+    tree.body = retained
+    _restore_user_elf_ast_helpers(tree, ast_evidence_names)
     restored = _RestoreGateAdapter().visit(tree)
     ast.fix_missing_locations(restored)
     return restored
@@ -16474,5 +17189,5 @@ def _restore_gate_ast(tree: ast.Module) -> ast.Module:
 def restored_gate_ast_sha256(root: Path, relative: str) -> str:
     source = (root / relative).read_text(encoding="utf-8")
     tree = _restore_gate_ast(ast.parse(source))
-    payload = ast.dump(tree, include_attributes=False).encode()
+    payload = ast_dump(tree).encode()
     return hashlib.sha256(payload).hexdigest()

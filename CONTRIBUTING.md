@@ -43,11 +43,20 @@ Accepted decision to change its meaning. Add a new ADR that supersedes it.
 
 ## Current validation commands
 
+Select the supported runtime before invoking repository automation:
+
+```bash
+export MICROS_PYTHON=/absolute/path/to/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+```
+
 Generate the validation plan for the current change with:
 
 ```bash
-python3 tools/validation_plan.py --tier fast
-python3 tools/validation_plan.py --tier pr
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier fast
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr
 ```
 
 Add `--execute` to run it. Use `--tier full` for `main`, milestone acceptance,
@@ -60,8 +69,8 @@ discovery rather than replacing it. Stage untracked files before using
 For documentation and repository-instruction changes, run:
 
 ```bash
-python3 -m unittest discover -s tests/host -p 'test_*.py'
-python3 tools/check_docs.py
+"${MICROS_PYTHON}" -E -S -B -m unittest discover -s tests/host -p 'test_*.py'
+"${MICROS_PYTHON}" -E -S -B tools/check_docs.py
 git add <intended-files>
 git diff --quiet
 git diff --check

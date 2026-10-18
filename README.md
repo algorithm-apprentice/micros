@@ -90,7 +90,8 @@ Install:
 
 - CMake 3.25 or newer;
 - Ninja;
-- Python 3.8 or newer;
+- GIL-enabled CPython 3.15 final, version 3.15.0 or newer within the 3.15
+  family;
 - Clang with the `riscv64-unknown-elf` target plus `llvm-nm` and
   `llvm-readelf`;
 - LLD;
@@ -100,6 +101,11 @@ Install:
 Then run:
 
 ```bash
+export MICROS_PYTHON=/absolute/path/to/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model

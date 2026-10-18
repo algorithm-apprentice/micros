@@ -639,7 +639,7 @@ from the outlined implementation.
 Run its focused implementation loop with:
 
 ```bash
-python3 -m unittest tests.host.test_scheduler_source_layout
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_scheduler_source_layout
 ```
 
 Use bounded concrete source checks for the critical minimal-accounting,

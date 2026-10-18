@@ -177,14 +177,14 @@ The first helper slice has these focused commands:
 cmake --preset host-debug
 cmake --build build/host-debug --target elf_spawn_fixture_test
 ctest --test-dir build/host-debug --output-on-failure -R '^elf-spawn-fixture$'
-python3 -B -m unittest tests.host.test_generate_elf_spawn_seed
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_generate_elf_spawn_seed
 ```
 
 The separate seed tool consumes full checked application ELFs and publishes
 only the existing RAMFS format:
 
 ```text
-python3 tools/generate_elf_spawn_seed.py --init-elf INIT_ELF --child-elf CHILD_ELF --output SEED
+"${MICROS_PYTHON}" -E -S -B tools/generate_elf_spawn_seed.py --init-elf INIT_ELF --child-elf CHILD_ELF --output SEED
 ```
 
 1. Publish this map and the merged predecessor/baseline references.

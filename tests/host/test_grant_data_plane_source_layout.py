@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import unittest
 
+from tests.host.ast_evidence import ast_dump
 from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
@@ -2931,7 +2932,7 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             ("planner", planner_ast_without_grant_paths(source("tools/validation_plan.py")), PLANNER_AST_DIGEST),
             ("context", context_ast_without_recipe_pin(source("tools/validation_context.py")), CONTEXT_AST_DIGEST),
         ):
-            self.assertEqual(expected, digest_bytes(ast.dump(tree, include_attributes=False).encode()), name)
+            self.assertEqual(expected, digest_bytes(ast_dump(tree).encode()), name)
 
     def test_all_four_independent_classification_dimensions_remain_exact(self):
         copy_gates = tuple("test-qemu-" + name for name in (
@@ -3020,7 +3021,7 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             "HOST_UNIT_ONLY_INPUTS = " + repr(("original_host", STRUCTURAL_TEST_PATH)) + "\n"
             "def algorithm(value):\n    return value + 1\n"
         )
-        fingerprint = lambda tree: ast.dump(tree, include_attributes=False)
+        fingerprint = lambda tree: ast_dump(tree)
         self.assertEqual(fingerprint(ast.parse(expected)), fingerprint(planner_ast_without_grant_paths(current)))
         for changed in (
             current.replace("kernel/grant_copy_range.c", "kernel/unchecked_range.c"),

@@ -243,7 +243,118 @@ if(MICROS_TARGET_TEST_COUNT GREATER 1)
     message(FATAL_ERROR "Select at most one target test image")
 endif()
 
-find_program(MICROS_PYTHON NAMES python3 REQUIRED)
+set(MICROS_PYTHON_ARGS -E -S -B)
+set(_MICROS_PYTHON_CANDIDATE "")
+
+if(DEFINED CACHE{MICROS_PYTHON})
+    get_property(
+        _MICROS_PYTHON_CANDIDATE
+        CACHE MICROS_PYTHON
+        PROPERTY VALUE
+    )
+    if(_MICROS_PYTHON_CANDIDATE STREQUAL "")
+        message(FATAL_ERROR "Explicit MICROS_PYTHON cache entry is empty")
+    endif()
+elseif(DEFINED ENV{MICROS_PYTHON})
+    set(_MICROS_PYTHON_CANDIDATE "$ENV{MICROS_PYTHON}")
+    if(_MICROS_PYTHON_CANDIDATE STREQUAL "")
+        message(FATAL_ERROR "Explicit MICROS_PYTHON environment entry is empty")
+    endif()
+elseif(DEFINED ENV{MICROS_PYTHON_ROOT})
+    if("$ENV{MICROS_PYTHON_ROOT}" STREQUAL "")
+        message(FATAL_ERROR "Explicit MICROS_PYTHON_ROOT is empty")
+    endif()
+    set(
+        _MICROS_PYTHON_CANDIDATE
+        "$ENV{MICROS_PYTHON_ROOT}/bin/python3.15"
+    )
+elseif(CMAKE_HOST_APPLE)
+    find_program(_MICROS_BREW NAMES brew NO_CACHE)
+    if(_MICROS_BREW)
+        execute_process(
+            COMMAND "${_MICROS_BREW}" --prefix python@3.15
+            RESULT_VARIABLE _MICROS_BREW_RESULT
+            OUTPUT_VARIABLE _MICROS_BREW_PYTHON_ROOT
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(
+            _MICROS_BREW_RESULT EQUAL 0
+            AND NOT _MICROS_BREW_PYTHON_ROOT STREQUAL ""
+        )
+            set(
+                _MICROS_PYTHON_CANDIDATE
+                "${_MICROS_BREW_PYTHON_ROOT}/bin/python3.15"
+            )
+        endif()
+    endif()
+endif()
+
+if(_MICROS_PYTHON_CANDIDATE STREQUAL "")
+    find_program(
+        _MICROS_PATH_PYTHON
+        NAMES python3.15
+        NO_CACHE
+    )
+    set(_MICROS_PYTHON_CANDIDATE "${_MICROS_PATH_PYTHON}")
+endif()
+if(
+    NOT _MICROS_PYTHON_CANDIDATE
+    OR NOT IS_ABSOLUTE "${_MICROS_PYTHON_CANDIDATE}"
+    OR NOT EXISTS "${_MICROS_PYTHON_CANDIDATE}"
+    OR IS_DIRECTORY "${_MICROS_PYTHON_CANDIDATE}"
+)
+    message(FATAL_ERROR "CPython 3.15 executable cannot be resolved")
+endif()
+if(
+    DEFINED ENV{__PYVENV_LAUNCHER__}
+    AND NOT "$ENV{__PYVENV_LAUNCHER__}" STREQUAL ""
+)
+    message(FATAL_ERROR "__PYVENV_LAUNCHER__ is unsupported")
+endif()
+
+set(
+    MICROS_PYTHON
+    "${_MICROS_PYTHON_CANDIDATE}"
+    CACHE FILEPATH
+    "Exact CPython 3.15 host-automation executable"
+    FORCE
+)
+string(
+    RANDOM
+    LENGTH 32
+    ALPHABET 0123456789abcdef
+    _MICROS_PYTHON_CHALLENGE
+)
+execute_process(
+    COMMAND
+        "${MICROS_PYTHON}"
+        ${MICROS_PYTHON_ARGS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/python_host_runtime.py"
+        --selected "${MICROS_PYTHON}"
+        --challenge "${_MICROS_PYTHON_CHALLENGE}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RESULT_VARIABLE MICROS_PYTHON_RESULT
+    OUTPUT_VARIABLE MICROS_PYTHON_OUTPUT
+    ERROR_VARIABLE MICROS_PYTHON_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(NOT MICROS_PYTHON_RESULT EQUAL 0)
+    message(
+        FATAL_ERROR
+        "Unsupported MICROS_PYTHON:\n${MICROS_PYTHON_OUTPUT}${MICROS_PYTHON_ERROR}"
+    )
+endif()
+set(
+    _MICROS_PYTHON_EXPECTED_CHALLENGE
+    "{\"challenge\":\"${_MICROS_PYTHON_CHALLENGE}\",\"status\":\"validated\"}"
+)
+if(NOT MICROS_PYTHON_OUTPUT STREQUAL _MICROS_PYTHON_EXPECTED_CHALLENGE)
+    message(
+        FATAL_ERROR
+        "Unsupported MICROS_PYTHON: runtime validation challenge failed"
+    )
+endif()
 
 set(
     MICROS_USER_ELF_CHECKER_SOURCES
@@ -475,7 +586,7 @@ add_custom_command(
     OUTPUT "${MICROS_RAMFS_SEED_IMAGE}"
     COMMAND
         "${MICROS_PYTHON}"
-        -B
+        ${MICROS_PYTHON_ARGS}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_seed.py"
         --manifest
         "${CMAKE_CURRENT_SOURCE_DIR}/servers/ramfs/seed.json"
@@ -2705,7 +2816,7 @@ if(MICROS_BUILD_HOST_TESTS)
             slow
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             -m
             unittest
             discover
@@ -2827,7 +2938,7 @@ if(MICROS_BUILD_HOST_TESTS)
             --output-on-failure
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             -m
             unittest
             discover
@@ -2964,7 +3075,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUI
             TARGET "${target}"
             POST_BUILD
             COMMAND
-                "${MICROS_PYTHON}" -B
+                "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py"
                 --elf "$<TARGET_FILE:${target}>"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3011,7 +3122,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUI
         add_custom_command(
             OUTPUT "${MICROS_ELF_SPAWN_SEED_IMAGE}"
             COMMAND
-                "${MICROS_PYTHON}" -B
+                "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_seed.py"
                 --init-elf "$<TARGET_FILE:micros_elf_spawn_init>"
                 --child-elf "$<TARGET_FILE:micros_elf_spawn_child>"
@@ -3033,7 +3144,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUI
     add_custom_command(
         OUTPUT "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
         COMMAND
-            "${MICROS_PYTHON}" -B
+            "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_runtime_fixture.py"
             --elf "$<TARGET_FILE:micros_application_runtime_probe>"
             --output "${MICROS_APPLICATION_RUNTIME_FIXTURE_SOURCE}"
@@ -3066,7 +3177,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUI
                 "$<TARGET_FILE:micros_application_runtime_probe>"
                 "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
             COMMAND
-                "${MICROS_PYTHON}" -B
+                "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_application_elf.py"
                 --elf "$<TARGET_FILE:micros_application_runtime_probe>"
                 --runtime-elf "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
@@ -3079,7 +3190,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST OR MICROS_BUILD_APPLICATION_IMAGES OR MICROS_BUI
         add_custom_command(
             OUTPUT "${MICROS_APPLICATION_SEED_IMAGE}"
             COMMAND
-                "${MICROS_PYTHON}" -B
+                "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_application_seed.py"
                 --elf "$<TARGET_FILE:micros_application_runtime_probe>"
                 --runtime-elf "${MICROS_APPLICATION_RUNTIME_ARTIFACT}"
@@ -3175,7 +3286,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
         POST_BUILD
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
             --elf
             "$<TARGET_FILE:micros_user_runtime_service>"
@@ -3190,7 +3301,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
         OUTPUT "${MICROS_USER_RUNTIME_FIXTURE_SOURCE}"
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_user_runtime_fixture.py"
             --elf
             "$<TARGET_FILE:micros_user_runtime_service>"
@@ -3301,7 +3412,7 @@ if(
             POST_BUILD
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
                 --elf
                 "$<TARGET_FILE:${target}>"
@@ -3360,7 +3471,7 @@ if(
             OUTPUT "${MICROS_RAMFS_EMBEDDED_SEED_SOURCE}"
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_ramfs_seed.py"
                 --input
                 "${MICROS_RAMFS_SERVICE_SEED_IMAGE}"
@@ -3390,7 +3501,7 @@ if(
             POST_BUILD
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
                 --elf
                 "$<TARGET_FILE:micros_ramfs_service>"
@@ -3421,7 +3532,7 @@ if(
             POST_BUILD
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
                 --elf
                 "$<TARGET_FILE:micros_vfs_service>"
@@ -3485,7 +3596,7 @@ if(
             POST_BUILD
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_user_elf.py"
                 --elf
                 "$<TARGET_FILE:micros_vm_server>"
@@ -3588,7 +3699,7 @@ if(
                     "${MICROS_VM_SCRATCH_PREEMPTION_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_scratch_preemption_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3645,7 +3756,7 @@ if(
                 OUTPUT "${MICROS_PM_SERVICE_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_pm_service_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3697,7 +3808,7 @@ if(
                 OUTPUT "${MICROS_TTY_SERVICE_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_tty_service_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3752,7 +3863,7 @@ if(
             add_custom_command(
                 OUTPUT "${MICROS_ELF_SPAWN_FIXTURE_SOURCE}"
                 COMMAND
-                    "${MICROS_PYTHON}" -B
+                    "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_elf_spawn_fixture.py"
                     --launcher-elf "$<TARGET_FILE:micros_bootstrap_launcher>"
                     --vm-elf "$<TARGET_FILE:micros_vm_server>"
@@ -3808,7 +3919,7 @@ if(
                 OUTPUT "${MICROS_VFS_SERVICE_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vfs_service_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3869,7 +3980,7 @@ if(
                 OUTPUT "${MICROS_RAMFS_SERVICE_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_ramfs_service_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3917,7 +4028,7 @@ if(
                 OUTPUT "${MICROS_VM_HANDOFF_FIXTURE_SOURCE}"
                 COMMAND
                     "${MICROS_PYTHON}"
-                    -B
+                    ${MICROS_PYTHON_ARGS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_vm_handoff_fixture.py"
                     --launcher-elf
                     "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -3964,7 +4075,7 @@ if(
             OUTPUT "${MICROS_BOOTSTRAP_FIXTURE_SOURCE}"
             COMMAND
                 "${MICROS_PYTHON}"
-                -B
+                ${MICROS_PYTHON_ARGS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_fixture.py"
                 --launcher-elf
                 "$<TARGET_FILE:micros_bootstrap_launcher>"
@@ -4371,7 +4482,7 @@ if(MICROS_BUILD_OBJECT_MODEL_TEST)
         test-qemu-object-model
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4406,7 +4517,7 @@ if(MICROS_BUILD_ENDPOINT_TEST)
         test-qemu-endpoint
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4441,7 +4552,7 @@ if(MICROS_BUILD_GRANT_TEST)
         test-qemu-grant
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4488,7 +4599,7 @@ if(MICROS_BUILD_IPC_TEST)
         test-qemu-ipc
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4523,7 +4634,7 @@ if(MICROS_BUILD_IPC_ECALL_CORE_TEST)
         test-qemu-ipc-ecall-core
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4557,7 +4668,7 @@ if(MICROS_BUILD_IPC_SYSCALL_TEST)
         test-qemu-ipc-syscall
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4591,7 +4702,7 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
         test-qemu-ipc-syscall-panic
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4629,7 +4740,7 @@ if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
         test-qemu-bootstrap-launcher
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4663,7 +4774,7 @@ if(MICROS_BUILD_VM_HANDOFF_TEST)
         test-qemu-vm-handoff
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4697,7 +4808,7 @@ if(MICROS_BUILD_PM_SERVICE_TEST)
         test-qemu-pm-service
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4733,7 +4844,7 @@ if(MICROS_BUILD_VM_SCRATCH_PREEMPTION_TEST)
         test-qemu-vm-scratch-preemption
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4767,7 +4878,7 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
         test-qemu-tty
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4805,7 +4916,7 @@ if(MICROS_BUILD_RAMFS_SERVICE_TEST)
         test-qemu-ramfs
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4839,7 +4950,7 @@ if(MICROS_BUILD_VFS_SERVICE_TEST)
         test-qemu-vfs
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4876,7 +4987,7 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
     add_custom_target(
         test-qemu-elf-spawn
         COMMAND
-            "${MICROS_PYTHON}" -B
+            "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu "${MICROS_QEMU}"
             --kernel "$<TARGET_FILE:micros>"
@@ -4904,7 +5015,7 @@ if(MICROS_BUILD_VM_READY_EARLY_TEST)
         test-qemu-vm-ready-early
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -4945,7 +5056,7 @@ if(MICROS_BUILD_VM_SELF_FAULT_TEST)
         test-qemu-vm-self-fault
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5010,7 +5121,7 @@ if(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
         test-qemu-vm-self-fault-sealed
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5075,7 +5186,7 @@ if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
         test-qemu-bootstrap-ready-timeout
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5116,7 +5227,7 @@ if(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
         test-qemu-bootstrap-manifest-panic
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5157,7 +5268,7 @@ if(MICROS_BUILD_GRANT_SYSCALL_TEST)
         test-qemu-grant-syscall
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5191,7 +5302,7 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
         test-qemu-user-runtime
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5239,7 +5350,7 @@ if(MICROS_BUILD_NESTED_TRAP_TEST)
         test-qemu-nested-trap
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5274,7 +5385,7 @@ if(MICROS_BUILD_FRAME_OWNERSHIP_TEST)
         test-qemu-frame-ownership
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5309,7 +5420,7 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
         test-qemu-user-address-space
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5344,7 +5455,7 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
         test-qemu-address-space-handoff
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5380,7 +5491,7 @@ if(MICROS_BUILD_USER_EXECUTION_TEST)
         test-qemu-user-execution
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5415,7 +5526,7 @@ if(MICROS_BUILD_SCHEDULER_TEST)
         test-qemu-scheduler
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5462,7 +5573,7 @@ if(
         test-qemu-scheduler-invalid-context
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5778,7 +5889,7 @@ add_custom_command(
     POST_BUILD
     COMMAND
         "${MICROS_PYTHON}"
-        -B
+        ${MICROS_PYTHON_ARGS}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_elf_sections.py"
         --readelf
         "${CMAKE_READELF}"
@@ -5794,7 +5905,7 @@ add_custom_target(
     test-qemu-smoke
     COMMAND
         "${MICROS_PYTHON}"
-        -B
+        ${MICROS_PYTHON_ARGS}
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
         --qemu
         "${MICROS_QEMU}"
@@ -5827,7 +5938,7 @@ if(MICROS_BUILD_UART_CONSOLE_TEST)
         test-qemu-uart-console
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5865,7 +5976,7 @@ if(MICROS_BUILD_PANIC_TEST)
         test-qemu-panic
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5912,7 +6023,7 @@ if(MICROS_BUILD_TRAP_TEST)
         test-qemu-trap
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5946,7 +6057,7 @@ if(MICROS_BUILD_TIMER_TEST)
         test-qemu-timer
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -5981,7 +6092,7 @@ if(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
         test-qemu-frame-allocator
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -6021,7 +6132,7 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
         test-qemu-trap-panic
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"
@@ -6073,7 +6184,7 @@ if(MICROS_BUILD_MMU_TEST)
         test-qemu-mmu
         COMMAND
             "${MICROS_PYTHON}"
-            -B
+            ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
             --qemu
             "${MICROS_QEMU}"

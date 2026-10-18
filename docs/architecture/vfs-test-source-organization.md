@@ -417,14 +417,14 @@ Before independent review, generate and inspect the authoritative
 pull-request plan:
 
 ```sh
-python3 tools/validation_plan.py --tier pr --base main
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --base main
 ```
 
 The plan must select complete native validation, the standalone VFS image, and
 the QEMU VFS gate for the completed change. Execute that plan once:
 
 ```sh
-python3 tools/validation_plan.py --tier pr --base main --execute
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --base main --execute
 ```
 
 Do not separately rerun a workflow already selected by the authoritative

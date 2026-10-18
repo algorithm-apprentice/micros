@@ -213,7 +213,8 @@ The build requires:
 
 - CMake 3.25 or newer;
 - Ninja;
-- Python 3.8 or newer;
+- GIL-enabled CPython 3.15 final, version 3.15.0 or newer within the 3.15
+  family;
 - Clang with the `riscv64-unknown-elf` target plus `llvm-nm` and
   `llvm-readelf`;
 - LLD;
@@ -241,17 +242,38 @@ It discovers LLD in this order:
 3. `brew --prefix lld` on macOS;
 4. `ld.lld` on `PATH`.
 
-CMake discovers `python3` and `qemu-system-riscv64` on `PATH`. They may be
-overridden in an explicit configure step:
+CMake selects GIL-enabled CPython 3.15 final in this order:
+
+1. the `MICROS_PYTHON` CMake cache entry;
+2. inherited `MICROS_PYTHON`;
+3. `${MICROS_PYTHON_ROOT}/bin/python3.15`;
+4. `brew --prefix python@3.15` on macOS;
+5. `python3.15` on `PATH`.
+
+An invalid explicit selection stops configuration rather than falling through.
+Every invocation uses `-E -S -B`. Supported execution also requires
+`OPENSSL_CONF=/dev/null`, `SSL_CERT_FILE=/dev/null`, and
+`SSL_CERT_DIR=/dev/null`. QEMU remains discoverable on `PATH`. Both tools may
+be selected in an explicit configure step:
 
 ```bash
 cmake --preset riscv64-debug \
-  -DMICROS_PYTHON=/absolute/path/to/python3 \
+  -DMICROS_PYTHON=/absolute/path/to/python3.15 \
   -DMICROS_QEMU=/absolute/path/to/qemu-system-riscv64
 ```
 
 Missing tools stop configuration with an explicit error. The build never
 falls back to a hosted C library or a host linker.
+
+Before running a workflow, select the interpreter and disable mutable OpenSSL
+configuration/trust inputs:
+
+```bash
+export MICROS_PYTHON=/absolute/path/to/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+```
 
 ## Build
 
@@ -311,8 +333,8 @@ cmake --workflow --preset test-unit
 Generate a changed-path plan with:
 
 ```bash
-python3 tools/validation_plan.py --tier fast
-python3 tools/validation_plan.py --tier pr
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier fast
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr
 ```
 
 Add `--execute` to run the commands. Unknown target paths and shared QEMU
@@ -325,18 +347,22 @@ Fresh execution is still the default. These explicit forms never reuse prior
 command results:
 
 ```bash
-python3 tools/validation_plan.py --tier pr --execute --fresh
-python3 tools/validation_plan.py --tier full --execute --fresh
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --execute --fresh
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
 ```
 
 When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:
 
 ```bash
-PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
-python3 tools/validation_plan.py \
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py \
   --tier pr --base origin/main --execute --producer
 ```
 
@@ -366,15 +392,20 @@ the native compiler. Reusable collection requires explicit `MICROS_CLANG` or
 `MICROS_LLVM_ROOT`; automatic discovery is fresh-only. Invalid explicit
 compiler overrides fail closed rather than selecting a fallback.
 
-For the supported Homebrew/Xcode configuration, use the same explicit
-environment for the producer and consumer. Compiler paths must match the
-configured cache, not merely resolve to the same multicall executable:
+For the supported Homebrew CPython/Xcode configuration, use the same explicit
+environment for configuration, producer, and consumer. Python and compiler
+spellings must match the configured cache, not merely resolve to the same
+executable:
 
 ```bash
-PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
-python3 tools/validation_plan.py --tier pr --execute --reuse
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --execute --reuse
 ```
 
 Missing, stale, unsupported or corrupt evidence prints a `MISS` reason and
@@ -390,10 +421,14 @@ failure code defined by ADR-0074. Non-producer reports omit that object.
 One exact canonical workflow can also be executed and recorded fresh:
 
 ```bash
-PYTHONNOUSERSITE=1 CLANG_NO_DEFAULT_CONFIG=1 \
-MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang \
-MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld \
-python3 tools/validation_plan.py --record-workflow test-unit
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --record-workflow test-unit
 ```
 
 This is **gate-only, not final author validation**; it cannot select paths,

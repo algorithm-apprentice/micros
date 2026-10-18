@@ -307,7 +307,9 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
                     {
                         tier: hashlib.sha256(
                             json.dumps(
-                                validation_plan.plan([path], tier, "BASE"),
+                                kernel_layout_source.original_validation_plan(
+                                    validation_plan.plan([path], tier, "BASE")
+                                ),
                                 separators=(",", ":"),
                             ).encode()
                         ).hexdigest()

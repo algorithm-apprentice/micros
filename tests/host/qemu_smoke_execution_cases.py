@@ -4,6 +4,8 @@ import io
 
 import sys
 
+from tools.python_host_runtime import python_command
+
 from tools import run_qemu_smoke
 
 
@@ -74,7 +76,7 @@ class QemuCommandCases:
 
 class QemuSerialInputCases:
     def test_writes_serial_input_once_after_complete_trigger_line(self):
-        command = [
+        command = list(python_command(
             sys.executable,
             "-c",
             (
@@ -85,7 +87,7 @@ class QemuSerialInputCases:
                 "sys.stdout.write(data.hex()+'\\n');"
                 "sys.stdout.flush()"
             ),
-        ]
+        ))
 
         result = run_qemu_smoke.run_qemu(
             command,
@@ -100,7 +102,7 @@ class QemuSerialInputCases:
         self.assertEqual("READY\n787f0d\n", result.output)
 
     def test_default_execution_keeps_stdin_closed(self):
-        command = [
+        command = list(python_command(
             sys.executable,
             "-c",
             (
@@ -108,7 +110,7 @@ class QemuSerialInputCases:
                 "data=sys.stdin.buffer.read(1);"
                 "sys.stdout.write('EOF\\n' if not data else 'DATA\\n')"
             ),
-        ]
+        ))
 
         result = run_qemu_smoke.run_qemu(command, 2.0)
 
@@ -118,7 +120,7 @@ class QemuSerialInputCases:
         self.assertEqual("EOF\n", result.output)
 
     def test_closed_serial_input_pipe_returns_a_normal_result(self):
-        command = [
+        command = list(python_command(
             sys.executable,
             "-c",
             (
@@ -127,7 +129,7 @@ class QemuSerialInputCases:
                 "sys.stdout.write('READY\\n');"
                 "sys.stdout.flush()"
             ),
-        ]
+        ))
 
         result = run_qemu_smoke.run_qemu(
             command,

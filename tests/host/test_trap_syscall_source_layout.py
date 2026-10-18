@@ -11,6 +11,7 @@ import re
 import unittest
 from unittest.mock import patch
 
+from tests.host.ast_evidence import ast_dump
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_endpoint_source_layout import (
     alias_rows as endpoint_alias_rows,
@@ -1518,7 +1519,7 @@ def python_body_fingerprint(node: ast.FunctionDef) -> str:
 
     body = ast.Module(body=copy.deepcopy(node.body), type_ignores=[])
     normalized = RenameIdentifiers().visit(body)
-    return hashlib.sha256(ast.dump(normalized, include_attributes=False).encode()).hexdigest()
+    return hashlib.sha256(ast_dump(normalized).encode()).hexdigest()
 
 
 def expanded_flow(
@@ -1876,7 +1877,7 @@ def planner_ast_without_new_paths(text: str) -> ast.Module:
             isinstance(node, ast.FunctionDef)
             and node.name in ("main", "parse_arguments", "repository_plan", "canonical_workflows")
         )
-        and ast.dump(node, include_attributes=False) != ast.dump(bootstrap, include_attributes=False)
+        and ast_dump(node) != ast_dump(bootstrap)
     ]
     return tree
 
@@ -2443,7 +2444,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         tree = planner_ast_without_new_paths(read_source("tools/validation_plan.py"))
         self.assertEqual(
             BASE_PLANNER_AST_HASH,
-            hashlib.sha256(ast.dump(tree, include_attributes=False).encode()).hexdigest(),
+            hashlib.sha256(ast_dump(tree).encode()).hexdigest(),
             "original ownership/pure planning stays exact; ADR-0064 owns the reviewed CLI extension",
         )
 

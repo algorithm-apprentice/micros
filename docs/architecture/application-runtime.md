@@ -132,8 +132,8 @@ to executable-byte parity. Bounds and denied features are not widened.
 The implemented checker entry is:
 
 ```text
-python3 tools/check_application_elf.py --elf FULL_LINK_ELF
-python3 tools/check_application_elf.py --elf FULL_LINK_ELF --runtime-elf SEEDED_ELF
+"${MICROS_PYTHON}" -E -S -B tools/check_application_elf.py --elf FULL_LINK_ELF
+"${MICROS_PYTHON}" -E -S -B tools/check_application_elf.py --elf FULL_LINK_ELF --runtime-elf SEEDED_ELF
 ```
 
 The second form validates the full link image first, then checks the seeded

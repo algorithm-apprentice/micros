@@ -1,3 +1,5 @@
+import os
+import sys
 import unittest
 from unittest import mock
 
@@ -119,6 +121,16 @@ class ValidationPlanTests(unittest.TestCase):
             self.assert_workflow_selected(path, "test-qemu-elf-spawn")
 
     def test_docs_only_avoids_builds_in_both_tiers(self):
+        self.assertEqual(
+            (
+                os.environ.get("MICROS_PYTHON") or sys.executable,
+                "-E",
+                "-S",
+                "-B",
+                "tools/check_docs.py",
+            ),
+            validation_plan.DOCS,
+        )
         expected = [
             validation_plan.DOCS,
             *validation_plan.diff_commands("origin/main"),

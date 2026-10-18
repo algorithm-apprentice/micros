@@ -88,7 +88,7 @@ transition authority through another reference owner.
 The focused structural command is:
 
 ```bash
-python3 -m unittest tests.host.test_kernel_ipc_source_layout
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_ipc_source_layout
 ```
 
 The authoritative final PR plan remains the gate described below.
@@ -964,7 +964,7 @@ change, verify a clean tracked worktree and no untracked task files, bind
 evidence to `HEAD` and `git write-tree`, and execute:
 
 ```bash
-python3 tools/validation_plan.py --tier pr --base main --execute
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --base main --execute
 ```
 
 Shared CMake/IPC ownership retains full-tier coverage. Do not run selected

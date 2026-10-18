@@ -475,9 +475,11 @@ profile with a closed Homebrew 3.15 runtime, disables site/OpenSSL/environment
 inputs, closes every child interpreter, and defines a stable project-owned AST
 evidence format without digest rebaselining. It adds no runtime-DAG node.
 Independent design review is clean after closure of OpenSSL, child-process,
-AST-evidence, and consumed-launcher boundaries. Design #151 is merged; the
-dependent implementation started separately and remains blocked only by the
-target validation corrections described below.
+AST-evidence, and consumed-launcher boundaries. Design #151 is separately
+merged. The dependent implementation now centralizes exact CMake/runtime
+selection, advances reusable evidence to
+`darwin-arm64-ninja-python315-v2`, closes the Homebrew/OpenSSL/child-process
+inputs, and preserves every prior AST digest through one shared serializer.
 
 The Python implementation gate then exposed a measured target hot-path defect:
 the ELF-spawn image can cross its timeout while the hart repeatedly scans the
@@ -503,8 +505,8 @@ hit its 10-second guest readiness deadline while executing
 the exact boot digest and complete VM-state validation while replacing
 262,144 per-frame bitmap helper calls and linear inactive-zero hashing with a
 bitmap-word active scan, complete inactive tail checks, and logarithmic FNV
-zero-run advancement. The Python implementation remains blocked until the
-separate design and implementation pass the exact no-retry acceptance sequence.
+zero-run advancement. The Python implementation was blocked until the separate
+design and implementation passed the exact no-retry acceptance sequence.
 
 Implementation planning then found one design-evidence defect before code:
 ADR-0077's valid managed-count-1 case cannot construct the existing complete
@@ -519,8 +521,9 @@ The dependent implementation now uses segmented immutable-prefix hashing, one
 cached initial-free bitmap word per active chunk, exact inactive byte/bitmap
 tail checks, and logarithmic FNV zero-run advancement. The structural Red,
 sanitizer-backed VM-core semantics, VM-handoff component, and exact one-shot
-VFS-to-ELF sequence are green. Complete producer/reuse evidence and independent
-implementation review remain before merge.
+VFS-to-ELF sequence, complete producer/reuse evidence, and independent review
+passed. Implementation #156 is merged with the exact reviewed tree. The Python
+implementation has resumed from current `main`.
 
 ## v0.1 completion goal
 

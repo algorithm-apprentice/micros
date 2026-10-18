@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import unittest
 
+from tests.host.ast_evidence import ast_dump
 from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_grant_data_plane_source_layout import grant_data_plane_cmake_projection
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
@@ -1432,7 +1433,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(SHARED_INSPECTION_ASTS), set(definitions))
         for name, expected in SHARED_INSPECTION_ASTS.items():
             with self.subTest(name=name):
-                current = ast.dump(definitions[name], include_attributes=False)
+                current = ast_dump(definitions[name])
                 self.assertEqual(expected, hashlib.sha256(current.encode()).hexdigest())
         scheduler = ast.parse(kernel_layout_source.read_path(ROOT / "tests/host/test_scheduler_source_layout.py"))
         self.assertFalse(any(

@@ -30,9 +30,13 @@ CMake selects:
 MICROS_PYTHON cache
 MICROS_PYTHON environment
 MICROS_PYTHON_ROOT/bin/python3.15
-Darwin: brew --prefix python@3.15
+Darwin host: brew --prefix python@3.15
 PATH: python3.15
 ```
+
+The Homebrew branch is selected from CMake's host platform, not the configured
+target platform, so RISC-V cross configurations on macOS retain the same
+precedence.
 
 The selected executable must report CPython 3.15, final release, patch 0 or
 newer. Selection stops on an invalid explicit cache/environment/root path; it
@@ -93,7 +97,8 @@ Darwin Homebrew profile below.
 
 `sys.path` contains only:
 
-- the reviewed repository/script root required by the invocation form;
+- the reviewed repository, script, and test-discovery roots required by the
+  invocation form;
 - the selected installation's standard-library zip spelling;
 - its `lib/python3.15`; and
 - its `lib/python3.15/lib-dynload`.
@@ -127,6 +132,13 @@ and `PYTHONSTARTUP` remains. The previous `PYTHONNOUSERSITE=1` requirement is
 removed because `-S` establishes the stronger no-site boundary and `-E`
 ignores Python environment configuration.
 
+CPython's internal `_PYTHON_SYSCONFIGDATA_NAME`,
+`_PYTHON_SYSCONFIGDATA_PATH`, `_PYTHON_PROJECT_BASE`, and
+`_PYTHON_HOST_PLATFORM` controls are also rejected by key presence, including
+an explicitly exported empty value. The runtime helper imports `sysconfig`
+only after this shared environment validation, so an external sysconfig module
+cannot execute before rejection.
+
 Python standard extensions use OpenSSL. Supported execution additionally
 requires:
 
@@ -155,6 +167,9 @@ The observed installation resolves through:
 
 Paths are runtime data, not source constants. The profile derives the
 versioned Cellar root from the selected resolved executable.
+The active `Python.framework` must resolve exactly to
+`<derived Cellar root>/Frameworks/Python.framework`; an external same-shaped
+framework is rejected before its import roots can enter the profile.
 
 It fingerprints:
 
@@ -180,6 +195,12 @@ admitted. Configuration and default trust loading are disabled by the required
 environment above. Provider/module binaries remain within the fingerprinted
 versioned OpenSSL installation.
 
+The complete Cellar includes an inert `site-packages` subtree that is absent
+from active `sys.path` under `-S`. Its links retain membership, mode, spelling,
+and resolved-path identity, but an external link target's bytes are not
+admitted as runtime inputs. Active standard-library, extension, provider, and
+Mach-O links remain fail-closed under the ordinary closure rule.
+
 The reusable profile identity advances from the Xcode-Python declaration so
 old receipts cannot match accidentally.
 
@@ -187,6 +208,10 @@ old receipts cannot match accidentally.
 
 `MICROS_PYTHON` remains the selected executable cache entry. A central
 `MICROS_PYTHON_ARGS` owns `-E;-S;-B`.
+
+Configuration accepts that executable only after the runtime helper validates
+its own process and returns the exact response to a fresh per-configuration
+challenge. Exit zero without that challenge response is a failure.
 
 Every CMake command that executes Python must use:
 
@@ -276,6 +301,22 @@ remain rejected before QEMU metadata.
 Each permanent commit remains green. AST serializer transport is separate from
 tool selection/profile code so review can distinguish evidence format from
 runtime closure.
+
+## Implementation realization
+
+The implementation owns:
+
+- selection and exact CMake argv in `CMakeLists.txt`;
+- metadata, environment, path, GIL, launcher-effect, and OpenSSL checks in
+  `tools/python_host_runtime.py`;
+- planner command identity and reusable closure in
+  `tools/validation_plan.py`, `tools/validation_context.py`, and
+  `tools/validation_inputs.py`;
+- exact child-process construction in the ELF/QEMU host cases; and
+- stable AST text/key evidence in `tests/host/ast_evidence.py`.
+
+The reusable identity is `darwin-arm64-ninja-python315-v2`. Existing v1
+receipts cannot match it.
 
 ## Acceptance
 

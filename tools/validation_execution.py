@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from tools import validation_context, validation_evidence
+from tools.python_host_runtime import documentation_command
 
 
 class ExecutionError(ValueError):
@@ -34,7 +35,7 @@ def _validate_commands(commands, workflows):
         if _workflow(command, workflows) is not None:
             continue
         if command in (
-            ("python3", "tools/check_docs.py"),
+            documentation_command(),
             ("git", "diff", "--cached", "--check"),
             ("git", "diff", "--check"),
         ):
