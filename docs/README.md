@@ -102,6 +102,9 @@ This directory contains the design baseline for `micros`.
 - [B03 object and scheduler baseline audit](research/minix-complete-baseline-b03-objects-scheduler.md)
   audits identity/lifecycle, stacks, ready queues, accounting, policy, common
   return, and idle.
+- [B04 endpoint and IPC baseline audit](research/minix-complete-baseline-b04-endpoint-ipc.md)
+  audits identity/privilege, queues, synchronous operations, reply tokens,
+  notifications, deadlock, close, and retained delivery.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
