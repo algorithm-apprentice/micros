@@ -19,6 +19,10 @@ Architecture is not reconstructed from chat history. Accepted ADRs and the
 architecture documents are the durable source of truth. Agent instruction
 files remain small and point to those sources rather than copying them.
 
+For a MINIX-derived subsystem, canonical context includes the fixed-reference
+data structures, algorithms, and complexity ledger required by ADR-0080.
+Behavior-only notes are not sufficient implementation authority.
+
 ### Bounded tasks
 
 Every implementation task has one outcome and a known position in the
@@ -109,6 +113,7 @@ Before implementation, record:
 - one measurable outcome;
 - scope and explicit non-goals;
 - relevant ADRs and invariants;
+- fixed-reference data structures, algorithms, and complexity bounds;
 - expected files or interfaces;
 - source-module ownership and applicable review signals;
 - failing test or acceptance scenario;
@@ -124,10 +129,12 @@ Every implementation-bearing outcome uses two separately reviewed phases.
 
 1. Create paired design and implementation todos, make implementation depend
    on design, leave implementation pending, and activate only design.
-2. Research the relevant source and platform behavior.
-3. Define the baseline, goal, non-goals, ownership, state, failure, and
-   acceptance contracts, including responsibility boundaries when source
-   organization changes, in canonical documents and a Proposed ADR.
+2. Research the relevant source and platform behavior, logical data
+   structures, algorithms, and complexity envelope.
+3. Define the baseline, goal, non-goals, ownership, state, failure,
+   structural/algorithmic mapping, and acceptance contracts, including
+   responsibility boundaries when source organization changes, in canonical
+   documents and a Proposed ADR.
 4. Keep production code, executable tests/models/harnesses, build scaffolding,
    dependencies, and reusable prototypes out of the design pull request.
 5. Stage the complete design change, verify no unstaged/untracked task files
@@ -184,6 +191,10 @@ the implementation is blocked.
 | Boot/toolchain behavior | Automated smoke command expecting a marker/exit | Clean build and deterministic QEMU result |
 | Bug fix | Regression test reproducing the bug | Test fails without and passes with the fix |
 | Documentation only | Link/structure checks when available | No implementation test is invented |
+
+For a MINIX-derived portable algorithm, the Red step also demonstrates the
+required structure or work bound with deterministic comparison, probe, link,
+or record-visit counts. Wall-clock timing is not the parity oracle.
 
 The Red step may require first creating a test harness. The harness itself must
 have an observable failure mode and cannot report success merely because the

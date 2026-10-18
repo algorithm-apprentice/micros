@@ -35,6 +35,24 @@ do not require an invented runtime test. Exploratory spikes are not merged.
 The full task and review loop is defined in
 [the AI-native development workflow](development/ai-native-workflow.md).
 
+## Structural and algorithmic baseline evidence
+
+For MINIX-derived runtime work, semantic output is necessary but not
+sufficient. The design first records the reference data structure, algorithm,
+and complexity envelope required by ADR-0080. Portable implementation begins
+with deterministic evidence for the relevant property:
+
+- queue/list/tree/hash topology and membership;
+- comparison, probe, link-traversal, or record-visit counts;
+- sorted, reverse-sorted, equal-key, boundary, and adversarial inputs;
+- auxiliary-storage and stack bounds; and
+- a small independent reference model when the transition is stateful.
+
+Complexity is analyzed over the logical record count even when production
+uses a fixed-capacity array. A wall-clock threshold cannot prove asymptotic
+parity. A complete behavior or QEMU gate cannot waive a known structural or
+algorithmic divergence.
+
 ## Behavior-preserving source decomposition
 
 A source-organization refactor starts with a structural Red test for the

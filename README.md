@@ -1,11 +1,11 @@
 # micros
 
 `micros` is a from-scratch educational RISC-V64 reimplementation of the
-behavioral architecture of MINIX 3. MINIX provides the subsystem baseline;
-`micros` independently reproduces that behavior with documented target
-adaptations and safety extensions. The system is intended to make kernel
-mechanisms, user-space services, and their dependencies small enough to study
-directly.
+logical structures, algorithms, and behavior of MINIX 3. MINIX provides the
+subsystem baseline; `micros` independently reproduces that mechanism and
+behavior with documented target adaptations and safety extensions. The system
+is intended to make kernel mechanisms, user-space services, and their
+dependencies small enough to study directly.
 
 Implementation now follows the accepted dependency DAG. The current boot
 foundation builds a freestanding RISC-V64 ELF, enters through OpenSBI, emits a
@@ -71,6 +71,8 @@ user context, and restore the hart's idle trap stack.
 - [Development dependency DAG](docs/architecture/development-dag.md)
 - [MINIX dependency analysis](docs/research/minix-dependency-analysis.md)
 - [MINIX baseline parity audit](docs/research/minix-baseline-parity-audit.md)
+- [MINIX structural and algorithmic transition](docs/research/minix-structural-algorithm-transition.md)
+- [Complete MINIX baseline audit contract](docs/research/minix-complete-baseline-audit.md)
 - [MINIX scheduler and context-switch study](docs/research/minix-scheduler-and-context-switch.md)
 - [MINIX endpoint and blocking IPC study](docs/research/minix-endpoint-and-ipc.md)
 - [MINIX RS and SEF bootstrap study](docs/research/minix-rs-sef-bootstrap.md)

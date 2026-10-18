@@ -4,8 +4,9 @@
 
 `micros` is an educational operating system that uses a small privileged
 kernel and isolated user-space services. It independently reimplements the
-verified behavioral architecture of MINIX 3 without attempting source
-compatibility, binary compatibility, or a line-by-line translation.
+verified logical structures, algorithms, and behavior of MINIX 3 without
+attempting source compatibility, binary compatibility, or a line-by-line
+translation.
 
 The first complete product increment is a shell-capable system running under
 QEMU. It should be small enough that one developer can trace a process from a
@@ -19,22 +20,23 @@ user request through IPC, memory management, filesystem lookup, and back.
 3. Prefer explicit protocols and ownership over shared writable state.
 4. Make stale identities, invalid transitions, and ownership violations fail
    immediately.
-5. Use the smallest mechanism that reproduces the dependency-ready MINIX
-   baseline.
+5. Reproduce the dependency-ready MINIX logical structures, algorithm family,
+   complexity envelope, and behavior before selecting another mechanism.
 6. Defer compatibility, migration, and recovery machinery until a working
    system creates a concrete need for them.
-7. Keep implementation provenance clear: MINIX defines behavioral evidence,
-   not source to copy.
+7. Keep implementation provenance clear: MINIX defines structural,
+   algorithmic, and behavioral evidence, not source to copy.
 8. Preserve explicit extension boundaries for foreseeable features without
    implementing those features before they are needed.
-9. Optimize or redesign semantics only after the corresponding baseline works
-   end to end.
+9. Optimize or redesign structures, algorithms, or semantics only after the
+   corresponding baseline works end to end.
 10. Organize source modules by cohesive authority, resource lifecycle,
     protocol layer, or algorithm rather than accumulating unrelated behavior
     in central core files.
 
-The classification and research gate are defined by
-[ADR-0025](../adr/0025-minix-behavioral-baseline-before-optimization.md).
+The current structural, algorithmic, and behavioral research gate is defined
+by [ADR-0080](../adr/0080-minix-structural-and-algorithmic-baseline.md), which
+supersedes the earlier behavioral-only rule in ADR-0025.
 Accepted subsystem ADRs remain authoritative until explicitly superseded.
 The source-organization rules and current VFS module map are defined by
 [ADR-0051](../adr/0051-responsibility-based-source-modules.md) and

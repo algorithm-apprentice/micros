@@ -84,6 +84,12 @@ This directory contains the design baseline for `micros`.
 - [MINIX baseline parity audit](research/minix-baseline-parity-audit.md)
   classifies every merged kernel foundation as baseline behavior, required
   target adaptation, compatible extension, staged substitution, or correction.
+- [MINIX structural and algorithmic transition](research/minix-structural-algorithm-transition.md)
+  defines the current data-structure, algorithm, and complexity certification
+  ledger and records the first node-Q findings.
+- [Complete MINIX baseline audit contract](research/minix-complete-baseline-audit.md)
+  pins the reviewed tree, assigns every runtime/evidence path and operation to
+  a sequential audit unit, and blocks implementation until consolidation.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

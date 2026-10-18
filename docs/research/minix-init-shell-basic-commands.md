@@ -2,13 +2,15 @@
 
 ## Purpose
 
-This study fixes the MINIX behavioral baseline for development-DAG Step 15:
-creating production init after static bootstrap sealing, running one
-interactive console shell, launching foreground commands, reaping them, and
-providing `echo`, `cat`, `ls`, and `ps`.
+This study fixes the MINIX behavioral, structural, and algorithmic baseline
+for development-DAG Step 15: creating production init after static bootstrap
+sealing, running one interactive console shell, launching foreground commands,
+reaping them, and providing `echo`, `cat`, `ls`, and `ps`.
 
-It is the sole ADR-0025 classification ledger for this node-Q outcome. The
-existing PM/VFS/VM spawn, application runtime, TTY, RAMFS, and exit/wait
+It remains the behavioral classification ledger selected by ADR-0079. The
+structural and complexity transition is recorded in
+[the ADR-0080 transition audit](minix-structural-algorithm-transition.md).
+The existing PM/VFS/VM spawn, application runtime, TTY, RAMFS, and exit/wait
 decisions remain authoritative.
 
 The study does not authorize copying MINIX or NetBSD source. It identifies
@@ -36,9 +38,39 @@ Files inspected locally:
 - `bin/ls/ls.c`
 - `bin/ps/ps.c`
 - `bin/ps/print.c`
+- `lib/libc/gen/fts.c`
+- `lib/libc/stdlib/qsort.c`
+- `minix/servers/pm/utility.c`
 
 The fixed MINIX source includes imported NetBSD userland. That source is
 baseline evidence only and is not a code donor.
+
+## Structural and algorithmic baseline
+
+The implementation must preserve the reference mechanism, not only the final
+text:
+
+- single-user init retains one exact foreground shell identity;
+- the staged one-command shell parses in one forward pass and retains one
+  exact foreground child identity;
+- the immutable one-component PATH specialization does not need MINIX's
+  31-bucket command hash because there is no multi-component search result to
+  cache;
+- `echo` streams operands and separators without retaining the complete
+  logical output;
+- `cat` uses one reusable transfer buffer and completes every write before the
+  next read;
+- `ls` mirrors FTS's entry storage plus order-vector separation and uses the
+  MINIX/NetBSD Bentley-McIlroy three-way quicksort family;
+- PM process-list publication uses the same sorting family over lightweight
+  selected entries; and
+- `ps` validates parent identities with logarithmic lookup in the already
+  PID-sorted prefix.
+
+The detailed source/function mapping and complexity envelope are in the
+transition audit. Complete-output aggregation, quadratic collection-time
+duplicate checks, whole-range insertion or selection sorts, and repeated
+parent prefix scans are divergences requiring correction.
 
 ## Init baseline
 
@@ -183,7 +215,7 @@ Node Q begins after these merged outcomes:
 The current PID-1 application and PM trigger are test-only. They prove the
 mechanisms but do not implement production init or shell policy.
 
-## Sole ADR-0025 classification ledger
+## Behavioral classification ledger
 
 | ID | `micros` node-Q choice relative to the fixed baseline | Classification | Reason or replacement point |
 | --- | --- | --- | --- |

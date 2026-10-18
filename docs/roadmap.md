@@ -7,8 +7,16 @@ not begin until the previous pull request has been reviewed and accepted.
 Architecture or scope changes are recorded in ADRs before implementation.
 Implementation follows the repository's documentation-first, test-first,
 independently reviewed AI-native workflow. Each dependency-ready subsystem
-first reproduces the documented MINIX behavioral baseline; optional
-optimization follows only after baseline integration passes.
+first reproduces the documented MINIX logical structures, algorithm family,
+complexity envelope, and behavior; optional optimization follows only after
+baseline integration passes.
+
+The structural-baseline transition defined by ADR-0080 blocks every runtime
+correction and feature implementation while the pinned B01-B14 complete audit
+is in progress. After the read-only audit and consolidated findings register
+are accepted, blocking corrections merge sequentially and each affected unit
+is re-certified. The unmerged node-Q implementation and Step 16 remain blocked
+until that correction queue is empty.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

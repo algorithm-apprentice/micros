@@ -1,7 +1,8 @@
 # ADR-0025: MINIX Behavioral Baseline Before Optimization
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-10-06
+- Superseded by: ADR-0080
 - Supersedes:
   - ADR-0016's statement that accepted timer expirations are scheduling quanta
   - ADR-0024 in full
