@@ -117,6 +117,9 @@ This directory contains the design baseline for `micros`.
 - [B08 PM and spawn baseline audit](research/minix-complete-baseline-b08-pm-spawn.md)
   audits PM identity/parentage, hidden spawn/rollback, exit/zombie/wait,
   operation-13 authority, and canonical spawn request/layout handling.
+- [B09 TTY baseline audit](research/minix-complete-baseline-b09-tty.md)
+  audits console handoff, UART/PLIC ownership, raw and canonical queues,
+  grant-backed requests, output ordering, and validation cadence.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

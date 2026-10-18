@@ -256,7 +256,7 @@ ledgers but do not revise them silently.
 | B06 static bootstrap | Audited; four blocking findings | [B06 static-bootstrap audit](minix-complete-baseline-b06-static-bootstrap.md) |
 | B07 VM | Audited; six blocking findings | [B07 VM audit](minix-complete-baseline-b07-vm.md) |
 | B08 PM and spawn | Audited; six blocking findings | [B08 PM/spawn audit](minix-complete-baseline-b08-pm-spawn.md) |
-| B09 TTY | Pending | N/A |
+| B09 TTY | Audited; seven blocking findings | [B09 TTY audit](minix-complete-baseline-b09-tty.md) |
 | B10 RAMFS | Pending | N/A |
 | B11 VFS | Pending | N/A |
 | B12 ELF spawn and application lifecycle | Pending | N/A |
