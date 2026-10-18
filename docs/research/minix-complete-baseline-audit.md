@@ -252,7 +252,7 @@ ledgers but do not revise them silently.
 | B02 memory | Audited; confirms B01-F006 and adds nine blocking findings | [B02 memory audit](minix-complete-baseline-b02-memory.md) |
 | B03 objects and scheduler | Audited; six blocking findings | [B03 object/scheduler audit](minix-complete-baseline-b03-objects-scheduler.md) |
 | B04 endpoints and IPC | Audited; six blocking findings | [B04 endpoint/IPC audit](minix-complete-baseline-b04-endpoint-ipc.md) |
-| B05 grants and user execution | Pending | N/A |
+| B05 grants and user execution | Audited; six blocking findings | [B05 grant/user-execution audit](minix-complete-baseline-b05-grants-user-execution.md) |
 | B06 static bootstrap | Pending | N/A |
 | B07 VM | Pending | N/A |
 | B08 PM and spawn | Pending | N/A |
