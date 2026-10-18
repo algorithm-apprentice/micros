@@ -32,6 +32,25 @@ The three long functions are `matches_expected_result` 217,
 `parse_arguments` 330 and `main` 187. The 64-method
 `ExpectedOutcomeTest` is not one cohesive parser algorithm.
 
+## Accepted node-Q serial extension
+
+Accepted
+[ADR-0079](../adr/0079-production-init-shell-and-basic-commands.md) adds one
+bounded interface after this source-only baseline: repeatable prompt-paced
+serial trigger/payload pairs for the node-Q shell gate.
+
+- `qemu_smoke_arguments.py` owns pair parsing, equal-count validation and
+  mutual exclusion with the existing single-trigger form.
+- `qemu_smoke_execution.py` owns raw incremental trigger matching after the
+  prior match, one write per stage and ordered arming.
+- `qemu_smoke_outcome.py` requires every configured stage before success.
+- `qemu_smoke_arguments.py` also owns repeatable exact transcript lines, while
+  `qemu_smoke_outcome.py` requires the unique contiguous terminated session
+  slice to match them exactly.
+
+The existing single-trigger interface, QEMU argv, output classification,
+timeouts, and pass/panic/failure semantics remain unchanged.
+
 ## Preserved behavior
 
 The [fixed responsibility study](../research/minix-qemu-runner-source-organization.md)

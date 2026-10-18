@@ -350,6 +350,26 @@ wait mechanisms without combining them with shell policy or commands.
 through the reviewed ADR-0009 PM/VFS/VM spawn transaction after launcher
 authority is sealed, then adds the shell and required commands.
 
+Step 15 is internally serialized:
+
+1. fix the local MINIX init, shell, foreground execution, echo, cat, ls and ps
+   baseline;
+2. define one shared canonical spawn-request builder and bounded
+   application-client layer;
+3. persist a bounded PM command display name and publish one read-only
+   application-process snapshot for `ps`;
+4. spawn production PID 1 exactly once from PM after bootstrap sealing;
+5. make init spawn, wait for and restart one console shell;
+6. implement the bounded simple-command shell and four separate command
+   applications;
+7. build one immutable checked userland seed; and
+8. prove exact serial output, command PIDs, shell reaping, post-init resource
+   equality, UART drain and clean SBI shutdown.
+
+Step 15 does not add fork, signals, sessions, login, getty, multiple terminals,
+full shell grammar, pipes, redirection, background jobs, static-service
+enumeration in `ps`, or production shutdown authority.
+
 ## Phase gates
 
 ### Mechanism gate

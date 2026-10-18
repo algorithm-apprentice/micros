@@ -94,3 +94,4 @@ to make the project appear more consistent than it was.
 | [0076](0076-bounded-complete-frame-ownership-validation.md) | Bounded complete frame-ownership validation | Accepted |
 | [0077](0077-bounded-complete-vm-boot-database-validation.md) | Bounded complete VM boot-database validation | Accepted |
 | [0078](0078-valid-vm-boot-database-boundary-evidence.md) | Valid VM boot-database boundary evidence | Accepted |
+| [0079](0079-production-init-shell-and-basic-commands.md) | Production init, shell, and basic commands | Accepted |
