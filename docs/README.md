@@ -108,6 +108,9 @@ This directory contains the design baseline for `micros`.
 - [B05 grant and user-execution baseline audit](research/minix-complete-baseline-b05-grants-user-execution.md)
   audits direct-grant lifecycle and copy, syscall/trap/context paths, service
   and application startup, and runtime memory primitives.
+- [B06 static-bootstrap baseline audit](research/minix-complete-baseline-b06-static-bootstrap.md)
+  audits immutable boot identity, manifest/topology validation, complete
+  service preparation, release/readiness, deadlines, failure, and sealing.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
