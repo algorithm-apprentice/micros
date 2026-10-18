@@ -236,7 +236,7 @@ ledgers but do not revise them silently.
 | Unit | Status | Ledger |
 | --- | --- | --- |
 | B01 platform | Audited; six blocking findings | [B01 platform audit](minix-complete-baseline-b01-platform.md) |
-| B02 memory | Pending | N/A |
+| B02 memory | Audited; confirms B01-F006 and adds nine blocking findings | [B02 memory audit](minix-complete-baseline-b02-memory.md) |
 | B03 objects and scheduler | Pending | N/A |
 | B04 endpoints and IPC | Pending | N/A |
 | B05 grants and user execution | Pending | N/A |
