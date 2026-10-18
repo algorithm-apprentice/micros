@@ -93,6 +93,9 @@ This directory contains the design baseline for `micros`.
 - [B01 platform baseline audit](research/minix-complete-baseline-b01-platform.md)
   audits entry, firmware memory discovery, early UART, panic, PLIC, and timer
   mechanisms and records the first blocking findings.
+- [B02 memory baseline audit](research/minix-complete-baseline-b02-memory.md)
+  audits frame allocation/ownership, Sv39 construction, process roots,
+  translation, release, and handoff complexity.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
