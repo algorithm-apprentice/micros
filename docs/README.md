@@ -120,6 +120,9 @@ This directory contains the design baseline for `micros`.
 - [B09 TTY baseline audit](research/minix-complete-baseline-b09-tty.md)
   audits console handoff, UART/PLIC ownership, raw and canonical queues,
   grant-backed requests, output ordering, and validation cadence.
+- [B10 RAMFS baseline audit](research/minix-complete-baseline-b10-ramfs.md)
+  audits seed/runtime state, node/reference ownership, namespace lookup,
+  allocation, sparse I/O, directory enumeration, and validation cadence.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
