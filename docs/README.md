@@ -99,6 +99,9 @@ This directory contains the design baseline for `micros`.
 - [B02 memory baseline audit](research/minix-complete-baseline-b02-memory.md)
   audits frame allocation/ownership, Sv39 construction, process roots,
   translation, release, and handoff complexity.
+- [B03 object and scheduler baseline audit](research/minix-complete-baseline-b03-objects-scheduler.md)
+  audits identity/lifecycle, stacks, ready queues, accounting, policy, common
+  return, and idle.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
