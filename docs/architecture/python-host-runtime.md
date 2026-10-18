@@ -30,9 +30,13 @@ CMake selects:
 MICROS_PYTHON cache
 MICROS_PYTHON environment
 MICROS_PYTHON_ROOT/bin/python3.15
-Darwin: brew --prefix python@3.15
+Darwin host: brew --prefix python@3.15
 PATH: python3.15
 ```
+
+The Homebrew branch is selected from CMake's host platform, not the configured
+target platform, so RISC-V cross configurations on macOS retain the same
+precedence.
 
 The selected executable must report CPython 3.15, final release, patch 0 or
 newer. Selection stops on an invalid explicit cache/environment/root path; it
@@ -163,6 +167,9 @@ The observed installation resolves through:
 
 Paths are runtime data, not source constants. The profile derives the
 versioned Cellar root from the selected resolved executable.
+The active `Python.framework` must resolve exactly to
+`<derived Cellar root>/Frameworks/Python.framework`; an external same-shaped
+framework is rejected before its import roots can enter the profile.
 
 It fingerprints:
 

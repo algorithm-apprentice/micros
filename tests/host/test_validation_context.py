@@ -463,6 +463,57 @@ class ValidationContextTests(unittest.TestCase):
             ):
                 tools._python()
 
+    def test_reusable_python_rejects_external_active_framework(self):
+        selected, _, installation, metadata = self.python_runtime_fixture()
+        framework = self.root / "external/Python.framework"
+        prefix = framework / "Versions/3.15"
+        base_executable = prefix / "bin/python3.15"
+        base_executable.parent.mkdir(parents=True)
+        base_executable.write_bytes(b"external framework Python")
+        stdlib = prefix / "lib/python3.15"
+        (stdlib / "lib-dynload").mkdir(parents=True)
+        external = {
+            **metadata,
+            "base_executable": str(base_executable),
+            "prefix": str(prefix),
+            "base_prefix": str(prefix),
+            "stdlib": str(stdlib),
+            "paths": [
+                str(ROOT),
+                str(prefix / "lib/python315.zip"),
+                str(stdlib),
+                str(stdlib / "lib-dynload"),
+            ],
+        }
+        tools = validation_context.DarwinTools.__new__(
+            validation_context.DarwinTools
+        )
+        tools.root = ROOT
+        tools.cache = {"MICROS_PYTHON": str(selected)}
+        tools.environment = self.environment(
+            MICROS_PYTHON=str(selected)
+        )
+        tools.roots = set()
+        tools._tool = mock.Mock()
+        with mock.patch(
+            "tools.validation_context._run",
+            return_value=json.dumps(external).encode(),
+        ), mock.patch.object(
+            validation_context.sys,
+            "executable",
+            str(selected),
+        ), mock.patch(
+            "tools.validation_context._cellar_root",
+            return_value=installation,
+        ), mock.patch(
+            "tools.validation_context.fingerprint_tree",
+            return_value="external-framework-was-admitted",
+        ), self.assertRaisesRegex(
+            validation_context.UnsupportedContext,
+            "framework.*installation",
+        ):
+            tools._python()
+
     def preset_fixture(self):
         value = json.loads((ROOT / "CMakePresets.json").read_text())
         (self.root / "CMakePresets.json").write_text(json.dumps(value))

@@ -43,6 +43,80 @@ def executable_fixture(directory, name, body):
 
 
 class CMakeConfigurationTests(unittest.TestCase):
+    @unittest.skipUnless(
+        sys.platform == "darwin",
+        "Homebrew precedence is a Darwin host contract",
+    )
+    def test_cross_toolchain_uses_host_homebrew_python_before_path(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = pathlib.Path(temporary_directory)
+            tools = temporary / "tools"
+            brew_root = temporary / "brew-python"
+            path_python = tools / "python3.15"
+            tools.mkdir()
+            (brew_root / "bin").mkdir(parents=True)
+            (brew_root / "bin/python3.15").symlink_to(sys.executable)
+            path_python.symlink_to(sys.executable)
+            executable_fixture(
+                tools,
+                "brew",
+                "if [ \"$1\" = \"--prefix\" ] "
+                "&& [ \"$2\" = \"python@3.15\" ]; then\n"
+                f"    printf '%s\\n' '{brew_root}'\n"
+                "    exit 0\n"
+                "fi\n"
+                "exit 1\n",
+            )
+            environment = python_environment()
+            environment.pop("MICROS_PYTHON", None)
+            environment.pop("MICROS_PYTHON_ROOT", None)
+            environment["PATH"] = (
+                str(tools) + os.pathsep + environment["PATH"]
+            )
+            for name, path in (
+                ("MICROS_CLANG", "/opt/homebrew/opt/llvm/bin/clang"),
+                ("MICROS_LD_LLD", "/opt/homebrew/opt/lld/bin/ld.lld"),
+                ("MICROS_QEMU", "/opt/homebrew/bin/qemu-system-riscv64"),
+            ):
+                if pathlib.Path(path).is_file():
+                    environment[name] = path
+            environment["CLANG_NO_DEFAULT_CONFIG"] = "1"
+            build = temporary / "build"
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(ROOT),
+                    "-B",
+                    str(build),
+                    "-G",
+                    "Ninja",
+                    "-DCMAKE_TOOLCHAIN_FILE="
+                    + str(
+                        ROOT
+                        / "cmake/toolchains/riscv64-clang.cmake"
+                    ),
+                ],
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            cache = (build / "CMakeCache.txt").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn(
+            "MICROS_PYTHON:FILEPATH="
+            + str(brew_root / "bin/python3.15"),
+            cache,
+        )
+        self.assertNotIn(
+            "MICROS_PYTHON:FILEPATH=" + str(path_python),
+            cache,
+        )
+
     def test_explicit_python_315_configures_with_exact_cache_spelling(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             result = subprocess.run(

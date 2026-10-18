@@ -268,7 +268,7 @@ elseif(DEFINED ENV{MICROS_PYTHON_ROOT})
         _MICROS_PYTHON_CANDIDATE
         "$ENV{MICROS_PYTHON_ROOT}/bin/python3.15"
     )
-elseif(APPLE)
+elseif(CMAKE_HOST_APPLE)
     find_program(_MICROS_BREW NAMES brew NO_CACHE)
     if(_MICROS_BREW)
         execute_process(

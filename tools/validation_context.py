@@ -49,7 +49,7 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "9024b2c0ac1dd5ef0146b511f9ed9692603d3086243224f2dc4c40db55473537",
+    "CMakeLists.txt": "fa35a3f3a5ddc9259124a1ef6099952f7514d5038c11a39374cc00f21a23bc95",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
 }
 QEMU_RUNNER_DIGEST = "c48d0bcac58f6bd28695cfa3cf49967052849c58974f3f8f4ac75526c224bc3f"
@@ -688,6 +688,13 @@ class DarwinTools:
         installation = _cellar_root(self.python)
         if installation.parent.name != "python@3.15":
             raise UnsupportedContext("Python is outside the versioned python@3.15 Cellar")
+        expected_framework = (
+            installation / "Frameworks/Python.framework"
+        ).resolve(strict=True)
+        if framework != expected_framework:
+            raise UnsupportedContext(
+                "Python framework differs from the selected installation"
+            )
         self.framework = framework
         self.python_installation = installation
         self.python_inert_roots = (
