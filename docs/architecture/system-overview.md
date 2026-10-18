@@ -326,6 +326,16 @@ The first successful internal PM transaction creates init as PID 1 with no
 parent and designates it as the application reaper. Static services remain
 outside that application parent tree.
 
+Accepted
+[ADR-0079](../adr/0079-production-init-shell-and-basic-commands.md) fixes the
+exact node-Q boundary. PM starts init once after the sealed event; init
+persists and restarts one foreground console shell. The shell uses direct
+spawn/wait rather than fork, supports only bounded simple commands and `exit`,
+and runs separate checked `echo`, `cat`, `ls`, and `ps` applications. `ps`
+observes only PM-owned applications through a versioned read-only snapshot;
+static services remain outside its output until a later discovery/inspection
+authority.
+
 ## Runtime interactions
 
 ### IPC

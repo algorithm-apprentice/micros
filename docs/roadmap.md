@@ -800,6 +800,15 @@ complete child-resource release.
   - `echo`, `cat`, `ls`, and `ps`; and
   - automated serial end-to-end scenario.
 
+Accepted
+[ADR-0079](adr/0079-production-init-shell-and-basic-commands.md) and the
+[node-Q architecture](architecture/init-shell.md) define this shell gate.
+The bounded outcome uses the existing direct spawn/wait path: PM creates PID 1
+after bootstrap sealing, init restarts one console shell, the shell executes
+foreground application commands, and PM publishes an application-only process
+snapshot for `ps`. Fork, signals, getty/login, full shell grammar, pipes,
+redirection, job control, and static-service enumeration remain later work.
+
 ### Exit criteria
 
 - the ELF-spawn gate proves one post-freeze failed spawn leaves no resource,

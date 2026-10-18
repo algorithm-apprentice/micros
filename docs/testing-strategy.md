@@ -675,6 +675,68 @@ only after physical UART drain and the complete resource-baseline report.
 The test PID 1 is not production init, and this gate does not claim shell
 behavior.
 
+### Init and shell node-Q evidence
+
+Accepted
+[ADR-0079](adr/0079-production-init-shell-and-basic-commands.md) and the
+[exact architecture contract](architecture/init-shell.md) define the next
+test-first outcome.
+
+Native deterministic evidence begins with:
+
+- canonical spawn-request encoding and failure-atomic output;
+- PM command-name lifecycle and sorted application snapshot records;
+- process-list request/reply/grant failure precedence;
+- application PM/VFS client reply and grant closure;
+- shell line parsing, command resolution, spawn/wait actions and recovery;
+- init exact-child wait and shell restart;
+- echo/cat/ls/ps selected behavior; and
+- immutable checked userland seed generation.
+
+The target Red is one `test-qemu-shell` image using the ordinary six static
+services and production application mechanisms. The runner uses five
+prompt-paced raw triggers and sends:
+
+```text
+echo hello micros\rcat /etc/motd\rls /bin\rps\rexit\r
+```
+
+The concatenation is the exact 48-byte script, but no later line is sent until
+the shell emits the next raw prompt. Native runner tests cover repeated raw
+prompts, post-match cursors, partial reads, unequal option counts, write
+failure, premature QEMU exit, and incomplete-step rejection.
+
+The node-Q gate also configures an exact contiguous transcript. Runner tests
+reject extra, duplicate, reordered, missing and unterminated records between
+the unique init-ready and shell-pass lines.
+
+The gate requires ordered command output, exact application PIDs 1, 2 and 6 in
+the `ps` snapshot, normal shell exit and reaping, the pre-shell/post-reap
+resource baseline, physical UART drain, the final shell pass record and clean
+SBI shutdown.
+
+The resource oracle canonicalizes only the head cursor of a completely empty,
+zeroed TTY input ring and the head cursor of a completely empty, zeroed echo
+ring. Native mutations prove residual input/echo bytes, flags, counts,
+completed lines, pending operations and every other live resource still fail
+comparison.
+
+VFS `next_tty_request_id` and TTY `last_accepted_request_id` remain monotonic
+high-water comparisons; IDs in live pending/completion state remain exact and
+must be absent at both checkpoints.
+
+Before the final breakpoint, a shell-test-only VFS/TTY drain waits until
+aggregate TTY output includes neither echo nor resident writes. Native tests
+cover output combinations, duplicate drain and reply cleanup. After resource
+equality succeeds, the test-only kernel path performs the existing bounded
+`THRE|TEMT` poll, seizes terminal ownership through the panic-seizure
+transition, validates the seized console/route state, writes and flushes the
+raw pass marker, and performs SBI success shutdown. No production image
+receives this completion path.
+
+No sleep, retry, host-kill success, unchecked marker, production shutdown
+operation, or test-only process authority is accepted.
+
 ## Planned test commands
 
 The build system should expose stable intent-based targets:
