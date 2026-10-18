@@ -111,6 +111,9 @@ This directory contains the design baseline for `micros`.
 - [B06 static-bootstrap baseline audit](research/minix-complete-baseline-b06-static-bootstrap.md)
   audits immutable boot identity, manifest/topology validation, complete
   service preparation, release/readiness, deadlines, failure, and sealing.
+- [B07 VM baseline audit](research/minix-complete-baseline-b07-vm.md)
+  audits boot-database adoption, frame policy, executable/stack planning,
+  scratch/freeze/commit/abort, exit release, and operation-12 authority.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
