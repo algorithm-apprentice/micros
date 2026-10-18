@@ -75,6 +75,14 @@ The graph deliberately serializes the first implementation even where some
 engineering work could be performed independently. This keeps reviews and
 failures attributable to one coherent change.
 
+ADR-0080 adds a certification gate without changing runtime dependencies.
+All B01-B14 units in the pinned complete-audit contract are reviewed
+sequentially and read-only before any correction or feature implementation.
+Only after the consolidated findings register is accepted are correction
+design/implementation pairs executed, one at a time in dependency order.
+Step 15 implementation and Step 16 remain blocked until every blocking
+finding is corrected and every affected unit is re-certified.
+
 ## Cycle-breaking substitutions
 
 | MINIX runtime cycle | Initial `micros` substitution | Later transition |
@@ -104,7 +112,7 @@ failures attributable to one coherent change.
 | 12 | RAMFS | Directory, file, and direct VFS-facing grant protocol tests pass |
 | 13 | VFS | Descriptor, console binding, pathname, mount, routing, and complete two-hop I/O verified |
 | 14 | ELF spawn path | A bounded dynamic application loads, activates, exits, waits, rolls back failed spawn, and returns to the post-init resource baseline |
-| 15 | Init and shell | Instruction synchronization remains valid and the shell runs the required commands |
+| 15 | Init and shell | Structural/algorithmic parity is certified; instruction synchronization remains valid and the shell runs the required commands |
 | 16 | DS, scheduler server, RS | Discovery and injected service recovery verified |
 | 17+ | Persistent storage and POSIX work | Added only behind explicit ADRs and conformance tests |
 

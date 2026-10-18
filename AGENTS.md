@@ -57,10 +57,12 @@ Do not infer architecture from MINIX when an Accepted `micros` ADR defines a
 different choice.
 
 Before designing a dependency-ready subsystem, apply
-[ADR-0025](docs/adr/0025-minix-behavioral-baseline-before-optimization.md):
-trace the fixed MINIX behavioral baseline, classify every difference, and
-document required adaptations before implementation. Existing Accepted ADRs
-remain authoritative until explicitly superseded.
+[ADR-0080](docs/adr/0080-minix-structural-and-algorithmic-baseline.md): trace
+the fixed MINIX behavior, authority, logical data structures, algorithms,
+average/worst/amortized complexity where relevant, stack and auxiliary-space
+bounds, and hot paths. Classify every difference and document required
+adaptations before implementation. ADR-0025 is historical superseded evidence;
+other Accepted ADRs remain authoritative until explicitly superseded.
 
 ## Source-of-truth order
 
@@ -84,10 +86,11 @@ requests.
 
 1. Create paired design and implementation todos; make implementation depend
    on design, keep implementation pending, and activate only the design task.
-2. Trace and document the corresponding MINIX behavioral baseline.
+2. Trace and document the corresponding MINIX behavioral, structural, and
+   algorithmic baseline, including complexity and storage bounds.
 3. Define the goal, non-goals, authority, state transitions, invariants,
-   failure boundaries, and acceptance evidence deeply enough that
-   implementation need not invent a contract.
+   data-structure and algorithm mapping, failure boundaries, and acceptance
+   evidence deeply enough that implementation need not invent a contract.
 4. Record durable decisions in a Proposed ADR and canonical design documents.
 5. Do not commit code, tests, models, harnesses, build scaffolding, or reusable
    prototypes.

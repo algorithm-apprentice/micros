@@ -40,7 +40,7 @@ to make the project appear more consistent than it was.
 | [0022](0022-user-execution-contexts-and-u-mode-entry.md) | User execution contexts and U-mode entry | Accepted |
 | [0023](0023-canonical-user-status-summary-bits.md) | Canonical user status summary bits | Accepted |
 | [0024](0024-preemptive-round-robin-scheduler.md) | Preemptive round-robin scheduler | Superseded |
-| [0025](0025-minix-behavioral-baseline-before-optimization.md) | MINIX behavioral baseline before optimization | Accepted |
+| [0025](0025-minix-behavioral-baseline-before-optimization.md) | MINIX behavioral baseline before optimization | Superseded |
 | [0026](0026-minix-baseline-kernel-scheduler.md) | MINIX-baseline kernel scheduler | Accepted |
 | [0027](0027-return-boundary-timer-rearming.md) | Return-boundary timer rearming | Accepted |
 | [0028](0028-squash-merge-task-pull-requests.md) | Squash-merge task pull requests | Accepted |
@@ -95,3 +95,4 @@ to make the project appear more consistent than it was.
 | [0077](0077-bounded-complete-vm-boot-database-validation.md) | Bounded complete VM boot-database validation | Accepted |
 | [0078](0078-valid-vm-boot-database-boundary-evidence.md) | Valid VM boot-database boundary evidence | Accepted |
 | [0079](0079-production-init-shell-and-basic-commands.md) | Production init, shell, and basic commands | Accepted |
+| [0080](0080-minix-structural-and-algorithmic-baseline.md) | MINIX structural and algorithmic baseline | Accepted |

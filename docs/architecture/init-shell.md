@@ -2,8 +2,13 @@
 
 ## Status and outcome
 
-This is the Accepted exact implementation contract for
-[ADR-0079](../adr/0079-production-init-shell-and-basic-commands.md).
+This is the Accepted behavioral and authority contract for
+[ADR-0079](../adr/0079-production-init-shell-and-basic-commands.md). The
+structural and algorithmic correction required by
+[ADR-0080](../adr/0080-minix-structural-and-algorithmic-baseline.md) blocks
+implementation through the complete B01-B14 audit and every prerequisite
+blocking correction. The requirements below define the B13 contract; they do
+not authorize implementation before the repository-wide gate closes.
 
 ```text
 design task:         init-shell-design
@@ -48,6 +53,8 @@ authority outside its owning protocol.
 
 | Path | Responsibility |
 | --- | --- |
+| `include/micros/bounded_sort.h` | Project-owned comparator/context contract for the fixed MINIX/NetBSD sort family |
+| `lib/algorithm/bounded_sort.c` | Independent bounded Bentley-McIlroy three-way quicksort implementation |
 | `include/micros/application_client.h` | Stable typed local application-client and snapshot/directory contracts |
 | `lib/spawn/spawn_request_build.c` | Sole canonical spawn-request encoder |
 | `lib/application/client_common.c` | Byte codecs, reply envelope validation, exact full writes |
@@ -104,11 +111,114 @@ generic PM/VFS wire code.
 
 Test-only sources cannot be linked into `build-userland-images`.
 
+## Shared bounded sort
+
+`micros_bounded_sort()` is a freestanding helper shared by PM and `ls`. Its
+exact public contract is:
+
+```c
+typedef int (*micros_bounded_sort_compare)(
+    const void *left,
+    const void *right,
+    void *context
+);
+
+enum micros_bounded_sort_result {
+    MICROS_BOUNDED_SORT_OK = 0,
+    MICROS_BOUNDED_SORT_ERROR_ARGUMENT = 1,
+};
+
+enum micros_bounded_sort_result micros_bounded_sort(
+    void *base,
+    size_t count,
+    size_t width,
+    micros_bounded_sort_compare compare,
+    void *context
+);
+```
+
+Valid arguments satisfy:
+
+```text
+base:       null is permitted only when count is zero; otherwise designates
+            count * width writable bytes
+count:      0..64
+width:      nonzero and, when count is nonzero, <= SIZE_MAX / count
+compare:    non-null deterministic total-order callback
+context:    opaque caller context, possibly null
+allocation: none
+```
+
+The comparator returns a value less than, equal to, or greater than zero for
+left-before, equal, or left-after. It does not mutate sortable storage and its
+ordering result cannot depend on call count; it may update caller-owned
+instrumentation in `context`.
+
+The implementation checks count, width, multiplication representability,
+base, and comparator before any pointer arithmetic or mutation. Every
+detectable argument failure returns
+`MICROS_BOUNDED_SORT_ERROR_ARGUMENT` with storage unchanged. The writable
+extent is a caller precondition because C cannot discover an object's size.
+Once arguments are valid, sorting has no failure path. Swaps operate through
+standard-defined byte copies and require no alignment. Count zero is a
+successful no-op when width and comparator are valid; `base` may be null in
+that case.
+
+The comparator receives the opaque context so PM can compare slot-indexed
+records and `ls` can compare name-table indexes without global sort state.
+
+The helper sorts exactly the supplied records. Callers own candidate
+construction, duplicate policy, and publication. It is not a libc or a
+general unbounded container framework.
+
 ## Exact PM snapshot
 
 The PM snapshot page is always 4,096 bytes and initially zero. At most 64
 compact records are written. Records are ordered by semantic PID, not slot or
 endpoint.
+
+The selected records are represented by a contiguous lightweight entry vector
+containing the process slot and resolved parent PID. The vector is ordered by
+the project-owned independent implementation of the same Bentley-McIlroy
+three-way quicksort family used by the fixed MINIX/NetBSD `qsort`:
+
+1. partitions smaller than seven use insertion sort;
+2. larger partitions choose the median of first, middle, and last;
+3. partitions larger than 40 first take three medians of three at stride
+   `count / 8`, then take their median;
+4. the pivot moves to the first element;
+5. four cursors perform the reference three-way partition, moving keys equal
+   to the pivot to both ends before vector-swapping them beside the middle;
+6. the logical left partition is completed before the right partition; and
+7. the right partition uses the reference tail-iteration order.
+
+To retain that order without placing worst-case recursive C frames on the
+2 KiB application stack, the bounded implementation uses an explicit
+pending-right range stack. Count is limited to 64; each range uses one-byte
+start and count fields, so the maximum range storage is 128 bytes. The
+algorithm has expected `O(n log n)` and worst `O(n^2)` comparison work,
+expected `O(log n)` and worst `O(n)` pending ranges, and no alignment or
+null-pointer arithmetic. This is an independent standard-defined
+implementation, not copied source. Selection sort and whole-range insertion
+sort are forbidden.
+
+The general PM validator used on this path replaces nested identity and wait
+searches with one bounded workspace:
+
+```text
+PID-ordered active slots:       64 x u16
+endpoint-ordered live slots:    64 x u16
+child counts by parent slot:    64 x u8
+```
+
+One table pass validates local record shape and fills the vectors. Sorting and
+adjacent comparison prove PID and endpoint uniqueness. Parent handles resolve
+directly by slot/generation while child counts serve wildcard waits. An exact
+wait selector is found by binary search in the PID-ordered slots and then
+checked against the child's parent handle. Prepared spawn endpoints use binary
+search in the endpoint-ordered live slots. The validator is `O(p log p)` time
+and `O(p)` bounded auxiliary storage; it performs no nested complete-table
+scan.
 
 Snapshot construction:
 
@@ -121,6 +231,11 @@ Snapshot construction:
 7. verify strict PID ordering and record count; and
 8. leave the unused page tail zero; and
 9. copy the complete 4,096-byte candidate through the caller's grant.
+
+The complete valid path, including invoked PM invariant validation, must have a
+documented bound no worse than the reference process-list collection and sort.
+An inherited nested process-table scan is a blocking finding, even when the
+table capacity is fixed.
 
 Copying the complete page proves the exact declared grant range and publishes
 the zero tail from PM-owned state. The result publishes count/size/capacity
@@ -227,29 +342,39 @@ explicit paths; VFS remains the pathname and executable-policy authority.
 
 ### `echo`
 
-One output buffer contains the complete result. The maximum accepted argv
-shape fits below 2,048 bytes, so no partial formatting state is required.
+Operands, separators, and the optional final newline are submitted
+sequentially through the complete-write client. Echo retains no
+complete-output aggregate. Sequential argument and byte work is `O(a + b)`
+with `O(1)` auxiliary state, matching the reference argv traversal and bounded
+stdio buffering.
 
 ### `cat`
 
 The transfer page is reused for each read. A zero transferred count is EOF.
 Every nonzero read must be fully written before another read. Close is
 attempted after every successful open, including a prior read/write failure.
+The copy is `O(b)` with one fixed transfer page, matching MINIX's reusable
+block buffer and partial-write loop.
 
 ### `ls`
 
 Exact `.` and `..` records are validated and filtered before storage. Other
-names are copied into one fixed 64-by-61-byte name table. Sorting compares
-unsigned bytes and then length. Duplicate names or more than 64 non-synthetic
-records are invariant failures. Filtering admits the valid RAMFS maximum of
-63 direct children plus its two synthetic records.
+names are copied into one fixed 64-by-61-byte name table. A separate 64-entry
+order vector plays the role of FTS's pointer array, avoiding repeated
+whole-name movement. The order vector uses the same project-owned
+Bentley-McIlroy quicksort family as PM. Sorting compares unsigned bytes and
+then length. Adjacent equal names after sorting, or more than 64
+non-synthetic records, are invariant failures. There is no duplicate scan
+during collection. Filtering admits the valid RAMFS maximum of 63 direct
+children plus its two synthetic records.
 
 ### `ps`
 
 The snapshot page is validated before any output. `record_count` rows must be
 strictly ascending, init must be PID 1 with parent 0 and reaper flag, and every
-other parent PID must name an earlier or current snapshot record. `ps` prints
-only `RUN` and `ZOMBIE`.
+other parent PID must be found by binary search in the earlier PID-sorted
+prefix. A per-row prefix scan is forbidden. `ps` prints only `RUN` and
+`ZOMBIE`.
 
 ## Userland seed and image budgets
 
@@ -285,6 +410,9 @@ raised merely to fit the selected applications.
 
 ### PM
 
+- bounded sort family, context comparison and deterministic work counts;
+- complete-table validation with ordered slot vectors, adjacent uniqueness,
+  child counts and binary exact-child lookup;
 - command basename/truncation/zero-tail lifecycle;
 - non-display command-byte replacement without spawn rejection;
 - init, child, zombie and record release;
@@ -307,10 +435,18 @@ raised merely to fit the selected applications.
 
 ### Commands
 
-- echo zero/max args and `-n`;
+- echo zero/max args, `-n`, sequential write traces and absence of
+  complete-output aggregation;
 - cat ordered multi-file/EOF/partial failure/close behavior;
-- ls malformed records, 64-entry bound and sort order;
-- ps malformed rows, parent/reaper invariants and exact formatting.
+- ls malformed records, 64-entry bound, sort order, adjacent duplicate
+  rejection, and reference-sort comparison-count cases;
+- ps malformed rows, binary parent lookup, parent/reaper invariants and exact
+  formatting;
+- shared sort empty/single/small, sorted, reverse, duplicate-heavy and
+  adversarial inputs whose comparison-key trace matches an independent model
+  of the exact pivot, partition and left-before-right order;
+- ls comparator byte-work counts, with expected
+  `O(d log d * name_length)` and worst `O(d^2 * name_length)` bounds.
 
 All models use explicit events, not sleeps. No randomized test is required.
 
@@ -385,14 +521,18 @@ forbidden while TTY owns the console.
 
 ## Implementation sequence
 
-1. Shared spawn builder and application-client native Red/Green.
-2. PM command metadata and snapshot protocol/model Red/Green.
-3. Public VFS record and client I/O Red/Green.
-4. Init/shell/command portable Red/Green.
-5. Checked images and production seed.
-6. Expected-failing target scenario, then minimum target adapters.
-7. Resource/drain/ordered-output completion.
-8. Narrow checks, complete milestone gate, exact producer/reuse evidence, and
+1. Project-owned MINIX/NetBSD sort-family Red/Green with deterministic work
+   evidence.
+2. Shared spawn builder and application-client native Red/Green.
+3. PM command metadata, efficient complete validation, and snapshot
+   protocol/model Red/Green.
+4. Public VFS record and client I/O Red/Green.
+5. Init/shell/command portable Red/Green, including order-vector and binary
+   parent lookup evidence.
+6. Checked images and production seed.
+7. Expected-failing target scenario, then minimum target adapters.
+8. Resource/drain/ordered-output completion.
+9. Narrow checks, complete milestone gate, exact producer/reuse evidence, and
    independent review.
 
 If implementation exposes an incomplete authority or wire contract, stop and
