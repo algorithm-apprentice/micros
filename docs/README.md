@@ -123,6 +123,9 @@ This directory contains the design baseline for `micros`.
 - [B10 RAMFS baseline audit](research/minix-complete-baseline-b10-ramfs.md)
   audits seed/runtime state, node/reference ownership, namespace lookup,
   allocation, sparse I/O, directory enumeration, and validation cadence.
+- [B11 VFS baseline audit](research/minix-complete-baseline-b11-vfs.md)
+  audits process/descriptor/open-file/vnode ownership, namespace and console
+  routing, two-hop I/O, cleanup, spawn-local state, and validation cadence.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
