@@ -258,7 +258,7 @@ ledgers but do not revise them silently.
 | B08 PM and spawn | Audited; six blocking findings | [B08 PM/spawn audit](minix-complete-baseline-b08-pm-spawn.md) |
 | B09 TTY | Audited; seven blocking findings | [B09 TTY audit](minix-complete-baseline-b09-tty.md) |
 | B10 RAMFS | Audited; six blocking findings | [B10 RAMFS audit](minix-complete-baseline-b10-ramfs.md) |
-| B11 VFS | Pending | N/A |
+| B11 VFS | Audited; six blocking findings | [B11 VFS audit](minix-complete-baseline-b11-vfs.md) |
 | B12 ELF spawn and application lifecycle | Pending | N/A |
 | B13 node-Q accepted design | Pending | N/A |
 | B14 executable evidence | Pending | N/A |
