@@ -105,6 +105,9 @@ This directory contains the design baseline for `micros`.
 - [B04 endpoint and IPC baseline audit](research/minix-complete-baseline-b04-endpoint-ipc.md)
   audits identity/privilege, queues, synchronous operations, reply tokens,
   notifications, deadlock, close, and retained delivery.
+- [B05 grant and user-execution baseline audit](research/minix-complete-baseline-b05-grants-user-execution.md)
+  audits direct-grant lifecycle and copy, syscall/trap/context paths, service
+  and application startup, and runtime memory primitives.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
