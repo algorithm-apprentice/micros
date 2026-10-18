@@ -5,10 +5,11 @@ contributors follow the same engineering contract.
 
 ## Mission
 
-Deliver `micros` v0.1 as defined in
-[the roadmap](docs/roadmap.md): a RISC-V64 microkernel system that boots under
-QEMU through OpenSBI, reaches an interactive shell, and passes its native,
-QEMU, integration, and end-to-end gates.
+Deliver a complete POSIX-compatible microkernel operating system using MINIX
+structures and algorithms as the first implementation baseline. The immediate
+checkpoint is v0.1 as defined in [the roadmap](docs/roadmap.md): boot through
+OpenSBI on RISC-V64 QEMU `virt`, reach the interactive shell, and pass the
+native, QEMU, integration, and end-to-end gates.
 
 ## Active role
 

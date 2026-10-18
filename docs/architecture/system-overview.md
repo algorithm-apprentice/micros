@@ -12,6 +12,11 @@ The first complete product increment is a shell-capable system running under
 QEMU. It should be small enough that one developer can trace a process from a
 user request through IPC, memory management, filesystem lookup, and back.
 
+A complete POSIX-compatible operating system is the final product goal. The
+shell increment is the first integrated checkpoint; omitted process, thread,
+signal, credential, terminal, storage, networking, libc, shell-language, and
+utility mechanisms remain staged future outcomes.
+
 ## Design principles
 
 1. Keep policy outside supervisor mode unless moving it would create an
@@ -738,7 +743,7 @@ cmake/              Cross-compilation and build helpers
 docs/               Architecture, research, decisions, and plans
 ```
 
-## Scope boundary for the first shell MVP
+## Scope boundary for the first shell milestone
 
 The shell MVP includes isolated address spaces, separate process/thread/hart
 objects, preemption, generation-aware IPC, one-shot reply rights, privileges,
@@ -747,3 +752,8 @@ direct grants, VM, PM, TTY, RAMFS, VFS, executable loading, init, and a shell.
 It excludes thread creation, `fork`, signals, persistent filesystems, dynamic
 drivers, DS, user-space scheduling policy, RS recovery, networking, SMP, and
 NetBSD userland compatibility.
+
+Those exclusions describe v0.1 ordering only. Accepted ADR-0081 makes complete
+POSIX compatibility the long-term goal and requires an explicit replacement
+point for every deferred MINIX/POSIX mechanism. MINIX source/binary
+compatibility and copied source remain permanent non-goals.

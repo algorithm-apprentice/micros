@@ -36,8 +36,8 @@ flowchart TD
     S[User-space scheduler policy]
     T[RS lifecycle and recovery]
     U[Block layer and persistent filesystem]
-    V[POSIX expansion]
-    W[NetBSD userland evaluation]
+    V[POSIX kernel and service semantics]
+    W[POSIX shell utilities userland evaluation and conformance]
 
     A --> B
     B --> C
@@ -88,11 +88,11 @@ finding is corrected and every affected unit is re-certified.
 | MINIX runtime cycle | Initial `micros` substitution | Later transition |
 | --- | --- | --- |
 | Kernel and VM depend on each other | Kernel bootstrap allocator, typed ownership ledger, and static mappings | One-way VM ownership handoff |
-| RS coordinates VM, PM, scheduler, and services | Static manifest plus bootstrap launcher | RS adopts the stable service protocol |
-| PM, VFS, and VM coordinate fork/exec | PM-directed `spawn` transaction | Add `exec`, then `fork` and copy-on-write |
-| VFS, filesystem servers, drivers, and DS discover each other | Fixed RAMFS endpoint and static mount | DS publication and dynamic drivers |
-| Kernel scheduler mechanism calls user scheduling policy | Kernel round-robin policy | User scheduler receives policy events |
-| File-backed VM calls VFS while VFS calls VM | Resident anonymous memory and RAMFS executable reads | Explicit asynchronous file-backed mapping protocol |
+| RS coordinates VM, PM, scheduler, and services | Static manifest plus bootstrap launcher | RS adopts the stable service protocol (`SOM-01`) |
+| PM, VFS, and VM coordinate fork/exec | PM-directed `spawn` transaction | Add `exec`, then `fork` and copy-on-write (`SOM-06`) |
+| VFS, filesystem servers, drivers, and DS discover each other | Fixed RAMFS endpoint and static mount | DS publication and dynamic drivers (`SOM-01`, `SOM-03`) |
+| Kernel scheduler mechanism calls user scheduling policy | Kernel round-robin policy | User scheduler receives policy events (`SOM-02`) |
+| File-backed VM calls VFS while VFS calls VM | Resident anonymous memory and RAMFS executable reads | Explicit asynchronous file-backed mapping protocol (`SOM-04`) |
 
 ## Topological implementation sequence
 
@@ -114,7 +114,13 @@ finding is corrected and every affected unit is re-certified.
 | 14 | ELF spawn path | A bounded dynamic application loads, activates, exits, waits, rolls back failed spawn, and returns to the post-init resource baseline |
 | 15 | Init and shell | Structural/algorithmic parity is certified; instruction synchronization remains valid and the shell runs the required commands |
 | 16 | DS, scheduler server, RS | Discovery and injected service recovery verified |
-| 17+ | Persistent storage and POSIX work | Added only behind explicit ADRs and conformance tests |
+| 17 | Block layer and persistent filesystem | Durable file data, metadata, crash boundaries, and file-backed VM interfaces pass |
+| 18 | POSIX kernel and service semantics | Process/thread, signal, credential, terminal, time, memory, IPC, and networking matrices pass |
+| 19 | POSIX shell, utilities, and userland evaluation | Mandatory shell/utility behavior passes; any reused userland has accepted provenance |
+| 20 | Complete POSIX conformance | Every unconditional mandatory row, every applicable conditionally mandatory row, and every claimed optional/XSI group has executable evidence |
+
+Steps 17 through 20 are the internal sequence of graph nodes U, V, and W.
+They do not add parallel work or another runtime dependency edge.
 
 Step 7 is internally serialized even though it is one graph node:
 

@@ -96,3 +96,4 @@ to make the project appear more consistent than it was.
 | [0078](0078-valid-vm-boot-database-boundary-evidence.md) | Valid VM boot-database boundary evidence | Accepted |
 | [0079](0079-production-init-shell-and-basic-commands.md) | Production init, shell, and basic commands | Accepted |
 | [0080](0080-minix-structural-and-algorithmic-baseline.md) | MINIX structural and algorithmic baseline | Accepted |
+| [0081](0081-complete-posix-compatible-system-goal.md) | Complete POSIX-compatible system goal | Accepted |

@@ -384,7 +384,7 @@ bounded prepare/commit paths.
 | Difference | Classification |
 | --- | --- |
 | Exact generation-bound private root and shared kernel entries | Compatible extension |
-| Fixed user window without dynamic AVL regions | Staged substitution |
+| Fixed user window without dynamic AVL regions | Staged substitution; SOM-04 |
 | Preflight/commit and reverse rollback | Compatible extension |
 | Complete global validation before ordinary lookup/translation/root switch | Divergence requiring correction |
 
@@ -425,7 +425,7 @@ pairwise distinctness pass.
 | One fixed UART device leaf | Required adaptation |
 | VM scratch map/remove while the VM root is temporarily inactive | Required adaptation |
 | Freeze/teardown plan tokens and failure-atomic commits | Compatible extension |
-| Absence of general post-handoff map/unmap/fault policy | Staged substitution |
+| Absence of general post-handoff map/unmap/fault policy | Staged substitution; SOM-04 |
 | All-process root validation on each selected-process transaction | Divergence requiring correction |
 | Pairwise duplicate scans in valid frame plans | Divergence requiring correction |
 
@@ -507,7 +507,7 @@ release.
 | Typed owner data | dense owner/target arrays and counts | `O(pmax)` storage | Compatible extension |
 | Sv39 codec | fixed three-level encoding | `O(1)` per PTE/VPN operation | Required adaptation |
 | Process root | exact generation-bound private root plus shared supervisor entries | `O(1)` identity | Compatible extension |
-| Fixed user window | no region AVL | fixed range | Staged substitution |
+| Fixed user window | no region AVL | fixed range | Staged substitution; SOM-04 |
 | Exceptional plans | bounded preflight/commit records | bounded by declared frame/mapping capacities | Compatible extension |
 | SBI/CSR activation | full fences and ASID-zero root | `O(1)` mechanism | Required adaptation |
 
@@ -741,3 +741,4 @@ during the read-only audit.
 - [Earlier parity audit](minix-baseline-parity-audit.md)
 - [Kernel address-space source baseline](minix-kernel-address-space-source-organization.md)
 - [Frame-ownership source baseline](minix-frame-ownership-source-organization.md)
+- [Staged-omission manifest](posix-staged-omission-manifest.md)

@@ -53,6 +53,24 @@ uses a fixed-capacity array. A wall-clock threshold cannot prove asymptotic
 parity. A complete behavior or QEMU gate cannot waive a known structural or
 algorithmic divergence.
 
+## POSIX conformance evidence
+
+The shell milestone does not imply complete compatibility. Accepted ADR-0081
+requires a versioned capability matrix for the final system. Every
+unconditional mandatory POSIX row, and every conditionally mandatory row whose
+standard-defined condition holds, must eventually name:
+
+- the owning kernel/service/library/utility interface;
+- native semantic and malformed-input evidence where portable;
+- target or integration evidence where privilege or cross-service behavior is
+  essential;
+- shell/utility conformance evidence when applicable;
+- representative application-compatibility evidence; and
+- the dependency-ready task that closes any remaining staged substitution.
+
+No milestone or application demo may claim complete POSIX compatibility while
+mandatory matrix rows remain undocumented, unimplemented, or untested.
+
 ## Behavior-preserving source decomposition
 
 A source-organization refactor starts with a structural Red test for the

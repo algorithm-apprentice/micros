@@ -47,21 +47,36 @@ user context, and restore the hart's idle trap stack.
   services.
 - Reach an interactive shell through a dependency-driven sequence of small,
   reviewable changes.
+- Continue beyond the shell milestone to complete POSIX-compatible process,
+  thread, signal, filesystem, terminal, memory, networking, libc, shell, and
+  utility behavior.
 - Keep process, thread, endpoint, and hart responsibilities separate even
   though v0.1 runs one thread per process on one hart.
 - Make correctness observable through fast host tests, QEMU integration tests,
   assertions, and deterministic diagnostics.
 
-## Initial non-goals
+## v0.1 staged deferrals
 
-- Source or binary compatibility with MINIX.
-- Importing the NetBSD userland.
-- Multithreaded user processes in v0.1.
-- Symmetric multiprocessing.
-- Networking, USB, audio, graphics, or broad hardware support.
-- Persistent storage before the RAM-based system is stable.
-- Full POSIX process semantics before `spawn` works end to end.
+IDs refer to the
+[staged-omission manifest](docs/research/posix-staged-omission-manifest.md).
+
+- Multithreaded user processes in v0.1 (`SOM-08`).
+- Networking (`SOM-16`).
+- Persistent storage before the RAM-based system is stable (`SOM-05`).
+- Full POSIX process creation/replacement before `spawn` works end to end
+  (`SOM-06`).
+
+## Permanent compatibility non-goals
+
+- Source, binary, syscall-number, or driver ABI compatibility with MINIX.
+- Copying MINIX or NetBSD source; reusable userland requires a separate
+  provenance decision.
+- USB, audio, graphics, or broad hardware support as prerequisites for POSIX
+  compatibility.
 - Production hardening or formal verification of the complete system.
+
+Symmetric multiprocessing and physical RISC-V hardware remain optional later
+platform work; neither is required to claim POSIX source compatibility.
 
 ## Documentation
 
@@ -73,6 +88,7 @@ user context, and restore the hart's idle trap stack.
 - [MINIX baseline parity audit](docs/research/minix-baseline-parity-audit.md)
 - [MINIX structural and algorithmic transition](docs/research/minix-structural-algorithm-transition.md)
 - [Complete MINIX baseline audit contract](docs/research/minix-complete-baseline-audit.md)
+- [POSIX and MINIX staged-omission manifest](docs/research/posix-staged-omission-manifest.md)
 - [MINIX scheduler and context-switch study](docs/research/minix-scheduler-and-context-switch.md)
 - [MINIX endpoint and blocking IPC study](docs/research/minix-endpoint-and-ipc.md)
 - [MINIX RS and SEF bootstrap study](docs/research/minix-rs-sef-bootstrap.md)
@@ -84,6 +100,7 @@ user context, and restore the hart's idle trap stack.
 - [Testing strategy](docs/testing-strategy.md)
 - [AI-native development workflow](docs/development/ai-native-workflow.md)
 - [Architecture decision records](docs/adr/README.md)
+- [Complete POSIX-compatible system goal](docs/adr/0081-complete-posix-compatible-system-goal.md)
 - [Contributing guide](CONTRIBUTING.md)
 
 ## Quick start

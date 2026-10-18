@@ -465,7 +465,7 @@ Atomic difference classifications:
 | --- | --- | --- |
 | PLIC registers and claim/complete instead of legacy mask/ack | Required adaptation | QEMU `virt` hardware |
 | Prevalidated two-commit enable plan | Compatible extension | Failure-atomic console handoff |
-| One source and one owner instead of per-vector hook lists | Staged substitution | Dynamic/shared routing returns with reviewed driver discovery |
+| One source and one owner instead of per-vector hook lists | Staged substitution | SOM-03 |
 
 `tty-core` supplies portable phase/plan/failure-preservation evidence.
 `test-qemu-mmu` authenticates disabled priority/enable state and independent
@@ -499,9 +499,11 @@ Atomic difference classifications:
 | --- | --- | --- |
 | SBI absolute timer instead of local APIC/board registers | Required adaptation | B01-O09 |
 | Hart-local initialized/active/deadline/tick state | Compatible extension | B01-O09 |
-| Context-stop accounting and runnable-load computation | Staged substitution | B03-O08 must audit the current accounting replacement and absent load-history behavior |
-| General kernel timer queue and expired callbacks | Staged substitution | Must return before the first feature needing multiple independent kernel timers, no later than Step 17 POSIX timers, through a reviewed DAG/ADR |
-| Process virtual/profile timers and signal delivery | Staged substitution | Step 17 POSIX/signals |
+| Context-stop accounting and scheduling policy | Staged substitution | B03-O08; SOM-02 |
+| Runnable-load history and public query | Staged substitution | SOM-21 |
+| General kernel timer queue and expired callbacks | Staged substitution | SOM-10 |
+| Process virtual/profile timer accounting | Staged substitution | SOM-10 |
+| User signal state and delivery | Staged substitution | SOM-09 |
 
 ### B01-O10 SBI reset
 
@@ -527,10 +529,11 @@ Atomic difference classifications:
 | Console ownership | one explicit owner/quiesced state | `O(1)` transition excluding drain | `O(1)` | Compatible extension |
 | PLIC hardware binding | one fixed controller object | `O(1)` | `O(1)` | Required adaptation |
 | PLIC enable transaction | one prevalidated plan | `O(1)` | `O(1)` | Compatible extension |
-| PLIC one-owner scope | no hook lists | `O(1)` | `O(1)` | Staged substitution |
+| PLIC one-owner scope | no hook lists | `O(1)` | `O(1)` | Staged substitution; SOM-03 |
 | SBI timer hardware | one state object per hart | `O(1)` | `O(1)` per hart | Required adaptation |
 | Hart-local timer validation | checked initialized/active/deadline state | `O(1)` | same state | Compatible extension |
-| General/virtual timer omission | no timer queue or signal timers | N/A | N/A | Staged substitution |
+| General/virtual timer omission | no general or process timer queue | N/A | N/A | Staged substitution; SOM-10 |
+| User signal omission | no user signal state or delivery | N/A | N/A | Staged substitution; SOM-09 |
 | SBI reset | register ABI call | `O(1)` from kernel perspective | `O(1)` | Required adaptation |
 | SBI-return failure record | fixed fallback record and WFI | `O(1)` excluding UART | `O(1)` | Compatible extension |
 
@@ -719,3 +722,4 @@ read-only audit.
 - [Scheduler/timer study](minix-scheduler-and-context-switch.md)
 - [IRQ notification study](minix-irq-notification.md)
 - [TTY/console/IRQ study](minix-tty-console-and-irq.md)
+- [Staged-omission manifest](posix-staged-omission-manifest.md)

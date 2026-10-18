@@ -178,6 +178,17 @@ requirements.
 Each production unit must account for every operation family below. A unit may
 split a family into finer rows but may not omit it.
 
+Under Accepted ADR-0081, every omitted MINIX/POSIX mechanism also references
+exactly one row in
+[the staged-omission manifest](posix-staged-omission-manifest.md). That
+manifest owns the missing mechanism/interface, current substitute, replacement
+point, predecessors, and removal/conformance evidence. "Outside v0.1" is an
+ordering statement, not a permanent exclusion.
+
+B01 and B02 were accepted before ADR-0081. This design updates their staged
+timer, signal, region, mapping, and fault rows to reference the manifest;
+later units apply the same rule during their initial audit.
+
 | Unit | Required operation families |
 | --- | --- |
 | B01 | firmware entry; FDT parse/canonicalization; UART ownership/output; panic; PLIC; timer program/delivery |
@@ -213,7 +224,9 @@ Every B01-B14 unit produces:
 8. one ADR-0080 classification for every difference;
 9. current evidence and evidence gaps; and
 10. findings with stable IDs, severity, dependencies, and the smallest
-    correction boundary.
+    correction boundary;
+11. the exact staged-omission manifest ID for every deferred MINIX/POSIX
+    mechanism.
 
 Audit documents do not propose implementation details beyond the correction
 boundary needed to make a later design task well scoped.
@@ -261,6 +274,8 @@ The read-only audit is complete only when:
   zero unsupported assignments;
 - the operation inventory has zero untraced rows;
 - every difference has exactly one ADR-0080 classification;
+- the staged-omission manifest has zero missing, zero duplicate, and zero
+  incomplete rows across README, roadmap, DAG, ADRs, and B01-B14;
 - every finding appears once in the consolidated register;
 - the correction DAG includes every blocking finding and contains no cycle;
 - no production or executable-evidence source changed from the pinned tree;

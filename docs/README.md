@@ -90,6 +90,9 @@ This directory contains the design baseline for `micros`.
 - [Complete MINIX baseline audit contract](research/minix-complete-baseline-audit.md)
   pins the reviewed tree, assigns every runtime/evidence path and operation to
   a sequential audit unit, and blocks implementation until consolidation.
+- [POSIX and MINIX staged-omission manifest](research/posix-staged-omission-manifest.md)
+  gives every deferred final-system family one substitute, replacement point,
+  predecessor set, and conformance gate.
 - [B01 platform baseline audit](research/minix-complete-baseline-b01-platform.md)
   audits entry, firmware memory discovery, early UART, panic, PLIC, and timer
   mechanisms and records the first blocking findings.
@@ -210,6 +213,8 @@ This directory contains the design baseline for `micros`.
 
 - [ADR index](adr/README.md) lists all architecture decisions and their current
   status.
+- [ADR-0081](adr/0081-complete-posix-compatible-system-goal.md) defines the
+  complete POSIX-compatible long-term product goal.
 
 All project documentation, source code, identifiers, comments, tests, and
 commit messages are written in English.

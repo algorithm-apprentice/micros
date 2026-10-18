@@ -114,6 +114,7 @@ Before implementation, record:
 - scope and explicit non-goals;
 - relevant ADRs and invariants;
 - fixed-reference data structures, algorithms, and complexity bounds;
+- the final replacement point for every staged MINIX/POSIX omission;
 - expected files or interfaces;
 - source-module ownership and applicable review signals;
 - failing test or acceptance scenario;

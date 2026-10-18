@@ -564,6 +564,25 @@ endpoint, and hart state must remain distinct. No v0.1 implementation may make
 multithreading or SMP require replacing the process identity, scheduler object
 model, IPC reply model, or global current-execution representation.
 
+## Long-term completion goal
+
+Accepted
+[ADR-0081](adr/0081-complete-posix-compatible-system-goal.md) defines the final
+product as a complete POSIX-compatible operating system comparable in breadth
+to MINIX. v0.1 remains the first integrated checkpoint, not the final feature
+boundary.
+
+Every v0.1 omission of process, thread, signal, credential, terminal, storage,
+memory, IPC, networking, libc, shell-language, or utility behavior is a staged
+future outcome. A mandatory requirement is conditionally inapplicable only
+when POSIX itself says so and the exact condition does not hold. MINIX remains
+the internal mechanism baseline; POSIX.1-2024 defines the final portable
+interface and behavior.
+
+The closed
+[staged-omission manifest](research/posix-staged-omission-manifest.md) owns
+every current deferral exactly once.
+
 ## Milestone 0: design baseline
 
 ### Deliverables
@@ -847,20 +866,83 @@ redirection, job control, and static-service enumeration remain later work.
   service contract;
 - bootstrap-only authority is not reintroduced.
 
-## Later milestones
+## Milestone 8: persistent storage
+
+### Deliverables
+
+- VirtIO block layer;
+- persistent filesystem with POSIX metadata and link semantics;
+- durable mount and recovery boundaries;
+- file-backed VM interface.
+
+### Exit criteria
+
+- file data and metadata survive deterministic reboot scenarios;
+- pathname, permission, link, timestamp, locking, and descriptor behavior map
+  to the POSIX capability matrix;
+- VFS/VM file-backed cycles use an explicit asynchronous protocol.
+
+## Milestone 9: POSIX system semantics
+
+### Deliverables
+
+- `fork`, complete `exec`, process groups, sessions, and job control;
+- MINIX-baseline copy-on-write fork mappings and write-fault separation;
+- POSIX threads and synchronization;
+- signals, clocks, timers, credentials, users, and groups;
+- pipes, FIFOs, shared memory, memory mapping, and required IPC;
+- complete terminal and pseudo-terminal behavior; and
+- sockets and required networking interfaces;
+- public POSIX headers, libc entry points, error/`errno` behavior, and ABI
+  wrappers delivered with each interface family.
+
+### Exit criteria
+
+- every unconditional mandatory System Interfaces row has deterministic
+  evidence, and every conditionally mandatory row passes when its
+  standard-defined condition holds;
+- deferred v0.1 substitutions are removed without weakening the MINIX
+  structural/algorithmic baseline;
+- fork copy-on-write sharing, write-fault isolation, and release pass native
+  and target evidence;
+- representative multithreaded and multiprocess applications run unchanged.
+
+## Milestone 10: POSIX shell and utilities
+
+### Deliverables
+
+- complete POSIX shell language;
+- mandatory utilities;
+- remaining shell/utility-facing libc and userland support;
+- explicitly reviewed userland provenance and maintenance policy.
+
+### Exit criteria
+
+- shell grammar, expansion, redirection, pipelines, jobs, and scripts pass
+  conformance evidence;
+- mandatory utilities pass their capability-matrix rows;
+- representative third-party POSIX source builds without project-private
+  source changes.
+
+## Milestone 11: complete POSIX conformance
+
+### Deliverables
+
+- versioned POSIX.1-2024 capability matrix;
+- claimed option-group profile;
+- complete native, QEMU, integration, shell/utility, and application evidence.
+
+### Exit criteria
+
+- every unconditional mandatory row, every applicable conditionally mandatory
+  row, and every claimed optional/XSI group passes;
+- no required behavior exists only in prose;
+- independent review finds no unsupported complete-compatibility claim.
+
+## Further platform milestones
 
 These require separate ADRs and are not part of the shell MVP:
 
-- `exec` completion and `fork`;
-- multiple threads per process;
-- copy-on-write;
-- signals;
-- VirtIO block devices;
-- a persistent filesystem;
-- file-backed memory mappings;
-- POSIX conformance expansion;
-- NetBSD userland port evaluation;
-- networking;
 - SMP;
 - physical RISC-V hardware.
 
@@ -873,7 +955,7 @@ These require separate ADRs and are not part of the shell MVP:
 | Assembly bugs | Corruption appears far from the cause | Dedicated QEMU context and trap tests with known register patterns |
 | Memory ownership ambiguity | Leaks or double allocation | Central ownership ledger and assertions before/after VM handoff |
 | Slow feedback | Kernel bugs become expensive to isolate | Keep pure logic host-testable and QEMU smoke tests short |
-| Unbounded source-level MINIX fidelity | MVP imports unrelated architecture, compatibility, or service breadth | Reproduce documented behavior and authority only, while keeping the DAG and non-goals |
+| Unbounded or accidental baseline scope | One task imports unrelated architecture or later POSIX breadth | Reproduce complete structures/algorithms through the sequential DAG; treat milestone omissions as staged, not as permission for one broad change |
 | Future concurrency requires redesign | Thread or SMP work replaces process and IPC foundations | Separate process/thread/hart objects and reply rights in v0.1 |
 | Silent service failure | Boot hangs without a diagnosis | Use one guest-owned counter deadline, exact service identity, and a stable fatal bootstrap record |
 | Host-only assumptions | macOS build works but CI or target behavior differs | Separate host and target toolchains and test on Linux CI |
