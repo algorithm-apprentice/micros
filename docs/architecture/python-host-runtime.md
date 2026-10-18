@@ -130,9 +130,10 @@ ignores Python environment configuration.
 
 CPython's internal `_PYTHON_SYSCONFIGDATA_NAME`,
 `_PYTHON_SYSCONFIGDATA_PATH`, `_PYTHON_PROJECT_BASE`, and
-`_PYTHON_HOST_PLATFORM` controls are also rejected. The runtime helper imports
-`sysconfig` only after this shared environment validation, so an external
-sysconfig module cannot execute before rejection.
+`_PYTHON_HOST_PLATFORM` controls are also rejected by key presence, including
+an explicitly exported empty value. The runtime helper imports `sysconfig`
+only after this shared environment validation, so an external sysconfig module
+cannot execute before rejection.
 
 Python standard extensions use OpenSSL. Supported execution additionally
 requires:

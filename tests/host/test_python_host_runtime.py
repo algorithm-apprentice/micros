@@ -237,6 +237,32 @@ class PythonHostRuntimeTests(unittest.TestCase):
         self.assertIn("_PYTHON_SYSCONFIGDATA_PATH", result.stderr)
         self.assertFalse(imported)
 
+    def test_empty_sysconfig_controls_fail_before_runtime_imports(self):
+        real_import = __import__
+
+        def guarded_import(name, *arguments, **keywords):
+            if name in {"ssl", "sysconfig"}:
+                raise AssertionError(
+                    f"{name} imported before environment rejection"
+                )
+            return real_import(name, *arguments, **keywords)
+
+        for name in (
+            "_PYTHON_SYSCONFIGDATA_NAME",
+            "_PYTHON_SYSCONFIGDATA_PATH",
+            "_PYTHON_PROJECT_BASE",
+            "_PYTHON_HOST_PLATFORM",
+        ):
+            environment = {**self.environment(), name: ""}
+            with self.subTest(name=name), mock.patch(
+                "builtins.__import__",
+                side_effect=guarded_import,
+            ), self.assertRaisesRegex(
+                python_host_runtime.UnsupportedPythonRuntime,
+                name,
+            ):
+                python_host_runtime.current_metadata(environment)
+
     def test_darwin_framework_identity_is_platform_scoped(self):
         metadata = self.metadata()
         framework = Path("/runtime/Python.framework/Versions/3.15")

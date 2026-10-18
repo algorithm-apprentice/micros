@@ -36,6 +36,20 @@ def validate_environment(environment):
     for name, expected in REQUIRED_ENVIRONMENT.items():
         if environment.get(name) != expected:
             raise UnsupportedPythonRuntime(f"{name} must equal {expected}")
+    sysconfig_controls = {
+        "_PYTHON_SYSCONFIGDATA_NAME",
+        "_PYTHON_SYSCONFIGDATA_PATH",
+        "_PYTHON_PROJECT_BASE",
+        "_PYTHON_HOST_PLATFORM",
+    }
+    present_sysconfig_controls = sorted(
+        name for name in sysconfig_controls if name in environment
+    )
+    if present_sysconfig_controls:
+        raise UnsupportedPythonRuntime(
+            "unsupported Python runtime environment: "
+            + ", ".join(present_sysconfig_controls)
+        )
     null = Path("/dev/null")
     try:
         information = null.lstat()
@@ -50,10 +64,6 @@ def validate_environment(environment):
         "PYTHONSTARTUP",
         "PYTHONEXECUTABLE",
         "__PYVENV_LAUNCHER__",
-        "_PYTHON_SYSCONFIGDATA_NAME",
-        "_PYTHON_SYSCONFIGDATA_PATH",
-        "_PYTHON_PROJECT_BASE",
-        "_PYTHON_HOST_PLATFORM",
         "RANDFILE",
         "CTLOG_FILE",
     }
