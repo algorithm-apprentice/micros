@@ -114,6 +114,9 @@ This directory contains the design baseline for `micros`.
 - [B07 VM baseline audit](research/minix-complete-baseline-b07-vm.md)
   audits boot-database adoption, frame policy, executable/stack planning,
   scratch/freeze/commit/abort, exit release, and operation-12 authority.
+- [B08 PM and spawn baseline audit](research/minix-complete-baseline-b08-pm-spawn.md)
+  audits PM identity/parentage, hidden spawn/rollback, exit/zombie/wait,
+  operation-13 authority, and canonical spawn request/layout handling.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
