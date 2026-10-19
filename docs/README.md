@@ -132,6 +132,12 @@ This directory contains the design baseline for `micros`.
 - [B13 node-Q accepted-design baseline audit](research/minix-complete-baseline-b13-node-q.md)
   audits production init, shell, command, snapshot, sorting, and archived
   candidate complexity against the fixed MINIX/NetBSD baseline.
+- [B14 executable-evidence baseline audit](research/minix-complete-baseline-b14-evidence.md)
+  audits every native, model, QEMU, generator, checker, runner, and recipe
+  path and records the remaining oracle, operation-count, and stack gaps.
+- [B14 executable-evidence role manifest](research/minix-complete-baseline-b14-evidence-manifest.md)
+  materializes every primary and secondary path, CTest, workflow, compile
+  definition, generated output, conditional, bridge, and consumer.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.
