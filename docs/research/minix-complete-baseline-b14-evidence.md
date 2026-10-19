@@ -7,7 +7,7 @@ audit unit:       B14 executable evidence
 micros commit:    da0bd95148f2704d5347c2af4c64085b90132746
 micros tree:      3b90c7716d69efd68930b3f8ab86a32813bdd6c3
 MINIX commit:     4db99f4012570a577414fe2a43697b2f239b699e
-result:           audited; three blocking evidence findings; not certified
+result:           audited; B14-F001 corrected by EV01; two findings remain open
 implementation:   forbidden during complete-audit phase
 ```
 
@@ -324,6 +324,7 @@ composition, or target stack high-water/canary report for the current paths.
 ### B14-F001: Historical source-identity oracles are not MINIX baseline oracles
 
 - Severity: High
+- Status: Corrected by the independently reviewed EV01 implementation.
 - `micros` evidence:
   - `tests/host/kernel_layout_source.py`
   - `tests/host/ast_evidence.py`
@@ -428,13 +429,45 @@ conditionals, and explicit bridges are represented.
 The current evidence is credible for semantic behavior, deterministic model
 agreement, artifact shape, authenticated target reports, and visible failure.
 It is not sufficient to certify the complete MINIX structural/algorithmic
-baseline. B14-F001 through B14-F003 remain blocking, and all 101 inherited
-evidence gaps remain open.
+baseline. EV01 addresses B14-F001; B14-F002 and B14-F003 remain open until
+their applicable reviewed implementations merge. All 101
+inherited evidence gaps retain their separately documented disposition.
 
 B14 is **audited but not certified**. The complete audit may proceed to the
 consolidated findings register and correction DAG; no production correction
 or node-Q implementation may start before that consolidation is reviewed and
 accepted.
+
+## EV01 re-certification
+
+The post-pin EV01 implementation adds:
+
+- `tests/host/evidence_authority.py`;
+- `tests/host/evidence_authority_fixture.py`;
+- `tests/host/evidence_authority_inventory.py`;
+- `tests/host/evidence_authority_types.py`;
+- `tests/host/evidence_authority_validation.py`; and
+- `tests/host/test_evidence_authority.py`.
+
+These B14-owned W01/W44 inputs add no CTest, workflow, build recipe, target
+artifact, QEMU marker, timeout, or reusable-profile change. The closed current
+inventory classifies 3,721 granular authority facts across six families,
+detects current W01/W44 identity owners, and rejects missing families,
+duplicate canonical
+facts, candidate-derived oracle authority, duplicate cross-transition claims,
+incomplete retirement coverage, invalid event chains, projection drift, and
+incomplete affected-unit recertification. Thirty-nine native authority cases
+cover granular source-owner joins, independent family fingerprints, typed
+provenance, external commands, cumulative retirement, and exact provisional
+suppression. The synthetic transition retires only its planned identity and
+preserves the unrelated transport identity and permanent invariant. Unit
+snapshots must match current-candidate values, and ordinary no-plan validation
+retains all previously recorded retirements.
+
+Independent implementation review used GPT-6.1 Sol and reported no substantive
+issue after the stale-unit-snapshot and no-plan-retirement regressions were
+added. EV01 retires no real production identity; operation-count and stack
+evidence remain EV02 and EV03.
 
 ## References
 

@@ -77,7 +77,13 @@ The initial exact owner tuples are:
 authority-core:
   tests/host/ast_evidence.py
   tests/host/c_source_records.py
+  tests/host/evidence_authority.py
+  tests/host/evidence_authority_fixture.py
+  tests/host/evidence_authority_inventory.py
+  tests/host/evidence_authority_types.py
+  tests/host/evidence_authority_validation.py
   tests/host/kernel_layout_source.py
+  tests/host/test_evidence_authority.py
 
 kernel-structure:
   tests/host/test_frame_ownership_source_layout.py
@@ -127,6 +133,8 @@ fixture-artifacts:
   tests/host/test_generate_vm_scratch_preemption_fixture.py
 ```
 
+The initial reviewed non-identity exception set is empty.
+
 A top-level scanner derives its universe from the **current** canonical
 W01/W44 Python discovery and import closure. The pinned B14 module set is a
 mandatory subset, not the universe ceiling. The scanner reports any
@@ -140,6 +148,16 @@ per-family key extraction.
 One module may appear in more than one family only when the family extractors
 produce disjoint canonical fact-key sets. Duplicate ownership of one
 materialized fact still fails.
+
+Current extractors materialize individual hash-table entries and function
+identities. Common `BASELINE_BODIES` tables resolve through their
+`ORIGINAL_FUNCTIONS` and `SOURCE_SETS`; centralized kernel classification
+facts resolve through `KERNEL_FILE_FACTS`. A bespoke unresolved fact inherits
+the complete closed repository-path set declared by its structural owner, so
+its projection is conservative rather than omitting a corrected source.
+Historical helper detection uses an explicit qualified allowlist; an ordinary
+new function that merely calls a generic `digest()` utility is not a transport
+identity.
 
 ## Authority model
 
@@ -199,10 +217,29 @@ planned_retirement_identity_keys[]
 replacement_oracles[]
 recertification_units[]
 declared_external_inputs[]
+red_command[]
+green_command[]
+recertification_command[]
+unit_commands[]
 ```
 
 `affected = retained union planned_retirement`. These sets and the owner are
 immutable after design acceptance.
+
+The validator receives a separate Accepted-design authority registry. For each
+correction task it binds the complete DAG-owned finding set, owner unit, exact
+merged design commit/tree/document, and canonical commands. The plan must
+match that external record exactly; self-declared design or command authority
+is insufficient.
+
+The validator also receives the complete transition-ownership registry. Each
+claim binds one transition ID, task, planned identity keys, oracle IDs, and
+terminal retirements. Transition IDs, identity claims, and oracle IDs are
+globally unique. Prior terminal retirements are removed from every later
+active set, including validation without a current plan; a later plan cannot
+reclaim or retain them. The current claim has
+no effective retirement before terminal success and must record exactly the
+planned retirement in the same `RETIREMENT_READY` candidate.
 
 The validator derives minimum recertification units as:
 
@@ -255,7 +292,9 @@ oracle set.
 
 `AUTHOR_RECERTIFIED` additionally contains typed `unit_results[]`. Each result
 names one audit unit, canonical command IDs/argv, `RUN` status, pass result,
-and the unit-ledger/input projection.
+and the unit-ledger/input projection. Every unit input must have the same
+value as its corresponding current-candidate input before that projection
+can authorize recertification.
 
 The validator derives two disjoint closures:
 
@@ -386,7 +425,9 @@ identity.
 
 The implementation is expected to own:
 
-- one project-owned authority schema/validator under `tests/host/`;
+- one project-owned public authority facade under `tests/host/`, with private
+  type/digest, validation, and synthetic-fixture modules split by
+  responsibility;
 - one native Python test module for positive and negative transitions;
 - one complete inventory declaration under `tests/host/`; and
 - narrow updates to existing structural tests only where needed to expose
