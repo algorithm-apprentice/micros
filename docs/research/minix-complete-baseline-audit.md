@@ -261,7 +261,7 @@ ledgers but do not revise them silently.
 | B11 VFS | Audited; six blocking findings | [B11 VFS audit](minix-complete-baseline-b11-vfs.md) |
 | B12 ELF spawn and application lifecycle | Audited; two blocking findings | [B12 ELF/application lifecycle audit](minix-complete-baseline-b12-elf-lifecycle.md) |
 | B13 node-Q accepted design | Audited; seven blocking candidate findings | [B13 node-Q audit](minix-complete-baseline-b13-node-q.md) |
-| B14 executable evidence | Pending | N/A |
+| B14 executable evidence | Audited; three blocking evidence findings | [B14 executable-evidence audit](minix-complete-baseline-b14-evidence.md) |
 | Consolidation | Pending | N/A |
 
 ## Complete-audit acceptance
