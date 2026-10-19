@@ -254,7 +254,8 @@ preserves every call site. B07 does not silently override that decision. The
 audit finds a conflict between that retained cadence and ADR-0080's MINIX
 path-local baseline; any correction must explicitly supersede ADR-0077 and
 ADR-0078, preserving their corruption semantics and evidence at the new
-diagnostic/transaction boundaries.
+explicit diagnostic/acceptance operations and selected transaction-subplan
+checks.
 
 ADR-0077 measured and corrected the fixed-capacity inactive-tail
 implementation needed to meet readiness. It did not measure or justify the
@@ -576,7 +577,11 @@ handoff; no post-handoff path uses it as the authoritative database.
   work.
 - Smallest correction boundary: one retained, generation-bound load plan whose
   per-page transition validates the next page and current scratch tuple in
-  path-local work; complete validation remains at transaction boundaries.
+  path-local work. Whole-state validation remains only an explicit
+  diagnostic/acceptance operation, not an ordinary load-transaction creation,
+  freeze, commit, or abort boundary. B12's cross-owner audit makes this
+  narrowing explicit so the correction does not reintroduce B07-F001 at a
+  coarser valid-path boundary.
 - Dependencies: B07-F001, including explicit ADR-0077/ADR-0078 supersession,
   and B02-F008/F009.
 
