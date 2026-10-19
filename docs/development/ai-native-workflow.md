@@ -197,6 +197,12 @@ For a MINIX-derived portable algorithm, the Red step also demonstrates the
 required structure or work bound with deterministic comparison, probe, link,
 or record-visit counts. Wall-clock timing is not the parity oracle.
 
+When a correction changes a frozen historical source identity, ADR-0082's
+authority transition is part of the same Red-Green outcome. The historical
+transport assertion stays active until an independent replacement oracle has
+failed for the audited divergence and passed for the correction. Candidate-
+derived digest rebaselining is prohibited.
+
 The Red step may require first creating a test harness. The harness itself must
 have an observable failure mode and cannot report success merely because the
 target did not respond.
