@@ -129,6 +129,9 @@ This directory contains the design baseline for `micros`.
 - [B12 ELF/application-lifecycle baseline audit](research/minix-complete-baseline-b12-elf-lifecycle.md)
   audits the complete PM/VFS/VM/kernel forward, rollback, activation, startup,
   exit, and wait transaction across the primary subsystem owners.
+- [B13 node-Q accepted-design baseline audit](research/minix-complete-baseline-b13-node-q.md)
+  audits production init, shell, command, snapshot, sorting, and archived
+  candidate complexity against the fixed MINIX/NetBSD baseline.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

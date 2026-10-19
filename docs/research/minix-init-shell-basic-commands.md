@@ -36,11 +36,13 @@ Files inspected locally:
 - `bin/cat/cat.c`
 - `bin/ls/main.c`
 - `bin/ls/ls.c`
+- `bin/ls/cmp.c`
 - `bin/ps/ps.c`
 - `bin/ps/print.c`
 - `lib/libc/gen/fts.c`
 - `lib/libc/stdlib/qsort.c`
-- `minix/servers/pm/utility.c`
+- `minix/servers/pm/mproc.h`
+- `minix/servers/pm/exec.c`
 
 The fixed MINIX source includes imported NetBSD userland. That source is
 baseline evidence only and is not a code donor.
@@ -93,14 +95,17 @@ application table under their existing manifest identities.
 
 ### Init starts and monitors a shell session
 
-MINIX single-user init forks and executes a shell on the console, waits for
-that child, and restarts the session after ordinary termination. Multi-user
-init similarly starts getty sessions, collects their children, and restarts a
-session unless it is explicitly shutting down.
+MINIX `single_user()` forks and executes a shell on the console and waits for
+that exact child. In the normal build, ordinary shell completion returns to
+`runcom`; only the small-build variant loops directly back to single-user
+mode. Automatic ordinary session restart is implemented by the multi-user
+`collect_child()`/`start_getty()` path, which collects an exited getty/session
+child and starts its replacement unless init is shutting down.
 
 The reusable baseline is:
 
-- init owns shell-session policy;
+- init owns shell-session policy, specializing exact single-user child/wait
+  identity with multi-user restart behavior;
 - the shell receives the console as standard input, output, and error;
 - init waits for the exact shell child;
 - successful child collection consumes the zombie; and
