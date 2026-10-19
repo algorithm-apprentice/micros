@@ -251,7 +251,7 @@ ledgers but do not revise them silently.
 | B01 platform | Audited; six blocking findings | [B01 platform audit](minix-complete-baseline-b01-platform.md) |
 | B02 memory | Audited; confirms B01-F006 and adds nine blocking findings | [B02 memory audit](minix-complete-baseline-b02-memory.md) |
 | B03 objects and scheduler | Audited; six blocking findings | [B03 object/scheduler audit](minix-complete-baseline-b03-objects-scheduler.md) |
-| B04 endpoints and IPC | Audited; six blocking findings | [B04 endpoint/IPC audit](minix-complete-baseline-b04-endpoint-ipc.md) |
+| B04 endpoints and IPC | Audited; five blocking findings and one SOM-24 staged finding | [B04 endpoint/IPC audit](minix-complete-baseline-b04-endpoint-ipc.md) |
 | B05 grants and user execution | Audited; six blocking findings | [B05 grant/user-execution audit](minix-complete-baseline-b05-grants-user-execution.md) |
 | B06 static bootstrap | Audited; four blocking findings | [B06 static-bootstrap audit](minix-complete-baseline-b06-static-bootstrap.md) |
 | B07 VM | Audited; six blocking findings | [B07 VM audit](minix-complete-baseline-b07-vm.md) |
@@ -262,7 +262,7 @@ ledgers but do not revise them silently.
 | B12 ELF spawn and application lifecycle | Audited; two blocking findings | [B12 ELF/application lifecycle audit](minix-complete-baseline-b12-elf-lifecycle.md) |
 | B13 node-Q accepted design | Audited; seven blocking candidate findings | [B13 node-Q audit](minix-complete-baseline-b13-node-q.md) |
 | B14 executable evidence | Audited; three blocking evidence findings | [B14 executable-evidence audit](minix-complete-baseline-b14-evidence.md) |
-| Consolidation | Pending | N/A |
+| Consolidation | Complete; 80 audited findings (79 blocking, one SOM-24 staged) mapped to an acyclic 59-node queue | [Findings register and correction DAG](minix-complete-baseline-findings-and-correction-dag.md) |
 
 ## Complete-audit acceptance
 

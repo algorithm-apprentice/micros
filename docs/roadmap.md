@@ -13,10 +13,12 @@ baseline integration passes.
 
 The structural-baseline transition defined by ADR-0080 blocks every runtime
 correction and feature implementation while the pinned B01-B14 complete audit
-is in progress. After the read-only audit and consolidated findings register
-are accepted, blocking corrections merge sequentially and each affected unit
-is re-certified. The unmerged node-Q implementation and Step 16 remain blocked
-until that correction queue is empty.
+is in progress. The completed
+[findings register and correction DAG](research/minix-complete-baseline-findings-and-correction-dag.md)
+assigns all blocking findings to one sequential correction queue. Each
+correction merges through its design/implementation pair and affected-unit
+re-certification. Node-Q remains blocked through `BASE01`; Step 16 and
+ordinary feature work remain blocked through `RECERT01`.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

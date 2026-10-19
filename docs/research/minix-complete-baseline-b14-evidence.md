@@ -298,8 +298,10 @@ B03-E006 B04-E006 B05-E006 B06-E005 B07-E005 B08-E006
 B09-E009 B10-E008 B11-E006 B12-E007 B13-E007
 ```
 
-The pinned build has no `-fstack-usage` output, checked static call-chain
-composition, or target stack high-water/canary report for those paths.
+The first ten are executable in the pinned tree. B13-E007 is a future
+admission check because the pinned tree has no node-Q production path. The
+pinned build has no `-fstack-usage` output, checked static call-chain
+composition, or target stack high-water/canary report for the current paths.
 
 ## Difference summary
 
@@ -360,7 +362,8 @@ composition, or target stack high-water/canary report for those paths.
   target transitions at fixed capacities. They do not count comparisons,
   probes, record visits, queue shifts, complete-validator invocations, copied
   bytes, retained ranges, or composed cross-owner work.
-- Impact: all existing suites can pass while the 77 audited runtime findings
+- Impact: all existing suites can pass while the 76 pre-node blocking runtime
+  findings
   retain quadratic scans, multiplied whole-state validation, byte-serial
   copies, wrong queue topology, or duplicate snapshots. Fixed capacities and
   wall-clock success cannot prove asymptotic parity.
@@ -396,11 +399,15 @@ composition, or target stack high-water/canary report for those paths.
 - Smallest correction boundary: add compiler-produced per-function stack
   usage with a checked target-call graph for nonrecursive paths, explicit
   bounded handling for indirect/assembly edges, and deterministic target
-  high-water evidence for the eleven named end-to-end path families. Fail on
-  unknown edges or budget excess; do not infer safety from ELF resident pages.
+  high-water evidence for the ten currently executable B01-B12 path
+  families. Fail on unknown edges or budget excess; do not infer safety from
+  ELF resident pages. Register B13-E007 as a mandatory admission check that
+  must run after corrected node-Q production code exists and before final
+  recertification.
 - Prerequisites: none.
-- Blocks: the eleven stack evidence gaps listed above and later correction
-  designs that alter call depth or automatic storage.
+- Blocks: the ten current stack evidence gaps and later correction designs
+  that alter call depth or automatic storage; B13-E007 remains blocked until
+  node-Q implementation and then blocks final recertification.
 
 ## Staged omissions
 

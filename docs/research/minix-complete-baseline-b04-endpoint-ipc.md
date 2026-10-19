@@ -7,7 +7,7 @@ audit unit:       B04 endpoints and IPC
 micros commit:    da0bd95148f2704d5347c2af4c64085b90132746
 micros tree:      3b90c7716d69efd68930b3f8ab86a32813bdd6c3
 MINIX commit:     4db99f4012570a577414fe2a43697b2f239b699e
-result:           audited; six blocking findings; not certified
+result:           audited; five blocking findings and one staged finding; not certified
 implementation:   forbidden during complete-audit phase
 ```
 
@@ -580,6 +580,8 @@ close/syscall/completion stack against 16 KiB.
 ### B04-F005: Receiver-owned MINIX IPC filters are absent
 
 - Severity: High
+- Classification: Staged substitution under SOM-24; this finding does not
+  block the pre-node-Q baseline queue.
 - `micros` evidence: no endpoint/receiver filter state or operation
 - MINIX evidence:
   - `CANRECEIVE` in `minix/kernel/ipc.h`
@@ -612,9 +614,10 @@ close/syscall/completion stack against 16 KiB.
 ## Unit conclusion
 
 B04 primary-path and operation coverage is complete for the pinned tree. The
-audit adds B04-F001 through B04-F006 as blocking findings,
-confirms B03-F006's completion dependency, and records SOM-04, SOM-08,
-SOM-09, SOM-10, SOM-23, and SOM-24.
+audit adds B04-F001 through B04-F004 and B04-F006 as blocking findings,
+records B04-F005 as the SOM-24 staged-substitution finding, confirms
+B03-F006's completion dependency, and records SOM-04, SOM-08, SOM-09,
+SOM-10, SOM-23, and SOM-24.
 
 B04 is **audited but not certified**. Independent review corrected
 receiver-filter source/complexity/storage closure, registry and endpoint
