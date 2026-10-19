@@ -183,14 +183,15 @@ the project-owned independent implementation of the same Bentley-McIlroy
 three-way quicksort family used by the fixed MINIX/NetBSD `qsort`:
 
 1. partitions smaller than seven use insertion sort;
-2. larger partitions choose the median of first, middle, and last;
-3. partitions larger than 40 first take three medians of three at stride
+2. a partition of exactly seven uses the middle element directly;
+3. partitions larger than seven choose the median of first, middle, and last;
+4. partitions larger than 40 first take three medians of three at stride
    `count / 8`, then take their median;
-4. the pivot moves to the first element;
-5. four cursors perform the reference three-way partition, moving keys equal
+5. the pivot moves to the first element;
+6. four cursors perform the reference three-way partition, moving keys equal
    to the pivot to both ends before vector-swapping them beside the middle;
-6. the logical left partition is completed before the right partition; and
-7. the right partition uses the reference tail-iteration order.
+7. the logical left partition is completed before the right partition; and
+8. the right partition uses the reference tail-iteration order.
 
 To retain that order without placing worst-case recursive C frames on the
 2 KiB application stack, the bounded implementation uses an explicit
@@ -270,6 +271,13 @@ process. Every public client call:
 
 Failure to revoke an accepted grant is an invariant failure, never an ordinary
 command error.
+
+The complete-write helper supports both external immutable bytes and bytes
+already resident in `client.page`. It stages each external page-sized chunk at
+most once. For an aliased page source, partial successes advance one current
+in-page/grant span over the already staged bytes; retries do not recopy or
+compact the complete remaining suffix. Total data staging remains `O(b)` even
+when every VFS completion reports one byte.
 
 ## Init state machine
 
@@ -354,7 +362,8 @@ The transfer page is reused for each read. A zero transferred count is EOF.
 Every nonzero read must be fully written before another read. Close is
 attempted after every successful open, including a prior read/write failure.
 The copy is `O(b)` with one fixed transfer page, matching MINIX's reusable
-block buffer and partial-write loop.
+block buffer and partial-write loop. The full-write path is explicitly
+alias-safe when the read bytes and write staging page are the same object.
 
 ### `ls`
 
@@ -431,13 +440,18 @@ raised merely to fit the selected applications.
 - slash-free command-name lengths 250 and 251, with no PM call for the latter;
 - fixed environment and three descriptor actions;
 - exact spawn/wait traces and error recovery;
-- init exact-child wait and respawn loop.
+- init exact-child wait and respawn loop; and
+- init shell-spawn rejection, wrong wait identity, and non-normal termination
+  at the exact fatal boundary, with no hidden retry/backoff.
 
 ### Commands
 
 - echo zero/max args, `-n`, sequential write traces and absence of
   complete-output aggregation;
-- cat ordered multi-file/EOF/partial failure/close behavior;
+- cat ordered multi-file/EOF/partial failure/close behavior, including
+  multiple partial completions with the source equal to the client page and
+  deterministic content/grant-span checks, plus a separate external immutable
+  source case whose copied-byte count proves stage-once linear staging;
 - ls malformed records, 64-entry bound, sort order, adjacent duplicate
   rejection, and reference-sort comparison-count cases;
 - ps malformed rows, binary parent lookup, parent/reaper invariants and exact

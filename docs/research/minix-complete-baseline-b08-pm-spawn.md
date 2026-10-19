@@ -635,9 +635,10 @@ Neither complete envelope has direct target stack-usage evidence.
 B08 primary-path and operation coverage is complete for the pinned tree. The
 audit adds B08-F001 through B08-F006 as blocking findings,
 confirms B02-F002, B03-F001, B04-F001/F002, B05-F001/F006, B06-F002/F004,
-and B07-F001/F005, adds SOM-26, shifts complete conformance to SOM-27, and
-records SOM-01, SOM-06, SOM-07, SOM-08, SOM-09, SOM-11, SOM-12, SOM-17,
-SOM-22, and SOM-23.
+and B07-F001/F005, adds SOM-26, and at that audit point shifted complete
+conformance to SOM-27. B13 later adds production shutdown as SOM-27 and moves
+the complete conformance claim to SOM-28. B08 records SOM-01, SOM-06, SOM-07,
+SOM-08, SOM-09, SOM-11, SOM-12, SOM-17, SOM-22, and SOM-23.
 
 B08 is **audited but not certified**. Independent review corrected
 operation-13 lookup/cadence accounting, end-to-end service validation counts,
