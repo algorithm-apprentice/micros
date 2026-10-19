@@ -75,6 +75,9 @@ This directory contains the design baseline for `micros`.
 - [Validation evidence and owned build changes](architecture/validation-evidence.md)
   records the Accepted exact-candidate command-reuse and bounded CMake
   classification contract; existing fresh execution remains authoritative.
+- [Evidence authority transition](architecture/evidence-authority-transition.md)
+  separates historical source-transport identities from independent
+  MINIX-derived correction oracles and defines fail-closed retirement.
 
 ## Research
 
@@ -257,6 +260,8 @@ This directory contains the design baseline for `micros`.
   status.
 - [ADR-0081](adr/0081-complete-posix-compatible-system-goal.md) defines the
   complete POSIX-compatible long-term product goal.
+- [ADR-0082](adr/0082-evidence-authority-transition.md) defines the reviewed
+  authority transition required before frozen-body corrections.
 
 All project documentation, source code, identifiers, comments, tests, and
 commit messages are written in English.

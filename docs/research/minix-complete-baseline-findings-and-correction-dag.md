@@ -150,7 +150,7 @@ blocking queue.
 
 | Node | Type | Findings | Prerequisites | Smallest correction boundary | Required acceptance evidence |
 | --- | --- | --- | --- | --- | --- |
-| `EV01` | Evidence foundation | `B14-F001` | - | Define the reviewed evidence-transition rule that preserves ownership/recipe invariants while replacing only invalidated historical body identities. | Independent MINIX-derived structural oracle and negative controls before any frozen-body correction. |
+| `EV01` | Evidence foundation | `B14-F001` | - | Define and implement [ADR-0082](../adr/0082-evidence-authority-transition.md), preserving ownership/recipe invariants while replacing only invalidated historical body identities. | Complete current authority inventory, typed fail-closed transition state, independent synthetic positive/negative evidence, and B14 recertification. |
 | `EV02` | Evidence foundation | `B14-F002` | `EV01` | Provide typed test-only counters at primitive work sites and composition rules for cross-owner paths. | Deterministic boundary/adversarial cases; counters absent from production images. |
 | `EV03` | Evidence foundation | `B14-F003` | - | Add fail-closed compiler/call-graph/indirect/assembly and target high-water tooling, close the ten executable B01-B12 path families, and register mandatory future B13 admission. | Static and target stack-budget reports for all current 4 KiB/16 KiB paths; explicit blocked B13 report until production code exists. |
 | `EV04` | Evidence barrier | - | `EV02`, `EV03` | Acceptance-only barrier: no runtime correction starts until EV01-EV03 are merged and recertified. | Current-candidate evidence tooling and clean independent review. |

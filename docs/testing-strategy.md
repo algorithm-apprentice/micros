@@ -53,6 +53,13 @@ uses a fixed-capacity array. A wall-clock threshold cannot prove asymptotic
 parity. A complete behavior or QEMU gate cannot waive a known structural or
 algorithmic divergence.
 
+Historical source/body/AST identities prove behavior-preserving transport,
+not MINIX baseline correctness. A correction that changes one of those
+identities follows [ADR-0082](adr/0082-evidence-authority-transition.md):
+register an independent MINIX-derived replacement oracle, demonstrate its
+Red failure, make it Green with the correction, and retire only the exact
+invalidated transport identity while preserving unrelated invariants.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
