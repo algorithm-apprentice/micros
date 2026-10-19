@@ -79,6 +79,8 @@ record before implementation. The record contains:
   MINIX/Accepted-adaptation/model provenance, including the exact planned
   retirement identities replaced by each oracle;
 - downstream audit units requiring re-certification; and
+- canonical Red, Green, recertification, and per-unit command argv bound to an
+  external Accepted-design authority record; and
 - ordered Red, Green, and author-recertification evidence events.
 
 The only states are:
