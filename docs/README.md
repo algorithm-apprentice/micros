@@ -138,6 +138,9 @@ This directory contains the design baseline for `micros`.
 - [B14 executable-evidence role manifest](research/minix-complete-baseline-b14-evidence-manifest.md)
   materializes every primary and secondary path, CTest, workflow, compile
   definition, generated output, conditional, bridge, and consumer.
+- [Complete MINIX baseline findings register and correction DAG](research/minix-complete-baseline-findings-and-correction-dag.md)
+  assigns all 80 audited findings exactly once to the reviewed pre-node
+  blocking queue or the SOM-24 post-node replacement point.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

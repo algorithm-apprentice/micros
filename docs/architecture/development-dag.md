@@ -78,10 +78,12 @@ failures attributable to one coherent change.
 ADR-0080 adds a certification gate without changing runtime dependencies.
 All B01-B14 units in the pinned complete-audit contract are reviewed
 sequentially and read-only before any correction or feature implementation.
-Only after the consolidated findings register is accepted are correction
-design/implementation pairs executed, one at a time in dependency order.
-Step 15 implementation and Step 16 remain blocked until every blocking
-finding is corrected and every affected unit is re-certified.
+The accepted
+[consolidated findings register and correction DAG](../research/minix-complete-baseline-findings-and-correction-dag.md)
+then executes correction design/implementation pairs one at a time in its
+preferred dependency order. Step 15 implementation remains blocked through
+`BASE01`; Step 16 and ordinary feature work remain blocked through
+`RECERT01`.
 
 ## Cycle-breaking substitutions
 
