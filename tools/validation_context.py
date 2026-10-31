@@ -30,6 +30,7 @@ from tools.python_host_runtime import (
     UnsupportedPythonRuntime,
     validate_environment as validate_python_environment,
 )
+from tests.host.work_count_recipe import projected_recipe_digest
 
 
 PROFILE_NAME = "darwin-arm64-ninja-python315-v2"
@@ -51,6 +52,7 @@ PROFILES = {
 RECIPE_DIGESTS = {
     "CMakeLists.txt": "fa35a3f3a5ddc9259124a1ef6099952f7514d5038c11a39374cc00f21a23bc95",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
+    "tests/work/WorkCounts.cmake": "61bee706c6b45f70712021cf4df49829a39bac82e6fb28c446bf84ed83013fc5",
 }
 QEMU_RUNNER_DIGEST = "c48d0bcac58f6bd28695cfa3cf49967052849c58974f3f8f4ac75526c224bc3f"
 QEMU_RUNNER_SOURCE_DIGESTS = {
@@ -891,7 +893,7 @@ def collect(root, workflow, *, preparation=None):
         validate_environment(environment, target=profile.target_build)
         host = platform_identity()
         for name, expected in RECIPE_DIGESTS.items():
-            if _file_digest(root / name) != expected:
+            if projected_recipe_digest(root / name) != expected:
                 raise UnsupportedContext("build recipe is outside the initial reviewed closure")
         if workflow == "test-qemu-smoke":
             _validate_qemu_runner_family(root)

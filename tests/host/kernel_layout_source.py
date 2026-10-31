@@ -10,6 +10,10 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.work_count_recipe import (
+    project_context_registration, project_external_evidence,
+    project_gate_compatibility, project_root_recipe,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -16230,6 +16234,7 @@ def restore_validation_execution_source(source: str) -> str:
 
 
 def restore_validation_context_source(source: str) -> str:
+    source = project_context_registration(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == PYTHON315_HOST_VALIDATION_CONTEXT_SHA256:
         source = _restore_exact_source_transports(
@@ -16717,6 +16722,7 @@ def restore_validation_context_source(source: str) -> str:
 
 
 def restore_cmake_source(source: str) -> str:
+    source = project_root_recipe(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == BASE_CMAKE_SHA256:
         return source
@@ -16853,7 +16859,7 @@ def read_bytes_path(path: Path) -> bytes:
         return restore_validation_execution_source(
             path.read_text(encoding="utf-8")
         ).encode()
-    raw = path.read_bytes()
+    raw = project_external_evidence(relative, path.read_bytes())
     if (
         relative is not None
         and relative.startswith("tools/")
@@ -17188,6 +17194,7 @@ def _restore_gate_ast(tree: ast.Module) -> ast.Module:
 
 def restored_gate_ast_sha256(root: Path, relative: str) -> str:
     source = (root / relative).read_text(encoding="utf-8")
+    source = project_gate_compatibility(relative, source)
     tree = _restore_gate_ast(ast.parse(source))
     payload = ast_dump(tree).encode()
     return hashlib.sha256(payload).hexdigest()

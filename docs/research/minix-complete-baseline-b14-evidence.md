@@ -429,8 +429,8 @@ conditionals, and explicit bridges are represented.
 The current evidence is credible for semantic behavior, deterministic model
 agreement, artifact shape, authenticated target reports, and visible failure.
 It is not sufficient to certify the complete MINIX structural/algorithmic
-baseline. EV01 addresses B14-F001; B14-F002 and B14-F003 remain open until
-their applicable reviewed implementations merge. All 101
+baseline. EV01 addresses B14-F001 and EV02 addresses the B14-F002 tooling
+boundary; B14-F003 remains open until its reviewed implementation merges. All 101
 inherited evidence gaps retain their separately documented disposition.
 
 B14 is **audited but not certified**. The complete audit may proceed to the
@@ -468,6 +468,52 @@ Independent implementation review used GPT-6.1 Sol and reported no substantive
 issue after the stale-unit-snapshot and no-plan-retirement regressions were
 added. EV01 retires no real production identity; operation-count and stack
 evidence remain EV02 and EV03.
+
+## EV02 evidence foundation
+
+Design #178 is separately merged under Accepted ADR-0083. Its EV02
+implementation adds these B14-owned inputs:
+
+```text
+include/micros/work_observation.h
+tests/work/work_counts.h
+tests/work/work_counts.c
+tests/work/WorkCounts.cmake
+tests/host/work_counts_test.c
+tests/host/work_counts_fixture.h
+tests/host/work_counts_fixture.c
+tests/host/work_observation_disabled_test.c
+tests/host/work_count_types.py
+tests/host/work_count_evidence.py
+tests/host/work_count_snapshots.py
+tests/host/work_count_lexical.py
+tests/host/work_count_projection.py
+tests/host/work_count_recipe.py
+tests/host/test_work_count_evidence.py
+```
+
+The two additional native CTests bring the current native inventory to 37;
+all pinned CTest identities and the 38 QEMU/four image workflows remain
+required. The historical primary/secondary manifests above are not rewritten.
+The new public-path header is compile-time evidence support with no collector
+declarations in default production mode, not a runtime ABI.
+
+The current authority inventory has 3,722 facts: all 3,721 previous keys,
+classes, values, and owners are conserved, with one new native-recipe artifact
+and one conservative dependency extension. The old root recipe digest remains
+unchanged. Its projection and the new independently rendered native artifact
+are both checked, rather than moving a historical pin to edited source.
+
+The evidence covers native capture, overflow/stale/output-atomicity,
+adversarial work, complete producer composition, primitive placement,
+comparison-precedence preservation, and RV64 compilation. Historical
+identities, default-mode observer absence, and the full native/QEMU/image
+matrix remain required implementation gates.
+
+EV02 closes the missing evidence-tooling boundary of B14-F002 only. It does
+not supply quantitative production-site admission or claim audited runtime
+complexity bounds. Those inherited runtime gaps and EV03 stack work remain
+outstanding.
 
 ## References
 

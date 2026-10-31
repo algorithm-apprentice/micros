@@ -1,15 +1,79 @@
+import ast
 import dataclasses
+import hashlib
 from pathlib import Path
+import subprocess
 import unittest
 
 from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
+from tests.host.evidence_authority_types import fact_set_digest
+from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class InventoryTests(unittest.TestCase):
+    def test_ev02_registration_preserves_every_historical_authority(self):
+        result = subprocess.run(
+            [
+                "git", "show",
+                "fa6eb16b0e9325587680e5504139c68e32bd22ab:"
+                "tests/host/evidence_authority_inventory.py",
+            ],
+            cwd=ROOT, capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        statement = next(
+            node for node in ast.parse(result.stdout).body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name)
+                    and target.id == "DECLARED_FAMILY_FACT_DIGESTS"
+                    for target in node.targets)
+        )
+        expected = ast.literal_eval(statement.value)
+        artifact_key = (
+            "tools/validation_context.py:data-entry:RECIPE_DIGESTS/"
+            + MODULE_PATH
+        )
+        projected = []
+        artifacts = []
+        for fact in evidence_authority_inventory.current_inventory(ROOT).facts:
+            if fact.key == artifact_key:
+                artifacts.append(fact)
+                self.assertIs(
+                    evidence_authority.AuthorityClass.ARTIFACT_CONTRACT,
+                    fact.authority_class,
+                )
+                self.assertEqual("B14", fact.primary_unit)
+                self.assertEqual(("B14",), fact.consumer_units)
+                self.assertEqual(
+                    (MODULE_PATH, "tools/validation_context.py"),
+                    fact.payload_paths,
+                )
+                self.assertEqual(
+                    hashlib.sha256(render_native_recipe().encode()).hexdigest(),
+                    fact.evidence_value,
+                )
+                continue
+            if fact.key == "tools/validation_context.py:data-entry:QEMU_RUNNER_DIGEST":
+                self.assertIn(MODULE_PATH, fact.payload_paths)
+                fact = dataclasses.replace(
+                    fact,
+                    payload_paths=tuple(
+                        path for path in fact.payload_paths if path != MODULE_PATH
+                    ),
+                )
+            projected.append(fact)
+        self.assertEqual(1, len(artifacts))
+        for family, fingerprint in expected.items():
+            self.assertEqual(
+                fingerprint,
+                fact_set_digest(fact for fact in projected if fact.family == family),
+                family,
+            )
+
     def test_current_authority_inventory_is_closed_and_unique(self):
         inventory = evidence_authority_inventory.current_inventory(ROOT)
 

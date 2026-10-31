@@ -136,7 +136,7 @@ expands the active pull request.
 | `B13-F006` | High | Pre-node blocking | Archived snapshot publication inherits quadratic PM validation | `NODE02` | [B13](minix-complete-baseline-b13-node-q.md) |
 | `B13-F007` | High | Pre-node blocking | Archived cat corrupts aliased partial-write retries | `NODE01` | [B13](minix-complete-baseline-b13-node-q.md) |
 | `B14-F001` | High | Corrected by EV01 | Historical source-identity oracles are not MINIX baseline oracles | `EV01` | [B14](minix-complete-baseline-b14-evidence.md) |
-| `B14-F002` | High | Pre-node blocking | The executable suite does not prove audited operation or complexity bounds | `EV02` | [B14](minix-complete-baseline-b14-evidence.md) |
+| `B14-F002` | High | Corrected by EV02 tooling | The executable suite does not prove audited operation or complexity bounds | `EV02` | [B14](minix-complete-baseline-b14-evidence.md) |
 | `B14-F003` | High | Pre-node blocking | Resident-page checks do not prove runtime stack bounds | `EV03` | [B14](minix-complete-baseline-b14-evidence.md) |
 
 ## Correction-node register

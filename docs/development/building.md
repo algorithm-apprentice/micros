@@ -337,6 +337,19 @@ Generate a changed-path plan with:
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr
 ```
 
+The EV02 native evidence has two focused targets. Configure the existing host
+graph, build both variants, and select their CTests with:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target work_counts_test work_observation_disabled_test
+ctest --test-dir build/host-debug --output-on-failure -R '^(work-counts|work-observation-disabled)$'
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_work_count_evidence
+```
+
+Both tests remain part of `test-unit-fast` and complete `test-unit`; targeted
+iteration is not final author validation.
+
 Add `--execute` to run the commands. Unknown target paths and shared QEMU
 infrastructure fail closed to complete `test-unit` and the complete QEMU
 matrix. The PR tier always runs complete `test-unit`; fast is an iteration

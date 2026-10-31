@@ -139,6 +139,8 @@ def native_outputs(root, directory, inventory, *, preparation=None):
     declared = re.findall(
         r"add_test\(\s*NAME\s+([A-Za-z0-9_-]+)\s+COMMAND\s+([A-Za-z0-9_]+)", source,
     )
+    from tests.host.work_count_recipe import native_test_declarations
+    declared.extend(native_test_declarations(root))
     expected = dict(declared)
     slow = set(re.findall(
         r"set_tests_properties\(\s*([A-Za-z0-9_-]+)\s+PROPERTIES\s+LABELS\s+slow\s*\)",
