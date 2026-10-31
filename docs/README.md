@@ -78,6 +78,9 @@ This directory contains the design baseline for `micros`.
 - [Evidence authority transition](architecture/evidence-authority-transition.md)
   separates historical source-transport identities from independent
   MINIX-derived correction oracles and defines fail-closed retirement.
+- [Operation-count evidence](architecture/operation-count-evidence.md)
+  defines the Accepted EV02 primitive-counter, complete-composition, and
+  transport-preserving annotation contract.
 
 ## Research
 
@@ -138,6 +141,9 @@ This directory contains the design baseline for `micros`.
 - [B14 executable-evidence baseline audit](research/minix-complete-baseline-b14-evidence.md)
   audits every native, model, QEMU, generator, checker, runner, and recipe
   path and records the remaining oracle, operation-count, and stack gaps.
+- [MINIX operation-count evidence study](research/minix-operation-count-evidence.md)
+  distinguishes reference error/action counters from the test-only primitive
+  work evidence required by EV02.
 - [B14 executable-evidence role manifest](research/minix-complete-baseline-b14-evidence-manifest.md)
   materializes every primary and secondary path, CTest, workflow, compile
   definition, generated output, conditional, bridge, and consumer.

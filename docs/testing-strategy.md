@@ -60,6 +60,15 @@ register an independent MINIX-derived replacement oracle, demonstrate its
 Red failure, make it Green with the correction, and retire only the exact
 invalidated transport identity while preserving unrelated invariants.
 
+The Accepted EV02 design
+[operation-count contract](architecture/operation-count-evidence.md) and
+[ADR-0083](adr/0083-test-only-operation-count-evidence.md) define exact
+test-only primitive observations, complete producer composition, overflow
+failure, and finite annotation projection. Design acceptance does not provide
+the executable tooling or close inherited runtime evidence gaps. Each later
+correction must declare its actual sites and independent Red/Green bounds;
+elapsed time and model action coverage remain insufficient.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

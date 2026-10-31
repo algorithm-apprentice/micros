@@ -98,3 +98,4 @@ to make the project appear more consistent than it was.
 | [0080](0080-minix-structural-and-algorithmic-baseline.md) | MINIX structural and algorithmic baseline | Accepted |
 | [0081](0081-complete-posix-compatible-system-goal.md) | Complete POSIX-compatible system goal | Accepted |
 | [0082](0082-evidence-authority-transition.md) | Evidence authority transition | Accepted |
+| [0083](0083-test-only-operation-count-evidence.md) | Test-only operation-count evidence | Accepted |
