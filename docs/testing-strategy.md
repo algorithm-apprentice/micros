@@ -69,7 +69,7 @@ the executable tooling or close inherited runtime evidence gaps. Each later
 correction must declare its actual sites and independent Red/Green bounds;
 elapsed time and model action coverage remain insufficient.
 
-The current EV02 implementation candidate adds two native CTests to both
+The merged EV02 implementation adds two native CTests to both
 native tiers and hosted composition/projection/portability regressions.
 It preserves the old root-recipe and historical authority expectations through
 the exact, independently declared native extension; no runtime identity is
@@ -77,6 +77,16 @@ retired. See the
 [operation-count implementation map](architecture/operation-count-evidence.md#implementation-map).
 Counter availability is not evidence that the later production work bounds
 already pass.
+
+The Accepted EV03
+[stack-bound contract](architecture/stack-bound-evidence.md) and
+[ADR-0084](adr/0084-checked-stack-bound-evidence.md) require compiler-produced
+fixed frames, a closed machine-call graph with explicit indirect/assembly
+edges, per-owner stack-epoch composition, and independent RV64 high-water
+observations. Unknown edges, recursion, dynamic frames, stale artifacts,
+and budget excess fail. The ten current B01-B12 rows require both static
+and target evidence; B13-E007 remains an explicit future admission at
+STACK13. Design acceptance does not create those artifacts or commands.
 
 ## POSIX conformance evidence
 
