@@ -88,6 +88,14 @@ and budget excess fail. The ten current B01-B12 rows require both static
 and target evidence; B13-E007 remains an explicit future admission at
 STACK13. Design acceptance does not create those artifacts or commands.
 
+The initial EV03 implementation's complete ordinary/metadata build matrix
+exposed a complete-ELF seed boundary: unloaded compiler metadata changed
+seeded application files, RAMFS constants/data and the embedded kernel image.
+[Accepted ADR-0085](adr/0085-stack-metadata-artifact-boundary.md) defines a
+separate artifact-ordering correction. The implementation is blocked until
+that design merges; byte passivity, object frame evidence, observed-image
+integrity and all original gates remain required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

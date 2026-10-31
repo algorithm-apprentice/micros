@@ -135,6 +135,21 @@ counterparts from the same source/recipe. Non-allocatable metadata is
 additional evidence only. This equality is checked, not assumed from flag
 names.
 
+### Complete-ELF artifact boundary
+
+The first uncommitted implementation exposed metadata entering complete-ELF
+seed payloads and consequently changing RAMFS and kernel loaded bytes.
+Implementation is blocked pending the separate corrective design in
+[Accepted ADR-0085](../adr/0085-stack-metadata-artifact-boundary.md).
+[The measured artifact path](../research/stack-metadata-artifact-boundary.md)
+records the failure; no passivity check is waived.
+
+The correction defines exact same-candidate ordinary/metadata leaf
+canonicalization after existing ELF validation and before complete-file
+copies/seeds. Both object frame sources remain required. Observed code is
+never replaced by an ordinary artifact. Restarted implementation and its
+current acceptance remain separate from the abandoned reference.
+
 ## Indirect-call closure
 
 A binding names image/variant, caller function, exact machine-call
