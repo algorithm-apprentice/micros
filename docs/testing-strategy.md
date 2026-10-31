@@ -69,6 +69,15 @@ the executable tooling or close inherited runtime evidence gaps. Each later
 correction must declare its actual sites and independent Red/Green bounds;
 elapsed time and model action coverage remain insufficient.
 
+The current EV02 implementation candidate adds two native CTests to both
+native tiers and hosted composition/projection/portability regressions.
+It preserves the old root-recipe and historical authority expectations through
+the exact, independently declared native extension; no runtime identity is
+retired. See the
+[operation-count implementation map](architecture/operation-count-evidence.md#implementation-map).
+Counter availability is not evidence that the later production work bounds
+already pass.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

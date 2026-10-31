@@ -6,6 +6,7 @@ import unittest
 
 from tests.host.ast_evidence import ast_dump
 from tools import validation_build_manifest, validation_context, validation_inputs
+from tests.host.work_count_recipe import project_external_evidence
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,7 +30,10 @@ class ValidationContextLayoutTests(unittest.TestCase):
         facade = ast.parse((ROOT / "tools/validation_context.py").read_text())
         remaining = {node.name for node in facade.body if isinstance(node, ast.FunctionDef)}
         for path, names in OWNERS.items():
-            tree = ast.parse((ROOT / path).read_text())
+            source = project_external_evidence(
+                path, (ROOT / path).read_bytes()
+            ).decode("utf-8")
+            tree = ast.parse(source)
             definitions = {
                 node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
             }

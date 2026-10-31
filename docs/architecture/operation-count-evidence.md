@@ -5,7 +5,9 @@
 This is the Accepted EV02 design contract for B14-F002 under
 [ADR-0083](../adr/0083-test-only-operation-count-evidence.md).
 EV01 design #176 and implementation #177 are merged. Implementation of this
-contract remains pending until its separate design PR merges.
+contract follows separately merged design #178, commit
+`fa6eb16b0e9325587680e5504139c68e32bd22ab`. The implementation candidate below
+still requires its complete author gate and independent implementation review.
 
 Provide one portable, test-only mechanism for exact primitive-work
 measurement, complete cross-owner composition, and transport-preserving
@@ -481,6 +483,41 @@ Independent implementation review follows complete current author evidence.
 EV02 completion supplies tooling only. B14 and the correction register may
 record that foundation outcome, but inherited B01-B13 work gaps remain open
 until their owning correction and affected-unit recertification.
+
+## Implementation map
+
+The implementation supplies the shared annotation header and private C17
+collector under `tests/work/`, with `work-counts` and
+`work-observation-disabled` in the existing native graph. Test fixtures use
+real source-local observations, independently calculated boundary/adversarial
+counts, and the same semantic code in enabled and disabled modes.
+
+The hosted facade separates typed declarations, full snapshot composition,
+positional C inspection, and anchored projection into bounded modules.
+Its tests cover invalid/partial provenance, double counting, arithmetic
+overflow, loop/branch/primitive relocation, source-stage mismatch, and
+freestanding RV64 compilation without an external atomic runtime.
+Statement locators cannot match a chained-assignment suffix. Comparison
+wrappers require expression delimiters proving that the declared interval is
+the complete original comparison; ambiguous operator-adjacent fragments are
+rejected rather than silently changing precedence through macro parentheses.
+
+`tests/work/WorkCounts.cmake` is a deterministic artifact rendered from an
+independent command declaration. Only its exact host-guard include is
+projected from the root CMake recipe. The original root-recipe checksum and
+every historical transport expectation remain unchanged; the new native
+module has its own declared artifact checksum. Current context collection
+checks both the projected historical root and the exact new artifact.
+
+The authority inventory adds one B14 artifact fact and the conservative new
+recipe dependency of the QEMU-runner context. A regression loads the immutable
+pre-implementation registry from the merged design and proves every previous
+fact's authority, value, ownership, and remaining provenance are conserved.
+No production identity is retired.
+
+This map records the EV02 tooling boundary, not runtime baseline
+certification. Actual production-site admissions and quantitative closure of
+the inherited work gaps belong to their owning correction tasks.
 
 ## References
 

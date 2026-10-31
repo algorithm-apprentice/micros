@@ -84,11 +84,11 @@ DECLARED_FAMILY_FACT_DIGESTS = {
     "kernel-structure":
         "6d4f3a952a315b57ae4d234b67b0c882e60b19b1e9af49c29a739e6c16ed43b9",
     "recipe-impact":
-        "3f93d4777afbd159d4df50166901bf7d6801f2ea5603c87a7b626d3e1f726baa",
+        "a14c50d641800083794bfa4f67e3b275e02528b181afc82879a6dae9f0f898dd",
     "service-structure":
         "11a2f268950946b406dd52d176a14198b3dfaffe36cb41e226ba8f648b078533",
     "tool-structure":
-        "388d933507248e408ae87021191a81477d0c75303f8d1fc26520e899bcd6231e",
+        "29bee701c5920506b72b9ad5f60da85521170673a222a3770c6d96953c6ed73b",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -509,7 +509,12 @@ def _assignment_facts(
                     relative,
                     "data-entry",
                     scope,
-                    _assignment_class(family),
+                    (
+                        AuthorityClass.ARTIFACT_CONTRACT
+                        if relative == "tools/validation_context.py"
+                        and scope == "RECIPE_DIGESTS/tests/work/WorkCounts.cmake"
+                        else _assignment_class(family)
+                    ),
                     _fact_primary_unit(payload_paths),
                     _consumer_units(relative, payload_paths),
                     payload_paths,

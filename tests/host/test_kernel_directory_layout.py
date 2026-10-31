@@ -342,7 +342,9 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             hashlib.sha256(restored.encode()).hexdigest(),
         )
         self.assertEqual(
-            hashlib.sha256(actual.encode()).hexdigest(),
+            hashlib.sha256(
+                kernel_layout_source.project_root_recipe(actual).encode()
+            ).hexdigest(),
             validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
         )
 
