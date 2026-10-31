@@ -84,6 +84,9 @@ This directory contains the design baseline for `micros`.
 - [Stack-bound evidence](architecture/stack-bound-evidence.md)
   defines the Accepted EV03 compiler/call-graph, assembly/indirect, target
   high-water, and future node-Q admission contract.
+- [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
+  records the blocked EV03 complete-ELF seed dependency and its narrow
+  corrective-design prerequisite.
 
 ## Research
 

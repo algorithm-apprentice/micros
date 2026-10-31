@@ -100,3 +100,4 @@ to make the project appear more consistent than it was.
 | [0082](0082-evidence-authority-transition.md) | Evidence authority transition | Accepted |
 | [0083](0083-test-only-operation-count-evidence.md) | Test-only operation-count evidence | Accepted |
 | [0084](0084-checked-stack-bound-evidence.md) | Checked stack-bound evidence | Accepted |
+| [0085](0085-stack-metadata-artifact-boundary.md) | Stack metadata artifact boundary | Accepted |
