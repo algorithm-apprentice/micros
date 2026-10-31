@@ -87,6 +87,9 @@ This directory contains the design baseline for `micros`.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
+- [Fatal-stack context evidence](research/fatal-stack-context-evidence.md)
+  records the verified current panic-call cycle and the finite
+  Accepted source/machine/state qualification required before EV03 can restart.
 
 ## Research
 

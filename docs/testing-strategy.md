@@ -96,6 +96,14 @@ separate artifact-ordering correction. The implementation is blocked until
 that design merges; byte passivity, object frame evidence, observed-image
 integrity and all original gates remain required.
 
+Corrective design #181 is merged. The restarted implementation subsequently
+verified a context-free panic-call cycle despite the exact post-seizure UART
+state predicate. [Accepted ADR-0086](adr/0086-finite-fatal-stack-context.md)
+defines the closed source/machine qualification required before another
+test-first restart. Unknown/real recursion, all original budgets and gates,
+and the later B01 runtime corrections remain required; no edge is simply
+deleted and no stack certificate is yet claimed.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

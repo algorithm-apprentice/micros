@@ -13,6 +13,13 @@ target high-water observations for the ten current B01-B12 path families.
 It installs mandatory future B13 admission without claiming production
 init/shell already exists.
 
+Design #180 and artifact corrective design #181 are merged. The restarted
+implementation exposed the concrete context-free fatal-call cycle recorded
+in [the fatal-context study](../research/fatal-stack-context-evidence.md).
+It is blocked and abandoned pending
+[Accepted ADR-0086](../adr/0086-finite-fatal-stack-context.md). The finite
+qualification below is design only until that separate prerequisite merges.
+
 Non-goals are runtime algorithm changes, larger stacks, new allocation or
 guard-page policy, storage promotion, general recursion proofs, LTO,
 SMP, fault recovery, profiling in production, telemetry IPC, node-Q code,
@@ -299,6 +306,159 @@ Only a complete successful certificate is publishable. Failed attempts
 retain diagnostics and never replace a prior record with success-shaped
 partial data. A changed source, index, tool, recipe, object, callback,
 assembly contract, or image invalidates the certificate.
+
+### Finite fatal context
+
+Accepted ADR-0086 refines only the current kernel UART panic cycle. It does
+not add a general predicate solver, remove ordinary panic calls, change a
+stack epoch or implement `PLAT02`.
+
+Actual function keys and frame artifacts remain unchanged. The host analysis
+node is `(function-key, qualifier)`, with exactly `UNQUALIFIED` and
+`UART_PANIC_READY`. The latter means the exact `uart_console_state` in
+`arch/riscv64/uart.c` has valid initialization magic, owner `PANIC` and
+`quiesced=true`, with SIE and SEIE clear. It is derived only from the
+normal-return and preservation proof below.
+
+#### Closed source and effect register
+
+| Site or function | Permitted proof role |
+| --- | --- |
+| `kernel/tty/uart_console_core.c:micros_uart_console_panic` | Exact magic check, success stores and stable result; failure has no ready return effect |
+| `arch/riscv64/uart.c:uart_panic_seize` | Clear SIE/SEIE, exact console-state argument, failure halt, normal-return UART initialization and state guarantee |
+| `kernel/diagnostic/panic.c:micros_panic_seize` | Only its normal continuation after `uart_panic_seize` may qualify subsequent seizure-diagnostic calls |
+| `kernel/diagnostic/panic.c:micros_panic_report` | Only its normal continuation after `micros_panic_seize` may qualify subsequent formatting calls |
+| `arch/riscv64/uart.c:uart_write` | Preserve ready state through the predicate and MMIO writer; prove only its ownership-failure panic edge infeasible |
+| `arch/riscv64/uart.c:uart_write_hex64` | Preserve ready state through its exact `uart_write` prefix and MMIO character calls |
+| `arch/riscv64/uart.c:uart_write_character` | Fixed UART MMIO only; no console-state or interrupt-enable mutation |
+| `arch/riscv64/uart.c:uart_flush` | MMIO status reads only; preserve console metadata and SIE/SEIE on every normal return, without claiming bounded polling |
+| `arch/riscv64/sbi.c:sbi_system_reset` at the reporter's exact reset site | Bind SRST EID/FID/scalar arguments and the pinned SEE normal-return effects below; retain its actual wrapper/caller frames and required returning-call failure continuation |
+| `kernel/tty/uart_console_core.c:micros_uart_console_output_allowed` and `micros_uart_console_validate` | Exact read-only predicate over the bound console state |
+| `arch/riscv64/interrupt.h` operations used by these functions | Actual CSR/barrier semantics and no hidden UART-state write |
+| The two declared compiler observer hooks, in observed mode only | Existing zero-stack ABI, observer-only writes and interrupt/state preservation |
+
+The implementation declaration names every actual source-stage function,
+source primitive, whole compound chain, occurrence and machine-call/branch
+site. The source stage is the independently reviewed reference, not a
+candidate-derived body or measured output. Ordinary and observed site
+inventories are separately complete after compiler instrumentation.
+
+PLIC/TTY mirror calls before UART seizure remain unqualified ordinary edges
+with all their frames and failure paths. Their success is not UART-state
+authority. Failure diagnostics after UART seizure may use the guarantee
+because the UART transition is independently proved, not because another
+mirror succeeded.
+
+The current console-state fields, owner values and validation branch come
+from the exact `kernel/tty/uart_console_core.h`/`.c` contract. The implementation
+must bind the actual linked object address and pointer argument; another
+same-shaped state cannot provide the fact.
+
+#### Establishment, dominance and preservation
+
+Source ordering is insufficient. Actual object and linked control flow must
+prove that each qualified call is dominated by the transition's normal-return
+continuation. No incoming branch, switch target, tail transfer or other
+entry may bypass it. The transition failure path cannot reach that
+continuation. Its unchanged complete source/body/control declaration and
+machine register/argument ownership remain required.
+
+Only the named post-transition calls and their exact formatting descendants
+may carry ready context. Every intervening call/operation is inventoried.
+The proof rejects a console-state write, alias escape, SIE/SEIE enable,
+unbound effect or new callee; it never assumes an unknown operation preserves
+the fact. Standard entry/exit compiler hooks receive no exception unless their
+already required observer-only leaf proof succeeds.
+
+The seizure wrapper's optional diagnostic flush, the reporter's pre-reset
+flush, System Reset return continuation, fallback `uart_write`, final flush
+and fatal `wfi` loop are part of that complete inventory. A nonreturning
+success contract cannot erase the required returning-call failure path.
+
+#### Pinned System Reset return contract
+
+The initial SEE proof is limited to native S-mode on the already selected
+one-hart QEMU `virt` platform and its exact default OpenSBI image. The
+independent upstream artifact, source pin and inspected effects are recorded
+in [the research evidence](../research/fatal-stack-context-evidence.md#system-reset-return-preservation).
+The firmware is 275928 bytes with SHA-256
+`894e2aef99590fc07ec6c60ab00282b8bc5d5d5bb2a1d0c6ada0c52df24274c0`.
+This is an upstream artifact expectation, not a digest learned from the
+candidate or a generic compatibility promise.
+
+The proof requires exact existing `sbi_system_reset` register binding:
+EID `0x53525354`, FID zero, shutdown type zero, system-failure reason one,
+and no supervisor buffer or console-state pointer argument. Its normal
+return is to the wrapper's exact `ecall + 4` continuation. The scoped SEE
+contract preserves the bound supervisor console metadata, SIE and SEIE;
+only the ABI result registers may change. Firmware private M-mode frames
+are distinct from the preserved supervisor stack. The actual C wrapper
+and every live supervisor caller frame still count.
+
+The fixed OpenSBI return path saves/restores `mstatus` (including SIE),
+preserves the relevant supervisor interrupt-enable bits, and updates the
+saved return PC/result registers rather than supervisor console storage.
+This additionally requires the current closed SBI inventory and no enabled
+Supervisor Software Events: OpenSBI's post-ecall event-injection path is not
+generic preservation authority. The current kernel uses TIME/SRST, not SSE
+registration/enable; a changed inventory, SEE, boot context or injected/
+redirected return is unsupported until independently bound.
+
+Resolve and recheck the actual configured default firmware through the
+existing closed QEMU data/configuration boundary. No user firmware override,
+unsealed file, same-version filename, different bytes or missing proof can
+substitute for the pinned image. Unknown/changed firmware or memory/CSR
+effects fail before qualifying the fallback; they do not skip a required
+stack row or authorize rebaselining the expected artifact.
+
+Model both nonreturning success and every normal-return failure continuation.
+Do not condition preservation on the ignored error/result value or treat an
+unexpected success-shaped return as a pass. The unchanged
+`MICROS_TEST_FAILURE sbi-system-reset-returned` output, final flush and fatal
+wait remain mandatory and cannot become successful QEMU completion.
+
+Native state evidence covers valid magic with each ordinary owner and
+quiescence state, invalid owner values, and invalid magic. Only the exact
+normal-return success relation establishes ready fields. The existing
+failure spin is recorded as nonreturning, not as a successful reset or proof
+of bounded polling.
+
+#### Exact edge disposition and composition
+
+In `UART_PANIC_READY`, the complete predicate must prove that the exact
+`console-owner-violation` branch in `uart_write` cannot reach its call to
+`micros_panic_entry`. Record that single source/machine site as infeasible
+with its proof references. In `UNQUALIFIED`, retain that edge unchanged.
+No other direct/indirect/assembly edge is removed by this rule.
+
+Use the existing fixed frame for each qualified node and retain callers across
+both ordinary and qualified invocations. A qualifier transition is not
+`RESET`. In particular, an ownership failure may retain an ordinary
+`uart_write` frame through panic and a second ready-context `uart_write`.
+The 48-byte panic context remains live exactly once per actual invocation.
+
+Compute the same conservative longest path over the finite qualified graph.
+With at most two nodes per actual function, work/storage remain `O(V + E)`.
+Every remaining same-epoch cycle, unknown frame/edge, overflow, budget excess
+or undeclared qualifier still fails.
+
+Native source/machine/ABI controls cover a returning reset with preserved
+state, missing flush/reset effects, changed console writes or SIE/SEIE,
+different EID/FID/arguments, changed firmware bytes or origin, SSE/injected
+return and bypassed transition dominance. Retain both live UART frames and
+the fallback chain; a rejected firmware contract must never silently switch
+to an unqualified cyclic success certificate.
+
+Each certificate additionally records qualifiers, exact establishing sites,
+preservation/guard evidence and the complete infeasible-edge disposition.
+Observed/declaration equality rejects omitted, extra, duplicated or borrowed
+proofs. No partial certificate publishes successfully.
+
+This closes neither recursive-panic runtime ownership nor corrupt-console,
+stuck-UART, trace or shutdown findings. Those remain at their existing
+`PLAT02`/`PLAT03` outcomes. All ten current stack rows, both metadata/observed
+graphs, future B13 admission and the complete ordinary author gate remain
+mandatory after restart.
 
 ## Target high-water observations
 
