@@ -81,9 +81,15 @@ This directory contains the design baseline for `micros`.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
+- [Stack-bound evidence](architecture/stack-bound-evidence.md)
+  defines the Accepted EV03 compiler/call-graph, assembly/indirect, target
+  high-water, and future node-Q admission contract.
 
 ## Research
 
+- [MINIX stack-bound evidence study](research/minix-stack-bound-evidence.md)
+  traces fixed-reference stack ownership and guard behavior, RV64 adaptations,
+  simultaneous-frame composition, and the EV03 evidence boundary.
 - [MINIX dependency analysis](research/minix-dependency-analysis.md) records the
   source baseline, component relationships, strongly connected component, and
   bootstrap lessons used to derive the `micros` design.
