@@ -54,6 +54,7 @@ def resolve_default_firmware(executable):
             raise StackEvidenceError("default firmware QEMU/configuration changed during resolution")
         return {
             "qemu": {"path": str(requested), "resolved": str(selected), **before},
+            "version": version.decode("utf-8"),
             "configuration": configuration,
             "data_roots": tuple(str(root) for root in roots),
             "firmware": {"path": str(firmware.resolve()), **identity},

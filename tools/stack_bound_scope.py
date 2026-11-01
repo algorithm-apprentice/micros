@@ -141,6 +141,25 @@ def symbol_value(image, name):
     return matches[0].value
 
 
+def producer_roles(configure):
+    if configure not in SCENARIOS:
+        raise StackEvidenceError("no live-producer declaration for this configuration")
+    scenario = SCENARIOS[configure]
+    roles = [
+        ("kernel", "boot", 0, 0, True),
+        ("kernel", "primary", 0, 0, configure == "riscv64-scheduler-test"),
+    ]
+    roles.extend(("kernel", "thread", slot, generation, True)
+                 for slot, generation in enumerate(scenario.thread_generations))
+    for image_id, relative in USER_IMAGE_SCOPES.get(configure, ()):
+        slot, generation = (
+            (image_id - 101, 1) if image_id < 200
+            else {201: (4, 1), 202: (6, 1), 203: (7, 2)}[image_id]
+        )
+        roles.append((relative, "user", slot, generation, True))
+    return tuple(roles)
+
+
 def declared_producers(root, directory, proofs):
     root, directory = Path(root), Path(directory)
     configure = directory.parent.name
@@ -150,7 +169,6 @@ def declared_producers(root, directory, proofs):
         actual = project_stack_source(unit, read_regular(root / unit)[0].decode())
         if tokens(actual) != tokens(reference_source(str(root), unit)):
             raise StackEvidenceError("producer-generation source contract changed")
-    scenario = SCENARIOS[configure]
     image = load_elf(directory / "kernel/micros.elf")
     bounds = {}
     for proof in proofs:
@@ -162,31 +180,20 @@ def declared_producers(root, directory, proofs):
         boot = bounds["kernel/micros.elf", "boot"]
         supervisor = bounds["kernel/micros.elf", "supervisor"]
         primary = max(supervisor, bounds["kernel/micros.elf", "primary-idle"])
-        result = [
-            Producer("kernel", "boot", 0, 0, symbol_value(image, "__boot_stack_bottom"),
-                     symbol_value(image, "__boot_stack_top"), boot),
-            Producer("kernel", "primary", 0, 0, symbol_value(image, "__trap_stack_bottom"),
-                     symbol_value(image, "__trap_stack_top"), primary,
-                     required=configure == "riscv64-scheduler-test"),
-        ]
         base = symbol_value(image, "__thread_kernel_stacks_start")
         if symbol_value(image, "__thread_kernel_stacks_end") - base != 128 * 16384:
             raise StackEvidenceError("producer thread pool differs from the Accepted capacity")
-        result.extend(Producer(
-            "kernel", "thread", slot, generation, base + slot * 16384,
-            base + (slot + 1) * 16384, supervisor,
-        ) for slot, generation in enumerate(scenario.thread_generations))
-        for image_id, relative in USER_IMAGE_SCOPES.get(configure, ()):
-            # The PM abort/reprepare consumes a thread generation; the ELF
-            # descriptor rollback consumes only the child process generation.
-            slot, generation = (
-                (image_id - 101, 1) if image_id < 200
-                else {201: (4, 1), 202: (6, 1), 203: (7, 2)}[image_id]
-            )
-            result.append(Producer(
-                relative, "user", slot, generation, 0x7ffff000, 0x80000000,
-                bounds[relative, "user-startup"],
-            ))
+        result = []
+        for relative, owner, slot, generation, required in producer_roles(configure):
+            if owner == "boot":
+                bottom, top, bound = symbol_value(image, "__boot_stack_bottom"), symbol_value(image, "__boot_stack_top"), boot
+            elif owner == "primary":
+                bottom, top, bound = symbol_value(image, "__trap_stack_bottom"), symbol_value(image, "__trap_stack_top"), primary
+            elif owner == "thread":
+                bottom, top, bound = base + slot * 16384, base + (slot + 1) * 16384, supervisor
+            else:
+                bottom, top, bound = 0x7ffff000, 0x80000000, bounds[relative, "user-startup"]
+            result.append(Producer(relative, owner, slot, generation, bottom, top, bound, required))
     except KeyError as error:
         raise StackEvidenceError("producer lacks its complete static root proof") from error
     producer_inventory(tuple(result))

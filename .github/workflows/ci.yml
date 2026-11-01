@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_ANALYTICS: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+
+jobs:
+  checks:
+    name: ${{ matrix.part }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        part: [native, target-1, target-2, target-3, target-4, target-5]
+    env:
+      CI_PART: ${{ matrix.part }}
+      CTEST_PARALLEL_LEVEL: ${{ matrix.part == 'native' && '3' || '' }}
+    steps:
+      - name: Checkout the exact event and complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the supported producer tools
+        run: |
+          set -euo pipefail
+          output="build/ci/parts/$CI_PART/diagnostics"
+          mkdir -p "$output"
+          {
+            test "$(uname -s)" = Darwin
+            test "$(uname -m)" = arm64
+            brew install cmake ninja python@3.15 llvm@23 lld@23 qemu actionlint
+            brew list --versions cmake ninja python@3.15 llvm@23 lld@23 qemu actionlint
+            python_prefix=$(brew --prefix python@3.15)
+            llvm_prefix=$(brew --prefix llvm@23)
+            lld_prefix=$(brew --prefix lld@23)
+            qemu_prefix=$(brew --prefix qemu)
+            {
+              printf 'MICROS_PYTHON=%s/bin/python3.15\n' "$python_prefix"
+              printf 'MICROS_CLANG=%s/bin/clang\n' "$llvm_prefix"
+              printf 'MICROS_LD_LLD=%s/bin/ld.lld\n' "$lld_prefix"
+              printf '%s\n' 'CLANG_NO_DEFAULT_CONFIG=1' 'OPENSSL_CONF=/dev/null' \
+                'SSL_CERT_FILE=/dev/null' 'SSL_CERT_DIR=/dev/null'
+            } >> "$GITHUB_ENV"
+            printf '%s/bin\n' "$qemu_prefix" >> "$GITHUB_PATH"
+          } 2>&1 | tee "$output/bootstrap.log"
+
+      - name: Check the complete workflow
+        run: |
+          set -euo pipefail
+          actionlint .github/workflows/ci.yml 2>&1 | tee "build/ci/parts/$CI_PART/diagnostics/actionlint.log"
+
+      - name: Execute only this part with live output
+        run: |
+          set -euo pipefail
+          "${MICROS_PYTHON}" -E -S -B tools/run_ci_part.py --part "$CI_PART"
+
+      - name: Retain the immutable current-attempt part
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: micros-ci-${{ github.run_id }}-${{ github.run_attempt }}-part-${{ matrix.part }}
+          path: build/ci/parts/${{ matrix.part }}/
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
+
+  validation:
+    if: ${{ always() }}
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      CI_PART: collector
+      CI_PRODUCER_RESULT: ${{ needs.checks.result }}
+    steps:
+      - name: Require every producer to succeed
+        run: |
+          set -euo pipefail
+          test "$CI_PRODUCER_RESULT" = success
+
+      - name: Checkout the same event and complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install only the collector runtime
+        run: |
+          set -euo pipefail
+          mkdir -p build/ci
+          {
+            brew install python@3.15
+            python_prefix=$(brew --prefix python@3.15)
+            {
+              printf 'MICROS_PYTHON=%s/bin/python3.15\n' "$python_prefix"
+              printf '%s\n' 'OPENSSL_CONF=/dev/null' 'SSL_CERT_FILE=/dev/null' 'SSL_CERT_DIR=/dev/null'
+            } >> "$GITHUB_ENV"
+          } 2>&1 | tee build/ci/collector-bootstrap.log
+
+      - name: Download only this complete attempt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: micros-ci-${{ github.run_id }}-${{ github.run_attempt }}-part-*
+          path: build/ci/downloads
+          merge-multiple: false
+          digest-mismatch: error
+
+      - name: Verify full coverage and publish the CI result
+        id: collect
+        run: |
+          set -euo pipefail
+          "${MICROS_PYTHON}" -E -S -B tools/collect_ci_results.py 2>&1 | tee build/ci/collector.log
+
+      - name: Retain aggregate evidence and diagnostics
+        if: ${{ !cancelled() && steps.collect.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: micros-ci-${{ github.run_id }}-${{ github.run_attempt }}-aggregate
+          path: |
+            build/ci/collector-bootstrap.log
+            build/ci/collector.log
+            build/ci/complete.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false

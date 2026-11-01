@@ -186,6 +186,7 @@ class StackArtifactBoundaryTest(unittest.TestCase):
             ) as pinned:
                 resolved = resolve_default_firmware(executable)
                 self.assertEqual(str(firmware), resolved["firmware"]["path"])
+                self.assertEqual("QEMU emulator version 11.1.3\n", resolved["version"])
                 pinned.assert_called_once_with(_file_identity(firmware))
             with patch(
                 "tools.stack_bound_fatal_firmware.qemu_configuration",

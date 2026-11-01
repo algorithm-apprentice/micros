@@ -6,7 +6,10 @@ This Accepted contract corrects the serial CI design under
 [ADR-0089](../adr/0089-parallel-github-actions-validation.md).
 The original implementation #186 is closed without merge and preserved at
 `f09f7852d354bbc03957096ce658cd16ef13a1b8`.
-Implementation is blocked until separate corrective-design merge.
+Corrective design #187 is separately merged. The implementation now supplies
+the producer matrix, constrained profile workers and current-attempt collector
+described below. Actual hosted acceptance belongs to the implementation PR;
+the existence of these files does not establish an operational CI result.
 
 The [original CI contract](github-actions-ci.md) still supplies supported
 host/runtime/tool/firmware authority, read-only permissions, source history,
@@ -124,7 +127,7 @@ ordering and complete publication.
 
 ## Producer execution and records
 
-The prospective CI part entry point accepts only one of the six declared
+The CI part entry point accepts only one of the six declared
 part IDs. It derives commands and profile membership from the current
 checked-in declarations; it accepts no arbitrary command, path subset,
 firmware, expected result or success file.
@@ -287,3 +290,46 @@ an unavailable macOS concurrency quota or a fixed runtime threshold.
 ADR-0088's publication review still precedes every implementation commit;
 actual hosted Green and final independent review precede merge. Verify the
 main run before reporting the parallel CI operational.
+
+## Implementation map and commands
+
+| Owner | Responsibility |
+| --- | --- |
+| `.github/workflows/ci.yml` | Six-member hosted matrix, bounded concurrency, immutable uploads and always-evaluated aggregate |
+| `tools/ci_environment.py` | Exact committed source/event and role-specific host/runtime/tool preflight |
+| `tools/ci_partition.py` | Closed canonical command ownership and deterministic target placement |
+| `tools/ci_execution.py` | Live bounded-memory command output, complete logs and actual exit status |
+| `tools/run_ci_part.py` | Ordinary workflow followed by its own profile worker; failure-atomic `PART_COMPLETE` |
+| `tools/ci_stack_profile.py` | Existing actual static/observed proof owners, original live seals and `PROFILE_COMPLETE` |
+| `tools/ci_records.py` | Strict JSON, normalized nonlinked data paths and complete transport-byte identities |
+| `tools/ci_stack_records.py` | Qualified image/root/observation consistency and pure graph-arithmetic replay |
+| `tools/ci_parts.py` | Exact part admission and complete canonical-intent union |
+| `tools/collect_ci_results.py` | Current-attempt fan-in, original-file rechecks and one atomic CI completion |
+
+The workflow invokes only these closed entry points, in its declared
+environment:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/run_ci_part.py --part "$CI_PART"
+"${MICROS_PYTHON}" -E -S -B tools/collect_ci_results.py
+```
+
+The collector requires `CI_PRODUCER_RESULT=success` from the matrix dependency.
+It has no command, directory, repository, run or artifact selector. The part
+runner alone starts the internal `ci_stack_profile.py --profile` worker for
+one profile already assigned to its `CI_PART`. These are hosted admission
+interfaces, not a way to simulate Actions acceptance on a local checkout.
+
+Native transport/routing/publication controls and workflow lint run with:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest discover -s tests/host -p 'test_ci_*.py'
+actionlint .github/workflows/ci.yml
+```
+
+The complete native gate includes those controls. They cover rejected foreign
+or incomplete data, exact routing, streamed nonzero failures and rollback
+after a post-publication source or artifact mutation. Model fixtures are not
+compiler executions or hosted results. The unchanged full local author plan,
+explicit parallel-native gate, actual hosted producers and final independent
+review remain required.
