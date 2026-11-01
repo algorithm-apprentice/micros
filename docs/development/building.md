@@ -364,6 +364,11 @@ command results:
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
 ```
 
+The Accepted [GitHub Actions contract](github-actions-ci.md) hosts that
+complete fresh plan without changing local validation, target deadlines or
+independent review. Its separate implementation remains blocked on design
+merge; no CI workflow is claimed by the design.
+
 When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:
 

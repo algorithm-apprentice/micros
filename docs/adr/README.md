@@ -103,3 +103,4 @@ to make the project appear more consistent than it was.
 | [0085](0085-stack-metadata-artifact-boundary.md) | Stack metadata artifact boundary | Accepted |
 | [0086](0086-finite-fatal-stack-context.md) | Finite fatal-stack context | Accepted |
 | [0087](0087-phase-bounded-vm-load-temporaries.md) | Phase-bounded VM load temporaries | Accepted |
+| [0088](0088-github-actions-validation.md) | GitHub Actions validation | Accepted |
