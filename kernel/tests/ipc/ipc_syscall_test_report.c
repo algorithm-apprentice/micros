@@ -1,5 +1,5 @@
 #include "kernel/tests/ipc/ipc_syscall_test_internal.h"
-
+#include "micros/stack_observation.h"
 static bool hold_syscall_fixture_threads(
     struct ipc_syscall_test_context *fixture,
     struct micros_kernel_objects *objects,
@@ -147,7 +147,7 @@ _Noreturn void micros_ipc_syscall_test_finish(void)
         "errors=stable completion=deferred "
         "registers=preserved cleanup=complete\n"
     );
-    uart_flush();
+    uart_flush(); MICROS_TEST_STACK_REPORT();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE

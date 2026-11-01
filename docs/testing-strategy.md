@@ -116,6 +116,32 @@ and proves actual frame release plus complete ordinary/observed graph and
 target acceptance. No budget, call edge, hook coverage, timeout or historical
 oracle is waived.
 
+Design #183 is separately merged. The restarted lifetime slice has a
+source/phase regression in `tests/host/test_vm_load_stack_lifetime.py`;
+its original signature/body expectations come from the fixed EV02 source
+stage, not from the corrected candidate. Narrow iteration uses the existing
+VM semantic executable plus that independent source check:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target vm_core_test
+ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_vm_load_stack_lifetime
+```
+
+These checks do not replace the required actual compiler/link stack proof,
+all current EV03 scenarios, complete author gate, or independent review.
+
+The explicit `test-stack-evidence` workflow now composes all 42 current
+ordinary/metadata configurations and 111 ELF outputs, then all ten separately
+instrumented QEMU scenarios. Each private build uses `cmake --fresh` and
+`cmake --build ... --clean-first`; content-bound manifests reject stale
+objects even when timestamps or cached configure values are preserved.
+Static proof precedes guest execution. Complete legacy acceptance and every
+generation-bound producer must pass before atomic certificate publication.
+Workflow availability is not execution evidence or independent review;
+both remain mandatory for the exact candidate being merged.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
@@ -901,6 +927,7 @@ cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-vfs-model
 cmake --workflow --preset test-elf-spawn-model
 cmake --workflow --preset test-unit
+cmake --workflow --preset test-stack-evidence
 cmake --workflow --preset build-tty-service-image
 cmake --workflow --preset build-ramfs-service-image
 cmake --workflow --preset build-vfs-service-image

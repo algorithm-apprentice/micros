@@ -1,5 +1,5 @@
 #include "kernel/tests/vfs/vfs_service_test.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -502,7 +502,7 @@ static bool vfs_test_all_services_are_ready(
 
 static _Noreturn void vfs_test_shutdown(void)
 {
-    (void)sbi_system_reset(
+    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
     );

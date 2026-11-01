@@ -10,6 +10,11 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.stack_recipe import (
+    project_command_extension, project_planner_registration,
+    project_external_evidence as project_stack_external,
+)
+from tests.host.stack_source_projection import project_stack_source
 from tests.host.work_count_recipe import (
     project_context_registration, project_external_evidence,
     project_gate_compatibility, project_root_recipe,
@@ -15822,6 +15827,10 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     del physical
     selected = current_path(root, logical)
     raw = selected.read_bytes()
+    if b"MICROS_TEST_STACK_" in raw:
+        raw = project_stack_source(
+            KERNEL_LOGICAL_TO_PHYSICAL[logical], raw.decode("utf-8")
+        ).encode()
     if logical == "kernel/frame_ownership_validation.c":
         raw = restore_frame_validation_hot_path(
             raw.decode("utf-8")
@@ -15972,6 +15981,7 @@ def _restore_exact_source_transports(
 
 
 def restore_validation_plan_source(source: str) -> str:
+    source = project_planner_registration(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == PYTHON315_VALIDATION_PLAN_SHA256:
         source = _restore_exact_source_transports(
@@ -16110,6 +16120,7 @@ def original_cmake_recipe_digest(value: str) -> str:
 
 
 def original_validation_plan(commands):
+    commands = project_command_extension(commands)
     restored = []
     for command in commands:
         if (
@@ -16859,7 +16870,7 @@ def read_bytes_path(path: Path) -> bytes:
         return restore_validation_execution_source(
             path.read_text(encoding="utf-8")
         ).encode()
-    raw = project_external_evidence(relative, path.read_bytes())
+    raw = project_stack_external(relative, project_external_evidence(relative, path.read_bytes()))
     if (
         relative is not None
         and relative.startswith("tools/")

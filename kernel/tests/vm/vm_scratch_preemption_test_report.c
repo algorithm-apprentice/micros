@@ -1,5 +1,5 @@
 #include "kernel/tests/vm/vm_scratch_preemption_test_internal.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include "arch/riscv64/platform.h"
 #include "arch/riscv64/trap_context.h"
@@ -173,7 +173,7 @@ _Noreturn void vm_scratch_test_report_success(
         "pte=absent ownership=transferable scratch=clear\n"
     );
     uart_flush();
-    (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);
+    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);
     for (;;) {
         __asm__ volatile("wfi");
     }

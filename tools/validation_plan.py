@@ -12,6 +12,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from tests.host.stack_recipe import validate_stack_workflow
 from tools import validation_build_impact, validation_context, validation_execution
 from tools.python_host_runtime import (
     UnsupportedPythonRuntime,
@@ -29,6 +30,7 @@ VFS_MODEL = ("cmake", "--workflow", "--preset", "test-vfs-model")
 ELF_SPAWN_MODEL = ("cmake", "--workflow", "--preset", "test-elf-spawn-model")
 DOCS = documentation_command()
 SMOKE = ("cmake", "--workflow", "--preset", "test-qemu-smoke")
+STACK_EVIDENCE = ("cmake", "--workflow", "--preset", "test-stack-evidence")
 
 QEMU_WORKFLOWS = (
     "test-qemu-smoke",
@@ -2419,6 +2421,7 @@ def plan(paths, tier, base="origin/main"):
         commands = [UNIT_FULL]
         commands.extend(workflow(name) for name in QEMU_WORKFLOWS)
         commands.extend(workflow(name) for name in IMAGE_WORKFLOWS)
+        commands.append(STACK_EVIDENCE)
         commands.append(DOCS)
         commands.extend(diff_commands(base))
         return commands
@@ -2452,6 +2455,8 @@ def plan(paths, tier, base="origin/main"):
             append_unique(commands, workflow(name))
         for name in image_workflows:
             append_unique(commands, workflow(name))
+    if workflows or image_workflows:
+        append_unique(commands, STACK_EVIDENCE)
     commands.extend(diff_commands(base))
     return commands
 
@@ -2588,6 +2593,7 @@ def custom_target_block(cmake, target):
 
 
 def validate_inventory(root):
+    validate_stack_workflow(root)
     workflows = preset_workflows(root)
     qemu_inventory = {
         name for name in workflows if name.startswith("test-qemu-")
@@ -2649,7 +2655,7 @@ def validate_inventory(root):
 def canonical_workflows():
     return (
         UNIT_FAST[-1], UNIT_FULL[-1],
-        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS,
+        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS, STACK_EVIDENCE[-1],
     )
 
 

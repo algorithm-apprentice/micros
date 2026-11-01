@@ -12,6 +12,7 @@ import unittest
 from tools import validation_context
 from tools.validation_build_manifest import native_outputs
 from tests.host.c_source_records import tokens
+from tests.host.stack_recipe import MODULE_PATH as STACK_MODULE_PATH, RECIPE as STACK_RECIPE
 from tests.host.work_count_recipe import (
     INCLUDE, MODULE_PATH, project_root_recipe, projected_recipe_digest,
     render_native_recipe, validate_native_recipe,
@@ -293,6 +294,9 @@ class WorkCountEvidenceTest(unittest.TestCase):
             module = root / MODULE_PATH
             module.parent.mkdir(parents=True)
             module.write_text(render_native_recipe())
+            stack_module = root / STACK_MODULE_PATH
+            stack_module.parent.mkdir(parents=True)
+            stack_module.write_text(STACK_RECIPE)
             self.assertEqual(
                 validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
                 projected_recipe_digest(root / "CMakeLists.txt"),
@@ -323,6 +327,9 @@ class WorkCountEvidenceTest(unittest.TestCase):
             module = root / MODULE_PATH
             module.parent.mkdir(parents=True)
             module.write_text(render_native_recipe())
+            stack_module = root / STACK_MODULE_PATH
+            stack_module.parent.mkdir(parents=True)
+            stack_module.write_text(STACK_RECIPE)
             output = root / "build"
             output.mkdir()
             inventory = {"tests": []}

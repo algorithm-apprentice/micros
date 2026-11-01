@@ -125,7 +125,7 @@ static void publish_load_input(
     }
 }
 
-enum micros_vm_core_error micros_vm_load_prepare(
+static enum micros_vm_core_error vm_load_prepare_transaction(
     struct micros_vm_state *state,
     uint64_t process_reservation_token,
     uint64_t semantic_pid,
@@ -144,29 +144,6 @@ enum micros_vm_core_error micros_vm_load_prepare(
     enum micros_vm_core_error error;
     size_t page_count;
 
-    if (
-        state == NULL || executable_bytes == NULL
-        || request_bytes == NULL || stack_values == NULL
-    ) {
-        return MICROS_VM_CORE_ERROR_ARGUMENT;
-    }
-    error = vm_core_validate_state(
-        state,
-        executable_bytes == state->executable_bytes
-            || request_bytes == state->request_bytes
-    );
-    if (error != MICROS_VM_CORE_OK) {
-        return error;
-    }
-    if (state->phase != MICROS_VM_LOADER_IDLE) {
-        return MICROS_VM_CORE_ERROR_STATE;
-    }
-    if (!prepare_source_shape_is_valid(
-        state, process_reservation_token, semantic_pid,
-        executable_bytes, executable_size, request_bytes, request_size, stack_values
-    )) {
-        return MICROS_VM_CORE_ERROR_ARGUMENT;
-    }
     error = prepare_binary_plans(
         state, executable_bytes, executable_size,
         request_bytes, request_size, &elf_plan, &stack_plan
@@ -202,6 +179,52 @@ enum micros_vm_core_error micros_vm_load_prepare(
     );
     state->transaction = candidate;
     state->phase = MICROS_VM_LOADER_INPUT_COPIED;
+    return MICROS_VM_CORE_OK;
+}
+
+enum micros_vm_core_error micros_vm_load_prepare(
+    struct micros_vm_state *state,
+    uint64_t process_reservation_token,
+    uint64_t semantic_pid,
+    const uint8_t *executable_bytes,
+    size_t executable_size,
+    const uint8_t *request_bytes,
+    size_t request_size,
+    const struct micros_application_stack_values *stack_values
+)
+{
+    enum micros_vm_core_error error;
+
+    if (
+        state == NULL || executable_bytes == NULL
+        || request_bytes == NULL || stack_values == NULL
+    ) {
+        return MICROS_VM_CORE_ERROR_ARGUMENT;
+    }
+    error = vm_core_validate_state(
+        state,
+        executable_bytes == state->executable_bytes
+            || request_bytes == state->request_bytes
+    );
+    if (error != MICROS_VM_CORE_OK) {
+        return error;
+    }
+    if (state->phase != MICROS_VM_LOADER_IDLE) {
+        return MICROS_VM_CORE_ERROR_STATE;
+    }
+    if (!prepare_source_shape_is_valid(
+        state, process_reservation_token, semantic_pid,
+        executable_bytes, executable_size, request_bytes, request_size, stack_values
+    )) {
+        return MICROS_VM_CORE_ERROR_ARGUMENT;
+    }
+    error = vm_load_prepare_transaction(
+        state, process_reservation_token, semantic_pid,
+        executable_bytes, executable_size, request_bytes, request_size, stack_values
+    );
+    if (error != MICROS_VM_CORE_OK) {
+        return error;
+    }
     return vm_core_validate_state(state, false);
 }
 

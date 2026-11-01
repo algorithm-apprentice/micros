@@ -1,5 +1,5 @@
 #include "kernel/tests/pm/pm_service_test_internal.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -262,7 +262,7 @@ static _Noreturn void report_success_and_shutdown(void)
         "argc=2 env=1 auxv=validated gp-tp=zero "
         "return=pm-exit code=37 cleanup=complete\n"
     );
-    uart_flush();
+    uart_flush(); MICROS_TEST_STACK_REPORT();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE

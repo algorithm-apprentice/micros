@@ -1,5 +1,5 @@
 #include "kernel/tests/tty/tty_service_test.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -477,7 +477,7 @@ _Noreturn void micros_tty_service_test_handle_trap(
     if (!uart_is_physically_drained()) {
         test_failure(hart, frame, "tty-service-test-uart-drain");
     }
-    (void)sbi_system_reset(
+    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
     );

@@ -1,5 +1,5 @@
 #include "kernel/tests/scheduler/scheduler_test_internal.h"
-
+#include "micros/stack_observation.h"
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
 #include "micros/frame_ownership_runtime.h"
@@ -151,7 +151,7 @@ static void report_scheduler_success(void)
         "user=cause9-scheduled supervisor=cause9-direct "
         "idle=cause9-selected\n"
     );
-    uart_flush();
+    uart_flush(); MICROS_TEST_STACK_REPORT();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
