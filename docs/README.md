@@ -276,6 +276,10 @@ This directory contains the design baseline for `micros`.
   Accepted hosted execution, source/tool authority, evidence and CI-bootstrap
   review boundary; its [research record](research/github-actions-ci-baseline.md)
   preserves the fixed MINIX and current platform evidence.
+- [Parallel CI validation](development/parallel-ci-validation.md) defines
+  bounded independent producers and a complete same-run aggregate;
+  [measured serial evidence](research/parallel-ci-validation-evidence.md)
+  records why the unmerged single-job implementation was abandoned.
 - [Contributing guide](../CONTRIBUTING.md) is the contributor entry point.
 - [Agent contract](../AGENTS.md) is the tool-neutral AI agent entry point.
 
