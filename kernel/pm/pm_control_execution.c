@@ -1,5 +1,5 @@
 #include "kernel/pm/pm_control_internal.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -330,7 +330,7 @@ void micros_pm_control_prepare_commit_prevalidated(
     state->prepared.process = plan->process;
     state->prepared.thread = plan->thread;
     state->prepared.hart = binding->hart;
-    state->prepared.endpoint = plan->endpoint;
+    state->prepared.endpoint = plan->endpoint; MICROS_TEST_STACK_ATTACHED(objects, plan->thread);
 }
 
 enum micros_pm_control_error
@@ -407,7 +407,7 @@ void micros_pm_control_abort_prepared_commit_prevalidated(
         &objects->processes[plan->process.slot];
     struct micros_thread *thread =
         &objects->threads[plan->thread.slot];
-    uint32_t generation = thread->generation;
+    uint32_t generation = thread->generation; MICROS_TEST_STACK_DETACHING(objects, plan->thread);
 
     micros_pm_control_clear_bytes(thread, sizeof(*thread));
     thread->slot_state = plan->quarantine_thread

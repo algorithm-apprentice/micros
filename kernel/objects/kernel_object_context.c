@@ -1,5 +1,5 @@
 #include "kernel/objects/kernel_object_private.h"
-
+#include "micros/stack_observation.h"
 static bool kernel_object_context_stack_avoids_threads(
     const struct micros_kernel_objects *objects,
     const struct micros_thread *thread,
@@ -133,7 +133,7 @@ micros_thread_attach_execution_context(
     thread->context_attached = true;
     thread->kernel_stack_bottom = kernel_stack_bottom;
     thread->kernel_stack_top = kernel_stack_top;
-    kernel_object_copy_user_context(&thread->user_context, context);
+    kernel_object_copy_user_context(&thread->user_context, context); MICROS_TEST_STACK_ATTACHED(objects, thread_handle);
     return MICROS_KERNEL_OBJECT_OK;
 }
 
@@ -273,7 +273,7 @@ micros_thread_detach_execution_context(
             return MICROS_KERNEL_OBJECT_ERROR_STATE;
         }
     }
-    thread->context_attached = false;
+    MICROS_TEST_STACK_DETACHING(objects, thread_handle); thread->context_attached = false;
     thread->kernel_stack_bottom = 0;
     thread->kernel_stack_top = 0;
     kernel_object_clear_user_context(&thread->user_context);

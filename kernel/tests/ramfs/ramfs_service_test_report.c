@@ -1,5 +1,5 @@
 #include "kernel/tests/ramfs/ramfs_service_test_internal.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -267,7 +267,7 @@ micros_ramfs_service_test_handle_trap(
             "ramfs-service-test-uart-drain"
         );
     }
-    (void)sbi_system_reset(
+    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
     );

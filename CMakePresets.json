@@ -743,6 +743,13 @@
       "targets": [
         "test-qemu-scheduler-invalid-context"
       ]
+    },
+    {
+      "name": "test-stack-evidence",
+      "configurePreset": "host-debug",
+      "targets": [
+        "test-stack-evidence"
+      ]
     }
   ],
   "workflowPresets": [
@@ -1443,6 +1450,20 @@
         {
           "type": "build",
           "name": "test-qemu-scheduler-invalid-next"
+        }
+      ]
+    },
+    {
+      "name": "test-stack-evidence",
+      "displayName": "Certify current static and observed stack bounds",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "test-stack-evidence"
         }
       ]
     }

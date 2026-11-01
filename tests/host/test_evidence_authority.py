@@ -2,6 +2,7 @@ import ast
 import dataclasses
 import hashlib
 from pathlib import Path
+import re
 import subprocess
 import unittest
 
@@ -15,6 +16,50 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class InventoryTests(unittest.TestCase):
+    def test_fatal_firmware_facts_remain_artifacts_not_runtime_baseline_oracles(self):
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        values = [
+            fact for fact in inventory.facts
+            if fact.family == "stack-firmware-artifact" and fact.evidence_value
+        ]
+        self.assertEqual(2, len(values))
+        for fact in values:
+            self.assertIs(evidence_authority.AuthorityClass.ARTIFACT_CONTRACT, fact.authority_class)
+            self.assertIn("docs/adr/0086-finite-fatal-stack-context.md", fact.payload_paths)
+            self.assertNotIn("B13", fact.consumer_units)
+
+    def test_ev03_source_binding_registration_preserves_all_earlier_facts(self):
+        research = (ROOT / "docs/research/minix-stack-bound-evidence.md").read_text()
+        reference = re.search(r"commit: ([0-9a-f]{40})", research).group(1)
+        result = subprocess.run(
+            ["git", "show", reference + ":tests/host/evidence_authority_inventory.py"],
+            cwd=ROOT, capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        declaration = next(
+            node for node in ast.parse(result.stdout).body
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "DECLARED_FAMILY_FACT_DIGESTS"
+                for target in node.targets
+            )
+        )
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        for family, expected in ast.literal_eval(declaration.value).items():
+            self.assertEqual(
+                expected, fact_set_digest(fact for fact in inventory.facts if fact.family == family),
+                family,
+            )
+        anchor, = (
+            fact for fact in inventory.facts
+            if fact.key == "tools/stack_bound_bindings.py:data-entry:AUTHORITY_COMMIT"
+        )
+        self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, anchor.authority_class)
+        self.assertEqual(reference, anchor.evidence_value)
+        self.assertEqual("B14", anchor.primary_unit)
+        self.assertEqual(
+            tuple([f"B{index:02d}" for index in range(1, 13)] + ["B14"]), anchor.consumer_units,
+        )
+
     def test_ev02_registration_preserves_every_historical_authority(self):
         result = subprocess.run(
             [
@@ -80,7 +125,7 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(6, len(inventory.families))
+        self.assertEqual(9, len(inventory.families))
         self.assertGreater(len(inventory.facts), 30)
         self.assertTrue(any(
             fact.authority_class

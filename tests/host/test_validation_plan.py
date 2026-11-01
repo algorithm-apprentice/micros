@@ -1181,7 +1181,7 @@ class ValidationPlanTests(unittest.TestCase):
         self.assertEqual(
             len(validation_plan.QEMU_WORKFLOWS)
             + len(validation_plan.IMAGE_WORKFLOWS)
-            + 5,
+            + 6,
             len(commands),
         )
 

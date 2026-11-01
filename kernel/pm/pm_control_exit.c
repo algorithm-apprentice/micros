@@ -1,5 +1,5 @@
 #include "kernel/pm/pm_control_internal.h"
-
+#include "micros/stack_observation.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -429,7 +429,7 @@ void micros_pm_control_exit_detach_commit_prevalidated(
         &objects->threads[plan->thread.slot];
     struct micros_process *process =
         &objects->processes[plan->process.slot];
-    uint32_t generation = thread->generation;
+    uint32_t generation = thread->generation; MICROS_TEST_STACK_DETACHING(objects, plan->thread);
 
     thread->scheduler_assigned = false;
     thread->scheduler_preemptible = false;

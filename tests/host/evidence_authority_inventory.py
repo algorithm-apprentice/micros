@@ -72,9 +72,62 @@ FAMILY_OWNERS = {
         "tests/host/test_generate_vm_handoff_fixture.py",
         "tests/host/test_generate_vm_scratch_preemption_fixture.py",
     ),
+    "stack-source-bindings": (
+        "tools/stack_bound_bindings.py",
+        "tools/stack_bound_callback_contracts.py",
+    ),
+    "stack-firmware-artifact": (
+        "tests/host/test_stack_artifact_boundary.py",
+        "tools/stack_bound_fatal_firmware.py",
+    ),
+    "stack-vm-lifetime": (
+        "tests/host/test_vm_load_stack_lifetime.py",
+    ),
 }
 
 NON_IDENTITY_EXCEPTIONS = ()
+
+STACK_BINDING_PAYLOAD_PATHS = (
+    "docs/architecture/stack-bound-evidence.md",
+    "include/micros/user_address_space.h",
+    "kernel/memory/user_address_space_mapping.c",
+    "kernel/pm/pm_control_syscall_core.h",
+    "kernel/pm/pm_control_syscall_runtime.c",
+    "kernel/tests/memory/address_space_handoff_test_snapshot.c",
+    "kernel/tests/memory/address_space_handoff_test_tty.c",
+    "kernel/vm/vm_snapshot.c",
+    "kernel/vm/vm_snapshot_validation.c",
+    "servers/pm/pm_coordinator.h",
+    "servers/pm/pm_coordinator_internal.h",
+    "servers/pm/pm_service_backend.c",
+    "servers/ramfs/ramfs_core.h",
+    "servers/ramfs/ramfs_service.c",
+    "servers/tty/tty_service.c",
+    "servers/tty/tty_service_core.h",
+    "servers/tty/tty_uart.h",
+    "servers/vfs/vfs_core.h",
+    "servers/vfs/vfs_service.c",
+    "servers/vm/vm_service_backend.c",
+    "servers/vm/vm_service_core.h",
+    "tools/stack_bound_bindings.py",
+    "tools/stack_bound_callback_contracts.py",
+)
+
+STACK_FIRMWARE_PAYLOAD_PATHS = (
+    "docs/adr/0086-finite-fatal-stack-context.md",
+    "docs/architecture/stack-bound-evidence.md",
+    "docs/research/fatal-stack-context-evidence.md",
+    "tests/host/test_stack_artifact_boundary.py",
+    "tools/stack_bound_fatal_firmware.py",
+)
+
+STACK_VM_LIFETIME_PAYLOAD_PATHS = (
+    "docs/adr/0087-phase-bounded-vm-load-temporaries.md",
+    "docs/architecture/stack-bound-evidence.md",
+    "servers/vm/vm_load.c",
+    "tests/host/test_vm_load_stack_lifetime.py",
+    "tools/stack_bound_vm_lifetime.py",
+)
 
 DECLARED_FAMILY_FACT_DIGESTS = {
     "authority-core":
@@ -89,6 +142,12 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "11a2f268950946b406dd52d176a14198b3dfaffe36cb41e226ba8f648b078533",
     "tool-structure":
         "29bee701c5920506b72b9ad5f60da85521170673a222a3770c6d96953c6ed73b",
+    "stack-source-bindings":
+        "8148089c54841e214d43b1f8f811eadd40904a4b39f88817d98dfb74477c33b6",
+    "stack-firmware-artifact":
+        "9d2683554290ebe151342a003891705b6351aeddc69fddf2b32b256d226e58bb",
+    "stack-vm-lifetime":
+        "17d0e193b7747ce3df1efe34c1fa6d777201f1d95ad6e07cec4a5904d57032a4",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -203,7 +262,7 @@ def _identity_candidate(path):
 
 
 def _assignment_class(family):
-    if family == "fixture-artifacts":
+    if family in ("fixture-artifacts", "stack-firmware-artifact"):
         return AuthorityClass.ARTIFACT_CONTRACT
     return AuthorityClass.TRANSPORT_IDENTITY
 
@@ -270,6 +329,7 @@ def _fact_primary_unit(payload_paths):
 def _consumer_units(relative, payload_paths=()):
     units = {"B14"}
     mappings = (
+        ("stack_", tuple(f"B{index:02d}" for index in range(1, 13))),
         ("frame", ("B02",)),
         ("address_space", ("B02",)),
         ("kernel_vm_handoff", ("B02", "B07")),
@@ -584,7 +644,7 @@ def _function_facts(
                     f"{function_name}/hash-{index}",
                     (
                         AuthorityClass.ARTIFACT_CONTRACT
-                        if family == "fixture-artifacts"
+                        if family in ("fixture-artifacts", "stack-firmware-artifact")
                         else AuthorityClass.TRANSPORT_IDENTITY
                     ),
                     _fact_primary_unit(tuple(sorted(payloads))),
@@ -599,6 +659,12 @@ def _function_facts(
 def _facts_for_owner(root, family, relative):
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     declared_paths = _path_strings(root, tree)
+    if family == "stack-source-bindings":
+        declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)
+    elif family == "stack-firmware-artifact":
+        declared_paths = set(STACK_FIRMWARE_PAYLOAD_PATHS)
+    elif family == "stack-vm-lifetime":
+        declared_paths = set(STACK_VM_LIFETIME_PAYLOAD_PATHS)
     return [
         _owner_boundary_fact(family, relative),
         *_assignment_facts(

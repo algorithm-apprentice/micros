@@ -3,6 +3,7 @@
 import hashlib
 from pathlib import Path
 
+from tests.host.stack_recipe import INCLUDE as STACK_INCLUDE, project_root_recipe as project_stack_recipe, validate_stack_recipe
 from tools.validation_inputs import UnsupportedContext
 
 
@@ -151,6 +152,7 @@ def project_gate_compatibility(relative, source):
 
 
 def project_root_recipe(source):
+    source = project_stack_recipe(source)
     if INCLUDE not in source:
         return source
     if source.count(INCLUDE) != 1 or source.count(INCLUDE + INCLUDE_ANCHOR) != 1:
@@ -164,6 +166,8 @@ def projected_recipe_digest(path):
         if path.name != "CMakeLists.txt":
             return hashlib.sha256(path.read_bytes()).hexdigest()
         source = path.read_text(encoding="utf-8")
+        if STACK_INCLUDE in source:
+            validate_stack_recipe(path.parent)
         if INCLUDE in source:
             validate_native_recipe(path.parent)
         return hashlib.sha256(

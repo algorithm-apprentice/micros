@@ -2,8 +2,8 @@
 
 ## Status, outcome, and non-goals
 
-EV03 is the next sequential evidence foundation after merged EV02 #179.
-This Accepted design supplies the implementation contract for B14-F003
+EV03 is the stack-evidence foundation following merged EV02 #179.
+This Accepted contract supplies the implementation boundary for B14-F003
 under [ADR-0084](../adr/0084-checked-stack-bound-evidence.md).
 The fixed-reference mapping is in
 [the MINIX study](../research/minix-stack-bound-evidence.md).
@@ -16,8 +16,9 @@ init/shell already exists.
 Designs #180, #181, and #182 are merged. The later uncommitted implementation
 closed the fatal-call cycle through the finite qualification below, then
 rejected an observed VM service stack bound of 4,240 bytes against 4,096.
-It is preserved and abandoned pending the separate
-[Accepted ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md).
+It was preserved and abandoned before the separate
+[Accepted ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md) merge
+as #183. Implementation has now restarted from that current main.
 The [measured evidence](../research/vm-load-temporary-stack-evidence.md)
 does not certify the abandoned implementation.
 
@@ -27,14 +28,14 @@ SMP, fault recovery, profiling in production, telemetry IPC, node-Q code,
 and later POSIX features.
 
 The sole production exception is the phase-bounded temporary lifetime
-described below. It is not active until ADR-0087 is separately merged;
-no other runtime correction is admitted within EV03.
+described below. No other runtime correction is admitted within EV03.
 
 ## Current path and scenario register
 
 Each row requires a static certificate and nonempty target evidence. The
-workflow names below already exist; their observation variants and the
-aggregate stack gate do not yet exist.
+existing workflow names below retain their original semantics; their
+separate observation variants now feed the explicit aggregate stack gate.
+Current admission still requires the complete same-candidate run and review.
 
 | Gap | Current path family | Observation scenario | Stack owners |
 | --- | --- | --- | --- |
@@ -151,7 +152,7 @@ names.
 
 The first uncommitted implementation exposed metadata entering complete-ELF
 seed payloads and consequently changing RAMFS and kernel loaded bytes.
-Implementation is blocked pending the separate corrective design in
+That implementation was blocked pending the separate corrective design in
 [Accepted ADR-0085](../adr/0085-stack-metadata-artifact-boundary.md).
 [The measured artifact path](../research/stack-metadata-artifact-boundary.md)
 records the failure; no passivity check is waived.
@@ -280,6 +281,15 @@ probe in `tests/qemu/user_runtime_probe.S` retains its 128-byte local frame;
 `tty_service_claim_wait.S` retains its 16-byte frame. Register-pattern
 tests that deliberately select a test stack require the corresponding
 owner/epoch binding, not an ordinary zero-stack leaf classification.
+
+The trap-register fixture has separate 256-byte entry and return-snapshot
+buffers. Its 32 returned-register stores cover exactly `[-256, 0)` below
+the snapshot top; these bytes are not an allocation on the retained C
+caller's stack. Object and linked symbols prove the disjoint storage,
+and the fixed C context publisher's actual store binds `frame->sp` to the
+exact snapshot top. Both entry and returned-snapshot epochs are recorded.
+The panic variant's retained but uncalled assembly range has no invented
+C return owner; an incoming call without that owner is rejected.
 
 Inline assembly is likewise inventoried. CSR/barrier/MMIO operations with
 no stack effect are distinct from saved supervisor `sp`/continuation
@@ -561,8 +571,8 @@ automatic retries, deadline increases, or host-kill success.
 
 ## Build, transport, and command boundary
 
-Implementation adds a single explicit aggregate workflow intended to be
-named `test-stack-evidence`. Its fixed dispatcher:
+Implementation adds the single explicit aggregate workflow
+`test-stack-evidence`. Its fixed dispatcher:
 
 1. captures and rechecks the exact clean staged candidate;
 2. builds ordinary and metadata-only variants for every current declared
@@ -593,9 +603,32 @@ only the declared evidence additions; it cannot erase a runtime edit or
 regenerate an old expected hash. Observer absence is checked in ordinary
 kernel, service and application outputs.
 
-The future command and mode names in this section are design interfaces,
-not claims of implemented targets. They become discoverable commands only
-in the separate implementation PR.
+The private build helpers always configure with `cmake --fresh` and build
+with `--clean-first`. Ordinary workflow directories are not reused or
+modified. `stack-build-seal.json` binds actual compiler argv, source and
+compiler dependencies, generation tools and runtime, complete Ninja commands,
+generated inputs, objects, maps, images and seed bytes. Content, kind, mode
+and size checks do not trust timestamps. Static and observed proof retains
+the original seal identity; a newer valid seal cannot replace the artifacts
+that produced an earlier proof or guest transcript.
+Every ordinary/metadata pair also compares complete compile/link recipes
+and source/generated inputs. Only the two metadata flags and declared build
+directory spellings may differ. The bound QEMU executable, default
+configuration and pinned firmware are rechecked before/after the guest and
+complete publication, not inferred from an unchanged executable filename.
+
+The aggregate accepts no subset, arbitrary command or supplied success
+record. It checks the closed 42-configuration/111-output declaration, all
+ten live-producer scopes, and current candidate/artifact identities before
+and after atomic publication of `build/stack-evidence/current.json`.
+Publication failure restores the prior complete record rather than leaving
+a new success-shaped partial result. The prior record is never current
+evidence for a different source/tool/artifact identity.
+
+The host-only CMake include, aggregate module and workflow steps have an
+independent finite declaration in `tests/host/stack_recipe.py`. Its exact
+projection retains the original root recipe and planner authorities;
+ordinary gate selection and all existing reusable profiles remain active.
 
 ## B13 admission and downstream use
 
@@ -617,8 +650,16 @@ survive a changed graph merely because an older scenario passed.
 
 ## Implementation slices and acceptance
 
-The implementation is blocked until the separate ADR-0087 corrective design
-is Accepted and merged. It then restarts test-first from current main.
+The ADR-0087 corrective design is separately merged as #183. The restarted
+implementation first demonstrated the missing lifetime separation, then
+introduced the exact private helper and preserved original source semantics,
+native VM behavior, and machine frame-return evidence. Those narrow checks
+alone do not constitute all-current stack certification.
+
+The previously failing observed VM service now has a 3,744-byte static bound,
+within the unchanged 4,096-byte capacity. Its real observed TTY scenario
+passes with every required user/supervisor record and original serial
+contract. That result does not substitute for the other current scopes.
 
 1. Native Red/Green: artifact identity and fixed-frame graph composition,
    including sequential-versus-nested work, recursion, missing edges,
@@ -640,6 +681,59 @@ If current code exceeds a budget, record the concrete witness and block
 EV04. Do not waive the proof or enlarge EV03 with an unreviewed runtime
 correction. No current gap is closed before its static and dynamic
 evidence passes on the final implementation.
+
+### Current implementation boundaries
+
+The restarted host evidence includes fixed compiler frames, exact relocated
+linked bytes, finite callbacks and source-owned command tables, assembly
+epochs and saved-supervisor continuations, and source-bound fatal contexts.
+Its observed-only leaves, lifecycle capture and catalog additions were
+reintroduced only after fresh native and real missing-observation Reds.
+Historical target results do not certify this restarted candidate.
+
+`tests/host/test_vm_load_stack_lifetime.py` independently reconstructs the
+original load work from the actual facade and helper; its signature/body
+expectations come from the fixed EV02 source stage. The separate
+`tools/stack_bound_vm_lifetime.py` proves actual fixed frames and the helper's
+return continuation before final validation. The lifetime facts have their
+own authority family; the earlier family fingerprints remain unchanged.
+
+The existing VM semantic test and source check are documented in
+[the testing strategy](../testing-strategy.md). Focused stack implementation
+checks are:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_stack_bound_evidence tests.host.test_stack_artifact_boundary tests.host.test_stack_test_tables tests.host.test_stack_fatal_bindings tests.host.test_stack_assembly tests.host.test_stack_observer_abi tests.host.test_stack_observer_state tests.host.test_stack_source_projection tests.host.test_stack_user_images tests.host.test_stack_manifest tests.host.test_stack_reports tests.host.test_stack_publication tests.host.test_stack_workflow tests.host.test_vm_load_stack_lifetime
+```
+
+The real observed component keeps the selected original scenario and its
+unchanged command, markers, input, deadline and shutdown checks. It requires
+static closure before executing an observed image, then checks per-owner
+records against physical and static limits:
+
+```bash
+export MICROS_STACK_TEST_BUILD=/absolute/path/to/configured/stack-evidence/variant/observed
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.stack.test_observer_qemu
+```
+
+The aggregate dispatcher, complete image-proof/report composition and
+failure-atomic publisher are implemented. A complete run publishes all ten
+current certificates plus the blocked B13 record; no individual component
+run can produce that aggregate success. Independent implementation review
+remains a separate mandatory merge gate.
+
+`tools/stack_bound_scope.py` declares all 42 configurations and 111 ELF
+outputs, including runtime copies and the compiled-but-unexecuted application
+probe. The live-producer inventory is separate: PM's aborted/reprepared
+thread and the full spawn path's consumed child-process generation retain
+their distinct identities. Those generation expectations bind the unchanged
+fixture/lifecycle source, not observed output.
+
+`tools/stack_bound_reports.py` rejects every omitted, extra, duplicated,
+unterminated, malformed, zero-sample, wrong-generation or out-of-bound
+observation. `tools/stack_bound_run.py` keeps all legacy acceptance before the
+appended report group and rechecks candidate/image identity after execution.
+No regex subset or prior successful rows can hide a malformed report.
 
 ## References
 
