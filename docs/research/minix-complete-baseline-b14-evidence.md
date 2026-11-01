@@ -7,7 +7,7 @@ audit unit:       B14 executable evidence
 micros commit:    da0bd95148f2704d5347c2af4c64085b90132746
 micros tree:      3b90c7716d69efd68930b3f8ab86a32813bdd6c3
 MINIX commit:     4db99f4012570a577414fe2a43697b2f239b699e
-result:           audited; B14-F001 corrected by EV01; two findings remain open
+result:           audited; B14-F001/F002/F003 infrastructure corrected by EV01-EV03
 implementation:   forbidden during complete-audit phase
 ```
 
@@ -15,6 +15,9 @@ B14 audits every executable oracle, target scenario, fixture generator,
 artifact checker, runner, and recipe selected by the pinned validation graph.
 It does not rerun the suites or treat an old passing result as proof of the
 newly audited MINIX structural and algorithmic baseline.
+Post-pin infrastructure re-certification and the acceptance-only EV04
+boundary are recorded [separately](evidence-foundations-recertification.md);
+the pinned manifests below remain unchanged.
 
 ## Exact primary and secondary path manifests
 
@@ -353,6 +356,8 @@ composition, or target stack high-water/canary report for the current paths.
 ### B14-F002: The executable suite does not prove audited operation or complexity bounds
 
 - Severity: High
+- Status: Evidence-tooling boundary corrected by merged EV02 #179; inherited
+  per-operation runtime gaps remain with their owning corrections.
 - `micros` evidence:
   - 35 native CTests and 38 QEMU workflows
   - replayable model operation-coverage counters
@@ -382,6 +387,8 @@ composition, or target stack high-water/canary report for the current paths.
 ### B14-F003: Resident-page checks do not prove runtime stack bounds
 
 - Severity: High
+- Status: Current B01-B12 stack-evidence boundary corrected by merged EV03
+  #184; B13-E007 remains blocked at its explicit future admission.
 - `micros` evidence:
   - ELF resident-page limits and declared stack-page counts
   - no compiler stack-usage artifacts
@@ -429,9 +436,11 @@ conditionals, and explicit bridges are represented.
 The current evidence is credible for semantic behavior, deterministic model
 agreement, artifact shape, authenticated target reports, and visible failure.
 It is not sufficient to certify the complete MINIX structural/algorithmic
-baseline. EV01 addresses B14-F001 and EV02 addresses the B14-F002 tooling
-boundary; B14-F003 remains open until its reviewed implementation merges. All 101
-inherited evidence gaps retain their separately documented disposition.
+baseline. Merged EV01, EV02 and EV03 address the three infrastructure
+boundaries. The original 101 inherited gap records retain their ownership;
+the [post-pin record](evidence-foundations-recertification.md) identifies the
+ten current stack rows with new evidence without declaring unrelated work
+or topology gaps closed.
 
 B14 is **audited but not certified**. The complete audit may proceed to the
 consolidated findings register and correction DAG; no production correction
@@ -498,7 +507,7 @@ required. The historical primary/secondary manifests above are not rewritten.
 The new public-path header is compile-time evidence support with no collector
 declarations in default production mode, not a runtime ABI.
 
-The current authority inventory has 3,722 facts: all 3,721 previous keys,
+At EV02 completion the authority inventory had 3,722 facts: all 3,721 previous keys,
 classes, values, and owners are conserved, with one new native-recipe artifact
 and one conservative dependency extension. The old root recipe digest remains
 unchanged. Its projection and the new independently rendered native artifact
@@ -512,8 +521,28 @@ matrix remain required implementation gates.
 
 EV02 closes the missing evidence-tooling boundary of B14-F002 only. It does
 not supply quantitative production-site admission or claim audited runtime
-complexity bounds. Those inherited runtime gaps and EV03 stack work remain
-outstanding.
+complexity bounds. Those inherited runtime gaps remain outstanding; EV03's
+separate merged result follows.
+
+## EV03 and EV04 re-certification
+
+Implementation #184 follows separately merged designs #180-#183 and adds the
+current compiler/frame/call/assembly/fatal-context proof, explicit observed
+images, pre-teardown lifecycle capture and complete atomic stack publication.
+It retains the ordinary QEMU/image gates, old source/recipe identities,
+4 KiB/16 KiB capacities and the explicit blocked B13 admission.
+
+The current authority inventory has 3,732 facts across nine closed families.
+The added stack-source, firmware-artifact and VM-lifetime owners preserve the
+previous family fingerprints; they are not a rebaseline of historical facts.
+The complete stack intent covers 42 configurations, 111 ELF outputs and the
+ten existing observed B03-B12 scenarios.
+
+The [EV04 acceptance record](evidence-foundations-recertification.md) supplies
+the current-candidate re-certification and review boundary. It records the
+separate failed hosted-CI attempt honestly rather than converting local
+evidence into remote approval. No runtime algorithm, inherited work bound,
+node-Q admission or complete baseline is certified by this foundation step.
 
 ## References
 

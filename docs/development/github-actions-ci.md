@@ -14,7 +14,10 @@ The unmerged serial implementation #186 has been abandoned after the user's
 parallelism request and measured hosted latency. Accepted
 [ADR-0089](../adr/0089-parallel-github-actions-validation.md) and the
 [parallel CI contract](parallel-ci-validation.md) define its replacement.
-Implementation must restart after separate corrective-design merge.
+Corrective design #187 is merged. The parallel implementation #188 is also
+closed without merge because actual hosted stack observations timed out;
+its current blocker and preserved source are recorded in the parallel
+contract. No hosted acceptance or operational workflow is claimed.
 The execution and report shape below records the original serial design;
 the parallel contract is authoritative for its replacement. The common
 host/security and publication-review rules below remain required, and a

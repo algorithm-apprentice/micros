@@ -165,6 +165,9 @@ This directory contains the design baseline for `micros`.
 - [Complete MINIX baseline findings register and correction DAG](research/minix-complete-baseline-findings-and-correction-dag.md)
   assigns all 80 audited findings exactly once to the reviewed pre-node
   blocking queue or the SOM-24 post-node replacement point.
+- [Evidence-foundation re-certification and EV04](research/evidence-foundations-recertification.md)
+  records merged EV01-EV03, current-candidate barrier acceptance and the
+  separate unaccepted hosted-CI performance boundary.
 - [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
   traces runnable queues, accounting, context selection, restore, and
   user-scheduler authority before scheduler implementation.

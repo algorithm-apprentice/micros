@@ -28,6 +28,14 @@ ready node. The preferred pre-node order below selects one dependency-ready
 task at a time. An out-of-scope discovery becomes a separate task; it never
 expands the active pull request.
 
+The post-pin
+[EV04 re-certification record](evidence-foundations-recertification.md)
+records separately merged EV01 #177, EV02 #179 and EV03 #184. Its acceptance
+merge opens the evidence barrier after current-candidate validation and
+independent review. These three infrastructure outcomes do not close the
+76 pre-node runtime findings or change the frozen counts above. The separate
+hosted-CI implementation remains unaccepted; it adds no runtime-DAG edge.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
@@ -157,8 +165,8 @@ blocking queue.
 | --- | --- | --- | --- | --- | --- |
 | `EV01` | Evidence foundation | `B14-F001` | - | Define and implement [ADR-0082](../adr/0082-evidence-authority-transition.md), preserving ownership/recipe invariants while replacing only invalidated historical body identities. | Complete current authority inventory, typed fail-closed transition state, independent synthetic positive/negative evidence, and B14 recertification. |
 | `EV02` | Evidence foundation | `B14-F002` | `EV01` | Define and implement [ADR-0083](../adr/0083-test-only-operation-count-evidence.md) and the [operation-count evidence contract](../architecture/operation-count-evidence.md): typed test-only primitive counters, complete composition, and finite observational transport projection. | Deterministic boundary/adversarial cases; failure-atomic captures and composition; retained transport identities; counters absent from production images. |
-| `EV03` | Evidence foundation | `B14-F003` | - | Implement [ADR-0084](../adr/0084-checked-stack-bound-evidence.md) and the [stack-bound contract](../architecture/stack-bound-evidence.md), close all ten B01-B12 scopes, and register future B13 admission. Designs #180/#181/#182 are merged. The implementation is blocked on the observed 4,240-byte VM stack and [Accepted ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)'s exact preparation-lifetime prerequisite. | Static and target stack-budget reports for all current 4 KiB/16 KiB paths; explicit blocked B13 report until production code exists. |
-| `EV04` | Evidence barrier | - | `EV02`, `EV03` | Acceptance-only barrier: no runtime correction node starts until EV01-EV03 are merged and recertified; the exact ADR-0087 storage exception belongs solely to EV03. | Current-candidate evidence tooling and clean independent review. |
+| `EV03` | Evidence foundation | `B14-F003` | - | Implementation #184 is merged after designs #180/#181/#182/#183. The [stack-bound contract](../architecture/stack-bound-evidence.md) covers all ten current B01-B12 scopes and future B13 admission; ADR-0087's exact preparation-lifetime repair preserves the original 4 KiB limit. | Static and target stack-budget reports for all current 4 KiB/16 KiB paths; explicit blocked B13 report until production code exists. |
+| `EV04` | Evidence barrier | - | `EV02`, `EV03` | Acceptance-only barrier: no runtime correction node starts until EV01-EV03 are merged and [re-certified](evidence-foundations-recertification.md); the exact ADR-0087 storage exception belongs solely to EV03. | Current-candidate evidence tooling and clean independent review. |
 | `COPY01` | Runtime correction | `B05-F006` | `EV04` | Replace volatile byte loops with the bounded MINIX-style word/block family while preserving freestanding semantics. | Aligned, unaligned, short, page, overlap-policy, and exact work-count cases. |
 | `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Add the two fixed diagnostic history roles with exact capacities and overflow algorithms; keep ownership separate from physical UART. | Native wrap/overflow/order model and target report integration. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Define bounded early/panic polling, recursive panic ownership, corrupt-console fallback, and terminal failure precedence. | Host state model plus stuck-device, recursive-entry, and corrupt-metadata target cases. |

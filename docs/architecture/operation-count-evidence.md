@@ -6,8 +6,10 @@ This is the Accepted EV02 design contract for B14-F002 under
 [ADR-0083](../adr/0083-test-only-operation-count-evidence.md).
 EV01 design #176 and implementation #177 are merged. Implementation of this
 contract follows separately merged design #178, commit
-`fa6eb16b0e9325587680e5504139c68e32bd22ab`. The implementation candidate below
-still requires its complete author gate and independent implementation review.
+`fa6eb16b0e9325587680e5504139c68e32bd22ab`. Implementation #179 is separately
+reviewed and merged as `fc98edd26505ac522d3752ad85f09366e8085f32`.
+The [EV04 acceptance record](../research/evidence-foundations-recertification.md)
+re-certifies the infrastructure without claiming later runtime work bounds.
 
 Provide one portable, test-only mechanism for exact primitive-work
 measurement, complete cross-owner composition, and transport-preserving
