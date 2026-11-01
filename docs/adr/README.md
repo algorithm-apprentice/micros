@@ -104,3 +104,4 @@ to make the project appear more consistent than it was.
 | [0086](0086-finite-fatal-stack-context.md) | Finite fatal-stack context | Accepted |
 | [0087](0087-phase-bounded-vm-load-temporaries.md) | Phase-bounded VM load temporaries | Accepted |
 | [0088](0088-github-actions-validation.md) | GitHub Actions validation | Accepted |
+| [0089](0089-parallel-github-actions-validation.md) | Parallel GitHub Actions validation | Accepted |

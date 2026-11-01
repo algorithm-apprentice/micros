@@ -632,6 +632,12 @@ ordinary gate selection and all existing reusable profiles remain active.
 
 ## B13 admission and downstream use
 
+The Accepted [parallel CI contract](../development/parallel-ci-validation.md)
+defines separate same-run producer and aggregate transport for hosted
+validation. It does not change this local command's full scope, global phase
+ordering, artifact verification or publication authority, and is inactive
+until separate corrective-design merge.
+
 Current scope emits exactly one `BLOCKED` B13-E007 record with reason
 `production-node-q-absent` and completion barrier `STACK13`. It cannot be
 treated as a B13 certificate or as a missing current path.
