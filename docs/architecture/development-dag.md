@@ -85,6 +85,12 @@ preferred dependency order. Step 15 implementation remains blocked through
 `BASE01`; Step 16 and ordinary feature work remain blocked through
 `RECERT01`.
 
+EV01-EV03 are separately merged. The
+[EV04 re-certification record](../research/evidence-foundations-recertification.md)
+opens the evidence barrier only after current-candidate validation,
+independent review and its acceptance merge. It changes no runtime edge and
+does not accept the separately blocked hosted-CI implementation.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

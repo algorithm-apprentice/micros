@@ -18,9 +18,12 @@ closed the fatal-call cycle through the finite qualification below, then
 rejected an observed VM service stack bound of 4,240 bytes against 4,096.
 It was preserved and abandoned before the separate
 [Accepted ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md) merge
-as #183. Implementation has now restarted from that current main.
+as #183. The restarted implementation #184 is separately reviewed and merged
+as `4668f47bafd9fe6f9e4791fe104a511c499547e6`.
 The [measured evidence](../research/vm-load-temporary-stack-evidence.md)
 does not certify the abandoned implementation.
+The [EV04 acceptance record](../research/evidence-foundations-recertification.md)
+re-certifies the merged infrastructure and preserves its current/future scope.
 
 Non-goals are runtime algorithm changes, larger stacks, new allocation or
 guard-page policy, storage promotion, general recursion proofs, LTO,
@@ -635,8 +638,9 @@ ordinary gate selection and all existing reusable profiles remain active.
 The Accepted [parallel CI contract](../development/parallel-ci-validation.md)
 defines separate same-run producer and aggregate transport for hosted
 validation. It does not change this local command's full scope, global phase
-ordering, artifact verification or publication authority, and is inactive
-until separate corrective-design merge.
+ordering, artifact verification or publication authority. Its attempted
+implementation #188 is closed without merge after two hosted observed guests
+timed out; the EV04 record documents that separate unresolved CI boundary.
 
 Current scope emits exactly one `BLOCKED` B13-E007 record with reason
 `production-node-q-absent` and completion barrier `STACK13`. It cannot be

@@ -142,6 +142,13 @@ generation-bound producer must pass before atomic certificate publication.
 Workflow availability is not execution evidence or independent review;
 both remain mandatory for the exact candidate being merged.
 
+EV03 implementation #184 is separately reviewed and merged. The
+[EV04 re-certification record](research/evidence-foundations-recertification.md)
+evaluates the complete current evidence foundations without adding a new
+test or weakening a gate. It also records the unaccepted hosted-CI attempt:
+local current-candidate evidence is not remote acceptance, and existing
+runtime validation-cost findings remain with their correction owners.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

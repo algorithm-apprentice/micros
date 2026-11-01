@@ -366,8 +366,11 @@ command results:
 
 The Accepted [GitHub Actions contract](github-actions-ci.md) hosts that
 complete fresh plan without changing local validation, target deadlines or
-independent review. Its separate implementation remains blocked on design
-merge; no CI workflow is claimed by the design.
+independent review. The designs are merged, but parallel implementation #188
+is closed without merge after two actual hosted observed-guest timeouts.
+The [current evidence record](../research/evidence-foundations-recertification.md)
+keeps that unresolved CI boundary separate from local validation and the
+existing runtime correction DAG. There is no operational workflow on `main`.
 
 When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:

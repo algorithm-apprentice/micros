@@ -6,7 +6,15 @@ This Accepted contract corrects the serial CI design under
 [ADR-0089](../adr/0089-parallel-github-actions-validation.md).
 The original implementation #186 is closed without merge and preserved at
 `f09f7852d354bbc03957096ce658cd16ef13a1b8`.
-Implementation is blocked until separate corrective-design merge.
+Corrective design #187 is merged. Its implementation #188 is closed without
+merge after the observed PM-service and ELF-spawn guests exceeded their
+unchanged hosted timeouts. The reviewed source is preserved at
+`2707f078a38876f519648b18042f5159ea873712` on
+`archive/github-actions-parallel-hosted-timeout`.
+The [evidence-foundation record](../research/evidence-foundations-recertification.md)
+documents the actual overlap, failed acceptance and measured validation hot
+paths. No operational CI workflow is claimed; implementation must restart
+from current `main` after the relevant existing corrections.
 
 The [original CI contract](github-actions-ci.md) still supplies supported
 host/runtime/tool/firmware authority, read-only permissions, source history,
