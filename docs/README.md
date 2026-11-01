@@ -272,6 +272,10 @@ This directory contains the design baseline for `micros`.
   tool discovery, build artifacts, and the deterministic QEMU command.
 - [AI-native development workflow](development/ai-native-workflow.md) defines
   the shared human/agent task, TDD, review, and merge contract.
+- [GitHub Actions validation](development/github-actions-ci.md) defines the
+  Accepted hosted execution, source/tool authority, evidence and CI-bootstrap
+  review boundary; its [research record](research/github-actions-ci-baseline.md)
+  preserves the fixed MINIX and current platform evidence.
 - [Contributing guide](../CONTRIBUTING.md) is the contributor entry point.
 - [Agent contract](../AGENTS.md) is the tool-neutral AI agent entry point.
 

@@ -302,6 +302,12 @@ author's resulting producer/reuse evidence and do not rerun it routinely.
 
 ## Evolution
 
+The Accepted
+[GitHub Actions contract](github-actions-ci.md) defines a separate hosted
+validation outcome and an explicit CI-publication review boundary.
+Implementation requires separate design merge and follows those review
+checkpoints. Ordinary runtime author-validation obligations are unchanged.
+
 As implementation begins, the repository will add deterministic build presets,
 test targets, CI checks, and machine-readable test output. Those executable
 interfaces become the preferred agent tools, but they remain governed by the
