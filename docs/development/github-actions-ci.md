@@ -2,13 +2,14 @@
 
 ## Status and outcome
 
-This is the Accepted contract for `github-actions-design`, following merged
-EV03 #184. [ADR-0088](../adr/0088-github-actions-validation.md) governs the
-separate implementation and its reviewed-publication bootstrap.
+This is the Accepted contract from separately merged design #185, following
+EV03 #184. [ADR-0088](../adr/0088-github-actions-validation.md) governs its
+implementation and reviewed-publication bootstrap.
 
 The outcome is one hosted CI job that executes the repository's complete
-current validation and retains attributable results. No workflow or hosted
-result is claimed by this design.
+current validation and retains attributable results. The implementation
+entry points below do not themselves establish hosted acceptance; that
+requires an actual attributable Actions run.
 
 ## Execution declaration
 
@@ -96,7 +97,7 @@ forbidden inherited-variable checks remain active. CI does not silently
 unset `PYTHONEXECUTABLE`, `__PYVENV_LAUNCHER__`, compiler injection controls,
 QEMU configuration or unsupported tool settings.
 
-The prospective `tools/ci_environment.py` has one responsibility: validate
+`tools/ci_environment.py` has one responsibility: validate
 and report this hosted preflight. It accepts no command, scope, replacement
 firmware or arbitrary source-directory argument. Its record includes actual
 host/tool/runtime/firmware identities, run ID and attempt, event commit,
@@ -205,9 +206,31 @@ a new required-check ruleset is outside this outcome.
 
 ## Implementation scope and tests
 
-The separate implementation owns the one workflow, the bounded preflight
-helper, focused native preflight controls, Python process-site registration
-where required, and directly related documentation.
+The [workflow](../../.github/workflows/ci.yml) owns only hosted sequencing,
+tool installation, logging and artifact upload. The
+[preflight helper](../../tools/ci_environment.py) checks host, event,
+clean candidate, full history, resolved base, actual tool versions and the
+existing firmware proof. It emits metadata only after complete success.
+The job compares initial and final preflight records so source/tool drift
+cannot be hidden by a successful command exit.
+
+[Native controls](../../tests/host/test_ci_environment.py) exercise invalid
+host/runtime boundaries, event/base identities, source drift, missing history
+and unsupported tool families before firmware introspection. The existing
+runtime and firmware suites retain their own independent checks. The firmware
+resolver additionally exposes the version it already checked, without another
+unchecked QEMU metadata invocation or a changed firmware expectation.
+
+CI-owned local iteration uses:
+
+```bash
+actionlint .github/workflows/ci.yml
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_ci_environment tests.host.test_stack_artifact_boundary tests.host.test_python_host_runtime tests.host.test_evidence_authority
+```
+
+If the CI-specific linter is missing, install it with `brew install actionlint`.
+The preflight CLI itself requires actual hosted metadata and macOS 26 arm64;
+a local tool probe or native fixture is not a hosted run.
 
 Fresh Red first records that the hosted workflow does not exist. Native
 controls then reject unsupported host/runtime/tool families, changed or

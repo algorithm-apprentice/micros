@@ -326,6 +326,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
         expected = {
             "tools/canonicalize_stack_metadata_elf.py",
             "tools/check_stack_evidence.py",
+            "tools/ci_environment.py",
             "tools/generate_stack_observer_catalog.py",
             "tools/stack_bound_manifest.py",
             "tools/validation_context.py",

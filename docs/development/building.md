@@ -366,8 +366,10 @@ command results:
 
 The Accepted [GitHub Actions contract](github-actions-ci.md) hosts that
 complete fresh plan without changing local validation, target deadlines or
-independent review. Its separate implementation remains blocked on design
-merge; no CI workflow is claimed by the design.
+independent review. The workflow and bounded preflight follow separately
+merged design #185. Its guide records the CI-specific local checks and the
+required real hosted result; workflow availability alone is not execution
+evidence.
 
 When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:

@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validation:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      HOMEBREW_NO_ANALYTICS: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+    steps:
+      - name: Checkout the event commit and complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install supported tools
+        run: |
+          set -euo pipefail
+          mkdir -p build/ci
+          {
+            test "$(uname -s)" = Darwin
+            test "$(uname -m)" = arm64
+            brew install cmake ninja python@3.15 llvm@23 lld@23 qemu actionlint
+            brew list --versions cmake ninja python@3.15 llvm@23 lld@23 qemu actionlint
+            python_prefix=$(brew --prefix python@3.15)
+            llvm_prefix=$(brew --prefix llvm@23)
+            lld_prefix=$(brew --prefix lld@23)
+            qemu_prefix=$(brew --prefix qemu)
+            {
+              printf 'MICROS_PYTHON=%s/bin/python3.15\n' "$python_prefix"
+              printf 'MICROS_CLANG=%s/bin/clang\n' "$llvm_prefix"
+              printf 'MICROS_LD_LLD=%s/bin/ld.lld\n' "$lld_prefix"
+              printf '%s\n' 'CLANG_NO_DEFAULT_CONFIG=1' 'OPENSSL_CONF=/dev/null' \
+                'SSL_CERT_FILE=/dev/null' 'SSL_CERT_DIR=/dev/null'
+            } >> "$GITHUB_ENV"
+            printf '%s/bin\n' "$qemu_prefix" >> "$GITHUB_PATH"
+          } 2>&1 | tee build/ci/bootstrap.log
+
+      - name: Validate workflow and shell syntax
+        run: |
+          set -euo pipefail
+          actionlint .github/workflows/ci.yml 2>&1 | tee build/ci/workflow-lint.log
+
+      - name: Bind hosted source and tool identities
+        run: |
+          set -euo pipefail
+          "${MICROS_PYTHON}" -E -S -B tools/ci_environment.py > build/ci/environment.json
+          base=$(git rev-parse --verify "${CI_BASE}^{commit}")
+          printf 'MICROS_CI_BASE=%s\n' "$base" >> "$GITHUB_ENV"
+
+      - name: Run complete fresh validation
+        run: |
+          set -euo pipefail
+          "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py \
+            --tier full --execute --fresh --base "$MICROS_CI_BASE" 2>&1 | tee build/ci/validation.log
+          "${MICROS_PYTHON}" -E -S -B tools/ci_environment.py > build/ci/environment-final.json
+          cmp build/ci/environment.json build/ci/environment-final.json
+          test -f build/stack-evidence/current.json
+
+      - name: Retain attributable diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: micros-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/ci/
+            build/validation-evidence/v1/logs/
+            build/stack-evidence/current.json
+            build/stack-evidence/*/*/stack-build-seal.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false

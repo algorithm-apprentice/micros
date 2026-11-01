@@ -99,6 +99,7 @@ platform work; neither is required to claim POSIX source compatibility.
 - [Roadmap](docs/roadmap.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [AI-native development workflow](docs/development/ai-native-workflow.md)
+- [GitHub Actions validation](docs/development/github-actions-ci.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Complete POSIX-compatible system goal](docs/adr/0081-complete-posix-compatible-system-goal.md)
 - [Contributing guide](CONTRIBUTING.md)
