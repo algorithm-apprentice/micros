@@ -169,6 +169,14 @@ validator remains the only caller-facing owner.
 
 ## Stable public VM-core symbol ownership
 
+Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md) is a
+separate EV03 prerequisite for the measured observed-stack excess. It
+defines one file-local preparation helper in `vm_load.c`, retaining this
+module graph, all data/state interfaces, and the exact validation and
+publication order. Its
+[phase and storage contract](stack-bound-evidence.md#phase-bounded-vm-preparation)
+is inactive until its separate design merge and does not implement VM01.
+
 | Owner | Public symbols |
 | --- | --- |
 | `vm_core.c` | `micros_vm_state_initialize` |
