@@ -90,6 +90,9 @@ This directory contains the design baseline for `micros`.
 - [Fatal-stack context evidence](research/fatal-stack-context-evidence.md)
   records the verified current panic-call cycle and the finite
   Accepted source/machine/state qualification required before EV03 can restart.
+- [VM load temporary-stack evidence](research/vm-load-temporary-stack-evidence.md)
+  records the later 4,240-byte observed VM bound and the Accepted exact
+  preparation-lifetime prerequisite, without relaxing the 4 KiB budget.
 
 ## Research
 

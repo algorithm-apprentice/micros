@@ -104,6 +104,18 @@ test-first restart. Unknown/real recursion, all original budgets and gates,
 and the later B01 runtime corrections remain required; no edge is simply
 deleted and no stack certificate is yet claimed.
 
+Corrective design #182 is merged. Its later uncommitted implementation found
+an observed VM-service stack bound of 4,240 bytes against the unchanged
+4,096-byte capacity and stopped before executing the observation image.
+[Accepted ADR-0087](adr/0087-phase-bounded-vm-load-temporaries.md) defines
+the one-source automatic-temporary lifetime correction required before
+EV03 restarts. Initial and final complete validation remain unchanged.
+After separate design merge, implementation starts with a fresh lifetime
+Red, preserves exact statement/error/state behavior in native evidence,
+and proves actual frame release plus complete ordinary/observed graph and
+target acceptance. No budget, call edge, hook coverage, timeout or historical
+oracle is waived.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

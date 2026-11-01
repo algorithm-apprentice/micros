@@ -13,17 +13,22 @@ target high-water observations for the ten current B01-B12 path families.
 It installs mandatory future B13 admission without claiming production
 init/shell already exists.
 
-Design #180 and artifact corrective design #181 are merged. The restarted
-implementation exposed the concrete context-free fatal-call cycle recorded
-in [the fatal-context study](../research/fatal-stack-context-evidence.md).
-It is blocked and abandoned pending
-[Accepted ADR-0086](../adr/0086-finite-fatal-stack-context.md). The finite
-qualification below is design only until that separate prerequisite merges.
+Designs #180, #181, and #182 are merged. The later uncommitted implementation
+closed the fatal-call cycle through the finite qualification below, then
+rejected an observed VM service stack bound of 4,240 bytes against 4,096.
+It is preserved and abandoned pending the separate
+[Accepted ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md).
+The [measured evidence](../research/vm-load-temporary-stack-evidence.md)
+does not certify the abandoned implementation.
 
 Non-goals are runtime algorithm changes, larger stacks, new allocation or
 guard-page policy, storage promotion, general recursion proofs, LTO,
 SMP, fault recovery, profiling in production, telemetry IPC, node-Q code,
 and later POSIX features.
+
+The sole production exception is the phase-bounded temporary lifetime
+described below. It is not active until ADR-0087 is separately merged;
+no other runtime correction is admitted within EV03.
 
 ## Current path and scenario register
 
@@ -460,6 +465,52 @@ stuck-UART, trace or shutdown findings. Those remain at their existing
 graphs, future B13 admission and the complete ordinary author gate remain
 mandatory after restart.
 
+## Phase-bounded VM preparation
+
+Accepted ADR-0087 addresses the observed 4,240-byte VM chain without changing
+the 4 KiB budget or either compiler mode. It admits exactly one private
+helper in `servers/vm/vm_load.c` after separate design merge.
+
+`micros_vm_load_prepare` keeps its existing public signature. Its preflight
+remains null checks, `vm_core_validate_state` with the existing staged-input
+expression, the IDLE check, and `prepare_source_shape_is_valid`, in that
+order. It retains only input parameters and the scalar error needed to
+propagate results.
+
+`vm_load_prepare_transaction` takes the same eight arguments and owns the
+existing transaction candidate, ELF plan, application-stack plan,
+`table_frames` and `data_frames`, including their initial zeroing and
+temporary scalar work. It executes the unchanged original interval from
+`prepare_binary_plans` through publication of `MICROS_VM_LOADER_INPUT_COPIED`.
+It propagates every original preparation error. Success returns `OK` to the
+facade, which then returns the result of the unchanged final
+`vm_core_validate_state(state, false)`.
+
+The helper cannot call complete state validation, recurse, publish pointers
+to its workspace, introduce static/heap/TLS storage, or change cleanup,
+frame selection, copying, field assignment or phase order. The facade cannot
+retain the aggregate workspace. Local initializations may move only with
+the declarations into the helper, before their first read.
+
+Source evidence reconstructs the exact original function from these two
+actual bodies through one finite declared expansion. It retains the original
+independent source expectation; expansion is not stack evidence and cannot
+erase an arbitrary runtime change. Compiler `.su` and `.stack_sizes`,
+actual linked call/return instructions, and the full graph independently
+prove that the helper frame has ended before final validation. The helper
+and facade frames are both counted during preparation.
+
+Native load/staged-input/capacity/rollback cases preserve the original result
+and complete state. Both compiler-mode graphs, all current variants,
+ordinary image passivity against its same-candidate metadata counterpart,
+and all ten observed scenarios remain required. No observation cost is
+subtracted. An excess on any other chain remains a blocker.
+
+This narrow storage correction does not implement or retire VM01-VM06,
+change the correction graph, or open EV04 early. It is the only exception
+to EV03's production-edit non-goal and remains inactive until the separate
+ADR-0087 design merge.
+
 ## Target high-water observations
 
 The RV64 observer supplies only the compiler's entry/exit hook ABI in
@@ -566,13 +617,15 @@ survive a changed graph merely because an older scenario passed.
 
 ## Implementation slices and acceptance
 
-Implementation remains pending until this design merges.
+The implementation is blocked until the separate ADR-0087 corrective design
+is Accepted and merged. It then restarts test-first from current main.
 
 1. Native Red/Green: artifact identity and fixed-frame graph composition,
    including sequential-versus-nested work, recursion, missing edges,
    dynamic frames, overflow, duplicate local names and epoch negatives.
 2. Native/target Red/Green: exact indirect and assembly closure, real RV64
-   metadata/byte-equality checks, leaf observer ABI and default absence.
+   metadata/byte-equality checks, the exact phase-bounded VM preparation
+   correction, leaf observer ABI and default absence.
 3. Target Red/Green: all current rows, pre-teardown producer capture,
    authenticated complete reports, blocked future admission, aggregate
    build/planner integration, and complete current author gates.
@@ -591,6 +644,8 @@ evidence passes on the final implementation.
 ## References
 
 - [Accepted ADR-0084](../adr/0084-checked-stack-bound-evidence.md)
+- [Accepted VM temporary-lifetime correction](../adr/0087-phase-bounded-vm-load-temporaries.md)
+- [VM stack failure evidence](../research/vm-load-temporary-stack-evidence.md)
 - [Fixed MINIX study](../research/minix-stack-bound-evidence.md)
 - [B14 evidence](../research/minix-complete-baseline-b14-evidence.md)
 - [Correction DAG](../research/minix-complete-baseline-findings-and-correction-dag.md)

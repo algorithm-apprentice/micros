@@ -85,6 +85,12 @@ preferred dependency order. Step 15 implementation remains blocked through
 `BASE01`; Step 16 and ordinary feature work remain blocked through
 `RECERT01`.
 
+The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
+prerequisite repair is confined to EV03's demonstrated VM automatic-storage
+overlap. After separate design merge, that one phase-lifetime edit may
+accompany the restarted evidence implementation; it does not start a
+runtime correction node, retire a B07 finding, or change this graph.
+
 ## Cycle-breaking substitutions
 
 | MINIX runtime cycle | Initial `micros` substitution | Later transition |
