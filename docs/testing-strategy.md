@@ -149,15 +149,23 @@ test or weakening a gate. It also records the unaccepted hosted-CI attempt:
 local current-candidate evidence is not remote acceptance, and existing
 runtime validation-cost findings remain with their correction owners.
 
-After merged EV04 #189, the Accepted COPY01
-[runtime memory contract](architecture/runtime-memory-primitives.md) defines
-the first real runtime correction. Its design is documentation-only.
-Implementation must first demonstrate both old aligned-byte-loop work
-failures, then prove exact native copy/fill counts and byte/access semantics,
-actual RV64 wide-transfer and no-recursion artifacts, one granular EV01
-retirement, affected-unit recertification and the unchanged complete gate.
-The existing runtime tests remain required; no proposed fixture, command
-or corrected runtime behavior is claimed before separate design merge.
+After merged EV04 #189 and separate design #190, COPY01's
+[runtime memory contract](architecture/runtime-memory-primitives.md)
+defines the first real runtime correction. Its native evidence builds the
+actual pinned byte bodies for both discriminating Red properties, and the
+actual current bodies for Green. Complete residue, boundary, mode, canary,
+typed-object and protected-page evidence accompanies the two aligned-work
+oracles. Actual frontend IR, non-stack RV64 transfers and the linked runtime
+object complement, rather than replace, the complete stack gate.
+
+The task-specific three-phase driver freezes every non-candidate input before
+Red and records actual named oracle and affected-unit outcomes. A newly staged
+claim cannot retire the original memory hash. Only its validated current
+terminal journal, or the unchanged prior committed registry after review,
+can change that one assertion. Journal models exercise negative controls but
+never certify a real transition. The existing runtime tests, B05-B12/B14
+recertification, complete fresh author gate and independent review remain
+required.
 
 ## POSIX conformance evidence
 

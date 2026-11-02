@@ -8,10 +8,11 @@ It owns only B05-F006 and its runtime work-evidence row B05-E005.
 The [fixed MINIX ledger](../research/minix-runtime-memory-primitives.md)
 defines the selected generic word family and all required adaptations.
 
-Independent design review is clean; implementation remains pending separate
-design merge.
-Nothing in this document claims the future tests, driver or transition record
-already exists.
+Independent design review and separate design merge #190 are complete.
+The implementation map below identifies the concrete evidence and author
+entry point. A new staged registry claim is not a completed transition;
+current author evidence and independent implementation review remain the
+acceptance boundary.
 
 ## Stable interfaces and preconditions
 
@@ -144,11 +145,11 @@ contains neither the collector nor its state/symbols.
 ## Native and target evidence
 
 Use the existing native discovery mechanism, not a new public workflow or
-production compile switch. A task-owned C fixture links the real prefixed
+production compile switch. The task-owned C fixture links the real prefixed
 bodies and, only in its enabled variant, the existing EV02 collector.
 The existing `runtime_test` cases remain unchanged and continue to run.
 
-The future owners are `tests/host/runtime_memory_fixture.c`,
+The owners are `tests/host/runtime_memory_fixture.c`,
 `runtime_memory_evidence.py`, `runtime_memory_authority.py` and
 `test_runtime_memory.py`, plus the author entry point below. Python discovery
 builds the fixture in private temporary storage; no CMake or preset change
@@ -282,7 +283,7 @@ data, not additional historical-source identities.
 
 ## Author transaction and ordinary assertions
 
-The task-specific author entry point is prospective
+The task-specific author entry point is
 `tools/check_runtime_memory.py`. Its only recording intents are:
 
 ```text
@@ -292,7 +293,10 @@ The task-specific author entry point is prospective
 ```
 
 The selected interpreter is resolved and checked through the existing runtime
-owner. There is no arbitrary command, source directory, finding, retirement
+owner. The admitted Homebrew framework launcher may report its actual
+`Python.app` runtime image in `orig_argv[0]`; both executable identities are
+bound, while every remaining argument stays exact.
+There is no arbitrary command, source directory, finding, retirement
 set, input artifact, expected outcome or success-file option.
 
 Each attempt has fixed project-owned data/log storage below
@@ -394,3 +398,54 @@ Only complete current-candidate author evidence and clean independent review
 permit implementation merge and B05-F006/B05-E005 re-certification.
 GRANT03, BOOT03, memory-validation corrections and hosted CI remain separate
 outcomes with their own dependencies and acceptance.
+
+## Implementation map
+
+| Owner | Executable responsibility |
+| --- | --- |
+| `lib/runtime/memory.c` | Existing two memory bodies and the exact source-local passive primitive observations |
+| `tests/host/runtime_memory_fixture.c` | Sanitized residue/length/value matrix, independent bytes and canaries, both disjoint address orders, typed objects, null/zero and protected-page controls |
+| `tests/host/runtime_memory_evidence.py` | Real compiler/executable identities, complete EV02 decoding, independent interval work, actual named oracle execution, frontend IR and non-stack RV64 object/linked transfer proof |
+| `tests/host/runtime_memory_authority.py` | Fixed design/source authority, closed inputs, typed journal reader, exact prior committed claim and process-local author suppression |
+| `tests/host/work_count_recipe.py` | Exact four-piece COPY01 adapter inverse for the retained complete source-gate AST |
+| `tests/host/test_runtime_memory.py` | Normal discovery and Red/Green, malformed-record, false-Red, failed-unit, publication-drift, lock and suppression controls |
+| `tools/check_runtime_memory.py` | The three closed recording intents and actual B05-B12/B14 execution, with no imported success or command override |
+
+The native capture matrix has 2,523 cases. The separate access pass exercises
+both source/destination address orders without observing two transfers as one
+primitive. Ordinary and metadata/observed objects retain their debug or
+`-Os` options. Additional frontend IR diagnostics disable LLVM optimization
+passes only to expose the constant inline intrinsic's width/alignment;
+the real object proofs use the unmodified optimization modes. B14 also joins
+the freshly executed B05 runtime ELF to its actual memory object and verifies
+complete relocated bytes before checking its wide data transfers. Its
+compiler recipe comes from the actual Ninja graph; an optional or stale
+`compile_commands.json` export is not authority.
+The complete EV03 gate separately retains all current linked
+ordinary/metadata/observed image and stack requirements.
+
+An attempt directory contains immutable phase JSON and complete native/unit
+logs. The strict `current.json` selector binds the attempt, event count and
+last record digest. Both the EV01 event chain and the complete log/record
+byte chain must agree. Starting Red removes the old current selection before
+execution; failed publication cannot restore a previous attempt's success.
+Red's documented exit status is 1 only after both actual expected failures
+are recorded; harness/authority failures exit 2. Green and recertification
+exit 0 only after their successful phase publication.
+
+The legacy source owner admits the one new fixture through its declared
+neighbor, without expanding any previous identity's payload fingerprint.
+Its original memory hash remains in the 23-entry table. Only that entry's
+assertion policy changes; the other 22 entries remain ordinary assertions.
+The directory-layout gate also freezes this assertion owner's complete AST.
+Its existing finite compatibility projection removes only COPY01's exact
+import, fixture neighbor, policy lookup and one-key conditional before that
+unchanged AST comparison. Missing or altered adapter pieces fail; unrelated
+source is never projected away. This preserves the higher-order transport
+identity rather than retiring or rebaselining another fact. B14 includes
+that complete retained gate-AST check.
+Prior retirement comes from the unchanged exact HEAD registry declaration,
+not a staged flag or a local journal copied into a later checkout.
+
+Commands and the first-commit ordering are documented in
+[the build guide](../development/building.md#runtime-memory-work-and-authority-evidence).

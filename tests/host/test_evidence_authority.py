@@ -125,7 +125,7 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(9, len(inventory.families))
+        self.assertEqual(10, len(inventory.families))
         self.assertGreater(len(inventory.facts), 30)
         self.assertTrue(any(
             fact.authority_class

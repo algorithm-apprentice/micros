@@ -330,6 +330,9 @@ The complete native milestone gate remains:
 cmake --workflow --preset test-unit
 ```
 
+The COPY01 native fixture also requires the explicit compiler environment
+documented under [runtime memory evidence](#runtime-memory-work-and-authority-evidence).
+
 Generate a changed-path plan with:
 
 ```bash
@@ -1044,6 +1047,64 @@ scheduler, and trap-stack baseline. Only the complete sequence emits:
 ```text
 MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
 ```
+
+## Runtime memory work and authority evidence
+
+COPY01 uses normal Python native discovery and the existing host-debug
+compiler cache. It requires the merged design's Git objects, not a shallow
+checkout that omits its source authority. On the supported Homebrew setup:
+
+```bash
+export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
+export OPENSSL_CONF=/dev/null
+export SSL_CERT_FILE=/dev/null
+export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
+cmake --preset host-debug
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_runtime_memory
+```
+
+The normal suite exercises original-byte-loop negative controls, actual
+current semantic/work/access behavior, compiler/IR artifacts and authority
+failure boundaries. It does not create an author transition or retire an
+identity by itself.
+
+The first implementation author executes these intents separately, from the
+repository root, under that same environment:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --red
+"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --green
+"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --recertify
+```
+
+Finalize and stage the complete oracle, driver, ownership and documentation
+inputs before Red. Its exit 1 denotes the two recorded expected work
+failures, not a broken compiler or skipped case; authority/harness failures
+exit 2. Do not join the three phases with `&&`. Between Red and Green, only
+the two candidate paths in the
+[accepted contract](../architecture/runtime-memory-primitives.md#closed-input-and-declaration-binding)
+may change; stage them before Green. Changed immutable inputs or any change
+after recorded Green require a new explicit Red attempt.
+
+Recertification reruns Green, then the actual fixed B05-B12 QEMU commands and
+B14's in-process retained structural/authority suite and linked-runtime
+proof. Logs and strict chained records live below
+`build/evidence-transitions/COPY01/`; a failed or interrupted transaction
+provides no terminal retirement.
+
+After terminal success, run the unchanged complete fresh author plan:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
+```
+
+The first permanent commit still requires clean independent implementation
+review of that exact staged tree and journal. Later ordinary checkouts use
+the reviewed HEAD registry and do not manufacture new author receipts or
+require the original temporary logs.
 
 ## TTY service image validation
 

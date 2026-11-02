@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_endpoint_source_layout import (
     alias_rows as endpoint_alias_rows,
@@ -1921,12 +1922,16 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
             "kernel/trap_route_core.c", "kernel/trap_route_core.h", "kernel/syscall.h",
             "kernel/user_runtime_test.h", "kernel/user_runtime_image.h",
             "tests/qemu/user_runtime_protocol.h",
+            FIXTURE_PATH,
         }
         self.assertEqual({*all_sources(), *PRIVATE_HEADERS, *neighbors}, discovered)
 
     def test_reviewed_eleven_headers_and_twelve_cohesive_artifacts_are_byte_exact(self) -> None:
         self.assertEqual((23, 11), (len(STABLE_HASHES), sum(path.endswith(".h") for path in STABLE_HASHES)))
+        memory_required = memory_identity_required(REPOSITORY_ROOT)
         for path, expected in STABLE_HASHES.items():
+            if path == "lib/runtime/memory.c" and not memory_required:
+                continue
             with self.subTest(path=path):
                 self.assertEqual(expected, hashlib.sha256(self.required_text(path).encode()).hexdigest(), REVIEWED_BASE)
 

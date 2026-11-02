@@ -117,6 +117,7 @@ def project_external_evidence(relative, data):
 
 
 def project_gate_compatibility(relative, source):
+    owner = "EV02"
     if relative == "tests/host/test_ramfs_source_layout.py":
         changes = (
             ("import sys\n", ""),
@@ -139,13 +140,25 @@ def project_gate_compatibility(relative, source):
                 '            tree = ast.parse((ROOT / path).read_text())\n',
             ),
         )
+    elif relative == "tests/host/test_trap_syscall_source_layout.py":
+        owner = "COPY01"
+        changes = (
+            ("from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required\n", ""),
+            ("            FIXTURE_PATH,\n", ""),
+            ("        memory_required = memory_identity_required(REPOSITORY_ROOT)\n", ""),
+            (
+                '            if path == "lib/runtime/memory.c" and not memory_required:\n'
+                "                continue\n",
+                "",
+            ),
+        )
     else:
         return source
     present = [source.count(added) for added, original in changes]
     if not any(present):
         return source
     if any(count != 1 for count in present):
-        raise AssertionError("EV02 gate compatibility is not exact")
+        raise AssertionError(f"{owner} gate compatibility is not exact")
     for added, original in changes:
         source = source.replace(added, original, 1)
     return source
