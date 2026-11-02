@@ -7,6 +7,14 @@ This is the canonical EV01 design for transitioning a reviewed historical
 It implements ADR-0082's contract; it does not authorize a production
 correction.
 
+The separately documented
+[packed identity correction](packed-evidence-identities.md), under Accepted
+ADR-0091, records an implementation coverage gap found after COPY01 #191.
+The existing scheduler's packed function and semantic declarations are still
+checked by their source gates but lack individual EV01 entries. The
+completeness requirement below remains binding; the corrective implementation
+must merge before PLAT01 resumes.
+
 ## Goal
 
 Provide one typed, fail-closed evidence mechanism so every later correction
@@ -149,8 +157,9 @@ One module may appear in more than one family only when the family extractors
 produce disjoint canonical fact-key sets. Duplicate ownership of one
 materialized fact still fails.
 
-Current extractors materialize individual hash-table entries and function
-identities. Common `BASELINE_BODIES` tables resolve through their
+Existing standalone-hash extractors materialize individual hash-table
+entries and function identities. They do not yet cover the packed scheduler
+declarations identified by EV01-C01. Common `BASELINE_BODIES` tables resolve through their
 `ORIGINAL_FUNCTIONS` and `SOURCE_SETS`; centralized kernel classification
 facts resolve through `KERNEL_FILE_FACTS`. A bespoke unresolved fact inherits
 the complete closed repository-path set declared by its structural owner, so

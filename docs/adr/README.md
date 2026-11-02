@@ -106,3 +106,4 @@ to make the project appear more consistent than it was.
 | [0088](0088-github-actions-validation.md) | GitHub Actions validation | Accepted |
 | [0089](0089-parallel-github-actions-validation.md) | Parallel GitHub Actions validation | Accepted |
 | [0090](0090-minix-word-based-runtime-memory.md) | MINIX word-based runtime copy and fill | Accepted |
+| [0091](0091-packed-evidence-identity-coverage.md) | Packed evidence identity coverage | Accepted |

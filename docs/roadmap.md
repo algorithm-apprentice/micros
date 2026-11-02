@@ -20,6 +20,14 @@ correction merges through its design/implementation pair and affected-unit
 re-certification. Node-Q remains blocked through `BASE01`; Step 16 and
 ordinary feature work remain blocked through `RECERT01`.
 
+The evidence barrier is merged as EV04 #189. COPY01 design #190 and
+implementation #191 close only B05-F006/B05-E005 with real primitive-work
+evidence and granular source-authority retirement. PLAT01 is the next
+preferred runtime design, but its source-authority study found the
+[packed-identity prerequisite](architecture/packed-evidence-identities.md).
+That separate evidence-only correction must merge before PLAT01 resumes.
+The remaining runtime queue and hosted CI are not declared complete.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

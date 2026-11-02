@@ -167,6 +167,16 @@ never certify a real transition. The existing runtime tests, B05-B12/B14
 recertification, complete fresh author gate and independent review remain
 required.
 
+Accepted
+[ADR-0091](adr/0091-packed-evidence-identity-coverage.md) addresses the packed
+scheduler declarations omitted from EV01's current materialization. The
+[bounded contract](architecture/packed-evidence-identities.md) requires
+independently pinned function records and semantic minimum-multisets,
+malformed/undeclared-data rejection, exact conservation of existing facts
+and COPY01 prior retirement, and the unchanged complete fresh author gate.
+The design contains no executable artifact and does not claim that the
+additional 177 facts are already implemented.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

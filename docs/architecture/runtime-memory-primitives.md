@@ -9,10 +9,11 @@ The [fixed MINIX ledger](../research/minix-runtime-memory-primitives.md)
 defines the selected generic word family and all required adaptations.
 
 Independent design review and separate design merge #190 are complete.
-The implementation map below identifies the concrete evidence and author
-entry point. A new staged registry claim is not a completed transition;
-current author evidence and independent implementation review remain the
-acceptance boundary.
+Implementation #191 is separately reviewed and merged, with the reviewed,
+published and squash trees identical. The implementation map below identifies
+the concrete evidence and author entry point. A new staged registry claim is
+not a completed transition; current author evidence and independent
+implementation review remain the acceptance boundary.
 
 ## Stable interfaces and preconditions
 

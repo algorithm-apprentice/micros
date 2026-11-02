@@ -78,6 +78,9 @@ This directory contains the design baseline for `micros`.
 - [Evidence authority transition](architecture/evidence-authority-transition.md)
   separates historical source-transport identities from independent
   MINIX-derived correction oracles and defines fail-closed retirement.
+- [Packed evidence identity coverage](architecture/packed-evidence-identities.md)
+  defines the Accepted EV01-C01 correction for the existing packed scheduler
+  declarations without rebaselining or retiring any identity.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -99,6 +102,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Packed evidence identity gap](research/packed-evidence-identity-gap.md)
+  records the fixed-source omission, existing consumers and preserved
+  assertions behind the EV01-C01 prerequisite.
 - [MINIX stack-bound evidence study](research/minix-stack-bound-evidence.md)
   traces fixed-reference stack ownership and guard behavior, RV64 adaptations,
   simultaneous-frame composition, and the EV03 evidence boundary.

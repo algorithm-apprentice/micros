@@ -646,9 +646,10 @@ runtime stack.
   defines the generic MINIX word family and exact authority transition.
   The [implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
   identifies the real work, access, artifact and granular-retirement evidence.
-  Closure of this finding and B05-E005 requires its actual terminal author
-  transaction, complete fresh gate and independent implementation review;
-  neither the design nor an uncommitted registry declaration is closure.
+  Implementation #191 closes only this finding and B05-E005 after the actual
+  terminal author transaction, complete fresh gate and clean independent
+  implementation re-review. The other B05 findings remain open, and the
+  pinned audit evidence below is not rewritten.
 - `micros` evidence:
   - `micros_runtime_memcpy`
   - `micros_runtime_memset`
