@@ -5,6 +5,9 @@ from pathlib import Path
 import re
 
 from tests.host import evidence_authority_packed
+from tests.host.evidence_authority_source import (
+    kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
+)
 from tests.host.evidence_authority_types import (
     AuthorityClass,
     Fact,
@@ -94,6 +97,41 @@ FAMILY_OWNERS = {
 
 NON_IDENTITY_EXCEPTIONS = ()
 
+LOGICAL_FILE_TABLES = {
+    "tests/host/test_endpoint_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_grant_data_plane_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_kernel_bootstrap_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_kernel_ipc_source_layout.py": (
+        "FILE_SCOPE_STORAGE_HASHES", "STABLE_HASHES", "STATIC_LOCAL_STORAGE_HASHES",
+    ),
+    "tests/host/test_kernel_object_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_kernel_pm_control_source_layout.py": ("STABLE_HEADER_HASHES",),
+    "tests/host/test_kernel_vm_handoff_source_layout.py": ("STABLE_HEADER_HASHES",),
+    "tests/host/test_pm_service_source_layout.py": ("STABLE_HEADER_HASHES",),
+    "tests/host/test_ramfs_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_scheduler_source_layout.py": ("STABLE_ARTIFACT_HASHES",),
+    "tests/host/test_trap_syscall_source_layout.py": (
+        "EXISTING_INLINE_HEADERS", "ORIGINAL_SOURCE_HASHES", "STABLE_HASHES",
+    ),
+    "tests/host/test_tty_source_layout.py": ("STABLE_HASHES",),
+    "tests/host/test_vm_service_source_layout.py": ("STABLE_HEADER_HASHES",),
+}
+OBJECT_RECONSTRUCTION_ROWS = (
+    ("tests/host/test_scheduler_source_layout.py", "STABLE_ARTIFACT_HASHES"),
+    ("tests/host/test_endpoint_source_layout.py", "STABLE_HASHES"),
+)
+OBJECT_RECONSTRUCTION_SOURCES = (
+    "kernel/kernel_objects.c",
+    "kernel/kernel_object_state.c",
+    "kernel/kernel_object_identity.c",
+    "kernel/kernel_object_stack.c",
+    "kernel/kernel_object_process.c",
+    "kernel/kernel_object_thread.c",
+    "kernel/kernel_object_context.c",
+    "kernel/kernel_object_hart.c",
+    "kernel/kernel_object_validation.c",
+)
+
 STACK_BINDING_PAYLOAD_PATHS = (
     "docs/architecture/stack-bound-evidence.md",
     "include/micros/user_address_space.h",
@@ -142,11 +180,11 @@ DECLARED_FAMILY_FACT_DIGESTS = {
     "fixture-artifacts":
         "3cff438cd00a5ee1b78bffdedb2b9e66c123c9972ab048eda1854aff2918d149",
     "kernel-structure":
-        "6d4f3a952a315b57ae4d234b67b0c882e60b19b1e9af49c29a739e6c16ed43b9",
+        "667e133360ea23123cabcda1f600e18b7b0ab1419d415f6b25bf885a0d69523d",
     "recipe-impact":
         "a14c50d641800083794bfa4f67e3b275e02528b181afc82879a6dae9f0f898dd",
     "service-structure":
-        "11a2f268950946b406dd52d176a14198b3dfaffe36cb41e226ba8f648b078533",
+        "97730d70d876f7504caa34c9ca64e7884b2cc5f4d591790f2480371602e3d99e",
     "tool-structure":
         "29bee701c5920506b72b9ad5f60da85521170673a222a3770c6d96953c6ed73b",
     "stack-source-bindings":
@@ -514,9 +552,30 @@ def _kernel_classification_path(root, literals, leaf):
     return old_path if (root / old_path).is_file() else None
 
 
-def _semantic_payload_paths(root, name, leaf, literals):
+def _object_reconstruction_sources(root, directory):
+    path = regular_source(root, "tests/host/test_kernel_object_source_layout.py")
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    sources = literal_value(single_assignment(tree, "CORE_SOURCES").value)
+    headers = literal_value(single_assignment(tree, "PRIVATE_HEADERS").value)
+    if (
+        sources != OBJECT_RECONSTRUCTION_SOURCES or type(headers) is not tuple
+        or not headers or headers[0] != "kernel/kernel_object_private.h"
+    ):
+        raise ValueError("object reconstruction source/header membership changed")
+    return kernel_sources(root, (*sources, headers[0]), directory).values()
+
+
+def _semantic_payload_paths(root, name, leaf, literals, relative, directory):
     paths = set()
-    if name == "BASELINE_BODIES":
+    if (
+        name in LOGICAL_FILE_TABLES.get(relative, ()) and len(leaf) == 1
+        and leaf[0].startswith("kernel/") and len(Path(leaf[0]).parts) == 2
+    ):
+        if leaf[0] == "kernel/kernel_objects.c" and (relative, name) in OBJECT_RECONSTRUCTION_ROWS:
+            paths.update(_object_reconstruction_sources(root, directory))
+        else:
+            paths.update(kernel_sources(root, leaf, directory).values())
+    elif name == "BASELINE_BODIES":
         path = _baseline_body_path(literals, leaf)
         if path and (root / path).is_file():
             paths.add(path)
@@ -544,7 +603,7 @@ def _owner_boundary_fact(family, relative):
 
 
 def _assignment_facts(
-    root, family, relative, tree, literals, declared_paths
+    root, family, relative, tree, literals, declared_paths, directory
 ):
     facts = []
     for node in tree.body:
@@ -570,7 +629,7 @@ def _assignment_facts(
             payload_set = {
                 relative,
                 *leaf_paths,
-                *_semantic_payload_paths(root, name, leaf, literals),
+                *_semantic_payload_paths(root, name, leaf, literals, relative, directory),
             }
             if payload_set == {relative}:
                 payload_set.update(declared_paths)
@@ -705,7 +764,7 @@ def _runtime_memory_facts(tree, family, relative):
     return facts
 
 
-def _facts_for_owner(root, family, relative):
+def _facts_for_owner(root, family, relative, directory=None):
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     packed = evidence_authority_packed.checked_declarations(tree, relative)
     if family == evidence_authority_packed.FAMILY:
@@ -717,7 +776,7 @@ def _facts_for_owner(root, family, relative):
                 AuthorityClass.TRANSPORT_IDENTITY, _fact_primary_unit(paths),
                 _consumer_units(relative, paths), paths, value,
             )
-            for kind, scope, paths, value in evidence_authority_packed.packed_records(root, tree, packed)
+            for kind, scope, paths, value in evidence_authority_packed.packed_records(root, tree, packed, directory)
         ]
     if family == "runtime-memory-baseline":
         return _runtime_memory_facts(tree, family, relative)
@@ -737,6 +796,7 @@ def _facts_for_owner(root, family, relative):
             tree,
             _literal_assignments(tree),
             declared_paths,
+            directory,
         ),
         *_function_facts(
             root, family, relative, tree, declared_paths
@@ -746,6 +806,7 @@ def _facts_for_owner(root, family, relative):
 
 def current_inventory(root):
     root = Path(root).resolve()
+    directory = kernel_directory(root)
     families = tuple(
         Family(family, owners)
         for family, owners in FAMILY_OWNERS.items()
@@ -754,7 +815,7 @@ def current_inventory(root):
         fact
         for family, owners in FAMILY_OWNERS.items()
         for owner in owners
-        for fact in _facts_for_owner(root, family, owner)
+        for fact in _facts_for_owner(root, family, owner, directory)
     )
     closure = _import_closure(root)
     discovered = tuple(sorted(

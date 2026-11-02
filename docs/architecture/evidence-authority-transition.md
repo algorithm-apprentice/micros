@@ -14,8 +14,10 @@ The scheduler's packed function and semantic declarations now have individual
 EV01 entries while their existing source gates remain active; implementation
 #193 is separately reviewed and merged. The subsequent
 [relocated payload correction](relocated-evidence-payloads.md), under Accepted
-ADR-0092, addresses 104 existing logical-file rows that omit their actual
-physical source. PLAT01 remains sequenced after that separate prerequisite.
+ADR-0092 and separately merged design #194, repairs 104 existing logical-
+source bindings. Its implementation retains 102 singleton sources and two
+complete object-reconstruction closures. PLAT01 remains sequenced after
+that correction's complete author gate, independent review and merge.
 
 ## Goal
 
@@ -168,9 +170,10 @@ facts resolve through `KERNEL_FILE_FACTS`. A bespoke unresolved fact inherits
 the complete closed repository-path set declared by its structural owner, so
 its projection is conservative rather than omitting a corrected source.
 EV01-C02 identifies a concrete exception to that intended coverage: the
-existing direct logical-file hash rows have a known directory owner but
-still enter fallback. Its specified exact binding replaces only that finite
-case; genuinely unresolved schemas keep their current handling.
+existing direct logical-file hash rows had known current owners but still
+entered fallback. Its implemented exact binding replaces only that finite
+case, including the two complete reconstruction exceptions; genuinely
+unresolved schemas keep their current handling.
 Historical helper detection uses an explicit qualified allowlist; an ordinary
 new function that merely calls a generic `digest()` utility is not a transport
 identity.

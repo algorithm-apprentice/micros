@@ -3,9 +3,14 @@
 import ast
 from collections import Counter
 import json
-from pathlib import Path
 import re
-import stat
+
+from tests.host.evidence_authority_source import (
+    kernel_sources,
+    literal_value as _literal,
+    regular_source as _regular,
+    single_assignment as _assignment,
+)
 
 
 OWNER = "tests/host/test_scheduler_source_layout.py"
@@ -67,43 +72,6 @@ def _packed_assignments(tree):
 
 def packed_candidate(tree):
     return any(_reserved_binding(node) for node in ast.walk(tree)) or bool(_packed_assignments(tree))
-
-
-def _literal(node):
-    if isinstance(node, ast.Constant) and type(node.value) in (str, int):
-        return node.value
-    if isinstance(node, ast.Tuple):
-        return tuple(_literal(item) for item in node.elts)
-    if isinstance(node, ast.Dict):
-        result = {}
-        for key_node, value_node in zip(node.keys, node.values):
-            key = _literal(key_node)
-            if not isinstance(key, (str, int, tuple)):
-                raise ValueError("packed authority has a nonliteral dictionary key")
-            try:
-                duplicate = key in result
-            except TypeError as error:
-                raise ValueError("packed authority has an invalid dictionary key") from error
-            if duplicate:
-                raise ValueError("packed authority has a duplicate dictionary key")
-            result[key] = _literal(value_node)
-        return result
-    raise ValueError("packed authority requires literal data")
-
-
-def _assignment(tree, name):
-    bindings = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)) and node.id == name
-    ]
-    statements = [
-        node for node in tree.body
-        if isinstance(node, ast.Assign) and len(node.targets) == 1
-        and isinstance(node.targets[0], ast.Name) and node.targets[0].id == name
-    ]
-    if len(statements) != 1 or bindings != [statements[0].targets[0]]:
-        raise ValueError(f"packed authority requires one ordinary {name} assignment")
-    return statements[0]
 
 
 def checked_declarations(tree, relative):
@@ -180,60 +148,10 @@ def _source_families(tree):
     return functions, families, set(roots)
 
 
-def _relative(path):
-    if (
-        type(path) is not str or not path or "\\" in path
-        or Path(path).is_absolute() or Path(path).as_posix() != path
-        or any(part in (".", "..") for part in Path(path).parts)
-    ):
-        raise ValueError("packed authority has an unsafe payload path")
-    return path
-
-
-def _regular(root, relative):
-    path = root / _relative(relative)
-    try:
-        for parent in path.parents:
-            status = parent.lstat()
-            if not stat.S_ISDIR(status.st_mode):
-                raise ValueError("packed authority has a linked payload parent")
-            if parent == root:
-                break
-        status = path.lstat()
-        if not stat.S_ISREG(status.st_mode) or status.st_nlink != 1:
-            raise ValueError("packed authority requires an unlinked regular payload")
-    except OSError as error:
-        raise ValueError(f"packed authority payload is unavailable: {relative}") from error
-    return path
-
-
-def _payload_bindings(root, families):
+def _payload_bindings(root, families, directory):
     _regular(root, OWNER)
-    layout = _regular(root, "tests/host/kernel_layout_source.py")
-    mapping = _literal(_assignment(ast.parse(layout.read_text(encoding="utf-8")), "KERNEL_FILE_FACTS").value)
-    if type(mapping) is not dict:
-        raise ValueError("packed authority requires the literal kernel directory map")
     logical_paths = tuple(path for paths in families.values() for path in paths)
-    if len(set(logical_paths)) != len(logical_paths):
-        raise ValueError("packed authority has duplicate source/header ownership")
-    physical_paths = {}
-    selected = set()
-    for logical in logical_paths:
-        _relative(logical)
-        physical = logical
-        if logical.startswith("kernel/"):
-            record = mapping.get(logical)
-            if type(record) is not tuple or len(record) != 4 or type(record[0]) is not str:
-                raise ValueError("packed authority has an unknown kernel directory binding")
-            physical = record[0]
-            if physical != logical and ((root / logical).exists() or (root / logical).is_symlink()):
-                raise ValueError("packed authority has ambiguous old/current owners")
-        _regular(root, physical)
-        if physical in selected:
-            raise ValueError("packed authority has ambiguous current owners")
-        selected.add(physical)
-        physical_paths[logical] = physical
-    return physical_paths
+    return kernel_sources(root, logical_paths, directory)
 
 
 def _record(kind, table, original, function, payloads, value):
@@ -288,9 +206,9 @@ def _semantic_records(table, families, roots, paths):
     return records
 
 
-def packed_records(root, tree, tables):
+def packed_records(root, tree, tables, directory=None):
     functions, families, roots = _source_families(tree)
-    paths = _payload_bindings(root, families)
+    paths = _payload_bindings(root, families, directory)
     return tuple((
         *_function_records(tables["FROZEN_FUNCTIONS"], functions, paths),
         *_semantic_records(tables["FROZEN_FACTS"], families, roots, paths),

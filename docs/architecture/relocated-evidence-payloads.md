@@ -8,9 +8,10 @@ in [the gap study](../research/relocated-evidence-payload-gap.md), under
 The reference commit is
 `de31bce3de93f58c94e053ea55e41040aba79987`.
 
-EV01-C01 #193 is complete. PLAT01 remains inactive until this additional
-evidence-only correction is separately designed, implemented and reviewed.
-This adds no runtime-DAG node, duplicate finding owner or runtime behavior.
+EV01-C01 #193 and this correction's separate design #194 are merged.
+PLAT01 is sequenced after EV01-C02's independently reviewed implementation
+merge. This adds no runtime-DAG node, duplicate finding owner or runtime
+behavior.
 
 ## Exact admission
 
@@ -275,3 +276,36 @@ squash merge precede resuming PLAT01.
 This design contains documentation only. No helper, test, model, fixture,
 runner, dependency, build scaffold or reusable executable prototype is
 authored before separate design acceptance and merge.
+
+## Implementation map
+
+After design #194, `tests/host/evidence_authority_source.py` supplies the
+shared literal declaration, ordinary-file and current directory-binding
+checks. The packed extractor reuses that helper without changing its
+177 facts or schemas. The existing inventory owns the seventeen qualified
+table admissions and two exact object-reconstruction exceptions.
+
+The independently recorded pre-extractor declaration from the fixed Git
+source supplies these two current family fingerprints:
+
+| Family | Corrected fingerprint |
+| --- | --- |
+| `kernel-structure` | `667e133360ea23123cabcda1f600e18b7b0ab1419d415f6b25bf885a0d69523d` |
+| `service-structure` | `97730d70d876f7504caa34c9ca64e7884b2cc5f4d591790f2480371602e3d99e` |
+
+All 104 corrected complete records match that independent declaration.
+The 3,808 other complete records and nine other fingerprints are unchanged.
+There are still 3,912 facts and eleven families, with no identity/value/
+class change or new retirement.
+
+`RelocatedBindingTests` exercises actual singleton and reconstruction
+bindings, complete historical recovery, unsafe paths and rejected inverse
+tampering. The test-side `prior_binding_facts` helper reads only fixed-Git
+membership and declarations for its historical data; it checks the exact
+corrected metadata before restoring those three fields. Earlier EV02,
+EV03, packed-family and COPY01 comparisons retain their original expected
+digests through this bounded inverse. Current authorization never uses it.
+
+The existing scheduler, endpoint, object and directory source gates remain
+unchanged. Complete current fresh author acceptance and independent review
+remain mandatory before implementation merge and PLAT01 resumption.
