@@ -499,10 +499,22 @@ The native target's closed source operands are those three case files,
 the two diagnostic portable-core C files, `kernel/tty/tty_control_core.c`,
 `servers/tty/tty_diagnostic.c`, `servers/tty/tty_control.c`,
 `servers/tty/tty_core.c`, the unchanged `MICROS_TTY_SERVICE_CORE_SOURCES`,
-`lib/runtime/memory.c` and `tests/work/work_observation.c`.
+`lib/runtime/memory.c` and `tests/work/work_counts.c`.
 Use the existing host C17/warning/sanitizer policy and enable the existing
 work-observation definition only for this native evidence target.
 Its syscall double is test-owned, not a new production callback interface.
+
+Design #196 at `60ca0ebad264714b079e0630a5c7bb47726e1250` incorrectly
+spelled the existing collector source as `tests/work/work_observation.c`;
+that file does not exist in the merged tree. The corrected operand above
+names the already Accepted EV02 collector, as specified by the
+[operation-count contract](operation-count-evidence.md) and
+[existing native recipe](../../tests/work/WorkCounts.cmake).
+This is a source-name correction, not a new collector, alias, source member,
+measurement rule or ADR decision. Implementation restarts only after this
+documentation correction is separately reviewed and merged, using that
+merged design as its authoring base. The fixed runtime/MINIX pins, closed
+candidate/immutable membership and all other contracts remain unchanged.
 
 No new target image, workflow, service or preset is added. Every kernel
 variant links the same production history/control owners, and every
