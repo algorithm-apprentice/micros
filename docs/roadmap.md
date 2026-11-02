@@ -25,9 +25,11 @@ implementation #191 close only B05-F006/B05-E005 with real primitive-work
 evidence and granular source-authority retirement. PLAT01 is the next
 preferred runtime design, but its source-authority study found the
 [packed-identity prerequisite](architecture/packed-evidence-identities.md).
-EV01-C01 implements the 177-record correction under separately merged
-design #192. PLAT01 resumes only after its complete author gate, independent
-review and implementation merge.
+EV01-C01 design #192 and implementation #193 are merged. The resumed
+PLAT01 study then found a distinct
+[relocated-source binding gap](architecture/relocated-evidence-payloads.md).
+Its EV01-C02 design/implementation pair precedes further PLAT01 work;
+the existing runtime sources remain unchanged by these evidence repairs.
 The remaining runtime queue and hosted CI are not declared complete.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

@@ -11,9 +11,11 @@ The separately documented
 [packed identity correction](packed-evidence-identities.md), under Accepted
 ADR-0091, repairs the implementation coverage gap found after COPY01 #191.
 The scheduler's packed function and semantic declarations now have individual
-EV01 entries while their existing source gates remain active. The
-completeness requirement below remains binding; PLAT01 resumes only after
-the corrective implementation's complete gate, independent review and merge.
+EV01 entries while their existing source gates remain active; implementation
+#193 is separately reviewed and merged. The subsequent
+[relocated payload correction](relocated-evidence-payloads.md), under Accepted
+ADR-0092, addresses 104 existing logical-file rows that omit their actual
+physical source. PLAT01 remains sequenced after that separate prerequisite.
 
 ## Goal
 
@@ -165,6 +167,10 @@ Common `BASELINE_BODIES` tables resolve through their
 facts resolve through `KERNEL_FILE_FACTS`. A bespoke unresolved fact inherits
 the complete closed repository-path set declared by its structural owner, so
 its projection is conservative rather than omitting a corrected source.
+EV01-C02 identifies a concrete exception to that intended coverage: the
+existing direct logical-file hash rows have a known directory owner but
+still enter fallback. Its specified exact binding replaces only that finite
+case; genuinely unresolved schemas keep their current handling.
 Historical helper detection uses an explicit qualified allowlist; an ordinary
 new function that merely calls a generic `digest()` utility is not a transport
 identity.

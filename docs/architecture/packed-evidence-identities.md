@@ -9,10 +9,11 @@ It refines ADR-0082 through
 
 The source is fixed at
 `b99848f52d01100a6db2833f610cff7007e1cc6f`, after COPY01 #191.
-The design merged separately as #192. PLAT01 is sequenced after this
-correction's separately reviewed implementation merge. This does not add a
-runtime correction node or reassign a finding in the pinned 59-node
-correction DAG.
+The design merged separately as #192 and implementation #193 completes
+this correction. PLAT01 subsequently identified the separate
+[relocated payload prerequisite](relocated-evidence-payloads.md).
+Neither evidence correction adds a runtime correction node or reassigns a
+finding in the pinned 59-node correction DAG.
 
 Design is documentation-only. No extractor, test, model, fixture, command
 runner, dependency or executable prototype is authored before separate

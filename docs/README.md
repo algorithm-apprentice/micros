@@ -81,6 +81,9 @@ This directory contains the design baseline for `micros`.
 - [Packed evidence identity coverage](architecture/packed-evidence-identities.md)
   defines the Accepted EV01-C01 correction for the existing packed scheduler
   declarations without rebaselining or retiring any identity.
+- [Relocated evidence payload bindings](architecture/relocated-evidence-payloads.md)
+  defines the Accepted EV01-C02 repair for direct logical-file hash rows
+  whose actual current source is missing from their payload.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -102,6 +105,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Relocated evidence payload gap](research/relocated-evidence-payload-gap.md)
+  records the 104 affected identities and the concrete immutable/candidate
+  closure conflict found during PLAT01 planning.
 - [Packed evidence identity gap](research/packed-evidence-identity-gap.md)
   records the fixed-source omission, existing consumers and preserved
   assertions behind the EV01-C01 prerequisite.
