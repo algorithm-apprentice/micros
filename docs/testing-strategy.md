@@ -187,6 +187,16 @@ source gates remain unchanged. Narrow iteration uses:
 
 This does not replace the complete fresh author plan or independent review.
 
+EV01-C01 implementation #193 is separately reviewed and merged. Accepted
+[ADR-0092](adr/0092-relocated-evidence-payload-bindings.md) defines the next
+[bounded payload repair](architecture/relocated-evidence-payloads.md):
+104 existing logical-file identities must bind their actual physical
+source rather than an unrelated fallback. Its implementation begins with
+missing-owner Red, independently declared complete before/after records,
+strict path/inverse negatives and unchanged packed/COPY01 behavior. It
+adds no new test target or runtime workflow and still requires the complete
+fresh author plan. Design acceptance alone supplies no repaired bindings.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

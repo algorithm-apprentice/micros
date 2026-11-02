@@ -590,6 +590,23 @@ now records all 177 new facts and complete old-fact conservation. The
 and every prior family fingerprint. PLAT01 remains sequenced after this
 implementation's complete fresh author gate, independent review and merge.
 
+## EV01-C02 relocated-payload prerequisite
+
+EV01-C01 implementation #193 has completed those gates and merged. The next
+PLAT01 planning step found a distinct source-binding defect, recorded in
+[the fixed-source study](relocated-evidence-payload-gap.md).
+The scalar inventory still contains 3,912 facts, but 104 direct logical-file
+rows omit the exact physical file already named by the directory map.
+
+The [Accepted contract](../architecture/relocated-evidence-payloads.md) and
+[ADR-0092](../adr/0092-relocated-evidence-payload-bindings.md) correct only
+their payload/primary/consumer metadata. All identities and historical
+values stay intact; two family fingerprints require independent corrected
+declarations, with a bounded inverse preserving historical comparisons.
+The other nine fingerprints, packed coverage, COPY01 prior retirement and
+all runtime findings remain unchanged. No repaired binding or real PLAT01
+transition is claimed before separate design and implementation acceptance.
+
 ## References
 
 - [ADR-0080](../adr/0080-minix-structural-and-algorithmic-baseline.md)

@@ -48,10 +48,14 @@ The next PLAT01 design found an
 [EV01 packed-identity coverage gap](packed-evidence-identity-gap.md).
 EV01-C01 is a separate corrective evidence prerequisite under
 [Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md).
-Its design #192 is separately merged, and the bounded implementation adds
-the 177 omitted facts while preserving all previous authority. PLAT01
-research remains preserved and resumes only after the correction's complete
-author gate, independent implementation review and merge. This maintenance prerequisite adds no
+Its design #192 and independently reviewed implementation #193 are merged,
+adding the 177 omitted facts while preserving all previous authority.
+Resumed PLAT01 planning then identified the
+[relocated payload binding prerequisite](relocated-evidence-payload-gap.md),
+EV01-C02 under Accepted
+[ADR-0092](../adr/0092-relocated-evidence-payload-bindings.md).
+PLAT01's documentation is preserved but inactive until that separate
+evidence correction is reviewed and merged. These maintenance prerequisites add no
 runtime correction node or finding owner to the pinned 59-node, 155-edge
 graph; it repairs the evidence gate before the next selected runtime row.
 The historical audit totals and the separately blocked hosted CI outcome
