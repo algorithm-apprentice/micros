@@ -204,6 +204,16 @@ behavior. Narrow iteration uses:
 No new test target or runtime workflow is added. The complete fresh author
 plan and independent implementation review remain mandatory.
 
+EV01-C02 implementation #195 has completed those gates and merged.
+Accepted [ADR-0093](adr/0093-minix-diagnostic-histories.md) and the
+[diagnostic-history contract](architecture/diagnostic-history.md) define
+the resumed PLAT01 outcome. It requires the exact two history mechanisms,
+independent native work/state and reader/consumer cases, real TTY and seeded
+panic extensions, complete finite source/machine proof and one twenty-key
+EV01 transition. All existing executions and budgets remain required.
+This design-only phase adds no executable native target, runner option,
+fixture or journal; those begin only after the separate design merge.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

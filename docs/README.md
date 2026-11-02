@@ -93,6 +93,9 @@ This directory contains the design baseline for `micros`.
 - [Runtime memory primitives](architecture/runtime-memory-primitives.md)
   defines COPY01's Accepted generic MINIX word family, exact work evidence and
   first granular real source-authority transition after EV04.
+- [Kernel diagnostic histories](architecture/diagnostic-history.md)
+  defines PLAT01's Accepted history, exact TTY reader, notification,
+  output-arbitration and terminal replay contract.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -105,6 +108,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [MINIX diagnostic history baseline](research/minix-diagnostic-history.md)
+  traces the two retained histories, notification, consumer transfer,
+  panic replay and direct-output boundary for PLAT01.
 - [Relocated evidence payload gap](research/relocated-evidence-payload-gap.md)
   records the 104 affected identities and the concrete immutable/candidate
   closure conflict found during PLAT01 planning.

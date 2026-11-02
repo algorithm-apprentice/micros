@@ -8,10 +8,10 @@ in [the gap study](../research/relocated-evidence-payload-gap.md), under
 The reference commit is
 `de31bce3de93f58c94e053ea55e41040aba79987`.
 
-EV01-C01 #193 and this correction's separate design #194 are merged.
-PLAT01 is sequenced after EV01-C02's independently reviewed implementation
-merge. This adds no runtime-DAG node, duplicate finding owner or runtime
-behavior.
+EV01-C01 #193 and this correction's design #194 and independently reviewed
+implementation #195 are merged. PLAT01 resumes from that completed
+prerequisite. This adds no runtime-DAG node, duplicate finding owner or
+runtime behavior.
 
 ## Exact admission
 

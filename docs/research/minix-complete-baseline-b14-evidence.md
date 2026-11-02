@@ -595,8 +595,9 @@ implementation's complete fresh author gate, independent review and merge.
 EV01-C01 implementation #193 has completed those gates and merged. The next
 PLAT01 planning step found a distinct source-binding defect, recorded in
 [the fixed-source study](relocated-evidence-payload-gap.md).
-The scalar inventory still contains 3,912 facts, but 104 direct logical-file
-rows omit the exact physical file already named by the directory map.
+At that point the scalar inventory contained 3,912 facts, but 104 direct
+logical-file rows omitted current source inputs already named by the
+directory/source-family maps.
 
 The [Accepted contract](../architecture/relocated-evidence-payloads.md) and
 [ADR-0092](../adr/0092-relocated-evidence-payload-bindings.md) correct only
@@ -608,8 +609,22 @@ all runtime findings remain unchanged. Design #194 is separately merged;
 the [implementation map](../architecture/relocated-evidence-payloads.md#implementation-map)
 records all 104 corrected bindings, including both complete object-family
 exceptions, and exact historical recovery. No real PLAT01 transition is
-claimed. Complete current author acceptance and independent review still
-precede this corrective implementation's merge.
+claimed. Implementation #195 has now completed current author acceptance
+and independent review and is merged.
+
+## PLAT01 real-consumer design
+
+The Accepted
+[ADR-0093](../adr/0093-minix-diagnostic-histories.md) and
+[canonical contract](../architecture/diagnostic-history.md) declare the
+next real transition: twenty existing source identities, four independently
+defined replacement properties, closed immutable/candidate source roles
+and complete B01-B12/B14 recertification.
+
+The design preserves the existing 3,912 records, corrected bindings,
+packed scheduler facts, prior COPY01 retirement and historical recipe/
+source-gate expectations. It supplies no executable consumer or additional
+retirement before separate design merge and implementation.
 
 ## References
 

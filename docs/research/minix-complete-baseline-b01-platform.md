@@ -573,6 +573,25 @@ assembly/report consumers.
 These gaps are findings inputs, not permission to add tests during the
 read-only audit.
 
+## Post-pin PLAT01 design
+
+The complete audit and EV04 barrier are merged. After COPY01 and the
+separately reviewed evidence prerequisites #192 through #195, Accepted
+[ADR-0093](../adr/0093-minix-diagnostic-histories.md) and the
+[diagnostic-history contract](../architecture/diagnostic-history.md)
+define the dependency-ready correction for B01-F002.
+
+The [fixed follow-up study](minix-diagnostic-history.md) resolves the exact
+1,998-byte payload inside the 2,000-byte tail, record-end semantics,
+sampled-cursor loss, consumer ownership and architecture-specific panic
+behavior. The design covers the complete history/notification/transfer/
+replay boundary, not just storage allocation.
+
+No finding is closed by design prose. B01-F001/F003/F005 remain PLAT02,
+B01-F004 remains PLAT03 and B01-F006 retains its memory correction owner.
+PLAT01 requires separate design merge, actual implementation evidence,
+granular retirement, affected-unit recertification and independent review.
+
 ## Findings register
 
 ### B01-F001: UART polling is unbounded
