@@ -65,6 +65,14 @@ graph; they repair the evidence gate before the next selected runtime row.
 The historical audit totals and the separately blocked hosted CI outcome
 are not relabeled as completed work.
 
+After design #196 and collector correction #197, PLAT01's uncommitted
+implementation found a [real startup IRQ retrigger](minix-diagnostic-history.md#observed-startup-irq-retrigger)
+that invalidates the first-probe ordering assumption. Implementation is
+blocked and abandoned; [Accepted ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md)
+is the sole active corrective-design prerequisite until its separate
+merge. It adds no runtime
+graph node, finding owner, retired key or accepted PLAT01 result.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
