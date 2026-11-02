@@ -149,6 +149,16 @@ test or weakening a gate. It also records the unaccepted hosted-CI attempt:
 local current-candidate evidence is not remote acceptance, and existing
 runtime validation-cost findings remain with their correction owners.
 
+After merged EV04 #189, the Accepted COPY01
+[runtime memory contract](architecture/runtime-memory-primitives.md) defines
+the first real runtime correction. Its design is documentation-only.
+Implementation must first demonstrate both old aligned-byte-loop work
+failures, then prove exact native copy/fill counts and byte/access semantics,
+actual RV64 wide-transfer and no-recursion artifacts, one granular EV01
+retirement, affected-unit recertification and the unchanged complete gate.
+The existing runtime tests remain required; no proposed fixture, command
+or corrected runtime behavior is claimed before separate design merge.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

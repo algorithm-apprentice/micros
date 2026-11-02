@@ -641,6 +641,11 @@ runtime stack.
 ### B05-F006: Runtime copy and fill are volatile byte loops
 
 - Severity: High
+- Current correction design: COPY01 follows merged EV04 #189.
+  [Accepted ADR-0090](../adr/0090-minix-word-based-runtime-memory.md)
+  defines the generic MINIX word family and exact authority transition.
+  This finding and B05-E005 remain open until separate implementation,
+  actual evidence and independent review complete.
 - `micros` evidence:
   - `micros_runtime_memcpy`
   - `micros_runtime_memset`

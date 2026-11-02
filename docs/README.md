@@ -84,6 +84,9 @@ This directory contains the design baseline for `micros`.
 - [Stack-bound evidence](architecture/stack-bound-evidence.md)
   defines the Accepted EV03 compiler/call-graph, assembly/indirect, target
   high-water, and future node-Q admission contract.
+- [Runtime memory primitives](architecture/runtime-memory-primitives.md)
+  defines COPY01's Accepted generic MINIX word family, exact work evidence and
+  first granular real source-authority transition after EV04.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -99,6 +102,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX stack-bound evidence study](research/minix-stack-bound-evidence.md)
   traces fixed-reference stack ownership and guard behavior, RV64 adaptations,
   simultaneous-frame composition, and the EV03 evidence boundary.
+- [MINIX runtime copy/fill study](research/minix-runtime-memory-primitives.md)
+  traces generic and ARM alignment/word mechanisms, C object-representation
+  constraints, exact work bounds and the Accepted COPY01 boundary.
 - [MINIX dependency analysis](research/minix-dependency-analysis.md) records the
   source baseline, component relationships, strongly connected component, and
   bootstrap lessons used to derive the `micros` design.
