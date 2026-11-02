@@ -214,6 +214,20 @@ EV01 transition. All existing executions and budgets remain required.
 This design-only phase adds no executable native target, runner option,
 fixture or journal; those begin only after the separate design merge.
 
+After design #196 and collector correction #197, the uncommitted
+implementation passed narrow native and seeded-panic checks but failed its
+real TTY first-read guard after a legal second retained IRQ. Its
+[recorded observation](research/minix-diagnostic-history.md#observed-startup-irq-retrigger)
+is not a target pass. Implementation is blocked and abandoned until
+[Accepted ADR-0094](adr/0094-retrigger-safe-diagnostic-probe.md) separately
+merges. It defines
+failure-atomic, fixture-only deferral and exact queued-IRQ consumption.
+The corrected native target will also compile the already declared user
+probe to test deferral, unchanged canaries/scalars and later complete
+transfer. Ordinary consumer errors, all legacy target assertions, host
+timeouts and full author gates remain unchanged; restarted real
+Red/Green/recertification and independent implementation review are required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

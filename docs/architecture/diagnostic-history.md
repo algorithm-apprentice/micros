@@ -3,8 +3,9 @@
 ## Status, readiness and boundary
 
 This is the Accepted PLAT01 contract under
-[ADR-0093](../adr/0093-minix-diagnostic-histories.md). Implementation remains
-pending until the separately reviewed design is merged.
+[ADR-0093](../adr/0093-minix-diagnostic-histories.md). Its original
+implementation barrier was the separate design merge; the current
+corrective-design barrier is recorded below.
 The baseline is `32f19782075ab34ff2bd6992f80540b6bfd47a4f`, following
 EV04, COPY01 and both evidence-identity prerequisites. The
 [fixed study](../research/minix-diagnostic-history.md) distinguishes the
@@ -17,9 +18,16 @@ and PLAT03's stack trace remain separate. Existing IPC, VM, object and TTY
 work-cost findings retain their correction owners.
 
 No executable artifact is authored in this design phase. Independent
-review reported no significant issue in the complete design. Implementation
+review reported no significant issue in the original complete design. Implementation
 and its runtime, source-authority, artifact and acceptance evidence remain
 a separate outcome.
+
+Design #196 and collector-source correction #197 are separately merged.
+The subsequent uncommitted implementation is blocked and abandoned after
+the [observed startup IRQ retrigger](../research/minix-diagnostic-history.md#observed-startup-irq-retrigger).
+The [Accepted correction](../adr/0094-retrigger-safe-diagnostic-probe.md)
+below is its sole active prerequisite. Existing runtime obligations remain
+unchanged; no PLAT01 implementation or retirement is accepted.
 
 ## Fixed roles and storage
 
@@ -1141,3 +1149,123 @@ partition, baseline mechanism, new native/target evidence and complete
 current author report before publication. PLAT01 closes only B01-F002;
 all other platform, memory, object, IPC, TTY, node-Q and hosted-CI outcomes
 remain with their documented owners.
+
+## Retrigger-safe target probe correction
+
+This subsection is Accepted under
+[ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md) after clean
+independent design review. Implementation remains blocked until its
+separate design merge. It replaces only the first TTY probe's admission and
+startup progress rules above, plus the single native source operand below.
+All production behavior and other PLAT01 scope remain unchanged.
+
+### Precise failure boundary
+
+The initial combined notification is still consumed after `READY_ACK`,
+and its real IRQ is drained and completed first. A later source-10 claim
+may nevertheless precede the next READ. Completion of one claim proves
+that transition, not persistent absence of a subsequent claim.
+
+The existing first-probe hook acquires a Boolean admission result. It
+runs only after successful production READ preflight and checks the same
+exact caller, registered cursor, completed readiness, disabled SIE and
+unchanged test kernel-THR counter before either result.
+
+| First-probe condition | Required action |
+| --- | --- |
+| `TTY_OWNED`, readiness deadline cleared, route `IDLE` | Append the exact 8,193-byte pattern once, move fixture phase from registered to injected, return admitted |
+| Same owner/readiness/cursor, route `IN_SERVICE`, claimed source 10, exact TTY endpoint has queued kernel IRQ bit `0x8` | Return deferred without mutation |
+| Unknown route, wrong source/cursor/phase, missing queued IRQ, premature readiness or another failed invariant | Fail explicitly; never defer |
+
+Queued-event inspection uses the authoritative destination registry. It
+does not inject, consume, acknowledge, synthesize or clear an event. The
+queued mask must be exactly the fixture's expected IRQ-only mask; an
+unexpected diagnostic or other bit is not borrowed as progress authority.
+
+The target READ adapter returns `MICROS_SYSCALL_ABI_STATE` (`-4`) for that
+test-only deferred result before invoking copy or after-copy hooks.
+Within the READ/fixture transition, only `a0` and the already advanced
+syscall `sepc` may differ; ordinary return/accounting keeps its existing
+behavior. The reader
+binding, history arrays/cursors, producer pending flag, destination bytes,
+notification state and fixture phase remain unchanged.
+
+An admitted first probe still samples its transfer span after the fixture
+append and commits the normal header/payload copy. Its after-copy hook
+then moves injected to complete and appends the single short forwarding
+record. A later read in the complete phase follows the original ordinary
+test observation; it never reenters first-probe deferral. An impossible
+reentry in the injected-but-not-completed phase fails.
+
+None of these deferral branches or result semantics appears without
+`MICROS_BUILD_TTY_SERVICE_TEST`. No additional production state, control
+command, event bit, callback provider or mapping lifetime is introduced.
+
+### User fixture and startup progress
+
+The private target-fixture helper returns one of exactly `COMPLETE`,
+`DEFERRED` or `FAILED`, rather than treating every nonzero scalar as
+success. It prepares the existing snapshot canaries, invokes the unchanged
+private READ wrapper and handles the actual result:
+
+1. `STATE` is `DEFERRED` only if all 10,016 snapshot bytes remain canaries
+   and every consumer scalar is unchanged.
+2. Any other negative or positive nonzero result is `FAILED`.
+3. Zero requires the complete original version/length/cursor/pattern and
+   inactive-suffix checks. Only then may it publish the new cursor and
+   mark exactly the fixture spool consumed.
+
+On `DEFERRED`, the test-only startup facade receives one canonical
+source-`NONE`, token-zero, zero-tail notification with exactly bit `0x8`.
+It performs the unchanged `handle_irq` drain/completion, then retries the
+same probe with its unchanged cursor and destination. Missing, malformed,
+foreign, combined or unknown notifications fail instead of authorizing
+another read. Every successful iteration consumes a real queued event and
+completes its corresponding retained claim.
+
+The loop is event-driven fixture progress, not production retry or an
+acceptance-workflow retry. It has no sleeps, polling, guessed interrupt
+count or timeout extension. The existing 90-second host bound remains
+mandatory. Local canary preparation/checking is allowed while an event is
+retained; the large kernel append and snapshot-copy probe are not.
+
+The original initial combined-event check remains exact. A bounded private
+startup helper may keep the facade's constructor within its review signal,
+but it receives only the already bound bus/I/O values and introduces no
+new callback initializer or provider. The independently frozen constructor
+inverse must restore the complete original constructor and preserve every
+existing callback binding. The ordinary diagnostic consumer still rejects
+every negative READ and never implements this fixture loop.
+
+### Native evidence and restart
+
+Append the already declared
+`tests/qemu/diagnostic_history_tty.c` operand immediately after
+`tests/host/tty_diagnostic_test.c` in the same native target's closed list.
+All other operands and both native tiers remain exact. The existing
+`tests/host/tty_diagnostic_test.c` owns focused raw-double cases for:
+
+- a valid deferral without cursor, spool, notification or snapshot mutation;
+- rejection of a changed snapshot or scalar on `STATE`;
+- explicit failure for every non-`STATE` error and unexpected positive result;
+- a subsequent exact 8,193-byte, three-page transfer with the same cursor;
+- no repeated injection or fixture-spool publication after completion; and
+- unchanged ordinary-consumer failure on a negative READ.
+
+The new source is already one of the fourteen immutable additions; no path,
+CTest, preset, workflow, target image or authority family is added. Source
+checks bind the fixture-only return before copy/after-copy, required queued
+event, exact startup consumption and unchanged legacy assertions.
+
+After separate design merge, derive the eight new authority facts from the
+corrected merged contract before their owner/extractor edits. Bind that new
+design commit/tree while retaining the original MINIX/runtime source pins,
+all twenty keys and all 3,912 committed predecessor facts. The previous
+unmerged eight-fact declaration, raw Red journal, source tree and narrow
+passes remain historical reference only.
+
+Restart with a new actual four-oracle Red, then current native/target Green,
+the unchanged B01-B12/B14 command table, raw-byte terminal chain and full
+post-terminal gate. The target must still prove the large copy only in
+`IDLE`, real diagnostic forwarding, zero kernel-THR delta, all original
+grant/input/claim/completion assertions and clean shutdown.

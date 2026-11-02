@@ -35,6 +35,15 @@ both histories, exact TTY transfer/notification and panic consumption.
 No PLAT01 runtime code is authored before its separate design merge.
 The remaining runtime queue and hosted CI are not declared complete.
 
+Design #196 and collector-source correction #197 are merged. The
+uncommitted PLAT01 implementation subsequently hit the
+[startup IRQ-retrigger blocker](research/minix-diagnostic-history.md#observed-startup-irq-retrigger).
+It is blocked and abandoned until the independently reviewed
+[Accepted ADR-0094 correction](adr/0094-retrigger-safe-diagnostic-probe.md)
+is separately merged. A later valid claim can appear after the first IRQ completion;
+the large target probe must defer until that actual pending event is
+consumed and completed. No runtime finding or hosted-CI outcome is closed.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

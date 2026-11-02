@@ -203,3 +203,67 @@ PLAT03's separate findings open.
 - [Console ownership](../adr/0012-console-and-irq-handoff.md)
 - [Panic contract](../adr/0014-panic-diagnostics.md)
 - [Finite fatal-stack context](../adr/0086-finite-fatal-stack-context.md)
+
+## Observed startup IRQ retrigger
+
+The first PLAT01 implementation after #196/#197 exposed a target-fixture
+ordering defect, not permission to weaken an IRQ or timeout check.
+Its uncommitted author base was
+`fe9e15e811d92e0b3789cddf9b898bb962a6cb53`; its preserved final staged
+reference tree is `b28366f9cc6195959505ed22ca6587250e024b29`.
+The implementation is blocked, its branch abandoned and its patch retained
+only as non-authoritative reference.
+
+The exact failing artifacts were:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| TTY-test kernel ELF | `4fd3f22459abfdd9090db40c95eb72c44fef0cde62ddacdb824594573deca2fd` |
+| TTY service ELF | `b92de08e2e0e4e0d7e529765656547364541ad615a26eb53491480aad30ec34a` |
+| Retained one-breakpoint observation log | `336725c812073f9480b22c2e13a92ef6136a71c167495cdea373fb39679f9bc7` |
+
+On that uncommitted tree, the real command
+`cmake --workflow --preset test-qemu-tty` failed with
+`MICROS_PANIC reason=diagnostic-test-reader` at the immutable first-read
+hook, before any large-pattern injection. The native diagnostic and
+original TTY-control cases and `test-qemu-panic` had passed. Those narrow
+results are historical; they do not certify the abandoned candidate or
+the current main branch.
+
+A separate bounded, non-acceptance reproduction used the same kernel and
+one GDB-remote breakpoint at `micros_diagnostic_test_before_read`.
+It read state without changing the source or relaxing a deadline:
+
+| Observation at the first READ | Value |
+| --- | --- |
+| Actual cursor argument | 830 |
+| Registered handoff cursor | 830 |
+| Fixture phase | Registered, before injection |
+| Console phase | `TTY_OWNED` |
+| Route phase | `IN_SERVICE` |
+| Claimed source | 10 |
+| Claim count | 2 |
+| Completion count | 1 |
+| Accepted readiness count | 1 |
+| UART interrupt-enable register | `0x05`, transmit interrupt disabled |
+
+The helper terminated its own QEMU process after this observation. A
+debugger stop is not a passing target, and no new Green or terminal
+transition event was published.
+
+The original startup did consume the initial combined IRQ/diagnostic
+notification and complete its claim. A subsequent legal claim was already
+retained before the later READ. The accepted
+[IRQ protocol](../adr/0047-tty-console-handoff-and-serial-protocol.md#supervisor-external-interrupt-dispatch)
+explicitly permits reassertion after completion; the software cannot infer
+persistent `IDLE` from the earlier acknowledgment.
+
+The fixed MINIX behavioral baseline is unchanged: notification invites
+inspection of authoritative device state, and the driver owns explicit
+acknowledgment. No new MINIX algorithm is inferred from this fixture
+failure. The correction is a testing adaptation under
+[Accepted ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md):
+defer the large test transfer without mutation while a real claim/event
+is retained, consume and complete that exact event, and then attempt the
+same probe again. Production READ, driver ownership, byte history,
+negative-result handling and all budgets remain unchanged.
