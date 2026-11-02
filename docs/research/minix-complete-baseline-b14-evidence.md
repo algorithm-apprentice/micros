@@ -551,7 +551,7 @@ the first real consumer of EV01 and EV02. Its
 [implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
 adds one closed family with exactly three facts: the merged-design transport
 anchor and two independently specified baseline work properties. The
-inventory therefore contains 3,735 facts across ten families; every previous
+inventory at that point contains 3,735 facts across ten families; every previous
 family fingerprint is preserved.
 
 The sole planned retirement remains the original
@@ -579,12 +579,16 @@ be corrected before a later transition consumes those declarations.
 
 The [fixed-source gap study](packed-evidence-identity-gap.md) and
 [Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md) define
-a separate documentation-first correction. The current count of 3,735
+a separate documentation-first correction. That count of 3,735
 materialized facts is not proof that the omitted data entries are already
 covered. The specified 177-fact addition preserves every existing fact and
 family fingerprint, introduces no retirement and retains COPY01's completed
-prior claim. No new executable coverage is claimed before separate design
-acceptance and implementation.
+prior claim. Design #192 is separately merged; its
+[implementation map](../architecture/packed-evidence-identities.md#implementation-map)
+now records all 177 new facts and complete old-fact conservation. The
+3,912-fact, eleven-family inventory retains the original scheduler assertions
+and every prior family fingerprint. PLAT01 remains sequenced after this
+implementation's complete fresh author gate, independent review and merge.
 
 ## References
 

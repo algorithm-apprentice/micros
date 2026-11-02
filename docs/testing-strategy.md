@@ -169,13 +169,23 @@ required.
 
 Accepted
 [ADR-0091](adr/0091-packed-evidence-identity-coverage.md) addresses the packed
-scheduler declarations omitted from EV01's current materialization. The
+scheduler declarations omitted from EV01's original materialization. The
 [bounded contract](architecture/packed-evidence-identities.md) requires
 independently pinned function records and semantic minimum-multisets,
 malformed/undeclared-data rejection, exact conservation of existing facts
 and COPY01 prior retirement, and the unchanged complete fresh author gate.
-The design contains no executable artifact and does not claim that the
-additional 177 facts are already implemented.
+After separate design #192, the implementation adds the 177 facts through
+one private literal-data helper and the existing authority tests. Native
+regressions compare fixed Git declarations, reject malformed/undeclared
+tables and unsafe current bindings, and preserve all previous fingerprints
+plus COPY01's journal-free prior retirement. Original scheduler and directory
+source gates remain unchanged. Narrow iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_scheduler_source_layout tests.host.test_kernel_directory_layout
+```
+
+This does not replace the complete fresh author plan or independent review.
 
 ## POSIX conformance evidence
 
