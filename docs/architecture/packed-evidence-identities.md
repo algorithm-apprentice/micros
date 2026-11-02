@@ -11,7 +11,8 @@ The source is fixed at
 `b99848f52d01100a6db2833f610cff7007e1cc6f`, after COPY01 #191.
 The design merged separately as #192 and implementation #193 completes
 this correction. PLAT01 subsequently identified the separate
-[relocated payload prerequisite](relocated-evidence-payloads.md).
+[relocated payload prerequisite](relocated-evidence-payloads.md), now
+completed by design #194 and implementation #195.
 Neither evidence correction adds a runtime correction node or reassigns a
 finding in the pinned 59-node correction DAG.
 

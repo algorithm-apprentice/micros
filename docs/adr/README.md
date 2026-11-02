@@ -108,3 +108,4 @@ to make the project appear more consistent than it was.
 | [0090](0090-minix-word-based-runtime-memory.md) | MINIX word-based runtime copy and fill | Accepted |
 | [0091](0091-packed-evidence-identity-coverage.md) | Packed evidence identity coverage | Accepted |
 | [0092](0092-relocated-evidence-payload-bindings.md) | Relocated evidence payload bindings | Accepted |
+| [0093](0093-minix-diagnostic-histories.md) | MINIX diagnostic histories | Accepted |

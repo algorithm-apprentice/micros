@@ -16,8 +16,11 @@ EV01 entries while their existing source gates remain active; implementation
 [relocated payload correction](relocated-evidence-payloads.md), under Accepted
 ADR-0092 and separately merged design #194, repairs 104 existing logical-
 source bindings. Its implementation retains 102 singleton sources and two
-complete object-reconstruction closures. PLAT01 remains sequenced after
-that correction's complete author gate, independent review and merge.
+complete object-reconstruction closures; implementation #195 has passed
+its complete author gate and independent review and is merged.
+The [Accepted diagnostic-history contract](diagnostic-history.md) now
+defines PLAT01's separate twenty-key transition. No diagnostic identity
+retires before that design's separate merge and real implementation evidence.
 
 ## Goal
 

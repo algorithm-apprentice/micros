@@ -28,10 +28,11 @@ preferred runtime design, but its source-authority study found the
 EV01-C01 design #192 and implementation #193 are merged. The resumed
 PLAT01 study then found a distinct
 [relocated-source binding gap](architecture/relocated-evidence-payloads.md).
-Its EV01-C02 design #194 is merged and the implementation supplies precise
-bindings under the unchanged full acceptance/review requirement. Further
-PLAT01 work follows that implementation merge; the existing runtime sources
-remain unchanged by these evidence repairs.
+Its EV01-C02 design #194 and independently reviewed implementation #195
+are merged. PLAT01 has resumed as the independently reviewed Accepted
+[diagnostic-history design](architecture/diagnostic-history.md), covering
+both histories, exact TTY transfer/notification and panic consumption.
+No PLAT01 runtime code is authored before its separate design merge.
 The remaining runtime queue and hosted CI are not declared complete.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

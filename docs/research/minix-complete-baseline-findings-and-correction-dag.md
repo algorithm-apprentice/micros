@@ -54,12 +54,14 @@ Resumed PLAT01 planning then identified the
 [relocated payload binding prerequisite](relocated-evidence-payload-gap.md),
 EV01-C02 under Accepted
 [ADR-0092](../adr/0092-relocated-evidence-payload-bindings.md).
-Its separate design #194 is merged and its implementation supplies the
-precise source bindings without changing any identity or historical value.
-PLAT01's documentation remains preserved until this correction's complete
-author gate, independent implementation review and merge. These maintenance prerequisites add no
+Its separate design #194 and independently reviewed implementation #195
+are merged, supplying precise source bindings without changing any identity
+or historical value. PLAT01 has resumed through Accepted
+[ADR-0093](../adr/0093-minix-diagnostic-histories.md) and its
+[diagnostic-history contract](../architecture/diagnostic-history.md).
+These maintenance prerequisites add no
 runtime correction node or finding owner to the pinned 59-node, 155-edge
-graph; it repairs the evidence gate before the next selected runtime row.
+graph; they repair the evidence gate before the next selected runtime row.
 The historical audit totals and the separately blocked hosted CI outcome
 are not relabeled as completed work.
 

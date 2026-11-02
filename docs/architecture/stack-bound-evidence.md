@@ -327,6 +327,14 @@ assembly contract, or image invalidates the certificate.
 
 ### Finite fatal context
 
+The rules below describe the implemented ADR-0086 boundary. Accepted
+[ADR-0093](../adr/0093-minix-diagnostic-histories.md) defines a separate
+[diagnostic formatting extension](diagnostic-history.md#finite-fatal-source-and-machine-proof):
+the same two qualifiers, three exact source/machine exclusions, closed
+read-only history formatting and a bounded test-only counter effect.
+It changes no current certificate or budget before its separately reviewed
+implementation is accepted.
+
 Accepted ADR-0086 refines only the current kernel UART panic cycle. It does
 not add a general predicate solver, remove ordinary panic calls, change a
 stack epoch or implement `PLAT02`.
