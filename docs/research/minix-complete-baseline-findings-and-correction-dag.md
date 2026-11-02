@@ -48,8 +48,10 @@ The next PLAT01 design found an
 [EV01 packed-identity coverage gap](packed-evidence-identity-gap.md).
 EV01-C01 is a separate corrective evidence prerequisite under
 [Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md).
-PLAT01 research is preserved but inactive until its separately reviewed
-design and implementation merge. This maintenance prerequisite adds no
+Its design #192 is separately merged, and the bounded implementation adds
+the 177 omitted facts while preserving all previous authority. PLAT01
+research remains preserved and resumes only after the correction's complete
+author gate, independent implementation review and merge. This maintenance prerequisite adds no
 runtime correction node or finding owner to the pinned 59-node, 155-edge
 graph; it repairs the evidence gate before the next selected runtime row.
 The historical audit totals and the separately blocked hosted CI outcome

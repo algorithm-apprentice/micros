@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 import re
 
+from tests.host import evidence_authority_packed
 from tests.host.evidence_authority_types import (
     AuthorityClass,
     Fact,
@@ -86,6 +87,9 @@ FAMILY_OWNERS = {
     "runtime-memory-baseline": (
         "tests/host/runtime_memory_authority.py",
     ),
+    "scheduler-packed-transport": (
+        "tests/host/test_scheduler_source_layout.py",
+    ),
 }
 
 NON_IDENTITY_EXCEPTIONS = ()
@@ -153,6 +157,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "17d0e193b7747ce3df1efe34c1fa6d777201f1d95ad6e07cec4a5904d57032a4",
     "runtime-memory-baseline":
         "df7b43a3b7dfb185a109e5d2b95fc610681a16127c8542ade497e99254e6f729",
+    "scheduler-packed-transport":
+        "6949be2673b5e0d6cf694ad2cfa7f7c810c468209f0c6d3c1d4b6de11c0de309",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -251,6 +257,8 @@ def _owned_functions(tree):
 
 def _identity_candidate(path):
     tree = ast.parse(path.read_text(encoding="utf-8"))
+    if evidence_authority_packed.packed_candidate(tree):
+        return True
     for node in ast.walk(tree):
         name = _assignment_name(node)
         if (
@@ -699,6 +707,18 @@ def _runtime_memory_facts(tree, family, relative):
 
 def _facts_for_owner(root, family, relative):
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+    packed = evidence_authority_packed.checked_declarations(tree, relative)
+    if family == evidence_authority_packed.FAMILY:
+        if relative != evidence_authority_packed.OWNER:
+            raise ValueError("packed authority family has an undeclared owner")
+        return [
+            Fact(
+                f"{relative}:{kind}:{scope}", family, relative, kind, scope,
+                AuthorityClass.TRANSPORT_IDENTITY, _fact_primary_unit(paths),
+                _consumer_units(relative, paths), paths, value,
+            )
+            for kind, scope, paths, value in evidence_authority_packed.packed_records(root, tree, packed)
+        ]
     if family == "runtime-memory-baseline":
         return _runtime_memory_facts(tree, family, relative)
     declared_paths = _path_strings(root, tree)

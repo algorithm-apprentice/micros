@@ -1,10 +1,16 @@
 import ast
+from collections import Counter
+import copy
 import dataclasses
 import hashlib
+import json
+import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import unittest
+from unittest.mock import patch
 
 from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
@@ -125,7 +131,7 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(10, len(inventory.families))
+        self.assertEqual(11, len(inventory.families))
         self.assertGreater(len(inventory.facts), 30)
         self.assertTrue(any(
             fact.authority_class
@@ -326,6 +332,336 @@ class InventoryTests(unittest.TestCase):
             set(vm_classification.consumer_units),
             {"B02", "B07", "B14"},
         )
+
+
+class PackedInventoryTests(unittest.TestCase):
+    OWNER = "tests/host/test_scheduler_source_layout.py"
+    FAMILY = "scheduler-packed-transport"
+
+    @classmethod
+    def setUpClass(cls):
+        study = (ROOT / "docs/research/packed-evidence-identity-gap.md").read_text()
+        reference = re.search(
+            r"The fixed current source is `micros` commit\s+`([0-9a-f]{40})`", study,
+        ).group(1)
+
+        def fixed_source(path):
+            return subprocess.check_output(
+                ["git", "show", reference + ":" + path],
+                cwd=ROOT, text=True, timeout=30,
+            )
+
+        cls.source = fixed_source(cls.OWNER)
+        cls.tables = cls.declarations(cls.source)
+        cls.layout_source = fixed_source("tests/host/kernel_layout_source.py")
+        cls.directory = cls.declarations(cls.layout_source)["KERNEL_FILE_FACTS"]
+        cls.previous = cls.declarations(fixed_source(
+            "tests/host/evidence_authority_inventory.py",
+        ))["DECLARED_FAMILY_FACT_DIGESTS"]
+
+    @staticmethod
+    def declarations(source):
+        values = {}
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(
+                node.targets[0], ast.Name,
+            ):
+                try:
+                    values[node.targets[0].id] = ast.literal_eval(node.value)
+                except (ValueError, TypeError):
+                    pass
+        return values
+
+    def physical(self, path):
+        return self.directory[path][0] if path.startswith("kernel/") else path
+
+    def payload(self, paths):
+        return tuple(sorted({self.OWNER, *map(self.physical, paths)}))
+
+    def changed(self, name, value):
+        tree = ast.parse(self.source)
+        statement, = (
+            node for node in tree.body
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == name for target in node.targets
+            )
+        )
+        statement.value = ast.parse(repr(value), mode="eval").body
+        return ast.unparse(tree)
+
+    def packed_facts(self, source=None, root=ROOT):
+        read = Path.read_text
+
+        def selected(path, *args, **kwargs):
+            return source if source is not None and path == root / self.OWNER else read(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", selected):
+            return tuple(evidence_authority_inventory._facts_for_owner(root, self.FAMILY, self.OWNER))
+
+    def test_function_records_match_fixed_data_and_exact_current_owners(self):
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        observed = {
+            fact.scope: fact for fact in inventory.facts
+            if fact.family == self.FAMILY and fact.kind == "function-body"
+        }
+        expected = {}
+        for original, text in self.tables["FROZEN_FUNCTIONS"].items():
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                name, lines, sha256 = line.split()
+                owner, = (
+                    path for path, names in self.tables["ORIGINAL_FUNCTIONS"][original].items()
+                    if name in names
+                )
+                expected[f"FROZEN_FUNCTIONS/{original}/{name}"] = (
+                    {"original_lines": int(lines), "sha256": sha256}, self.payload((owner,)),
+                )
+        self.assertEqual(163, len(observed))
+        self.assertEqual(set(expected), set(observed))
+        for scope, (value, payload) in expected.items():
+            fact = observed[scope]
+            self.assertEqual(self.OWNER + ":function-body:" + scope, fact.key)
+            self.assertEqual(json.dumps(value, sort_keys=True, separators=(",", ":")), fact.evidence_value)
+            self.assertEqual(payload, fact.payload_paths)
+            self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
+            self.assertGreaterEqual(set(fact.consumer_units), {"B03", "B14"})
+            source, = (path for path in payload if path != self.OWNER)
+            self.assertEqual("B03" if source.startswith("kernel/scheduler/") else "B14", fact.primary_unit)
+
+    def test_semantic_entries_preserve_each_minimum_multiset_and_family_closure(self):
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        observed = {
+            fact.scope: fact for fact in inventory.facts
+            if fact.family == self.FAMILY and fact.kind == "data-table"
+        }
+        self.assertEqual(14, len(observed))
+        families = {
+            sources[0]: (*sources, self.tables["PRIVATE_HEADERS"][index])
+            for index, sources in enumerate(self.tables["SOURCE_SETS"].values())
+        }
+        occurrences = 0
+        for (original, name), text in self.tables["FROZEN_FACTS"].items():
+            scope = f"FROZEN_FACTS/{original}/{name}"
+            expected = sorted(Counter(text.split()).items())
+            fact = observed[scope]
+            self.assertEqual(self.OWNER + ":data-table:" + scope, fact.key)
+            self.assertEqual(json.dumps(expected, separators=(",", ":")), fact.evidence_value)
+            self.assertEqual(self.payload(families[original]), fact.payload_paths)
+            self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
+            occurrences += sum(count for _, count in expected)
+        self.assertEqual(1080, occurrences)
+
+    def test_new_family_conserves_all_prior_fingerprints_and_committed_retirement(self):
+        from tests.host import runtime_memory_authority as memory
+
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        self.assertTrue(evidence_authority.validate_inventory(inventory).ok)
+        self.assertEqual(3912, len(inventory.facts))
+        self.assertEqual(11, len(inventory.families))
+        self.assertEqual(3735, sum(fact.family != self.FAMILY for fact in inventory.facts))
+        for family, expected in self.previous.items():
+            self.assertEqual(expected, fact_set_digest(
+                fact for fact in inventory.facts if fact.family == family
+            ), family)
+        with patch.object(memory, "read_current", side_effect=AssertionError("prior claim needs no journal")):
+            self.assertFalse(memory.memory_identity_required(ROOT))
+        authority, _, registry = memory.task_definition(ROOT)
+        result = evidence_authority.validate_transition(
+            inventory, {authority.task_id: authority}, registry, None, (), None,
+        )
+        self.assertTrue(result.ok, result)
+        self.assertFalse(result.retired_identity_keys)
+        self.assertEqual(
+            {fact.key for fact in inventory.facts} - {memory.MEMORY_IDENTITY},
+            set(result.active_identity_keys),
+        )
+        self.assertTrue({
+            fact.key for fact in inventory.facts if fact.family == self.FAMILY
+        } <= set(result.active_identity_keys))
+
+    def test_tables_reject_missing_duplicate_or_nonliteral_declarations(self):
+        for name in ("FROZEN_FUNCTIONS", "FROZEN_FACTS"):
+            for mutation in ("missing", "repeated", "duplicate-key", "call", "alias", "annotated", "augmented"):
+                tree = ast.parse(self.source)
+                statement, = (
+                    node for node in tree.body
+                    if isinstance(node, ast.Assign) and any(
+                        isinstance(target, ast.Name) and target.id == name for target in node.targets
+                    )
+                )
+                if mutation == "missing":
+                    tree.body.remove(statement)
+                elif mutation == "repeated":
+                    tree.body.append(copy.deepcopy(statement))
+                elif mutation == "duplicate-key":
+                    statement.value.keys.append(copy.deepcopy(statement.value.keys[0]))
+                    statement.value.values.append(copy.deepcopy(statement.value.values[0]))
+                elif mutation in ("call", "alias"):
+                    statement.value = ast.parse("dict()" if mutation == "call" else "OTHER", mode="eval").body
+                elif mutation == "annotated":
+                    tree.body[tree.body.index(statement)] = ast.parse(name + ": dict = {}").body[0]
+                else:
+                    tree.body.extend(ast.parse(name + " |= {}").body)
+                with self.subTest(table=name, mutation=mutation), self.assertRaises(ValueError):
+                    self.packed_facts(ast.unparse(tree))
+
+    def test_function_rows_reject_incomplete_unknown_or_malformed_membership(self):
+        original, text = next(iter(self.tables["FROZEN_FUNCTIONS"].items()))
+        rows = text.strip().splitlines()
+        name, lines, sha256 = rows[0].split()
+        changes = (
+            rows[1:], [*rows, rows[0]], [*rows, "unknown 1 " + sha256],
+            [f"not-a-name {lines} {sha256}", *rows[1:]],
+            *([f"{name} {count} {sha256}", *rows[1:]] for count in ("0", "-1", "1.5", "4294967296")),
+            [f"{name} {lines} {sha256.upper()}", *rows[1:]],
+            [f"{name} {lines} {sha256[:-1]}", *rows[1:]],
+            [rows[0] + " extra", *rows[1:]],
+        )
+        for index, changed in enumerate(changes):
+            table = dict(self.tables["FROZEN_FUNCTIONS"])
+            table[original] = "\n".join(changed)
+            with self.subTest(row=index), self.assertRaises(ValueError):
+                self.packed_facts(self.changed("FROZEN_FUNCTIONS", table))
+        for mutation in ("missing-source", "extra-source"):
+            table = dict(self.tables["FROZEN_FUNCTIONS"])
+            if mutation == "missing-source":
+                del table[original]
+            else:
+                table["kernel/unknown.c"] = text
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.packed_facts(self.changed("FROZEN_FUNCTIONS", table))
+
+    def test_semantic_rows_reject_wrong_roots_tags_and_empty_or_nonliteral_values(self):
+        pair, text = next(iter(self.tables["FROZEN_FACTS"].items()))
+        for mutation in ("missing-root", "unknown-root", "empty", "wrong-tag", "short-tag", "nonliteral"):
+            table = dict(self.tables["FROZEN_FACTS"])
+            if mutation == "missing-root":
+                del table[pair]
+            elif mutation == "unknown-root":
+                table[(pair[0], "unknown")] = text
+            else:
+                table[pair] = {
+                    "empty": "", "wrong-tag": "X" + "0" * 24,
+                    "short-tag": "C" + "0" * 23, "nonliteral": ("C" + "0" * 24,),
+                }[mutation]
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.packed_facts(self.changed("FROZEN_FACTS", table))
+        roots = self.tables["INITIAL_FUNCTION_MIGRATION"]
+        for changed in (roots[:-1], (*roots, roots[0]), (*roots, self.tables["SHORT_PHASE_ROOTS"][0])):
+            with self.subTest(roots=changed), self.assertRaises(ValueError):
+                self.packed_facts(self.changed("INITIAL_FUNCTION_MIGRATION", changed))
+
+    def test_original_ownership_requires_complete_unique_family_members(self):
+        original = next(iter(self.tables["ORIGINAL_FUNCTIONS"]))
+        owners = self.tables["ORIGINAL_FUNCTIONS"][original]
+        first, second = tuple(owners)[:2]
+        for mutation in ("duplicate", "missing", "extra-owner", "missing-owner", "wrong-family"):
+            table = copy.deepcopy(self.tables["ORIGINAL_FUNCTIONS"])
+            if mutation == "duplicate":
+                table[original][second] += (owners[first][0],)
+            elif mutation == "missing":
+                table[original][first] = owners[first][1:]
+            elif mutation == "extra-owner":
+                table[original]["kernel/unknown.c"] = ()
+            elif mutation == "missing-owner":
+                del table[original][second]
+            else:
+                table["kernel/unknown.c"] = table.pop(original)
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.packed_facts(self.changed("ORIGINAL_FUNCTIONS", table))
+
+    def test_validly_shaped_value_or_binding_changes_cannot_rebaseline_the_family(self):
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        original, text = next(iter(self.tables["FROZEN_FUNCTIONS"].items()))
+        name, lines, sha256 = text.strip().splitlines()[0].split()
+        mutations = []
+        for old, new in ((lines + " " + sha256, str(int(lines) + 1) + " " + sha256), (sha256, "0" * 64)):
+            table = dict(self.tables["FROZEN_FUNCTIONS"])
+            table[original] = text.replace(old, new, 1)
+            mutations.append(self.changed("FROZEN_FUNCTIONS", table))
+        table = dict(self.tables["FROZEN_FACTS"])
+        pair = next(iter(table))
+        table[pair] += " " + table[pair].split()[0]
+        mutations.append(self.changed("FROZEN_FACTS", table))
+        owners = copy.deepcopy(self.tables["ORIGINAL_FUNCTIONS"])
+        first, second = tuple(owners[original])[:2]
+        owners[original][first] = tuple(item for item in owners[original][first] if item != name)
+        owners[original][second] += (name,)
+        mutations.append(self.changed("ORIGINAL_FUNCTIONS", owners))
+        for index, source in enumerate(mutations):
+            changed = dataclasses.replace(
+                inventory, facts=(
+                    *(fact for fact in inventory.facts if fact.family != self.FAMILY),
+                    *self.packed_facts(source),
+                ),
+            )
+            with self.subTest(mutation=index):
+                self.assertEqual(evidence_authority.ErrorCode.FACT_AUTHORITY, evidence_authority.validate_inventory(changed).error)
+
+    def test_discovery_recognizes_packed_only_modules_without_approving_them(self):
+        body = "function 1 " + "a" * 64
+        semantic = "C" + "b" * 24
+        with tempfile.TemporaryDirectory(prefix="micros-packed-discovery-") as temporary:
+            path = Path(temporary) / "test_unknown.py"
+            for source in (
+                "FROZEN_FUNCTIONS = {}", "FROZEN_FACTS = None",
+                "OTHER = " + repr({"source.c": body}),
+                "OTHER = " + repr({("source.c", "function"): semantic}),
+            ):
+                path.write_text(source)
+                self.assertTrue(evidence_authority_inventory._identity_candidate(path), source)
+                with self.assertRaises(ValueError):
+                    evidence_authority_inventory._facts_for_owner(Path(temporary), "kernel-structure", path.name)
+            path.write_text("def fixture():\n    source = " + repr(body + "\n" + semantic))
+            self.assertFalse(evidence_authority_inventory._identity_candidate(path))
+        for source in (
+            self.source + "\nOTHER = " + repr({"source.c": body}),
+            self.source + "\nALIAS = FROZEN_FUNCTIONS",
+            self.source + "\nFROZEN_FUNCTIONS.update({})",
+        ):
+            with self.assertRaises(ValueError):
+                self.packed_facts(source)
+
+    def test_current_payloads_reject_missing_linked_and_ambiguous_bindings(self):
+        original = next(iter(self.tables["ORIGINAL_FUNCTIONS"]))
+        paths = {path for sources in self.tables["SOURCE_SETS"].values() for path in sources}
+        paths.update(self.tables["PRIVATE_HEADERS"])
+        for mutation in ("none", "missing", "symlink", "hardlink", "parent-link", "old-owner", "ambiguous-map"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="micros-packed-path-") as temporary:
+                root = Path(temporary)
+                for path in self.payload(paths):
+                    destination = root / path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_text(self.source if path == self.OWNER else "")
+                layout = root / "tests/host/kernel_layout_source.py"
+                layout.write_text(self.layout_source)
+                target = root / self.physical(original)
+                if mutation == "missing":
+                    target.unlink()
+                elif mutation == "symlink":
+                    saved = target.with_suffix(".saved")
+                    target.rename(saved)
+                    target.symlink_to(saved.name)
+                elif mutation == "hardlink":
+                    os.link(target, target.with_suffix(".alias"))
+                elif mutation == "parent-link":
+                    directory = target.parent
+                    saved = directory.with_name(directory.name + "-saved")
+                    directory.rename(saved)
+                    directory.symlink_to(saved.name)
+                elif mutation == "old-owner":
+                    (root / original).write_text("")
+                elif mutation == "ambiguous-map":
+                    mapping = copy.deepcopy(self.directory)
+                    other = tuple(self.tables["SOURCE_SETS"].values())[0][1]
+                    mapping[other] = (self.physical(original), *mapping[other][1:])
+                    layout.write_text("KERNEL_FILE_FACTS = " + repr(mapping))
+                if mutation == "none":
+                    self.assertEqual(177, len(self.packed_facts(root=root)))
+                else:
+                    with self.assertRaises(ValueError):
+                        self.packed_facts(root=root)
 
 
 class TransitionTests(unittest.TestCase):

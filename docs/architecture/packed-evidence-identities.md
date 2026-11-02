@@ -9,9 +9,10 @@ It refines ADR-0082 through
 
 The source is fixed at
 `b99848f52d01100a6db2833f610cff7007e1cc6f`, after COPY01 #191.
-PLAT01's design remains blocked on the separate implementation of this
-correction. This does not add a runtime correction node or reassign a
-finding in the pinned 59-node correction DAG.
+The design merged separately as #192. PLAT01 is sequenced after this
+correction's separately reviewed implementation merge. This does not add a
+runtime correction node or reassign a finding in the pinned 59-node
+correction DAG.
 
 Design is documentation-only. No extractor, test, model, fixture, command
 runner, dependency or executable prototype is authored before separate
@@ -259,3 +260,30 @@ transition, target workflow, deadline exception or partial-report substitute.
 Independent implementation review remains mandatory before merge. PLAT01's
 documentation work may resume only after this corrective implementation is
 separately accepted and merged.
+
+## Implementation map
+
+The private `tests/host/evidence_authority_packed.py` helper now owns the
+literal schemas, duplicate rejection, source-family and phase-root equality,
+and unlinked current-file binding. It reads declaration ASTs without
+executing scheduler code. The existing inventory owns family registration,
+discovery and the unchanged audit-unit mapping; the transition validator
+and scheduler source assertions are unchanged.
+
+Before the extractor edit, a separate fixed-Git derivation recorded every
+new key, value and payload together with every prior fact. The new family
+fingerprint is
+`6949be2673b5e0d6cf694ad2cfa7f7c810c468209f0c6d3c1d4b6de11c0de309`.
+The implementation materializes all 177 new facts and conserves all 3,735
+previous records and ten fingerprints, for 3,912 facts in eleven families.
+
+`PackedInventoryTests` in the existing authority test module compares
+function records and multiset entries with the fixed Git declarations,
+rejects malformed or undeclared inputs and unsafe bindings, and checks prior
+fingerprints and COPY01's journal-free committed retirement. The original
+Red found zero of the required 163 function records and zero of the required
+fourteen multiset entries. All new facts remain active; no new runtime
+retirement or target execution is introduced.
+
+The existing scheduler/directory source gates and complete fresh author
+plan remain required before independent implementation review and merge.
