@@ -325,12 +325,14 @@ class PythonHostRuntimeTests(unittest.TestCase):
     def test_python_process_construction_has_one_reviewed_owner_inventory(self):
         expected = {
             "tools/canonicalize_stack_metadata_elf.py",
+            "tools/check_runtime_memory.py",
             "tools/check_stack_evidence.py",
             "tools/generate_stack_observer_catalog.py",
             "tools/stack_bound_manifest.py",
             "tools/validation_context.py",
             "tools/validation_execution.py",
             "tools/validation_plan.py",
+            "tests/host/runtime_memory_authority.py",
             "tests/host/qemu_smoke_execution_cases.py",
             "tests/host/test_check_application_elf.py",
             "tests/host/test_qemu_runner_source_layout.py",

@@ -83,6 +83,9 @@ FAMILY_OWNERS = {
     "stack-vm-lifetime": (
         "tests/host/test_vm_load_stack_lifetime.py",
     ),
+    "runtime-memory-baseline": (
+        "tests/host/runtime_memory_authority.py",
+    ),
 }
 
 NON_IDENTITY_EXCEPTIONS = ()
@@ -148,6 +151,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "9d2683554290ebe151342a003891705b6351aeddc69fddf2b32b256d226e58bb",
     "stack-vm-lifetime":
         "17d0e193b7747ce3df1efe34c1fa6d777201f1d95ad6e07cec4a5904d57032a4",
+    "runtime-memory-baseline":
+        "df7b43a3b7dfb185a109e5d2b95fc610681a16127c8542ade497e99254e6f729",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -656,8 +661,46 @@ def _function_facts(
     return facts
 
 
+def _runtime_memory_facts(tree, family, relative):
+    declarations = _literal_assignments(tree)
+    references = (
+        "docs/architecture/runtime-memory-primitives.md",
+        "docs/adr/0090-minix-word-based-runtime-memory.md",
+        "docs/research/minix-runtime-memory-primitives.md",
+        relative,
+    )
+    anchor = tuple(declarations.get(name) for name in (
+        "DESIGN_COMMIT", "DESIGN_TREE", "DESIGN_DOCUMENT",
+    ))
+    oracles = declarations.get("ORACLE_DECLARATIONS")
+    if any(type(value) is not str for value in anchor) or (
+        type(oracles) is not tuple or len(oracles) != 2
+        or any(type(row) is not tuple or len(row) != 3 or any(type(value) is not str for value in row)
+               for row in oracles)
+    ):
+        raise ValueError("runtime memory authority declaration is malformed")
+    consumers = tuple(f"B{index:02d}" for index in range(5, 13)) + ("B14",)
+    facts = [Fact(
+        relative + ":design-anchor:COPY01", family, relative, "design-anchor", "COPY01",
+        AuthorityClass.TRANSPORT_IDENTITY, "B05", consumers, tuple(sorted(references)), ":".join(anchor),
+    )]
+    for identifier, test, property_name in oracles:
+        paths = (
+            *references, "tests/host/runtime_memory_fixture.c", "tests/host/runtime_memory_evidence.py",
+            "tests/host/test_runtime_memory.py", "tools/check_runtime_memory.py",
+        )
+        facts.append(Fact(
+            relative + ":baseline-oracle:" + identifier, family, relative,
+            "baseline-oracle", identifier, AuthorityClass.BASELINE_ORACLE, "B05", consumers,
+            tuple(sorted(paths)), test + ":" + property_name,
+        ))
+    return facts
+
+
 def _facts_for_owner(root, family, relative):
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+    if family == "runtime-memory-baseline":
+        return _runtime_memory_facts(tree, family, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

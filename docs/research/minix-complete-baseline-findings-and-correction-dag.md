@@ -36,6 +36,15 @@ independent review. These three infrastructure outcomes do not close the
 76 pre-node runtime findings or change the frozen counts above. The separate
 hosted-CI implementation remains unaccepted; it adds no runtime-DAG edge.
 
+The first runtime outcome after that barrier is `COPY01`, under separately
+merged design #190 / ADR-0090. Its
+[implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
+binds only B05-F006/B05-E005, including the first actual granular evidence
+transition. A staged implementation or planned retirement does not open the
+next node: current author recertification and independent implementation
+review still precede its merge. The pinned audit totals above remain
+historical, not a claim that the remaining corrections are complete.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and

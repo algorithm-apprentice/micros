@@ -124,6 +124,9 @@ export MICROS_PYTHON=/absolute/path/to/python3.15
 export OPENSSL_CONF=/dev/null
 export SSL_CERT_FILE=/dev/null
 export SSL_CERT_DIR=/dev/null
+export CLANG_NO_DEFAULT_CONFIG=1
+export MICROS_CLANG=/absolute/path/to/clang
+export MICROS_LD_LLD=/absolute/path/to/ld.lld
 
 cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model

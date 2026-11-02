@@ -532,7 +532,7 @@ images, pre-teardown lifecycle capture and complete atomic stack publication.
 It retains the ordinary QEMU/image gates, old source/recipe identities,
 4 KiB/16 KiB capacities and the explicit blocked B13 admission.
 
-The current authority inventory has 3,732 facts across nine closed families.
+At EV03 completion the authority inventory had 3,732 facts across nine closed families.
 The added stack-source, firmware-artifact and VM-lifetime owners preserve the
 previous family fingerprints; they are not a rebaseline of historical facts.
 The complete stack intent covers 42 configurations, 111 ELF outputs and the
@@ -543,6 +543,30 @@ the current-candidate re-certification and review boundary. It records the
 separate failed hosted-CI attempt honestly rather than converting local
 evidence into remote approval. No runtime algorithm, inherited work bound,
 node-Q admission or complete baseline is certified by this foundation step.
+
+## COPY01 granular runtime transition
+
+Separately merged design #190 / ADR-0090 binds the first real consumer of
+EV01 and EV02. Its
+[implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
+adds one closed family with exactly three facts: the merged-design transport
+anchor and two independently specified baseline work properties. The
+inventory therefore contains 3,735 facts across ten families; every previous
+family fingerprint is preserved.
+
+The sole planned retirement remains the original
+`STABLE_HASHES/lib/runtime/memory.c` fact. Its old literal stays in the
+inventory. The actual author driver records original-body Red, current-source
+Green and complete B05-B12/B14 recertification with strict source/tool, event
+and log binding. Synthetic journal cases only test failure handling; they
+cannot be substituted for that real execution. The ordinary assertion adapter
+does not trust a newly staged completed claim.
+
+After the reviewed outcome is committed, only that exact prior HEAD registry
+entry supplies no-plan retirement. All other transport facts, permanent
+invariants and artifact contracts remain active. COPY01 neither closes the
+other B05 findings nor certifies the remaining runtime correction DAG, B13,
+hosted CI or the complete MINIX baseline.
 
 ## References
 
