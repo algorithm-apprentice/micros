@@ -36,14 +36,24 @@ independent review. These three infrastructure outcomes do not close the
 76 pre-node runtime findings or change the frozen counts above. The separate
 hosted-CI implementation remains unaccepted; it adds no runtime-DAG edge.
 
-The first runtime outcome after that barrier is `COPY01`, under separately
-merged design #190 / ADR-0090. Its
+The first runtime outcome after that barrier, `COPY01`, is merged as #191
+after separate design #190 / ADR-0090. Its
 [implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
-binds only B05-F006/B05-E005, including the first actual granular evidence
-transition. A staged implementation or planned retirement does not open the
-next node: current author recertification and independent implementation
-review still precede its merge. The pinned audit totals above remain
-historical, not a claim that the remaining corrections are complete.
+closes only B05-F006/B05-E005 through actual primitive Red/Green, granular
+recertification, the complete fresh author gate and clean independent
+implementation re-review. Its reviewed, published and squash trees are
+identical. The other 75 pre-node runtime findings remain open.
+
+The next PLAT01 design found an
+[EV01 packed-identity coverage gap](packed-evidence-identity-gap.md).
+EV01-C01 is a separate corrective evidence prerequisite under
+[Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md).
+PLAT01 research is preserved but inactive until its separately reviewed
+design and implementation merge. This maintenance prerequisite adds no
+runtime correction node or finding owner to the pinned 59-node, 155-edge
+graph; it repairs the evidence gate before the next selected runtime row.
+The historical audit totals and the separately blocked hosted CI outcome
+are not relabeled as completed work.
 
 ## Consolidation invariants
 
@@ -176,7 +186,7 @@ blocking queue.
 | `EV02` | Evidence foundation | `B14-F002` | `EV01` | Define and implement [ADR-0083](../adr/0083-test-only-operation-count-evidence.md) and the [operation-count evidence contract](../architecture/operation-count-evidence.md): typed test-only primitive counters, complete composition, and finite observational transport projection. | Deterministic boundary/adversarial cases; failure-atomic captures and composition; retained transport identities; counters absent from production images. |
 | `EV03` | Evidence foundation | `B14-F003` | - | Implementation #184 is merged after designs #180/#181/#182/#183. The [stack-bound contract](../architecture/stack-bound-evidence.md) covers all ten current B01-B12 scopes and future B13 admission; ADR-0087's exact preparation-lifetime repair preserves the original 4 KiB limit. | Static and target stack-budget reports for all current 4 KiB/16 KiB paths; explicit blocked B13 report until production code exists. |
 | `EV04` | Evidence barrier | - | `EV02`, `EV03` | Acceptance-only barrier: no runtime correction node starts until EV01-EV03 are merged and [re-certified](evidence-foundations-recertification.md); the exact ADR-0087 storage exception belongs solely to EV03. | Current-candidate evidence tooling and clean independent review. |
-| `COPY01` | Runtime correction | `B05-F006` | `EV04` | [Accepted ADR-0090](../adr/0090-minix-word-based-runtime-memory.md) and its [runtime memory contract](../architecture/runtime-memory-primitives.md) replace the volatile byte-only bodies with the fixed generic MINIX word family, preserving freestanding semantics and retiring only the exact invalidated transport identity. Implementation remains pending separate design merge. | Aligned, unaligned, short, page, overlap-policy, and exact work-count cases. |
+| `COPY01` | Runtime correction | `B05-F006` | `EV04` | Implementation #191 follows [Accepted ADR-0090](../adr/0090-minix-word-based-runtime-memory.md) and the [runtime memory contract](../architecture/runtime-memory-primitives.md): the generic MINIX word family is implemented, freestanding semantics are preserved, and only the exact invalidated transport assertion is retired. | Aligned, unaligned, short, page, overlap-policy and exact work-count cases; current full author gate and independent review complete. |
 | `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Add the two fixed diagnostic history roles with exact capacities and overflow algorithms; keep ownership separate from physical UART. | Native wrap/overflow/order model and target report integration. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Define bounded early/panic polling, recursive panic ownership, corrupt-console fallback, and terminal failure precedence. | Host state model plus stuck-device, recursive-entry, and corrupt-metadata target cases. |
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Add the bounded reference-style panic trace over authenticated kernel stack ownership. | Native unwind/frame validation and target ordinary/recursive fault traces within the stack budget. |

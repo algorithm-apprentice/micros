@@ -546,8 +546,8 @@ node-Q admission or complete baseline is certified by this foundation step.
 
 ## COPY01 granular runtime transition
 
-Separately merged design #190 / ADR-0090 binds the first real consumer of
-EV01 and EV02. Its
+Separately merged design #190 / ADR-0090 and implementation #191 complete
+the first real consumer of EV01 and EV02. Its
 [implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
 adds one closed family with exactly three facts: the merged-design transport
 anchor and two independently specified baseline work properties. The
@@ -567,6 +567,24 @@ entry supplies no-plan retirement. All other transport facts, permanent
 invariants and artifact contracts remain active. COPY01 neither closes the
 other B05 findings nor certifies the remaining runtime correction DAG, B13,
 hosted CI or the complete MINIX baseline.
+
+## EV01-C01 packed-identity prerequisite
+
+PLAT01's design subsequently found that the registered scheduler source gate
+contains 163 packed function records and fourteen semantic
+minimum-multisets that are not materialized by the current standalone-hash
+extractor. The existing scheduler source/phase assertions still run, and the
+complete gate AST remains frozen. Missing per-key coverage must nevertheless
+be corrected before a later transition consumes those declarations.
+
+The [fixed-source gap study](packed-evidence-identity-gap.md) and
+[Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md) define
+a separate documentation-first correction. The current count of 3,735
+materialized facts is not proof that the omitted data entries are already
+covered. The specified 177-fact addition preserves every existing fact and
+family fingerprint, introduces no retirement and retains COPY01's completed
+prior claim. No new executable coverage is claimed before separate design
+acceptance and implementation.
 
 ## References
 
