@@ -604,8 +604,12 @@ their payload/primary/consumer metadata. All identities and historical
 values stay intact; two family fingerprints require independent corrected
 declarations, with a bounded inverse preserving historical comparisons.
 The other nine fingerprints, packed coverage, COPY01 prior retirement and
-all runtime findings remain unchanged. No repaired binding or real PLAT01
-transition is claimed before separate design and implementation acceptance.
+all runtime findings remain unchanged. Design #194 is separately merged;
+the [implementation map](../architecture/relocated-evidence-payloads.md#implementation-map)
+records all 104 corrected bindings, including both complete object-family
+exceptions, and exact historical recovery. No real PLAT01 transition is
+claimed. Complete current author acceptance and independent review still
+precede this corrective implementation's merge.
 
 ## References
 

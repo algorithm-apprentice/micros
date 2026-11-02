@@ -2,6 +2,7 @@ import ast
 from collections import Counter
 import copy
 import dataclasses
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -14,11 +15,139 @@ from unittest.mock import patch
 
 from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
+from tests.host.ast_evidence import ast_dump
 from tests.host.evidence_authority_types import fact_set_digest
 from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def relocated_binding_reference(root=ROOT):
+    study = (root / "docs/research/relocated-evidence-payload-gap.md").read_text()
+    reference = re.search(r"The fixed source is\s+`([0-9a-f]{40})`", study).group(1)
+    tables = tuple(re.findall(
+        r"^\| `(test_[^`]+\.py)` \| `([^`]+)` \| ([0-9]+) \|$",
+        study, re.MULTILINE,
+    ))
+    if len(tables) != 17:
+        raise ValueError("historical binding scope lacks its exact table admission")
+    return _relocated_binding_reference(root, reference, tables)
+
+
+@lru_cache(maxsize=4)
+def _relocated_binding_reference(root, reference, tables):
+    def fixed_source(path):
+        return subprocess.check_output(
+            ["git", "show", reference + ":" + path], cwd=root, text=True, timeout=30,
+        )
+
+    def literals(source):
+        values = {}
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(
+                node.targets[0], ast.Name,
+            ):
+                try:
+                    values[node.targets[0].id] = ast.literal_eval(node.value)
+                except (TypeError, ValueError):
+                    pass
+        return values
+
+    inventory_source = fixed_source("tests/host/evidence_authority_inventory.py")
+    mapping_names = {
+        "_PRIMARY_PREFIXES", "_primary_unit_for_path", "_path_units",
+        "_fact_primary_unit", "_consumer_units",
+    }
+
+    def mapping_nodes(source):
+        result = {}
+        for node in ast.parse(source).body:
+            name = node.name if isinstance(node, ast.FunctionDef) else (
+                node.targets[0].id if isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) else None
+            )
+            if name in mapping_names:
+                result[name] = ast_dump(node)
+        return result
+
+    if mapping_nodes(inventory_source) != mapping_nodes(
+        (root / "tests/host/evidence_authority_inventory.py").read_text(),
+    ):
+        raise ValueError("historical binding unit rules changed")
+    files = set(filter(None, subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", "-z", reference],
+        cwd=root, timeout=30,
+    ).decode().split("\0")))
+    directory = literals(fixed_source("tests/host/kernel_layout_source.py"))["KERNEL_FILE_FACTS"]
+    objects = literals(fixed_source("tests/host/test_kernel_object_source_layout.py"))
+    members = (*objects["CORE_SOURCES"], objects["PRIVATE_HEADERS"][0])
+    object_keys = {
+        "tests/host/test_scheduler_source_layout.py:data-entry:STABLE_ARTIFACT_HASHES/kernel/kernel_objects.c",
+        "tests/host/test_endpoint_source_layout.py:data-entry:STABLE_HASHES/kernel/kernel_objects.c",
+    }
+    rows = {}
+    sources = {}
+    for filename, table, count in tables:
+        owner = "tests/host/" + filename
+        if owner not in sources:
+            sources[owner] = fixed_source(owner)
+        source = sources[owner]
+        old_paths = tuple(sorted({owner} | {
+            node.value for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Constant) and type(node.value) is str and node.value in files
+        }))
+        entries = {
+            path: value for path, value in literals(source)[table].items()
+            if path in directory
+        }
+        if len(entries) != int(count):
+            raise ValueError("historical binding table membership changed")
+        for logical, value in entries.items():
+            key = f"{owner}:data-entry:{table}/{logical}"
+            selected = members if key in object_keys else (logical,)
+            new_paths = tuple(sorted({owner, *(directory[path][0] for path in selected)}))
+            rows[key] = (
+                value,
+                (old_paths, evidence_authority_inventory._fact_primary_unit(old_paths),
+                 evidence_authority_inventory._consumer_units(owner, old_paths)),
+                (new_paths, evidence_authority_inventory._fact_primary_unit(new_paths),
+                 evidence_authority_inventory._consumer_units(owner, new_paths)),
+            )
+    if len(rows) != 104:
+        raise ValueError("historical binding inventory is incomplete")
+    return rows, literals(inventory_source)["DECLARED_FAMILY_FACT_DIGESTS"]
+
+
+def prior_binding_facts(facts, root=ROOT):
+    rows, _ = relocated_binding_reference(root)
+    admitted = {
+        (owner, scope.partition("/")[0])
+        for owner, scope in (key.split(":data-entry:", 1) for key in rows)
+    }
+    result = []
+    seen = set()
+    for fact in facts:
+        if fact.key in rows:
+            if fact.key in seen:
+                raise ValueError("duplicate corrected binding")
+            seen.add(fact.key)
+            _, before, after = rows[fact.key]
+            if (fact.payload_paths, fact.primary_unit, fact.consumer_units) != after:
+                raise ValueError("corrected binding metadata differs from its fixed declaration")
+            fact = dataclasses.replace(
+                fact, payload_paths=before[0], primary_unit=before[1], consumer_units=before[2],
+            )
+        elif (
+            fact.kind == "data-entry"
+            and (fact.owner_path, fact.scope.partition("/")[0]) in admitted
+            and fact.scope.partition("/")[2].startswith("kernel/")
+        ):
+            raise ValueError("unknown corrected binding")
+        result.append(fact)
+    if seen != set(rows):
+        raise ValueError("missing or unknown corrected binding")
+    return tuple(result)
 
 
 class InventoryTests(unittest.TestCase):
@@ -50,9 +179,10 @@ class InventoryTests(unittest.TestCase):
             )
         )
         inventory = evidence_authority_inventory.current_inventory(ROOT)
+        historical = prior_binding_facts(inventory.facts)
         for family, expected in ast.literal_eval(declaration.value).items():
             self.assertEqual(
-                expected, fact_set_digest(fact for fact in inventory.facts if fact.family == family),
+                expected, fact_set_digest(fact for fact in historical if fact.family == family),
                 family,
             )
         anchor, = (
@@ -90,7 +220,7 @@ class InventoryTests(unittest.TestCase):
         )
         projected = []
         artifacts = []
-        for fact in evidence_authority_inventory.current_inventory(ROOT).facts:
+        for fact in prior_binding_facts(evidence_authority_inventory.current_inventory(ROOT).facts):
             if fact.key == artifact_key:
                 artifacts.append(fact)
                 self.assertIs(
@@ -460,9 +590,10 @@ class PackedInventoryTests(unittest.TestCase):
         self.assertEqual(3912, len(inventory.facts))
         self.assertEqual(11, len(inventory.families))
         self.assertEqual(3735, sum(fact.family != self.FAMILY for fact in inventory.facts))
+        historical = prior_binding_facts(inventory.facts)
         for family, expected in self.previous.items():
             self.assertEqual(expected, fact_set_digest(
-                fact for fact in inventory.facts if fact.family == family
+                fact for fact in historical if fact.family == family
             ), family)
         with patch.object(memory, "read_current", side_effect=AssertionError("prior claim needs no journal")):
             self.assertFalse(memory.memory_identity_required(ROOT))
@@ -662,6 +793,152 @@ class PackedInventoryTests(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         self.packed_facts(root=root)
+
+
+class RelocatedBindingTests(unittest.TestCase):
+    def test_direct_tty_hash_binds_its_relocated_source(self):
+        key = "tests/host/test_tty_source_layout.py:data-entry:STABLE_HASHES/kernel/tty_control_core.c"
+        fact, = (
+            fact for fact in evidence_authority_inventory.current_inventory(ROOT).facts
+            if fact.key == key
+        )
+        self.assertIn("kernel/tty/tty_control_core.c", fact.payload_paths)
+        self.assertEqual(
+            ("kernel/tty/tty_control_core.c", "tests/host/test_tty_source_layout.py"),
+            fact.payload_paths,
+        )
+        self.assertNotIn("tools/validation_context.py", fact.payload_paths)
+        self.assertEqual("B09", fact.primary_unit)
+        self.assertEqual(("B01", "B09", "B14"), fact.consumer_units)
+
+    def test_reconstruction_hashes_bind_every_current_owner_and_header(self):
+        rows, _ = relocated_binding_reference()
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        for key in (
+            "tests/host/test_scheduler_source_layout.py:data-entry:STABLE_ARTIFACT_HASHES/kernel/kernel_objects.c",
+            "tests/host/test_endpoint_source_layout.py:data-entry:STABLE_HASHES/kernel/kernel_objects.c",
+        ):
+            fact, = (fact for fact in inventory.facts if fact.key == key)
+            with self.subTest(key=key):
+                self.assertEqual(11, len(fact.payload_paths))
+                self.assertEqual(rows[key][2], (
+                    fact.payload_paths, fact.primary_unit, fact.consumer_units,
+                ))
+                self.assertIn("kernel/objects/kernel_object_context.c", fact.payload_paths)
+                self.assertIn("kernel/objects/kernel_object_private.h", fact.payload_paths)
+
+    def test_all_corrected_records_recover_the_exact_prior_inventory(self):
+        rows, fingerprints = relocated_binding_reference()
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        self.assertTrue(evidence_authority.validate_inventory(inventory).ok)
+        self.assertEqual(3912, len(inventory.facts))
+        observed = {fact.key: fact for fact in inventory.facts if fact.key in rows}
+        self.assertEqual(set(rows), set(observed))
+        self.assertEqual({2: 102, 11: 2}, Counter(len(fact.payload_paths) for fact in observed.values()))
+        for key, fact in observed.items():
+            expected_value, _, expected_metadata = rows[key]
+            self.assertEqual(expected_value, fact.evidence_value)
+            self.assertEqual(expected_metadata, (fact.payload_paths, fact.primary_unit, fact.consumer_units))
+            self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
+        projected = prior_binding_facts(inventory.facts)
+        self.assertEqual(104, sum(before != after for before, after in zip(inventory.facts, projected)))
+        for family, expected in fingerprints.items():
+            self.assertEqual(expected, fact_set_digest(fact for fact in projected if fact.family == family), family)
+
+    def test_historical_inverse_rejects_binding_drift_without_erasing_value_changes(self):
+        inventory = evidence_authority_inventory.current_inventory(ROOT)
+        key = "tests/host/test_scheduler_source_layout.py:data-entry:STABLE_ARTIFACT_HASHES/kernel/kernel_objects.c"
+        selected, = (fact for fact in inventory.facts if fact.key == key)
+        changes = (
+            dataclasses.replace(selected, payload_paths=selected.payload_paths[:-1]),
+            dataclasses.replace(selected, payload_paths=(
+                *selected.payload_paths, "tools/validation_context.py",
+            )),
+            dataclasses.replace(selected, primary_unit="B14"),
+            dataclasses.replace(selected, consumer_units=("B14",)),
+            dataclasses.replace(selected, key=selected.key + "/unknown"),
+        )
+        for changed in changes:
+            facts = tuple(changed if fact.key == key else fact for fact in inventory.facts)
+            with self.subTest(change=changed), self.assertRaises(ValueError):
+                prior_binding_facts(facts)
+        with self.assertRaises(ValueError):
+            prior_binding_facts((*inventory.facts, selected))
+        with self.assertRaises(ValueError):
+            prior_binding_facts((*inventory.facts, dataclasses.replace(
+                selected, key=selected.key + "/unknown", scope=selected.scope + "/unknown",
+            )))
+        changed = dataclasses.replace(selected, evidence_value="0" * 64)
+        projected = prior_binding_facts(
+            tuple(changed if fact.key == key else fact for fact in inventory.facts),
+        )
+        _, fingerprints = relocated_binding_reference()
+        self.assertNotEqual(
+            fingerprints[selected.family],
+            fact_set_digest(fact for fact in projected if fact.family == selected.family),
+        )
+
+    def test_current_binding_rejects_missing_nonfacade_reconstruction_inputs(self):
+        lstat = Path.lstat
+        for relative in (
+            "kernel/objects/kernel_object_context.c",
+            "kernel/objects/kernel_object_private.h",
+        ):
+            def missing(path, *args, **kwargs):
+                if path == ROOT / relative:
+                    raise FileNotFoundError(relative)
+                return lstat(path, *args, **kwargs)
+
+            with self.subTest(path=relative), patch.object(Path, "lstat", missing), self.assertRaises(ValueError):
+                evidence_authority_inventory.current_inventory(ROOT)
+
+    def test_directory_binding_rejects_unsafe_or_ambiguous_current_sources(self):
+        from tests.host.evidence_authority_source import kernel_sources
+
+        logical = "kernel/example.c"
+        physical = "kernel/objects/example.c"
+        for mutation in (
+            "none", "missing-entry", "malformed-entry", "missing-file",
+            "symlink", "hardlink", "parent-link", "old-flat", "ambiguous-map", "duplicate-key",
+        ):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="micros-relocated-source-") as temporary:
+                root = Path(temporary)
+                target = root / physical
+                target.parent.mkdir(parents=True)
+                target.write_text("")
+                mapping = {logical: (physical, "100644", "0" * 64, ())}
+                if mutation == "missing-entry":
+                    mapping = {}
+                elif mutation == "malformed-entry":
+                    mapping[logical] = physical
+                elif mutation == "missing-file":
+                    target.unlink()
+                elif mutation == "symlink":
+                    saved = target.with_suffix(".saved")
+                    target.rename(saved)
+                    target.symlink_to(saved.name)
+                elif mutation == "hardlink":
+                    os.link(target, target.with_suffix(".alias"))
+                elif mutation == "parent-link":
+                    directory = target.parent
+                    saved = directory.with_name(directory.name + "-saved")
+                    directory.rename(saved)
+                    directory.symlink_to(saved.name)
+                elif mutation == "old-flat":
+                    (root / logical).write_text("")
+                elif mutation == "ambiguous-map":
+                    mapping["kernel/other.c"] = mapping[logical]
+                source = root / "tests/host/kernel_layout_source.py"
+                source.parent.mkdir(parents=True)
+                text = "KERNEL_FILE_FACTS = " + repr(mapping)
+                if mutation == "duplicate-key":
+                    text = text[:-1] + ", " + repr(logical) + ": " + repr(mapping[logical]) + "}"
+                source.write_text(text)
+                if mutation == "none":
+                    self.assertEqual({logical: physical}, kernel_sources(root, (logical,)))
+                else:
+                    with self.assertRaises(ValueError):
+                        kernel_sources(root, (logical,))
 
 
 class TransitionTests(unittest.TestCase):

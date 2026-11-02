@@ -189,13 +189,20 @@ This does not replace the complete fresh author plan or independent review.
 
 EV01-C01 implementation #193 is separately reviewed and merged. Accepted
 [ADR-0092](adr/0092-relocated-evidence-payload-bindings.md) defines the next
-[bounded payload repair](architecture/relocated-evidence-payloads.md):
-104 existing logical-file identities must bind their actual physical
-source rather than an unrelated fallback. Its implementation begins with
-missing-owner Red, independently declared complete before/after records,
-strict path/inverse negatives and unchanged packed/COPY01 behavior. It
-adds no new test target or runtime workflow and still requires the complete
-fresh author plan. Design acceptance alone supplies no repaired bindings.
+[bounded payload repair](architecture/relocated-evidence-payloads.md).
+After separate design #194, implementation binds 102 existing logical-file
+identities to their physical source and two object hashes to their complete
+nine-source/private-header reconstruction. Actual missing-owner Red,
+independently declared complete records, path/inverse negatives and
+historical comparisons preserve all prior values and packed/COPY01
+behavior. Narrow iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_scheduler_source_layout tests.host.test_endpoint_source_layout tests.host.test_kernel_object_source_layout tests.host.test_kernel_directory_layout
+```
+
+No new test target or runtime workflow is added. The complete fresh author
+plan and independent implementation review remain mandatory.
 
 ## POSIX conformance evidence
 

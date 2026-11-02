@@ -220,6 +220,7 @@ class RuntimeMemoryAuthorityTest(unittest.TestCase):
         from tests.host.evidence_authority_inventory import current_inventory
         from tests.host.evidence_authority_types import fact_set_digest
         from tests.host.runtime_memory_authority import DESIGN_COMMIT, MEMORY_IDENTITY
+        from tests.host.test_evidence_authority import prior_binding_facts
         from tools.validation_inputs import _run
 
         inventory = current_inventory(ROOT)
@@ -235,8 +236,9 @@ class RuntimeMemoryAuthorityTest(unittest.TestCase):
                 for target in node.targets
             )
         )
+        historical = prior_binding_facts(inventory.facts)
         for family, expected in ast.literal_eval(statement.value).items():
-            self.assertEqual(expected, fact_set_digest(fact for fact in inventory.facts if fact.family == family))
+            self.assertEqual(expected, fact_set_digest(fact for fact in historical if fact.family == family))
         existing, = (fact for fact in inventory.facts if fact.key == MEMORY_IDENTITY)
         self.assertIs(AuthorityClass.TRANSPORT_IDENTITY, existing.authority_class)
         added = tuple(fact for fact in inventory.facts if fact.family == "runtime-memory-baseline")
