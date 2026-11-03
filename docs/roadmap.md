@@ -22,27 +22,42 @@ ordinary feature work remain blocked through `RECERT01`.
 
 The evidence barrier is merged as EV04 #189. COPY01 design #190 and
 implementation #191 close only B05-F006/B05-E005 with real primitive-work
-evidence and granular source-authority retirement. PLAT01 is the next
-preferred runtime design, but its source-authority study found the
+evidence and granular source-authority retirement. PLAT01's source-authority
+study first found the
 [packed-identity prerequisite](architecture/packed-evidence-identities.md).
 EV01-C01 design #192 and implementation #193 are merged. The resumed
 PLAT01 study then found a distinct
 [relocated-source binding gap](architecture/relocated-evidence-payloads.md).
 Its EV01-C02 design #194 and independently reviewed implementation #195
-are merged. PLAT01 has resumed as the independently reviewed Accepted
+are merged. PLAT01 then obtained the independently reviewed Accepted
 [diagnostic-history design](architecture/diagnostic-history.md), covering
 both histories, exact TTY transfer/notification and panic consumption.
-No PLAT01 runtime code is authored before its separate design merge.
+Its design phase authored no runtime code before the separate design merge.
 The remaining runtime queue and hosted CI are not declared complete.
 
-Design #196 and collector-source correction #197 are merged. The
-uncommitted PLAT01 implementation subsequently hit the
+Design #196 and collector-source correction #197 merged. The
+first uncommitted PLAT01 implementation subsequently hit the
 [startup IRQ-retrigger blocker](research/minix-diagnostic-history.md#observed-startup-irq-retrigger).
-It is blocked and abandoned until the independently reviewed
+It was abandoned before the independently reviewed
 [Accepted ADR-0094 correction](adr/0094-retrigger-safe-diagnostic-probe.md)
-is separately merged. A later valid claim can appear after the first IRQ completion;
+separately merged as #198. A later valid claim can appear after the first IRQ completion;
 the large target probe must defer until that actual pending event is
-consumed and completed. No runtime finding or hosted-CI outcome is closed.
+consumed and completed.
+
+Restarted PLAT01 implementation #199 is now independently reviewed and
+merged. Actual Red/Green, thirteen-unit recertification and all 48 fresh
+author commands passed, including 42 static configurations, 111 ELF outputs
+and ten observed stack scopes. The reviewed, published and squash trees
+are identical; a fresh committed checkout preserves COPY01 and PLAT01
+authority without an author journal. This closes only B01-F002.
+The next single preferred task is the documentation-only
+[PLAT02 design study](research/minix-terminal-failure-baseline.md), covering
+bounded UART polling, recursive panic and corrupt-console fallback.
+Its [Accepted ADR-0095](adr/0095-bounded-uart-and-terminal-panic.md) and
+[terminal contract](architecture/terminal-failure.md) have passed
+independent design/correction review. Implementation waits for the
+separate design merge.
+Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

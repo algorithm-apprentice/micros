@@ -367,6 +367,20 @@ command results:
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
 ```
 
+On macOS, keep the host awake during long target runs. Maintenance sleep
+can cross a guest readiness deadline even though the kernel made no
+progress during that interval. A command-scoped assertion avoids changing
+global power settings or any guest/test deadline:
+
+```bash
+caffeinate -i -s "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
+```
+
+The system-sleep assertion requires AC power and lasts only for that
+command. Do not treat it as a guest-clock or timeout override. A changed
+launcher environment may invalidate an older execution receipt; keep the
+exact-context check and run fresh rather than weakening the fingerprint.
+
 The Accepted [GitHub Actions contract](github-actions-ci.md) hosts that
 complete fresh plan without changing local validation, target deadlines or
 independent review. The designs are merged, but parallel implementation #188

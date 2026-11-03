@@ -42,7 +42,7 @@ after separate design #190 / ADR-0090. Its
 closes only B05-F006/B05-E005 through actual primitive Red/Green, granular
 recertification, the complete fresh author gate and clean independent
 implementation re-review. Its reviewed, published and squash trees are
-identical. The other 75 pre-node runtime findings remain open.
+identical. That merge left 75 pre-node runtime findings open.
 
 The next PLAT01 design found an
 [EV01 packed-identity coverage gap](packed-evidence-identity-gap.md).
@@ -67,11 +67,23 @@ are not relabeled as completed work.
 
 After design #196 and collector correction #197, PLAT01's uncommitted
 implementation found a [real startup IRQ retrigger](minix-diagnostic-history.md#observed-startup-irq-retrigger)
-that invalidates the first-probe ordering assumption. Implementation is
-blocked and abandoned; [Accepted ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md)
-is the sole active corrective-design prerequisite until its separate
-merge. It adds no runtime
-graph node, finding owner, retired key or accepted PLAT01 result.
+that invalidated the first-probe ordering assumption. That implementation
+was abandoned; [Accepted ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md)
+separately merged as #198 before a fresh implementation restart.
+
+PLAT01 implementation #199 is independently reviewed and merged as
+`8375ca2f5285bc42063af8ed92ba6f3811d517e8`, with reviewed/publication/squash
+tree `cb472a9262b9d6f22c42c4c9e1182bf1da069d78`. Actual replacement
+Red/Green, B01-B12/B14 recertification, the complete 48-command fresh author
+gate and all current stack evidence passed. Ordinary committed checks
+preserve both completed retirements without local journals.
+This closes only B01-F002, leaving 74 pre-node runtime findings open.
+The historical audit counts and 59-node, 155-edge graph remain unchanged.
+
+PLAT02 is now the next single dependency-ready design. Its
+[fixed-reference study](minix-terminal-failure-baseline.md) traces polling,
+panic entry and terminal failure boundaries before any implementation.
+PLAT03, memory correction and hosted CI do not start in parallel.
 
 ## Consolidation invariants
 
@@ -205,7 +217,7 @@ blocking queue.
 | `EV03` | Evidence foundation | `B14-F003` | - | Implementation #184 is merged after designs #180/#181/#182/#183. The [stack-bound contract](../architecture/stack-bound-evidence.md) covers all ten current B01-B12 scopes and future B13 admission; ADR-0087's exact preparation-lifetime repair preserves the original 4 KiB limit. | Static and target stack-budget reports for all current 4 KiB/16 KiB paths; explicit blocked B13 report until production code exists. |
 | `EV04` | Evidence barrier | - | `EV02`, `EV03` | Acceptance-only barrier: no runtime correction node starts until EV01-EV03 are merged and [re-certified](evidence-foundations-recertification.md); the exact ADR-0087 storage exception belongs solely to EV03. | Current-candidate evidence tooling and clean independent review. |
 | `COPY01` | Runtime correction | `B05-F006` | `EV04` | Implementation #191 follows [Accepted ADR-0090](../adr/0090-minix-word-based-runtime-memory.md) and the [runtime memory contract](../architecture/runtime-memory-primitives.md): the generic MINIX word family is implemented, freestanding semantics are preserved, and only the exact invalidated transport assertion is retired. | Aligned, unaligned, short, page, overlap-policy and exact work-count cases; current full author gate and independent review complete. |
-| `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Add the two fixed diagnostic history roles with exact capacities and overflow algorithms; keep ownership separate from physical UART. | Native wrap/overflow/order model and target report integration. |
+| `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Implementation #199 follows Accepted ADR-0093/0094: both exact history roles, TTY transfer/notification and panic replay preserve separate physical ownership. | Actual primitive/native/target Red-Green, granular twenty-key retirement, thirteen-unit recertification, complete fresh author/stack evidence and independent review complete. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Define bounded early/panic polling, recursive panic ownership, corrupt-console fallback, and terminal failure precedence. | Host state model plus stuck-device, recursive-entry, and corrupt-metadata target cases. |
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Add the bounded reference-style panic trace over authenticated kernel stack ownership. | Native unwind/frame validation and target ordinary/recursive fault traces within the stack budget. |
 | `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Canonicalize once, retain allocator search state, and remove successful-path per-frame raw-FDT rescans. | Range/frame visit counts over fragmented and excluded maps. |

@@ -110,3 +110,4 @@ to make the project appear more consistent than it was.
 | [0092](0092-relocated-evidence-payload-bindings.md) | Relocated evidence payload bindings | Accepted |
 | [0093](0093-minix-diagnostic-histories.md) | MINIX diagnostic histories | Accepted |
 | [0094](0094-retrigger-safe-diagnostic-probe.md) | Retrigger-safe diagnostic probe | Accepted |
+| [0095](0095-bounded-uart-and-terminal-panic.md) | Bounded UART and terminal panic | Accepted |
