@@ -7,6 +7,7 @@
 #include "arch/riscv64/trap_context.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
+#include "kernel/diagnostic/diagnostic_history.h"
 
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
@@ -106,6 +107,7 @@ _Noreturn void micros_panic_report(
         uart_write("\n");
     }
 
+    micros_diagnostic_panic_report();
     uart_flush();
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,

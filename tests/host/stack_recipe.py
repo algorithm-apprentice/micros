@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from tests.host.diagnostic_history_source import project_diagnostic_cmake
+
 
 MODULE_PATH = "tests/stack/StackEvidence.cmake"
 INCLUDE = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
@@ -53,6 +55,7 @@ PLANNER_ADDITIONS = (
 
 
 def project_root_recipe(source):
+    source = project_diagnostic_cmake(source)
     if INCLUDE not in source:
         return source
     if source.count(INCLUDE) != 1 or source.count(INCLUDE + ANCHOR) != 1:

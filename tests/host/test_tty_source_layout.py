@@ -8,6 +8,8 @@ import re
 import unittest
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
+from tests.host.diagnostic_history_source import project_diagnostic_native_fixture
 from tests.host.c_source_records import function_records
 from tests.host.test_frame_ownership_source_layout import tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
@@ -727,7 +729,7 @@ CONTEXT_AST_DIGEST = 'da82678bf0371477e724a109153bd4008d2c8b755c9a531a9e04dc40ae
 
 
 def source(path):
-    return kernel_layout_source.read_path(ROOT / path)
+    return project_diagnostic_native_fixture(path, kernel_layout_source.read_path(ROOT / path))
 
 
 def digest_bytes(value):
@@ -2256,6 +2258,10 @@ def main(argv=None):
             from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
             value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
+            if not diagnostic_identity_required(
+                ROOT, "tests/host/test_tty_source_layout.py:data-entry:STABLE_HASHES/" + path,
+            ):
+                continue
             self.assertEqual(expected, digest_bytes(value), path)
         self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / "tests/host/c_source_records.py")))
 

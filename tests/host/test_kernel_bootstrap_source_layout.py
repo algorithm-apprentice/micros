@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.diagnostic_history_source import project_boot_diagnostic_seed
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
@@ -1878,7 +1879,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         self.assertIn(path, self.texts)
         bodies = "\n".join(c_function_body(self.texts[path], name) for name in self.definitions[path])
         self.assertEqual(31, len(BOOT_BRANCHES))
-        self.assertEqual(BOOT_BRANCHES, branch_records(bodies))
+        self.assertEqual(BOOT_BRANCHES, branch_records(project_boot_diagnostic_seed(bodies)))
         selected = {
             "micros_kernel_object_runtime_initialize", "micros_trap_install",
             "micros_kernel_object_runtime_registry", "micros_kernel_object_runtime_boot_hart",

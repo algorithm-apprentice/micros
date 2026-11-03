@@ -27,7 +27,7 @@ class ContextNode:
 class ContextBindings:
     establishing: tuple
     preservers: tuple[FunctionKey, ...]
-    infeasible: tuple
+    infeasible: tuple[tuple[FunctionKey, int], ...]
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ def binding_inventory(binding, frames, edges):
     sites = {(edge.caller, edge.offset): edge for edge in edges}
     if (
         type(binding.establishing) is not tuple or type(binding.preservers) is not tuple
-        or type(binding.infeasible) is not tuple or len(binding.infeasible) != 2
+        or type(binding.infeasible) is not tuple or len(binding.infeasible) != 3
     ):
         raise StackEvidenceError("invalid finite context declaration")
     ready_sites = set()
@@ -67,25 +67,40 @@ def binding_inventory(binding, frames, edges):
         if function not in frames or function in preservers:
             raise StackEvidenceError("unknown or duplicate context preserver")
         preservers.add(function)
-    guard, offset = binding.infeasible
-    require_function(guard)
-    require_uint64(offset, "context guard offset")
-    edge = sites.get(binding.infeasible)
-    if (
-        guard.translation_unit != "arch/riscv64/uart.c" or guard.symbol != "uart_write"
-        or guard not in preservers or edge is None or edge.kind is not EdgeKind.CALL
-        or len(edge.targets) != 1 or edge.targets[0].translation_unit != "arch/riscv64/panic.S"
-        or edge.targets[0].symbol != "micros_panic_entry"
-    ):
-        raise StackEvidenceError("context exclusion borrows an undeclared panic edge")
-    return ready_sites, preservers
+    required = {
+        "uart_write_direct": ("arch/riscv64/panic.S", "micros_panic_entry"),
+        "uart_write": ("arch/riscv64/uart.c", "uart_write_record"),
+        "uart_write_hex64": ("arch/riscv64/uart.c", "uart_write_hex64_record"),
+    }
+    excluded = set()
+    callers = set()
+    for site in binding.infeasible:
+        if type(site) is not tuple or len(site) != 2:
+            raise StackEvidenceError("invalid finite context exclusion site")
+        guard, offset = site
+        require_function(guard)
+        require_uint64(offset, "context guard offset")
+        edge = sites.get(site)
+        if (
+            guard.translation_unit != "arch/riscv64/uart.c"
+            or guard.symbol not in required or guard.symbol in callers
+            or guard not in preservers or site in excluded
+            or edge is None or edge.kind is not EdgeKind.CALL or len(edge.targets) != 1
+            or (edge.targets[0].translation_unit, edge.targets[0].symbol) != required[guard.symbol]
+        ):
+            raise StackEvidenceError("context exclusion borrows an undeclared diagnostic edge")
+        excluded.add(site)
+        callers.add(guard.symbol)
+    if callers != set(required):
+        raise StackEvidenceError("context exclusion lacks its complete three-site register")
+    return ready_sites, preservers, excluded
 
 
 def certify_context_bounds(frames, edges, roots, binding):
     sizes = frame_inventory(frames)
     entries = root_inventory(roots, sizes)
     call_inventory(edges, sizes, entries)
-    establishing, preservers = binding_inventory(binding, sizes, edges)
+    establishing, preservers, excluded = binding_inventory(binding, sizes, edges)
     node_sizes = {
         ContextNode(function, Qualifier.UNQUALIFIED): size for function, size in sizes.items()
     }
@@ -103,7 +118,7 @@ def certify_context_bounds(frames, edges, roots, binding):
             caller = ContextNode(edge.caller, qualifier)
             if caller not in children:
                 continue
-            if qualifier is Qualifier.UART_PANIC_READY and site == binding.infeasible:
+            if qualifier is Qualifier.UART_PANIC_READY and site in excluded:
                 continue
             ready = qualifier is Qualifier.UART_PANIC_READY or site in establishing
             for target in edge.targets:

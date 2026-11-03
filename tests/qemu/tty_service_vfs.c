@@ -366,6 +366,39 @@ static bool collect_completed(
     }
 }
 
+static bool submit_write_when_writable(
+    uint64_t request_id,
+    micros_grant_t grant,
+    size_t count,
+    struct tty_call_result *result
+)
+{
+    uint64_t events;
+
+    for (;;) {
+        if (!call_tty(
+            MICROS_TTY_MESSAGE_SUBMIT_WRITE,
+            request_id,
+            grant,
+            count,
+            result
+        )) {
+            return false;
+        }
+        if (result->result != MICROS_TTY_RESULT_BUSY) {
+            return true;
+        }
+        if (result->transferred_count != 0) {
+            return false;
+        }
+        do {
+            if (!receive_tty_events(&events)) {
+                return false;
+            }
+        } while ((events & MICROS_TTY_EVENT_WRITABLE) == 0);
+    }
+}
+
 static bool submit_write(
     uint64_t request_id,
     micros_grant_t grant,
@@ -383,8 +416,7 @@ static bool submit_write(
     }
     copy_bytes(tty_write_buffer, bytes, count);
     return (
-        call_tty(
-            MICROS_TTY_MESSAGE_SUBMIT_WRITE,
+        submit_write_when_writable(
             request_id,
             grant,
             count,

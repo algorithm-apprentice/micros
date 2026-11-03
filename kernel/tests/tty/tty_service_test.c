@@ -19,6 +19,7 @@
 #include "micros/panic.h"
 #include "micros/tty.h"
 #include "tests/qemu/tty_handoff_protocol.h"
+#include "tests/qemu/diagnostic_history_kernel.h"
 
 #define MICROS_TTY_TEST_EXCEPTION_BREAKPOINT UINT64_C(3)
 #define MICROS_TTY_TEST_UART_LSR UINT8_C(5)
@@ -477,6 +478,7 @@ _Noreturn void micros_tty_service_test_handle_trap(
     if (!uart_is_physically_drained()) {
         test_failure(hart, frame, "tty-service-test-uart-drain");
     }
+    micros_diagnostic_test_finish();
     MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE

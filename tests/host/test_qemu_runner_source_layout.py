@@ -13,6 +13,7 @@ import unittest
 from unittest import mock
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.diagnostic_history_source import project_runner_options
 from tests.host import kernel_layout_source
 from tools.python_host_runtime import python_command
 
@@ -1758,7 +1759,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"MICROS_QEMU": "/fixture/qemu", "MICROS_NM": "/fixture/nm"}):
             with mock.patch.object(argparse.ArgumentParser, "add_argument", record):
                 result = arguments.parse_arguments(["--kernel", str(ROOT / "README.md"), "--marker", "BOOT"])
-        self.assertEqual(expected, tuple(name for _, name in observed))
+        self.assertEqual(expected, tuple(name for _, name in project_runner_options(observed)))
         self.assertEqual(1, len({identity for identity, _ in observed}))
         self.assertEqual(("/fixture/qemu", "/fixture/nm", ["128M"], 10.0, None), (
             result.qemu, result.nm, result.memory, result.timeout, result.serial_input,

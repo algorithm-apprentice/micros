@@ -218,15 +218,52 @@ After design #196 and collector correction #197, the uncommitted
 implementation passed narrow native and seeded-panic checks but failed its
 real TTY first-read guard after a legal second retained IRQ. Its
 [recorded observation](research/minix-diagnostic-history.md#observed-startup-irq-retrigger)
-is not a target pass. Implementation is blocked and abandoned until
+is not a target pass. That implementation was abandoned; corrective
 [Accepted ADR-0094](adr/0094-retrigger-safe-diagnostic-probe.md) separately
-merges. It defines
-failure-atomic, fixture-only deferral and exact queued-IRQ consumption.
-The corrected native target will also compile the already declared user
-probe to test deferral, unchanged canaries/scalars and later complete
-transfer. Ordinary consumer errors, all legacy target assertions, host
-timeouts and full author gates remain unchanged; restarted real
-Red/Green/recertification and independent implementation review are required.
+merged as #198. It defines failure-atomic, fixture-only deferral and exact
+queued-IRQ consumption. The corrected native target also compiles the
+already declared user probe to test deferral, unchanged canaries/scalars
+and later complete transfer. Ordinary consumer errors, all legacy target
+assertions, host timeouts and full author gates remain unchanged.
+
+The restarted author harness is
+[`tools/check_diagnostic_history.py`](../tools/check_diagnostic_history.py).
+Its three documented intents compile and execute the fixed original
+decoder/target images for Red, the current native/target subjects for
+Green, and the complete named affected-unit commands for recertification.
+All fourteen immutable fixture/tool paths and external inputs are frozen
+before the actual Red. A compiler failure, timeout, malformed report or
+failed original target scenario cannot qualify as an expected divergence.
+
+Focused source, report and transaction iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_diagnostic_history
+```
+
+The current-source binding cases intentionally require the complete
+implementation; isolated helper/model passes do not certify an absent
+runtime. Synthetic journal tests never provide author transition events.
+The complete fresh post-terminal gate and independent implementation
+review remain required before the first completed-claim commit.
+
+The existing timeout-classifier cases use the exact pre-PLAT01 recipe
+recovered by the independently pinned diagnostic inverse. The extended
+current recipe remains outside the old timeout templates and selects the
+full matrix; neither those templates nor their expected hashes change.
+QEMU source-family fixtures use valid Python source, while malformed source
+must produce the existing unsupported-context result before QEMU metadata.
+Focused integration regression uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_validation_build_impact tests.host.test_validation_context tests.host.test_diagnostic_history
+```
+
+The diagnostic stack regressions also compile the actual TTY-control owner.
+They admit only its two new direct-syscall wrappers, reject an indirect-call
+mutation, an undeclared helper or a borrowed source origin, and preserve
+the old owner checks. A passing constructor fixture alone does not certify
+all functions in the real linked image.
 
 ## POSIX conformance evidence
 

@@ -96,6 +96,16 @@ def _add_platform_report_arguments(
         help="Require the ordered five-record panic report",
     )
     parser.add_argument(
+        "--require-diagnostic-history",
+        choices=("retained", "seeded"),
+        help="Require bounded encoded panic history, optionally the exact intentional seed",
+    )
+    parser.add_argument(
+        "--require-diagnostic-forwarding",
+        action="store_true",
+        help="Require the unique TTY-forwarded diagnostic before the legacy I/O sequence",
+    )
+    parser.add_argument(
         "--require-trap-ready",
         action="store_true",
         help="Require exactly one trap-ready record",

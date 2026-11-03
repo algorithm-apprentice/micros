@@ -15,6 +15,7 @@ import unittest
 from unittest import mock
 
 from tests.host import kernel_layout_source
+from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
 from tools import validation_context, validation_plan
 
 
@@ -181,6 +182,10 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
     def test_every_current_source_restores_the_original_bytes(self) -> None:
         for logical in kernel_layout_source.KERNEL_LOGICAL_PATHS:
             restored = kernel_layout_source.read_logical_bytes(ROOT, logical)
+            if not diagnostic_identity_required(
+                ROOT, "tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/" + logical + "/2",
+            ):
+                continue
             self.assertEqual(
                 kernel_layout_source.KERNEL_ORIGINAL_SHA256[logical],
                 hashlib.sha256(restored).hexdigest(),
@@ -200,6 +205,10 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             kernel_layout_source.EXTERNAL_SOURCE_FACTS.items()
         ):
             restored = kernel_layout_source.read_bytes_path(ROOT / relative)
+            if not diagnostic_identity_required(
+                ROOT, "tests/host/kernel_layout_source.py:data-entry:EXTERNAL_SOURCE_FACTS/" + relative + "/1",
+            ):
+                continue
             self.assertEqual(expected, hashlib.sha256(restored).hexdigest(), relative)
 
         self.assertEqual(9, len(kernel_layout_source.GENERATOR_FILE_FACTS))

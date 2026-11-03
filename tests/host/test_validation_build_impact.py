@@ -3,6 +3,7 @@ import re
 import unittest
 from unittest import mock
 
+from tests.host.diagnostic_history_source import project_diagnostic_cmake
 from tools import validation_build_impact
 from tools import validation_plan
 
@@ -21,7 +22,9 @@ def timeout_edit(content, target, value):
 class ValidationBuildImpactTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        cls.original = project_diagnostic_cmake(
+            (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        )
 
     def test_panic_timeout_has_one_explicit_owner(self):
         edited = timeout_edit(self.original, "test-qemu-panic", 12)
@@ -57,6 +60,11 @@ class ValidationBuildImpactTests(unittest.TestCase):
 
     def test_unchanged_file_has_no_verified_edit(self):
         self.assertIsNone(validation_build_impact.classify(self.original, self.original))
+
+    def test_diagnostic_recipe_extension_keeps_full_matrix_selection(self):
+        source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        edited = timeout_edit(source, "test-qemu-panic", 12)
+        self.assertIsNone(validation_build_impact.classify(source, edited))
 
     def test_every_unlisted_target_stays_shared(self):
         for target in ("test-qemu-trap", "test-qemu-scheduler"):

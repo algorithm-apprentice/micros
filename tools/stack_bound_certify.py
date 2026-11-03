@@ -104,6 +104,11 @@ def certify_image(root, directory, image_name, variant, mode):
         if len(qemu) != 1:
             raise StackEvidenceError("stack kernel proof lacks its configured QEMU")
         fatal = derive_fatal_context(root, directory, catalog, qemu=qemu[0])
+        if (
+            fatal.version != 2 or len(fatal.exclusions) != 3
+            or tuple((row.edge.function, row.edge.offset) for row in fatal.exclusions) != fatal.bindings.infeasible
+        ):
+            raise StackEvidenceError("kernel stack proof lacks its complete version-two fatal register")
         proofs = certify_context_bounds(graph.frames, graph.edges, roots, fatal.bindings)
     else:
         proofs = certify_stack_bounds(graph.frames, graph.edges, roots)

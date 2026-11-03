@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 import re
 
-from tests.host import evidence_authority_packed
+from tests.host import diagnostic_history_source, evidence_authority_packed
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
 )
@@ -92,6 +92,10 @@ FAMILY_OWNERS = {
     ),
     "scheduler-packed-transport": (
         "tests/host/test_scheduler_source_layout.py",
+    ),
+    "diagnostic-history-baseline": (
+        "tests/host/diagnostic_history_authority.py",
+        "tests/host/diagnostic_history_source.py",
     ),
 }
 
@@ -197,6 +201,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "df7b43a3b7dfb185a109e5d2b95fc610681a16127c8542ade497e99254e6f729",
     "scheduler-packed-transport":
         "6949be2673b5e0d6cf694ad2cfa7f7c810c468209f0c6d3c1d4b6de11c0de309",
+    "diagnostic-history-baseline":
+        "d30a3bf2737a3a38b20940e4acde18e26de252198d9a3ee1bbf24b4e8e973d49",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -780,6 +786,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         ]
     if family == "runtime-memory-baseline":
         return _runtime_memory_facts(tree, family, relative)
+    if family == diagnostic_history_source.FAMILY:
+        return diagnostic_history_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

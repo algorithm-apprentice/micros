@@ -10,6 +10,10 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
+from tests.host.diagnostic_history_source import (
+    diagnostic_kernel_members, project_diagnostic_context, project_diagnostic_external, project_diagnostic_gate,
+)
 from tests.host.stack_recipe import (
     project_command_extension, project_planner_registration,
     project_external_evidence as project_stack_external,
@@ -15656,6 +15660,9 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
             else:
                 seen_inodes[identity] = selected.relative_to(root).as_posix()
 
+    additional, additional_errors = diagnostic_kernel_members(root)
+    expected.update(additional)
+    errors.extend(additional_errors)
     observed = set()
     for path in kernel_root.rglob("*"):
         relative = path.relative_to(root).as_posix()
@@ -15835,7 +15842,10 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
         raw = restore_frame_validation_hot_path(
             raw.decode("utf-8")
         ).encode()
-    return _restored_include_bytes(logical, raw, expected_sha256, transports)
+    required = diagnostic_identity_required(
+        root, "tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/" + logical + "/2",
+    )
+    return _restored_include_bytes(logical, raw, expected_sha256, transports, required=required)
 
 
 def _restored_include_bytes(
@@ -15843,7 +15853,11 @@ def _restored_include_bytes(
     raw: bytes,
     expected_sha256: str,
     transports,
+    *,
+    required: bool = True,
 ) -> bytes:
+    if type(required) is not bool:
+        raise AssertionError("source identity policy is not a checked Boolean")
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as error:
@@ -15863,7 +15877,7 @@ def _restored_include_bytes(
             )
         lines[line_number - 1] = old_line
     restored = "".join(lines).encode()
-    if hashlib.sha256(restored).hexdigest() != expected_sha256:
+    if required and hashlib.sha256(restored).hexdigest() != expected_sha256:
         raise AssertionError(f"original source mismatch: {relative}")
     return restored
 
@@ -15892,6 +15906,9 @@ def _restored_external_bytes(path: Path, relative: str) -> bytes:
         path.read_bytes(),
         expected_sha256,
         transports,
+        required=diagnostic_identity_required(
+            REPOSITORY_ROOT, "tests/host/kernel_layout_source.py:data-entry:EXTERNAL_SOURCE_FACTS/" + relative + "/1",
+        ),
     )
 
 
@@ -16245,6 +16262,7 @@ def restore_validation_execution_source(source: str) -> str:
 
 
 def restore_validation_context_source(source: str) -> str:
+    source = project_diagnostic_context(source)
     source = project_context_registration(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == PYTHON315_HOST_VALIDATION_CONTEXT_SHA256:
@@ -16870,7 +16888,9 @@ def read_bytes_path(path: Path) -> bytes:
         return restore_validation_execution_source(
             path.read_text(encoding="utf-8")
         ).encode()
-    raw = project_stack_external(relative, project_external_evidence(relative, path.read_bytes()))
+    raw = project_diagnostic_external(
+        relative, project_stack_external(relative, project_external_evidence(relative, path.read_bytes()))
+    )
     if (
         relative is not None
         and relative.startswith("tools/")
@@ -17205,6 +17225,7 @@ def _restore_gate_ast(tree: ast.Module) -> ast.Module:
 
 def restored_gate_ast_sha256(root: Path, relative: str) -> str:
     source = (root / relative).read_text(encoding="utf-8")
+    source = project_diagnostic_gate(relative, source)
     source = project_gate_compatibility(relative, source)
     tree = _restore_gate_ast(ast.parse(source))
     payload = ast_dump(tree).encode()

@@ -26,8 +26,10 @@ Design #196 and collector-source correction #197 are separately merged.
 The subsequent uncommitted implementation is blocked and abandoned after
 the [observed startup IRQ retrigger](../research/minix-diagnostic-history.md#observed-startup-irq-retrigger).
 The [Accepted correction](../adr/0094-retrigger-safe-diagnostic-probe.md)
-below is its sole active prerequisite. Existing runtime obligations remain
-unchanged; no PLAT01 implementation or retirement is accepted.
+below separately merged as #198. The restarted implementation follows
+both decisions and derives a fresh declaration from that merged design.
+Existing runtime obligations remain unchanged; implementation acceptance
+and retirement still require the complete current transaction and review.
 
 ## Fixed roles and storage
 
@@ -484,6 +486,13 @@ ordinary dispatch. Keep its portable terminal, UART, service-core,
 completion and VFS-grant implementations unchanged.
 
 The existing TTY-control wrapper owner gains the two exact raw calls.
+The stack callback bridge admits only the new
+`micros_tty_control_diagnostic_register` and
+`micros_tty_control_diagnostic_read` functions in that existing owner as
+callback-free additions. It checks their exact source origin and every
+actual machine call; an indirect call or an undeclared new helper fails.
+Old functions, callback types, constructors and providers keep their
+existing checks. This is not a callback-free exemption for the whole file.
 The diagnostic consumer has no UART-bus or grant-copy callback parameter:
 it returns ordinary `micros_tty_effects` to the facade, which applies them
 through its already bound UART bus. This preserves the existing callback

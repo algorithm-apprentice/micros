@@ -47,6 +47,8 @@ enum micros_tty_result {
 enum micros_tty_control_command {
     MICROS_TTY_CONTROL_COMMIT = 1,
     MICROS_TTY_CONTROL_IRQ_COMPLETE = 2,
+    MICROS_TTY_CONTROL_DIAGNOSTIC_REGISTER = 3,
+    MICROS_TTY_CONTROL_DIAGNOSTIC_READ = 4,
 };
 
 #endif

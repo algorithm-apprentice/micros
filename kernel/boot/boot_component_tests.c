@@ -44,7 +44,7 @@
 #ifdef MICROS_BUILD_UART_CONSOLE_TEST
 #include "kernel/tests/tty/uart_console_test.h"
 #endif
-
+#include "tests/qemu/diagnostic_history_kernel.h"
 #ifdef MICROS_BUILD_OBJECT_MODEL_TEST
 bool micros_kernel_object_runtime_run_self_test(void);
 #endif
@@ -102,8 +102,8 @@ void boot_test_foundation(const struct boot_context *boot)
 #ifdef MICROS_BUILD_UART_CONSOLE_TEST
     micros_uart_console_runtime_run_self_test(boot->hart_id);
 #endif
-
 #ifdef MICROS_BUILD_PANIC_TEST
+    micros_diagnostic_test_seed_panic();
     MICROS_PANIC(boot->hart_id, "intentional-test");
 #endif
 

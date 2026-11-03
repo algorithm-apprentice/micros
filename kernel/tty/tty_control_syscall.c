@@ -21,6 +21,7 @@
 #include "micros/ipc_runtime.h"
 #include "micros/panic.h"
 #include "micros/user_address_space.h"
+#include "kernel/diagnostic/diagnostic_history.h"
 
 static _Noreturn void panic_tty_control(
     struct micros_hart *hart,
@@ -326,6 +327,16 @@ micros_tty_control_handle_captured_user_ecall(
             frame,
             MICROS_SYSCALL_ABI_UNAUTHORIZED
         );
+    }
+    if (
+        authority == MICROS_TTY_CONTROL_AUTHORITY_AUTHORIZED
+        && (request.command == MICROS_TTY_CONTROL_DIAGNOSTIC_REGISTER
+            || request.command == MICROS_TTY_CONTROL_DIAGNOSTIC_READ)
+    ) {
+        frame->a0 = micros_diagnostic_control_dispatch(
+            hart, frame, context, &request, state, bootstrap, registry
+        );
+        return MICROS_SYSCALL_RETURN_NORMAL;
     }
     if (
         authority != MICROS_TTY_CONTROL_AUTHORITY_AUTHORIZED

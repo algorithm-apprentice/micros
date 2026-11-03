@@ -3,6 +3,7 @@
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 #include "micros/timer.h"
+#include "kernel/diagnostic/diagnostic_history.h"
 
 static void preflight_idle_selection(
     const struct micros_kernel_objects *objects,
@@ -66,6 +67,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
     micros_scheduler_test_note_selector_entry();
 #endif
     preflight_idle_selection(objects, hart);
+    micros_diagnostic_notify_pending(hart, NULL);
     error = micros_hart_plan_user_return(
         objects,
         hart_handle,

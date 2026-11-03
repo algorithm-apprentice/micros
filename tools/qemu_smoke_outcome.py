@@ -36,6 +36,8 @@ from tools.qemu_smoke_objects import (
 )
 
 from tools.qemu_smoke_faults import (
+    _has_diagnostic_history,
+    _has_diagnostic_forwarding,
     _has_complete_panic_report,
     _has_complete_trap_context,
     _has_vm_self_fault,
@@ -320,6 +322,8 @@ def matches_expected_result(
     expected_vm_self_fault_scause=None,
     expected_vm_self_fault_stval=None,
     expected_vm_self_fault_ownership=None,
+    require_diagnostic_history=None,
+    require_diagnostic_forwarding=False,
 ):
     output_lines = result.output.splitlines()
 
@@ -391,7 +395,10 @@ def matches_expected_result(
         expected_vm_self_fault_ownership=expected_vm_self_fault_ownership,
     ):
         return False
-    return True
+    return (
+        (require_diagnostic_history is None or _has_diagnostic_history(result.output, require_diagnostic_history))
+        and (not require_diagnostic_forwarding or _has_diagnostic_forwarding(result.output))
+    )
 
 
 def classify_smoke(

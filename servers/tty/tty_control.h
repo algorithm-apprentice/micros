@@ -9,4 +9,10 @@ micros_runtime_result_t micros_tty_control_commit(
 
 micros_runtime_result_t micros_tty_control_irq_complete(void);
 
+micros_runtime_result_t micros_tty_control_diagnostic_register(
+    micros_endpoint_t self_endpoint,
+    uint8_t *snapshot
+);
+micros_runtime_result_t micros_tty_control_diagnostic_read(uint32_t previous);
+
 #endif

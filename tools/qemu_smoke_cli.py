@@ -107,6 +107,8 @@ def _matches_observed_run(
         expected_vm_self_fault_ownership=(
             arguments.vm_self_fault_ownership
         ),
+        require_diagnostic_history=arguments.require_diagnostic_history,
+        require_diagnostic_forwarding=arguments.require_diagnostic_forwarding,
     )
 
 

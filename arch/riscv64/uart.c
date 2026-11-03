@@ -3,6 +3,10 @@
 #include "arch/riscv64/interrupt.h"
 #include "kernel/tty/uart_console_core.h"
 #include "micros/panic.h"
+#include "kernel/diagnostic/diagnostic_history.h"
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "tests/qemu/diagnostic_history_kernel.h"
+#endif
 
 enum {
     UART_THR = 0,
@@ -33,9 +37,12 @@ static void uart_write_character(char character)
     while ((uart0[UART_LSR] & UART_LSR_THR_EMPTY) == 0) {
     }
     uart0[UART_THR] = (uint8_t)character;
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+    micros_diagnostic_test_observe_thr();
+#endif
 }
 
-void uart_write(const char *text)
+static void uart_write_direct(const char *text)
 {
     if (!micros_uart_console_output_allowed(&uart_console_state)) {
         MICROS_PANIC(0, "console-owner-violation");
@@ -49,7 +56,7 @@ void uart_write(const char *text)
     }
 }
 
-void uart_write_hex64(uint64_t value)
+static void uart_write_hex64_direct(uint64_t value)
 {
     static const char digits[] = "0123456789abcdef";
     int shift;
@@ -60,6 +67,83 @@ void uart_write_hex64(uint64_t value)
 
         uart_write_character(digits[digit]);
     }
+}
+
+static bool uart_panic_mode(void)
+{
+    return uart_console_state.owner == MICROS_UART_CONSOLE_OWNER_PANIC;
+}
+
+static void uart_write_logical_byte(uint8_t byte)
+{
+    if (!uart_console_state.quiesced) {
+        if (byte == (uint8_t)'\n') {
+            uart_write_character('\r');
+        }
+        uart_write_character((char)byte);
+    }
+    micros_diagnostic_record_byte(byte);
+}
+
+static void uart_write_record(const char *text)
+{
+    uintptr_t saved_status = riscv_irq_save();
+
+    if (
+        micros_uart_console_validate(&uart_console_state) != MICROS_UART_CONSOLE_OK
+        || uart_console_state.owner == MICROS_UART_CONSOLE_OWNER_PANIC
+        || !micros_diagnostic_history_valid(micros_diagnostic_history_state())
+    ) {
+        MICROS_PANIC(0, "diagnostic-console-invariant");
+    }
+    while (*text != '\0') {
+        uart_write_logical_byte((uint8_t)*text);
+        ++text;
+    }
+    micros_diagnostic_record_end();
+    riscv_irq_restore(saved_status);
+}
+
+static void uart_write_hex64_record(uint64_t value)
+{
+    static const char digits[] = "0123456789abcdef";
+    uintptr_t saved_status = riscv_irq_save();
+    int shift;
+
+    if (
+        micros_uart_console_validate(&uart_console_state) != MICROS_UART_CONSOLE_OK
+        || uart_console_state.owner == MICROS_UART_CONSOLE_OWNER_PANIC
+        || !micros_diagnostic_history_valid(micros_diagnostic_history_state())
+    ) {
+        MICROS_PANIC(0, "diagnostic-console-invariant");
+    }
+    uart_write_logical_byte((uint8_t)'0');
+    uart_write_logical_byte((uint8_t)'x');
+    for (shift = 60; shift >= 0; shift -= 4) {
+        uint8_t digit = (uint8_t)((value >> (unsigned int)shift) & 0xfU);
+
+        uart_write_logical_byte((uint8_t)digits[digit]);
+    }
+    micros_diagnostic_record_end();
+    riscv_irq_restore(saved_status);
+}
+
+void uart_write(const char *text)
+{
+    if (uart_panic_mode()) {
+        uart_write_direct(text);
+        return;
+    }
+    uart_write_record(text);
+}
+
+void uart_write_hex64(uint64_t value)
+{
+    if (uart_panic_mode()) {
+        uart_write_hex64_direct(value);
+        return;
+    }
+    uart_write_hex64_record(value);
 }
 
 bool uart_console_panic_is_active(void)
@@ -135,6 +219,7 @@ void uart_console_begin_quiesce_prevalidated(void)
     ) {
         MICROS_PANIC(0, "console-quiesce-invariant");
     }
+    micros_diagnostic_handoff();
 }
 
 void uart_console_handoff_commit_prevalidated(void)
