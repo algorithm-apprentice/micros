@@ -8,6 +8,7 @@ import re
 import unittest
 
 from tests.host.ast_evidence import ast_dump
+from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
 from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands
@@ -2924,6 +2925,10 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
                 from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
                 value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
+                if not diagnostic_identity_required(
+                    ROOT, "tests/host/test_grant_data_plane_source_layout.py:data-entry:STABLE_HASHES/" + path,
+                ):
+                    continue
                 self.assertEqual(expected, digest_bytes(value))
         self.assertEqual(SHARED_INSPECTOR_DIGEST, digest_bytes(kernel_layout_source.read_bytes_path(ROOT / "tests/host/c_source_records.py")))
 

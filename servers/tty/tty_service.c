@@ -10,6 +10,10 @@
 #include "servers/tty/tty_control.h"
 #include "servers/tty/tty_service_core.h"
 #include "servers/tty/tty_uart.h"
+#include "servers/tty/tty_diagnostic.h"
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+#include "tests/qemu/diagnostic_history_tty.h"
+#endif
 
 #ifndef MICROS_TTY_CONFIGURED_VFS_SERVICE_ID
 #define MICROS_TTY_CONFIGURED_VFS_SERVICE_ID UINT32_C(6)
@@ -20,6 +24,10 @@ volatile struct micros_bootstrap_service_config
 
 static struct micros_tty_service_state tty_service;
 static struct micros_tty_uart_state tty_uart;
+/* Initialized data keeps page alignment inside the closed data/BSS layout. */
+static struct micros_tty_diagnostic tty_diagnostic = {
+    .snapshot = {MICROS_DIAGNOSTIC_VERSION},
+};
 static volatile uint64_t tty_service_data =
     UINT64_C(0x5454595345525643);
 
@@ -67,17 +75,6 @@ static uint32_t tty_service_read_u32_le(const uint8_t *bytes)
         | (uint32_t)bytes[2] << 16
         | (uint32_t)bytes[3] << 24
     );
-}
-
-static uint64_t tty_service_read_u64_le(const uint8_t *bytes)
-{
-    uint64_t value = 0;
-    size_t index;
-
-    for (index = 0; index < 8; ++index) {
-        value |= (uint64_t)bytes[index] << (index * 8);
-    }
-    return value;
 }
 
 static bool validate_configuration(
@@ -280,23 +277,6 @@ static enum micros_tty_service_copy_result service_copy(
         return MICROS_TTY_SERVICE_COPY_INVARIANT;
     }
     return classify_copy_result(result);
-}
-
-static bool notification_is_tty_irq(
-    const struct micros_ipc_message *message
-)
-{
-    return (
-        message->source == MICROS_ENDPOINT_NONE
-        && message->type == MICROS_IPC_TYPE_KERNEL_NOTIFICATION
-        && message->reply_token == 0
-        && tty_service_read_u64_le(&message->payload[0])
-            == MICROS_KERNEL_EVENT_TTY_IRQ
-        && tty_service_bytes_are_zero(
-            &message->payload[8],
-            sizeof(message->payload) - 8
-        )
-    );
 }
 
 static bool notify_vfs(uint64_t events)
@@ -538,6 +518,7 @@ void micros_service_main(void)
         .context = NULL,
     };
     struct micros_ipc_message message;
+    struct micros_tty_effects diagnostic_effects;
 
     if (
         tty_service_data != UINT64_C(0x5454595345525643)
@@ -557,6 +538,9 @@ void micros_service_main(void)
         ) != MICROS_SYSCALL_ABI_OK
         || micros_tty_service_commit_ownership(&tty_service)
             != MICROS_TTY_SERVICE_OK
+        || !micros_tty_diagnostic_initialize(
+            &tty_diagnostic, micros_bootstrap_service_config.self_endpoint
+        )
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
         || !prepare_ready_interrupt_race(&bus)
 #endif
@@ -565,7 +549,39 @@ void micros_service_main(void)
         __builtin_trap();
     }
 
+#ifdef MICROS_BUILD_TTY_SERVICE_TEST
+    uint64_t initial_events;
+
+    tty_service_clear_bytes(&message, sizeof(message));
+    if (
+        micros_runtime_receive(MICROS_ENDPOINT_ANY, &message) != MICROS_SYSCALL_ABI_OK
+        || !micros_tty_diagnostic_notification(&message, &initial_events)
+        || initial_events != (MICROS_KERNEL_EVENT_TTY_IRQ | MICROS_KERNEL_EVENT_DIAGNOSTIC)
+        || !handle_irq(&bus, &io)
+    ) {
+        __builtin_trap();
+    }
+    while (true) {
+        enum micros_diagnostic_test_transfer_result transfer = micros_diagnostic_test_tty_transfer(&tty_diagnostic);
+
+        if (transfer == MICROS_DIAGNOSTIC_TEST_TRANSFER_COMPLETE) {
+            break;
+        }
+        tty_service_clear_bytes(&message, sizeof(message));
+        if (
+            transfer != MICROS_DIAGNOSTIC_TEST_TRANSFER_DEFERRED
+            || micros_runtime_receive(MICROS_ENDPOINT_ANY, &message) != MICROS_SYSCALL_ABI_OK
+            || !micros_tty_diagnostic_notification(&message, &initial_events)
+            || initial_events != MICROS_KERNEL_EVENT_TTY_IRQ
+            || !handle_irq(&bus, &io)
+        ) {
+            __builtin_trap();
+        }
+    }
+#endif
+
     for (;;) {
+        uint64_t diagnostic_events = 0;
         tty_service_clear_bytes(&message, sizeof(message));
         if (
             micros_runtime_receive(
@@ -577,12 +593,26 @@ void micros_service_main(void)
         }
         if (message.type == MICROS_IPC_TYPE_KERNEL_NOTIFICATION) {
             if (
-                !notification_is_tty_irq(&message)
-                || !handle_irq(&bus, &io)
+                !micros_tty_diagnostic_notification(&message, &diagnostic_events)
+                || (
+                    (diagnostic_events & MICROS_KERNEL_EVENT_TTY_IRQ) != 0
+                    && !handle_irq(&bus, &io)
+                )
             ) {
                 __builtin_trap();
             }
         } else if (!handle_call(&bus, &io, &message)) {
+            __builtin_trap();
+        }
+        if (
+            !micros_tty_diagnostic_progress(
+                &tty_diagnostic, &tty_service.terminal,
+                (diagnostic_events & MICROS_KERNEL_EVENT_DIAGNOSTIC) != 0, &diagnostic_effects
+            )
+            || micros_tty_uart_apply_effects(
+                &tty_uart, &bus, &tty_service.terminal, &diagnostic_effects
+            ) != MICROS_TTY_UART_OK
+        ) {
             __builtin_trap();
         }
     }

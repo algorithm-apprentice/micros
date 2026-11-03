@@ -5,6 +5,7 @@
 #include "lib/runtime/raw_syscall.h"
 #include "micros/syscall_abi.h"
 #include "micros/tty.h"
+#include "micros/diagnostic.h"
 
 micros_runtime_result_t micros_tty_control_commit(
     micros_endpoint_t self_endpoint
@@ -44,5 +45,31 @@ micros_runtime_result_t micros_tty_control_irq_complete(void)
         0,
         0,
         MICROS_SYSCALL_ABI_TTY_CONTROL
+    );
+}
+
+micros_runtime_result_t micros_tty_control_diagnostic_register(
+    micros_endpoint_t self_endpoint,
+    uint8_t *snapshot
+)
+{
+    if (
+        self_endpoint == MICROS_ENDPOINT_NONE || self_endpoint == MICROS_ENDPOINT_ANY
+        || snapshot == NULL || (uintptr_t)snapshot % 4096 != 0
+    ) {
+        return MICROS_SYSCALL_ABI_ARGUMENT;
+    }
+    return micros_runtime_raw_syscall(
+        MICROS_TTY_CONTROL_DIAGNOSTIC_REGISTER, MICROS_TTY_CONTROL_VERSION,
+        MICROS_TTY_SERVICE_ID, self_endpoint, (uintptr_t)snapshot,
+        MICROS_DIAGNOSTIC_SNAPSHOT_SIZE, 0, MICROS_SYSCALL_ABI_TTY_CONTROL
+    );
+}
+
+micros_runtime_result_t micros_tty_control_diagnostic_read(uint32_t previous)
+{
+    return micros_runtime_raw_syscall(
+        MICROS_TTY_CONTROL_DIAGNOSTIC_READ, MICROS_TTY_CONTROL_VERSION,
+        previous, 0, 0, 0, 0, MICROS_SYSCALL_ABI_TTY_CONTROL
     );
 }

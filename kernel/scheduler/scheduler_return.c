@@ -4,6 +4,7 @@
 #include "micros/panic.h"
 #include "micros/timer.h"
 #include "micros/user_execution.h"
+#include "kernel/diagnostic/diagnostic_history.h"
 
 static _Noreturn void panic_invalid_context(
     struct micros_hart *hart,
@@ -158,6 +159,7 @@ static enum micros_scheduler_error select_user_return(
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         return scheduler_error;
     }
+    micros_diagnostic_notify_pending(hart, frame);
     error = micros_hart_plan_user_return(
         objects,
         hart_handle,

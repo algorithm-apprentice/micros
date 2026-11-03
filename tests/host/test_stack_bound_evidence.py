@@ -1000,7 +1000,12 @@ class StackBoundEvidenceTest(unittest.TestCase):
         )
 
         main = function("entry")
-        uart = function("uart_write", "arch/riscv64/uart.c")
+        uart = function("uart_write_direct", "arch/riscv64/uart.c")
+        wrapper = function("uart_write", "arch/riscv64/uart.c")
+        recording = function("uart_write_record", "arch/riscv64/uart.c")
+        hex_wrapper = function("uart_write_hex64", "arch/riscv64/uart.c")
+        hex_recording = function("uart_write_hex64_record", "arch/riscv64/uart.c")
+        hex_direct = function("uart_write_hex64_direct", "arch/riscv64/uart.c")
         panic = function("micros_panic_entry", "arch/riscv64/panic.S")
         shared = function("micros_trap_panic_entry", "arch/riscv64/panic.S")
         report = function("micros_panic_report", "kernel/diagnostic/panic.c")
@@ -1009,18 +1014,25 @@ class StackBoundEvidenceTest(unittest.TestCase):
         frames = tuple(Frame(key, size) for key, size in (
             (main, 16), (uart, 32), (panic, 0), (shared, 48),
             (report, 80), (seize, 16), (character, 64),
+            (wrapper, 16), (recording, 0), (hex_wrapper, 16),
+            (hex_recording, 0), (hex_direct, 16),
         ))
         edges = (
             CallSite(main, 0, (uart,)), CallSite(uart, 0, (panic,)),
             CallSite(uart, 4, (character,)), CallSite(panic, 0, (shared,), EdgeKind.TAIL),
             CallSite(shared, 0, (report,)), CallSite(report, 0, (seize,)),
             CallSite(report, 4, (uart,)),
+            CallSite(wrapper, 0, (recording,)), CallSite(wrapper, 4, (uart,)),
+            CallSite(hex_wrapper, 0, (hex_recording,)), CallSite(hex_wrapper, 4, (hex_direct,)),
+            CallSite(hex_direct, 0, (wrapper,)), CallSite(recording, 0, (panic,)),
+            CallSite(hex_recording, 0, (panic,)),
         )
         roots = (Root("supervisor", main, 16384, 288),)
         with self.assertRaisesRegex(StackEvidenceError, "recursive"):
             certify_stack_bounds(frames, edges, roots)
         binding = ContextBindings(
-            ((report, 4),), (uart, character), (uart, 0),
+            ((report, 4),), (uart, character, wrapper, hex_wrapper, hex_direct),
+            ((uart, 0), (wrapper, 0), (hex_wrapper, 0)),
         )
         proof, = certify_context_bounds(frames, edges, roots, binding)
         self.assertEqual(560, proof.bytes_used)
@@ -1032,6 +1044,15 @@ class StackBoundEvidenceTest(unittest.TestCase):
             certify_context_bounds(frames, edges, roots, replace(binding, establishing=()))
         with self.assertRaises(StackEvidenceError):
             certify_context_bounds(frames, edges, roots, replace(binding, preservers=(uart,)))
+        for exclusions in (
+            binding.infeasible[:2],
+            (*binding.infeasible, (uart, 4)),
+            (binding.infeasible[0], binding.infeasible[1], binding.infeasible[1]),
+            ((uart, 4), *binding.infeasible[1:]),
+            (uart, 0),
+        ):
+            with self.subTest(exclusions=exclusions), self.assertRaises(StackEvidenceError):
+                certify_context_bounds(frames, edges, roots, replace(binding, infeasible=exclusions))
 
     def test_both_panic_entries_retain_one_shared_48_byte_context(self):
         from tools.stack_bound_panic import panic_frame_evidence

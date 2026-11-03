@@ -261,8 +261,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(11, len(inventory.families))
-        self.assertGreater(len(inventory.facts), 30)
+        self.assertEqual(12, len(inventory.families))
+        self.assertEqual(3920, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -587,10 +587,14 @@ class PackedInventoryTests(unittest.TestCase):
 
         inventory = evidence_authority_inventory.current_inventory(ROOT)
         self.assertTrue(evidence_authority.validate_inventory(inventory).ok)
-        self.assertEqual(3912, len(inventory.facts))
-        self.assertEqual(11, len(inventory.families))
-        self.assertEqual(3735, sum(fact.family != self.FAMILY for fact in inventory.facts))
-        historical = prior_binding_facts(inventory.facts)
+        retained = tuple(
+            fact for fact in inventory.facts
+            if fact.family in self.previous or fact.family == self.FAMILY
+        )
+        self.assertEqual(3912, len(retained))
+        self.assertEqual(11, len({fact.family for fact in retained}))
+        self.assertEqual(3735, sum(fact.family != self.FAMILY for fact in retained))
+        historical = prior_binding_facts(retained)
         for family, expected in self.previous.items():
             self.assertEqual(expected, fact_set_digest(
                 fact for fact in historical if fact.family == family
@@ -831,7 +835,8 @@ class RelocatedBindingTests(unittest.TestCase):
         rows, fingerprints = relocated_binding_reference()
         inventory = evidence_authority_inventory.current_inventory(ROOT)
         self.assertTrue(evidence_authority.validate_inventory(inventory).ok)
-        self.assertEqual(3912, len(inventory.facts))
+        retained = tuple(fact for fact in inventory.facts if fact.family in fingerprints)
+        self.assertEqual(3912, len(retained))
         observed = {fact.key: fact for fact in inventory.facts if fact.key in rows}
         self.assertEqual(set(rows), set(observed))
         self.assertEqual({2: 102, 11: 2}, Counter(len(fact.payload_paths) for fact in observed.values()))
@@ -840,8 +845,8 @@ class RelocatedBindingTests(unittest.TestCase):
             self.assertEqual(expected_value, fact.evidence_value)
             self.assertEqual(expected_metadata, (fact.payload_paths, fact.primary_unit, fact.consumer_units))
             self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
-        projected = prior_binding_facts(inventory.facts)
-        self.assertEqual(104, sum(before != after for before, after in zip(inventory.facts, projected)))
+        projected = prior_binding_facts(retained)
+        self.assertEqual(104, sum(before != after for before, after in zip(retained, projected)))
         for family, expected in fingerprints.items():
             self.assertEqual(expected, fact_set_digest(fact for fact in projected if fact.family == family), family)
 

@@ -17,6 +17,7 @@ struct micros_tty_control_request {
     uint64_t physical_base;
     uint32_t mapped_length;
     uint32_t irq_source;
+    uint32_t diagnostic_cursor;
 };
 
 enum micros_syscall_abi_result micros_tty_control_decode(

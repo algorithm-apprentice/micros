@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from tools.qemu_smoke_records import (
@@ -145,4 +146,84 @@ def _has_complete_scheduler_invalid_context(output, expected_state):
             line.startswith(SCHEDULER_TEST_MARKER)
             for line in output_lines
         )
+    )
+
+
+def _diagnostic_history_payload(output):
+    if not _has_complete_panic_report(output):
+        return None
+    lines, terminated = _split_output_records(output)
+    panic = [index for index, line in enumerate(lines) if line.startswith(PANIC_MARKER)]
+    traps = [index for index, line in enumerate(lines) if line.startswith("MICROS_TRAP_CONTEXT")]
+    end = panic[-1]
+    if traps:
+        if not _has_complete_trap_context(output):
+            return None
+        end = traps[0]
+    indices = [
+        index for index, line in enumerate(lines)
+        if line.startswith("MICROS_DIAGNOSTIC_HISTORY")
+    ]
+    if (
+        not indices or indices[0] != end + 1
+        or indices != list(range(indices[0], indices[0] + len(indices)))
+        or not all(terminated[index] for index in indices)
+        or any(line.startswith("MICROS_") for line in lines[indices[-1] + 1:])
+    ):
+        return None
+    header = re.fullmatch(
+        r"MICROS_DIAGNOSTIC_HISTORY state=retained bytes=0x([0-9a-f]{16})",
+        lines[indices[0]],
+    )
+    if header is None:
+        return None
+    count = int(header.group(1), 16)
+    if count > 1998 or len(indices) - 1 > count:
+        return None
+    payload = bytearray()
+    for index in indices[1:]:
+        record = re.fullmatch(
+            r"MICROS_DIAGNOSTIC_HISTORY_DATA offset=0x([0-9a-f]{16}) data=([0-9a-f]{2,64})",
+            lines[index],
+        )
+        if (
+            record is None or int(record.group(1), 16) != len(payload)
+            or len(record.group(2)) % 2 != 0
+        ):
+            return None
+        payload.extend(bytes.fromhex(record.group(2)))
+        if len(payload) > count:
+            return None
+    return bytes(payload) if len(payload) == count else None
+
+
+def _has_diagnostic_history(output, requirement):
+    if requirement not in ("retained", "seeded"):
+        return False
+    payload = _diagnostic_history_payload(output)
+    if payload is None:
+        return False
+    if requirement == "retained":
+        return True
+    seed = bytes(ord("a") + index % 23 for index in range(1999)) + b"\n"
+    return payload == seed[2:]
+
+
+def _has_diagnostic_forwarding(output):
+    lines, terminated = _split_output_records(output)
+    expected = (
+        "MICROS_DIAGNOSTIC_TEST_PASS transfer=three-pages envelope=irq-diagnostic "
+        "output=tty early=drained"
+    )
+    diagnostics = [
+        index for index, line in enumerate(lines)
+        if line.startswith("MICROS_DIAGNOSTIC_TEST_PASS")
+    ]
+    ready = [index for index, line in enumerate(lines) if line == "MICROS_TTY_INPUT_READY"]
+    finished = [index for index, line in enumerate(lines) if line.startswith("MICROS_TTY_TEST_PASS ")]
+    return (
+        len(diagnostics) == 1 and len(ready) == 1 and len(finished) == 1
+        and diagnostics[0] < ready[0] < finished[0]
+        and lines[diagnostics[0]] == expected
+        and all(terminated[index] for index in (*diagnostics, *ready, *finished))
     )

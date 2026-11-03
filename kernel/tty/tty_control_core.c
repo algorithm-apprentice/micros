@@ -81,6 +81,22 @@ enum micros_syscall_abi_result micros_tty_control_decode(
             return MICROS_SYSCALL_ABI_ARGUMENT;
         }
         candidate.irq_source = (uint32_t)arguments->a2;
+    } else if (candidate.command == MICROS_TTY_CONTROL_DIAGNOSTIC_REGISTER) {
+        if (arguments->a5 > UINT32_MAX || arguments->a6 != 0) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.service_id = (uint32_t)arguments->a2;
+        candidate.endpoint = (micros_endpoint_t)arguments->a3;
+        candidate.virtual_base = arguments->a4;
+        candidate.mapped_length = (uint32_t)arguments->a5;
+    } else if (candidate.command == MICROS_TTY_CONTROL_DIAGNOSTIC_READ) {
+        if (
+            arguments->a3 != 0 || arguments->a4 != 0
+            || arguments->a5 != 0 || arguments->a6 != 0
+        ) {
+            return MICROS_SYSCALL_ABI_ARGUMENT;
+        }
+        candidate.diagnostic_cursor = (uint32_t)arguments->a2;
     } else {
         return MICROS_SYSCALL_ABI_ARGUMENT;
     }

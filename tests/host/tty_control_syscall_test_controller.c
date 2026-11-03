@@ -1,4 +1,25 @@
 #include "tty_control_syscall_test_internal.h"
+#include "kernel/diagnostic/diagnostic_history.h"
+
+uint64_t micros_diagnostic_control_dispatch(
+    struct micros_hart *hart,
+    struct micros_trap_frame *frame,
+    const struct micros_syscall_context *context,
+    const struct micros_tty_control_request *request,
+    const struct micros_tty_handoff_runtime_state *state,
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry
+)
+{
+    (void)hart;
+    (void)frame;
+    (void)context;
+    (void)request;
+    (void)state;
+    (void)bootstrap;
+    (void)registry;
+    abort();
+}
 
 void micros_test_external_interrupt_enable(void)
 {

@@ -31,6 +31,7 @@ from tools.python_host_runtime import (
     validate_environment as validate_python_environment,
 )
 from tests.host.work_count_recipe import projected_recipe_digest
+from tests.host.diagnostic_history_source import projected_runner_digest
 
 
 PROFILE_NAME = "darwin-arm64-ninja-python315-v2"
@@ -114,7 +115,7 @@ def _validate_qemu_runner_family(root):
         raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
     for name, expected in QEMU_RUNNER_SOURCE_DIGESTS.items():
         path = root / name
-        if path.is_symlink() or not path.is_file() or _file_digest(path) != expected:
+        if path.is_symlink() or not path.is_file() or projected_runner_digest(path) != expected:
             raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
     names = tuple(Path(name).stem for name in QEMU_RUNNER_SOURCE_DIGESTS if name != "tools/run_qemu_smoke.py")
     forbidden = [

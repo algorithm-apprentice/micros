@@ -2985,6 +2985,34 @@ if(MICROS_BUILD_HOST_TESTS)
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
     )
+    add_executable(
+        diagnostic_history_test
+        tests/host/diagnostic_history_test.c
+        tests/host/diagnostic_control_test.c
+        tests/host/tty_diagnostic_test.c
+        tests/qemu/diagnostic_history_tty.c
+        kernel/diagnostic/diagnostic_history_core.c
+        kernel/diagnostic/diagnostic_control_core.c
+        kernel/tty/tty_control_core.c
+        servers/tty/tty_diagnostic.c
+        servers/tty/tty_control.c
+        servers/tty/tty_core.c
+        ${MICROS_TTY_SERVICE_CORE_SOURCES}
+        lib/runtime/memory.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(diagnostic_history_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(diagnostic_history_test PRIVATE c_std_17)
+    target_compile_options(diagnostic_history_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(diagnostic_history_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(diagnostic_history_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(diagnostic_history_test PRIVATE MICROS_TEST_WORK_COUNTS=1)
+    add_test(NAME diagnostic-history COMMAND diagnostic_history_test)
+    add_dependencies(test-unit-fast diagnostic_history_test)
+    add_dependencies(test-unit diagnostic_history_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()
@@ -3435,6 +3463,7 @@ if(
             micros_tty_service
             micros-tty-service
             servers/tty/tty_control.c
+            servers/tty/tty_diagnostic.c
             servers/tty/tty_core.c
             servers/tty/tty_service.c
             ${MICROS_TTY_SERVICE_CORE_SOURCES}
@@ -3445,6 +3474,7 @@ if(
                 micros_tty_service
                 PRIVATE
                     tests/qemu/tty_service_claim_wait.S
+                    tests/qemu/diagnostic_history_tty.c
             )
             target_compile_definitions(
                 micros_tty_service
@@ -4141,6 +4171,11 @@ add_executable(
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
     kernel/diagnostic/panic.c
+    kernel/diagnostic/diagnostic_history_core.c
+    kernel/diagnostic/diagnostic_history.c
+    kernel/diagnostic/diagnostic_control_core.c
+    kernel/diagnostic/diagnostic_control.c
+    kernel/diagnostic/panic_history.c
     kernel/platform/plic.c
     kernel/platform/plic_core.c
     ${MICROS_PM_CONTROL_CORE_SOURCES}
@@ -4167,6 +4202,10 @@ add_executable(
     ${MICROS_VM_SNAPSHOT_SOURCES}
     ${MICROS_VM_BOOT_VALIDATION_SOURCES}
 )
+
+if(MICROS_BUILD_PANIC_TEST OR MICROS_BUILD_TTY_SERVICE_TEST)
+    target_sources(micros PRIVATE tests/qemu/diagnostic_history_kernel.c)
+endif()
 
 if(MICROS_BUILD_UART_CONSOLE_TEST)
     target_compile_definitions(
@@ -4723,6 +4762,8 @@ if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -4905,6 +4946,7 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
             --require-mmu-ready
             --require-frame-ownership-ready
             --require-objects-ready
+            --require-diagnostic-forwarding
             --timeout
             90
         DEPENDS micros
@@ -5040,6 +5082,8 @@ if(MICROS_BUILD_VM_READY_EARLY_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -5087,6 +5131,8 @@ if(MICROS_BUILD_VM_SELF_FAULT_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -5152,6 +5198,8 @@ if(MICROS_BUILD_VM_SELF_FAULT_SEALED_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -5211,6 +5259,8 @@ if(MICROS_BUILD_BOOTSTRAP_READY_TIMEOUT_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -5252,6 +5302,8 @@ if(MICROS_BUILD_BOOTSTRAP_MANIFEST_PANIC_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -5598,6 +5650,8 @@ if(
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -6007,6 +6061,8 @@ if(MICROS_BUILD_PANIC_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            seeded
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready
@@ -6163,6 +6219,8 @@ if(MICROS_BUILD_TRAP_PANIC_TEST)
             --require-fdt-events
             --require-fdt-reservations
             --require-panic-report
+            --require-diagnostic-history
+            retained
             --require-trap-ready
             --require-frame-allocator-ready
             --require-mmu-ready

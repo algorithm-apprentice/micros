@@ -7,6 +7,7 @@ import re
 
 from tests.host.c_source_records import c_lexical_text, compact, function_records, tokens
 from tests.host.stack_source_projection import project_stack_source
+from tests.host.diagnostic_history_source import diagnostic_no_callback_scope, project_diagnostic_callback_source
 from tools.stack_bound_callback_contracts import GROUPS
 from tools.stack_bound_callbacks import require_callback_argument
 from tools.stack_bound_objects import call_instructions, function_symbols, load_object
@@ -23,7 +24,12 @@ def reference_source(root, unit):
 
 def anchored_function(root, key, source_unit=None):
     unit = key.translation_unit if source_unit is None else source_unit
-    actual = function_records(project_stack_source(unit, (Path(root) / unit).read_text())).get(key.symbol)
+    source = project_stack_source(unit, (Path(root) / unit).read_text())
+    try:
+        source = project_diagnostic_callback_source(unit, source)
+    except AssertionError as error:
+        raise StackEvidenceError(f"diagnostic callback constructor: {error}") from error
+    actual = function_records(source).get(key.symbol)
     expected = function_records(reference_source(str(root), unit)).get(key.symbol)
     if (
         actual is None or expected is None
@@ -116,9 +122,16 @@ def require_callback_type_scope(root, group, units):
     ):
         raise StackEvidenceError(f"{group.identifier} callback header contract changed")
     expression = r"\b(?:" + "|".join(map(re.escape, group.types)) + r")\b"
+    callback_free = set()
     for unit in units:
         if not unit.startswith(group.source_prefix):
             continue
+        try:
+            if diagnostic_no_callback_scope(root, unit, group.types):
+                callback_free.add(unit)
+                continue
+        except (AssertionError, ValueError, OSError) as error:
+            raise StackEvidenceError(f"{group.identifier} diagnostic callback scope: {error}") from error
         actual = function_records((Path(root) / unit).read_text())
         expected = function_records(reference_source(str(root), unit))
         selected = {
@@ -133,6 +146,7 @@ def require_callback_type_scope(root, group, units):
                 anchored_function(root, FunctionKey("source", "source.elf", unit, name))
             except StackEvidenceError as error:
                 raise StackEvidenceError(f"{group.identifier} callback type/argument scope: {error}") from error
+    return frozenset(callback_free)
 
 
 def configured_callback_flags(directory):
@@ -167,8 +181,25 @@ def bind_current_callbacks(root, directory, catalog):
         ]
         if not candidates:
             continue
-        require_callback_type_scope(root, group, {key.translation_unit for key in candidates})
+        callback_free = require_callback_type_scope(root, group, {key.translation_unit for key in candidates})
         for key in candidates:
+            diagnostic_wrapper = (
+                key.translation_unit == "servers/tty/tty_control.c"
+                and key.symbol in (
+                    "micros_tty_control_diagnostic_register", "micros_tty_control_diagnostic_read",
+                )
+            )
+            if key.translation_unit in callback_free or diagnostic_wrapper:
+                if origins[key] != key.translation_unit:
+                    raise StackEvidenceError("diagnostic callback-free function borrowed another source origin")
+                obj = load_object(Path(directory) / objects[key])
+                symbol = function_symbols(obj).get(key.symbol)
+                if symbol is None or grouped.get(key) or any(
+                    call.target_symbol is None
+                    for call in call_instructions(obj, symbol, key, switch_jumps(obj, symbol))
+                ):
+                    raise StackEvidenceError("diagnostic callback-free source has an actual indirect call")
+                continue
             reference = function_records(reference_source(str(root), origins[key])).get(key.symbol)
             if reference is None:
                 if (

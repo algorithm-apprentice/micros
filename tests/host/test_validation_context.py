@@ -95,7 +95,7 @@ class ValidationContextTests(unittest.TestCase):
         for index, name in enumerate(paths):
             path = self.root / name
             path.parent.mkdir(exist_ok=True)
-            raw = ("fixed reviewed source member " + str(index) + "\n").encode()
+            raw = ("# fixed reviewed source member " + str(index) + "\n").encode()
             path.write_bytes(raw)
             expected[name] = hashlib.sha256(raw).hexdigest()
         return expected

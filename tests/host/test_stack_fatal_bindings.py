@@ -34,18 +34,24 @@ class StackFatalBindingsTest(unittest.TestCase):
 
     def test_qualification_records_every_post_seizure_call_and_the_exact_guard(self):
         proof = self.bind()
-        self.assertEqual(51, len(proof.bindings.establishing))
+        self.assertEqual(2, proof.version)
+        history_calls = tuple(row for row in proof.establishment if row.target == "micros_diagnostic_panic_report")
+        self.assertEqual(1, len(history_calls))
+        self.assertEqual(51, len(proof.bindings.establishing) - len(history_calls))
         self.assertEqual(
-            ("arch/riscv64/uart.c", "uart_write", 0x34),
-            (
-                proof.bindings.infeasible[0].translation_unit,
-                proof.bindings.infeasible[0].symbol, proof.bindings.infeasible[1],
-            ),
+            {"uart_write_direct", "uart_write", "uart_write_hex64"},
+            {key.symbol for key, _ in proof.bindings.infeasible},
         )
-        self.assertEqual(51, len(proof.establishment))
+        self.assertEqual(
+            {"direct-console-owner", "text-recording-arm", "hex-recording-arm"},
+            {row.role for row in proof.exclusions},
+        )
+        self.assertEqual(3, len(proof.exclusions))
+        self.assertEqual(51, len(proof.establishment) - len(history_calls))
         self.assertTrue(any(row.function.symbol == "sbi_system_reset" for row in proof.preservation))
         self.assertTrue(any(row.function.symbol == "uart_flush" for row in proof.preservation))
         self.assertEqual(16, proof.console.size)
+        self.assertEqual(("diagnostic_history", 12012), (proof.history.symbol, proof.history.size))
         self.assertEqual({"sbi_set_timer", "sbi_system_reset"}, {
             row.function.symbol for row in proof.sbi_inventory
         })
@@ -67,6 +73,27 @@ class StackFatalBindingsTest(unittest.TestCase):
             self.bind(replace(self.catalog, origins=tuple(
                 replace(row, line=row.line + 1) if row == origin else row for row in self.catalog.origins
             )))
+
+    def test_tty_counter_has_its_own_linked_object_effect_and_live_frame(self):
+        from tools.stack_bound_fatal import derive_fatal_context
+
+        with tempfile.TemporaryDirectory(prefix="micros-fatal-tty-counter-", dir=ROOT / "build") as directory:
+            root, output, dependencies = build_fatal_fixture(ROOT, Path(directory).resolve(), tty_test=True)
+            catalog = fixture_catalog(root, output, dependencies)
+            with patch("tools.stack_bound_fatal.resolve_default_firmware", return_value={"fixture": "pinned"}):
+                proof = derive_fatal_context(root, output, catalog, qemu="/fixture/qemu-system-riscv64")
+            self.assertEqual(("diagnostic_thr_writes", 8), (proof.test_counter.symbol, proof.test_counter.size))
+            for other in (proof.console, proof.history):
+                self.assertTrue(
+                    proof.test_counter.address + proof.test_counter.size <= other.address
+                    or other.address + other.size <= proof.test_counter.address
+                )
+            observer, = (row for row in proof.preservation if row.function.symbol == "micros_diagnostic_test_observe_thr")
+            character, = (row for row in proof.preservation if row.function.symbol == "uart_write_character")
+            self.assertIn(observer.function, proof.bindings.preservers)
+            self.assertEqual(1, len(observer.writes))
+            self.assertEqual({"maximum", "below-maximum"}, {row[0] for row in observer.relations})
+            self.assertEqual(1, sum(row.target == observer.function.symbol for row in character.calls))
 
     def test_changed_source_state_or_missing_fallback_cannot_supply_qualification(self):
         for unit, old, new in (
