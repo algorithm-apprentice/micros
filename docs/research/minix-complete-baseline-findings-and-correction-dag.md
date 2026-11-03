@@ -91,13 +91,18 @@ passed. The fresh committed checkout preserves all prior authority
 without a journal. This closes only B01-F001/F003/F005 and their
 E002/E003/E005 evidence gaps, leaving 71 pre-node runtime findings open.
 
-PLAT03 is now the single active dependency-ready design. Its
+PLAT03 design #202 is separately merged. Its
 [fixed-source study](minix-panic-stack-trace.md) and
 [Accepted trace contract](../architecture/panic-stack-trace.md) cover
-only B01-F004/B01-E004. Independent design review is clean;
-implementation remains pending the separate design merge. Memory correction
-and hosted CI do not start in parallel; the historical audit counts and
-graph remain unchanged.
+only B01-F004/B01-E004. Independent design and Acceptance reviews were
+clean. The first uncommitted implementation then misinterpreted case 8's
+shorthand rejection label, despite the contract's correct explicit
+progress-before-range order. It was stopped and abandoned before
+production changes. The single active task is the documentation-only
+[Accepted ADR-0097 clarification](../adr/0097-panic-trace-link-rejection-precedence.md);
+PLAT03 implementation is blocked until that correction separately merges.
+Memory correction and hosted CI do not start in parallel; the historical
+audit counts and graph remain unchanged.
 
 ## Consolidation invariants
 
