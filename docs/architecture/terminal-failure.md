@@ -9,10 +9,14 @@ B01-E002/E003/E005 evidence gaps. Complete independent design review and
 correction re-review are clean.
 
 The independently reviewed design separately merged as #200 /
-`aac991ad9d734f8ef6c375e43934bc95f9defe04`. Implementation is proceeding from that
-merged tree, with the independent declarations frozen before their source
-owners and extractor are changed. Design Acceptance is not runtime or
-target acceptance.
+`aac991ad9d734f8ef6c375e43934bc95f9defe04`. Implementation #201 is now
+independently reviewed and merged as
+`e12b2d6c163ac92282d380eff5be419fad7f7a30`, with identical reviewed,
+published and squash tree `53d900f539d0e766b2998ff57aeea990ac25e30a`.
+Its declarations were independently frozen before owner/extractor edits.
+Actual matching baseline/current evidence, all 49 fresh author commands,
+43 static configurations/112 ELF outputs and ten observed scopes passed.
+Ordinary committed checks preserve both prior claims without journals.
 
 The fixed source base is PLAT01 implementation #199:
 
@@ -35,6 +39,8 @@ original boot caller, diagnostic locations and completed authority claims.
 The native state test, twelve-case controller and four-context linked
 proof are executable; current target evidence, the full fresh author plan
 and independent implementation review remain mandatory acceptance gates.
+The merged outcome passed those gates; its trace successor is the separately
+Accepted [PLAT03 contract](panic-stack-trace.md).
 
 ## Bounded physical output
 

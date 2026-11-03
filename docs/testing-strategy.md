@@ -303,6 +303,23 @@ The [build guide](development/building.md#terminal-failure-baseline-and-current-
 documents the actual baseline intent, error distinction, fresh private
 builds, retained reports and first-author immutable-input comparison.
 
+PLAT02 implementation #201 passed that complete current gate and
+independent implementation review. Its ordinary committed checkout
+preserves the original 3,920 facts plus the nine independently declared
+terminal facts and both prior claims without author journals.
+
+The next Accepted
+[PLAT03 trace contract](architecture/panic-stack-trace.md) defines
+portable owner/cursor validation, exact frame-load work, eighteen real
+target cases, a 192-byte observation object and actual old-runtime Red.
+Its separate `MICROS_TRACE_*` records preserve the existing five-record
+panic classifier and physical-output accounting. The future implementation
+must preserve all 3,929 prior facts and thirteen fingerprints, extend
+complete stack evidence to 44 configurations/113 outputs, retain all ten
+current observed scopes and run the complete 50-command fresh author gate.
+These are design acceptance requirements, not existing trace commands or
+reported execution results.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

@@ -99,6 +99,9 @@ This directory contains the design baseline for `micros`.
 - [Bounded UART and terminal panic](architecture/terminal-failure.md)
   defines PLAT02's Accepted finite waits, first-entry/reset ownership, terminal
   metadata repair and independently observed failure boundaries.
+- [Bounded panic stack trace](architecture/panic-stack-trace.md)
+  defines PLAT03's Accepted current-kernel frame walk, exact stack/epoch
+  authentication, finite read/output rules and independent target evidence.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -111,6 +114,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [MINIX panic stack-trace baseline](research/minix-panic-stack-trace.md)
+  traces the fixed current-kernel walk, pinned RV64 frame convention,
+  ownership barriers, complexity and retained evidence for PLAT03.
 - [MINIX UART and terminal failure baseline](research/minix-terminal-failure-baseline.md)
   traces bounded polling, panic entry/reset ownership and current console
   failure boundaries for the dependency-ready PLAT02 design.

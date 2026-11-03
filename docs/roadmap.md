@@ -50,16 +50,25 @@ author commands passed, including 42 static configurations, 111 ELF outputs
 and ten observed stack scopes. The reviewed, published and squash trees
 are identical; a fresh committed checkout preserves COPY01 and PLAT01
 authority without an author journal. This closes only B01-F002.
-The next single preferred outcome is
-[PLAT02](research/minix-terminal-failure-baseline.md), covering
-bounded UART polling, recursive panic and corrupt-console fallback.
-Its [Accepted ADR-0095](adr/0095-bounded-uart-and-terminal-panic.md) and
+The following [PLAT02](research/minix-terminal-failure-baseline.md)
+outcome covers bounded UART polling, recursive panic and corrupt-console
+fallback. Its [Accepted ADR-0095](adr/0095-bounded-uart-and-terminal-panic.md) and
 [terminal contract](architecture/terminal-failure.md) have passed
 independent design/correction review and separately merged as #200.
-The implementation provides the runtime owners, independent source/work
-evidence, twelve real target cases and expanded finite stack proof.
-Its complete current author gate, independent review and merge remain
-the prerequisite for PLAT03.
+Implementation #201 is now independently reviewed and merged. All 49
+current author commands passed fresh, with actual matching baseline/current
+terminal evidence, 43 static configurations/112 ELF outputs and ten
+observed scopes. The reviewed, published and squash trees are identical;
+a fresh committed checkout preserves all prior authority without journals.
+This closes only B01-F001/F003/F005 and makes PLAT03 dependency-ready.
+
+The single active outcome is now the
+[PLAT03 trace design](architecture/panic-stack-trace.md), under
+[Accepted ADR-0096](adr/0096-bounded-kernel-panic-stack-trace.md).
+Its [fixed-source study](research/minix-panic-stack-trace.md) traces
+the current-kernel frame chain, RV64 layout and authenticated entry-epoch
+barriers. Independent design review is clean. Implementation remains
+pending the separate design merge; no trace code is claimed by this design.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
