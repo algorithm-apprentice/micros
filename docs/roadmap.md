@@ -62,13 +62,19 @@ observed scopes. The reviewed, published and squash trees are identical;
 a fresh committed checkout preserves all prior authority without journals.
 This closes only B01-F001/F003/F005 and makes PLAT03 dependency-ready.
 
-The single active outcome is now the
-[PLAT03 trace design](architecture/panic-stack-trace.md), under
+The [PLAT03 trace design](architecture/panic-stack-trace.md) follows
 [Accepted ADR-0096](adr/0096-bounded-kernel-panic-stack-trace.md).
 Its [fixed-source study](research/minix-panic-stack-trace.md) traces
 the current-kernel frame chain, RV64 layout and authenticated entry-epoch
-barriers. Independent design review is clean. Implementation remains
-pending the separate design merge; no trace code is claimed by this design.
+barriers. Clean independent design and Acceptance review preceded its
+separate merge as #202.
+
+The first uncommitted implementation stopped before production changes
+after its initial declaration misread case 8's shorthand stop result.
+The single active outcome is the
+[Accepted ADR-0097 clarification](adr/0097-panic-trace-link-rejection-precedence.md).
+The already defined progress-before-range order remains unchanged;
+PLAT03 implementation is blocked until the correction separately merges.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

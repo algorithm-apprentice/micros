@@ -112,3 +112,4 @@ to make the project appear more consistent than it was.
 | [0094](0094-retrigger-safe-diagnostic-probe.md) | Retrigger-safe diagnostic probe | Accepted |
 | [0095](0095-bounded-uart-and-terminal-panic.md) | Bounded UART and terminal panic | Accepted |
 | [0096](0096-bounded-kernel-panic-stack-trace.md) | Bounded kernel panic stack trace | Accepted |
+| [0097](0097-panic-trace-link-rejection-precedence.md) | Panic-trace link rejection precedence | Accepted |

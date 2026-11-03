@@ -16,7 +16,14 @@ MINIX behavior, RV64 representation and complexity baseline.
 
 This phase adds no executable code, test, model, harness, build scaffold
 or reusable prototype. Independent design review found no substantive
-issue. Implementation remains pending until the separate design merge.
+issue and the design separately merged as #202.
+
+The first uncommitted implementation later found that case 8's shorthand
+could be misread as the preceding case's stop code. Its initial
+declaration did so. That attempt stopped before production edits and
+was abandoned. [Accepted ADR-0097](../adr/0097-panic-trace-link-rejection-precedence.md)
+clarifies the target expectation without changing the cursor algorithm.
+Implementation remains blocked until that separate correction merges.
 
 ## Preserved authority and non-goals
 
@@ -463,8 +470,8 @@ trace test does not lengthen any existing workflow or guest deadline.
 | 4 | Real selected slot-one thread S-mode trap with the same forged-register shape | `owner=thread`, exact live generation and slot; same boundary exclusion |
 | 5 | A real second trap after the first complete capture, before first dispatch | Original nested-trap panic on the installed emergency stack; `owner=emergency`, root `boundary` |
 | 6 | Boot fixture supplies a null outer predecessor | The real report frames remain; stop `end`, with no invented extra frame |
-| 7 | First synthetic outer successor is misaligned | Emit the current valid record, stop `invalid-frame`, no successor read |
-| 8 | Successor names the user window rather than the admitted kernel stack | Same explicit rejection and no user-memory read |
+| 7 | First synthetic outer successor is greater than the current frame but misaligned | Emit the current valid record, stop `invalid-frame`, no successor read |
+| 8 | Nonzero successor names the user window below the admitted kernel stack | Emit current PC, stop `nonmonotonic` before range validation, no user-memory read |
 | 9 | Successor equals its current frame | Emit current PC, stop `nonmonotonic`, no loop |
 | 10 | Synthetic record has zero saved PC | Stop `invalid-pc` without emitting that record |
 | 11 | Synthetic record has a nonzero PC in the user window | Same PC rejection without treating executable user memory as kernel text |
@@ -482,6 +489,14 @@ inputs, not evidence that an invented chain is a normal C backtrace.
 Case 1 separately requires actual linked C calls and return addresses.
 The synthetic constructor's fixed reservation and every live production
 frame remain included in stack bounds.
+
+For successor-error cases, the current synthetic record has a valid PC
+and lies strictly below the authenticated root, so a preceding PC or
+root-boundary result cannot hide the intended successor check.
+Case 8's user-window successor is necessarily lower than that current
+kernel frame; `nonmonotonic` is the first applicable failure under the
+unchanged cursor order. This explicit expectation is the clarification
+defined by ADR-0097, not a reordered algorithm or a new scenario.
 
 For cases 3/4, set the saved predecessor to a record-shaped address
 inside the actual trap capture and arrange the relevant saved GPRs as
@@ -742,7 +757,8 @@ observed scopes must pass unchanged 4 KiB/16 KiB budgets.
 
 ## Acceptance and phase barrier
 
-After separate Accepted design merge, implementation proceeds in this
+After the Accepted design and its link-order clarification separately
+merge, implementation proceeds in this
 order:
 
 1. independently freeze the new facts and complete immutable evidence
