@@ -265,6 +265,12 @@ mutation, an undeclared helper or a borrowed source origin, and preserve
 the old owner checks. A passing constructor fixture alone does not certify
 all functions in the real linked image.
 
+PLAT01 implementation #199 has completed the actual transaction, the full
+fresh author gate and independent implementation review. Its ordinary
+committed-source checks preserve both completed retirements without local
+journals. The next documentation-only PLAT02 design retains all this
+evidence while defining separate polling and terminal-failure acceptance.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

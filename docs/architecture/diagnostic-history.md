@@ -31,6 +31,16 @@ both decisions and derives a fresh declaration from that merged design.
 Existing runtime obligations remain unchanged; implementation acceptance
 and retirement still require the complete current transaction and review.
 
+The restarted implementation is merged as #199 /
+`8375ca2f5285bc42063af8ed92ba6f3811d517e8`. Actual Red/Green,
+B01-B12/B14 recertification and the complete 48-command fresh author gate
+passed, including all 42 static configurations, 111 ELF outputs and ten
+observed scopes. Independent implementation review found no substantive
+issue. Reviewed, published and squash trees are identical, and a fresh
+committed checkout preserves both COPY01 and PLAT01 retirements without
+author journals. This closes only B01-F002; the historical design and
+corrective-design barriers above do not describe an outstanding blocker.
+
 ## Fixed roles and storage
 
 The kernel owns one zero-initialized history object:

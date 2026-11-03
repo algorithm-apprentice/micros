@@ -96,6 +96,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel diagnostic histories](architecture/diagnostic-history.md)
   defines PLAT01's Accepted history, exact TTY reader, notification,
   output-arbitration and terminal replay contract.
+- [Bounded UART and terminal panic](architecture/terminal-failure.md)
+  defines PLAT02's Accepted finite waits, first-entry/reset ownership, terminal
+  metadata repair and independently observed failure boundaries.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -108,6 +111,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [MINIX UART and terminal failure baseline](research/minix-terminal-failure-baseline.md)
+  traces bounded polling, panic entry/reset ownership and current console
+  failure boundaries for the dependency-ready PLAT02 design.
 - [MINIX diagnostic history baseline](research/minix-diagnostic-history.md)
   traces the two retained histories, notification, consumer transfer,
   panic replay and direct-output boundary for PLAT01.
