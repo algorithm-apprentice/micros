@@ -13,6 +13,7 @@ from tests.host.diagnostic_history_source import (
     FATAL_SOURCE_CONTRACTS, HISTORY_LAYOUT, diagnostic_header_source,
     THR_OBSERVATION, THR_OBSERVATION_HEADER,
 )
+from tests.host.terminal_failure_source import CONTROL_SOURCES, extend_terminal_runtime_source, observe_source
 
 
 ORIGINAL_UNITS = (
@@ -37,6 +38,16 @@ HISTORY_HEADERS = (
 )
 UNITS = (*ORIGINAL_UNITS, *HISTORY_UNITS)
 SOURCES = (*ORIGINAL_SOURCES, *HISTORY_UNITS, *HISTORY_HEADERS)
+PRELUDE_UNITS = (
+    "kernel/platform/plic.c", "kernel/platform/plic_core.c",
+    "kernel/tty/tty_handoff_runtime.c", "kernel/tty/tty_handoff_runtime_state.c",
+    "kernel/tty/tty_handoff_core.c",
+)
+PRELUDE_HEADERS = (
+    "kernel/platform/plic.h", "kernel/platform/plic_core.h",
+    "kernel/tty/tty_handoff_runtime.h", "kernel/tty/tty_handoff_runtime_internal.h",
+    "kernel/tty/tty_handoff_core.h",
+)
 
 
 def install_diagnostic_fixture(source_root):
@@ -105,7 +116,9 @@ def install_diagnostic_fixture(source_root):
         path.write_text(text)
 
 
-def build_fatal_fixture(root, temporary, *, tty_test=False):
+def build_fatal_fixture(root, temporary, *, tty_test=False, terminal_test=False, observed=False):
+    if terminal_test and (tty_test or observed):
+        raise ValueError("terminal and TTY fixtures are distinct target configurations")
     source_root, directory = temporary / "source", temporary / "metadata"
     source_root.mkdir()
     directory.mkdir()
@@ -114,7 +127,19 @@ def build_fatal_fixture(root, temporary, *, tty_test=False):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(reference_source(str(root), unit))
     install_diagnostic_fixture(source_root)
-    units, sources = UNITS, SOURCES
+    for unit in ("arch/riscv64/uart.c", "arch/riscv64/sbi.c", "kernel/diagnostic/panic.c", "arch/riscv64/platform.h"):
+        path = source_root / unit
+        path.write_text(extend_terminal_runtime_source(unit, path.read_text()))
+    for unit, source in CONTROL_SOURCES.items():
+        path = source_root / unit
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source)
+    for unit in (*PRELUDE_UNITS, *PRELUDE_HEADERS):
+        path = source_root / unit
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reference_source(str(root), unit))
+    units = (*UNITS, *(name for name in CONTROL_SOURCES if name.endswith(".c")), *PRELUDE_UNITS)
+    sources = (*SOURCES, *CONTROL_SOURCES, *PRELUDE_UNITS, *PRELUDE_HEADERS)
     if tty_test:
         unit = "tests/qemu/diagnostic_history_kernel.c"
         header = "tests/qemu/diagnostic_history_kernel.h"
@@ -125,14 +150,28 @@ def build_fatal_fixture(root, temporary, *, tty_test=False):
             + FATAL_SOURCE_CONTRACTS[(unit, "micros_diagnostic_test_observe_thr")]
         )
         units, sources = (*units, unit), (*sources, unit, header)
+    if terminal_test:
+        for unit in ("arch/riscv64/uart.c", "arch/riscv64/sbi.c", "kernel/diagnostic/panic.c"):
+            path = source_root / unit
+            path.write_text(observe_source(unit, path.read_text()))
+        additional = (
+            "tests/qemu/terminal_failure_kernel.c", "tests/qemu/terminal_failure_kernel.h",
+            "tests/work/work_counts.c", "tests/work/work_counts.h", "include/micros/work_observation.h",
+        )
+        for unit in additional:
+            path = source_root / unit
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((root / unit).read_bytes())
+        units += tuple(unit for unit in additional if unit.endswith(".c"))
+        sources += additional
+    if observed:
+        unit = "tests/stack/observer.S"
+        path = source_root / unit
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((root / unit).read_bytes())
+        units, sources = (*units, unit), (*sources, unit)
     commands, outputs, dependencies = [], [], {}
-    stub = "kernel/fixture/fatal_mirrors.c"
-    (source_root / stub).parent.mkdir(parents=True)
-    (source_root / stub).write_text(
-        "int micros_plic_panic_disable(void) { return 1; }\n"
-        "int micros_tty_handoff_runtime_panic(void) { return 0; }\n"
-    )
-    for unit in (*units, stub):
+    for unit in units:
         relative = "CMakeFiles/micros.dir/" + unit + ".obj"
         output, source = directory / relative, source_root / unit
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -147,8 +186,14 @@ def build_fatal_fixture(root, temporary, *, tty_test=False):
         ]
         if unit.endswith(".c"):
             argv.extend(("-fstack-usage", "-fstack-size-section"))
+            if observed:
+                argv.append("-finstrument-functions-after-inlining")
+        if observed:
+            argv.append("-DMICROS_STACK_OBSERVER_KERNEL=1")
         if tty_test:
             argv.append("-DMICROS_BUILD_TTY_SERVICE_TEST=1")
+        if terminal_test:
+            argv.extend(("-DMICROS_BUILD_TERMINAL_FAILURE_TEST=1", "-DMICROS_TEST_WORK_COUNTS=1"))
         argv.extend(("-c", str(source), "-o", str(output)))
         result = subprocess.run(argv, cwd=directory, capture_output=True, text=True, timeout=60)
         if result.returncode:
@@ -163,14 +208,24 @@ def build_fatal_fixture(root, temporary, *, tty_test=False):
     (directory / "CMakeCache.txt").write_text(
         "MICROS_QEMU:FILEPATH=/fixture/qemu-system-riscv64\n"
         + ("MICROS_BUILD_TTY_SERVICE_TEST:BOOL=ON\n" if tty_test else "")
+        + ("MICROS_BUILD_TERMINAL_FAILURE_TEST:BOOL=ON\n" if terminal_test else "")
+        + ("MICROS_STACK_BUILD_MODE:STRING=observed\n" if observed else "")
     )
     (directory / "kernel").mkdir()
     argv = [
         os.environ["MICROS_LD_LLD"], "-m", "elf64lriscv", "--no-relax",
         "--gc-sections",
         "--entry=micros_panic_report", "--undefined=sbi_set_timer", "-Ttext=0x80200000",
+        "--undefined=micros_plic_initialize",
         "--Map=kernel/micros.map", "-o", "kernel/micros.elf", *outputs,
     ]
+    if observed:
+        argv.extend(f"--defsym={name}={value}" for name, value in (
+            ("__boot_stack_bottom", 0x81000000), ("__boot_stack_top", 0x81004000),
+            ("__trap_stack_bottom", 0x81004000), ("__trap_stack_top", 0x81008000),
+            ("__trap_emergency_stack_bottom", 0x81008000), ("__trap_emergency_stack_top", 0x81009000),
+            ("__thread_kernel_stacks_start", 0x82000000), ("__thread_kernel_stacks_end", 0x82200000),
+        ))
     result = subprocess.run(argv, cwd=directory, capture_output=True, text=True, timeout=60)
     if result.returncode:
         raise AssertionError(f"{shlex.join(argv)}\n{result.stdout}{result.stderr}")

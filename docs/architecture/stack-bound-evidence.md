@@ -327,6 +327,15 @@ assembly contract, or image invalidates the certificate.
 
 ### Finite fatal context
 
+The current PLAT02 implementation follows Accepted
+[ADR-0095](../adr/0095-bounded-uart-and-terminal-panic.md) and the
+[terminal source/machine contract](terminal-failure.md#finite-source-and-machine-proof).
+Its version-three certificate proves UART readiness and panic ownership
+separately, composes their four fixed combinations and records exactly
+four guarded sites. All actual frames, including both recursive capture
+frames, remain live. The original ADR-0086/0093 rules below are the
+historical foundation, not a second current two-qualifier contract.
+
 The rules below describe the implemented ADR-0086 boundary. Accepted
 [ADR-0093](../adr/0093-minix-diagnostic-histories.md) defines a separate
 [diagnostic formatting extension](diagnostic-history.md#finite-fatal-source-and-machine-proof):
@@ -629,7 +638,7 @@ configuration and pinned firmware are rechecked before/after the guest and
 complete publication, not inferred from an unchanged executable filename.
 
 The aggregate accepts no subset, arbitrary command or supplied success
-record. It checks the closed 42-configuration/111-output declaration, all
+record. It checks the closed 43-configuration/112-output declaration, all
 ten live-producer scopes, and current candidate/artifact identities before
 and after atomic publication of `build/stack-evidence/current.json`.
 Publication failure restores the prior complete record rather than leaving
@@ -740,7 +749,7 @@ current certificates plus the blocked B13 record; no individual component
 run can produce that aggregate success. Independent implementation review
 remains a separate mandatory merge gate.
 
-`tools/stack_bound_scope.py` declares all 42 configurations and 111 ELF
+`tools/stack_bound_scope.py` declares all 43 configurations and 112 ELF
 outputs, including runtime copies and the compiled-but-unexecuted application
 probe. The live-producer inventory is separate: PM's aborted/reprepared
 thread and the full spawn path's consumed child-process generation retain

@@ -16,6 +16,7 @@ from unittest import mock
 
 from tests.host import kernel_layout_source
 from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tools import validation_context, validation_plan
 
 
@@ -310,7 +311,7 @@ class KernelDirectoryLayoutTest(unittest.TestCase):
             for path in (logical, physical):
                 observed = (
                     validation_plan.requires_full_tier([path]),
-                    tuple(validation_plan.affected_workflows([path])),
+                    tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))),
                     tuple(validation_plan.affected_slow_models([path])),
                     tuple(validation_plan.affected_image_workflows([path])),
                     {

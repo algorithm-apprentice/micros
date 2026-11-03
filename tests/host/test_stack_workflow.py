@@ -45,8 +45,9 @@ class StackWorkflowTest(unittest.TestCase):
     def test_preset_projection_keeps_existing_order_and_cannot_erase_a_changed_gate(self):
         import json
         from tests.host.stack_recipe import project_presets
+        from tests.host.terminal_failure_source import project_terminal_presets
 
-        source = (ROOT / "CMakePresets.json").read_text()
+        source = project_terminal_presets((ROOT / "CMakePresets.json").read_text())
         original = json.loads(project_presets(source))
         current = json.loads(source)
         self.assertEqual(original["buildPresets"], current["buildPresets"][:-1])

@@ -132,8 +132,8 @@ ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
 These checks do not replace the required actual compiler/link stack proof,
 all current EV03 scenarios, complete author gate, or independent review.
 
-The explicit `test-stack-evidence` workflow now composes all 42 current
-ordinary/metadata configurations and 111 ELF outputs, then all ten separately
+The explicit `test-stack-evidence` workflow now composes all 43 current
+ordinary/metadata configurations and 112 ELF outputs, then all ten separately
 instrumented QEMU scenarios. Each private build uses `cmake --fresh` and
 `cmake --build ... --clean-first`; content-bound manifests reject stale
 objects even when timestamps or cached configure values are preserved.
@@ -268,8 +268,40 @@ all functions in the real linked image.
 PLAT01 implementation #199 has completed the actual transaction, the full
 fresh author gate and independent implementation review. Its ordinary
 committed-source checks preserve both completed retirements without local
-journals. The next documentation-only PLAT02 design retains all this
-evidence while defining separate polling and terminal-failure acceptance.
+journals. PLAT02 retains all this evidence while defining separate polling
+and terminal-failure acceptance.
+
+PLAT02's Accepted ADR-0095 and separate design #200 are merged. Initial
+declaration and ownership iteration uses the independently frozen nine-fact
+contract while preserving all 3,920 predecessor records and both prior
+claims:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_terminal_failure tests.host.test_evidence_authority
+```
+
+The same module exercises the closed debugger protocol, exact source and
+recipe inverses, bounded observation/work decoding, fixed baseline archive,
+and independent target-state expectations. The compiler models exercise
+actual RV64 entry/reset relations and qualified live-frame composition.
+They do not replace the real fixed-baseline Red, current target evidence
+or complete author gate.
+
+The build scaffolding declares one additional `panic-control` CTest in
+both native tiers and the twelve-case target workflow:
+
+```bash
+cmake --workflow --preset test-qemu-terminal-failure
+```
+
+The runtime owners and actual baseline/current modes are implemented.
+A declared workflow, parser fixture or compiler failure does not establish
+a passing target result. The first-author manifest comparison, complete
+fresh 49-command plan and independent review remain required.
+
+The [build guide](development/building.md#terminal-failure-baseline-and-current-evidence)
+documents the actual baseline intent, error distinction, fresh private
+builds, retained reports and first-author immutable-input comparison.
 
 ## POSIX conformance evidence
 

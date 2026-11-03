@@ -105,10 +105,13 @@ def certify_image(root, directory, image_name, variant, mode):
             raise StackEvidenceError("stack kernel proof lacks its configured QEMU")
         fatal = derive_fatal_context(root, directory, catalog, qemu=qemu[0])
         if (
-            fatal.version != 2 or len(fatal.exclusions) != 3
+            fatal.version != 3 or len(fatal.exclusions) != 4
             or tuple((row.edge.function, row.edge.offset) for row in fatal.exclusions) != fatal.bindings.infeasible
+            or tuple(row.required for row in fatal.exclusions) != (1, 1, 1, 2)
+            or tuple((row.function, row.offset) for row in fatal.latch_establishment) != fatal.bindings.latching
+            or fatal.control.size != 4
         ):
-            raise StackEvidenceError("kernel stack proof lacks its complete version-two fatal register")
+            raise StackEvidenceError("kernel stack proof lacks its complete version-three fatal register")
         proofs = certify_context_bounds(graph.frames, graph.edges, roots, fatal.bindings)
     else:
         proofs = certify_stack_bounds(graph.frames, graph.edges, roots)

@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from tests.host.diagnostic_history_source import project_diagnostic_cmake
+from tests.host.terminal_failure_source import project_terminal_cmake
 from tools import validation_build_impact
 from tools import validation_plan
 
@@ -23,7 +24,7 @@ class ValidationBuildImpactTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.original = project_diagnostic_cmake(
-            (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+            project_terminal_cmake((ROOT / "CMakeLists.txt").read_text(encoding="utf-8"))
         )
 
     def test_panic_timeout_has_one_explicit_owner(self):

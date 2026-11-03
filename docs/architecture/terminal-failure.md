@@ -5,10 +5,14 @@
 This is the Accepted PLAT02 contract under
 [ADR-0095](../adr/0095-bounded-uart-and-terminal-panic.md). Its only finding
 owners are B01-F001, B01-F003 and B01-F005, with the corresponding
-B01-E002/E003/E005 evidence gaps. Implementation remains pending until
-independent design review, Acceptance and separate merge.
-Complete independent design review and correction re-review are clean.
-The remaining implementation barrier is this design's separate merge.
+B01-E002/E003/E005 evidence gaps. Complete independent design review and
+correction re-review are clean.
+
+The independently reviewed design separately merged as #200 /
+`aac991ad9d734f8ef6c375e43934bc95f9defe04`. Implementation is proceeding from that
+merged tree, with the independent declarations frozen before their source
+owners and extractor are changed. Design Acceptance is not runtime or
+target acceptance.
 
 The fixed source base is PLAT01 implementation #199:
 
@@ -24,8 +28,13 @@ algorithms, reader/notification authority and TTY arbitration remain
 unchanged. PLAT03 owns tracing. This outcome does not repair other runtime
 validators, change normal TTY service or activate hosted CI.
 
-All interfaces, files and commands described as additions below are
-prospective implementation obligations, not executable design artifacts.
+The design merge authored no executable artifact. The eight runtime owners
+below now implement its bounded waits, independent entry/reset ownership
+and terminal-only repair. Their source/effect projections preserve the
+original boot caller, diagnostic locations and completed authority claims.
+The native state test, twelve-case controller and four-context linked
+proof are executable; current target evidence, the full fresh author plan
+and independent implementation review remain mandatory acceptance gates.
 
 ## Bounded physical output
 

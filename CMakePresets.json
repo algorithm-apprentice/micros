@@ -394,6 +394,15 @@
       "cacheVariables": {
         "MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-terminal-failure-test",
+      "displayName": "RISC-V 64 terminal failure evidence",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-terminal-failure-test",
+      "cacheVariables": {
+        "MICROS_BUILD_TERMINAL_FAILURE_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -749,6 +758,13 @@
       "configurePreset": "host-debug",
       "targets": [
         "test-stack-evidence"
+      ]
+    },
+    {
+      "name": "test-qemu-terminal-failure",
+      "configurePreset": "riscv64-terminal-failure-test",
+      "targets": [
+        "test-qemu-terminal-failure"
       ]
     }
   ],
@@ -1464,6 +1480,20 @@
         {
           "type": "build",
           "name": "test-stack-evidence"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-terminal-failure",
+      "displayName": "Verify bounded UART and terminal panic",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-terminal-failure-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-terminal-failure"
         }
       ]
     }

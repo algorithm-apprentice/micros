@@ -80,10 +80,15 @@ preserve both completed retirements without local journals.
 This closes only B01-F002, leaving 74 pre-node runtime findings open.
 The historical audit counts and 59-node, 155-edge graph remain unchanged.
 
-PLAT02 is now the next single dependency-ready design. Its
+PLAT02 is now the single active dependency-ready implementation after
+the separately reviewed design #200. Its
 [fixed-reference study](minix-terminal-failure-baseline.md) traces polling,
 panic entry and terminal failure boundaries before any implementation.
-PLAT03, memory correction and hosted CI do not start in parallel.
+The runtime/evidence owners follow the
+[Accepted terminal contract](../architecture/terminal-failure.md);
+complete current author acceptance, independent review and merge remain
+the completion boundary. PLAT03, memory correction and hosted CI do not
+start in parallel.
 
 ## Consolidation invariants
 

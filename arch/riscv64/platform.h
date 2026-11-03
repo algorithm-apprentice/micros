@@ -21,7 +21,7 @@ enum {
 void uart_write(const char *text);
 void uart_write_hex64(uint64_t value);
 void uart_flush(void);
-void uart_panic_seize(void);
+bool uart_panic_seize(void);
 bool uart_console_begin_preflight(void);
 void uart_console_begin_quiesce_prevalidated(void);
 void uart_console_handoff_commit_prevalidated(void);

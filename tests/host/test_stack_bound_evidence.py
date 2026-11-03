@@ -670,17 +670,15 @@ class StackBoundEvidenceTest(unittest.TestCase):
                         )
 
     def test_actual_system_reset_wrapper_binds_exact_scalar_ecall_registers(self):
-        from tools.stack_bound_fatal_machine import require_srst_registers
+        from tools.stack_bound_fatal_effects import terminal_srst_effects
         from tools.stack_bound_objects import function_symbols, instructions, load_object, section_bytes
 
         with tempfile.TemporaryDirectory(prefix="micros-stack-srst-operands-") as directory:
-            body = (ROOT / "arch/riscv64/sbi.c").read_text().replace(
-                '#include "arch/riscv64/platform.h"', "#include <stdint.h>",
-            )
+            body = (ROOT / "arch/riscv64/sbi.c").read_text()
             _, output = compile_fixture(Path(directory), body)
             obj = load_object(output)
             symbol = function_symbols(obj)["sbi_system_reset"]
-            self.assertIsInstance(require_srst_registers(obj, symbol), int)
+            terminal_srst_effects(obj, symbol)
             section = obj.sections[symbol.section_index]
             data = section_bytes(obj, section)[symbol.value:symbol.value + symbol.size]
             address, word = next(
@@ -692,7 +690,7 @@ class StackBoundEvidenceTest(unittest.TestCase):
             output.write_bytes(changed)
             with self.assertRaisesRegex(StackEvidenceError, "SRST|register|operand"):
                 changed_object = load_object(output)
-                require_srst_registers(changed_object, function_symbols(changed_object)["sbi_system_reset"])
+                terminal_srst_effects(changed_object, function_symbols(changed_object)["sbi_system_reset"])
 
     def test_linked_code_and_data_must_equal_the_complete_relocated_object(self):
         from tools.stack_bound_objects import load_object, function_symbols
@@ -897,7 +895,7 @@ class StackBoundEvidenceTest(unittest.TestCase):
         from tools.stack_bound_bindings import reference_source
         from tools.stack_bound_objects import function_symbols, load_object
 
-        source = reference_source(str(ROOT), "arch/riscv64/uart.c")
+        source = reference_source(str(ROOT), "arch/riscv64/platform.h") + reference_source(str(ROOT), "arch/riscv64/uart.c")
         anchor = "void uart_flush(void)\n{\n"
         self.assertEqual(1, source.count(anchor))
         with tempfile.TemporaryDirectory(prefix="micros-stack-uart-effects-") as temporary:
@@ -922,7 +920,7 @@ class StackBoundEvidenceTest(unittest.TestCase):
         from tools.stack_bound_bindings import reference_source
         from tools.stack_bound_objects import function_symbols, load_object
 
-        source = reference_source(str(ROOT), "arch/riscv64/uart.c")
+        source = reference_source(str(ROOT), "arch/riscv64/platform.h") + reference_source(str(ROOT), "arch/riscv64/uart.c")
         with tempfile.TemporaryDirectory(prefix="micros-stack-uart-seizure-") as temporary:
             directory = Path(temporary).resolve()
             for index, candidate in enumerate((
@@ -1009,19 +1007,20 @@ class StackBoundEvidenceTest(unittest.TestCase):
         panic = function("micros_panic_entry", "arch/riscv64/panic.S")
         shared = function("micros_trap_panic_entry", "arch/riscv64/panic.S")
         report = function("micros_panic_report", "kernel/diagnostic/panic.c")
+        claimed = function("panic_report_claimed", "kernel/diagnostic/panic.c")
         seize = function("micros_panic_seize", "kernel/diagnostic/panic.c")
         character = function("uart_write_character", "arch/riscv64/uart.c")
         frames = tuple(Frame(key, size) for key, size in (
             (main, 16), (uart, 32), (panic, 0), (shared, 48),
-            (report, 80), (seize, 16), (character, 64),
+            (report, 16), (claimed, 80), (seize, 16), (character, 64),
             (wrapper, 16), (recording, 0), (hex_wrapper, 16),
             (hex_recording, 0), (hex_direct, 16),
         ))
         edges = (
             CallSite(main, 0, (uart,)), CallSite(uart, 0, (panic,)),
             CallSite(uart, 4, (character,)), CallSite(panic, 0, (shared,), EdgeKind.TAIL),
-            CallSite(shared, 0, (report,)), CallSite(report, 0, (seize,)),
-            CallSite(report, 4, (uart,)),
+            CallSite(shared, 0, (report,)), CallSite(report, 0, (claimed,)),
+            CallSite(claimed, 0, (seize,)), CallSite(claimed, 4, (uart,)),
             CallSite(wrapper, 0, (recording,)), CallSite(wrapper, 4, (uart,)),
             CallSite(hex_wrapper, 0, (hex_recording,)), CallSite(hex_wrapper, 4, (hex_direct,)),
             CallSite(hex_direct, 0, (wrapper,)), CallSite(recording, 0, (panic,)),
@@ -1031,23 +1030,25 @@ class StackBoundEvidenceTest(unittest.TestCase):
         with self.assertRaisesRegex(StackEvidenceError, "recursive"):
             certify_stack_bounds(frames, edges, roots)
         binding = ContextBindings(
-            ((report, 4),), (uart, character, wrapper, hex_wrapper, hex_direct),
-            ((uart, 0), (wrapper, 0), (hex_wrapper, 0)),
+            ((claimed, 4),), (uart, character, wrapper, hex_wrapper, hex_direct, report, claimed, seize, panic, shared),
+            ((uart, 0), (wrapper, 0), (hex_wrapper, 0), (report, 0)),
+            latching=((report, 0),),
+            latch_preservers=tuple(frame.function for frame in frames),
         )
         proof, = certify_context_bounds(frames, edges, roots, binding)
-        self.assertEqual(560, proof.bytes_used)
+        self.assertEqual(576, proof.bytes_used)
         self.assertEqual(
-            [(uart, Qualifier.UNQUALIFIED), (uart, Qualifier.UART_PANIC_READY)],
+            [(uart, Qualifier.UNQUALIFIED), (uart, Qualifier.PANIC_LATCHED_UART_READY)],
             [(node.function, node.qualifier) for node in proof.witness if node.function == uart],
         )
-        with self.assertRaisesRegex(StackEvidenceError, "recursive"):
+        with self.assertRaises(StackEvidenceError):
             certify_context_bounds(frames, edges, roots, replace(binding, establishing=()))
         with self.assertRaises(StackEvidenceError):
             certify_context_bounds(frames, edges, roots, replace(binding, preservers=(uart,)))
         for exclusions in (
             binding.infeasible[:2],
             (*binding.infeasible, (uart, 4)),
-            (binding.infeasible[0], binding.infeasible[1], binding.infeasible[1]),
+            (binding.infeasible[0], binding.infeasible[1], binding.infeasible[1], binding.infeasible[3]),
             ((uart, 4), *binding.infeasible[1:]),
             (uart, 0),
         ):

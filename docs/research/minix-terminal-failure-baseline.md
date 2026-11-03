@@ -3,9 +3,10 @@
 ## Status and scope
 
 This is the fixed-reference research for PLAT02, following independently
-reviewed PLAT01 implementation #199. The design is in progress; this study
-does not authorize implementation or claim that the remaining platform
-findings are closed.
+reviewed PLAT01 implementation #199. The independently reviewed Accepted
+design separately merged as #200. Its runtime and evidence implementation
+follows that contract; this fixed-source study alone does not close the
+remaining platform findings.
 
 ```text
 micros source commit: 8375ca2f5285bc42063af8ed92ba6f3811d517e8
@@ -205,9 +206,11 @@ and [canonical contract](../architecture/terminal-failure.md) now specify:
    COPY01/PLAT01 authority, any additional identity transition, finite
    source/machine proof, current scope and existing budgets.
 
-Independent design and correction review are clean. Implementation still
-requires the separate design merge. No executable prototype, test, harness
-or production edit belongs to this research/design phase.
+Independent design and correction review are clean, and separate design
+#200 is merged. The later implementation supplies the declared runtime and
+evidence owners. No executable prototype, test, harness or production edit
+belonged to the research/design phase; implementation acceptance still
+requires the current full author evidence and independent review.
 
 ## References
 

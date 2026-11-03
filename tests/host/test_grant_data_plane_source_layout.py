@@ -14,6 +14,7 @@ from tests.host.test_frame_ownership_source_layout import c_function_definitions
 from tests.host.test_pm_service_source_layout import cmake_commands
 from tests.host.test_vm_service_source_layout import file_scope_objects
 from tools import validation_context, validation_plan
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import kernel_layout_source
 
 
@@ -2950,7 +2951,7 @@ class GrantDataPlaneSourceLayoutTest(unittest.TestCase):
             for path in aliases:
                 with self.subTest(path=path):
                     self.assertEqual(expected, (
-                        validation_plan.requires_full_tier([path]), tuple(validation_plan.affected_workflows([path])),
+                        validation_plan.requires_full_tier([path]), tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))),
                         tuple(validation_plan.affected_slow_models([path])), tuple(validation_plan.affected_image_workflows([path])),
                     ))
         self.assertEqual((False, [], [], []), (

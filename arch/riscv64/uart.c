@@ -1,6 +1,9 @@
 #include "arch/riscv64/platform.h"
+#include "kernel/diagnostic/panic_control.h"
 
 #include "arch/riscv64/interrupt.h"
+#include "tests/qemu/terminal_failure_kernel.h"
+#include "micros/work_observation.h"
 #include "kernel/tty/uart_console_core.h"
 #include "micros/panic.h"
 #include "kernel/diagnostic/diagnostic_history.h"
@@ -34,9 +37,20 @@ static struct micros_uart_console_state uart_console_state = {
 
 static void uart_write_character(char character)
 {
-    while ((uart0[UART_LSR] & UART_LSR_THR_EMPTY) == 0) {
+    uint32_t failed = 0;
+
+    while (MICROS_TEST_WORK_COMPARE(
+        "terminal-thre-poll", MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC,
+        (MICROS_TERMINAL_TEST_LSR(uart0[UART_LSR], false) & UART_LSR_THR_EMPTY) == 0
+    )) {
+        if (++failed == UINT32_C(100000)) {
+            micros_panic_terminate_no_console();
+        }
     }
     uart0[UART_THR] = (uint8_t)character;
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_thr();
+#endif
 #ifdef MICROS_BUILD_TTY_SERVICE_TEST
     micros_diagnostic_test_observe_thr();
 #endif
@@ -174,16 +188,23 @@ bool uart_console_panic_is_active(void)
     return active;
 }
 
-void uart_panic_seize(void)
+bool uart_panic_seize(void)
 {
+    bool repaired = false;
+
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_seizure();
+#endif
     (void)riscv_irq_save();
     riscv_external_interrupt_disable();
     if (
         micros_uart_console_panic(&uart_console_state)
         != MICROS_UART_CONSOLE_OK
     ) {
-        for (;;) {
-        }
+        uart_console_state.initialization_magic = MICROS_UART_CONSOLE_INITIALIZATION_MAGIC;
+        uart_console_state.owner = MICROS_UART_CONSOLE_OWNER_PANIC;
+        uart_console_state.quiesced = true;
+        repaired = true;
     }
     uart0[UART_LCR] = UART_LCR_8N1;
     uart0[UART_IER] = 0;
@@ -192,11 +213,20 @@ void uart_panic_seize(void)
     uart0[UART_DLM] = UART_DIVISOR_MSB;
     uart0[UART_LCR] = UART_LCR_8N1;
     riscv_mmio_fence();
+    return repaired;
 }
 
 void uart_flush(void)
 {
-    while ((uart0[UART_LSR] & UART_LSR_TRANSMITTER_EMPTY) == 0) {
+    uint32_t failed = 0;
+
+    while (MICROS_TEST_WORK_COMPARE(
+        "terminal-temt-poll", MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC,
+        (MICROS_TERMINAL_TEST_LSR(uart0[UART_LSR], true) & UART_LSR_TRANSMITTER_EMPTY) == 0
+    )) {
+        if (++failed == UINT32_C(100000)) {
+            micros_panic_terminate_no_console();
+        }
     }
 }
 
@@ -250,3 +280,10 @@ bool uart_console_handoff_is_quiesced(void)
         && uart0[UART_IER] == 0
     );
 }
+
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+void micros_terminal_test_corrupt_console(void)
+{
+    uart_console_state.initialization_magic ^= UINT64_C(1);
+}
+#endif

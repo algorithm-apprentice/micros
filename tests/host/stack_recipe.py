@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from tests.host.diagnostic_history_source import project_diagnostic_cmake
+from tests.host.terminal_failure_source import project_terminal_cmake, project_terminal_presets
 
 
 MODULE_PATH = "tests/stack/StackEvidence.cmake"
@@ -55,6 +56,10 @@ PLANNER_ADDITIONS = (
 
 
 def project_root_recipe(source):
+    try:
+        source = project_terminal_cmake(source)
+    except ValueError as error:
+        raise AssertionError(str(error)) from error
     source = project_diagnostic_cmake(source)
     if INCLUDE not in source:
         return source
@@ -64,6 +69,10 @@ def project_root_recipe(source):
 
 
 def project_presets(source):
+    try:
+        source = project_terminal_presets(source)
+    except ValueError as error:
+        raise AssertionError(str(error)) from error
     if '"name": "test-stack-evidence"' not in source:
         return source
     if source.count('"name": "test-stack-evidence"') != 3:
