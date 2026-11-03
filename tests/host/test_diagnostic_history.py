@@ -944,11 +944,13 @@ class DiagnosticSourceTest(unittest.TestCase):
                 project_runner_options(changed)
 
     def test_complete_recipe_has_an_exact_inverse(self):
+        from tests.host.terminal_failure_source import project_terminal_cmake
+
         baseline = subprocess.check_output(
             ("git", "show", SOURCE_PROJECTION["source_reference"] + ":CMakeLists.txt"),
             cwd=ROOT, timeout=30,
         ).decode("utf-8")
-        source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        source = project_terminal_cmake((ROOT / "CMakeLists.txt").read_text(encoding="utf-8"))
         self.assertEqual(baseline, project_diagnostic_cmake(source))
         for changed in (
             source.replace("            --require-diagnostic-forwarding\n", "", 1),
@@ -968,7 +970,7 @@ class DiagnosticFatalMachineTest(unittest.TestCase):
         from tools.stack_bound_objects import function_symbols, load_object
         from tools.stack_bound_types import StackEvidenceError
 
-        source = reference_source(str(ROOT), "arch/riscv64/uart.c")
+        source = reference_source(str(ROOT), "arch/riscv64/platform.h") + reference_source(str(ROOT), "arch/riscv64/uart.c")
         store = "    uart0[UART_THR] = (uint8_t)character;\n"
         observation = "    micros_diagnostic_test_observe_thr();\n"
         self.assertEqual(1, source.count(store))

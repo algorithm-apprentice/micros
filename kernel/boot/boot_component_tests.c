@@ -95,7 +95,7 @@ extern unsigned char
 extern unsigned char
     micros_nested_trap_test_emergency_stack_top[];
 #endif
-
+#include "tests/qemu/terminal_failure_kernel.h"
 void boot_test_foundation(const struct boot_context *boot)
 {
     (void)boot;
@@ -397,5 +397,8 @@ void boot_test_nested_trap(const struct boot_context *boot)
     }
     micros_nested_trap_test_trigger();
     MICROS_PANIC(boot->hart_id, "nested-trap-test-returned");
+#endif
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_run(boot->hart_id);
 #endif
 }

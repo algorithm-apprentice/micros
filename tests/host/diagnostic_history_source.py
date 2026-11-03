@@ -10,6 +10,7 @@ import subprocess
 from tests.host.ast_evidence import ast_dump
 from tests.host.evidence_authority_source import literal_value, regular_source, single_assignment
 from tests.host.evidence_authority_types import AuthorityClass, Fact, digest
+from tests.host.terminal_failure_source import project_terminal_boot_bodies, project_terminal_gate
 
 
 FAMILY = "diagnostic-history-baseline"
@@ -358,6 +359,10 @@ def project_runner_options(observed):
 
 
 def project_diagnostic_gate(relative, source):
+    try:
+        source = project_terminal_gate(relative, source)
+    except ValueError as error:
+        raise AssertionError(str(error)) from error
     if relative == "tests/host/kernel_layout_source.py":
         return project_kernel_gate_adapter(source)
     if relative == "tests/host/test_kernel_directory_layout.py":
@@ -981,6 +986,10 @@ def validate_source_adapters(root):
 
 
 def project_boot_diagnostic_seed(source):
+    try:
+        source = project_terminal_boot_bodies(source)
+    except ValueError as error:
+        raise AssertionError(str(error)) from error
     original = (
         "#ifdef MICROS_BUILD_PANIC_TEST\n"
         '    MICROS_PANIC(boot->hart_id, "intentional-test");\n'

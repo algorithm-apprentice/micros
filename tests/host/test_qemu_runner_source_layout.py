@@ -14,6 +14,7 @@ from unittest import mock
 
 from tests.host.ast_evidence import ast_dump
 from tests.host.diagnostic_history_source import project_runner_options
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import kernel_layout_source
 from tools.python_host_runtime import python_command
 
@@ -1635,7 +1636,7 @@ class QemuRunnerSourceLayoutTest(unittest.TestCase):
         for old, paths in alias_rows():
             self.assertEqual(paths, aliases.get(old), old)
             self.assertTrue(planner.requires_full_tier([old]))
-            self.assertEqual(38, len(planner.affected_workflows([old])))
+            self.assertEqual(38, len(project_terminal_workflows(planner.affected_workflows([old]))))
             self.assertEqual([], planner.affected_slow_models([old]))
             self.assertEqual([], planner.affected_image_workflows([old]))
             for path in paths:

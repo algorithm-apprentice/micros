@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from tests.host.ast_evidence import ast_dump
 from tests.host.diagnostic_history_source import project_boot_diagnostic_seed
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_frame_ownership_source_layout import (
     c_function_definitions,
@@ -2084,7 +2085,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         self.assertEqual(38, len(QEMU_WORKFLOWS))
         self.assertEqual(28, len(CROSS_GATE_WORKFLOWS))
         self.assertEqual(13, len(LAUNCHER_WORKFLOWS))
-        self.assertEqual(QEMU_WORKFLOWS, tuple(validation_plan.QEMU_WORKFLOWS))
+        self.assertEqual(QEMU_WORKFLOWS, tuple(project_terminal_workflows(validation_plan.QEMU_WORKFLOWS)))
         baselines = {
             "kernel/bootstrap_manifest.c": (False, CROSS_GATE_WORKFLOWS),
             "kernel/bootstrap_runtime.c": (False, CROSS_GATE_WORKFLOWS),
@@ -2100,7 +2101,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
         for path, (full, workflows) in baselines.items():
             with self.subTest(path=path):
                 self.assertEqual(full, validation_plan.requires_full_tier([path]))
-                self.assertEqual(workflows, tuple(validation_plan.affected_workflows([path])))
+                self.assertEqual(workflows, tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))))
                 self.assertEqual([], validation_plan.affected_slow_models([path]))
                 self.assertEqual([], validation_plan.affected_image_workflows([path]))
                 if full:
@@ -2110,7 +2111,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
                     )
         for path in ("CMakeLists.txt", "CMakePresets.json"):
             self.assertTrue(validation_plan.requires_full_tier([path]))
-            self.assertEqual(QEMU_WORKFLOWS, tuple(validation_plan.affected_workflows([path])))
+            self.assertEqual(QEMU_WORKFLOWS, tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))))
             self.assertEqual(set(validation_plan.SLOW_MODEL_INPUTS), set(
                 validation_plan.affected_slow_models([path]),
             ))

@@ -211,6 +211,8 @@ class RuntimeMemoryAuthorityTest(unittest.TestCase):
             ('if path == "lib/runtime/memory.c" and not memory_required:', 'if path.endswith(".c") and not memory_required:'),
             ("            FIXTURE_PATH,\n", "            FIXTURE_PATH,\n            FIXTURE_PATH,\n"),
             ("self.assertEqual((23, 11),", "self.assertEqual((23, 10),"),
+            ("project_terminal_workflows(validation_plan.QEMU_WORKFLOWS)", "validation_plan.QEMU_WORKFLOWS"),
+            ("project_terminal_workflows(validation_plan.affected_workflows([path]))", "project_terminal_workflows(())"),
         ):
             with self.subTest(mutation=new), self.assertRaises(ValueError):
                 validate_gate_adapter(ROOT, source.replace(old, new))

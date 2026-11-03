@@ -1120,6 +1120,65 @@ review of that exact staged tree and journal. Later ordinary checkouts use
 the reviewed HEAD registry and do not manufacture new author receipts or
 require the original temporary logs.
 
+## Terminal-failure baseline and current evidence
+
+The PLAT02 driver follows the
+[Accepted terminal contract](../architecture/terminal-failure.md).
+Stage the complete test, controller, source/effect and documentation inputs
+before the first real baseline observation:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/check_terminal_failures.py --baseline
+```
+
+Exit one requires all twelve actual VMs: four positive controls and eight
+exact audited divergences. An execution, compiler, protocol, closure or
+timeout error exits two and is not Red. The baseline uses the fixed
+pre-correction Git archive with only reversible observations/build
+extensions; the new production control files are genuinely absent.
+
+After the runtime correction, run the focused native ownership test and
+the current target gate:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target panic_control_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^panic-control$'
+cmake --workflow --preset test-qemu-terminal-failure
+```
+
+The controller makes a fresh private configure and clean-first kernel
+build, even when the workflow's ordinary kernel dependency is already
+built. This binds the guest to current source bytes rather than relying
+on timestamps or an older artifact. Each of the twelve owned QEMU
+processes has one eight-second deadline; only the fixed four-byte selector
+can be written through its private debugger connection.
+
+Raw observations, register/object bindings, commands, actual artifacts and
+source/tool/firmware input manifests remain below `build/terminal-failure/`.
+Successful current execution publishes `current.json`; the exact audited
+baseline publishes `baseline.json`. For the first implementation author,
+their immutable inputs must agree:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+import json
+from pathlib import Path
+root = Path("build/terminal-failure")
+baseline = json.loads((root / "baseline.json").read_text())
+current = json.loads((root / "current.json").read_text())
+assert baseline["baseline"] is True and current["baseline"] is False
+assert baseline["input_manifest"]["immutable"] == current["input_manifest"]["immutable"]
+print("terminal baseline/current immutable inputs match")
+PY
+```
+
+Changed immutable inputs require a new baseline observation and current
+execution. These reports neither retire an identity nor create a reuse
+receipt. Later ordinary current execution does not require the old local
+baseline report. The complete fresh author plan and independent review
+remain separate requirements.
+
 ## TTY service image validation
 
 Build and validate the standalone real TTY service ELF with:

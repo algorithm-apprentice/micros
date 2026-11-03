@@ -6,6 +6,7 @@ option(MICROS_BUILD_HOST_TESTS "Build native host tests" OFF)
 option(MICROS_BUILD_PANIC_TEST "Build the intentional panic image" OFF)
 option(MICROS_BUILD_TRAP_TEST "Build the trap recovery test image" OFF)
 option(MICROS_BUILD_TIMER_TEST "Build the timer interrupt test image" OFF)
+option(MICROS_BUILD_TERMINAL_FAILURE_TEST "Build the terminal failure evidence image" OFF)
 option(
     MICROS_BUILD_UART_CONSOLE_TEST
     "Build the UART console ownership handoff test image"
@@ -195,6 +196,7 @@ set(
     MICROS_BUILD_PANIC_TEST
     MICROS_BUILD_TRAP_TEST
     MICROS_BUILD_TIMER_TEST
+    MICROS_BUILD_TERMINAL_FAILURE_TEST
     MICROS_BUILD_UART_CONSOLE_TEST
     MICROS_BUILD_FRAME_ALLOCATOR_TEST
     MICROS_BUILD_TRAP_PANIC_TEST
@@ -3013,6 +3015,22 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(test-unit-fast diagnostic_history_test)
     add_dependencies(test-unit diagnostic_history_test)
 
+    add_executable(
+        panic_control_test
+        tests/host/panic_control_test.c
+        kernel/diagnostic/panic_control_core.c
+    )
+    target_include_directories(panic_control_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_features(panic_control_test PRIVATE c_std_17)
+    target_compile_options(panic_control_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(panic_control_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(panic_control_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    add_test(NAME panic-control COMMAND panic_control_test)
+    add_dependencies(test-unit-fast panic_control_test)
+    add_dependencies(test-unit panic_control_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()
@@ -4171,6 +4189,8 @@ add_executable(
     ${MICROS_SCHEDULER_RUNTIME_SOURCES}
     ${MICROS_BOOT_FOUNDATION_SOURCES}
     kernel/diagnostic/panic.c
+    kernel/diagnostic/panic_control_core.c
+    kernel/diagnostic/panic_control.c
     kernel/diagnostic/diagnostic_history_core.c
     kernel/diagnostic/diagnostic_history.c
     kernel/diagnostic/diagnostic_control_core.c
@@ -4205,6 +4225,24 @@ add_executable(
 
 if(MICROS_BUILD_PANIC_TEST OR MICROS_BUILD_TTY_SERVICE_TEST)
     target_sources(micros PRIVATE tests/qemu/diagnostic_history_kernel.c)
+endif()
+
+if(MICROS_BUILD_TERMINAL_FAILURE_TEST)
+    target_compile_definitions(micros PRIVATE MICROS_BUILD_TERMINAL_FAILURE_TEST=1 MICROS_TEST_WORK_COUNTS=1)
+    target_sources(
+        micros PRIVATE
+        tests/qemu/terminal_failure_kernel.c
+        tests/work/work_counts.c
+    )
+    add_custom_target(
+        test-qemu-terminal-failure
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_terminal_failures.py"
+        DEPENDS micros
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        USES_TERMINAL
+        VERBATIM
+    )
 endif()
 
 if(MICROS_BUILD_UART_CONSOLE_TEST)

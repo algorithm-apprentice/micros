@@ -1,4 +1,6 @@
 #include "arch/riscv64/platform.h"
+#include "tests/qemu/terminal_failure_kernel.h"
+#include "kernel/diagnostic/panic_control.h"
 
 enum {
     SBI_EXT_TIME = 0x54494d45,
@@ -26,6 +28,16 @@ intptr_t sbi_set_timer(uint64_t absolute_time)
 
 intptr_t sbi_system_reset(uint32_t reset_type, uint32_t reset_reason)
 {
+    if (
+        reset_type == SBI_RESET_TYPE_SHUTDOWN
+        && reset_reason == SBI_RESET_REASON_SYSTEM_FAILURE
+        && !micros_panic_claim_reset()
+    ) {
+        micros_panic_halt();
+    }
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_reset(reset_type, reset_reason);
+#endif
     register uintptr_t argument0 __asm__("a0") = reset_type;
     register uintptr_t argument1 __asm__("a1") = reset_reason;
     register uintptr_t function_id __asm__("a6") = SBI_SYSTEM_RESET;

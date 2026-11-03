@@ -328,6 +328,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
             "tools/check_diagnostic_history.py",
             "tools/check_runtime_memory.py",
             "tools/check_stack_evidence.py",
+            "tools/check_terminal_failures.py",
             "tools/generate_stack_observer_catalog.py",
             "tools/stack_bound_manifest.py",
             "tools/validation_context.py",

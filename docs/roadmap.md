@@ -50,13 +50,16 @@ author commands passed, including 42 static configurations, 111 ELF outputs
 and ten observed stack scopes. The reviewed, published and squash trees
 are identical; a fresh committed checkout preserves COPY01 and PLAT01
 authority without an author journal. This closes only B01-F002.
-The next single preferred task is the documentation-only
-[PLAT02 design study](research/minix-terminal-failure-baseline.md), covering
+The next single preferred outcome is
+[PLAT02](research/minix-terminal-failure-baseline.md), covering
 bounded UART polling, recursive panic and corrupt-console fallback.
 Its [Accepted ADR-0095](adr/0095-bounded-uart-and-terminal-panic.md) and
 [terminal contract](architecture/terminal-failure.md) have passed
-independent design/correction review. Implementation waits for the
-separate design merge.
+independent design/correction review and separately merged as #200.
+The implementation provides the runtime owners, independent source/work
+evidence, twelve real target cases and expanded finite stack proof.
+Its complete current author gate, independent review and merge remain
+the prerequisite for PLAT03.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

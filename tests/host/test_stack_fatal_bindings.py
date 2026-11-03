@@ -34,20 +34,23 @@ class StackFatalBindingsTest(unittest.TestCase):
 
     def test_qualification_records_every_post_seizure_call_and_the_exact_guard(self):
         proof = self.bind()
-        self.assertEqual(2, proof.version)
+        self.assertEqual(3, proof.version)
         history_calls = tuple(row for row in proof.establishment if row.target == "micros_diagnostic_panic_report")
         self.assertEqual(1, len(history_calls))
-        self.assertEqual(51, len(proof.bindings.establishing) - len(history_calls))
+        self.assertEqual(52, len(proof.bindings.establishing) - len(history_calls))
         self.assertEqual(
-            {"uart_write_direct", "uart_write", "uart_write_hex64"},
+            {"uart_write_direct", "uart_write", "uart_write_hex64", "micros_panic_report"},
             {key.symbol for key, _ in proof.bindings.infeasible},
         )
         self.assertEqual(
-            {"direct-console-owner", "text-recording-arm", "hex-recording-arm"},
+            {"direct-console-owner", "text-recording-arm", "hex-recording-arm", "first-report-body"},
             {row.role for row in proof.exclusions},
         )
-        self.assertEqual(3, len(proof.exclusions))
-        self.assertEqual(51, len(proof.establishment) - len(history_calls))
+        self.assertEqual(4, len(proof.exclusions))
+        self.assertEqual(52, len(proof.establishment) - len(history_calls))
+        self.assertEqual(("panic_control", 4), (proof.control.symbol, proof.control.size))
+        self.assertEqual(1, len(proof.bindings.latching))
+        self.assertTrue(proof.bindings.latch_preservers)
         self.assertTrue(any(row.function.symbol == "sbi_system_reset" for row in proof.preservation))
         self.assertTrue(any(row.function.symbol == "uart_flush" for row in proof.preservation))
         self.assertEqual(16, proof.console.size)
@@ -64,7 +67,7 @@ class StackFatalBindingsTest(unittest.TestCase):
                     self.catalog, frames=tuple(frame for frame in self.catalog.frames if frame.function != target),
                 ))
         call = next(call for call in self.catalog.calls if (
-            call.caller.symbol == "micros_panic_report" and call.targets[0].symbol == "sbi_system_reset"
+            call.caller.symbol == "panic_report_claimed" and call.targets[0].symbol == "sbi_system_reset"
         ))
         with self.assertRaises(StackEvidenceError):
             self.bind(replace(self.catalog, calls=tuple(item for item in self.catalog.calls if item != call)))
@@ -73,6 +76,17 @@ class StackFatalBindingsTest(unittest.TestCase):
             self.bind(replace(self.catalog, origins=tuple(
                 replace(row, line=row.line + 1) if row == origin else row for row in self.catalog.origins
             )))
+
+    def test_new_control_and_claimed_report_reject_foreign_source_origins(self):
+        for name, foreign in (
+            ("micros_panic_claim_first", "kernel/diagnostic/panic.c"),
+            ("panic_report_claimed", "kernel/diagnostic/panic_control.c"),
+        ):
+            origin = next(row for row in self.catalog.origins if row.function.symbol == name)
+            with self.subTest(name=name), self.assertRaises(StackEvidenceError):
+                self.bind(replace(self.catalog, origins=tuple(
+                    replace(row, source=foreign) if row == origin else row for row in self.catalog.origins
+                )))
 
     def test_tty_counter_has_its_own_linked_object_effect_and_live_frame(self):
         from tools.stack_bound_fatal import derive_fatal_context
@@ -94,6 +108,70 @@ class StackFatalBindingsTest(unittest.TestCase):
             self.assertEqual(1, len(observer.writes))
             self.assertEqual({"maximum", "below-maximum"}, {row[0] for row in observer.relations})
             self.assertEqual(1, sum(row.target == observer.function.symbol for row in character.calls))
+
+    def test_terminal_observers_have_disjoint_actual_atomic_and_snapshot_effects(self):
+        from tools.stack_bound_fatal import derive_fatal_context
+        from tools.stack_bound_assembly import collect_linked_assembly
+        from tools.stack_bound_context import certify_context_bounds
+        from tools.stack_bound_types import Root
+
+        with tempfile.TemporaryDirectory(prefix="micros-fatal-terminal-", dir=ROOT / "build") as directory:
+            root, output, dependencies = build_fatal_fixture(ROOT, Path(directory).resolve(), terminal_test=True)
+            catalog = fixture_catalog(root, output, dependencies)
+            with patch("tools.stack_bound_fatal.resolve_default_firmware", return_value={"fixture": "pinned"}):
+                proof = derive_fatal_context(root, output, catalog, qemu="/fixture/qemu-system-riscv64")
+            observed = {item.symbol: item.size for item in proof.test_objects}
+            self.assertEqual(104, observed["micros_terminal_test_observation"])
+            self.assertEqual(3056, observed["micros_terminal_test_work_snapshot"])
+            self.assertEqual(3072, observed["collector"])
+            self.assertTrue(any(row.function.symbol == "micros_test_work_record" for row in proof.preservation))
+            self.assertTrue(any(row.function.symbol == "publish_snapshot" for row in proof.preservation))
+            graph = collect_linked_assembly(root, output, "kernel/micros.elf", "riscv64-fatal-fixture", catalog)
+            report = next(frame.function for frame in graph.frames if frame.function.symbol == "micros_panic_report")
+            certify_context_bounds(graph.frames, graph.edges, (Root("panic", report, 4096, 48),), proof.bindings)
+
+    def test_compiler_hooks_remain_separate_from_actual_constructor_and_state_calls(self):
+        from tools.stack_bound_fatal import derive_fatal_context
+        from tools.stack_bound_assembly import collect_linked_assembly
+        from tools.stack_bound_context import certify_context_bounds
+        from tools.stack_bound_types import Root
+
+        with tempfile.TemporaryDirectory(prefix="micros-fatal-compiler-hooks-", dir=ROOT / "build") as directory:
+            root, output, dependencies = build_fatal_fixture(ROOT, Path(directory).resolve(), observed=True)
+            catalog = fixture_catalog(root, output, dependencies)
+            with patch("tools.stack_bound_fatal.resolve_default_firmware", return_value={"fixture": "pinned"}):
+                proof = derive_fatal_context(root, output, catalog, qemu="/fixture/qemu-system-riscv64")
+            self.assertTrue(proof.compiler_hooks)
+            graph = collect_linked_assembly(root, output, "kernel/micros.elf", "riscv64-fatal-fixture", catalog)
+            report = next(frame.function for frame in graph.frames if frame.function.symbol == "micros_panic_report")
+            certify_context_bounds(graph.frames, graph.edges, (Root("panic", report, 4096, 48),), proof.bindings)
+
+    def test_terminal_capture_cannot_borrow_a_smaller_observation_as_its_snapshot(self):
+        from tools.stack_bound_fatal import derive_fatal_context
+
+        owner = ROOT / "tests/qemu/terminal_failure_kernel.c"
+        unpatched_read = Path.read_bytes
+        source = owner.read_bytes()
+        changed = source.replace(
+            b"micros_test_work_finish(&micros_terminal_test_work_snapshot)",
+            b"((void)*(volatile uint32_t *)&micros_terminal_test_work_snapshot, "
+            b"micros_test_work_finish((struct micros_test_work_snapshot *)&micros_terminal_test_observation))",
+            1,
+        )
+        self.assertNotEqual(source, changed)
+
+        def read_fixture(path):
+            return changed if path == owner else unpatched_read(path)
+
+        with tempfile.TemporaryDirectory(prefix="micros-fatal-snapshot-alias-", dir=ROOT / "build") as directory:
+            with patch.object(Path, "read_bytes", read_fixture):
+                root, output, dependencies = build_fatal_fixture(ROOT, Path(directory).resolve(), terminal_test=True)
+            catalog = fixture_catalog(root, output, dependencies)
+            with (
+                patch("tools.stack_bound_fatal.resolve_default_firmware", return_value={"fixture": "pinned"}),
+                self.assertRaisesRegex(StackEvidenceError, "snapshot|observer"),
+            ):
+                derive_fatal_context(root, output, catalog, qemu="/fixture/qemu-system-riscv64")
 
     def test_changed_source_state_or_missing_fallback_cannot_supply_qualification(self):
         for unit, old, new in (
@@ -127,7 +205,7 @@ class StackFatalBindingsTest(unittest.TestCase):
         from tools.stack_bound_flow import function_flow
         from tools.stack_bound_objects import function_symbols, load_object
 
-        key = next(row.function for row in self.catalog.frames if row.function.symbol == "micros_panic_report")
+        key = next(row.function for row in self.catalog.frames if row.function.symbol == "panic_report_claimed")
         origin = next(row for row in self.catalog.origins if row.function == key)
         obj = load_object(self.directory / dict(self.catalog.objects)[key])
         calls = function_flow(obj, function_symbols(obj)[key.symbol]).calls
@@ -159,7 +237,7 @@ class StackFatalBindingsTest(unittest.TestCase):
             graph.frames, graph.edges, (Root("supervisor", uart, 16384),), self.bind().bindings,
         )
         self.assertEqual(
-            [Qualifier.UNQUALIFIED, Qualifier.UART_PANIC_READY],
+            [Qualifier.UNQUALIFIED, Qualifier.PANIC_LATCHED_UART_READY],
             [node.qualifier for node in proof.witness if node.function == uart],
         )
         self.assertTrue(any(node.function.symbol == "micros_trap_panic_entry" for node in proof.witness))

@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from tools import validation_plan
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host.c_source_records import (
     Function,
     compact,
@@ -1605,7 +1606,7 @@ def struct_body(text: str, name: str) -> str:
 def metadata_for(path: str) -> tuple:
     return (
         validation_plan.requires_full_tier([path]),
-        tuple(validation_plan.affected_workflows([path])),
+        tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))),
         tuple(validation_plan.affected_slow_models([path])),
         tuple(validation_plan.affected_image_workflows([path])),
     )
@@ -1873,7 +1874,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             self.assertEqual(expected, digest(cmake_command(self.cmake, "add_custom_target", name)), name)
 
     def test_validation_metadata_independent_exact_four_dimensions(self) -> None:
-        self.assertEqual(QEMU_WORKFLOWS, validation_plan.QEMU_WORKFLOWS)
+        self.assertEqual(QEMU_WORKFLOWS, project_terminal_workflows(validation_plan.QEMU_WORKFLOWS))
         equivalences = dict(kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS))
         for family, (source_set, paths) in enumerate(SOURCE_SETS.items()):
             expected_children = (*paths[1:], PRIVATE_HEADERS[family])

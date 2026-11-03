@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from tests.host.ast_evidence import ast_dump
 from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_endpoint_source_layout import (
     alias_rows as endpoint_alias_rows,
@@ -2396,7 +2397,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
 
     def test_original_six_path_metadata_remains_exact(self) -> None:
         self.assertEqual((38, 21), (len(QEMU_WORKFLOWS), len(SYSCALL_WORKFLOWS)))
-        self.assertEqual(QEMU_WORKFLOWS, tuple(validation_plan.QEMU_WORKFLOWS))
+        self.assertEqual(QEMU_WORKFLOWS, tuple(project_terminal_workflows(validation_plan.QEMU_WORKFLOWS)))
         baselines = {
             "kernel/trap.c": (True, QEMU_WORKFLOWS, ()),
             "kernel/syscall.c": (False, SYSCALL_WORKFLOWS, ("test-ipc-model",)),
@@ -2410,7 +2411,7 @@ class TrapSyscallSourceLayoutTest(unittest.TestCase):
         for path, (full, workflows, models) in baselines.items():
             with self.subTest(path=path):
                 self.assertEqual(full, validation_plan.requires_full_tier([path]))
-                self.assertEqual(workflows, tuple(validation_plan.affected_workflows([path])))
+                self.assertEqual(workflows, tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))))
                 self.assertEqual(models, tuple(validation_plan.affected_slow_models([path])))
                 self.assertEqual([], validation_plan.affected_image_workflows([path]))
 

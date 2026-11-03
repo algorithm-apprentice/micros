@@ -203,10 +203,12 @@ def validate_green_source(source):
 
 
 def validate_gate_adapter(root, source):
+    from tests.host.terminal_failure_source import project_terminal_gate
     from tests.host.work_count_recipe import project_gate_compatibility
 
     try:
-        projected = project_gate_compatibility(IDENTITY_OWNER, source)
+        projected = project_terminal_gate(IDENTITY_OWNER, source)
+        projected = project_gate_compatibility(IDENTITY_OWNER, projected)
         expected = design_blob(root, IDENTITY_OWNER).decode("utf-8")
         if ast_dump(ast.parse(projected)) != ast_dump(ast.parse(expected)):
             raise ValueError("COPY01 assertion adapter changed an unrelated original gate node")

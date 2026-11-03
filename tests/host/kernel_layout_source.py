@@ -14,6 +14,9 @@ from tests.host.diagnostic_history_authority import identity_required as diagnos
 from tests.host.diagnostic_history_source import (
     diagnostic_kernel_members, project_diagnostic_context, project_diagnostic_external, project_diagnostic_gate,
 )
+from tests.host.terminal_failure_source import (
+    project_terminal_plan, project_terminal_planner, project_terminal_source_bytes, terminal_kernel_members,
+)
 from tests.host.stack_recipe import (
     project_command_extension, project_planner_registration,
     project_external_evidence as project_stack_external,
@@ -15663,6 +15666,9 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
     additional, additional_errors = diagnostic_kernel_members(root)
     expected.update(additional)
     errors.extend(additional_errors)
+    terminal, terminal_errors = terminal_kernel_members(root)
+    expected.update(terminal)
+    errors.extend(terminal_errors)
     observed = set()
     for path in kernel_root.rglob("*"):
         relative = path.relative_to(root).as_posix()
@@ -15833,7 +15839,7 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     physical, _, expected_sha256, transports = KERNEL_FILE_FACTS[logical]
     del physical
     selected = current_path(root, logical)
-    raw = selected.read_bytes()
+    raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], selected.read_bytes())
     if b"MICROS_TEST_STACK_" in raw:
         raw = project_stack_source(
             KERNEL_LOGICAL_TO_PHYSICAL[logical], raw.decode("utf-8")
@@ -15903,7 +15909,7 @@ def _restored_external_bytes(path: Path, relative: str) -> bytes:
     _, expected_sha256, transports = EXTERNAL_SOURCE_FACTS[relative]
     return _restored_include_bytes(
         relative,
-        path.read_bytes(),
+        project_terminal_source_bytes(relative, path.read_bytes()),
         expected_sha256,
         transports,
         required=diagnostic_identity_required(
@@ -15998,6 +16004,7 @@ def _restore_exact_source_transports(
 
 
 def restore_validation_plan_source(source: str) -> str:
+    source = project_terminal_planner(source)
     source = project_planner_registration(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == PYTHON315_VALIDATION_PLAN_SHA256:
@@ -16137,6 +16144,7 @@ def original_cmake_recipe_digest(value: str) -> str:
 
 
 def original_validation_plan(commands):
+    commands = project_terminal_plan(commands)
     commands = project_command_extension(commands)
     restored = []
     for command in commands:

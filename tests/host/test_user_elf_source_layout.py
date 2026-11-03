@@ -12,6 +12,7 @@ from unittest import mock
 from tests.host.test_kernel_address_space_source_layout import cmake_command
 from tests.host.ast_evidence import ast_digest, ast_key
 from tools import validation_plan
+from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import kernel_layout_source
 
 
@@ -614,7 +615,7 @@ def build_errors(text):
 def metadata(path):
     return (
         validation_plan.requires_full_tier([path]),
-        tuple(validation_plan.affected_workflows([path])),
+        tuple(project_terminal_workflows(validation_plan.affected_workflows([path]))),
         tuple(validation_plan.affected_slow_models([path])),
         tuple(validation_plan.affected_image_workflows([path])),
     )

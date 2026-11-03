@@ -4,6 +4,8 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
+#include "tests/qemu/terminal_failure_kernel.h"
+#include "kernel/diagnostic/panic_control.h"
 #include "arch/riscv64/trap_context.h"
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
@@ -27,7 +29,9 @@ void micros_panic_seize(void)
         micros_tty_handoff_runtime_panic()
             == MICROS_TTY_HANDOFF_OK
     );
-    uart_panic_seize();
+    if (uart_panic_seize()) {
+        uart_write("MICROS_CONSOLE_METADATA_REPAIRED\n");
+    }
     if (
         (!plic_disabled || !tty_panicked)
         && !panic_seizure_failure_emitted
@@ -42,7 +46,7 @@ void micros_panic_seize(void)
     }
 }
 
-_Noreturn void micros_panic_report(
+static _Noreturn void panic_report_claimed(
     uintptr_t hart_id,
     const char *reason,
     const char *file,
@@ -51,7 +55,13 @@ _Noreturn void micros_panic_report(
     const struct micros_panic_machine_context *context
 )
 {
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_report(context);
+#endif
     micros_panic_seize();
+#ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
+    micros_terminal_test_after_seize(hart_id);
+#endif
 
     uart_write("MICROS_PANIC reason=");
     uart_write(reason);
@@ -119,4 +129,19 @@ _Noreturn void micros_panic_report(
     for (;;) {
         __asm__ volatile("wfi");
     }
+}
+
+_Noreturn void micros_panic_report(
+    uintptr_t hart_id,
+    const char *reason,
+    const char *file,
+    uint32_t line,
+    const struct micros_trap_frame *trap_frame,
+    const struct micros_panic_machine_context *context
+)
+{
+    if (!micros_panic_claim_first()) {
+        micros_panic_terminate_no_console();
+    }
+    panic_report_claimed(hart_id, reason, file, line, trap_frame, context);
 }
