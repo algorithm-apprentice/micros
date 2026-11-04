@@ -14,10 +14,12 @@ commit: 8d4fd8c0dad354a7840a70d1505fa0cfebd2888f
 tree:   b2a444d27e0e6cc43d5f5d1e6a5926c52b520dc2
 ```
 
-EV01-C03 implementation is preserved as reference, not merged or accepted.
-Only this corrective design is active. Its implementation follows separate
-review, Acceptance and merge; EV01-C03 restarts afterward from current main.
-MEM01 and hosted CI do not proceed in parallel.
+Design #206 is separately reviewed and merged as
+`137d91698a923be57fd27f54ed570485c3768f88`.
+Only its corrective implementation is active. EV01-C03 implementation is
+preserved as reference, not merged or accepted, and restarts after this
+prerequisite's separate implementation merge. MEM01 and hosted CI do not
+proceed in parallel.
 
 ## Two different authority lifetimes
 
@@ -207,6 +209,6 @@ not reusable as complete acceptance.
 
 ## Design phase barrier
 
-This proposal adds documents only. No controller, test, model, fixture,
-prototype, build scaffold or dependency is authored before independent
-review, Acceptance and separate design merge.
+The separately merged design added documents only. No controller, test,
+model, fixture, prototype, build scaffold or dependency was authored in
+that phase. Implementation started from the merged Accepted design.

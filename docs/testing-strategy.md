@@ -360,13 +360,27 @@ remained unrun; this is not complete acceptance.
 
 [Accepted ADR-0099](adr/0099-panic-trace-execution-scopes.md) isolates the
 [current/baseline execution-scope repair](architecture/panic-trace-execution-scopes.md).
-Its future implementation must preserve strict historical checks and all
+Its implementation must preserve strict historical checks and all
 current input/artifact stability, require all six current production
 subjects, renew the actual eighteen-case pair in the fixed #204 envelope
 with only the reviewed controller/test overlays, then pass the complete
 fresh author gate on the actual current checkout. The two evidence contexts
-must remain separately labeled. No controller/test changes exist in this
-design phase; EV01-C03 and MEM01 remain blocked.
+must remain separately labeled. The separate design #206 contained no
+controller/test changes; EV01-C03 and MEM01 remain blocked.
+
+The implementation adds only Boolean-mode/current-subject checks and
+baseline-only historical-scope dispatch. Native execution-scope regressions
+retain complete current source capture, reject every missing current subject
+and source/tool/firmware/artifact drift, and preserve strict historical
+pre/post checks and failure publication behavior. These host protocol
+fixtures do not certify actual guest behavior. Narrow iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_panic_trace tests.host.test_evidence_authority.InventoryTests tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_diagnostic_history.DiagnosticHistoryAuthorityTest
+```
+
+The separately labeled actual target pair and complete real-current author
+plan remain required before independent implementation review.
 
 ## POSIX conformance evidence
 

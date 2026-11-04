@@ -1,6 +1,7 @@
 """Independent PLAT03 trace and corrected link-precedence regressions."""
 
 import ast
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -942,6 +943,232 @@ class PanicTraceControllerTest(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 run_cases(Path("fixed.elf"), baseline=True)
             self.assertEqual(2, run.call_count)
+
+
+class PanicTraceExecutionScopeTest(unittest.TestCase):
+    @contextmanager
+    def execution(self, *, baseline=False):
+        from contextlib import ExitStack, redirect_stdout
+        import io
+        from types import SimpleNamespace
+        from tools import check_panic_traces as controller
+        from tools.validation_context import Candidate
+
+        with tempfile.TemporaryDirectory(prefix="micros-trace-scope-") as directory, ExitStack() as stack:
+            root = Path(directory)
+            state = SimpleNamespace(
+                controller=controller, root=root, untracked=b"",
+                candidate=Candidate({}, {"head": "1" * 40}, True),
+                tools={"compiler": "fixed"}, firmware={"image": "fixed"},
+                members=set(controller.SOURCE_ROLES["candidate_paths"])
+                | set(controller.SOURCE_ROLES["immutable_additions"])
+                | {"CMakeLists.txt", "CMakePresets.json", "docs/later-design.md"},
+                scope_check=controller.require_source_scope,
+            )
+            for name in state.members:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((ROOT / name).read_bytes() if name in (
+                    "CMakeLists.txt", "CMakePresets.json",
+                ) else name.encode())
+
+            def git(*arguments):
+                if arguments == ("ls-files", "--others", "--exclude-standard", "-z"):
+                    return state.untracked
+                self.assertEqual(("ls-files", "-z"), arguments)
+                return b"".join(name.encode() + b"\0" for name in sorted(state.members))
+
+            def build(source, workspace):
+                target = workspace / "target"
+                state.image = target / "kernel/micros.elf"
+                state.image.parent.mkdir(parents=True)
+                state.image.write_bytes(b"scope-policy fixture, not an executable")
+                return target, ()
+
+            stack.enter_context(redirect_stdout(io.StringIO()))
+            stack.enter_context(patch.object(controller, "ROOT", root))
+            stack.enter_context(patch.object(controller, "git", side_effect=git))
+            stack.enter_context(patch(
+                "tools.validation_context.capture_candidate", side_effect=lambda _: state.candidate,
+            ))
+            stack.enter_context(patch(
+                "tests.host.diagnostic_history_evidence.closed_tool_inputs",
+                side_effect=lambda _: dict(state.tools),
+            ))
+            stack.enter_context(patch(
+                "tools.stack_bound_fatal_firmware.resolve_default_firmware",
+                side_effect=lambda _: dict(state.firmware),
+            ))
+            stack.enter_context(patch(
+                "tests.host.diagnostic_history_evidence.build_artifacts", return_value=("kernel/micros.elf",),
+            ))
+            state.scope = stack.enter_context(patch.object(controller, "require_source_scope"))
+            stack.enter_context(patch.object(controller, "prepare_baseline", return_value=root))
+            stack.enter_context(patch.object(controller, "validate_baseline"))
+            state.build = stack.enter_context(patch.object(controller, "build_target", side_effect=build))
+            stack.enter_context(patch.object(controller, "run_cases", return_value=(
+                controller.ImageBinding("0" * 64, (), (), (), (), not baseline),
+                (PanicTraceCaptureTest.case(baseline=baseline),), (),
+            )))
+            state.oracles = stack.enter_context(patch.object(controller, "run_oracles", return_value=({}, "")))
+            state.publish = stack.enter_context(patch.object(controller, "publish_json", wraps=controller.publish_json))
+            yield state
+
+    def test_current_execution_reaches_manifest_capture_with_later_committed_files(self):
+        from tools import check_panic_traces as controller
+
+        class ManifestReached(Exception):
+            pass
+
+        with (
+            patch.object(controller, "source_manifest", side_effect=ManifestReached),
+            patch.object(controller, "build_target") as build,
+            patch.object(controller, "publish_json") as publish,
+        ):
+            with self.assertRaises(Exception) as result:
+                controller.execute(False)
+            self.assertIsInstance(result.exception, ManifestReached)
+            build.assert_not_called()
+            publish.assert_not_called()
+
+    def test_current_manifest_keeps_every_input_and_rejects_dirty_or_incomplete_ownership(self):
+        from dataclasses import replace
+
+        with self.execution() as state:
+            manifest = state.controller.source_manifest()
+            self.assertEqual(state.members, set(manifest["subjects"]) | set(manifest["immutable"]["files"]))
+            self.assertIn("docs/later-design.md", manifest["immutable"]["files"])
+            state.candidate = replace(state.candidate, clean=False)
+            with self.assertRaises(ValueError):
+                state.controller.source_manifest()
+            state.candidate = replace(state.candidate, clean=True)
+            state.untracked = b"untracked-input\0"
+            with self.assertRaises(ValueError):
+                state.controller.source_manifest()
+            state.untracked = b""
+            for name in state.controller.SOURCE_ROLES["immutable_additions"]:
+                state.members.remove(name)
+                with self.subTest(missing=name), self.assertRaises(ValueError):
+                    state.controller.source_manifest()
+                state.members.add(name)
+
+    def test_current_execution_requires_every_subject_and_exact_boolean_modes(self):
+        from tools.check_panic_traces import SOURCE_ROLES
+
+        for name in SOURCE_ROLES["candidate_paths"]:
+            with self.subTest(missing=name), self.execution() as state:
+                state.members.remove(name)
+                (state.root / name).unlink()
+                with self.assertRaises(ValueError):
+                    state.controller.execute(False)
+                state.build.assert_not_called()
+                state.publish.assert_not_called()
+        for mode in (0, 1, None, "current"):
+            with self.subTest(mode=mode), self.execution() as state:
+                state.scope.side_effect = state.scope_check
+                with self.assertRaises(ValueError):
+                    state.controller.execute(mode)
+                state.build.assert_not_called()
+                state.publish.assert_not_called()
+
+    def test_current_run_preserves_complete_inputs_and_rejects_each_kind_of_drift(self):
+        with self.execution() as state:
+            self.assertEqual(0, state.controller.execute(False))
+            state.scope.assert_not_called()
+            record = json.loads((state.root / "build/panic-trace/current.json").read_text())
+            self.assertEqual(
+                state.members,
+                set(record["input_manifest"]["subjects"]) | set(record["input_manifest"]["immutable"]["files"]),
+            )
+        for change in ("subject", "other-source", "membership", "tool", "firmware", "artifact"):
+            with self.subTest(change=change), self.execution() as state:
+                def drift(cases, *, baseline):
+                    if change in ("subject", "other-source"):
+                        name = (
+                            state.controller.SOURCE_ROLES["candidate_paths"][0]
+                            if change == "subject" else "docs/later-design.md"
+                        )
+                        (state.root / name).write_bytes(b"changed input")
+                    elif change == "membership":
+                        name = "docs/another-later-design.md"
+                        state.members.add(name)
+                        (state.root / name).write_bytes(b"new input")
+                    elif change == "tool":
+                        state.tools["compiler"] = "changed"
+                    elif change == "firmware":
+                        state.firmware["image"] = "changed"
+                    else:
+                        state.image.write_bytes(b"changed artifact")
+                    return {}, ""
+
+                state.oracles.side_effect = drift
+                with self.assertRaisesRegex(ValueError, "changed during execution"):
+                    state.controller.execute(False)
+                state.publish.assert_not_called()
+
+    def test_baseline_checks_both_boundaries_and_failures_never_publish_success(self):
+        from contextlib import redirect_stderr
+        from dataclasses import replace
+        import io
+
+        with self.execution(baseline=True) as state:
+            self.assertEqual(1, state.controller.execute(True))
+            self.assertEqual(
+                [{"baseline": True}, {"baseline": True}],
+                [entry.kwargs for entry in state.scope.call_args_list],
+            )
+        for failure in ("scope-before", "scope-after", "capture", "build", "oracles"):
+            baseline = failure.startswith("scope-")
+            with self.subTest(failure=failure), self.execution(baseline=baseline) as state:
+                old_report = state.root / "build/panic-trace" / ("baseline.json" if baseline else "current.json")
+                old_report.parent.mkdir(parents=True)
+                old_report.write_bytes(b"old report is not current acceptance")
+                if failure.startswith("scope-"):
+                    state.scope.side_effect = (
+                        [ValueError("scope rejected")] if failure == "scope-before"
+                        else [None, ValueError("scope rejected")]
+                    )
+                elif failure == "capture":
+                    state.candidate = replace(state.candidate, clean=False)
+                else:
+                    getattr(state, failure).side_effect = ValueError("execution rejected")
+                with redirect_stderr(io.StringIO()):
+                    self.assertEqual(2, state.controller.main(["--baseline"] if baseline else []))
+                state.publish.assert_not_called()
+                self.assertEqual(b"old report is not current acceptance", old_report.read_bytes())
+
+    def test_historical_scope_still_rejects_new_members_and_nontrace_production(self):
+        from tools import check_panic_traces as controller
+
+        git_before = controller.git
+        base = set(filter(None, git_before(
+            "ls-tree", "-r", "--name-only", "-z", controller.DESIGN_PINS["design_commit"],
+        ).decode().split("\0")))
+        allowed = base | set(controller.SOURCE_ROLES["candidate_paths"]) | set(
+            controller.SOURCE_ROLES["immutable_additions"],
+        )
+        present = allowed | {"docs/later-design.md"}
+
+        def git(*arguments):
+            if arguments == ("ls-files", "-z"):
+                return b"".join(name.encode() + b"\0" for name in sorted(present))
+            return git_before(*arguments)
+
+        read_before = controller.read_regular
+        selected = ROOT / "kernel/memory/frame_allocator.c"
+
+        def changed(path):
+            data, identity = read_before(path)
+            return (data + b"\nint unreviewed_state;\n", identity) if path == selected else (data, identity)
+
+        with patch.object(controller, "git", side_effect=git):
+            with self.assertRaisesRegex(ValueError, "membership escaped"):
+                controller.require_source_scope(baseline=True)
+            present = allowed
+            controller.require_source_scope(baseline=True)
+            with patch.object(controller, "read_regular", side_effect=changed):
+                with self.assertRaisesRegex(ValueError, "production outside"):
+                    controller.require_source_scope(baseline=True)
 
 
 class PanicTraceIntegrationTest(unittest.TestCase):
