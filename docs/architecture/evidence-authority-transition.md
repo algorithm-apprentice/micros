@@ -185,6 +185,15 @@ Historical helper detection uses an explicit qualified allowlist; an ordinary
 new function that merely calls a generic `digest()` utility is not a transport
 identity.
 
+The later [standalone frame-validator study](../research/standalone-frame-validator-payload-gap.md)
+identifies one distinct known consumer outside ADR-0092's direct-file table
+scope. Its current fallback includes the real C owner but also independent
+CMake/planner inputs, creating a genuine `PROJECTION` collision for MEM01.
+The [Accepted EV01-C03 contract](standalone-frame-validator-binding.md) names
+only that scalar identity and its one precise payload correction.
+Current closure-disjointness remains required; no runtime identity retires
+through this prerequisite.
+
 ## Authority model
 
 ### Identity key

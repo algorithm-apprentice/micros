@@ -104,9 +104,23 @@ separately merged as #203 before the restarted implementation. PLAT03 now
 supplies the bounded private trace, native/target evidence and version-four
 fault-epoch proof. Its acceptance requires matching immutable baseline/current
 inputs, the complete fresh 50-command author gate and independent review;
-only B01-F004/B01-E004 belong to this outcome.
-Memory correction and hosted CI do not start in parallel; the historical
-audit counts and graph remain unchanged.
+implementation #204 passed those gates and merged as
+`ddca7661d4fa7e13acf0aaa5f0ba55b91f9c9916`, with identical reviewed,
+committed, remote and squash tree
+`3bf57ef9d12345f7b72e082a5843c97a2476f23e`. Fresh committed
+authority/source checks pass without author journals. This closes only
+B01-F004/B01-E004, leaving 70 pre-node runtime findings open.
+
+Independent review of the next MEM01 design found a distinct
+[standalone frame-validator payload gap](standalone-frame-validator-payload-gap.md).
+The author verified that its 797-path fallback intersects MEM01's immutable
+command inputs, so the existing transition validator correctly rejects the
+proposal. MEM01 design is blocked and preserved as reference; its
+implementation has not started.
+[Accepted ADR-0098](../adr/0098-standalone-frame-validator-evidence-binding.md)
+defines the separate EV01-C03 one-key metadata prerequisite. No memory
+correction or hosted-CI work proceeds in parallel. The runtime finding
+ownership, historical audit counts and graph remain unchanged.
 
 ## Consolidation invariants
 
@@ -242,8 +256,8 @@ blocking queue.
 | `COPY01` | Runtime correction | `B05-F006` | `EV04` | Implementation #191 follows [Accepted ADR-0090](../adr/0090-minix-word-based-runtime-memory.md) and the [runtime memory contract](../architecture/runtime-memory-primitives.md): the generic MINIX word family is implemented, freestanding semantics are preserved, and only the exact invalidated transport assertion is retired. | Aligned, unaligned, short, page, overlap-policy and exact work-count cases; current full author gate and independent review complete. |
 | `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Implementation #199 follows Accepted ADR-0093/0094: both exact history roles, TTY transfer/notification and panic replay preserve separate physical ownership. | Actual primitive/native/target Red-Green, granular twenty-key retirement, thirteen-unit recertification, complete fresh author/stack evidence and independent review complete. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Implementation #201 under Accepted ADR-0095 bounds actual early/panic polls, claims first entry/reset independently and repairs only terminal console fields. | Actual twelve-case baseline/current evidence, complete fresh author/stack gate, journal-free prior authority and independent review complete. |
-| `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | The private trace implements Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md), following separately merged designs #202/#203. | Native owner/frame/work validation, matching eighteen-case baseline/current execution, version-four fault-epoch proof, the complete fresh author/stack gate and independent implementation review are the acceptance boundary. |
-| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Canonicalize once, retain allocator search state, and remove successful-path per-frame raw-FDT rescans. | Range/frame visit counts over fragmented and excluded maps. |
+| `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
+| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Canonicalize once, retain allocator search state, and remove successful-path per-frame raw-FDT rescans. Its design is blocked on the separate one-key EV01-C03 binding prerequisite. | Range/frame visit counts over fragmented and excluded maps; no implementation before separately reviewed design acceptance. |
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Add the reference large-page kernel map and direct table-frame ownership/indexing without linear table-frame searches. | Page-table topology, allocation, lookup, and ownership probe counts. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Keep complete ownership validation diagnostic-only and introduce selected-record mutation plans. | Active/inactive visit counts and failure-atomic selected transitions. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |

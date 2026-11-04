@@ -84,6 +84,9 @@ This directory contains the design baseline for `micros`.
 - [Relocated evidence payload bindings](architecture/relocated-evidence-payloads.md)
   defines the Accepted EV01-C02 repair for direct logical-file hash rows
   whose actual current source is missing from their payload.
+- [Standalone frame-validator binding](architecture/standalone-frame-validator-binding.md)
+  defines the Accepted one-key EV01-C03 repair for collateral fallback paths that
+  block the next allocator correction's immutable-input boundary.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -114,6 +117,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Standalone frame-validator payload gap](research/standalone-frame-validator-payload-gap.md)
+  records the actual 797-path fallback, immutable/candidate collision and
+  independently specified one-record correction.
 - [MINIX panic stack-trace baseline](research/minix-panic-stack-trace.md)
   traces the fixed current-kernel walk, pinned RV64 frame convention,
   ownership barriers, complexity and retained evidence for PLAT03.

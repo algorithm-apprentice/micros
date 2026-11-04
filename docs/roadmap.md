@@ -78,8 +78,25 @@ owner/cursor, target reader, streamed trace and version-four fault/stack
 evidence are now implemented. Acceptance requires matching immutable
 eighteen-case baseline/current evidence, all 50 fresh author commands,
 44 static configurations/113 outputs, ten observed scopes and independent
-implementation review. This outcome owns only B01-F004/B01-E004; MEM01
-follows it in the sequential correction queue.
+implementation review. Implementation #204 passed those gates and merged as
+`ddca7661d4fa7e13acf0aaa5f0ba55b91f9c9916`, with identical reviewed,
+committed, remote and squash tree
+`3bf57ef9d12345f7b72e082a5843c97a2476f23e`. A fresh committed checkout
+preserves prior authority without author journals. This closes only
+B01-F004/B01-E004.
+
+MEM01's next documentation-only proposal received an independent High
+design finding: one standalone frame-validator hash inherits 797 payload
+paths, colliding with independent immutable CMake/planner inputs. The author
+verified the actual inventory and unchanged `PROJECTION` rejection.
+That proposal is preserved as reference, not accepted implementation
+authority, and no memory implementation has started.
+The single active prerequisite is
+[Accepted ADR-0098](adr/0098-standalone-frame-validator-evidence-binding.md)
+and its [one-key binding contract](architecture/standalone-frame-validator-binding.md).
+EV01-C03 changes only independently declared payload/unit metadata while
+preserving all other facts, historical values and disjointness. MEM01 design
+resumes only after the separate prerequisite implementation merges.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

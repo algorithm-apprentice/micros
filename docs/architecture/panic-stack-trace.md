@@ -34,6 +34,19 @@ matching immutable baseline/current inputs and independent review before
 the first implementation commit. No unrelated runtime finding or hosted-CI
 acceptance is included.
 
+Implementation #204 is independently reviewed and merged as
+`ddca7661d4fa7e13acf0aaa5f0ba55b91f9c9916`. Its reviewed, committed,
+remote and squash trees are identical:
+`3bf57ef9d12345f7b72e082a5843c97a2476f23e`.
+All 50 fresh author commands passed, including 40 native CTests, 1,399
+Python tests, matching eighteen-case baseline/current evidence,
+44 static configurations/113 ELF outputs and ten observed scopes.
+Independent review found no substantive issue before the first
+implementation commit. A fresh committed checkout passed 101
+authority/source checks without author journals. Exact task branches
+were cleaned while purposeful archives and reference stashes were retained.
+This closes only B01-F004/B01-E004.
+
 ## Preserved authority and non-goals
 
 Keep the original direct/trap panic entry signatures, 48-byte machine
