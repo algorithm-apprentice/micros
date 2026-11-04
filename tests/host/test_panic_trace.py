@@ -1140,6 +1140,7 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
                 self.assertEqual(b"old report is not current acceptance", old_report.read_bytes())
 
     def test_historical_scope_still_rejects_new_members_and_nontrace_production(self):
+        from functools import lru_cache
         from tools import check_panic_traces as controller
 
         git_before = controller.git
@@ -1156,14 +1157,29 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
                 return b"".join(name.encode() + b"\0" for name in sorted(present))
             return git_before(*arguments)
 
-        read_before = controller.read_regular
+        fixed_inputs = {
+            ROOT / name: (mode, identity)
+            for name, mode, identity in controller.baseline_members()
+        }
         selected = ROOT / "kernel/memory/frame_allocator.c"
 
+        @lru_cache(maxsize=None)
+        def historical(path):
+            mode, identity = fixed_inputs[path]
+            data = git_before("cat-file", "blob", identity)
+            name = path.relative_to(ROOT).as_posix()
+            if name in controller.SOURCE_OVERLAYS:
+                data = controller.observe_source(name, data.decode()).encode()
+            return data, {"mode": mode}
+
         def changed(path):
-            data, identity = read_before(path)
+            data, identity = historical(path)
             return (data + b"\nint unreviewed_state;\n", identity) if path == selected else (data, identity)
 
-        with patch.object(controller, "git", side_effect=git):
+        with (
+            patch.object(controller, "git", side_effect=git),
+            patch.object(controller, "read_regular", side_effect=historical),
+        ):
             with self.assertRaisesRegex(ValueError, "membership escaped"):
                 controller.require_source_scope(baseline=True)
             present = allowed
@@ -1175,13 +1191,14 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
 
 class PanicTraceIntegrationTest(unittest.TestCase):
     def test_current_recipes_and_test_only_overlays_restore_the_complete_fixed_inputs(self):
+        from tests.host.bootstrap_allocation_source import project_cmake
         from tests.host.panic_trace_source import (
             SOURCE_OVERLAYS, TEST_HEADER, extend_cmake, extend_presets, fixed_source, observe_source,
             project_trace_runtime,
         )
 
         self.assertTrue(
-            (ROOT / "CMakeLists.txt").read_text() == extend_cmake(fixed_source("CMakeLists.txt")),
+            project_cmake((ROOT / "CMakeLists.txt").read_text()) == extend_cmake(fixed_source("CMakeLists.txt")),
             "current CMake does not contain the exact independently specified trace integration",
         )
         self.assertTrue(

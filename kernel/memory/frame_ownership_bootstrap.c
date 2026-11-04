@@ -25,6 +25,7 @@ enum micros_frame_ownership_error micros_frame_ownership_allocate(
 {
     uint64_t allocated_address;
     uint64_t frame_index;
+    uint64_t saved_cursor;
     enum micros_frame_allocator_error allocator_error;
     enum micros_frame_ownership_error error;
 
@@ -45,6 +46,7 @@ enum micros_frame_ownership_error micros_frame_ownership_allocate(
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
 
+    saved_cursor = ownership->allocator->allocation_cursor;
     allocator_error = micros_frame_allocator_allocate(
         ownership->allocator,
         &allocated_address
@@ -73,10 +75,13 @@ enum micros_frame_ownership_error micros_frame_ownership_allocate(
         || ownership->owner_counts[owner.kind]
             >= ownership->managed_frame_count
     ) {
-        (void)micros_frame_allocator_release(
+        allocator_error = micros_frame_allocator_release(
             ownership->allocator,
             allocated_address
         );
+        if (allocator_error == MICROS_FRAME_ALLOCATOR_OK) {
+            ownership->allocator->allocation_cursor = saved_cursor;
+        }
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
 
@@ -260,7 +265,10 @@ static void commit_process_release(
         if ((release_bitmap[word_index] & bit) == 0) {
             continue;
         }
-        ownership->allocator->allocated_bitmap[word_index] &= ~bit;
+        micros_frame_ownership_allocator_mark_free(
+            ownership->allocator,
+            frame_index
+        );
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};
         ownership->handoff_targets[frame_index] =

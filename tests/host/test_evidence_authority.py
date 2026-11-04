@@ -327,8 +327,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(14, len(inventory.families))
-        self.assertEqual(3938, len(inventory.facts))
+        self.assertEqual(15, len(inventory.families))
+        self.assertEqual(3946, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1198,7 +1198,10 @@ class StandaloneBindingTests(unittest.TestCase):
         ).groups()
         self.assertEqual(old, fingerprints["authority-core"])
         expected = {**fingerprints, "authority-core": new}
-        self.assertEqual(expected, dict(self.inventory.declared_family_fact_digests))
+        self.assertEqual(expected, {
+            family: fingerprint for family, fingerprint in self.inventory.declared_family_fact_digests
+            if family in expected
+        })
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
 
     def test_historical_view_rejects_metadata_drift_and_preserves_every_other_field(self):

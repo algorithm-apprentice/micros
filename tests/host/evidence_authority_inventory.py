@@ -4,7 +4,10 @@ import ast
 from pathlib import Path
 import re
 
-from tests.host import diagnostic_history_source, evidence_authority_packed, panic_trace_source, terminal_failure_source
+from tests.host import (
+    bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed,
+    panic_trace_source, terminal_failure_source,
+)
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
 )
@@ -104,6 +107,10 @@ FAMILY_OWNERS = {
     "panic-trace-baseline": (
         "tests/host/panic_trace_evidence.py",
         "tests/host/panic_trace_source.py",
+    ),
+    "bootstrap-allocation-baseline": (
+        "tests/host/bootstrap_allocation_authority.py",
+        "tests/host/bootstrap_allocation_source.py",
     ),
 }
 
@@ -215,6 +222,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "65851676be2a3e117557f4e73f5b12b078a06d54918e02f3e43179d902a6f3bd",
     "panic-trace-baseline":
         "d442149bc63732d9409a9f045cba855bae31d6cab675455717aa297f2d064740",
+    "bootstrap-allocation-baseline":
+        "36e0a2b18375288c5b43b8ccb01dbf8faff137db16120b693d7f8d8456108811",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -815,6 +824,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return terminal_failure_source.declaration_facts(root, relative)
     if family == panic_trace_source.FAMILY:
         return panic_trace_source.declaration_facts(root, relative)
+    if family == bootstrap_allocation_source.FAMILY:
+        return bootstrap_allocation_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

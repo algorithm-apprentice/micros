@@ -10,7 +10,7 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
-from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
+from tests.host.bootstrap_allocation_authority import identity_required as diagnostic_identity_required
 from tests.host.diagnostic_history_source import (
     diagnostic_kernel_members, project_diagnostic_context, project_diagnostic_external, project_diagnostic_gate,
 )
@@ -15848,7 +15848,12 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
         raw = project_stack_source(
             KERNEL_LOGICAL_TO_PHYSICAL[logical], raw.decode("utf-8")
         ).encode()
-    if logical == "kernel/frame_ownership_validation.c":
+    if (
+        logical == "kernel/frame_ownership_validation.c"
+        and diagnostic_identity_required(
+            root, "tests/host/kernel_layout_source.py:data-entry:BOUNDED_FRAME_VALIDATION_SHA256",
+        )
+    ):
         raw = restore_frame_validation_hot_path(
             raw.decode("utf-8")
         ).encode()

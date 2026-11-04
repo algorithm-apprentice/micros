@@ -15,9 +15,12 @@ The restarted design base is EV01-C03 #208, commit
 prerequisite. The original design's evidence-binding blocker is closed by
 separate #205/#208 under ADR-0098; #206/#207 under ADR-0099 preserve ordinary
 current trace acceptance without widening historical baseline authority.
-Runtime source and type/header bytes remain identical to #204.
-Only `mem01-design` is active; implementation remains pending a separately
-reviewed, Accepted design merge.
+Runtime source and type/header bytes at that design base remain identical
+to #204. Design #209 is separately reviewed and merged as
+`82f0b229afd2f396b0fdd8fc24b9bec00793fe97`, tree
+`76be2a6fb534fab324ef20960314263a7ebaa1bc`.
+Only the dependent MEM01 implementation is active. Its complete acceptance
+still requires the actual native/target work and authority evidence below.
 
 ## Retained authority and non-goals
 
@@ -317,7 +320,7 @@ tools/generate_bootstrap_allocation_fixture.py
 tools/check_bootstrap_allocation.py
 ```
 
-They are prospective design declarations, not files claimed to exist now.
+These eight files form the closed implementation evidence boundary.
 
 ### Actual code under the native fixture
 
@@ -335,6 +338,12 @@ The native harness may select the declared baseline/current layout at
 compile time, but must not add a cursor field to the baseline or read one
 there. The logical availability/owner model does not depend on either
 representation.
+
+Passive observations are materialized only in private generated native
+translations. Their exact inverse recovers the selected fixed/current
+source bytes and binds every declared primitive occurrence and enclosing
+compound. The production files contain no observation state or calls, so
+ordinary and unrelated already-counted targets cannot acquire MEM01 work.
 
 The closed original helper set is `range_end`, `ranges_intersect`,
 `fdt_memory_union_covers`, `intersects_fdt_reservations`,
@@ -612,6 +621,8 @@ After the design separately merges:
 9. publish and squash only the identical reviewed tree; and
 10. clean only the completed task's local/remote refs.
 
-This design phase runs only its documentation/structure and three-layer diff
-checks. It does not claim that any prospective native fixture, observation,
-journal, replacement oracle or corrected allocator already exists.
+The separately merged design contained documentation only and passed its
+required structure/three-layer checks. Implementation evidence is produced
+by the [documented actual commands](../development/building.md#bootstrap-allocation-work-and-authority-evidence);
+scaffold availability alone is not a qualifying Red, current Green or
+completed retirement.
