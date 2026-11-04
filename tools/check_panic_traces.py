@@ -734,8 +734,13 @@ def execute(baseline):
     from tools.python_host_runtime import require_current_runtime
 
     require_current_runtime()
-    require_source_scope(baseline=baseline)
+    if type(baseline) is not bool:
+        raise ValueError("PLAT03 source scope requires an exact execution stage")
+    if baseline:
+        require_source_scope(baseline=True)
     before = source_manifest()
+    if not baseline and set(before["subjects"]) != set(SOURCE_ROLES["candidate_paths"]):
+        raise ValueError("PLAT03 current execution requires all six trace production subjects")
     root = owned_artifact(ROOT, "build/panic-trace")
     root.mkdir(parents=True, exist_ok=True)
     workspace = owned_artifact(root, uuid.uuid4().hex)
@@ -750,7 +755,7 @@ def execute(baseline):
     print(output, flush=True)
     if baseline:
         validate_baseline(source)
-    require_source_scope(baseline=baseline)
+        require_source_scope(baseline=True)
     if source_manifest() != before or snapshot_files(directory, tuple(artifacts)) != artifacts:
         raise ValueError("PLAT03 source, tools, firmware or actual artifacts changed during execution")
     record = {
