@@ -105,6 +105,9 @@ This directory contains the design baseline for `micros`.
 - [Bounded panic stack trace](architecture/panic-stack-trace.md)
   defines PLAT03's Accepted current-kernel frame walk, exact stack/epoch
   authentication, finite read/output rules and independent target evidence.
+- [Panic-trace execution scopes](architecture/panic-trace-execution-scopes.md)
+  defines the Accepted separation of strict historical author scope from complete,
+  run-stable ordinary current inputs without weakening either boundary.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -117,6 +120,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Panic-trace current-scope blocker](research/panic-trace-current-scope-blocker.md)
+  records the actual full-gate rejection of already committed later documents
+  and the isolated PLAT03-C02 prerequisite.
 - [Standalone frame-validator payload gap](research/standalone-frame-validator-payload-gap.md)
   records the actual 797-path fallback, immutable/candidate collision and
   independently specified one-record correction.

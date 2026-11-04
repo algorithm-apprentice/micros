@@ -14,9 +14,14 @@ commit: ddca7661d4fa7e13acf0aaa5f0ba55b91f9c9916
 tree:   3bf57ef9d12345f7b72e082a5843c97a2476f23e
 ```
 
-Only the prerequisite design is active. Its implementation depends on
-separate review, Acceptance and merge. MEM01 design is blocked on the later
-prerequisite implementation outcome; no memory runtime work starts here.
+Design #205 is separately reviewed and merged as
+`8d4fd8c0dad354a7840a70d1505fa0cfebd2888f`.
+The initial implementation is preserved but blocked: its full author run
+found that the ordinary panic-trace gate rejects these already committed
+design documents as outside PLAT03's historical scope.
+[Accepted ADR-0099](../adr/0099-panic-trace-execution-scopes.md) defines the
+separate prerequisite; no controller change is folded into this contract.
+MEM01 remains blocked and no memory runtime work starts here.
 
 ## Exact admission
 
