@@ -706,6 +706,15 @@ before and after both modes. Any frozen-input change requires renewed
 baseline evidence. A later ordinary current workflow has no dependency
 on the author's old local baseline log.
 
+The later [current-scope study](../research/panic-trace-current-scope-blocker.md)
+found that the implemented ordinary path nevertheless enforces the original
+whole-repository membership and noncandidate production freeze.
+[Accepted ADR-0099](../adr/0099-panic-trace-execution-scopes.md) and its
+[execution-scope contract](panic-trace-execution-scopes.md) isolate the
+correction: historical author/baseline checks remain exact, while ordinary
+current execution binds every current input for the complete run.
+This proposal is not an implemented relaxation or a renewed baseline pass.
+
 ### Nine new facts, no retirement
 
 Before source-owner or extractor edits, independently declare exactly

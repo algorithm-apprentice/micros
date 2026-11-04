@@ -91,12 +91,23 @@ paths, colliding with independent immutable CMake/planner inputs. The author
 verified the actual inventory and unchanged `PROJECTION` rejection.
 That proposal is preserved as reference, not accepted implementation
 authority, and no memory implementation has started.
-The single active prerequisite is
+EV01-C03 follows
 [Accepted ADR-0098](adr/0098-standalone-frame-validator-evidence-binding.md)
 and its [one-key binding contract](architecture/standalone-frame-validator-binding.md).
 EV01-C03 changes only independently declared payload/unit metadata while
 preserving all other facts, historical values and disjointness. MEM01 design
 resumes only after the separate prerequisite implementation merges.
+
+Design #205 is merged, but EV01-C03's initial implementation is preserved
+and blocked. Its full author run passed native checks and seven commands,
+then the ordinary panic-trace gate rejected the three already committed
+design documents against PLAT03's original file set. This same rejection
+affects clean main; it is not a trace-runtime failure.
+[Accepted ADR-0099](adr/0099-panic-trace-execution-scopes.md) and the
+[execution-scope contract](architecture/panic-trace-execution-scopes.md)
+are the sole active PLAT03-C02 prerequisite. Preserve strict historical
+baseline scope and complete current source/artifact stability; restart
+EV01-C03 only after the separate corrective implementation merges.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

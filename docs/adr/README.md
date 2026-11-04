@@ -114,3 +114,4 @@ to make the project appear more consistent than it was.
 | [0096](0096-bounded-kernel-panic-stack-trace.md) | Bounded kernel panic stack trace | Accepted |
 | [0097](0097-panic-trace-link-rejection-precedence.md) | Panic-trace link rejection precedence | Accepted |
 | [0098](0098-standalone-frame-validator-evidence-binding.md) | Standalone frame-validator evidence binding | Accepted |
+| [0099](0099-panic-trace-execution-scopes.md) | Panic-trace author and current execution scopes | Accepted |

@@ -352,6 +352,22 @@ must prove the exact one corrected record, 3,937 unchanged records,
 historical comparison recovery and unchanged disjointness. The current
 design adds no executable fixture or new test/workflow.
 
+After design #205, the uncommitted EV01-C03 implementation passed focused
+native checks and the complete native stage, but its full producer failed
+at ordinary `test-qemu-panic-trace`: PLAT03's historical scope rejected the
+three already committed design documents. Seven commands passed and 42
+remained unrun; this is not complete acceptance.
+
+[Accepted ADR-0099](adr/0099-panic-trace-execution-scopes.md) isolates the
+[current/baseline execution-scope repair](architecture/panic-trace-execution-scopes.md).
+Its future implementation must preserve strict historical checks and all
+current input/artifact stability, require all six current production
+subjects, renew the actual eighteen-case pair in the fixed #204 envelope
+with only the reviewed controller/test overlays, then pass the complete
+fresh author gate on the actual current checkout. The two evidence contexts
+must remain separately labeled. No controller/test changes exist in this
+design phase; EV01-C03 and MEM01 remain blocked.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

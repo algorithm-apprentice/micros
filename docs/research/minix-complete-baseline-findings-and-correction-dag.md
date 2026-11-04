@@ -122,6 +122,17 @@ defines the separate EV01-C03 one-key metadata prerequisite. No memory
 correction or hosted-CI work proceeds in parallel. The runtime finding
 ownership, historical audit counts and graph remain unchanged.
 
+EV01-C03 design #205 is merged. Its initial implementation is preserved
+and blocked by the distinct
+[ordinary panic-trace scope failure](panic-trace-current-scope-blocker.md):
+the full plan passed seven commands, then rejected three already committed
+design files against the original PLAT03 membership.
+[Accepted ADR-0099](../adr/0099-panic-trace-execution-scopes.md) is the
+sole active PLAT03-C02 corrective design. It preserves historical baseline
+authority while specifying complete current-run input stability.
+EV01-C03 implementation restarts after that separate prerequisite merges;
+MEM01 remains blocked. No runtime finding is newly retired or reassigned.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
