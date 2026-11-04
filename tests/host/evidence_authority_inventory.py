@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 import re
 
-from tests.host import diagnostic_history_source, evidence_authority_packed, terminal_failure_source
+from tests.host import diagnostic_history_source, evidence_authority_packed, panic_trace_source, terminal_failure_source
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
 )
@@ -100,6 +100,10 @@ FAMILY_OWNERS = {
     "terminal-failure-baseline": (
         "tests/host/terminal_failure_evidence.py",
         "tests/host/terminal_failure_source.py",
+    ),
+    "panic-trace-baseline": (
+        "tests/host/panic_trace_evidence.py",
+        "tests/host/panic_trace_source.py",
     ),
 }
 
@@ -209,6 +213,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "d30a3bf2737a3a38b20940e4acde18e26de252198d9a3ee1bbf24b4e8e973d49",
     "terminal-failure-baseline":
         "65851676be2a3e117557f4e73f5b12b078a06d54918e02f3e43179d902a6f3bd",
+    "panic-trace-baseline":
+        "d442149bc63732d9409a9f045cba855bae31d6cab675455717aa297f2d064740",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -796,6 +802,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return diagnostic_history_source.declaration_facts(root, relative)
     if family == terminal_failure_source.FAMILY:
         return terminal_failure_source.declaration_facts(root, relative)
+    if family == panic_trace_source.FAMILY:
+        return panic_trace_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

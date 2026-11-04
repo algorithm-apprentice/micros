@@ -59,6 +59,7 @@ SCENARIOS = {
 }
 
 KERNEL_ONLY = frozenset((
+    "riscv64-panic-trace-test",
     "riscv64-terminal-failure-test",
     "riscv64-debug", "riscv64-panic-test", "riscv64-trap-test", "riscv64-timer-test",
     "riscv64-uart-console-test", "riscv64-frame-allocator-test", "riscv64-trap-panic-test",

@@ -59,7 +59,8 @@ micros_kernel_object_runtime_detach_address_space(
     || defined(MICROS_BUILD_GRANT_SYSCALL_TEST) \
     || defined(MICROS_BUILD_USER_RUNTIME_TEST) \
     || defined(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST) \
-    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)
+    || defined(MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST) \
+    || defined(MICROS_BUILD_PANIC_TRACE_TEST)
 struct micros_kernel_objects *
 micros_kernel_object_runtime_test_registry(void);
 #endif

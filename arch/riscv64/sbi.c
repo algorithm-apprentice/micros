@@ -1,7 +1,7 @@
 #include "arch/riscv64/platform.h"
 #include "tests/qemu/terminal_failure_kernel.h"
 #include "kernel/diagnostic/panic_control.h"
-
+#include "tests/qemu/panic_trace_kernel.h"
 enum {
     SBI_EXT_TIME = 0x54494d45,
     SBI_EXT_SYSTEM_RESET = 0x53525354,
@@ -37,6 +37,9 @@ intptr_t sbi_system_reset(uint32_t reset_type, uint32_t reset_reason)
     }
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
     micros_terminal_test_reset(reset_type, reset_reason);
+#endif
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_reset(reset_type, reset_reason);
 #endif
     register uintptr_t argument0 __asm__("a0") = reset_type;
     register uintptr_t argument1 __asm__("a1") = reset_reason;

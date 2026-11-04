@@ -1179,6 +1179,103 @@ receipt. Later ordinary current execution does not require the old local
 baseline report. The complete fresh author plan and independent review
 remain separate requirements.
 
+## Panic-trace baseline and current evidence
+
+The PLAT03 driver follows the
+[bounded trace contract](../architecture/panic-stack-trace.md) and
+[Accepted link-precedence clarification](../adr/0097-panic-trace-link-rejection-precedence.md).
+Stage the complete native/guest fixtures, independent models, source/effect
+declarations, controller and documentation before observing the old runtime:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/check_panic_traces.py --baseline
+```
+
+Exit one requires all eighteen actual VMs to retain their original
+panic/trap/history and natural-reset behavior, the ordinary-reset positive
+control, and four separately executed expected trace-property failures.
+Compile, protocol, observer, timeout, closure and unexpected-result failures
+exit two. Missing trace output alone is not qualifying Red.
+
+The baseline archive is fixed at PLAT02 #201. Exact inverse checks admit
+only the three immutable guest files and declared observation/build overlays;
+the new production trace owners remain absent. The baseline does not enable
+the current-only trace-count flag or reference the absent injected-load
+symbol. In the current fixture, the reset observer checks the actual
+load-page-fault cause, zero fault address and exact linked instruction PC.
+The stuck-output fixture rejects any THR store after its trace header.
+
+Focused implementation iteration and current target execution use:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_panic_trace
+cmake --preset host-debug
+cmake --build build/host-debug --target panic_trace_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^panic-trace$'
+cmake --workflow --preset test-qemu-panic-trace
+```
+
+Each mode performs a fresh private configure and clean-first kernel build.
+Each VM has one absolute eight-second deadline, including debugger startup.
+The controller accepts no arbitrary image, source, address, case or timeout.
+Complete captures, raw transcripts, actual helper/caller bindings, build
+artifacts and input manifests remain below `build/panic-trace/`. Only a
+completed run atomically publishes `baseline.json` or `current.json`.
+Current success exits zero; it requires all eighteen cases and four oracles.
+
+The first implementation author compares the complete immutable inputs:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+import json
+from pathlib import Path
+root = Path("build/panic-trace")
+baseline = json.loads((root / "baseline.json").read_text())
+current = json.loads((root / "current.json").read_text())
+assert baseline["baseline"] is True and current["baseline"] is False
+assert baseline["input_manifest"]["immutable"] == current["input_manifest"]["immutable"]
+print("panic trace baseline/current immutable inputs match")
+PY
+```
+
+Any immutable-input change requires renewed baseline and current evidence.
+These records do not retire an identity or replace the complete fresh author
+plan, complete stack evidence, or independent implementation review.
+Later current execution does not require the author's local baseline report.
+
+For development of the finite source/object/linked proof, the existing
+dispatcher can check one fresh ordinary/metadata boot-image pair:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+from pathlib import Path
+from tools.check_stack_evidence import static_configuration
+from tools.stack_bound_build import static_profiles
+from tools.validation_context import capture_candidate
+root = Path.cwd()
+candidate = capture_candidate(root)
+assert candidate.clean
+profile, = (value for value in static_profiles(root) if value.configure == "riscv64-debug")
+static_configuration(root, profile, candidate)
+print("DEVELOPMENT_ONLY: one static configuration passed; no complete stack certificate")
+PY
+```
+
+Stage the complete candidate first. This uses the ordinary build seals,
+passivity checks and real linked proof; it does not publish the complete
+certificate, run the ten observed scopes, or satisfy the full author gate.
+Select `riscv64-panic-trace-test` instead of `riscv64-debug` in this same
+development command to check the closed trace fixture.
+
+The fixture proof binds the actual outer, nested and word-load fault
+instructions, complete trap captures, physical stack pivots and read-only
+post-load-fault C route. Hardware transitions retain the interrupted epochs;
+explicit panic reentry retains both captures on one stack. The existing
+unqualified panic-report certificate supplies a conservative upper bound
+for the already-latched destination tail, not permission to enter another
+report body. No new panic-edge exclusion or frame-releasing graph edge is
+introduced.
+
 ## TTY service image validation
 
 Build and validate the standalone real TTY service ELF with:

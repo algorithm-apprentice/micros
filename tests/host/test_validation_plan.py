@@ -1051,6 +1051,7 @@ class ValidationPlanTests(unittest.TestCase):
             "test-qemu-timer": "arch/riscv64/sbi.c",
             "test-qemu-uart-console": "kernel/uart_console_test.c",
             "test-qemu-terminal-failure": "tests/qemu/terminal_failure_kernel.c",
+            "test-qemu-panic-trace": "tests/qemu/panic_trace_kernel.c",
             "test-qemu-frame-allocator": "kernel/frame_allocator.c",
             "test-qemu-trap-panic": "arch/riscv64/trap_test.S",
             "test-qemu-mmu": "kernel/mmu_test.c",

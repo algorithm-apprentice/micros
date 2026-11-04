@@ -10,7 +10,7 @@ micros runtime reference: e12b2d6c163ac92282d380eff5be419fad7f7a30
 micros runtime tree:      53d900f539d0e766b2998ff57aeea990ac25e30a
 MINIX reference:         4db99f4012570a577414fe2a43697b2f239b699e
 RISC-V psABI reference:  9b2767e2a8851709608c4e1452998ad232d6278b
-implementation:         pending separate Accepted design merge
+design merges:          #202 and #203
 ```
 
 The PLAT02 author ran all 49 current commands fresh, the actual fixed-source
@@ -277,5 +277,8 @@ This study closes no finding by itself. The
 [canonical contract](../architecture/panic-stack-trace.md) specifies
 the exact interfaces, frame/error ordering, read boundary, output
 grammar, eighteen-case fixture matrix, source authority and acceptance
-gates. Those contracts passed independent design review and are Accepted;
-implementation remains pending their separate design merge.
+gates. Those contracts passed independent design review and separately
+merged as #202 and #203. The private implementation and executable evidence
+now follow those contracts; only complete implementation acceptance closes
+B01-F004/B01-E004. The historical runtime/source pins in this study remain
+unchanged.

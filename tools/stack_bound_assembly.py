@@ -1,5 +1,6 @@
 """Closed fixed-source RV64 assembly frames and explicit epoch boundaries."""
 
+from collections import Counter
 from dataclasses import dataclass, replace
 from functools import lru_cache
 import json
@@ -28,9 +29,22 @@ from tools.user_elf_instructions import _instruction_destination
 from tools.validation_context import target_compiler
 from tools.validation_inputs import _file_identity
 from tools.user_elf_parse import load_elf
+from tests.host.panic_trace_source import observe_source, project_trace_runtime, validate_trace_helper_instructions
 
 
 CONTRACTS = {
+    "tests/qemu/panic_trace_kernel.S": (
+        ("micros_panic_trace_test_armed", 0, "local"),
+        ("micros_panic_trace_test_started", 0, "local"),
+        ("micros_panic_trace_test_fake_pc", 0, "local"),
+        ("micros_panic_trace_test_error", 0, "local"),
+        ("micros_panic_trace_test_trap", 0, "local"),
+        ("micros_panic_trace_test_synthetic", 1024, "local"),
+    ),
+    "arch/riscv64/panic_trace.S": (
+        ("micros_panic_trace_frame_pointer", 0, "local"),
+        ("micros_panic_trace_load_word", 0, "local"),
+    ),
     "arch/riscv64/boot.S": (("_start", 0, "boot"),),
     "arch/riscv64/trap.S": (
         ("micros_trap_entry", 288, "trap"), ("micros_riscv_trap_install", 0, "local"),
@@ -172,6 +186,7 @@ class AssemblyEvidence:
     payloads: tuple
     faults: tuple
     snapshots: tuple = ()
+    effects: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -214,7 +229,10 @@ def reference_object(root, unit, flags, compiler, compiler_sha):
         for source in (unit, *HEADERS):
             path = directory / source
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(reference_source(root, source))
+            text = reference_source(root, source)
+            if source == "arch/riscv64/trap.S" and "MICROS_BUILD_PANIC_TRACE_TEST" in flags:
+                text = observe_source(source, text)
+            path.write_text(text)
         output = directory / "reference.obj"
         argv = [
             compiler, "--target=riscv64-unknown-elf", "-march=rv64imac_zicsr_zifencei",
@@ -235,11 +253,392 @@ def function_code(obj, symbol):
     ))
 
 
+def trace_helper_object_evidence(obj, variant, image, flags):
+    observed = "MICROS_BUILD_PANIC_TRACE_TEST" in flags
+    names = ("micros_panic_trace_frame_pointer", "micros_panic_trace_load_word")
+    symbols = function_symbols(obj)
+    if set(symbols) != set(names):
+        raise StackEvidenceError("trace assembly lost its exact two private function owners")
+    frame, load = (symbols[name] for name in names)
+    if frame.section_index != load.section_index:
+        raise StackEvidenceError("trace helpers do not share their complete fixed executable section")
+    section = obj.sections[frame.section_index]
+    if (
+        section.section_type != 1 or section.flags != 6 or frame.value != 0
+        or load.value != frame.size or load.value + load.size != section.size
+        or any(other.flags & 2 and other != section for other in obj.sections)
+    ):
+        raise StackEvidenceError("trace assembly acquired unowned executable bytes or data storage")
+    exports = {symbol.name for symbol in obj.symbols if symbol.binding == 1 and symbol.section_index != 0}
+    expected = set(names) | ({"micros_panic_trace_test_load_fault"} if observed else set())
+    if exports != expected:
+        raise StackEvidenceError("trace assembly acquired an unbound external entry or state alias")
+    references = tuple(relocations(obj, section.index))
+    if observed:
+        if len(references) != 2:
+            raise StackEvidenceError("trace fault selector lacks its exact two object relocations")
+        upper, lower = references
+        if (
+            upper[0:2] != (load.value, 23)
+            or upper[2].name != "micros_panic_trace_test_scenario" or upper[2].section_index != 0
+            or upper[2].value != 0 or upper[3] != 0
+            or lower[0:2] != (load.value + 4, 24)
+            or lower[2].section_index != section.index or lower[2].value != load.value or lower[3] != 0
+        ):
+            raise StackEvidenceError("trace fault selector borrowed another actual object or lower relocation")
+    elif references:
+        raise StackEvidenceError("ordinary trace helpers acquired a data or call relocation")
+    base = 0x80000000
+    code = tuple(tuple((base + point, width, word) for point, width, word in function_code(obj, symbol))
+                 for symbol in (frame, load))
+    try:
+        fault_pc = validate_trace_helper_instructions(*code, selector=base + load.value if observed else None)
+    except ValueError as error:
+        raise StackEvidenceError(str(error)) from error
+    unit = "arch/riscv64/panic_trace.S"
+    frames = tuple(Frame(FunctionKey(variant, image, unit, name), 0) for name in names)
+    faults = ()
+    if observed:
+        witness, = (symbol for symbol in obj.symbols if symbol.name == "micros_panic_trace_test_load_fault")
+        if witness.section_index != section.index or witness.value != fault_pc - base:
+            raise StackEvidenceError("trace fault witness is not its actual null-load instruction")
+        faults = (Fault(frames[1].function, witness.value - load.value, "micros_trap_entry", ""),)
+    return AssemblyEvidence(frames, (), (), (), faults)
+
+
+def _trace_fixture_string(obj, value):
+    if value is None or value[0] != "symbol" or not 0 < value[2] < len(obj.sections):
+        raise StackEvidenceError("trace fixture panic argument has no actual readonly symbol")
+    section = obj.sections[value[2]]
+    if section.section_type != 1 or section.flags != 2 or not 0 <= value[3] < section.size:
+        raise StackEvidenceError("trace fixture panic text leaves its actual readonly input")
+    data = section_bytes(obj, section)[value[3]:]
+    if b"\0" not in data:
+        raise StackEvidenceError("trace fixture panic text has no bounded terminator")
+    return data.split(b"\0", 1)[0]
+
+
+def _trace_synthetic_case(obj, symbol, scenario, line):
+    from tools.stack_bound_console import branch_taken
+    from tools.stack_bound_fatal_effects import _prelude_arithmetic
+    from tools.stack_bound_flow import function_flow
+    from tools.stack_bound_machine import CALLER_SAVED
+    from tools.stack_bound_values import pcrel_values, value_transfer
+
+    flow = function_flow(obj, symbol)
+    high, low = pcrel_values(obj, symbol, flow)
+    calls = {call.offset: call for call in flow.calls}
+    registers = [None] * 32
+    registers[0], registers[2], registers[10] = ("scalar", 0), ("stack", 0), ("scalar", scenario)
+    state, point, visits, writes, observed_calls = (tuple(registers), ()), 0, Counter(), [], []
+    panic = None
+    while True:
+        visits[point] += 1
+        if visits[point] > 33:
+            raise StackEvidenceError("trace fixture constructor exceeds its fixed 33-record loop")
+        if point in calls:
+            call = calls[point]
+            observed_calls.append((point, call.target_symbol, state[0][2], state[0][10:14]))
+            if call.target_symbol == "micros_panic_entry":
+                panic = state[0]
+            elif call.target_symbol == "micros_panic_trace_test_error":
+                break
+            else:
+                raise StackEvidenceError("trace fixture constructor has a foreign call")
+            registers = list(state[0])
+            for register in CALLER_SAVED:
+                registers[register] = None
+            state = tuple(registers), state[1]
+            point = flow.continuations[point]
+            continue
+        width, word = flow.instructions[point]
+        action = memory_action(width, word)
+        if action is not None:
+            write, size, register, basis, offset = action
+            base = state[0][basis]
+            if not write or size != 8 or base is None or base[0] != "stack" or not -1024 <= base[1] + offset <= -8:
+                raise StackEvidenceError("trace fixture constructor escaped its fixed stack reservation")
+            writes.append((base[1] + offset, state[0][register]))
+        elif width == 4 and word & 0x7f in (0x73, 0x2f, 0x0f):
+            raise StackEvidenceError("trace fixture constructor acquired a privileged or atomic effect")
+        changed, memory = value_transfer(obj, state, point, width, word, high, low, {})
+        value = _prelude_arithmetic(width, word, state[0])
+        if value is not None:
+            changed = list(changed)
+            changed[_instruction_destination(word, width)] = value
+            changed = tuple(changed)
+        state = changed, memory
+        following = flow.successors[point]
+        branch = branch_offset(width, word)
+        if branch is not None and branch[1]:
+            point = following[0 if branch_taken(width, word, state[0]) else 1]
+        elif len(following) == 1:
+            point = following[0]
+        else:
+            raise StackEvidenceError("trace fixture constructor has no exact bounded continuation")
+    if state[0][2] != ("stack", -1024) or (panic is not None) != (6 <= scenario <= 12):
+        raise StackEvidenceError("trace fixture lost its live reservation or exact scenario admission")
+    fake = function_symbols(obj)["micros_panic_trace_test_fake_pc"]
+    expected_pc = ("symbol", fake.name, fake.section_index, fake.value)
+    expected = {}
+    for index in range(33):
+        frame = -896 + index * 16
+        expected[frame - 16] = (8, ("scalar", 0) if index == 32 else ("stack", frame + 16))
+        expected[frame - 8] = 8, expected_pc
+    if scenario in (7, 8, 9):
+        expected[-912] = 8, {7: ("stack", -895), 8: ("scalar", 0x40000000), 9: ("stack", -896)}[scenario]
+    elif scenario in (10, 11):
+        expected[-904] = 8, ("scalar", 0 if scenario == 10 else 0x40000000)
+    if dict(state[1]) != expected or len(writes) != 67 + int(7 <= scenario <= 11):
+        raise StackEvidenceError("trace fixture did not construct its exact independent frame/link/PC inputs")
+    if panic is not None and (
+        panic[2] != ("stack", -1024)
+        or panic[8] != (("scalar", 0) if scenario == 6 else ("stack", -896))
+        or panic[10] != ("scalar", 0) or panic[13] != ("scalar", line)
+        or _trace_fixture_string(obj, panic[11]) != b"panic-trace-test"
+        or _trace_fixture_string(obj, panic[12]) != b"tests/qemu/panic_trace_kernel.S"
+    ):
+        raise StackEvidenceError("trace fixture panic lost its actual frame, arguments or source location")
+    return scenario, tuple(observed_calls), len(writes)
+
+
+def trace_fixture_object_evidence(root, obj, variant, image):
+    from tools.stack_bound_fatal_effects import prelude_states
+    from tools.stack_bound_flow import function_flow
+    from tools.stack_bound_values import register_inputs
+
+    unit = "tests/qemu/panic_trace_kernel.S"
+    symbols = function_symbols(obj)
+    if set(symbols) != {name for name, _, _ in CONTRACTS[unit]} or any(
+        section.flags & 2 and (section.section_type != 1 or section.flags not in (2, 6)) for section in obj.sections
+    ):
+        raise StackEvidenceError("trace fixture assembly has an undeclared function or writable allocation")
+    frames, calls, effects = [], [], []
+    for name, size, _ in CONTRACTS[unit]:
+        symbol = symbols[name]
+        key = FunctionKey(variant, image, unit, name)
+        code = function_code(obj, symbol)
+        require_c_frame_movement(obj, symbol, size)
+        flow = function_flow(obj, symbol)
+        found = tuple(replace(call, caller=key) for call in flow.calls)
+        expected = (
+            ("micros_panic_entry", "micros_panic_trace_test_error") if name.endswith("_synthetic")
+            else ("micros_panic_trace_test_error",) if name.endswith("_trap") else ()
+        )
+        if tuple(call.target_symbol for call in found) != expected or any(call.kind is not EdgeKind.CALL for call in found):
+            raise StackEvidenceError("trace fixture error/panic transfer lost its actual retained caller frame")
+        frames.append(Frame(key, size))
+        calls.extend(found)
+        if name.endswith(("_armed", "_started", "_fake_pc")):
+            if tuple((width, word) for _, width, word in code) != ((2, 1), (2, 0x8082)):
+                raise StackEvidenceError("trace fixture checkpoint is not an exact frameless NOP/return")
+            effects.append((name, "no-frame-no-memory"))
+    error = symbols["micros_panic_trace_test_error"]
+    flow, inputs = function_flow(obj, error), register_inputs(obj, error)
+    stores = []
+    for point, (width, word) in flow.instructions.items():
+        action = memory_action(width, word)
+        if action is not None:
+            if not action[0] or action[1] != 4 or action[4] != 8 or inputs[point][action[3]] != (
+                "symbol", "micros_panic_trace_test_observation", 0, 0,
+            ) or inputs[point][action[2]] != ("scalar", 4):
+                raise StackEvidenceError("trace fixture error stop writes outside its exact observation phase")
+            stores.append(point)
+        elif width == 4 and word & 0x7f == 0x73 and word != 0x10500073:
+            raise StackEvidenceError("trace fixture error stop changed privileged state")
+    if (
+        len(stores) != 1 or sum(instruction == (4, 0x10500073) for instruction in flow.instructions.values()) != 1
+        or any(word in (0x00008067, 0x8082) for _, word in flow.instructions.values())
+    ):
+        raise StackEvidenceError("trace fixture error stop can return or has no exact phase store")
+    effects.append(("error-phase", stores[0], 8, 4))
+    trap = symbols["micros_panic_trace_test_trap"]
+    flow = function_flow(obj, trap)
+    faults = tuple(point for point, instruction in flow.instructions.items() if instruction == (4, 0xc0001073))
+    if len(faults) != 1:
+        raise StackEvidenceError("trace fixture has no unique actual outer illegal instruction")
+    fault, = faults
+    states, _, _ = prelude_states(obj, trap, {}, arguments=(0x80000000,))
+    fake = symbols["micros_panic_trace_test_fake_pc"]
+    if tuple(states[fault][0][register] for register in (2, 3, 4, 8)) != (
+        ("stack", 0), ("scalar", 0), ("symbol", fake.name, fake.section_index, fake.value), ("scalar", 0x80000020),
+    ):
+        raise StackEvidenceError("trace fixture does not place the plausible forged record inside the actual trap capture")
+    effects.append(("forged-trap-registers", fault, states[fault][0][3:5], states[fault][0][8]))
+    source = read_regular(Path(root) / unit)[0].decode()
+    marker = "    call micros_panic_entry\n"
+    if source.count(marker) != 1:
+        raise StackEvidenceError("trace fixture source has no unique original panic call")
+    line = source[:source.index(marker)].count("\n") + 1
+    effects.append(("synthetic-inputs", tuple(
+        _trace_synthetic_case(obj, symbols["micros_panic_trace_test_synthetic"], scenario, line) for scenario in range(19)
+    )))
+    key = FunctionKey(variant, image, unit, trap.name)
+    return AssemblyEvidence(tuple(frames), tuple(calls), (), (), (Fault(key, fault, "micros_trap_entry", ""),), effects=tuple(effects))
+
+
+def _trace_trap_case(obj, bindings, registers, csrs, memory):
+    from tools.stack_bound_console import branch_taken
+    from tools.stack_bound_fatal_effects import _prelude_arithmetic
+    from tools.stack_bound_flow import function_flow
+    from tools.stack_bound_machine import signed
+    from tools.stack_bound_values import pcrel_values, value_transfer
+
+    symbol = function_symbols(obj)["micros_trap_entry"]
+    flow = function_flow(obj, symbol)
+    high, low = pcrel_values(obj, symbol, flow)
+    for point, value in tuple(high.items()):
+        if value[2] != ("symbol", "micros_panic_trace_test_scenario", 0, 0):
+            raise StackEvidenceError("trace trap entry acquired a foreign data reference")
+        high[point] = (*value[:2], ("scalar", bindings["selector"]))
+    frame = bindings["primary_top"] - 288
+    writable = {bindings["anchor"] + offset for offset in (32, 40, 48)} | set(range(frame, frame + 288, 8))
+    calls = {call.offset: call for call in flow.calls}
+    state, point, visited, writes, systems = (tuple(registers), ()), 0, set(), [], []
+    memory, csrs = dict(memory), dict(csrs)
+    while True:
+        if point in visited:
+            raise StackEvidenceError("trace trap entry has a cyclic capture or pivot")
+        visited.add(point)
+        if point in calls:
+            target = calls[point].target_symbol
+            if target not in ("micros_trap_dispatch", "micros_trap_nested_panic"):
+                raise StackEvidenceError("trace trap entry has an unbound C transition")
+            return target, point, state[0], csrs, memory, tuple(writes), tuple(systems)
+        width, word = flow.instructions[point]
+        if (width, word) == (4, 0xc0001073):
+            return "fault", point, state[0], csrs, memory, tuple(writes), tuple(systems)
+        changed, stored = value_transfer(obj, state, point, width, word, high, low, {})
+        changed = list(changed)
+        action = memory_action(width, word)
+        if action is not None:
+            write, size, register, basis, offset = action
+            base = high[low[point]][2] if point in low else state[0][basis]
+            if base is None or base[0] != "scalar":
+                raise StackEvidenceError("trace trap entry has an unbound memory basis")
+            address = base[1] + offset
+            if write:
+                value = state[0][register]
+                if size != 8 or address not in writable or value is None or value[0] != "scalar":
+                    raise StackEvidenceError("trace trap entry writes outside its exact anchor/capture")
+                memory[address, size] = value[1] & 0xffffffffffffffff
+                writes.append((point, address, size, value[1]))
+            else:
+                if (address, size) not in memory:
+                    raise StackEvidenceError("trace trap entry reads an unbound anchor, selector or capture")
+                value = memory[address, size]
+                unsigned = width == 4 and word >> 12 & 7 in (4, 5, 6)
+                changed[register] = ("scalar", value if unsigned else signed(value, size * 8))
+        elif width == 4 and word & 0x7f == 0x73:
+            csr, operation = word >> 20, word >> 12 & 7
+            source = state[0][word >> 15 & 31]
+            if csr not in csrs or operation not in (1, 2, 3) or source is None or source[0] != "scalar":
+                raise StackEvidenceError("trace trap entry has an unbound CSR transition")
+            value = csrs[csr]
+            if operation == 1 or source[1]:
+                if csr not in (0x100, 0x140):
+                    raise StackEvidenceError("trace trap entry overwrites its actual hardware fault witness")
+                csrs[csr] = (
+                    source[1] if operation == 1 else value | source[1] if operation == 2 else value & ~source[1]
+                ) & 0xffffffffffffffff
+                systems.append((point, csr, operation, source[1], csrs[csr]))
+            changed[word >> 7 & 31] = ("scalar", value)
+        else:
+            if width == 4 and word & 0x7f not in (0x13, 0x1b, 0x33, 0x3b, 0x17, 0x37, 0x63, 0x6f):
+                raise StackEvidenceError("trace trap entry has an unknown instruction effect")
+            value = _prelude_arithmetic(width, word, state[0])
+            if value is not None:
+                changed[_instruction_destination(word, width)] = value
+        changed[0] = ("scalar", 0)
+        state = tuple(changed), stored
+        successors = flow.successors[point]
+        branch = branch_offset(width, word)
+        if branch is not None and branch[1]:
+            point = successors[0 if branch_taken(width, word, state[0]) else 1]
+        elif len(successors) == 1:
+            point = successors[0]
+        else:
+            raise StackEvidenceError("trace trap entry has no exact capture/pivot continuation")
+
+
+def trace_trap_effects(obj, bindings):
+    if set(bindings) != {"anchor", "source_sp", "primary_top", "emergency_top", "selector", "entry_pc"} or any(
+        type(value) is not int or not 0 < value <= 0xffffffffffffffff for value in bindings.values()
+    ):
+        raise StackEvidenceError("trace trap proof lacks its exact input roles")
+    symbol = function_symbols(obj)["micros_trap_entry"]
+    labels = tuple(value for value in obj.symbols if value.name == "micros_panic_trace_test_nested_fault")
+    if len(labels) != 1 or labels[0].section_index != symbol.section_index:
+        raise StackEvidenceError("trace trap proof lost its actual nested-fault instruction")
+    fault = labels[0].value - symbol.value
+    anchor, frame = bindings["anchor"], bindings["primary_top"] - 288
+    cases = []
+    for scenario in (3, 4, 5, 13, 14, 15):
+        for sum_enabled in (0, 1):
+            registers = [("scalar", 0x40000000 + 8 * index) for index in range(32)]
+            registers[0], registers[2] = ("scalar", 0), ("scalar", bindings["source_sp"])
+            registers[4], registers[10] = ("scalar", anchor), ("scalar", 0)
+            csrs = {
+                0x140: anchor, 0x100: 0x100 | sum_enabled * 0x40000,
+                0x141: bindings["entry_pc"] + 0x1000, 0x142: 13 if scenario == 15 else 2,
+                0x143: 0 if scenario == 15 else 0xc0001073,
+            }
+            memory = {
+                (anchor, 8): bindings["primary_top"], (anchor + 16, 8): bindings["emergency_top"],
+                (bindings["selector"], 4): scenario,
+            }
+            observed = _trace_trap_case(obj, bindings, registers, csrs, memory)
+            target, point, current, status, saved, writes, systems = observed
+            expected = {frame + (index - 1) * 8: registers[index][1] for index in range(1, 32)}
+            expected.update({frame + 248 + index * 8: csrs[csr] for index, csr in enumerate((0x100, 0x141, 0x142, 0x143))})
+            expected[frame + 280] = anchor
+            captures = tuple(row for row in writes if frame <= row[1] < frame + 288)
+            if (
+                target != ("fault" if scenario == 5 else "micros_trap_dispatch")
+                or scenario == 5 and point != fault
+                or Counter(row[1] for row in captures) != Counter(expected.keys())
+                or any(saved.get((address, 8)) != value for address, value in expected.items())
+                or current[2] != ("scalar", frame) or current[4] != ("scalar", anchor)
+                or status[0x140] != 0 or status[0x100] & 0x40002
+                or any(saved.get((anchor + offset, 8)) != 0 for offset in (32, 40, 48))
+                or scenario != 5 and current[10] != ("scalar", frame)
+            ):
+                raise StackEvidenceError("trace primary pivot lost a complete live capture, CSR state or dispatch argument")
+            nested = ()
+            if scenario == 5:
+                nested_status = {**status, 0x141: bindings["entry_pc"] + point, 0x142: 2, 0x143: 0xc0001073}
+                second = _trace_trap_case(obj, bindings, current, nested_status, saved)
+                name, location, state, final_status, retained, nested_writes, nested_systems = second
+                if (
+                    name != "micros_trap_nested_panic" or state[2] != ("scalar", bindings["emergency_top"])
+                    or state[10:12] != (("scalar", anchor), ("scalar", frame))
+                    or final_status[0x140] != 0 or final_status[0x100] & 0x40002
+                    or retained != saved or nested_writes
+                ):
+                    raise StackEvidenceError("trace nested pivot overwrites the suspended primary epoch or borrows another stack")
+                nested = location, state[2], state[10:12], nested_systems
+            cases.append((scenario, sum_enabled, target, point, bindings["source_sp"], frame, writes, systems, nested))
+    return tuple(cases)
+
+
 def assembly_object_evidence(root, obj, unit, variant, image, flags=frozenset()):
     if unit not in CONTRACTS or type(flags) is not frozenset:
         raise StackEvidenceError("unbound assembly source or compile-definition inventory")
+    if unit == "arch/riscv64/panic_trace.S":
+        if "MICROS_BUILD_PANIC_TRACE_TEST" in flags and len(flags) != 1:
+            raise StackEvidenceError("trace assembly borrowed another test configuration")
+        return trace_helper_object_evidence(obj, variant, image, flags)
+    if unit == "tests/qemu/panic_trace_kernel.S":
+        if flags != frozenset({"MICROS_BUILD_PANIC_TRACE_TEST"}):
+            raise StackEvidenceError("trace fixture assembly escaped its one exact configuration")
+        return trace_fixture_object_evidence(root, obj, variant, image)
     for source in (unit, *HEADERS):
-        if read_regular(Path(root) / source)[0].decode("utf-8") != reference_source(str(root), source):
+        actual = read_regular(Path(root) / source)[0].decode("utf-8")
+        try:
+            actual = project_trace_runtime(source, actual)
+        except ValueError as error:
+            raise StackEvidenceError(str(error)) from error
+        if actual != reference_source(str(root), source):
             raise StackEvidenceError("assembly source/include differs from its fixed stage")
     compiler = str(target_compiler(dict(os.environ)).resolve(strict=True))
     reference = reference_object(
@@ -284,6 +683,13 @@ def assembly_object_evidence(root, obj, unit, variant, image, flags=frozenset())
         if role == "trap":
             nested, = (call for call in found if call.target_symbol == "micros_trap_nested_panic")
             epochs.append(Epoch(key, nested.offset, "emergency", nested.target_symbol))
+            if "MICROS_BUILD_PANIC_TRACE_TEST" in flags:
+                witness = tuple(item for item in obj.symbols if item.name == "micros_panic_trace_test_nested_fault")
+                if len(witness) != 1 or witness[0].section_index != symbol.section_index or (
+                    witness[0].value, 4, 0xc0001073
+                ) not in code:
+                    raise StackEvidenceError("trace trap source lacks its actual post-capture injected fault")
+                faults.append(Fault(key, witness[0].value - symbol.value, "micros_trap_entry", ""))
         elif role == "idle":
             point, width, word = code[-1]
             if branch_offset(width, word) is None:
@@ -441,7 +847,10 @@ def collect_linked_assembly(root, directory, image_name, variant, catalog):
             replace(epoch, offset=offset_for(epoch.function, epoch.offset))
             for epoch in proof.epochs if epoch.function in active
         )
-        faults.extend(fault for fault in proof.faults if fault.function in active)
+        faults.extend(
+            replace(fault, offset=offset_for(fault.function, fault.offset))
+            for fault in proof.faults if fault.function in active
+        )
         snapshots.extend(snapshot for snapshot in proof.snapshots if snapshot.function in active)
         units.append(unit)
         if unit == "arch/riscv64/panic.S":

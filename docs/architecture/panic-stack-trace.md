@@ -14,16 +14,25 @@ stack/entry-epoch reads. The
 [fixed-source study](../research/minix-panic-stack-trace.md) defines the
 MINIX behavior, RV64 representation and complexity baseline.
 
-This phase adds no executable code, test, model, harness, build scaffold
-or reusable prototype. Independent design review found no substantive
-issue and the design separately merged as #202.
+The design phase added no executable code, test, model, harness, build
+scaffold or reusable prototype. Independent design review found no
+substantive issue and the design separately merged as #202.
 
 The first uncommitted implementation later found that case 8's shorthand
 could be misread as the preceding case's stop code. Its initial
 declaration did so. That attempt stopped before production edits and
 was abandoned. [Accepted ADR-0097](../adr/0097-panic-trace-link-rejection-precedence.md)
 clarifies the target expectation without changing the cursor algorithm.
-Implementation remains blocked until that separate correction merges.
+That correction separately merged as #203 before the restarted implementation.
+
+The private production owners below implement the bounded owner/cursor,
+authenticated target adapter and two zero-frame assembly helpers. The
+native fixture, eighteen-case controller and version-four source/object/
+linked proof cover the declared behavior and terminal boundaries. The
+implementation acceptance barrier remains the complete fresh author plan,
+matching immutable baseline/current inputs and independent review before
+the first implementation commit. No unrelated runtime finding or hosted-CI
+acceptance is included.
 
 ## Preserved authority and non-goals
 
@@ -778,6 +787,8 @@ order:
    commit, verify committed/remote/squash tree equality and ordinary
    journal-free prior authority, then merge and clean only the task refs.
 
-This design itself runs only documentation/structure and three-layer
-diff checks. It does not claim a trace, a target pass, a source-authority
-transition or a new stack certificate exists.
+The separately merged design phases ran only documentation/structure and
+three-layer diff checks. Their acceptance did not claim a trace, target
+pass, source-authority transition or new stack certificate. Implementation
+evidence is produced by the [documented current commands](../development/building.md#panic-trace-baseline-and-current-evidence);
+development-only static pairs do not replace the complete gate above.

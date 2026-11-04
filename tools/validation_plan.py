@@ -39,6 +39,7 @@ QEMU_WORKFLOWS = (
     "test-qemu-timer",
     "test-qemu-uart-console",
     "test-qemu-terminal-failure",
+    "test-qemu-panic-trace",
     "test-qemu-frame-allocator",
     "test-qemu-trap-panic",
     "test-qemu-mmu",
@@ -1748,6 +1749,22 @@ VFS_QEMU_TEST_INPUTS = (
 )
 
 GATE_INPUTS = {
+    "test-qemu-panic-trace": (
+        "kernel/diagnostic/panic_trace_core.h",
+        "kernel/diagnostic/panic_trace_core.c",
+        "kernel/diagnostic/panic_trace.h",
+        "kernel/diagnostic/panic_trace.c",
+        "arch/riscv64/panic_trace.S",
+        "kernel/panic.c",
+        "tests/host/panic_trace_test.c",
+        "tests/host/panic_trace_source.py",
+        "tests/host/panic_trace_evidence.py",
+        "tests/host/test_panic_trace.py",
+        "tests/qemu/panic_trace_kernel.c",
+        "tests/qemu/panic_trace_kernel.h",
+        "tests/qemu/panic_trace_kernel.S",
+        "tools/check_panic_traces.py",
+    ),
     "test-qemu-terminal-failure": (
         "arch/riscv64/uart.c",
         "arch/riscv64/platform.h",

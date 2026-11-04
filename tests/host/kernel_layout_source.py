@@ -17,6 +17,7 @@ from tests.host.diagnostic_history_source import (
 from tests.host.terminal_failure_source import (
     project_terminal_plan, project_terminal_planner, project_terminal_source_bytes, terminal_kernel_members,
 )
+from tests.host.panic_trace_source import project_trace_source_bytes, trace_kernel_members
 from tests.host.stack_recipe import (
     project_command_extension, project_planner_registration,
     project_external_evidence as project_stack_external,
@@ -15669,6 +15670,9 @@ def validate_current_layout(root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
     terminal, terminal_errors = terminal_kernel_members(root)
     expected.update(terminal)
     errors.extend(terminal_errors)
+    trace, trace_errors = trace_kernel_members(root)
+    expected.update(trace)
+    errors.extend(trace_errors)
     observed = set()
     for path in kernel_root.rglob("*"):
         relative = path.relative_to(root).as_posix()
@@ -16897,7 +16901,7 @@ def read_bytes_path(path: Path) -> bytes:
             path.read_text(encoding="utf-8")
         ).encode()
     raw = project_diagnostic_external(
-        relative, project_stack_external(relative, project_external_evidence(relative, path.read_bytes()))
+        relative, project_stack_external(relative, project_external_evidence(relative, project_trace_source_bytes(relative, path.read_bytes())))
     )
     if (
         relative is not None
