@@ -299,6 +299,7 @@ static void commit_initialized_state(
     allocator->managed_range_count = managed_range_count;
     allocator->managed_frame_count = managed_frame_count;
     allocator->free_frame_count = managed_frame_count;
+    allocator->allocation_cursor = 0;
 
     for (
         index = 0;
@@ -447,6 +448,16 @@ enum micros_frame_allocator_error micros_frame_allocator_allocate(
     ) {
         return MICROS_FRAME_ALLOCATOR_ERROR_ARGUMENT;
     }
+    if (
+        allocator->managed_range_count == 0
+        || allocator->managed_range_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES
+        || allocator->managed_frame_count == 0
+        || allocator->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || allocator->free_frame_count > allocator->managed_frame_count
+        || allocator->allocation_cursor > allocator->managed_frame_count
+    ) {
+        return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
+    }
     if (allocator->free_frame_count == 0) {
         return MICROS_FRAME_ALLOCATOR_ERROR_EXHAUSTED;
     }
@@ -458,18 +469,64 @@ enum micros_frame_allocator_error micros_frame_allocator_allocate(
     ) {
         const struct micros_managed_frame_range *range =
             &allocator->managed_ranges[range_index];
-        uint64_t frame_index;
+        uint64_t range_end_index;
+        uint64_t search_index;
+        size_t word_index;
+        size_t word_limit;
 
-        for (frame_index = 0; frame_index < range->frame_count; ++frame_index) {
-            uint64_t bitmap_index = range->bitmap_offset + frame_index;
-            size_t word_index = (size_t)(bitmap_index / 64);
-            uint64_t bit = UINT64_C(1) << (bitmap_index % 64);
+        if (
+            range->frame_count == 0
+            || range->bitmap_offset > allocator->managed_frame_count
+            || range->frame_count > allocator->managed_frame_count - range->bitmap_offset
+            || (range->base & FRAME_MASK) != 0
+            || range->frame_count > UINT64_MAX / MICROS_FRAME_SIZE
+            || range->base > UINT64_MAX - range->frame_count * MICROS_FRAME_SIZE
+        ) {
+            return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
+        }
+        range_end_index = range->bitmap_offset + range->frame_count;
+        if (range_end_index <= allocator->allocation_cursor) {
+            continue;
+        }
+        search_index = allocator->allocation_cursor > range->bitmap_offset
+            ? allocator->allocation_cursor : range->bitmap_offset;
+        word_limit = (size_t)((range_end_index + 63) / 64);
+        for (
+            word_index = (size_t)(search_index / 64);
+            word_index < word_limit;
+            ++word_index
+        ) {
+            uint64_t allocated_word = allocator->allocated_bitmap[word_index];
+            uint64_t word_base = (uint64_t)word_index * 64;
+            unsigned first_bit = search_index > word_base
+                ? (unsigned)(search_index - word_base) : 0;
+            unsigned bit_limit = range_end_index - word_base < 64
+                ? (unsigned)(range_end_index - word_base) : 64;
+            uint64_t mask = UINT64_MAX << first_bit;
+            uint64_t available;
+            unsigned bit_index;
 
-            if ((allocator->allocated_bitmap[word_index] & bit) == 0) {
+            if (bit_limit != 64) {
+                mask &= (UINT64_C(1) << bit_limit) - 1;
+            }
+            available = ~allocated_word & mask;
+            if (available == 0) {
+                continue;
+            }
+            for (bit_index = first_bit; bit_index < bit_limit; ++bit_index) {
+                uint64_t bit = UINT64_C(1) << bit_index;
+                uint64_t bitmap_index = word_base + bit_index;
+                uint64_t address;
+
+                if ((available & bit) == 0) {
+                    continue;
+                }
+                address = range->base
+                    + ((bitmap_index - range->bitmap_offset) << FRAME_SHIFT);
                 allocator->allocated_bitmap[word_index] |= bit;
                 --allocator->free_frame_count;
-                *physical_address = range->base
-                    + (frame_index << FRAME_SHIFT);
+                allocator->allocation_cursor = bitmap_index + 1;
+                *physical_address = address;
                 return MICROS_FRAME_ALLOCATOR_OK;
             }
         }
@@ -490,6 +547,16 @@ enum micros_frame_allocator_error micros_frame_allocator_release(
     if ((physical_address & FRAME_MASK) != 0) {
         return MICROS_FRAME_ALLOCATOR_ERROR_UNALIGNED;
     }
+    if (
+        allocator->managed_range_count == 0
+        || allocator->managed_range_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES
+        || allocator->managed_frame_count == 0
+        || allocator->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || allocator->free_frame_count > allocator->managed_frame_count
+        || allocator->allocation_cursor > allocator->managed_frame_count
+    ) {
+        return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
+    }
 
     for (
         range_index = 0;
@@ -498,12 +565,23 @@ enum micros_frame_allocator_error micros_frame_allocator_release(
     ) {
         const struct micros_managed_frame_range *range =
             &allocator->managed_ranges[range_index];
-        uint64_t range_size = range->frame_count << FRAME_SHIFT;
+        uint64_t range_size;
         uint64_t frame_index;
         uint64_t bitmap_index;
         size_t word_index;
         uint64_t bit;
 
+        if (
+            range->frame_count == 0
+            || range->bitmap_offset > allocator->managed_frame_count
+            || range->frame_count > allocator->managed_frame_count - range->bitmap_offset
+            || (range->base & FRAME_MASK) != 0
+            || range->frame_count > UINT64_MAX / MICROS_FRAME_SIZE
+            || range->base > UINT64_MAX - range->frame_count * MICROS_FRAME_SIZE
+        ) {
+            return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
+        }
+        range_size = range->frame_count << FRAME_SHIFT;
         if (physical_address < range->base) {
             break;
         }
@@ -519,8 +597,14 @@ enum micros_frame_allocator_error micros_frame_allocator_release(
         if ((allocator->allocated_bitmap[word_index] & bit) == 0) {
             return MICROS_FRAME_ALLOCATOR_ERROR_NOT_ALLOCATED;
         }
+        if (allocator->free_frame_count == allocator->managed_frame_count) {
+            return MICROS_FRAME_ALLOCATOR_ERROR_INVARIANT;
+        }
         allocator->allocated_bitmap[word_index] &= ~bit;
         ++allocator->free_frame_count;
+        if (bitmap_index < allocator->allocation_cursor) {
+            allocator->allocation_cursor = bitmap_index;
+        }
         return MICROS_FRAME_ALLOCATOR_OK;
     }
     return MICROS_FRAME_ALLOCATOR_ERROR_UNMANAGED;

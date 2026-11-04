@@ -116,14 +116,19 @@ independent implementation review, and merged as #208,
 remote and squash tree is `36110108d7839460b2f384761bb9aaa540e82444`;
 fresh committed checks preserve ordinary authority without author journals.
 
-Only MEM01 design is now active under
+Only MEM01 implementation is now active under
 [Accepted ADR-0100](adr/0100-minix-bootstrap-allocation.md) and the
 [bootstrap allocation contract](architecture/bootstrap-allocation.md).
-The restarted proposal retains one lower-bound bitmap cursor, lowest-address
+The separately reviewed design #209 retains one lower-bound bitmap cursor, lowest-address
 selection, complete mutation/rollback coherence and original whole-interval
 FDT safety while removing repeated per-frame work. Its six actual fact
 closures now fit the eight candidate paths without immutable overlap.
-Implementation remains pending separate design review, Acceptance and merge.
+Design #209 merged as `82f0b229afd2f396b0fdd8fc24b9bec00793fe97`,
+with identical reviewed/committed/remote/squash tree
+`76be2a6fb534fab324ef20960314263a7ebaa1bc`.
+The dependent implementation must demonstrate actual work Red/Green,
+granular recertification and complete current acceptance before this
+runtime finding can close.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

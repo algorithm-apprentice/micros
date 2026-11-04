@@ -496,6 +496,9 @@ def extend_cmake(source, *, production=True):
 
 
 def project_trace_cmake(source, *, production=True):
+    from tests.host.bootstrap_allocation_source import project_cmake
+
+    source = project_cmake(source)
     changes = _cmake_changes(production)
     if not any(marker in source for marker in (TEST_FLAG, "panic_trace", "-fno-optimize-sibling-calls")):
         return source
@@ -826,6 +829,9 @@ TRACE_MEMBERSHIP = (
 
 
 def project_trace_gate(relative, source):
+    from tests.host.bootstrap_allocation_source import project_gate_adapter
+
+    source = project_gate_adapter(relative, source)
     if relative != "tests/host/kernel_layout_source.py" or (
         TRACE_LAYOUT_IMPORT not in source and TRACE_MEMBERSHIP not in source
     ):

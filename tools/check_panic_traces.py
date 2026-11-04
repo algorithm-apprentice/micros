@@ -632,6 +632,7 @@ def prepare_baseline(workspace):
 
 
 def source_manifest():
+    from tests.host.bootstrap_allocation_source import project_cmake
     from tests.host.diagnostic_history_evidence import closed_tool_inputs
     from tools.stack_bound_fatal_firmware import resolve_default_firmware
     from tools.validation_context import capture_candidate
@@ -651,7 +652,7 @@ def source_manifest():
             raise ValueError("PLAT03 candidate has an untracked or ignored runtime replacement")
     cmake = read_regular(ROOT / "CMakeLists.txt")[0].decode()
     original = project_trace_cmake(cmake)
-    if extend_cmake(original) != cmake:
+    if extend_cmake(original) != project_cmake(cmake):
         raise ValueError("PLAT03 current recipe omits a declared source, fixture or frame-chain option")
     presets = read_regular(ROOT / "CMakePresets.json")[0].decode()
     if extend_presets(project_trace_presets(presets)) != presets:

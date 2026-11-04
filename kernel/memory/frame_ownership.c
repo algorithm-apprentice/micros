@@ -133,6 +133,7 @@ static bool allocator_geometry_is_valid(
             > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
         || allocator->free_frame_count
             > allocator->managed_frame_count
+        || allocator->allocation_cursor > allocator->managed_frame_count
     ) {
         return false;
     }
@@ -194,6 +195,7 @@ static bool allocator_is_pristine(
         !allocator_geometry_is_valid(allocator)
         || allocator->free_frame_count
             != allocator->managed_frame_count
+        || allocator->allocation_cursor != 0
     ) {
         return false;
     }
@@ -496,4 +498,7 @@ void micros_frame_ownership_allocator_mark_free(
     uint64_t bit = UINT64_C(1) << (frame_index % 64);
 
     allocator->allocated_bitmap[word_index] &= ~bit;
+    if (frame_index < allocator->allocation_cursor) {
+        allocator->allocation_cursor = frame_index;
+    }
 }

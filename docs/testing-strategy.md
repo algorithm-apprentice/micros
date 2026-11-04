@@ -415,10 +415,44 @@ oracles, complete semantic/access/rollback guards, the cursor-before-bitmap
 snapshot boundary and actual-code baseline/current fixtures. Six granular
 retirements preserve original values and all unrelated current authorities.
 The fixed #208 runtime and MINIX trace are retained; all six fact closures
-fit the declared eight candidate paths. Future acceptance requires actual
+fit the declared eight candidate paths. Acceptance requires actual
 affected-unit recertification and the unchanged full target/stack scope.
-This design authors no executable fixture, model, observation or runtime
-code; implementation remains pending separate design review and merge.
+The separately reviewed design #209 contained documentation only; the
+dependent implementation supplies the closed eight-owner native evidence.
+Observations exist only in generated native translations whose passive
+inverse binds the actual original/current bodies. Both compiler modes keep
+the original/current header layouts distinct; the baseline has no cursor.
+Independent record/geometry visits, bitmap loads and selected-bit probes
+remain in complete collector snapshots rather than wall-clock thresholds.
+
+Native iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_bootstrap_allocation
+```
+
+The [actual three-phase commands](development/building.md#bootstrap-allocation-work-and-authority-evidence)
+freeze the complete source/tool/fixture envelope and record all three
+oracles. Retained transport, staged/committed/provisional authority,
+malformed declarations, observation relocation and replay tamper controls
+remain required. Neither a compile failure nor a missing scaffold qualifies
+as old-runtime work Red.
+
+The original nine bootstrap source families remain exact. Finite membership
+and gate-source inverses in MEM01's source owner separate only its complete
+native C/header pair and preserve the original complete gate AST. The pair
+remains mandatory under the new family's closed ownership.
+Missing fixture members and unknown bootstrap neighbors fail; no historical
+fact value, payload binding or family fingerprint changes. B14 also runs the
+retained bootstrap source-layout suite and Python process-owner inventory.
+The three new Python runtime users retain the exact selected `-E -S -B`
+prefix and existing runtime validation; no interpreter policy changes.
+The native recipe enumerates its input headers during each canonical CMake
+configure and retains every original source/header as an explicit generation
+dependency. It emits no custom compiler-style dependency log. The generated
+bundle remains bound to its fixed Git inventory, independently of this build
+dependency superset. The original reusable-profile parser and admission policy
+remain unchanged.
 
 ## POSIX conformance evidence
 

@@ -1120,6 +1120,70 @@ review of that exact staged tree and journal. Later ordinary checkouts use
 the reviewed HEAD registry and do not manufacture new author receipts or
 require the original temporary logs.
 
+## Bootstrap allocation work and authority evidence
+
+MEM01 follows separately merged
+[ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
+[bootstrap allocation contract](../architecture/bootstrap-allocation.md).
+Use the explicit supported compiler/Python environment above, configure the
+native profile, and stage the complete source, recipe, fixture and
+documentation inputs before recording evidence:
+
+```bash
+cmake --preset host-debug
+"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --red
+"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --green
+"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --recertify
+```
+
+Do not join the phases with `&&`: successful Red exits one only after all
+three actual old-runtime work oracles fail as expected while their original
+semantic execution succeeds. Build, malformed capture, source, tool or
+authority failures exit two. Green and recertification succeed with exit
+zero. No caller-supplied source, command, expected result or snapshot
+authorizes a transaction.
+
+An external compiler or linker upgrade invalidates the attempt even when
+every unit has passed. Prefer existing versioned executable paths over mutable
+package-manager aliases for a long transaction. Before renewing Red, configure
+the native profile and every selected target configure preset with
+`cmake --fresh --preset <configure-preset>` under the same new explicit tool
+environment. This replaces cached compiler selections; it does not waive
+any execution, artifact identity or recertification requirement.
+
+Focused portable and generated-native execution uses:
+
+```bash
+cmake --build build/host-debug --target frame_allocator_test frame_ownership_test bootstrap_allocation_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^(frame-allocator|frame-ownership|bootstrap-allocation)$'
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_bootstrap_allocation
+```
+
+The native fixture compiles fixed #208 source/headers for Red and actual
+current source/headers for Green. Generated native translations add only
+exact, reversible primitive observations. The baseline has no fabricated
+cursor; ordinary builds contain no MEM01 observations. The one
+`bootstrap-allocation` CTest complements, not replaces, independent work
+oracles and the original frame allocator/ownership cases.
+
+Between recorded Red and Green, only the contract's six production files
+and two assertion adapters may change. Stage those changes before Green.
+Every other tracked source, native recipe, test mapping, oracle and tool
+input remains immutable. Any immutable-input change requires renewed Red
+and Green; any change after Green prevents borrowing that result.
+
+Recertification replays Green, then records actual B01-B12 workflows and
+B14's in-process retained authority/source/oracle checks. The provisional
+scope is bound to the exact root, PID, plan and candidate, covers only the
+six declared assertions, and clears on every exit. Strict hash-chained
+records live under `build/evidence-transitions/MEM01/`. An incomplete
+transaction provides no retirement.
+
+After terminal success, run the complete fresh author plan and obtain
+independent implementation review before the first permanent commit.
+Only the exact reviewed committed declaration supports ordinary checks
+without the original author's journal.
+
 ## Terminal-failure baseline and current evidence
 
 The PLAT02 driver follows the

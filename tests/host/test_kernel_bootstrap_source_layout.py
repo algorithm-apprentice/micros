@@ -919,6 +919,8 @@ def accepted_family_paths() -> set[str]:
 
 
 def discovered_family_paths() -> set[str]:
+    from tests.host.bootstrap_allocation_source import project_bootstrap_family_members
+
     patterns = (
         "kernel/bootstrap*.[ch]", "kernel/boot_*.[ch]", "kernel/main.c",
         "include/micros/bootstrap*.h", "include/micros/fdt.h",
@@ -926,10 +928,10 @@ def discovered_family_paths() -> set[str]:
         "tests/qemu/bootstrap_launcher*.[ch]", "tests/qemu/bootstrap_protocol.h",
         GENERATOR_PATH,
     )
-    return {
+    return project_bootstrap_family_members({
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in patterns for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
-    }
+    })
 
 
 def local_include_closure(relative: str) -> tuple[str, ...]:

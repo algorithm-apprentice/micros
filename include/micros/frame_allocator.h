@@ -39,6 +39,8 @@ struct micros_frame_allocator {
         reserved_ranges[MICROS_FRAME_ALLOCATOR_MAX_RESERVED_RANGES];
     struct micros_managed_frame_range
         managed_ranges[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES];
+    /* Every bitmap bit below this lower search bound is allocated. */
+    uint64_t allocation_cursor;
     uint64_t allocated_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
 };
 

@@ -138,12 +138,15 @@ tree is `36110108d7839460b2f384761bb9aaa540e82444`; journal-free committed
 checks passed. The six actual MEM01 fact closures now fit its eight
 candidate paths without immutable command-input overlap.
 
-Only the restarted MEM01 design is active under
+Only MEM01 implementation is active under
 [Accepted ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
 [allocation contract](../architecture/bootstrap-allocation.md).
-Its implementation remains pending separate design acceptance and merge.
-No runtime finding is newly retired or reassigned by these prerequisites
-or this proposal.
+Design #209 is separately reviewed and merged at
+`82f0b229afd2f396b0fdd8fc24b9bec00793fe97`, tree
+`76be2a6fb534fab324ef20960314263a7ebaa1bc`. Actual work Red/Green,
+the six-key transaction and full current gates remain the implementation
+acceptance barrier. No runtime finding is newly retired or reassigned
+merely by the design or evidence scaffold.
 
 ## Consolidation invariants
 

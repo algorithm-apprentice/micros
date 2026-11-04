@@ -3051,6 +3051,73 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(test-unit-fast panic_trace_test)
     add_dependencies(test-unit panic_trace_test)
 
+    set(MEM01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/bootstrap-allocation")
+    set(MEM01_NATIVE_INPUTS
+        kernel/memory/frame_allocator.c
+        kernel/memory/frame_ownership.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/frame_ownership_bootstrap.c
+        kernel/memory/frame_ownership_handoff.c
+        kernel/memory/frame_ownership_vm_claim.c
+        kernel/memory/frame_ownership_vm_freeze.c
+        kernel/memory/frame_ownership_vm_release.c
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+        kernel/memory/bootstrap_memory.c
+    )
+    set(MEM01_NATIVE_OUTPUTS)
+    foreach(mem01_source IN LISTS MEM01_NATIVE_INPUTS)
+        list(APPEND MEM01_NATIVE_OUTPUTS "${MEM01_NATIVE_ROOT}/${mem01_source}")
+    endforeach()
+    file(GLOB_RECURSE MEM01_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
+    )
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_allocation_fixture.py"
+        DEPENDS ${MEM01_NATIVE_INPUTS} ${MEM01_NATIVE_HEADERS}
+            tools/generate_bootstrap_allocation_fixture.py
+            tests/host/bootstrap_allocation_source.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(bootstrap_allocation_test ${MEM01_NATIVE_OUTPUTS}
+        tests/host/bootstrap_allocation_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(bootstrap_allocation_test PRIVATE
+        "${MEM01_NATIVE_ROOT}" "${MEM01_NATIVE_ROOT}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(bootstrap_allocation_test PRIVATE c_std_17)
+    target_compile_options(bootstrap_allocation_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(bootstrap_allocation_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(bootstrap_allocation_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(bootstrap_allocation_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_BOOTSTRAP_MEMORY_COUNTS=1)
+    add_test(NAME bootstrap-allocation COMMAND bootstrap_allocation_test)
+    add_dependencies(test-unit-fast bootstrap_allocation_test)
+    add_dependencies(test-unit bootstrap_allocation_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()

@@ -121,6 +121,7 @@ static bool intersects_fdt_reservations(
     return false;
 }
 
+#if defined(MICROS_BUILD_FRAME_ALLOCATOR_TEST)
 static bool managed_frame_is_allowed(
     const struct micros_fdt_memory_map *memory_map,
     uint64_t physical_address
@@ -149,62 +150,89 @@ static bool managed_frame_is_allowed(
         )
     );
 }
+#endif
 
-static bool bootstrap_state_is_valid(
-    const struct micros_fdt_memory_map *memory_map,
-    bool require_all_free
-)
+static uint64_t bootstrap_bitmap_word_count(uint64_t word)
+{
+    uint64_t count = 0;
+
+    while (word != 0) {
+        word &= word - UINT64_C(1);
+        ++count;
+    }
+    return count;
+}
+
+static bool bootstrap_bitmap_is_valid(bool require_all_free)
 {
     uint64_t allocated_count = 0;
-    uint64_t expected_bitmap_offset = 0;
-    uint64_t previous_end = 0;
-    uint64_t bitmap_index;
-    size_t index;
+    size_t word_index;
 
-    if (
-        !bootstrap_allocator.initialized
-        || bootstrap_allocator.managed_frame_count == 0
-        || bootstrap_allocator.free_frame_count
-            > bootstrap_allocator.managed_frame_count
-    ) {
-        return false;
-    }
     for (
-        bitmap_index = 0;
-        bitmap_index < bootstrap_allocator.managed_frame_count;
-        ++bitmap_index
+        word_index = 0;
+        word_index < MICROS_FRAME_ALLOCATOR_BITMAP_WORDS;
+        ++word_index
     ) {
-        size_t word_index = (size_t)(bitmap_index / 64);
-        uint64_t bit = UINT64_C(1) << (bitmap_index % 64);
+        uint64_t word = bootstrap_allocator.allocated_bitmap[word_index];
+        uint64_t word_base = (uint64_t)word_index * 64;
+        uint64_t active_mask = 0;
+        uint64_t prefix_mask = 0;
 
-        if ((bootstrap_allocator.allocated_bitmap[word_index] & bit) != 0) {
-            ++allocated_count;
+        if (word_base < bootstrap_allocator.managed_frame_count) {
+            uint64_t bits = bootstrap_allocator.managed_frame_count - word_base;
+
+            active_mask = bits >= 64
+                ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
         }
+        if (word_base < bootstrap_allocator.allocation_cursor) {
+            uint64_t bits = bootstrap_allocator.allocation_cursor - word_base;
+
+            prefix_mask = bits >= 64
+                ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
+        }
+        if ((word & ~active_mask) != 0 || (word & prefix_mask) != prefix_mask) {
+            return false;
+        }
+        allocated_count += bootstrap_bitmap_word_count(word & active_mask);
     }
-    if (
+    return (
         allocated_count
-            != (
+            == (
                 bootstrap_allocator.managed_frame_count
                 - bootstrap_allocator.free_frame_count
             )
-        || (require_all_free && allocated_count != 0)
-    ) {
-        return false;
-    }
+        && (!require_all_free || allocated_count == 0)
+    );
+}
+
+static bool bootstrap_ranges_are_valid(
+    const struct micros_fdt_memory_map *memory_map
+)
+{
+    uint64_t expected_bitmap_offset = 0;
+    uint64_t previous_end = 0;
+    size_t index;
 
     for (
         index = 0;
-        index < bootstrap_allocator.managed_range_count;
+        index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES;
         ++index
     ) {
         const struct micros_managed_frame_range *range =
             &bootstrap_allocator.managed_ranges[index];
         uint64_t range_size;
         uint64_t end;
-        uint64_t frame_index;
 
+        if (index >= bootstrap_allocator.managed_range_count) {
+            if (range->base != 0 || range->frame_count != 0 || range->bitmap_offset != 0) {
+                return false;
+            }
+            continue;
+        }
         if (
             range->frame_count == 0
+            || range->frame_count
+                > bootstrap_allocator.managed_frame_count - expected_bitmap_offset
             || range->frame_count > UINT64_MAX / MICROS_FRAME_SIZE
         ) {
             return false;
@@ -230,22 +258,63 @@ static bool bootstrap_state_is_valid(
         ) {
             return false;
         }
-        for (frame_index = 0; frame_index < range->frame_count; ++frame_index) {
-            if (
-                !managed_frame_is_allowed(
-                    memory_map,
-                    range->base
-                        + (frame_index * MICROS_FRAME_SIZE)
-                )
-            ) {
-                return false;
-            }
-        }
         expected_bitmap_offset += range->frame_count;
         previous_end = end;
     }
-    return expected_bitmap_offset
-        == bootstrap_allocator.managed_frame_count;
+    if (expected_bitmap_offset != bootstrap_allocator.managed_frame_count) {
+        return false;
+    }
+    for (
+        index = bootstrap_allocator.memory_range_count;
+        index < MICROS_FRAME_ALLOCATOR_MAX_MEMORY_RANGES;
+        ++index
+    ) {
+        const struct micros_physical_range *range = &bootstrap_allocator.memory_ranges[index];
+
+        if (range->base != 0 || range->size != 0) {
+            return false;
+        }
+    }
+    for (
+        index = bootstrap_allocator.reserved_range_count;
+        index < MICROS_FRAME_ALLOCATOR_MAX_RESERVED_RANGES;
+        ++index
+    ) {
+        const struct micros_physical_range *range = &bootstrap_allocator.reserved_ranges[index];
+
+        if (range->base != 0 || range->size != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool bootstrap_state_is_valid(
+    const struct micros_fdt_memory_map *memory_map,
+    bool require_all_free
+)
+{
+    if (
+        memory_map == NULL
+        || memory_map->memory_range_count == 0
+        || memory_map->memory_range_count > MICROS_FDT_MAX_MEMORY_RANGES
+        || memory_map->reservation_range_count > MICROS_FDT_MAX_RESERVATION_RANGES
+        || memory_map->reserved_memory_range_count > MICROS_FDT_MAX_RESERVED_MEMORY_RANGES
+        || !bootstrap_allocator.initialized
+        || bootstrap_allocator.memory_range_count == 0
+        || bootstrap_allocator.memory_range_count > MICROS_FRAME_ALLOCATOR_MAX_MEMORY_RANGES
+        || bootstrap_allocator.reserved_range_count > MICROS_FRAME_ALLOCATOR_MAX_RESERVED_RANGES
+        || bootstrap_allocator.managed_range_count == 0
+        || bootstrap_allocator.managed_range_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES
+        || bootstrap_allocator.managed_frame_count == 0
+        || bootstrap_allocator.managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || bootstrap_allocator.free_frame_count > bootstrap_allocator.managed_frame_count
+        || bootstrap_allocator.allocation_cursor > bootstrap_allocator.managed_frame_count
+    ) {
+        return false;
+    }
+    return bootstrap_ranges_are_valid(memory_map)
+        && bootstrap_bitmap_is_valid(require_all_free);
 }
 
 enum micros_frame_allocator_error micros_bootstrap_memory_initialize(

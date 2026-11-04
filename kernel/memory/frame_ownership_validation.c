@@ -217,6 +217,31 @@ static bool inactive_state_is_zero(
     return true;
 }
 
+static bool allocated_prefix_is_valid(
+    const struct micros_frame_ownership *ownership
+)
+{
+    const struct micros_frame_allocator *allocator = ownership->allocator;
+    uint64_t cursor = allocator->allocation_cursor;
+    size_t complete_words = (size_t)(cursor / 64);
+    size_t index;
+    unsigned boundary = (unsigned)(cursor % 64);
+
+    for (index = 0; index < complete_words; ++index) {
+        if (allocator->allocated_bitmap[index] != UINT64_MAX) {
+            return false;
+        }
+    }
+    if (boundary != 0) {
+        uint64_t mask = (UINT64_C(1) << boundary) - 1;
+
+        if ((allocator->allocated_bitmap[complete_words] & mask) != mask) {
+            return false;
+        }
+    }
+    return true;
+}
+
 enum micros_frame_ownership_error micros_frame_ownership_validate(
     const struct micros_frame_ownership *ownership
 )
@@ -240,6 +265,7 @@ enum micros_frame_ownership_error micros_frame_ownership_validate(
                 != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
         )
         || !micros_frame_ownership_geometry_matches(ownership)
+        || !allocated_prefix_is_valid(ownership)
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
