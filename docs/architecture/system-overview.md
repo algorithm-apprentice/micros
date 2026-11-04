@@ -562,6 +562,8 @@ source. TTY drains `IIR` to no-pending and invokes exact `IRQ_COMPLETE(10)`.
 The kernel validates ownership and in-service state before writing the PLIC
 completion register. A fatal kernel panic disables external delivery and may
 seize UART permanently in polled mode.
+The claimed report emits a [bounded current-kernel stack trace](panic-stack-trace.md)
+before replaying diagnostic history; it never follows user or older trap epochs.
 
 ## Architectural invariants
 

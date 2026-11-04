@@ -75,6 +75,17 @@ micros_nested_trap_injected_fault:
     csrr t0, stval
     sd t0, MICROS_TRAP_CONTEXT_STVAL_OFFSET(sp)
 
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    la t0, micros_panic_trace_test_scenario
+    lw t0, 0(t0)
+    li t1, 5
+    bne t0, t1, .Lpanic_trace_dispatch
+.globl micros_panic_trace_test_nested_fault
+micros_panic_trace_test_nested_fault:
+    .4byte 0xc0001073
+.Lpanic_trace_dispatch:
+#endif
+
     mv a0, sp
     call micros_trap_dispatch
 

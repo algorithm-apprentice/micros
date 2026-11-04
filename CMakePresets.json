@@ -403,6 +403,15 @@
       "cacheVariables": {
         "MICROS_BUILD_TERMINAL_FAILURE_TEST": "ON"
       }
+    },
+    {
+      "name": "riscv64-panic-trace-test",
+      "displayName": "RISC-V 64 panic stack trace evidence",
+      "inherits": "riscv64-debug",
+      "binaryDir": "${sourceDir}/build/riscv64-panic-trace-test",
+      "cacheVariables": {
+        "MICROS_BUILD_PANIC_TRACE_TEST": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -765,6 +774,13 @@
       "configurePreset": "riscv64-terminal-failure-test",
       "targets": [
         "test-qemu-terminal-failure"
+      ]
+    },
+    {
+      "name": "test-qemu-panic-trace",
+      "configurePreset": "riscv64-panic-trace-test",
+      "targets": [
+        "test-qemu-panic-trace"
       ]
     }
   ],
@@ -1494,6 +1510,20 @@
         {
           "type": "build",
           "name": "test-qemu-terminal-failure"
+        }
+      ]
+    },
+    {
+      "name": "test-qemu-panic-trace",
+      "displayName": "Verify owned bounded panic stack traces",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "riscv64-panic-trace-test"
+        },
+        {
+          "type": "build",
+          "name": "test-qemu-panic-trace"
         }
       ]
     }

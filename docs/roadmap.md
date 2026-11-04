@@ -71,10 +71,15 @@ separate merge as #202.
 
 The first uncommitted implementation stopped before production changes
 after its initial declaration misread case 8's shorthand stop result.
-The single active outcome is the
-[Accepted ADR-0097 clarification](adr/0097-panic-trace-link-rejection-precedence.md).
-The already defined progress-before-range order remains unchanged;
-PLAT03 implementation is blocked until the correction separately merges.
+The [Accepted ADR-0097 clarification](adr/0097-panic-trace-link-rejection-precedence.md)
+separately merged as #203, retaining the already defined progress-before-range
+order and unblocking the restarted PLAT03 implementation. The private
+owner/cursor, target reader, streamed trace and version-four fault/stack
+evidence are now implemented. Acceptance requires matching immutable
+eighteen-case baseline/current evidence, all 50 fresh author commands,
+44 static configurations/113 outputs, ten observed scopes and independent
+implementation review. This outcome owns only B01-F004/B01-E004; MEM01
+follows it in the sequential correction queue.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

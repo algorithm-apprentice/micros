@@ -1,5 +1,5 @@
 #include "kernel/boot/boot_internal.h"
-
+#include "tests/qemu/panic_trace_kernel.h"
 #include "arch/riscv64/platform.h"
 #include "micros/bootstrap_memory.h"
 #include "micros/kernel_address_space.h"
@@ -400,5 +400,8 @@ void boot_test_nested_trap(const struct boot_context *boot)
 #endif
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
     micros_terminal_test_run(boot->hart_id);
+#endif
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_run(boot->hart_id);
 #endif
 }

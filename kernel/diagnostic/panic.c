@@ -1,5 +1,5 @@
 #include "micros/panic.h"
-
+#include "tests/qemu/panic_trace_kernel.h"
 #include <stdint.h>
 
 #include "arch/riscv64/interrupt.h"
@@ -10,7 +10,7 @@
 #include "kernel/platform/plic.h"
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/diagnostic/diagnostic_history.h"
-
+#include "kernel/diagnostic/panic_trace.h"
 #ifndef MICROS_VERSION
 #error "MICROS_VERSION must be defined by the build"
 #endif
@@ -57,6 +57,9 @@ static _Noreturn void panic_report_claimed(
 {
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
     micros_terminal_test_report(context);
+#endif
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_report(context);
 #endif
     micros_panic_seize();
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
@@ -117,6 +120,10 @@ static _Noreturn void panic_report_claimed(
         uart_write("\n");
     }
 
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_after_core();
+#endif
+    micros_panic_trace_report();
     micros_diagnostic_panic_report();
     uart_flush();
     (void)sbi_system_reset(

@@ -59,13 +59,23 @@ def loaded_value(obj, stored, base, offset, size, unsigned):
     if base is None:
         return None
     if base[0] == "stack":
-        item = stored.get(base[1] + offset)
-        if item is None or item[0] < size:
+        address = base[1] + offset
+        item = stored.get(address)
+        displacement = 0
+        if item is None:
+            containing = tuple((start, value) for start, value in stored.items()
+                               if start < address and address + size <= start + value[0])
+            if len(containing) == 1:
+                start, item = containing[0]
+                displacement = address - start
+        if item is None or displacement + size > item[0]:
             return None
         value = item[1]
         if value[0] == "scalar":
-            number = value[1] & ((1 << (8 * size)) - 1)
+            number = (value[1] >> (8 * displacement)) & ((1 << (8 * size)) - 1)
             return "scalar", number if unsigned else signed(number, 8 * size)
+        if displacement:
+            return None
         if value[0] == "result" and value[2] <= 8 * size:
             return value
         return value if size == 8 else None
@@ -151,7 +161,7 @@ def register_inputs(obj, symbol, *, arguments=None, result_call=None, result_bit
             registers[10 + argument] = ("scalar", arguments[argument])
     produced = {}
     if result_call is not None:
-        if result_bits not in (1, 32) or type(result_bits) is not int:
+        if result_bits not in (1, 32, 64) or type(result_bits) is not int:
             raise StackEvidenceError("unsupported finite result width")
         continuation = flow.continuations.get(result_call)
         if continuation is None:

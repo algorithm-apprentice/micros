@@ -160,6 +160,40 @@ def _diagnostic_history_payload(output):
         if not _has_complete_trap_context(output):
             return None
         end = traps[0]
+    trace = [
+        index for index, line in enumerate(lines)
+        if line.startswith("MICROS_TRACE_")
+    ]
+    if trace:
+        if (
+            len(trace) < 2 or len(trace) > 34 or trace[0] != end + 1
+            or trace != list(range(trace[0], trace[0] + len(trace)))
+            or not all(terminated[index] for index in trace)
+        ):
+            return None
+        trace_header = re.fullmatch(
+            r"MICROS_TRACE_BEGIN version=1 owner=(boot|primary|thread|emergency|unavailable) limit=0x0000000000000020",
+            lines[trace[0]],
+        )
+        trace_end = re.fullmatch(
+            r"MICROS_TRACE_END count=0x([0-9a-f]{16}) stop=(end|boundary|limit|owner|invalid-frame|invalid-pc|nonmonotonic)",
+            lines[trace[-1]],
+        )
+        if (
+            trace_header is None or trace_end is None
+            or int(trace_end.group(1), 16) != len(trace) - 2
+            or trace_header.group(1) == "unavailable"
+                and (len(trace) != 2 or trace_end.group(2) != "owner")
+        ):
+            return None
+        for expected, index in enumerate(trace[1:-1]):
+            record = re.fullmatch(
+                r"MICROS_TRACE_FRAME index=0x([0-9a-f]{16}) pc=0x[0-9a-f]{16} fp=0x[0-9a-f]{16}",
+                lines[index],
+            )
+            if record is None or int(record.group(1), 16) != expected:
+                return None
+        end = trace[-1]
     indices = [
         index for index, line in enumerate(lines)
         if line.startswith("MICROS_DIAGNOSTIC_HISTORY")

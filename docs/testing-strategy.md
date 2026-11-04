@@ -132,8 +132,8 @@ ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
 These checks do not replace the required actual compiler/link stack proof,
 all current EV03 scenarios, complete author gate, or independent review.
 
-The explicit `test-stack-evidence` workflow now composes all 43 current
-ordinary/metadata configurations and 112 ELF outputs, then all ten separately
+The explicit `test-stack-evidence` workflow now composes all 44 current
+ordinary/metadata configurations and 113 ELF outputs, then all ten separately
 instrumented QEMU scenarios. Each private build uses `cmake --fresh` and
 `cmake --build ... --clean-first`; content-bound manifests reject stale
 objects even when timestamps or cached configure values are preserved.
@@ -313,12 +313,29 @@ The next Accepted
 portable owner/cursor validation, exact frame-load work, eighteen real
 target cases, a 192-byte observation object and actual old-runtime Red.
 Its separate `MICROS_TRACE_*` records preserve the existing five-record
-panic classifier and physical-output accounting. The future implementation
+panic classifier and physical-output accounting. The implementation
 must preserve all 3,929 prior facts and thirteen fingerprints, extend
 complete stack evidence to 44 configurations/113 outputs, retain all ten
 current observed scopes and run the complete 50-command fresh author gate.
-These are design acceptance requirements, not existing trace commands or
-reported execution results.
+These are complete acceptance requirements, not claimed execution results.
+
+The implementation supplies the portable core and target reader, isolated
+controller, eighteen guest scenarios, independent captured-stack model,
+strict observations and four named oracles. Its version-four proof binds
+actual guest output extents, all three diagnostic work kinds, complete
+snapshot custody, fault CSR predicates and physically retained stack epochs.
+Its [build-guide commands](development/building.md#panic-trace-baseline-and-current-evidence)
+distinguish genuine fixed-runtime Red from a broken harness. Narrow host
+iteration uses `tests.host.test_panic_trace`; the `panic-trace` native CTest
+and `test-qemu-panic-trace` workflow execute the corresponding runtime owners.
+Scaffold availability is not a current runtime pass or a completed correction.
+
+The original history decoder accepts at most one complete, contiguous
+`MICROS_TRACE_*` block between the unchanged core/trap records and history.
+It retains the original history length, offsets, bytes and trailing-record
+checks; it does not strip serial bytes or relax the five-record panic
+classifier. Current trace acceptance independently compares every emitted
+frame and work count against the actual stopped stack.
 
 ## POSIX conformance evidence
 
@@ -1071,6 +1088,7 @@ The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 QEMU targets are `test-qemu-smoke`,
 `test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
 `test-qemu-uart-console`,
+`test-qemu-terminal-failure`, `test-qemu-panic-trace`,
 `test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
 `test-qemu-object-model`, `test-qemu-endpoint`,
 `test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
@@ -1115,6 +1133,8 @@ cmake --workflow --preset test-qemu-panic
 cmake --workflow --preset test-qemu-trap
 cmake --workflow --preset test-qemu-timer
 cmake --workflow --preset test-qemu-uart-console
+cmake --workflow --preset test-qemu-terminal-failure
+cmake --workflow --preset test-qemu-panic-trace
 cmake --workflow --preset test-qemu-frame-allocator
 cmake --workflow --preset test-qemu-trap-panic
 cmake --workflow --preset test-qemu-mmu

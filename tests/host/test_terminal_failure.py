@@ -210,11 +210,12 @@ class TerminalSourceTest(unittest.TestCase):
 
     def test_planner_extension_preserves_the_complete_original_selection_algorithm(self):
         from tests.host.terminal_failure_source import fixed_source, project_terminal_planner, project_terminal_plan
+        from tests.host.panic_trace_source import project_trace_plan
         from tools import validation_plan
 
         source = (ROOT / "tools/validation_plan.py").read_text()
         self.assertEqual(fixed_source("tools/validation_plan.py"), project_terminal_planner(source))
-        plan = validation_plan.plan([], "full")
+        plan = project_trace_plan(validation_plan.plan([], "full"))
         projected = project_terminal_plan(plan)
         self.assertEqual(49, len(plan))
         self.assertEqual(48, len(projected))
@@ -247,9 +248,10 @@ class TerminalSourceTest(unittest.TestCase):
 
     def test_current_build_wires_exactly_the_declared_native_and_target_extensions(self):
         from tests.host.terminal_failure_source import extend_cmake, extend_presets, fixed_source
+        from tests.host.panic_trace_source import project_trace_cmake, project_trace_presets
 
-        self.assertEqual(extend_cmake(fixed_source("CMakeLists.txt")), (ROOT / "CMakeLists.txt").read_text())
-        self.assertEqual(extend_presets(fixed_source("CMakePresets.json")), (ROOT / "CMakePresets.json").read_text())
+        self.assertEqual(extend_cmake(fixed_source("CMakeLists.txt")), project_trace_cmake((ROOT / "CMakeLists.txt").read_text()))
+        self.assertEqual(extend_presets(fixed_source("CMakePresets.json")), project_trace_presets((ROOT / "CMakePresets.json").read_text()))
 
     def test_terminal_runtime_inverse_preserves_every_original_operation_and_fixed_bound(self):
         from tests.host.terminal_failure_source import (

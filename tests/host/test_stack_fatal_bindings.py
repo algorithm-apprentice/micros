@@ -34,10 +34,12 @@ class StackFatalBindingsTest(unittest.TestCase):
 
     def test_qualification_records_every_post_seizure_call_and_the_exact_guard(self):
         proof = self.bind()
-        self.assertEqual(3, proof.version)
+        self.assertEqual(4, proof.version)
         history_calls = tuple(row for row in proof.establishment if row.target == "micros_diagnostic_panic_report")
+        trace_calls = tuple(row for row in proof.establishment if row.target == "micros_panic_trace_report")
         self.assertEqual(1, len(history_calls))
-        self.assertEqual(52, len(proof.bindings.establishing) - len(history_calls))
+        self.assertEqual(1, len(trace_calls))
+        self.assertEqual(52, len(proof.bindings.establishing) - len(history_calls) - len(trace_calls))
         self.assertEqual(
             {"uart_write_direct", "uart_write", "uart_write_hex64", "micros_panic_report"},
             {key.symbol for key, _ in proof.bindings.infeasible},
@@ -47,7 +49,7 @@ class StackFatalBindingsTest(unittest.TestCase):
             {row.role for row in proof.exclusions},
         )
         self.assertEqual(4, len(proof.exclusions))
-        self.assertEqual(52, len(proof.establishment) - len(history_calls))
+        self.assertEqual(52, len(proof.establishment) - len(history_calls) - len(trace_calls))
         self.assertEqual(("panic_control", 4), (proof.control.symbol, proof.control.size))
         self.assertEqual(1, len(proof.bindings.latching))
         self.assertTrue(proof.bindings.latch_preservers)

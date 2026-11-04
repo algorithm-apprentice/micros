@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 
@@ -14,6 +15,7 @@ from tests.host.diagnostic_history_source import (
     THR_OBSERVATION, THR_OBSERVATION_HEADER,
 )
 from tests.host.terminal_failure_source import CONTROL_SOURCES, extend_terminal_runtime_source, observe_source
+from tests.host.panic_trace_source import FATAL_EFFECT_CONTRACT, SOURCE_ROLES, fixed_source
 
 
 ORIGINAL_UNITS = (
@@ -116,6 +118,44 @@ def install_diagnostic_fixture(source_root):
         path.write_text(text)
 
 
+def install_trace_fixture(root, source_root):
+    private = tuple(name for name in SOURCE_ROLES["candidate_paths"] if name != "kernel/diagnostic/panic.c")
+    selected = tuple(sorted({unit for unit, _ in FATAL_EFFECT_CONTRACT["selected_resolvers"]}))
+    sources = []
+    pending = [*private, *selected, "kernel/objects/kernel_object_private.h"]
+    while pending:
+        unit = pending.pop()
+        if unit in sources:
+            continue
+        path = source_root / unit
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(
+                (root / unit).read_bytes() if unit in (*private, *SOURCE_ROLES["immutable_additions"])
+                else fixed_source(unit).encode()
+            )
+        sources.append(unit)
+        pending.extend("include/" + name if name.startswith("micros/") else name
+                       for name in re.findall(r'^#include "([^"]+)"$', path.read_text(), flags=re.MULTILINE))
+    path = source_root / "kernel/diagnostic/panic.c"
+    source = path.read_text()
+    include = '#include "kernel/diagnostic/diagnostic_history.h"\n'
+    if include + "\n" not in source:
+        source = source.replace(include, include + "\n", 1)
+    source = source.replace(include + "\n", include + '#include "kernel/diagnostic/panic_trace.h"\n', 1)
+    source = source.replace("    micros_diagnostic_panic_report();\n",
+                            "    micros_panic_trace_report();\n    micros_diagnostic_panic_report();\n", 1)
+    path.write_text(source)
+    unit = "kernel/fatal_fixture_roots.c"
+    # These are compiler-frame specimens, not boot or trap implementations.
+    (source_root / unit).write_text("".join(
+        "void " + name + "(void) {}\n" for name in (
+            "kernel_main", "micros_trap_dispatch", "micros_trap_nested_panic", "micros_scheduler_idle_select",
+        )
+    ))
+    return (*tuple(name for name in (*private, *selected) if name.endswith((".c", ".S"))), unit), (*sources, unit)
+
+
 def build_fatal_fixture(root, temporary, *, tty_test=False, terminal_test=False, observed=False):
     if terminal_test and (tty_test or observed):
         raise ValueError("terminal and TTY fixtures are distinct target configurations")
@@ -170,6 +210,8 @@ def build_fatal_fixture(root, temporary, *, tty_test=False, terminal_test=False,
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes((root / unit).read_bytes())
         units, sources = (*units, unit), (*sources, unit)
+    trace_units, trace_sources = install_trace_fixture(root, source_root)
+    units, sources = (*units, *trace_units), tuple(dict.fromkeys((*sources, *trace_sources)))
     commands, outputs, dependencies = [], [], {}
     for unit in units:
         relative = "CMakeFiles/micros.dir/" + unit + ".obj"
@@ -185,7 +227,10 @@ def build_fatal_fixture(root, temporary, *, tty_test=False, terminal_test=False,
             "-I" + str(root), "-I" + str(root / "include"),
         ]
         if unit.endswith(".c"):
-            argv.extend(("-fstack-usage", "-fstack-size-section"))
+            argv.extend((
+                "-fstack-usage", "-fstack-size-section", "-fno-omit-frame-pointer",
+                "-mno-omit-leaf-frame-pointer", "-fno-optimize-sibling-calls",
+            ))
             if observed:
                 argv.append("-finstrument-functions-after-inlining")
         if observed:
@@ -219,13 +264,17 @@ def build_fatal_fixture(root, temporary, *, tty_test=False, terminal_test=False,
         "--undefined=micros_plic_initialize",
         "--Map=kernel/micros.map", "-o", "kernel/micros.elf", *outputs,
     ]
-    if observed:
-        argv.extend(f"--defsym={name}={value}" for name, value in (
-            ("__boot_stack_bottom", 0x81000000), ("__boot_stack_top", 0x81004000),
-            ("__trap_stack_bottom", 0x81004000), ("__trap_stack_top", 0x81008000),
-            ("__trap_emergency_stack_bottom", 0x81008000), ("__trap_emergency_stack_top", 0x81009000),
-            ("__thread_kernel_stacks_start", 0x82000000), ("__thread_kernel_stacks_end", 0x82200000),
-        ))
+    argv.extend("--undefined=" + name for name in (
+        "kernel_main", "micros_trap_dispatch", "micros_trap_nested_panic", "micros_scheduler_idle_select",
+    ))
+    argv.extend(f"--defsym={name}={value}" for name, value in (
+        ("__boot_stack_bottom", 0x81000000), ("__boot_stack_top", 0x81004000),
+        ("__trap_stack_bottom", 0x81004000), ("__trap_stack_top", 0x81008000),
+        ("__trap_emergency_stack_bottom", 0x81008000), ("__trap_emergency_stack_top", 0x81009000),
+        ("__thread_kernel_stacks_start", 0x82000000), ("__thread_kernel_stacks_end", 0x82200000),
+        ("micros_thread_kernel_stacks", 0x82000000), ("micros_thread_kernel_stacks_end", 0x82200000),
+        ("__kernel_text_start", 0x80200000), ("__kernel_text_end", 0x80300000),
+    ))
     result = subprocess.run(argv, cwd=directory, capture_output=True, text=True, timeout=60)
     if result.returncode:
         raise AssertionError(f"{shlex.join(argv)}\n{result.stdout}{result.stderr}")

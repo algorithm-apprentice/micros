@@ -10,6 +10,11 @@ import subprocess
 
 from tests.host.evidence_authority_source import literal_value, regular_source, single_assignment
 from tests.host.evidence_authority_types import AuthorityClass, Fact, digest
+from tests.host.panic_trace_source import (
+    effective_trace_observations, project_trace_boot_bodies, project_trace_cmake, project_trace_gate, project_trace_plan,
+    project_trace_planner, project_trace_presets, project_trace_runtime, project_trace_source_bytes,
+    project_trace_workflows,
+)
 
 
 FAMILY = "terminal-failure-baseline"
@@ -381,6 +386,7 @@ def observe_source(relative, source):
 
 
 def project_observations(relative, source):
+    source = project_trace_runtime(relative, source)
     if not any(marker in source for marker in (TEST_HEADER, TEST_FLAG, "micros_terminal_test_")):
         return source
     if relative == "arch/riscv64/uart.c":
@@ -480,6 +486,7 @@ def extend_cmake(source, *, production=True):
 
 
 def project_terminal_cmake(source, *, production=True):
+    source = project_trace_cmake(source, production=production)
     if TEST_FLAG not in source and "panic_control" not in source and "check_terminal_failures" not in source:
         return source
     result = _exact_changes(source, _cmake_changes(production), inverse=True)
@@ -518,6 +525,7 @@ def extend_presets(source):
 
 
 def project_terminal_presets(source):
+    source = project_trace_presets(source)
     if TEST_FLAG not in source and "terminal-failure" not in source:
         return source
     result = _exact_changes(source, _preset_changes(), inverse=True)
@@ -755,11 +763,12 @@ def project_terminal_runtime(relative, source):
 
 
 def project_terminal_source_bytes(relative, raw):
-    if relative not in (
-        "arch/riscv64/uart.c", "arch/riscv64/sbi.c", "arch/riscv64/platform.h", "kernel/diagnostic/panic.c",
-    ):
-        return raw
     try:
+        raw = project_trace_source_bytes(relative, raw)
+        if relative not in (
+            "arch/riscv64/uart.c", "arch/riscv64/sbi.c", "arch/riscv64/platform.h", "kernel/diagnostic/panic.c",
+        ):
+            return raw
         return project_terminal_runtime(relative, raw.decode("utf-8")).encode("utf-8")
     except ValueError as error:
         raise AssertionError(str(error)) from error
@@ -807,6 +816,7 @@ def terminal_kernel_members(root):
 
 
 def project_terminal_planner(source):
+    source = project_trace_planner(source)
     workflow = RECIPE_ADMISSION["target_workflow"]
     if workflow not in source and "terminal_failure" not in source:
         return source
@@ -828,6 +838,7 @@ def project_terminal_planner(source):
 
 
 def project_terminal_plan(commands):
+    commands = project_trace_plan(commands)
     command = ("cmake", "--workflow", "--preset", RECIPE_ADMISSION["target_workflow"])
     if command not in commands:
         return commands
@@ -844,6 +855,7 @@ def project_terminal_plan(commands):
 
 
 def project_terminal_workflows(workflows):
+    workflows = project_trace_workflows(workflows)
     name = RECIPE_ADMISSION["target_workflow"]
     values = tuple(workflows)
     if name not in values:
@@ -857,6 +869,7 @@ def project_terminal_workflows(workflows):
 
 
 def project_terminal_boot_bodies(source):
+    source = project_trace_boot_bodies(source)
     if TEST_FLAG not in source:
         return source
     prior = '    MICROS_PANIC(boot->hart_id, "nested-trap-test-returned");\n#endif\n'
@@ -876,6 +889,7 @@ TERMINAL_MEMBERSHIP = (
 
 
 def project_terminal_gate(relative, source):
+    source = project_trace_gate(relative, source)
     workflow_import = "from tests.host.terminal_failure_source import project_terminal_workflows\n"
     workflow = "validation_plan.QEMU_WORKFLOWS"
     affected = "validation_plan.affected_workflows([path])"
@@ -914,9 +928,10 @@ def project_terminal_gate(relative, source):
     ), inverse=True)
 
 
-def effective_terminal_body(body, *, enabled):
-    if type(enabled) is not bool:
+def effective_terminal_body(body, *, enabled, trace_enabled=False):
+    if type(enabled) is not bool or type(trace_enabled) is not bool or enabled and trace_enabled:
         raise ValueError("PLAT02 observation mode is not explicit")
+    body = effective_trace_observations(body, enabled=trace_enabled)
     statements = (
         "micros_terminal_test_seizure();", "micros_terminal_test_thr();",
         "micros_terminal_test_report(context);", "micros_terminal_test_after_seize(hart_id);",
@@ -931,22 +946,22 @@ def effective_terminal_body(body, *, enabled):
     for suffix, mask, drain in (
         ("thre", "UART_LSR_THR_EMPTY", "false"), ("temt", "UART_LSR_TRANSMITTER_EMPTY", "true"),
     ):
+        read = "micros_panic_trace_test_lsr(uart0[UART_LSR])" if trace_enabled and suffix == "thre" else "uart0[UART_LSR]"
         marker = (
             "MICROS_TEST_WORK_COMPARE(\n"
             f'        "terminal-{suffix}-poll", MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC,\n'
-            f"        (MICROS_TERMINAL_TEST_LSR(uart0[UART_LSR], {drain}) & {mask}) == 0\n"
+            f"        (MICROS_TERMINAL_TEST_LSR({read}, {drain}) & {mask}) == 0\n"
             "    )"
         )
         if marker not in body:
             continue
         if body.count(marker) != 1:
             raise ValueError("PLAT02 repeats a readiness-comparison observation")
-        predicate = f"(uart0[UART_LSR] & {mask}) == 0"
+        predicate = f"({read} & {mask}) == 0"
         if enabled:
-            predicate = (
-                "(micros_test_work_record(MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC, MICROS_WORK_KIND_COMPARISON, 1), "
-                f"(micros_terminal_test_lsr(uart0[UART_LSR], {drain}) & {mask}) == 0)"
-            )
+            predicate = f"(micros_terminal_test_lsr({read}, {drain}) & {mask}) == 0"
+        if enabled or trace_enabled:
+            predicate = "(micros_test_work_record(MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC, MICROS_WORK_KIND_COMPARISON, 1), " + predicate + ")"
         body = body.replace(marker, predicate, 1)
     if "MICROS_TERMINAL_TEST_" in body or "MICROS_BUILD_TERMINAL_FAILURE_TEST" in body or "terminal-thre-poll" in body or "terminal-temt-poll" in body:
         raise ValueError("PLAT02 effective source left an unbound observation construct")

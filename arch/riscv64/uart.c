@@ -1,6 +1,6 @@
 #include "arch/riscv64/platform.h"
 #include "kernel/diagnostic/panic_control.h"
-
+#include "tests/qemu/panic_trace_kernel.h"
 #include "arch/riscv64/interrupt.h"
 #include "tests/qemu/terminal_failure_kernel.h"
 #include "micros/work_observation.h"
@@ -41,13 +41,16 @@ static void uart_write_character(char character)
 
     while (MICROS_TEST_WORK_COMPARE(
         "terminal-thre-poll", MICROS_WORK_OWNER_KERNEL_DIAGNOSTIC,
-        (MICROS_TERMINAL_TEST_LSR(uart0[UART_LSR], false) & UART_LSR_THR_EMPTY) == 0
+        (MICROS_TERMINAL_TEST_LSR(MICROS_PANIC_TRACE_TEST_LSR(uart0[UART_LSR]), false) & UART_LSR_THR_EMPTY) == 0
     )) {
         if (++failed == UINT32_C(100000)) {
             micros_panic_terminate_no_console();
         }
     }
     uart0[UART_THR] = (uint8_t)character;
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_thr();
+#endif
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
     micros_terminal_test_thr();
 #endif
@@ -192,6 +195,9 @@ bool uart_panic_seize(void)
 {
     bool repaired = false;
 
+#ifdef MICROS_BUILD_PANIC_TRACE_TEST
+    micros_panic_trace_test_seizure();
+#endif
 #ifdef MICROS_BUILD_TERMINAL_FAILURE_TEST
     micros_terminal_test_seizure();
 #endif

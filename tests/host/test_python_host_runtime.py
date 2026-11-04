@@ -326,6 +326,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
         expected = {
             "tools/canonicalize_stack_metadata_elf.py",
             "tools/check_diagnostic_history.py",
+            "tools/check_panic_traces.py",
             "tools/check_runtime_memory.py",
             "tools/check_stack_evidence.py",
             "tools/check_terminal_failures.py",
