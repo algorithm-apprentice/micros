@@ -108,6 +108,9 @@ This directory contains the design baseline for `micros`.
 - [Panic-trace execution scopes](architecture/panic-trace-execution-scopes.md)
   defines the Accepted separation of strict historical author scope from complete,
   run-stable ordinary current inputs without weakening either boundary.
+- [Bootstrap allocation and range validation](architecture/bootstrap-allocation.md)
+  defines MEM01's Accepted search coordinate, whole-interval/word validation,
+  exact mutation/rollback rules and six-key evidence transition.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -120,6 +123,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [MINIX bootstrap allocation baseline](research/minix-bootstrap-allocation.md)
+  traces the distinct kernel-range and VM-cache phases, current repeated work,
+  complexity/storage bounds and the completed evidence prerequisites.
 - [Panic-trace current-scope blocker](research/panic-trace-current-scope-blocker.md)
   records the actual full-gate rejection of already committed later documents
   and the isolated PLAT03-C02 prerequisite.

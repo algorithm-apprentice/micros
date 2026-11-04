@@ -24,8 +24,17 @@ separate prerequisite, now completed by design #206 and implementation #207.
 The binding implementation restarted from
 `b643b0b6a4da2d533127204c5814a5f78e576e1d`, with its complete independent
 before/after declaration reconfirmed before restoring tests or extractor
-changes. No controller change is folded into this contract. MEM01 remains
-blocked and no memory runtime work starts here.
+changes. No controller change is folded into this contract.
+Implementation #208 is independently reviewed and merged as
+`bcace37522e5beb101ef5278889a2f87742f5721`, with identical reviewed,
+committed, remote and squash tree
+`36110108d7839460b2f384761bb9aaa540e82444`.
+All 50 fresh author commands passed, including 40 native CTests,
+1,412 Python tests and the unchanged complete stack/target scope.
+Independent GPT-6.1 Sol review was clean before the first implementation
+commit; a fresh committed checkout passed 247 authority/source controls
+without author journals. Exact task branches and the owned check worktree
+were cleaned. This unblocks MEM01 design, not its runtime implementation.
 
 ## Exact admission
 
