@@ -346,13 +346,13 @@ the prior claims without an author journal.
 The next MEM01 design is blocked by the
 [standalone validator payload gap](research/standalone-frame-validator-payload-gap.md).
 [Accepted ADR-0098](adr/0098-standalone-frame-validator-evidence-binding.md)
-requires a separate evidence-only prerequisite. Its future native Red must
+requires a separate evidence-only prerequisite. Native Red must
 expose the actual overbroad binding and immutable-input collision; Green
 must prove the exact one corrected record, 3,937 unchanged records,
-historical comparison recovery and unchanged disjointness. The current
-design adds no executable fixture or new test/workflow.
+historical comparison recovery and unchanged disjointness. The separately
+merged design added no executable fixture or new test/workflow.
 
-After design #205, the uncommitted EV01-C03 implementation passed focused
+After design #205, the initial uncommitted EV01-C03 implementation passed focused
 native checks and the complete native stage, but its full producer failed
 at ordinary `test-qemu-panic-trace`: PLAT03's historical scope rejected the
 three already committed design documents. Seven commands passed and 42
@@ -366,7 +366,7 @@ subjects, renew the actual eighteen-case pair in the fixed #204 envelope
 with only the reviewed controller/test overlays, then pass the complete
 fresh author gate on the actual current checkout. The two evidence contexts
 must remain separately labeled. The separate design #206 contained no
-controller/test changes; EV01-C03 and MEM01 remain blocked.
+controller/test changes.
 
 The implementation adds only Boolean-mode/current-subject checks and
 baseline-only historical-scope dispatch. Native execution-scope regressions
@@ -381,6 +381,26 @@ fixtures do not certify actual guest behavior. Narrow iteration uses:
 
 The separately labeled actual target pair and complete real-current author
 plan remain required before independent implementation review.
+
+PLAT03-C02 implementation #207 passed that pair, all 50 fresh actual-current
+commands and independent review, then preserved ordinary authority in a fresh
+committed checkout without author journals. Its exact reviewed/committed/
+remote/squash tree is `6928ae70be64082d236508986c003c25a29b7c6b`.
+EV01-C03 restarted from that merged outcome; MEM01 remains blocked.
+
+The restarted binding uses only the qualified scalar and existing checked
+directory helper. Native regressions preserve strict schema/path/closure
+failures, recover prior comparisons through a bounded test-only inverse and
+match all current records to the independent pre-edit declaration. Narrow
+iteration includes the retained current-scope regression:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_diagnostic_history.DiagnosticHistoryAuthorityTest tests.host.test_terminal_failure.TerminalAuthorityTest tests.host.test_panic_trace.PanicTraceAuthorityTest tests.host.test_panic_trace.PanicTraceExecutionScopeTest tests.host.test_scheduler_source_layout tests.host.test_endpoint_source_layout tests.host.test_kernel_object_source_layout tests.host.test_kernel_directory_layout tests.host.test_frame_validation_hot_path
+```
+
+Original source gates, journal-free prior claims, the complete fresh author
+plan and independent implementation review remain required. No runtime,
+CTest, target workflow, planner or controller change belongs to EV01-C03.
 
 ## POSIX conformance evidence
 

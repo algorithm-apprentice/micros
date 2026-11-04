@@ -98,16 +98,21 @@ EV01-C03 changes only independently declared payload/unit metadata while
 preserving all other facts, historical values and disjointness. MEM01 design
 resumes only after the separate prerequisite implementation merges.
 
-Design #205 is merged, but EV01-C03's initial implementation is preserved
-and blocked. Its full author run passed native checks and seven commands,
+Design #205 is merged. EV01-C03's initial implementation was preserved
+when its full author run passed native checks and seven commands,
 then the ordinary panic-trace gate rejected the three already committed
 design documents against PLAT03's original file set. This same rejection
-affects clean main; it is not a trace-runtime failure.
+also affected clean main at #205; it was not a trace-runtime failure.
 [Accepted ADR-0099](adr/0099-panic-trace-execution-scopes.md) and the
 [execution-scope contract](architecture/panic-trace-execution-scopes.md)
-are the sole active PLAT03-C02 prerequisite. Preserve strict historical
-baseline scope and complete current source/artifact stability; restart
-EV01-C03 only after the separate corrective implementation merges.
+define the separate PLAT03-C02 prerequisite. Design #206 and independently
+reviewed implementation #207 have now merged with identical reviewed,
+committed, remote and squash tree
+`6928ae70be64082d236508986c003c25a29b7c6b`. The renewed actual historical
+pair and complete current author gate passed without weakening either
+boundary. EV01-C03 implementation has restarted from current main with
+a fresh independent declaration; complete acceptance remains required.
+MEM01 remains blocked on it.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

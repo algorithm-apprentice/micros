@@ -16,6 +16,7 @@ from unittest.mock import patch
 from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
 from tests.host.ast_evidence import ast_dump
+from tests.host.evidence_authority_source import literal_value, single_assignment
 from tests.host.evidence_authority_types import fact_set_digest
 from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
@@ -119,7 +120,72 @@ def _relocated_binding_reference(root, reference, tables):
     return rows, literals(inventory_source)["DECLARED_FAMILY_FACT_DIGESTS"]
 
 
+def standalone_binding_reference(root=ROOT):
+    study = (root / "docs/research/standalone-frame-validator-payload-gap.md").read_text()
+    reference = re.search(r"The fixed source is\s+`([0-9a-f]{40})`", study).group(1)
+    return _standalone_binding_reference(root, reference)
+
+
+@lru_cache(maxsize=4)
+def _standalone_binding_reference(root, reference):
+    def fixed_source(path):
+        return subprocess.check_output(
+            ["git", "show", reference + ":" + path], cwd=root, text=True, timeout=30,
+        )
+
+    # Reuse the fixed-source check for the unchanged unit-rule ASTs.
+    relocated_binding_reference(root)
+    owner = "tests/host/kernel_layout_source.py"
+    name = "BOUNDED_FRAME_VALIDATION_SHA256"
+    tree = ast.parse(fixed_source(owner))
+    value = literal_value(single_assignment(tree, name).value)
+    directory = literal_value(single_assignment(tree, "KERNEL_FILE_FACTS").value)
+    files = set(filter(None, subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", "-z", reference],
+        cwd=root, timeout=30,
+    ).decode().split("\0")))
+    old_paths = tuple(sorted({owner} | {
+        node.value for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and type(node.value) is str and node.value in files
+    }))
+    new_paths = tuple(sorted((owner, directory["kernel/frame_ownership_validation.c"][0])))
+    before = evidence_authority.Fact(
+        owner + ":data-entry:" + name, "authority-core", owner, "data-entry", name,
+        evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+        evidence_authority_inventory._fact_primary_unit(old_paths),
+        evidence_authority_inventory._consumer_units(owner, old_paths), old_paths, value,
+    )
+    after = dataclasses.replace(
+        before, payload_paths=new_paths, primary_unit="B02", consumer_units=("B02", "B14"),
+    )
+    inventory_tree = ast.parse(fixed_source("tests/host/evidence_authority_inventory.py"))
+    fingerprints = literal_value(single_assignment(inventory_tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
+    return before, after, fingerprints
+
+
+def prior_standalone_binding_facts(facts, root=ROOT):
+    before, after, _ = standalone_binding_reference(root)
+    result = []
+    seen = False
+    for fact in facts:
+        if fact.key == after.key:
+            if seen:
+                raise ValueError("duplicate corrected standalone binding")
+            seen = True
+            if (fact.payload_paths, fact.primary_unit, fact.consumer_units) != (
+                after.payload_paths, after.primary_unit, after.consumer_units,
+            ):
+                raise ValueError("corrected standalone binding metadata differs from its fixed declaration")
+            fact = dataclasses.replace(
+                fact, payload_paths=before.payload_paths, primary_unit=before.primary_unit,
+                consumer_units=before.consumer_units,
+            )
+        result.append(fact)
+    return tuple(result)
+
+
 def prior_binding_facts(facts, root=ROOT):
+    facts = prior_standalone_binding_facts(facts, root)
     rows, _ = relocated_binding_reference(root)
     admitted = {
         (owner, scope.partition("/")[0])
@@ -846,7 +912,8 @@ class RelocatedBindingTests(unittest.TestCase):
             self.assertEqual(expected_metadata, (fact.payload_paths, fact.primary_unit, fact.consumer_units))
             self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
         projected = prior_binding_facts(retained)
-        self.assertEqual(104, sum(before != after for before, after in zip(retained, projected)))
+        standalone_view = prior_standalone_binding_facts(retained)
+        self.assertEqual(104, sum(before != after for before, after in zip(standalone_view, projected)))
         for family, expected in fingerprints.items():
             self.assertEqual(expected, fact_set_digest(fact for fact in projected if fact.family == family), family)
 
@@ -900,8 +967,8 @@ class RelocatedBindingTests(unittest.TestCase):
     def test_directory_binding_rejects_unsafe_or_ambiguous_current_sources(self):
         from tests.host.evidence_authority_source import kernel_sources
 
-        logical = "kernel/example.c"
-        physical = "kernel/objects/example.c"
+        logical = "kernel/frame_ownership_validation.c"
+        physical = "kernel/memory/frame_ownership_validation.c"
         for mutation in (
             "none", "missing-entry", "malformed-entry", "missing-file",
             "symlink", "hardlink", "parent-link", "old-flat", "ambiguous-map", "duplicate-key",
@@ -938,12 +1005,240 @@ class RelocatedBindingTests(unittest.TestCase):
                 text = "KERNEL_FILE_FACTS = " + repr(mapping)
                 if mutation == "duplicate-key":
                     text = text[:-1] + ", " + repr(logical) + ": " + repr(mapping[logical]) + "}"
-                source.write_text(text)
+                source.write_text(text + "\nBOUNDED_FRAME_VALIDATION_SHA256 = " + repr("0" * 64))
                 if mutation == "none":
                     self.assertEqual({logical: physical}, kernel_sources(root, (logical,)))
+                    fact, = (
+                        fact for fact in evidence_authority_inventory._facts_for_owner(
+                            root, "authority-core", "tests/host/kernel_layout_source.py",
+                        )
+                        if fact.scope == "BOUNDED_FRAME_VALIDATION_SHA256"
+                    )
+                    self.assertEqual((physical, "tests/host/kernel_layout_source.py"), fact.payload_paths)
                 else:
                     with self.assertRaises(ValueError):
                         kernel_sources(root, (logical,))
+                    with self.assertRaises(ValueError):
+                        evidence_authority_inventory._facts_for_owner(
+                            root, "authority-core", "tests/host/kernel_layout_source.py",
+                        )
+
+
+class StandaloneBindingTests(unittest.TestCase):
+    OWNER = "tests/host/kernel_layout_source.py"
+    SOURCE = "kernel/memory/frame_ownership_validation.c"
+    KEY = OWNER + ":data-entry:BOUNDED_FRAME_VALIDATION_SHA256"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.fact, = (fact for fact in cls.inventory.facts if fact.key == cls.KEY)
+
+    def transition(self):
+        # This synthetic registration never records an actual retirement.
+        plan = evidence_authority.synthetic_plan(evidence_authority.synthetic_inventory())
+        units = self.fact.consumer_units
+        plan = dataclasses.replace(
+            plan, owner_unit="B02", finding_ids=("B02-F999",),
+            affected_identity_keys=(self.KEY,), retained_identity_keys=(),
+            planned_retirement_identity_keys=(self.KEY,),
+            replacement_oracles=(dataclasses.replace(
+                plan.replacement_oracles[0], replaces_identity_keys=(self.KEY,),
+            ),),
+            recertification_units=units,
+            unit_commands=tuple((unit, ("validate-" + unit.lower(),)) for unit in units),
+        )
+        authority = dataclasses.replace(
+            evidence_authority.synthetic_task_authorities(plan)[plan.owner_task],
+            command_input_paths=("CMakeLists.txt", "tools/validation_plan.py"),
+            unit_input_paths=tuple((unit, (self.SOURCE,)) for unit in units),
+        )
+        environment = evidence_authority.synthetic_environment(plan)
+        immutable = dict(environment.immutable_inputs)
+        del immutable["tools/command_registry.py"]
+        immutable.update(
+            (path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            for path in authority.command_input_paths
+        )
+        candidate = tuple(
+            (path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            for path in (self.SOURCE, self.OWNER)
+        )
+        environment = dataclasses.replace(
+            environment, immutable_inputs=tuple(sorted(immutable.items())),
+            red_candidate_inputs=candidate, current_candidate_inputs=candidate,
+            unit_inputs=tuple((unit, (candidate[0],)) for unit in units),
+        )
+        return plan, authority, environment
+
+    def validate(self, plan, authority, environment, events=()):
+        return evidence_authority.validate_transition(
+            self.inventory, {plan.owner_task: authority},
+            evidence_authority.synthetic_transition_registry(plan),
+            plan, events, environment,
+        )
+
+    def test_standalone_hash_binds_only_its_actual_source(self):
+        self.assertEqual((self.SOURCE, self.OWNER), self.fact.payload_paths)
+        self.assertEqual("B02", self.fact.primary_unit)
+        self.assertEqual(("B02", "B14"), self.fact.consumer_units)
+
+    def test_actual_binding_keeps_independent_command_inputs_immutable(self):
+        result = self.validate(*self.transition())
+        self.assertTrue(result.ok, result)
+        self.assertIs(evidence_authority.TransitionState.REPLACEMENT_REGISTERED, result.state)
+        self.assertFalse(result.retired_identity_keys)
+
+    def test_real_source_overlap_absence_and_changed_bytes_still_fail(self):
+        plan, authority, environment = self.transition()
+        source_value = dict(environment.current_candidate_inputs)[self.SOURCE]
+        result = self.validate(
+            plan, dataclasses.replace(
+                authority, command_input_paths=(*authority.command_input_paths, self.SOURCE),
+            ),
+            dataclasses.replace(
+                environment, immutable_inputs=(*environment.immutable_inputs, (self.SOURCE, source_value)),
+            ),
+        )
+        self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+        for field in ("red_candidate_inputs", "current_candidate_inputs"):
+            with self.subTest(missing=field):
+                result = self.validate(plan, authority, dataclasses.replace(
+                    environment, **{field: tuple(
+                        item for item in getattr(environment, field) if item[0] != self.SOURCE
+                    )},
+                ))
+                self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+        red = evidence_authority.synthetic_red_event(plan, environment)
+        green = evidence_authority.synthetic_green_event(plan, environment, red)
+        self.assertTrue(self.validate(plan, authority, environment, (red, green)).ok)
+        changed = dataclasses.replace(
+            environment,
+            current_candidate_inputs=tuple(
+                (path, "changed-source" if path == self.SOURCE else value)
+                for path, value in environment.current_candidate_inputs
+            ),
+            unit_inputs=tuple(
+                (unit, ((self.SOURCE, "changed-source"),)) for unit in plan.recertification_units
+            ),
+        )
+        result = self.validate(plan, authority, changed, (red, green))
+        self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+    def test_admitted_scalar_rejects_missing_duplicate_and_nonliteral_shapes(self):
+        name = "BOUNDED_FRAME_VALIDATION_SHA256"
+        value = repr("0" * 64)
+        valid = name + " = " + value + "\n"
+        declarations = (
+            "", valid + valid, name + ": str = " + value,
+            name + " = alias = " + value,
+            valid + "def shadow():\n    " + name + " = " + value,
+            valid + name + " += " + value,
+            name + " = str(" + value + ")",
+            name + " = (" + value + ",)",
+            name + " = {" + value + ": " + value + "}",
+            name + " = [" + value + "]",
+            name + " = " + repr("0" * 40),
+            name + " = " + repr("A" * 64),
+            name + " = None",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-standalone-shape-") as directory:
+            root = Path(directory)
+            source = root / self.OWNER
+            source.parent.mkdir(parents=True)
+            for declaration in declarations:
+                source.write_text(declaration)
+                with self.subTest(declaration=declaration), self.assertRaises(ValueError):
+                    evidence_authority_inventory._facts_for_owner(root, "authority-core", self.OWNER)
+
+    def test_similar_names_and_unqualified_owners_keep_their_existing_fallback(self):
+        name = "BOUNDED_FRAME_VALIDATION_SHA256"
+        value = repr("0" * 64)
+        with tempfile.TemporaryDirectory(prefix="micros-standalone-selector-") as directory:
+            root = Path(directory)
+            owner = root / self.OWNER
+            owner.parent.mkdir(parents=True)
+            target = root / self.SOURCE
+            target.parent.mkdir(parents=True)
+            target.write_text("current source need not equal its historical hash")
+            (root / "CMakeLists.txt").write_text("independent command input")
+            mapping = {"kernel/frame_ownership_validation.c": (self.SOURCE, "100644", "0" * 64, ())}
+            declarations = (
+                "KERNEL_FILE_FACTS = " + repr(mapping) + "\n"
+                + name + " = " + value + "\nINPUT = 'CMakeLists.txt'\n"
+            )
+            for other in ("BASE_FRAME_VALIDATION_SHA256", name + "_OTHER"):
+                owner.write_text(declarations + other + " = " + value)
+                facts = evidence_authority_inventory._facts_for_owner(root, "authority-core", self.OWNER)
+                selected, = (fact for fact in facts if fact.scope == name)
+                opaque, = (fact for fact in facts if fact.scope == other)
+                self.assertEqual((self.SOURCE, self.OWNER), selected.payload_paths)
+                self.assertIn("CMakeLists.txt", opaque.payload_paths)
+            other_owner = "tests/host/another_source.py"
+            (root / other_owner).write_text(name + " = " + value + "\nINPUT = 'CMakeLists.txt'\n")
+            facts = evidence_authority_inventory._facts_for_owner(root, "authority-core", other_owner)
+            opaque, = (fact for fact in facts if fact.scope == name)
+            self.assertEqual(("CMakeLists.txt", other_owner), opaque.payload_paths)
+
+    def test_exact_record_and_every_other_complete_fingerprint_match_fixed_source(self):
+        before, after, fingerprints = standalone_binding_reference()
+        self.assertEqual(after, self.fact)
+        historical = prior_standalone_binding_facts(self.inventory.facts)
+        self.assertEqual(1, sum(current != prior for current, prior in zip(self.inventory.facts, historical)))
+        self.assertEqual(before, next(fact for fact in historical if fact.key == self.KEY))
+        for family, expected in fingerprints.items():
+            self.assertEqual(
+                expected, fact_set_digest(fact for fact in historical if fact.family == family), family,
+            )
+        contract = (ROOT / "docs/architecture/standalone-frame-validator-binding.md").read_text()
+        old, new = re.search(
+            r"^\| `authority-core` \| `([0-9a-f]{64})` \| `([0-9a-f]{64})` \|$",
+            contract, re.MULTILINE,
+        ).groups()
+        self.assertEqual(old, fingerprints["authority-core"])
+        expected = {**fingerprints, "authority-core": new}
+        self.assertEqual(expected, dict(self.inventory.declared_family_fact_digests))
+        self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
+
+    def test_historical_view_rejects_metadata_drift_and_preserves_every_other_field(self):
+        before, _, fingerprints = standalone_binding_reference()
+        metadata_changes = (
+            {"payload_paths": self.fact.payload_paths[:-1]},
+            {"payload_paths": (*self.fact.payload_paths, "CMakeLists.txt")},
+            {"primary_unit": "B14"}, {"consumer_units": ("B14",)},
+        )
+        for change in metadata_changes:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                prior_standalone_binding_facts((dataclasses.replace(self.fact, **change),))
+        with self.assertRaises(ValueError):
+            prior_standalone_binding_facts((self.fact, self.fact))
+        with self.assertRaises(ValueError):
+            prior_standalone_binding_facts((before,))
+        changes = (
+            {"evidence_value": "0" * 64}, {"key": self.KEY + "/other"},
+            {"family": "other"}, {"owner_path": self.OWNER + ".other"},
+            {"kind": "other"}, {"scope": self.fact.scope + "/other"},
+            {"authority_class": evidence_authority.AuthorityClass.PERMANENT_INVARIANT},
+        )
+        for change in changes:
+            changed = dataclasses.replace(self.fact, **change)
+            with self.subTest(change=change):
+                current = tuple(changed if fact.key == self.KEY else fact for fact in self.inventory.facts)
+                historical = prior_standalone_binding_facts(current)
+                selected, = (fact for fact in historical if fact.key == changed.key)
+                for field, value in change.items():
+                    self.assertEqual(value, getattr(selected, field))
+                self.assertNotEqual(
+                    fingerprints[self.fact.family],
+                    fact_set_digest(fact for fact in historical if fact.family == self.fact.family),
+                )
+        unrelated = tuple(fact for fact in self.inventory.facts if fact.key != self.KEY)
+        self.assertEqual(unrelated, prior_standalone_binding_facts(unrelated))
+        self.assertNotEqual(
+            fingerprints[self.fact.family],
+            fact_set_digest(fact for fact in unrelated if fact.family == self.fact.family),
+        )
 
 
 class TransitionTests(unittest.TestCase):

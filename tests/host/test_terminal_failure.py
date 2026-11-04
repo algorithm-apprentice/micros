@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from tests.host.evidence_authority_inventory import current_inventory
 from tests.host.evidence_authority_types import AuthorityClass, fact_set_digest
+from tests.host.test_evidence_authority import prior_standalone_binding_facts
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,9 +69,10 @@ class TerminalAuthorityTest(unittest.TestCase):
         inventory = current_inventory(ROOT)
         self.assertEqual(12, len(expected))
         self.assertEqual(3920, sum(fact.family in expected for fact in inventory.facts))
+        historical = prior_standalone_binding_facts(inventory.facts)
         for family, fingerprint in expected.items():
             self.assertEqual(
-                fingerprint, fact_set_digest(fact for fact in inventory.facts if fact.family == family),
+                fingerprint, fact_set_digest(fact for fact in historical if fact.family == family),
                 family,
             )
 
