@@ -337,6 +337,21 @@ checks; it does not strip serial bytes or relax the five-record panic
 classifier. Current trace acceptance independently compares every emitted
 frame and work count against the actual stopped stack.
 
+PLAT03 implementation #204 passed the complete 50-command fresh author gate
+and independent implementation review: 40 native CTests, 1,399 Python tests,
+matching eighteen-case runtime evidence, all 44 static configurations/
+113 outputs and ten observed scopes. Ordinary committed checks preserve
+the prior claims without an author journal.
+
+The next MEM01 design is blocked by the
+[standalone validator payload gap](research/standalone-frame-validator-payload-gap.md).
+[Accepted ADR-0098](adr/0098-standalone-frame-validator-evidence-binding.md)
+requires a separate evidence-only prerequisite. Its future native Red must
+expose the actual overbroad binding and immutable-input collision; Green
+must prove the exact one corrected record, 3,937 unchanged records,
+historical comparison recovery and unchanged disjointness. The current
+design adds no executable fixture or new test/workflow.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
