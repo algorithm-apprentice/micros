@@ -188,7 +188,7 @@ STACK_VM_LIFETIME_PAYLOAD_PATHS = (
 
 DECLARED_FAMILY_FACT_DIGESTS = {
     "authority-core":
-        "c9f825f5b1488d03ee1c54db9ae3324b312807cd62de6dfa23166331a32e7e5d",
+        "152ba765d3a332961b59e88a7725f4a823c335bb62b97ba09c662bb84e1098fd",
     "fixture-artifacts":
         "3cff438cd00a5ee1b78bffdedb2b9e66c123c9972ab048eda1854aff2918d149",
     "kernel-structure":
@@ -586,6 +586,13 @@ def _object_reconstruction_sources(root, directory):
 def _semantic_payload_paths(root, name, leaf, literals, relative, directory):
     paths = set()
     if (
+        relative == "tests/host/kernel_layout_source.py"
+        and name == "BOUNDED_FRAME_VALIDATION_SHA256" and not leaf
+    ):
+        paths.update(kernel_sources(
+            root, ("kernel/frame_ownership_validation.c",), directory,
+        ).values())
+    elif (
         name in LOGICAL_FILE_TABLES.get(relative, ()) and len(leaf) == 1
         and leaf[0].startswith("kernel/") and len(Path(leaf[0]).parts) == 2
     ):
@@ -784,6 +791,10 @@ def _runtime_memory_facts(tree, family, relative):
 
 def _facts_for_owner(root, family, relative, directory=None):
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+    if relative == "tests/host/kernel_layout_source.py":
+        value = literal_value(single_assignment(tree, "BOUNDED_FRAME_VALIDATION_SHA256").value)
+        if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ValueError("standalone frame-validator authority requires a scalar SHA256")
     packed = evidence_authority_packed.checked_declarations(tree, relative)
     if family == evidence_authority_packed.FAMILY:
         if relative != evidence_authority_packed.OWNER:

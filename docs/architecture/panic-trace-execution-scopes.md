@@ -16,10 +16,18 @@ tree:   b2a444d27e0e6cc43d5f5d1e6a5926c52b520dc2
 
 Design #206 is separately reviewed and merged as
 `137d91698a923be57fd27f54ed570485c3768f88`.
-Only its corrective implementation is active. EV01-C03 implementation is
-preserved as reference, not merged or accepted, and restarts after this
-prerequisite's separate implementation merge. MEM01 and hosted CI do not
-proceed in parallel.
+Implementation #207 is independently reviewed and merged as
+`b643b0b6a4da2d533127204c5814a5f78e576e1d`, with identical reviewed,
+committed, remote and squash tree
+`6928ae70be64082d236508986c003c25a29b7c6b`.
+The separately labeled actual eighteen-case pair and all 50 fresh
+actual-current author commands passed, including 44 static configurations/
+113 outputs and ten observed scopes. Independent GPT-6.1 Sol review was
+clean before the first implementation commit. A fresh committed checkout
+passed 87 authority/source checks without an author build or journal.
+Both owned validation worktrees and exact completed task branches were
+removed. This unblocks the preserved EV01-C03 implementation, not MEM01
+runtime work or hosted CI.
 
 ## Two different authority lifetimes
 
