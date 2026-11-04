@@ -386,7 +386,7 @@ PLAT03-C02 implementation #207 passed that pair, all 50 fresh actual-current
 commands and independent review, then preserved ordinary authority in a fresh
 committed checkout without author journals. Its exact reviewed/committed/
 remote/squash tree is `6928ae70be64082d236508986c003c25a29b7c6b`.
-EV01-C03 restarted from that merged outcome; MEM01 remains blocked.
+EV01-C03 restarted from that merged outcome before MEM01 could resume.
 
 The restarted binding uses only the qualified scalar and existing checked
 directory helper. Native regressions preserve strict schema/path/closure
@@ -401,6 +401,24 @@ iteration includes the retained current-scope regression:
 Original source gates, journal-free prior claims, the complete fresh author
 plan and independent implementation review remain required. No runtime,
 CTest, target workflow, planner or controller change belongs to EV01-C03.
+
+EV01-C03 implementation #208 passed all 50 fresh author commands and
+independent review, then passed 247 authority/source checks in a fresh
+committed checkout without author journals. The current inventory preserves
+3,938 facts in fourteen families, including its exact one-record binding
+correction.
+
+The restarted
+[Accepted MEM01 contract](architecture/bootstrap-allocation.md) under
+[ADR-0100](adr/0100-minix-bootstrap-allocation.md) fixes three native work
+oracles, complete semantic/access/rollback guards, the cursor-before-bitmap
+snapshot boundary and actual-code baseline/current fixtures. Six granular
+retirements preserve original values and all unrelated current authorities.
+The fixed #208 runtime and MINIX trace are retained; all six fact closures
+fit the declared eight candidate paths. Future acceptance requires actual
+affected-unit recertification and the unchanged full target/stack scope.
+This design authors no executable fixture, model, observation or runtime
+code; implementation remains pending separate design review and merge.
 
 ## POSIX conformance evidence
 

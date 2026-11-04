@@ -85,7 +85,7 @@ committed, remote and squash tree
 preserves prior authority without author journals. This closes only
 B01-F004/B01-E004.
 
-MEM01's next documentation-only proposal received an independent High
+MEM01's initial documentation-only proposal received an independent High
 design finding: one standalone frame-validator hash inherits 797 payload
 paths, colliding with independent immutable CMake/planner inputs. The author
 verified the actual inventory and unchanged `PROJECTION` rejection.
@@ -110,9 +110,20 @@ reviewed implementation #207 have now merged with identical reviewed,
 committed, remote and squash tree
 `6928ae70be64082d236508986c003c25a29b7c6b`. The renewed actual historical
 pair and complete current author gate passed without weakening either
-boundary. EV01-C03 implementation has restarted from current main with
-a fresh independent declaration; complete acceptance remains required.
-MEM01 remains blocked on it.
+boundary. EV01-C03 then restarted, passed all 50 fresh author commands and
+independent implementation review, and merged as #208,
+`bcace37522e5beb101ef5278889a2f87742f5721`. Its reviewed, committed,
+remote and squash tree is `36110108d7839460b2f384761bb9aaa540e82444`;
+fresh committed checks preserve ordinary authority without author journals.
+
+Only MEM01 design is now active under
+[Accepted ADR-0100](adr/0100-minix-bootstrap-allocation.md) and the
+[bootstrap allocation contract](architecture/bootstrap-allocation.md).
+The restarted proposal retains one lower-bound bitmap cursor, lowest-address
+selection, complete mutation/rollback coherence and original whole-interval
+FDT safety while removing repeated per-frame work. Its six actual fact
+closures now fit the eight candidate paths without immutable overlap.
+Implementation remains pending separate design review, Acceptance and merge.
 Hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

@@ -115,7 +115,7 @@ Independent review of the next MEM01 design found a distinct
 [standalone frame-validator payload gap](standalone-frame-validator-payload-gap.md).
 The author verified that its 797-path fallback intersects MEM01's immutable
 command inputs, so the existing transition validator correctly rejects the
-proposal. MEM01 design is blocked and preserved as reference; its
+proposal. The initial MEM01 design was blocked and preserved as reference; its
 implementation has not started.
 [Accepted ADR-0098](../adr/0098-standalone-frame-validator-evidence-binding.md)
 defines the separate EV01-C03 one-key metadata prerequisite. No memory
@@ -132,8 +132,18 @@ historical baseline authority from complete current-run input stability.
 Design #206 and implementation #207 have now independently passed their
 required gates and merged. The actual historical pair, full current author
 plan, unchanged authority and journal-free committed checks passed.
-Only EV01-C03 implementation has restarted; MEM01 remains blocked.
-No runtime finding is newly retired or reassigned.
+EV01-C03 restarted, passed its complete current author and independent
+review gates, and merged as #208. Its exact reviewed/committed/remote/squash
+tree is `36110108d7839460b2f384761bb9aaa540e82444`; journal-free committed
+checks passed. The six actual MEM01 fact closures now fit its eight
+candidate paths without immutable command-input overlap.
+
+Only the restarted MEM01 design is active under
+[Accepted ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
+[allocation contract](../architecture/bootstrap-allocation.md).
+Its implementation remains pending separate design acceptance and merge.
+No runtime finding is newly retired or reassigned by these prerequisites
+or this proposal.
 
 ## Consolidation invariants
 
@@ -270,7 +280,7 @@ blocking queue.
 | `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Implementation #199 follows Accepted ADR-0093/0094: both exact history roles, TTY transfer/notification and panic replay preserve separate physical ownership. | Actual primitive/native/target Red-Green, granular twenty-key retirement, thirteen-unit recertification, complete fresh author/stack evidence and independent review complete. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Implementation #201 under Accepted ADR-0095 bounds actual early/panic polls, claims first entry/reset independently and repairs only terminal console fields. | Actual twelve-case baseline/current evidence, complete fresh author/stack gate, journal-free prior authority and independent review complete. |
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
-| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Canonicalize once, retain allocator search state, and remove successful-path per-frame raw-FDT rescans. Its design is blocked on the separate one-key EV01-C03 binding prerequisite. | Range/frame visit counts over fragmented and excluded maps; no implementation before separately reviewed design acceptance. |
+| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | The [Accepted allocation contract](../architecture/bootstrap-allocation.md) restarts after completed #205/#208 and #206/#207 prerequisites; retain canonical geometry, lower-bound search state and whole-interval/word validity. | Three native work oracles, exact rollback/mutation guards and six-key authority transition; no implementation before separately reviewed design acceptance. |
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Add the reference large-page kernel map and direct table-frame ownership/indexing without linear table-frame searches. | Page-table topology, allocation, lookup, and ownership probe counts. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Keep complete ownership validation diagnostic-only and introduce selected-record mutation plans. | Active/inactive visit counts and failure-atomic selected transitions. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
