@@ -203,10 +203,13 @@ Accepted [ADR-0102](../adr/0102-granular-memory-native-source-authority.md)
 defines the separate
 [EV01-C04 binding contract](memory-native-source-authority.md): 328
 additional precise assertions, unchanged predecessor records and unchanged
-current source admission. Separate design #213 is merged. Its dependent
-metadata implementation supplies the declared family and focused regressions;
-MEM03 design stays blocked until the complete current author gate,
-independent implementation review and separate implementation merge.
+current source admission. Separate design #213 and independently reviewed
+implementation #214 are merged. All 4,282 records, seventeen fingerprints,
+prior journal-free authority and unchanged current source guards passed the
+complete current author gate. The
+[Accepted MEM03 contract](selected-frame-ownership.md) now plans its exact
+38-key transition through those bindings; no MEM03 runtime identity has
+retired and implementation has not started.
 
 ## Authority model
 

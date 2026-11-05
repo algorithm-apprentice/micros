@@ -154,12 +154,25 @@ before implementation. Accepted
 [EV01-C04 contract](architecture/memory-native-source-authority.md) define
 precise identities for 328 existing MEM01/MEM02 source-admission clauses
 while preserving original records and current checks. Separate design #213
-is merged as `52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`. Only its evidence
-implementation is active: real missing-identity Red and the 106-test focused
-Green passed without changing native admission. Complete current acceptance
-and independent implementation review remain required before its merge and
-MEM03 design resumption. MEM03/MEM04 retain the complete-validation cadence findings;
-hosted CI and all other runtime findings retain their existing owners.
+is merged as `52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`.
+Implementation #214 passed real coverage Red, complete current fifty-command
+acceptance and independent first-commit review, then merged as
+`8927f9956eb270962517b19715a12bc93a5fa466`, with identical reviewed and squash
+tree `9f7802dfdfc84034b626068b5c160b90a645dad7`.
+Fresh committed/actual-main journal-free checks and exact cleanup passed.
+All old facts, fingerprints, guards and runtime source remain unchanged.
+
+Only MEM03 design is now active. Accepted
+[ADR-0103](adr/0103-selected-frame-ownership-validation.md) and its
+[selected ownership contract](architecture/selected-frame-ownership.md)
+define active metadata, selected-record plans, whole-active transitions and
+explicit complete diagnostics. The
+[fixed-source study](research/minix-selected-frame-ownership.md) records
+the 26 current direct audit calls and the active obligations that cannot be
+removed with the global scan. No MEM03 runtime code, fixture or observation
+exists yet. Independent design review and separate merge precede
+implementation. The 66 remaining runtime findings, including MEM04 and
+hosted-CI blockers, retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
