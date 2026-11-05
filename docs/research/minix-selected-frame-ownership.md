@@ -4,8 +4,11 @@
 
 This is the fixed-source MEM03 study for B02-F002 and B02-E002 under
 [Accepted ADR-0103](../adr/0103-selected-frame-ownership-validation.md).
-It records the design baseline, not implementation evidence.
-MEM03 implementation remains pending the separate design merge.
+It records the fixed design baseline, not current implementation acceptance.
+Design #215 is separately merged. The first uncommitted implementation was
+archived after the [complete-validator token-scope defect](complete-validator-token-scope-gap.md)
+blocked B14 recertification; Accepted ADR-0104 is the sole active corrective
+design before a fresh implementation restart.
 
 The current source is independently reviewed EV01-C04 implementation #214:
 
@@ -245,7 +248,7 @@ success.
 | All-process VM mapping checks and pairwise selected-frame searches | Remaining divergences, VM02 / B02-F008/F009 |
 | Other explicit scheduler, endpoint, grant, bootstrap, PM and VM validators | Retain their separate finding owners; MEM03 cannot declare their costs solved |
 
-## Evidence constraints for the pending design
+## Evidence constraints
 
 B02-E002 requires real primitive observations which distinguish active
 frames, inactive frames, active ranges, inactive ranges, bitmap words and
@@ -253,7 +256,7 @@ object/scheduler work. The existing collector has one active capture and a
 fixed 27-owner by fourteen-kind ABI; it does not carry an extra active/inactive
 dimension.
 
-The design must specify how those distinctions are measured without changing
+The contract specifies how those distinctions are measured without changing
 that ABI, assigning memory work to a false owner, double-adding inclusive
 captures or estimating callee work from caller counts.
 
@@ -265,10 +268,12 @@ audits need separately stated scopes; a missing requested mapping must not
 hide corruption inside the still-required selected process-root proof.
 
 The separately merged EV01-C04 keys now permit granular admission planning.
-They do not authorize a runtime change. The pending design must name every
+They do not authorize a runtime change. The contract must name every
 affected source identity and precise current helper/observation adaptation,
 retain historical native modes and original MEM01/MEM02 work bounds, and
 prove that candidate payloads remain disjoint from independent inspectors.
 
-No runtime, executable test, model, observation, generator, build scaffold or
-prototype has been authored for MEM03.
+The separately merged original design contained no runtime, executable test,
+model, observation, generator, build scaffold or prototype. The later
+uncommitted implementation is archived reference evidence. The current
+corrective phase is documentation-only and changes no MINIX runtime baseline.

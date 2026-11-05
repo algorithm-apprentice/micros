@@ -152,9 +152,12 @@ remain 4 KiB, and complete owner/root validation cadence is unchanged.
 
 MEM03's [Accepted selected-ownership contract](selected-frame-ownership.md)
 separates operation-local metadata/record checks from explicit complete
-diagnostics. Its evidence-key prerequisite #213/#214 is merged; only design
-is active. The current runtime still has the complete-validation cadence
-described above until a separately reviewed implementation changes it.
+diagnostics. Its evidence-key prerequisite #213/#214 and design #215 are
+merged. The first uncommitted implementation was archived after B14 exposed
+the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md).
+Only the corrective design is active. The committed runtime retains the
+complete-validation cadence described above until a separately reviewed
+implementation changes it.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

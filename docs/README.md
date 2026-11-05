@@ -119,7 +119,7 @@ This directory contains the design baseline for `micros`.
   table identities, retained complete validation and native/hardware evidence.
 - [Selected frame ownership and complete audits](architecture/selected-frame-ownership.md)
   defines MEM03's Accepted active-metadata/selected-record/whole-active boundaries,
-  retained complete diagnostics and exact work/source-authority evidence.
+  retained complete diagnostics and the Accepted precise-token authority amendment.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -132,13 +132,17 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Complete-validator token scope gap](research/complete-validator-token-scope-gap.md)
+  records the accidental preprocessed-prefix identity that blocked MEM03's
+  first uncommitted recertification despite unchanged complete-scan helpers.
+
 - [MINIX selected frame-ownership baseline](research/minix-selected-frame-ownership.md)
   traces selected metadata and separate diagnostics, the current 26 direct
   audit call sites and the obligations their consumers currently inherit.
 
 - [Memory-native source authority gap](research/memory-native-source-authority-gap.md)
   records the fixed current-source guards, missing individual identities and
-  closed 328-clause census that block MEM03 design.
+  closed 328-clause census repaired by separately merged EV01-C04.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,
