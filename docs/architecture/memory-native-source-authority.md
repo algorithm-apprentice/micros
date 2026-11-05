@@ -18,10 +18,15 @@ tree:   910e04a2129a692ec74ede4c34ff19c8f18e2397
 Separate design #213 is independently reviewed and merged as
 `52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`, with identical reviewed and squash
 tree `ed862e2a70b55a61405f08ae8aaa8a014b689d3b`.
-Only its dependent evidence implementation is active. MEM03 design is
-blocked until that implementation passes complete acceptance and merges.
-No memory runtime correction, hosted-CI work or other task proceeds in
-parallel.
+Its independently reviewed implementation #214 is merged as
+`8927f9956eb270962517b19715a12bc93a5fa466`, with identical
+reviewed/committed/remote/preview/squash tree
+`9f7802dfdfc84034b626068b5c160b90a645dad7`.
+Actual coverage Red, complete-record conservation, all fifty fresh author
+commands and independent first-commit GPT-6.1 Sol review passed.
+Fresh committed and actual-main checks preserve ordinary authority without
+journals; completed task refs and the owned check worktree are removed.
+This resumes MEM03 design, not its runtime implementation or hosted CI.
 
 The outcome is precise inventory authority for **328 already executing
 current-source assertions**, without changing their behavior. The repair
@@ -509,3 +514,10 @@ The documented three-module focused command passes 106 tests. That result
 does not replace the required current complete fifty-command producer,
 independent implementation review, first-commit boundary, journal-free
 committed verification or exact publication checks.
+
+Implementation #214 completed those gates: 42 native CTests, 1,453 Python
+tests, forty QEMU workflows, four image workflows, 44 static configurations,
+113 outputs and ten observed scopes, with B13 explicitly blocked.
+The fresh committed checkout additionally passed 106 authority/source checks
+and documentation/cleanliness checks without transition journals.
+No runtime source, prior native guard/generator or identity retirement changed.

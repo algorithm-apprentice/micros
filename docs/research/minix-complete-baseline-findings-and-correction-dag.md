@@ -171,13 +171,20 @@ The subsequent MEM03 design found the
 Accepted [ADR-0102](../adr/0102-granular-memory-native-source-authority.md)
 defines the [EV01-C04 prerequisite](../architecture/memory-native-source-authority.md).
 Separate design #213 is merged as
-`52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`. Only the evidence implementation
-is active. Its real missing-identity Red and 106-test focused Green passed;
-complete current acceptance and independent implementation review remain
-required. MEM03 design is blocked until the separate prerequisite
-implementation merges; MEM03 implementation remains pending. This repair
-changes no runtime finding ownership or edge in the 59-node correction graph
-and does not accept hosted CI.
+`52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`.
+Implementation #214 passed actual coverage Red, all fifty fresh author
+commands, independent first-commit review and journal-free committed checks.
+It merged as `8927f9956eb270962517b19715a12bc93a5fa466`, with identical
+reviewed/committed/remote/preview/squash tree
+`9f7802dfdfc84034b626068b5c160b90a645dad7`; exact task-ref/check-worktree
+cleanup and actual-main authority checks passed.
+
+Only MEM03 design is now active under Accepted
+[ADR-0103](../adr/0103-selected-frame-ownership-validation.md) and the
+[selected ownership contract](../architecture/selected-frame-ownership.md).
+Its implementation remains pending separate independent design review,
+Acceptance and merge. The evidence prerequisite closes no runtime finding
+or edge in the 59-node correction graph and does not accept hosted CI.
 
 ## Consolidation invariants
 
@@ -316,7 +323,7 @@ blocking queue.
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
 | `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Implementation #210 follows design #209 and the [Accepted allocation contract](../architecture/bootstrap-allocation.md): canonical geometry, lower-bound search progress and whole-interval/word validity. | Actual three-oracle Red/Green, exact rollback/mutation guards, six-key retirement, full current acceptance and independent review complete. |
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Implementation #212 follows design #211 and the Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md): largest legal leaves and direct checked table/owner identities. | Actual native/target Red-Green, retained MMU guards, exact three-key retirement, full current recertification and independent review complete. |
-| `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Keep complete ownership validation diagnostic-only and introduce selected-record mutation plans. Design is blocked on the separate [EV01-C04 source-binding prerequisite](../architecture/memory-native-source-authority.md). | Active/inactive visit counts and failure-atomic selected transitions; no runtime implementation has started. |
+| `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. The separate EV01-C04 prerequisite is merged. Only design is active. | Actual active/inactive/bitmap/object work, failure-atomic selected transitions, retained complete diagnostics and exact 38-key authority transition; no implementation has started. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Move complete registry audits off ordinary scheduler paths; use direct hart identity and bounded stack ownership structures. | Object/hart/stack comparison counts and corruption diagnostics. |

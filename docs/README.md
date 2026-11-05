@@ -117,6 +117,9 @@ This directory contains the design baseline for `micros`.
 - [Kernel mapping topology and direct table identity](architecture/kernel-mapping-topology.md)
   defines MEM02's Accepted largest-legal Sv39 leaves, checked parent-indexed
   table identities, retained complete validation and native/hardware evidence.
+- [Selected frame ownership and complete audits](architecture/selected-frame-ownership.md)
+  defines MEM03's Accepted active-metadata/selected-record/whole-active boundaries,
+  retained complete diagnostics and exact work/source-authority evidence.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -128,6 +131,10 @@ This directory contains the design baseline for `micros`.
   preparation-lifetime prerequisite, without relaxing the 4 KiB budget.
 
 ## Research
+
+- [MINIX selected frame-ownership baseline](research/minix-selected-frame-ownership.md)
+  traces selected metadata and separate diagnostics, the current 26 direct
+  audit call sites and the obligations their consumers currently inherit.
 
 - [Memory-native source authority gap](research/memory-native-source-authority-gap.md)
   records the fixed current-source guards, missing individual identities and

@@ -519,6 +519,22 @@ producer, independent first-commit review and committed publication evidence
 remain required. Neither this prerequisite nor its synthetic closure test
 claims a runtime correction or source-identity retirement.
 
+EV01-C04 implementation #214 completed those gates and merged with the exact
+reviewed tree. Its 4,282 facts/seventeen families preserve every predecessor
+record and source guard; fresh committed/actual-main checks preserve ordinary
+authority without journals.
+
+The next Accepted [MEM03 contract](architecture/selected-frame-ownership.md)
+under [ADR-0103](adr/0103-selected-frame-ownership-validation.md) requires
+five passive native observation slices plus an ordinary control over one
+fixed 99-case matrix. Actual portable operations, runtime process release
+and PM reservation validation distinguish selected work from inherited
+complete audits, while full diagnostic cases retain all active/inactive
+corruption evidence. Its 38-key plan preserves prior facts and bounds.
+This phase contains documentation only; the new native fixture, CTest,
+generator and three-phase driver do not exist yet. Runtime implementation
+remains behind independent design review, Acceptance and separate merge.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
