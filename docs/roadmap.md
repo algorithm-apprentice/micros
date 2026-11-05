@@ -131,7 +131,7 @@ The reviewed/committed/remote/preview/squash tree is
 ordinary authority without author journals, and completed task refs are
 removed. This closes only B01-F006/B02-F001.
 
-Only the dependency-ready MEM02 implementation is now active. Accepted
+MEM02 implementation #212 is now independently reviewed and merged. Accepted
 [ADR-0101](adr/0101-minix-kernel-mapping-topology.md) and its
 [kernel-map contract](architecture/kernel-mapping-topology.md) define
 largest legal kernel leaves, direct checked table identities, exact mapping
@@ -139,10 +139,24 @@ domains and real native/hardware evidence. Independent design and Acceptance
 reviews are clean; separate design #211 merged as
 `e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, with identical reviewed and squash
 tree `4f520e80e7f7a7490f67d438029c5d7ff77abcc0`.
-Actual implementation Red/Green, recertification and full acceptance remain
-required before either mapping finding closes. MEM03/MEM04 retain
-the complete-validation cadence findings; hosted CI and all other runtime
-findings retain their existing owners.
+Actual pre-production Red, current Green, thirteen-unit recertification,
+all fifty fresh author commands and independent first-commit review passed.
+The reviewed/committed/remote/preview/squash tree is
+`910e04a2129a692ec74ede4c34ff19c8f18e2397`, merged as
+`bf4eef8f0c59a9d06ae3a20d4a52c5f07943c2ee`. Journal-free committed checks and
+exact task-ref cleanup passed. This closes B02-F003/B02-F004, leaving
+66 pre-node runtime findings open.
+
+The next MEM03 design found a distinct
+[current-native source authority gap](research/memory-native-source-authority-gap.md)
+before implementation. Accepted
+[ADR-0102](adr/0102-granular-memory-native-source-authority.md) and the
+[EV01-C04 contract](architecture/memory-native-source-authority.md) define
+precise identities for 328 existing MEM01/MEM02 source-admission clauses
+while preserving original records and current checks. Only this evidence
+design is active; MEM03 design is blocked until its separate implementation
+merges. MEM03/MEM04 retain the complete-validation cadence findings;
+hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

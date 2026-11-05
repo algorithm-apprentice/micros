@@ -87,6 +87,9 @@ This directory contains the design baseline for `micros`.
 - [Standalone frame-validator binding](architecture/standalone-frame-validator-binding.md)
   defines the Accepted one-key EV01-C03 repair for collateral fallback paths that
   block the next allocator correction's immutable-input boundary.
+- [Granular memory-native source authority](architecture/memory-native-source-authority.md)
+  defines EV01-C04's Accepted current-source assertion bindings for the existing
+  MEM01/MEM02 native evidence, without relaxing their checks.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -125,6 +128,10 @@ This directory contains the design baseline for `micros`.
   preparation-lifetime prerequisite, without relaxing the 4 KiB budget.
 
 ## Research
+
+- [Memory-native source authority gap](research/memory-native-source-authority-gap.md)
+  records the fixed current-source guards, missing individual identities and
+  closed 328-clause census that block MEM03 design.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,
