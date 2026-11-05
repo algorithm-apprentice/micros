@@ -1,14 +1,17 @@
 import ast
 from collections import Counter
+from contextlib import ExitStack
 import copy
 import dataclasses
 from functools import lru_cache
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -17,7 +20,7 @@ from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
 from tests.host.ast_evidence import ast_dump
 from tests.host.evidence_authority_source import literal_value, single_assignment
-from tests.host.evidence_authority_types import fact_set_digest
+from tests.host.evidence_authority_types import digest, fact_set_digest
 from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
 
@@ -216,6 +219,249 @@ def prior_binding_facts(facts, root=ROOT):
     return tuple(result)
 
 
+def memory_native_binding_reference(root=ROOT):
+    contract = (root / "docs/architecture/memory-native-source-authority.md").read_text()
+    policy = re.search(r"^commit: ([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    tree = re.search(r"^tree:   ([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    return _memory_native_binding_reference(root, policy, tree)
+
+
+def memory_native_binding_row(task, kind, path, contract, name=""):
+    assertion = "tests/host/" + (
+        "bootstrap_allocation_source.py" if task == "MEM01" else "kernel_mapping_source.py"
+    )
+    assertions = (
+        (assertion, "tools/generate_kernel_mapping_fixture.py")
+        if kind == "native-input" else (assertion,)
+    )
+    return (
+        task + "/" + kind + "/" + path + ("/" + name if name else ""),
+        path, assertions, contract,
+    )
+
+
+def memory_native_function_contract(signature, guards, content, linkage="unconstrained"):
+    return {
+        "comparison": "function", "signature": signature,
+        "guards": guards, "content": content, "linkage": linkage,
+    }
+
+
+def memory_native_lexical_digest(text):
+    from tests.host.c_source_records import compact
+    from tests.host.test_frame_ownership_source_layout import c_lexical_text
+
+    return hashlib.sha256(compact(c_lexical_text(text)).encode()).hexdigest()
+
+
+def memory_native_skeleton_digest(text, records):
+    for record in records.values():
+        fragment = record.signature + "{" + record.body + "}"
+        if text.count(fragment) != 1:
+            raise ValueError("fixed native reference has ambiguous function fragments")
+        text = text.replace(fragment, "", 1)
+    return memory_native_lexical_digest(text)
+
+
+def memory_native_allocation_rows(source_at, projection):
+    from tests.host.c_source_records import compact, function_records, tokens
+    from tests.host.test_frame_ownership_source_layout import c_lexical_text
+
+    reference = projection["source_reference"]
+    rows = []
+    for path, mutable in projection["mutable_functions"].items():
+        text = source_at(reference, path)
+        records = function_records(text)
+        helpers = projection["new_helpers"].get(path, ())
+        for name, record in records.items():
+            content = ("lexical-body-sha256", memory_native_lexical_digest(record.body))
+            if name in mutable:
+                body = tokens(c_lexical_text(record.body))
+                calls = {
+                    left for left, right in zip(body, body[1:])
+                    if right == "(" and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", left)
+                } - {
+                    "if", "while", "for", "switch", "return", "sizeof", "_Alignof",
+                    "UINT64_C", "UINT32_C", "UINT16_C",
+                }
+                if name == "bootstrap_state_is_valid":
+                    calls = {"bootstrap_bitmap_is_valid", "bootstrap_ranges_are_valid"}
+                elif name == "commit_process_release":
+                    calls.add("micros_frame_ownership_allocator_mark_free")
+                elif name == "micros_frame_ownership_validate":
+                    calls.add("allocated_prefix_is_valid")
+                content = ("calls", tuple(sorted(calls)))
+            rows.append(memory_native_binding_row("MEM01", "function", path,
+                memory_native_function_contract(
+                    ("compact", compact(record.signature)), record.guards, content,
+                ), name,
+            ))
+        for name, signature, calls in helpers:
+            rows.append(memory_native_binding_row("MEM01", "function", path,
+                memory_native_function_contract(
+                    ("compact", compact(signature)), (), ("calls", tuple(sorted(calls))),
+                ), name,
+            ))
+        rows.append(memory_native_binding_row("MEM01", "definitions", path, {
+            "comparison": "definition-set",
+            "expected": tuple(sorted(set(records) | {helper[0] for helper in helpers})),
+        }))
+        rows.append(memory_native_binding_row("MEM01", "skeleton", path, {
+            "comparison": "lexical-skeleton-sha256",
+            "expected": memory_native_skeleton_digest(text, records),
+        }))
+    path = "include/micros/frame_allocator.h"
+    text = source_at(reference, path)
+    anchor = "    uint64_t allocated_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];"
+    if text.count(anchor) != 1:
+        raise ValueError("fixed native reference lost its original cursor anchor")
+    rows.append(memory_native_binding_row("MEM01", "header", path, {
+        "comparison": "lexical-header-sha256",
+        "expected": memory_native_lexical_digest(text.replace(
+            anchor, "    uint64_t allocation_cursor;\n" + anchor, 1,
+        )),
+    }))
+    rows.append(memory_native_binding_row("MEM01", "test-guard", "kernel/memory/bootstrap_memory.c", {
+        "comparison": "exact-test-wrapper", "function": "managed_frame_is_allowed",
+        "opening": "#if defined(MICROS_BUILD_FRAME_ALLOCATOR_TEST)\n",
+        "closing": "\n#endif", "occurrences": 1,
+    }, "managed_frame_is_allowed"))
+    return rows
+
+
+def memory_native_mapping_rows(source_at, projection, policy_tree, native):
+    from tests.host.c_source_records import compact, function_records
+
+    reference = projection["source_reference"]
+    subjects = (
+        "kernel/memory/address_space.c", "kernel/memory/address_space_validation.c",
+        "kernel/memory/address_space_internal.h",
+    )
+    rows = [
+        memory_native_binding_row("MEM02", "native-input", path, {
+            "comparison": "file-bytes-sha256", "expected": hashlib.sha256(data).hexdigest(),
+        }) for path, data in native.items() if path not in subjects
+    ]
+    calls_function, = (
+        node for node in policy_tree.body if isinstance(node, ast.FunctionDef)
+        and node.name == "_current_calls"
+    )
+    if len(calls_function.body) != 1 or not isinstance(calls_function.body[0], ast.Return):
+        raise ValueError("fixed native reference has a nonliteral mapping call table")
+    call_sets = ast.literal_eval(calls_function.body[0].value)
+    guard, = (
+        node for node in policy_tree.body if isinstance(node, ast.FunctionDef)
+        and node.name == "validate_retained_source"
+    )
+    exceptions, = (
+        node.value for node in guard.body if isinstance(node, ast.Assign)
+        and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "changed_signatures"
+    )
+    exceptions = ast.literal_eval(exceptions)
+    bindings = projection["current_bindings"]
+    for path, owner in zip(subjects[:2], ("constructor", "validator")):
+        text = source_at(reference, path)
+        records = function_records(text)
+        names = (set(records) - set(bindings[owner + "_removed"])) | set(bindings[owner + "_added"])
+        for name in sorted(names):
+            signature = (
+                ("compact", compact(records[name].signature))
+                if name in records and name not in exceptions else ("unconstrained",)
+            )
+            content = (
+                ("lexical-body-sha256", memory_native_lexical_digest(records[name].body))
+                if name in projection["retained_" + owner] else ("calls", tuple(sorted(call_sets[name])))
+            )
+            linkage = (
+                "static" if name in bindings[owner + "_added"]
+                and name != "micros_kernel_address_space_table_frame_is_valid" else "unconstrained"
+            )
+            rows.append(memory_native_binding_row("MEM02", "function", path,
+                memory_native_function_contract(signature, (), content, linkage), name,
+            ))
+        rows.append(memory_native_binding_row("MEM02", "definitions", path, {
+            "comparison": "definition-set", "expected": tuple(sorted(names)),
+        }))
+        rows.append(memory_native_binding_row("MEM02", "skeleton", path, {
+            "comparison": "lexical-skeleton-sha256",
+            "expected": memory_native_skeleton_digest(text, records),
+        }))
+    path = subjects[2]
+    text = source_at(reference, path)
+    policy = bindings["private_header"]
+    text = text.replace(policy["array_anchor"], policy["array_additions"] + policy["array_anchor"], 1)
+    text = text.replace(
+        "struct micros_frame_allocator;",
+        "struct micros_frame_allocator;\n" + policy["forward"] + "\n\n" + policy["helper"] + ";\n", 1,
+    )
+    rows.append(memory_native_binding_row("MEM02", "header", path, {
+        "comparison": "lexical-header-sha256", "expected": memory_native_lexical_digest(text),
+    }))
+    rows.append(memory_native_binding_row("MEM02", "include", subjects[1], {
+        "comparison": "exact-include", "text": '#include "micros/bootstrap_memory.h"\n',
+        "occurrences": 1,
+    }, "micros-bootstrap-memory"))
+    return rows
+
+
+@lru_cache(maxsize=4)
+def _memory_native_binding_reference(root, policy, policy_tree):
+    def fixed_bytes(reference, path):
+        return subprocess.check_output(
+            ("git", "show", reference + ":" + path), cwd=root, timeout=30,
+        )
+
+    def source_at(reference, path):
+        return fixed_bytes(reference, path).decode()
+
+    observed_tree = subprocess.check_output(
+        ("git", "rev-parse", policy + "^{tree}"), cwd=root, text=True, timeout=30,
+    ).strip()
+    if observed_tree != policy_tree:
+        raise ValueError("fixed native policy commit/tree disagree")
+    allocation_tree = ast.parse(source_at(policy, "tests/host/bootstrap_allocation_source.py"))
+    mapping_tree = ast.parse(source_at(policy, "tests/host/kernel_mapping_source.py"))
+    allocation = literal_value(single_assignment(allocation_tree, "SOURCE_PROJECTION").value)
+    mapping = literal_value(single_assignment(mapping_tree, "SOURCE_PROJECTION").value)
+    recipe = literal_value(single_assignment(mapping_tree, "RECIPE_ADMISSION").value)
+    members = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", mapping["source_reference"]),
+        cwd=root, timeout=30,
+    ).decode().split("\0")))
+    selected = {
+        name for name in members
+        if name.endswith(".h") and name.startswith(("include/", "arch/", "kernel/"))
+    } | set(recipe["native_source_members"])
+    archive = subprocess.check_output(
+        ("git", "archive", mapping["source_reference"], *sorted(selected)), cwd=root, timeout=30,
+    )
+    native = {}
+    with tarfile.open(fileobj=io.BytesIO(archive)) as entries:
+        for entry in entries:
+            if entry.isdir():
+                continue
+            if not entry.isfile() or entry.name not in selected or entry.name in native:
+                raise ValueError("fixed native reference has an unexpected archive entry")
+            native[entry.name] = entries.extractfile(entry).read()
+    if len(native) != 186 or set(native) != selected:
+        raise ValueError("fixed native reference lost a source/header")
+    reference = (
+        ("policy", policy, policy_tree),
+        ("MEM01", allocation["source_reference"]),
+        ("MEM02", mapping["source_reference"]),
+    )
+    rows = tuple(sorted((
+        *memory_native_allocation_rows(source_at, allocation),
+        *memory_native_mapping_rows(source_at, mapping, mapping_tree, native),
+    )))
+    if len(rows) != 328 or len({row[0] for row in rows}) != 328:
+        raise ValueError("fixed native reference lost a current-source assertion")
+    inventory_tree = ast.parse(source_at(policy, "tests/host/evidence_authority_inventory.py"))
+    fingerprints = literal_value(single_assignment(inventory_tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
+    return reference, rows, fingerprints
+
+
 class InventoryTests(unittest.TestCase):
     def test_fatal_firmware_facts_remain_artifacts_not_runtime_baseline_oracles(self):
         inventory = evidence_authority_inventory.current_inventory(ROOT)
@@ -327,8 +573,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(16, len(inventory.families))
-        self.assertEqual(3954, len(inventory.facts))
+        self.assertEqual(17, len(inventory.families))
+        self.assertEqual(4282, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1242,6 +1488,304 @@ class StandaloneBindingTests(unittest.TestCase):
             fingerprints[self.fact.family],
             fact_set_digest(fact for fact in unrelated if fact.family == self.fact.family),
         )
+
+
+class MemoryNativeBindingTests(unittest.TestCase):
+    OWNER = "tests/host/memory_native_source_bindings.py"
+    FAMILY = "memory-native-admission"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.reference, cls.rows, cls.previous = memory_native_binding_reference()
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.facts = tuple(fact for fact in cls.inventory.facts if fact.family == cls.FAMILY)
+        cls.declaration = (ROOT / cls.OWNER).read_text()
+
+    @classmethod
+    def expected_facts(cls):
+        consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+        return tuple(evidence_authority.Fact(
+            cls.OWNER + ":native-source-admission:" + scope, cls.FAMILY, cls.OWNER,
+            "native-source-admission", scope, evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, tuple(sorted({cls.OWNER, subject, *assertions})),
+            digest((cls.reference, scope, subject, assertions, contract)),
+        ) for scope, subject, assertions, contract in cls.rows)
+
+    @classmethod
+    def fixture(cls, directory):
+        root = Path(directory)
+        for path in {value for fact in cls.expected_facts() for value in fact.payload_paths}:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(cls.declaration if path == cls.OWNER else "")
+        return root
+
+    @classmethod
+    def materialize(cls, root):
+        return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
+
+    @staticmethod
+    def declaration_text(reference, rows):
+        return "BINDING_REFERENCE = " + repr(reference) + "\nNATIVE_SOURCE_BINDINGS = " + repr(rows) + "\n"
+
+    def test_existing_current_rejections_have_individual_inventory_keys(self):
+        from tests.host import bootstrap_allocation_source as allocation
+        from tests.host import kernel_mapping_source as mapping
+        from tests.host import memory_native_source_bindings as declarations
+        from tests.host.work_count_types import Stage
+        from tools import generate_kernel_mapping_fixture as generator
+
+        subject = "kernel/memory/frame_ownership_validation.c"
+        current = (ROOT / subject).read_text()
+        allocation.validate_retained_source(ROOT, subject, current, stage=Stage.GREEN)
+        changed = current.replace(
+            "return micros_frame_ownership_validate(ownership);",
+            "return MICROS_FRAME_OWNERSHIP_OK;", 1,
+        )
+        self.assertNotEqual(current, changed)
+        with self.assertRaisesRegex(ValueError, "retained original body"):
+            allocation.validate_retained_source(ROOT, subject, changed, stage=Stage.GREEN)
+        mapping.validate_retained_source(ROOT, subject, current, Stage.GREEN)
+        with self.assertRaisesRegex(ValueError, "noncandidate native source changed"):
+            mapping.validate_retained_source(ROOT, subject, changed, Stage.GREEN)
+
+        generator.source_bundle(ROOT, Stage.GREEN, observed=False)
+        read = generator.read_regular
+        for selected in (subject, "include/micros/frame_ownership.h"):
+            def changed_read(path):
+                data, identity = read(path)
+                return (data + b"\n" if path == ROOT / selected else data), identity
+
+            with self.subTest(guard=selected), patch.object(
+                generator, "read_regular", side_effect=changed_read,
+            ), self.assertRaisesRegex(ValueError, "corrected native input"):
+                generator.source_bundle(ROOT, Stage.GREEN, observed=False)
+
+        declared = {row[0] for row in declarations.NATIVE_SOURCE_BINDINGS}
+        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        required = (
+            "MEM01/function/" + subject + "/micros_frame_ownership_vm_transition_preflight",
+            "MEM02/native-input/" + subject,
+            "MEM02/native-input/include/micros/frame_ownership.h",
+        )
+        for scope in required:
+            with self.subTest(scope=scope):
+                self.assertIn(scope, declared)
+                self.assertTrue(
+                    self.OWNER + ":native-source-admission:" + scope in keys,
+                    "missing identity for an existing rejecting native-source assertion: " + scope,
+                )
+
+    def test_complete_bindings_equal_fixed_policy_and_runtime_source(self):
+        from tests.host import memory_native_source_bindings as declarations
+
+        self.assertEqual(self.reference, declarations.BINDING_REFERENCE)
+        self.assertEqual(self.rows, declarations.NATIVE_SOURCE_BINDINGS)
+        self.assertEqual(self.expected_facts(), self.facts)
+        self.assertEqual(328, len(self.facts))
+        self.assertEqual(
+            fact_set_digest(self.expected_facts()),
+            dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
+        )
+        self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
+        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        self.assertEqual(3954, len(retained))
+        self.assertEqual(16, len(self.previous))
+        for family, expected in self.previous.items():
+            with self.subTest(family=family):
+                self.assertEqual(
+                    expected, fact_set_digest(fact for fact in retained if fact.family == family),
+                )
+
+    def test_declaration_is_literal_only_and_cannot_execute_or_rebind(self):
+        reference = "BINDING_REFERENCE = " + repr(self.reference) + "\n"
+        rows = "NATIVE_SOURCE_BINDINGS = " + repr(self.rows) + "\n"
+        malformed = (
+            "", reference, rows, reference + reference + rows,
+            self.declaration + "\nextra = 1\n",
+            self.declaration + "\nraise RuntimeError('must not execute')\n",
+            self.declaration + "\ndef hidden():\n    BINDING_REFERENCE = 0\n",
+            reference + "NATIVE_SOURCE_BINDINGS: tuple = " + repr(self.rows),
+            reference + "NATIVE_SOURCE_BINDINGS = tuple()\n",
+            reference + "NATIVE_SOURCE_BINDINGS = []\n",
+            reference + "NATIVE_SOURCE_BINDINGS = True\n",
+            reference + "NATIVE_SOURCE_BINDINGS = None\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-memory-native-literals-") as directory:
+            root = self.fixture(directory)
+            for index, text in enumerate(malformed):
+                with self.subTest(case=index):
+                    (root / self.OWNER).write_text(text)
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+
+    def test_scope_value_owner_and_reference_drift_cannot_rebaseline_bindings(self):
+        first = self.rows[0]
+        changed_contract = {**first[3], "expected": ("invented_definition",)}
+        variants = {
+            "missing": self.rows[:-1],
+            "extra": (*self.rows, first),
+            "duplicate": (*self.rows[:-1], first),
+            "scope": ((first[0].replace("MEM01/", "MEM99/", 1), *first[1:]), *self.rows[1:]),
+            "subject": ((first[0], "kernel/memory/frame_ownership.c", *first[2:]), *self.rows[1:]),
+            "assertion": ((*first[:2], ("tests/host/kernel_mapping_source.py",), first[3]), *self.rows[1:]),
+            "comparison": ((*first[:3], {**first[3], "comparison": "other"}), *self.rows[1:]),
+            "value": ((*first[:3], changed_contract), *self.rows[1:]),
+            "field": ((*first[:3], {**first[3], "extra": 0}), *self.rows[1:]),
+        }
+        with tempfile.TemporaryDirectory(prefix="micros-memory-native-drift-") as directory:
+            root = self.fixture(directory)
+            for label, rows in variants.items():
+                with self.subTest(case=label):
+                    (root / self.OWNER).write_text(self.declaration_text(self.reference, rows))
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+            changed = (
+                ("policy", "0" * 40, self.reference[0][2]), *self.reference[1:],
+            )
+            (root / self.OWNER).write_text(self.declaration_text(changed, self.rows))
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+
+    def test_payloads_are_exact_ordinary_files_not_candidate_expectations(self):
+        selected = (
+            self.OWNER, "kernel/memory/frame_ownership_validation.c",
+            "include/micros/frame_ownership.h",
+            "tests/host/bootstrap_allocation_source.py",
+            "tools/generate_kernel_mapping_fixture.py",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-memory-native-paths-") as directory:
+            root = self.fixture(directory)
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            subject = root / "kernel/memory/frame_ownership_validation.c"
+            subject.write_text("changed candidate bytes are not a new historical expectation\n")
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            peer = root / "payload-peer"
+            peer.write_text("not an admitted source")
+            for relative in selected:
+                path = root / relative
+                saved = path.read_bytes()
+                for kind in ("missing", "symlink", "hardlink"):
+                    with self.subTest(path=relative, kind=kind):
+                        path.unlink()
+                        if kind == "symlink":
+                            path.symlink_to(peer)
+                        elif kind == "hardlink":
+                            os.link(peer, path)
+                        with self.assertRaises(ValueError):
+                            self.materialize(root)
+                        if path.exists() or path.is_symlink():
+                            path.unlink()
+                        path.write_bytes(saved)
+            parent = root / "kernel/memory"
+            moved = root / "saved-memory"
+            parent.rename(moved)
+            parent.symlink_to(moved, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+            parent.unlink()
+            moved.rename(parent)
+
+    def test_selected_clause_closure_preserves_real_overlap_rejection(self):
+        scopes = {
+            "MEM01/function/kernel/memory/frame_ownership_validation.c/micros_frame_ownership_vm_transition_preflight",
+            "MEM02/native-input/kernel/memory/frame_ownership_validation.c",
+            "MEM02/native-input/include/micros/frame_ownership.h",
+        }
+        facts = tuple(fact for fact in self.facts if fact.scope in scopes)
+        self.assertEqual(3, len(facts))
+        keys = tuple(fact.key for fact in facts)
+        units = facts[0].consumer_units
+        subjects = ("include/micros/frame_ownership.h", "kernel/memory/frame_ownership_validation.c")
+        paths = tuple(sorted({path for fact in facts for path in fact.payload_paths}))
+        plan = evidence_authority.synthetic_plan(evidence_authority.synthetic_inventory())
+        plan = dataclasses.replace(
+            plan, owner_unit="B02", finding_ids=("B02-F999",),
+            affected_identity_keys=keys, retained_identity_keys=(),
+            planned_retirement_identity_keys=keys,
+            replacement_oracles=(dataclasses.replace(
+                plan.replacement_oracles[0], replaces_identity_keys=keys,
+            ),),
+            recertification_units=units,
+            unit_commands=tuple((unit, ("validate-" + unit.lower(),)) for unit in units),
+        )
+        authority = dataclasses.replace(
+            evidence_authority.synthetic_task_authorities(plan)[plan.owner_task],
+            command_input_paths=(
+                "tests/host/c_source_records.py", "tests/host/work_count_evidence.py",
+                "tools/stack_bound_assembly.py",
+            ),
+            unit_input_paths=tuple((unit, subjects) for unit in units),
+        )
+        environment = evidence_authority.synthetic_environment(plan)
+        immutable = dict(environment.immutable_inputs)
+        del immutable["tools/command_registry.py"]
+        immutable.update(
+            (path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            for path in authority.command_input_paths
+        )
+        candidate = tuple((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths)
+        selected = tuple(item for item in candidate if item[0] in subjects)
+        environment = dataclasses.replace(
+            environment, immutable_inputs=tuple(sorted(immutable.items())),
+            red_candidate_inputs=candidate, current_candidate_inputs=candidate,
+            unit_inputs=tuple((unit, selected) for unit in units),
+        )
+        authorities = {plan.owner_task: authority}
+        registry = evidence_authority.synthetic_transition_registry(plan)
+        result = evidence_authority.validate_transition(self.inventory, authorities, registry, plan, (), environment)
+        self.assertTrue(result.ok, result)
+        self.assertIs(evidence_authority.TransitionState.REPLACEMENT_REGISTERED, result.state)
+        self.assertFalse(result.retired_identity_keys)
+        for overlap in (subjects[1], self.OWNER):
+            with self.subTest(overlap=overlap):
+                changed_authority = dataclasses.replace(
+                    authority, command_input_paths=(*authority.command_input_paths, overlap),
+                )
+                changed_environment = dataclasses.replace(
+                    environment,
+                    immutable_inputs=(*environment.immutable_inputs, (overlap, dict(candidate)[overlap])),
+                )
+                result = evidence_authority.validate_transition(
+                    self.inventory, {plan.owner_task: changed_authority}, registry,
+                    plan, (), changed_environment,
+                )
+                self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+    def test_all_prior_committed_claims_remain_journal_free(self):
+        from tests.host import (
+            bootstrap_allocation_authority, diagnostic_history_authority,
+            kernel_mapping_authority, runtime_memory_authority,
+        )
+
+        modules = (
+            bootstrap_allocation_authority, diagnostic_history_authority,
+            kernel_mapping_authority, runtime_memory_authority,
+        )
+        with ExitStack() as stack:
+            for module in modules:
+                for name in ("read_current", "read_journal", "validate_journal"):
+                    stack.enter_context(patch.object(
+                        module, name, side_effect=AssertionError("ordinary authority must not use a journal"),
+                    ))
+            _, authorities, _, registry = kernel_mapping_authority.task_definition(ROOT)
+            self.assertEqual(4, len(registry.claims))
+            self.assertEqual(30, sum(len(claim.claimed_identity_keys) for claim in registry.claims))
+            result = evidence_authority.validate_transition(
+                self.inventory, authorities, registry, None, (), None,
+            )
+            self.assertTrue(result.ok, result)
+            retired = {key for claim in registry.claims for key in claim.claimed_identity_keys}
+            self.assertEqual(
+                {fact.key for fact in self.inventory.facts} - retired,
+                set(result.active_identity_keys),
+            )
+            self.assertFalse(runtime_memory_authority.memory_identity_required(ROOT))
+            for claim in registry.claims:
+                if claim.owner_task == "COPY01":
+                    continue
+                key = claim.claimed_identity_keys[0]
+                self.assertFalse(kernel_mapping_authority.identity_required(ROOT, key), key)
 
 
 class TransitionTests(unittest.TestCase):

@@ -153,9 +153,12 @@ before implementation. Accepted
 [ADR-0102](adr/0102-granular-memory-native-source-authority.md) and the
 [EV01-C04 contract](architecture/memory-native-source-authority.md) define
 precise identities for 328 existing MEM01/MEM02 source-admission clauses
-while preserving original records and current checks. Only this evidence
-design is active; MEM03 design is blocked until its separate implementation
-merges. MEM03/MEM04 retain the complete-validation cadence findings;
+while preserving original records and current checks. Separate design #213
+is merged as `52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`. Only its evidence
+implementation is active: real missing-identity Red and the 106-test focused
+Green passed without changing native admission. Complete current acceptance
+and independent implementation review remain required before its merge and
+MEM03 design resumption. MEM03/MEM04 retain the complete-validation cadence findings;
 hosted CI and all other runtime findings retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

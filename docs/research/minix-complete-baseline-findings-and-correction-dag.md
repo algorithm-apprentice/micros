@@ -170,10 +170,14 @@ The subsequent MEM03 design found the
 [memory-native source authority gap](memory-native-source-authority-gap.md).
 Accepted [ADR-0102](../adr/0102-granular-memory-native-source-authority.md)
 defines the [EV01-C04 prerequisite](../architecture/memory-native-source-authority.md).
-Only that evidence-only design is active. MEM03 design is blocked until
-the separate prerequisite implementation merges; its implementation remains
-pending. This repair changes no runtime finding ownership or edge in the
-59-node correction graph and does not accept hosted CI.
+Separate design #213 is merged as
+`52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`. Only the evidence implementation
+is active. Its real missing-identity Red and 106-test focused Green passed;
+complete current acceptance and independent implementation review remain
+required. MEM03 design is blocked until the separate prerequisite
+implementation merges; MEM03 implementation remains pending. This repair
+changes no runtime finding ownership or edge in the 59-node correction graph
+and does not accept hosted CI.
 
 ## Consolidation invariants
 

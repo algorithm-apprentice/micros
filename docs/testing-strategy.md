@@ -500,10 +500,24 @@ MEM01/MEM02 current native-source guards. Accepted
 [EV01-C04 contract](architecture/memory-native-source-authority.md) require
 328 independently declared assertion bindings, complete conservation of the
 3,954 predecessor facts and sixteen fingerprints, strict existing source
-checks and unchanged closure rejection. The design contains documents only;
-no new binding module, extractor or test exists yet. The future evidence-only
-implementation retains the complete fifty-command author gate and does not
-claim a runtime correction or source-identity retirement.
+checks and unchanged closure rejection. Separate design #213 is merged.
+The dependent implementation supplies the literal-only declaration and
+closed inventory materialization, without modifying either existing source
+guard or native generator. Its actual Red exposes three missing identities
+after proving their old guards reject; its focused Green proves complete
+fixed-source record equality, all predecessor fingerprints, narrow closure,
+path/schema/drift rejection and journal-free prior authority.
+
+Focused iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_bootstrap_allocation tests.host.test_kernel_mapping
+```
+
+That command passes 106 tests. The complete current fifty-command author
+producer, independent first-commit review and committed publication evidence
+remain required. Neither this prerequisite nor its synthetic closure test
+claims a runtime correction or source-identity retirement.
 
 ## POSIX conformance evidence
 
