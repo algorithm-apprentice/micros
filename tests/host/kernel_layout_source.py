@@ -10,7 +10,8 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
-from tests.host.bootstrap_allocation_authority import identity_required as diagnostic_identity_required
+from tests.host.kernel_mapping_authority import identity_required as diagnostic_identity_required
+from tests.host.kernel_mapping_source import project_mmu_source_bytes
 from tests.host.diagnostic_history_source import (
     diagnostic_kernel_members, project_diagnostic_context, project_diagnostic_external, project_diagnostic_gate,
 )
@@ -15844,6 +15845,7 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     del physical
     selected = current_path(root, logical)
     raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], selected.read_bytes())
+    raw = project_mmu_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], raw)
     if b"MICROS_TEST_STACK_" in raw:
         raw = project_stack_source(
             KERNEL_LOGICAL_TO_PHYSICAL[logical], raw.decode("utf-8")

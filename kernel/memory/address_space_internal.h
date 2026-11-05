@@ -21,10 +21,22 @@ struct micros_kernel_address_space_private_state {
     uint64_t table_count;
     uint64_t leaf_count;
     uint64_t table_frames[MICROS_KERNEL_PAGE_TABLE_MAX_FRAMES];
+    uint16_t table_range_indices[MICROS_KERNEL_PAGE_TABLE_MAX_FRAMES];
+    uint16_t level1_table_ids[MICROS_SV39_TABLE_ENTRY_COUNT];
+    uint16_t level0_table_ids[MICROS_SV39_TABLE_ENTRY_COUNT][MICROS_SV39_TABLE_ENTRY_COUNT];
     struct micros_kernel_address_space_report report;
 };
 
 struct micros_frame_allocator;
+struct micros_frame_ownership;
+
+bool micros_kernel_address_space_table_frame_is_valid(
+    const struct micros_frame_allocator *allocator,
+    const struct micros_frame_ownership *ownership,
+    uint64_t frame_index,
+    uint16_t range_index,
+    uint64_t physical_address
+);
 
 bool micros_kernel_address_space_allocator_is_pristine(
     const struct micros_frame_allocator *allocator

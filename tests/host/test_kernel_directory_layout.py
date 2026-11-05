@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 from tests.host import kernel_layout_source
-from tests.host.bootstrap_allocation_authority import identity_required as diagnostic_identity_required
+from tests.host.kernel_mapping_authority import identity_required as diagnostic_identity_required
 from tests.host.terminal_failure_source import project_terminal_workflows
 from tools import validation_context, validation_plan
 

@@ -31,7 +31,7 @@ the registered hart's stack anchor, the trap frame carries that hart context,
 and timer mechanism state is owned by the same hart rather than standalone
 globals. Each live process generation can now own a private Sv39 root whose
 user subtree occupies `[0x40000000, 0x80000000)`, while immutable
-supervisor-only kernel subtrees remain shared. Typed page-table and user-frame
+supervisor-only kernel entries remain shared. Typed page-table and user-frame
 owners, full ASID-zero activation fences, inactive-root mutation, complete-page
 zeroing, and teardown-before-process-release are enforced and tested. Threads
 now own exact 264-byte user contexts and slot-derived 16 KiB supervisor stacks.

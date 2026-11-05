@@ -17,8 +17,11 @@ tree:   08f31a8b1dfc639c8b826ea65d092327fea159a1
 MINIX:  4db99f4012570a577414fe2a43697b2f239b699e
 ```
 
-Only design is active. Independent design review is clean; the paired
-implementation remains pending the separate design merge.
+Design #211 is independently reviewed and separately merged as
+`e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, tree
+`4f520e80e7f7a7490f67d438029c5d7ff77abcc0`. Only its dependent implementation
+is active. The original source-authority assertions remain active until the
+actual three-oracle transaction and required acceptance complete.
 
 ## Authority and non-goals
 
@@ -746,3 +749,29 @@ completed task refs.
 
 This design phase authors no executable artifact and claims none of those
 future gates has run.
+
+## Implementation map
+
+The separate implementation retains the three specified production owners.
+Construction selects a domain-contained leaf and follows checked child slots;
+validation owns the shared selected-frame check, complete reachability and
+span-based expected coverage. The private header contains only the three
+arrays and the cross-owner helper declaration. Complete owner validation,
+the original per-bit scans and publication/activation order remain unchanged.
+
+The eight declared evidence owners now supply actual-source native bindings,
+the independent seventeen-case model, strict observations and target parsing,
+finite source/recipe transport and the three-phase authority transaction.
+The existing MMU C/assembly fixture preserves both original faults while
+using two temporary frames for its separate large-leaf controls. Its new
+assembly leaf is bound to the exact RV64 load/return bytes and zero stack;
+the original source/object proofs remain active.
+
+The first genuine pre-production Red used staged tree
+`2dd9e3dcba887d251f8e58e9cdf631b2dc645142`, with all three production files
+still identical to #210. All three named oracles failed as expected, while
+85 native snapshots and both successful original/large-leaf hardware-control
+runs completed. Later immutable-binding changes renew that transaction;
+the initial Red is retained as history rather than borrowed as final
+acceptance. The complete current gates and independent implementation review
+remain required before either finding closes.

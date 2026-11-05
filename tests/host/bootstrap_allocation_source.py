@@ -732,6 +732,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.kernel_mapping_source import project_cmake as project_mapping_cmake
+
+    text = project_mapping_cmake(text)
     if not any(marker in text for marker in ("MEM01_NATIVE", "bootstrap_allocation", "bootstrap-allocation")):
         return text
     addition = native_recipe()
@@ -817,6 +820,9 @@ def extend_gate_adapter(path, text):
 
 
 def project_gate_adapter(path, text):
+    from tests.host.kernel_mapping_source import project_gate_adapter as project_mapping_adapter
+
+    text = project_mapping_adapter(path, text)
     if path == "tests/host/test_kernel_bootstrap_source_layout.py":
         return project_bootstrap_discovery(text)
     changes = _gate_changes(path)

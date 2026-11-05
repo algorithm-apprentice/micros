@@ -3118,6 +3118,77 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(test-unit-fast bootstrap_allocation_test)
     add_dependencies(test-unit bootstrap_allocation_test)
 
+    set(MEM02_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/kernel-mapping")
+    set(MEM02_NATIVE_INPUTS
+        kernel/memory/frame_allocator.c
+        kernel/memory/frame_ownership.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/frame_ownership_bootstrap.c
+        kernel/memory/frame_ownership_handoff.c
+        kernel/memory/frame_ownership_vm_claim.c
+        kernel/memory/frame_ownership_vm_freeze.c
+        kernel/memory/frame_ownership_vm_release.c
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+        kernel/memory/sv39.c
+        kernel/memory/bootstrap_memory.c
+        kernel/memory/address_space.c
+        kernel/memory/address_space_validation.c
+    )
+    set(MEM02_NATIVE_OUTPUTS)
+    foreach(mem02_source IN LISTS MEM02_NATIVE_INPUTS)
+        list(APPEND MEM02_NATIVE_OUTPUTS "${MEM02_NATIVE_ROOT}/${mem02_source}")
+    endforeach()
+    file(GLOB_RECURSE MEM02_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_kernel_mapping_fixture.py"
+        DEPENDS ${MEM02_NATIVE_INPUTS} ${MEM02_NATIVE_HEADERS}
+            tools/generate_kernel_mapping_fixture.py
+            tests/host/kernel_mapping_source.py
+            tests/host/kernel_mapping_test.h
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(kernel_mapping_test ${MEM02_NATIVE_OUTPUTS}
+        tests/host/kernel_mapping_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(kernel_mapping_test PRIVATE
+        "${MEM02_NATIVE_ROOT}" "${MEM02_NATIVE_ROOT}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(kernel_mapping_test PRIVATE c_std_17)
+    target_compile_options(kernel_mapping_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(kernel_mapping_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(kernel_mapping_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(kernel_mapping_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_KERNEL_MAPPING_COUNTS=1)
+    add_test(NAME kernel-mapping COMMAND kernel_mapping_test)
+    add_dependencies(test-unit-fast kernel_mapping_test)
+    add_dependencies(test-unit kernel_mapping_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()
@@ -6415,6 +6486,24 @@ if(MICROS_BUILD_MMU_TEST)
             --require-mmu-ready
             --require-frame-ownership-ready
             --require-mmu-test-report
+            --memory
+            128M
+            --memory
+            256M
+            --marker
+            "MICROS_KERNEL_MAPPING_TEST_PASS topology=largest aliases=2m,1g misaligned=rejected resources=preserved"
+            --ordered-pattern
+            "MICROS_FRAME_OWNERSHIP_READY owned=0x[0-9a-f]{16} kernel-tables=0x[0-9a-f]{16} phase=bootstrap"
+            --ordered-pattern
+            "MICROS_KERNEL_MAPPING_OBSERVATION version=1 tables=0x[0-9a-f]{16} leaves-4k=0x[0-9a-f]{16} leaves-2m=0x[0-9a-f]{16} leaves-1g=0x[0-9a-f]{16} largest=1"
+            --ordered-pattern
+            "MICROS_KERNEL_MAPPING_GUARDS aliases=2m,1g misaligned=rejected resources=preserved"
+            --ordered-pattern
+            "MICROS_KERNEL_MAPPING_TEST_PASS topology=largest aliases=2m,1g misaligned=rejected resources=preserved"
+            --ordered-pattern
+            "MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002"
+            --ordered-pattern
+            "MICROS_TTY_CONTROLLER_TEST_PASS mapping=exact priority=disabled enable=disabled context=supervisor seie=independent"
             --require-objects-ready
             --timeout
             8

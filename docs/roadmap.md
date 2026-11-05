@@ -131,12 +131,16 @@ The reviewed/committed/remote/preview/squash tree is
 ordinary authority without author journals, and completed task refs are
 removed. This closes only B01-F006/B02-F001.
 
-Only the dependency-ready MEM02 design is now active. Accepted
+Only the dependency-ready MEM02 implementation is now active. Accepted
 [ADR-0101](adr/0101-minix-kernel-mapping-topology.md) and its
 [kernel-map contract](architecture/kernel-mapping-topology.md) define
 largest legal kernel leaves, direct checked table identities, exact mapping
-domains and real native/hardware evidence. Independent design review is clean;
-its implementation remains pending the separate design merge. MEM03/MEM04 retain
+domains and real native/hardware evidence. Independent design and Acceptance
+reviews are clean; separate design #211 merged as
+`e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, with identical reviewed and squash
+tree `4f520e80e7f7a7490f67d438029c5d7ff77abcc0`.
+Actual implementation Red/Green, recertification and full acceptance remain
+required before either mapping finding closes. MEM03/MEM04 retain
 the complete-validation cadence findings; hosted CI and all other runtime
 findings retain their existing owners.
 
@@ -146,7 +150,7 @@ generation-safe process/thread/hart identity tables with per-hart trap and
 timer ownership. A typed per-frame ledger now binds allocator geometry to exact
 kernel/process-generation owners and provides the staged one-way VM-handoff
 gate. Generation-safe per-process Sv39 roots now share immutable kernel
-subtrees while owning private, typed user mappings. U-mode entry, saved
+entries while owning private, typed user mappings. U-mode entry, saved
 execution contexts, and thread-owned kernel stacks now complete the first real
 user round trip. The portable MINIX-style queues and accounting model now drive
 repeated two-address-space switching under real timer interrupts, including a
