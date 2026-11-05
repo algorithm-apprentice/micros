@@ -15,10 +15,13 @@ commit: bf4eef8f0c59a9d06ae3a20d4a52c5f07943c2ee
 tree:   910e04a2129a692ec74ede4c34ff19c8f18e2397
 ```
 
-Only this prerequisite design is active. Its implementation remains pending
-separate review, Acceptance and merge. MEM03 design is blocked until the
-prerequisite implementation merges. No memory runtime correction, hosted-CI
-work or other task proceeds in parallel.
+Separate design #213 is independently reviewed and merged as
+`52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`, with identical reviewed and squash
+tree `ed862e2a70b55a61405f08ae8aaa8a014b689d3b`.
+Only its dependent evidence implementation is active. MEM03 design is
+blocked until that implementation passes complete acceptance and merges.
+No memory runtime correction, hosted-CI work or other task proceeds in
+parallel.
 
 The outcome is precise inventory authority for **328 already executing
 current-source assertions**, without changing their behavior. The repair
@@ -468,3 +471,41 @@ journals, reviewed/committed/remote/merge-preview/squash tree equality and
 exact task-ref cleanup.
 
 Only then resume MEM03 design. No runtime finding closes through EV01-C04.
+
+## Implementation map
+
+The separate implementation adds the one literal-only declaration and
+materializes its exact rows through the existing inventory owner. It changes
+no source guard, generator, native fixture, shared parser, collector,
+transition rule, build recipe or runtime source.
+
+Before any extractor or test edit, the author retained the complete 3,954
+predecessor records and independently declared all 328 new records from the
+fixed policy and runtime sources. Their new family fingerprint is:
+
+```text
+9fdb9c93e92ff742f563d63e54e574e5e630260c07dddeec9997ed2d8144ec16
+```
+
+The generated literal declaration's SHA256 is:
+
+```text
+4a90c7ec808b4fa3edd4606b83b250b0e9ddba4cbde09de03df65dea6ec35202
+```
+
+The actual regression Red first proved that the existing MEM01 body guard
+and both MEM02 fixed-input consumers still reject their negative controls,
+then failed for the three absent individual keys named above. The original
+inventory extractor was unchanged at that point. This was an authority
+coverage failure, not a missing helper, compiler failure or runtime work Red.
+
+Seven focused cases now cover the real guards, complete independent
+fixed-source reconstruction, every predecessor fingerprint, literal-only
+and drift rejection, unsafe payload paths, non-candidate-derived values,
+precise synthetic closure and real overlap rejection, and all prior
+committed claims with journal readers disabled.
+
+The documented three-module focused command passes 106 tests. That result
+does not replace the required current complete fifty-command producer,
+independent implementation review, first-commit boundary, journal-free
+committed verification or exact publication checks.

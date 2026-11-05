@@ -1,6 +1,7 @@
 """Closed current evidence-authority inventory for ADR-0082."""
 
 import ast
+from collections import Counter
 from pathlib import Path
 import re
 
@@ -16,6 +17,7 @@ from tests.host.evidence_authority_types import (
     Fact,
     Family,
     Inventory,
+    digest,
     fact_set_digest,
 )
 
@@ -115,6 +117,9 @@ FAMILY_OWNERS = {
     "kernel-mapping-baseline": (
         "tests/host/kernel_mapping_authority.py",
         "tests/host/kernel_mapping_source.py",
+    ),
+    "memory-native-admission": (
+        "tests/host/memory_native_source_bindings.py",
     ),
 }
 
@@ -230,6 +235,22 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "36e0a2b18375288c5b43b8ccb01dbf8faff137db16120b693d7f8d8456108811",
     "kernel-mapping-baseline":
         "f2388c75814e42ff852e397a35e37bddf80f171f65074ade752dae10e6ddff92",
+    "memory-native-admission":
+        "9fdb9c93e92ff742f563d63e54e574e5e630260c07dddeec9997ed2d8144ec16",
+}
+
+_MEMORY_NATIVE_COUNTS = {
+    "MEM01/function": 85,
+    "MEM01/definitions": 5,
+    "MEM01/skeleton": 5,
+    "MEM01/header": 1,
+    "MEM01/test-guard": 1,
+    "MEM02/native-input": 183,
+    "MEM02/function": 42,
+    "MEM02/definitions": 2,
+    "MEM02/skeleton": 2,
+    "MEM02/header": 1,
+    "MEM02/include": 1,
 }
 
 _IDENTITY_NAME = re.compile(
@@ -804,7 +825,120 @@ def _runtime_memory_facts(tree, family, relative):
     return facts
 
 
+def _memory_native_binding_row(row):
+    if (
+        type(row) is not tuple or len(row) != 4
+        or any(type(value) is not str or not value for value in row[:2])
+        or type(row[2]) is not tuple
+        or any(type(path) is not str for path in row[2])
+        or type(row[3]) is not dict
+    ):
+        raise ValueError("memory-native authority has a malformed binding row")
+    scope, subject, assertions, contract = row
+    parts = scope.split("/", 2)
+    if len(parts) != 3 or "/".join(parts[:2]) not in _MEMORY_NATIVE_COUNTS:
+        raise ValueError("memory-native authority has an unknown clause")
+    task, kind, suffix = parts
+    expected_assertions = (
+        ("tests/host/bootstrap_allocation_source.py",) if task == "MEM01" else
+        ("tests/host/kernel_mapping_source.py", "tools/generate_kernel_mapping_fixture.py")
+        if kind == "native-input" else ("tests/host/kernel_mapping_source.py",)
+    )
+    if assertions != expected_assertions:
+        raise ValueError("memory-native authority has an unknown assertion owner")
+    if kind == "function":
+        prefix = subject + "/"
+        if not suffix.startswith(prefix) or re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", suffix[len(prefix):],
+        ) is None:
+            raise ValueError("memory-native authority has an invalid function scope")
+    elif kind == "test-guard":
+        if suffix != subject + "/managed_frame_is_allowed":
+            raise ValueError("memory-native authority has an invalid test-guard scope")
+    elif kind == "include":
+        if suffix != subject + "/micros-bootstrap-memory":
+            raise ValueError("memory-native authority has an invalid include scope")
+    elif suffix != subject:
+        raise ValueError("memory-native authority borrowed another subject")
+    comparisons = {
+        "function": ("function", {"comparison", "signature", "guards", "content", "linkage"}),
+        "definitions": ("definition-set", {"comparison", "expected"}),
+        "skeleton": ("lexical-skeleton-sha256", {"comparison", "expected"}),
+        "header": ("lexical-header-sha256", {"comparison", "expected"}),
+        "native-input": ("file-bytes-sha256", {"comparison", "expected"}),
+        "test-guard": (
+            "exact-test-wrapper", {"comparison", "function", "opening", "closing", "occurrences"},
+        ),
+        "include": ("exact-include", {"comparison", "text", "occurrences"}),
+    }
+    comparison, fields = comparisons[kind]
+    if set(contract) != fields or contract["comparison"] != comparison:
+        raise ValueError("memory-native authority changed a comparison schema")
+    return task + "/" + kind
+
+
+def _memory_native_binding_facts(root, family, relative):
+    if relative != "tests/host/memory_native_source_bindings.py":
+        raise ValueError("memory-native authority has an undeclared declaration owner")
+    tree = ast.parse(regular_source(root, relative).read_text(encoding="utf-8"))
+    statements = tree.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(
+        statements[0].value, ast.Constant,
+    ) and type(statements[0].value.value) is str:
+        statements = statements[1:]
+    names = ("BINDING_REFERENCE", "NATIVE_SOURCE_BINDINGS")
+    if len(statements) != 2 or any(
+        not isinstance(node, ast.Assign) or _assignment_name(node) not in names
+        for node in statements
+    ):
+        raise ValueError("memory-native authority permits only its literal declarations")
+    reference, rows = (
+        literal_value(single_assignment(tree, name).value) for name in names
+    )
+    if type(reference) is not tuple or len(reference) != 3:
+        raise ValueError("memory-native authority has an invalid reference")
+    for index, (tag, size) in enumerate((("policy", 3), ("MEM01", 2), ("MEM02", 2))):
+        entry = reference[index]
+        if (
+            type(entry) is not tuple or len(entry) != size or entry[0] != tag
+            or any(
+                type(value) is not str or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in entry[1:]
+            )
+        ):
+            raise ValueError("memory-native authority has an invalid fixed reference")
+    if type(rows) is not tuple or len(rows) != sum(_MEMORY_NATIVE_COUNTS.values()):
+        raise ValueError("memory-native authority omitted or added a binding")
+    facts, observed, counts, checked_paths = [], set(), Counter(), {relative}
+    consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+    for row in rows:
+        clause = _memory_native_binding_row(row)
+        scope, subject, assertions, contract = row
+        if scope in observed:
+            raise ValueError("memory-native authority has duplicate binding ownership")
+        observed.add(scope)
+        counts[clause] += 1
+        paths = tuple(sorted({relative, subject, *assertions}))
+        for path in paths:
+            if path not in checked_paths:
+                regular_source(root, path)
+                checked_paths.add(path)
+        facts.append(Fact(
+            relative + ":native-source-admission:" + scope, family, relative,
+            "native-source-admission", scope, AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, paths,
+            digest((reference, scope, subject, assertions, contract)),
+        ))
+    if counts != _MEMORY_NATIVE_COUNTS or fact_set_digest(facts) != (
+        DECLARED_FAMILY_FACT_DIGESTS[family]
+    ):
+        raise ValueError("memory-native authority differs from its independent declaration")
+    return tuple(facts)
+
+
 def _facts_for_owner(root, family, relative, directory=None):
+    if family == "memory-native-admission":
+        return _memory_native_binding_facts(root, family, relative)
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     if relative == "tests/host/kernel_layout_source.py":
         value = literal_value(single_assignment(tree, "BOUNDED_FRAME_VALIDATION_SHA256").value)
