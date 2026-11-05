@@ -142,6 +142,14 @@ platform constants in v0.1. The kernel maps the UART page and only the three
 PLIC pages required for source-10 priority, hart-0 supervisor enable, and
 hart-0 supervisor claim/complete.
 
+MEM01's cursor/range correction is merged. The separately reviewed Accepted
+[MEM02 kernel-map design](kernel-mapping-topology.md) replaces only the
+base-page kernel mapping and linear table searches with largest legal Sv39
+leaves and checked parent-indexed identities. Production still uses the
+4 KiB mapper until that design is merged and separately implemented.
+Private user leaves and complete owner/root validation cadence do not change
+in this outcome.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

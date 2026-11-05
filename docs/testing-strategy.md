@@ -454,6 +454,29 @@ bundle remains bound to its fixed Git inventory, independently of this build
 dependency superset. The original reusable-profile parser and admission policy
 remain unchanged.
 
+MEM01 implementation #210 passed the actual three-oracle transaction,
+thirteen-unit recertification, all 50 fresh author commands and independent
+first-commit review. Fresh committed evidence preserves ordinary authority
+without author journals.
+
+The next Accepted [MEM02 contract](architecture/kernel-mapping-topology.md)
+and [ADR-0101](adr/0101-minix-kernel-mapping-topology.md) fix seventeen native
+input cases with five separate captures each. The actual fixed/current
+mapper, validator, codec and typed allocator must prove largest legal leaves,
+direct selected-table work, complete semantic guards and explicitly retained
+global validation costs. The existing MMU component must retain its two
+permission faults and TTY-controller check, then prove real 2 MiB/1 GiB
+alias loads, exact misalignment faults and complete resource restoration.
+The same ELF runs at 128/256 MiB without increasing the eight-second guest
+timeout. Exact assembly-source/object admission and all original stack
+budgets remain required.
+
+This is design only. The prospective native case, target extension and
+three-phase commands do not exist yet. Independent design review is clean;
+implementation remains pending the separate design merge. The original
+50-command full gate, three granular retirements, prior authority and blocked
+B13 remain mandatory.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
