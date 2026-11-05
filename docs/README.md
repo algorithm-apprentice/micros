@@ -111,6 +111,9 @@ This directory contains the design baseline for `micros`.
 - [Bootstrap allocation and range validation](architecture/bootstrap-allocation.md)
   defines MEM01's Accepted search coordinate, whole-interval/word validation,
   exact mutation/rollback rules and six-key evidence transition.
+- [Kernel mapping topology and direct table identity](architecture/kernel-mapping-topology.md)
+  defines MEM02's Accepted largest-legal Sv39 leaves, checked parent-indexed
+  table identities, retained complete validation and native/hardware evidence.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -123,6 +126,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
+  traces fixed large-page and direct-table mechanisms, shared-root compatibility,
+  current search costs and the explicit Sv39 storage adaptation.
 - [MINIX bootstrap allocation baseline](research/minix-bootstrap-allocation.md)
   traces the distinct kernel-range and VM-cache phases, current repeated work,
   complexity/storage bounds and the completed evidence prerequisites.

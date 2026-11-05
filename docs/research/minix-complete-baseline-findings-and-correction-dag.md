@@ -138,15 +138,25 @@ tree is `36110108d7839460b2f384761bb9aaa540e82444`; journal-free committed
 checks passed. The six actual MEM01 fact closures now fit its eight
 candidate paths without immutable command-input overlap.
 
-Only MEM01 implementation is active under
+MEM01 implementation #210 is independently reviewed and merged under
 [Accepted ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
 [allocation contract](../architecture/bootstrap-allocation.md).
-Design #209 is separately reviewed and merged at
-`82f0b229afd2f396b0fdd8fc24b9bec00793fe97`, tree
-`76be2a6fb534fab324ef20960314263a7ebaa1bc`. Actual work Red/Green,
-the six-key transaction and full current gates remain the implementation
-acceptance barrier. No runtime finding is newly retired or reassigned
-merely by the design or evidence scaffold.
+It follows separate design #209 and genuine pre-production Red. Current Green,
+the six-key transaction, thirteen-unit recertification, all 50 fresh author
+commands and independent first-commit review passed. The exact
+reviewed/committed/remote/preview/squash tree is
+`08f31a8b1dfc639c8b826ea65d092327fea159a1`, merged as
+`3f7e33026f92c8c1765ce00c2b03b5c2d6855197`; journal-free committed checks and
+exact task-ref cleanup passed. This closes B01-F006/B02-F001, leaving
+68 pre-node runtime findings open.
+
+Only the MEM02 design is active, following that actual prerequisite.
+Accepted [ADR-0101](../adr/0101-minix-kernel-mapping-topology.md) and the
+[kernel-map contract](../architecture/kernel-mapping-topology.md) cover
+B02-F003/B02-F004 and B02-E003. Independent design review is clean; the paired
+implementation remains pending the separate design merge. No mapping finding
+is retired merely by this documentation; MEM03/MEM04 and hosted CI remain
+separate.
 
 ## Consolidation invariants
 
@@ -283,8 +293,8 @@ blocking queue.
 | `PLAT01` | Runtime correction | `B01-F002` | `EV04` | Implementation #199 follows Accepted ADR-0093/0094: both exact history roles, TTY transfer/notification and panic replay preserve separate physical ownership. | Actual primitive/native/target Red-Green, granular twenty-key retirement, thirteen-unit recertification, complete fresh author/stack evidence and independent review complete. |
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Implementation #201 under Accepted ADR-0095 bounds actual early/panic polls, claims first entry/reset independently and repairs only terminal console fields. | Actual twelve-case baseline/current evidence, complete fresh author/stack gate, journal-free prior authority and independent review complete. |
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
-| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | The [Accepted allocation contract](../architecture/bootstrap-allocation.md) restarts after completed #205/#208 and #206/#207 prerequisites; retain canonical geometry, lower-bound search state and whole-interval/word validity. | Three native work oracles, exact rollback/mutation guards and six-key authority transition; no implementation before separately reviewed design acceptance. |
-| `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Add the reference large-page kernel map and direct table-frame ownership/indexing without linear table-frame searches. | Page-table topology, allocation, lookup, and ownership probe counts. |
+| `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Implementation #210 follows design #209 and the [Accepted allocation contract](../architecture/bootstrap-allocation.md): canonical geometry, lower-bound search progress and whole-interval/word validity. | Actual three-oracle Red/Green, exact rollback/mutation guards, six-key retirement, full current acceptance and independent review complete. |
+| `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | The independently reviewed Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md) defines largest legal leaves and direct checked table/owner identities without linear searches. Only design is active. | Actual topology/work Red/Green, original MMU faults plus large-page/misalignment/resource guards, exact three-key retirement and full current recertification; implementation remains pending separate design merge. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Keep complete ownership validation diagnostic-only and introduce selected-record mutation plans. | Active/inactive visit counts and failure-atomic selected transitions. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |
