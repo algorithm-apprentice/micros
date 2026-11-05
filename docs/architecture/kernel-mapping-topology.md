@@ -19,9 +19,16 @@ MINIX:  4db99f4012570a577414fe2a43697b2f239b699e
 
 Design #211 is independently reviewed and separately merged as
 `e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, tree
-`4f520e80e7f7a7490f67d438029c5d7ff77abcc0`. Only its dependent implementation
-is active. The original source-authority assertions remain active until the
-actual three-oracle transaction and required acceptance complete.
+`4f520e80e7f7a7490f67d438029c5d7ff77abcc0`.
+Implementation #212 is independently reviewed and merged as
+`bf4eef8f0c59a9d06ae3a20d4a52c5f07943c2ee`, with identical
+reviewed/committed/remote/preview/squash tree
+`910e04a2129a692ec74ede4c34ff19c8f18e2397`.
+Actual pre-production Red, current Green, thirteen-unit recertification,
+all fifty fresh author commands and first-commit independent review passed.
+Fresh committed checks preserve ordinary authority without journals, and
+completed task refs are removed. This closes only the two mapping findings
+and their evidence gap; MEM03/MEM04 cadence findings remain open.
 
 ## Authority and non-goals
 

@@ -194,6 +194,18 @@ only that scalar identity and its one precise payload correction.
 Current closure-disjointness remains required; no runtime identity retires
 through this prerequisite.
 
+After MEM02 #212, the
+[memory-native source study](../research/memory-native-source-authority-gap.md)
+identifies missing individual identities for existing MEM01/MEM02 current
+native-source assertions. Their aggregate declaration facts are not a
+granular substitute and include shared immutable policy in their payloads.
+Accepted [ADR-0102](../adr/0102-granular-memory-native-source-authority.md)
+defines the separate
+[EV01-C04 binding contract](memory-native-source-authority.md): 328
+additional precise assertions, unchanged predecessor records and unchanged
+current source admission. MEM03 design is blocked until that evidence-only
+prerequisite is independently implemented and merged.
+
 ## Authority model
 
 ### Identity key

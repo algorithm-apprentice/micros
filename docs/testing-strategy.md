@@ -489,6 +489,22 @@ The missing-family structural Red is not a runtime topology/work Red and
 cannot retire a transport identity. Actual fixed-source native and QEMU
 execution remains mandatory before production mapping changes.
 
+MEM02 implementation #212 passed the actual three-oracle transaction,
+thirteen-unit recertification, all fifty fresh author commands and independent
+first-commit review. Fresh committed evidence preserves ordinary authority
+without journals.
+
+The subsequent MEM03 design found missing individual identities for existing
+MEM01/MEM02 current native-source guards. Accepted
+[ADR-0102](adr/0102-granular-memory-native-source-authority.md) and the
+[EV01-C04 contract](architecture/memory-native-source-authority.md) require
+328 independently declared assertion bindings, complete conservation of the
+3,954 predecessor facts and sixteen fingerprints, strict existing source
+checks and unchanged closure rejection. The design contains documents only;
+no new binding module, extractor or test exists yet. The future evidence-only
+implementation retains the complete fifty-command author gate and does not
+claim a runtime correction or source-identity retirement.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
