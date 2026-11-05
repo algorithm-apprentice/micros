@@ -4,6 +4,10 @@
 
 This is the Accepted MEM03 contract under
 [ADR-0103](../adr/0103-selected-frame-ownership-validation.md).
+The evidence-envelope amendment below is Accepted under
+[ADR-0104](../adr/0104-precise-complete-validator-token-authority.md).
+Its independent design review is clean; separate merge still precedes the
+implementation restart.
 The [fixed-source study](../research/minix-selected-frame-ownership.md)
 records the MINIX baseline, complete caller census and consumer assumptions.
 No implementation is authorized until independent design review, Acceptance
@@ -19,7 +23,11 @@ MINIX:  4db99f4012570a577414fe2a43697b2f239b699e
 
 Runtime source is unchanged from MEM02 #212. The actual runtime prerequisite
 is MEM01 #210; separately merged #213/#214 supply the precise evidence keys.
-Only MEM03 design is active. Implementation remains pending.
+Design #215 is separately merged. The first uncommitted implementation
+stopped at the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md)
+after native Green and twelve QEMU recertification passes. Only the corrective
+design is active; implementation is blocked and must restart from current
+`main` after its separate merge.
 
 The outcome closes only B02-F002/B02-E002: ordinary ownership operations
 check active metadata and the records they consume, rather than auditing
@@ -616,6 +624,56 @@ observer absence and unchanged original MEM01/MEM02 work/semantic bounds.
 A compile failure, missing helper, malformed record or incomplete run is
 never qualifying Red.
 
+## Complete-helper token authority
+
+The original `ACTIVE_TOKENS_SHA256` and `INACTIVE_TOKENS_SHA256` assertions
+cover preprocessed prefixes containing private declarations and ordinary
+lookup/count code. They are not helper-only identities. Accepted ADR-0104
+refines only that incidental scope; the complete diagnostic bodies remain
+unchanged.
+
+Preserve both original constant names, values, complete inventory records
+and the historical `function_source`/`function_token_digest` behavior.
+Fixed #214 source and headers must reproduce the old values independently.
+Do not update them from the candidate or remove their checks before the
+proper transition.
+
+For each exact key independently:
+
+- while active, retain its original prefix-token assertion;
+- only under the legitimate provisional/terminal or committed retirement,
+  require the actual preprocessed named helper's complete signature/body
+  identity instead; and
+- always run the unchanged current Clang AST word-scan checks.
+
+Declare the new exact-helper expectations in the MEM03 source authority,
+independently from fixed #214 source/headers before runtime edits:
+
+```text
+validate_active_frames:
+d023646f0a6a0fe5bd3f5bfca640ae3ef72e5a3837a4ac00936bbdc1701de320
+
+inactive_state_is_zero:
+b5696c8cd0c3f62b187bcb771b68c7901a598b347a71eb202a10a8fc2072ee5a
+```
+
+Use the existing correct function-record inspector, require one definition,
+and tokenize the complete selected signature and body. Preserve linkage,
+qualifiers and all source tokens. Do not project current code into a fixed
+old algorithm or change a shared parser.
+
+Before author Red, preserve fixed-prefix reproduction and prove that an
+unrelated valid declaration/helper/lookup-prefix change leaves the exact
+helper identity unchanged. Missing/duplicate definitions, signature/body
+mutations and every existing active/inactive AST negative remain failures.
+These scope tests never manufacture an author retirement.
+
+The selected-record oracle must require this retained-helper proof as well
+as its actual portable work/state evidence. Its fixed-runtime work still
+fails for the audited selected-path divergence, not because the scanner
+changed. Current acceptance requires both exact helpers and all complete
+diagnostic/work guards.
+
 ## Granular source authority
 
 Preserve all 4,282 current complete facts and seventeen fingerprints.
@@ -624,9 +682,11 @@ Accepted-contract, recipe and oracle inputs. Its eventual total is 4,290
 facts in eighteen families; this is a requirement, not a current inventory
 claim.
 
-Only 38 current transport identities may retire: fourteen still-active
+The corrected plan permits exactly 40 current transport identities
+to retire: fourteen still-active
 kernel-directory file identities, eleven MEM01 current function clauses,
-three MEM01 definition-set clauses and ten MEM02 native-input identities.
+three MEM01 definition-set clauses, ten MEM02 native-input identities and the
+two actual prefix-token assertions above.
 Do not retire an original skeleton merely because functions are added.
 Do not own any of the four already retired MEM01 memory files again.
 
@@ -671,6 +731,8 @@ MEM02/native-input/kernel/memory/frame_ownership_internal.h
 MEM02/native-input/kernel/memory/frame_ownership_validation.c
 MEM02/native-input/kernel/memory/frame_ownership_vm_claim.c
 MEM02/native-input/kernel/memory/frame_ownership_vm_release.c
+tests/host/test_frame_validation_hot_path.py:data-entry:ACTIVE_TOKENS_SHA256
+tests/host/test_frame_validation_hot_path.py:data-entry:INACTIVE_TOKENS_SHA256
 ```
 
 Every `MEM01/` or `MEM02/` suffix is prefixed exactly with:
@@ -679,8 +741,8 @@ Every `MEM01/` or `MEM02/` suffix is prefixed exactly with:
 tests/host/memory_native_source_bindings.py:native-source-admission:
 ```
 
-The twenty production paths plus these six paths form the complete
-26-path candidate envelope:
+The twenty production paths plus these seven paths form the complete
+27-path candidate envelope:
 
 ```text
 tests/host/bootstrap_allocation_source.py
@@ -688,10 +750,11 @@ tests/host/kernel_layout_source.py
 tests/host/kernel_mapping_source.py
 tests/host/memory_native_source_bindings.py
 tests/host/test_kernel_directory_layout.py
+tests/host/test_frame_validation_hot_path.py
 tools/generate_kernel_mapping_fixture.py
 ```
 
-The literal binding owner remains byte-identical to #214. The five legacy
+The literal binding owner remains byte-identical to #214. The six legacy
 adapters must be independently specified, installed before actual Red and
 frozen by exact finite inverses against #214. Their presence does not relax
 an assertion before the MEM03 transition permits it. Only the twenty production
@@ -699,8 +762,17 @@ files may change during the actual correction attempt.
 
 All other existing inputs and the eight new evidence owners are immutable
 within that attempt. Complete-current record conservation is independent of
-any historical view. Shared inspectors, collector policy, transition rules
-and CMake/planner inputs remain outside the candidate closure.
+any historical view. Shared C inspectors, collector policy, transition rules
+and CMake/planner inputs remain outside the candidate closure. The hot-path
+test is only a frozen per-key assertion adapter: its existing Clang AST
+checks and all unrelated test/inspection behavior remain unchanged.
+
+Freeze the complete six-adapter identities as an immutable external input in
+addition to their candidate-payload ownership. Generic closure/disjointness
+rules remain unchanged. Bind both Accepted ADR-0103 and the separately merged
+ADR-0104, the original design reference and the corrected merged design
+commit/tree in the restarted authority declaration. No record from the
+abandoned 38-key attempt is current acceptance.
 
 The old `BASE_FRAME_VALIDATION_SHA256` is historical restoration evidence,
 not another current assertion to retire: its restoration call is already
@@ -718,6 +790,8 @@ Admit only finite, independently declared changes:
 - per-input MEM02 admission at both generator and source consumers, retaining
   every unaffected byte comparison and actual current dependencies;
 - kernel-directory assertion delegation for the fourteen new file keys;
+- exact per-key prefix-token delegation to the independently fixed complete
+  helper identities, preserving the old literals and all Clang AST checks;
 - exact native recipe/source-owner/Python-runtime registration;
 - the two new portable public symbols and one target declaration, while
   preserving layouts and original symbol owners; and
@@ -753,7 +827,8 @@ Coverage is exact:
 - the selected-record oracle owns the four kernel-directory handoff/private-
   header/VM-claim/VM-release keys, nine MEM01 bootstrap/validation function
   keys, two MEM01 core/validation definition-set keys and eight MEM02 inputs
-  other than bootstrap runtime and its public runtime header: 23 keys;
+  other than bootstrap runtime and its public runtime header, plus the two
+  prefix-token assertions: 25 keys;
 - the runtime-owner oracle owns the two MEM01 runtime functions, bootstrap-
   runtime definition set and the MEM02 bootstrap-runtime/runtime-header
   inputs: five keys; and
@@ -791,7 +866,7 @@ The exact affected-unit commands are:
 | B12 | `cmake --workflow --preset test-qemu-elf-spawn` |
 | B14 | The actual `--recertify` invocation above, including the complete current native oracle replay, retained MEM01/MEM02 evidence, authority/source/recipe and Python-owner checks |
 
-Provisional suppression is limited to the exact 38 keys and current
+Provisional suppression is limited to the exact 40 keys and current
 validated Green context. Clear it on every exit. Failure or interruption
 publishes no usable terminal event. Only complete success derives
 `RETIREMENT_READY`.

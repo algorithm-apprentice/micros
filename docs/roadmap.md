@@ -162,17 +162,27 @@ tree `9f7802dfdfc84034b626068b5c160b90a645dad7`.
 Fresh committed/actual-main journal-free checks and exact cleanup passed.
 All old facts, fingerprints, guards and runtime source remain unchanged.
 
-Only MEM03 design is now active. Accepted
+MEM03 design #215 is separately merged. Accepted
 [ADR-0103](adr/0103-selected-frame-ownership-validation.md) and its
 [selected ownership contract](architecture/selected-frame-ownership.md)
 define active metadata, selected-record plans, whole-active transitions and
 explicit complete diagnostics. The
 [fixed-source study](research/minix-selected-frame-ownership.md) records
 the 26 current direct audit calls and the active obligations that cannot be
-removed with the global scan. No MEM03 runtime code, fixture or observation
-exists yet. Independent design review and separate merge precede
-implementation. The 66 remaining runtime findings, including MEM04 and
-hosted-CI blockers, retain their existing owners.
+removed with the global scan. The first uncommitted implementation passed
+actual native Red/Green and all twelve QEMU recertification commands, but
+B14 rejected an accidentally prefix-wide token assertion while both complete
+scan helpers remained unchanged.
+
+The implementation was archived without a permanent commit or retirement.
+Only the corrective design under Accepted
+[ADR-0104](adr/0104-precise-complete-validator-token-authority.md) is active.
+The [scope investigation](research/complete-validator-token-scope-gap.md)
+defines the two added identities and one frozen adapter, yielding the
+40-key/27-path envelope without changing runtime behavior or old hash values.
+Independent design review is clean; separate merge precedes a fresh
+implementation restart and complete renewed acceptance. The 66 remaining runtime findings,
+including MEM04 and hosted-CI blockers, retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

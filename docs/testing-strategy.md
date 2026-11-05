@@ -530,10 +530,26 @@ five passive native observation slices plus an ordinary control over one
 fixed 99-case matrix. Actual portable operations, runtime process release
 and PM reservation validation distinguish selected work from inherited
 complete audits, while full diagnostic cases retain all active/inactive
-corruption evidence. Its 38-key plan preserves prior facts and bounds.
-This phase contains documentation only; the new native fixture, CTest,
-generator and three-phase driver do not exist yet. Runtime implementation
-remains behind independent design review, Acceptance and separate merge.
+corruption evidence. Separate design #215 is merged. The first uncommitted
+implementation passed the three native work oracles and all twelve QEMU
+recertification commands. B14 then rejected one
+[prefix-wide token assertion](research/complete-validator-token-scope-gap.md)
+despite byte-identical active/inactive scan helpers; no terminal event or
+implementation commit was published.
+
+Accepted [ADR-0104](adr/0104-precise-complete-validator-token-authority.md)
+defines a documentation-only corrective phase. Its 40-key plan preserves
+both old prefix hashes and their historical checks, then uses independently
+fixed exact-helper identities only under proper retirement. All current
+Clang AST and corruption negatives remain mandatory. Positive prefix-only
+changes, missing/duplicate definitions and helper/signature mutations must
+prove the corrected boundary. This design adds no executable test, fixture,
+generator, CTest or adapter.
+
+Independent design review is clean. Implementation remains blocked until the
+separate corrective-design merge. The restart must renew actual Red/Green, complete
+recertification and the unchanged fifty-command author gate; archived
+results are reference evidence, not current acceptance.
 
 ## POSIX conformance evidence
 
