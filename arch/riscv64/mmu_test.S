@@ -39,3 +39,19 @@ micros_mmu_execute_resume:
 .globl micros_mmu_writable_probe
 micros_mmu_writable_probe:
     .4byte 0x00008067
+
+.section .text, "ax", @progbits
+.option push
+.option norvc
+.balign 4
+.globl micros_mmu_large_load_test_trigger
+.type micros_mmu_large_load_test_trigger, @function
+micros_mmu_large_load_test_trigger:
+.globl micros_mmu_large_load_fault
+micros_mmu_large_load_fault:
+    ld a0, 0(a0)
+.globl micros_mmu_large_load_resume
+micros_mmu_large_load_resume:
+    ret
+.size micros_mmu_large_load_test_trigger, . - micros_mmu_large_load_test_trigger
+.option pop

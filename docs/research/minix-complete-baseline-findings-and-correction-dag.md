@@ -150,13 +150,15 @@ reviewed/committed/remote/preview/squash tree is
 exact task-ref cleanup passed. This closes B01-F006/B02-F001, leaving
 68 pre-node runtime findings open.
 
-Only the MEM02 design is active, following that actual prerequisite.
+Only the MEM02 implementation is active, following that actual prerequisite.
 Accepted [ADR-0101](../adr/0101-minix-kernel-mapping-topology.md) and the
 [kernel-map contract](../architecture/kernel-mapping-topology.md) cover
-B02-F003/B02-F004 and B02-E003. Independent design review is clean; the paired
-implementation remains pending the separate design merge. No mapping finding
-is retired merely by this documentation; MEM03/MEM04 and hosted CI remain
-separate.
+B02-F003/B02-F004 and B02-E003. Independent complete and Acceptance reviews
+are clean; separate design #211 merged as
+`e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, tree
+`4f520e80e7f7a7490f67d438029c5d7ff77abcc0`. The implementation begins with
+independently declared evidence and actual fixed-source Red, not source-hash
+retirement. MEM03/MEM04 and hosted CI remain separate.
 
 ## Consolidation invariants
 
@@ -294,7 +296,7 @@ blocking queue.
 | `PLAT02` | Runtime correction | `B01-F001`, `B01-F003`, `B01-F005` | `PLAT01` | Implementation #201 under Accepted ADR-0095 bounds actual early/panic polls, claims first entry/reset independently and repairs only terminal console fields. | Actual twelve-case baseline/current evidence, complete fresh author/stack gate, journal-free prior authority and independent review complete. |
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
 | `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Implementation #210 follows design #209 and the [Accepted allocation contract](../architecture/bootstrap-allocation.md): canonical geometry, lower-bound search progress and whole-interval/word validity. | Actual three-oracle Red/Green, exact rollback/mutation guards, six-key retirement, full current acceptance and independent review complete. |
-| `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | The independently reviewed Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md) defines largest legal leaves and direct checked table/owner identities without linear searches. Only design is active. | Actual topology/work Red/Green, original MMU faults plus large-page/misalignment/resource guards, exact three-key retirement and full current recertification; implementation remains pending separate design merge. |
+| `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Separate design #211 defines the Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md): largest legal leaves and direct checked table/owner identities without linear searches. Only implementation is active. | Actual topology/work Red/Green, original MMU faults plus large-page/misalignment/resource guards, exact three-key retirement, full current recertification and independent implementation review remain required. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Keep complete ownership validation diagnostic-only and introduce selected-record mutation plans. | Active/inactive visit counts and failure-atomic selected transitions. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |

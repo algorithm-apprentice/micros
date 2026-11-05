@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 from tests.host import (
-    bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed,
+    bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
     panic_trace_source, terminal_failure_source,
 )
 from tests.host.evidence_authority_source import (
@@ -111,6 +111,10 @@ FAMILY_OWNERS = {
     "bootstrap-allocation-baseline": (
         "tests/host/bootstrap_allocation_authority.py",
         "tests/host/bootstrap_allocation_source.py",
+    ),
+    "kernel-mapping-baseline": (
+        "tests/host/kernel_mapping_authority.py",
+        "tests/host/kernel_mapping_source.py",
     ),
 }
 
@@ -224,6 +228,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "d442149bc63732d9409a9f045cba855bae31d6cab675455717aa297f2d064740",
     "bootstrap-allocation-baseline":
         "36e0a2b18375288c5b43b8ccb01dbf8faff137db16120b693d7f8d8456108811",
+    "kernel-mapping-baseline":
+        "f2388c75814e42ff852e397a35e37bddf80f171f65074ade752dae10e6ddff92",
 }
 
 _IDENTITY_NAME = re.compile(
@@ -826,6 +832,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return panic_trace_source.declaration_facts(root, relative)
     if family == bootstrap_allocation_source.FAMILY:
         return bootstrap_allocation_source.declaration_facts(root, relative)
+    if family == kernel_mapping_source.FAMILY:
+        return kernel_mapping_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

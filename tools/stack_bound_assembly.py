@@ -30,6 +30,7 @@ from tools.validation_context import target_compiler
 from tools.validation_inputs import _file_identity
 from tools.user_elf_parse import load_elf
 from tests.host.panic_trace_source import observe_source, project_trace_runtime, validate_trace_helper_instructions
+from tests.host.kernel_mapping_source import extend_mmu_assembly, project_mmu_source
 
 
 CONTRACTS = {
@@ -77,6 +78,7 @@ CONTRACTS = {
     "arch/riscv64/mmu_test.S": (
         ("micros_mmu_text_probe", 0, "local"), ("micros_mmu_store_test_trigger", 0, "local"),
         ("micros_mmu_execute_test_trigger", 16, "nx-fault"),
+        ("micros_mmu_large_load_test_trigger", 0, "local"),
     ),
     "arch/riscv64/nested_trap_test.S": (("micros_nested_trap_test_trigger", 0, "local"),),
     "arch/riscv64/scheduler_test.S": (
@@ -230,6 +232,8 @@ def reference_object(root, unit, flags, compiler, compiler_sha):
             path = directory / source
             path.parent.mkdir(parents=True, exist_ok=True)
             text = reference_source(root, source)
+            if source == "arch/riscv64/mmu_test.S":
+                text = extend_mmu_assembly(text)
             if source == "arch/riscv64/trap.S" and "MICROS_BUILD_PANIC_TRACE_TEST" in flags:
                 text = observe_source(source, text)
             path.write_text(text)
@@ -636,6 +640,7 @@ def assembly_object_evidence(root, obj, unit, variant, image, flags=frozenset())
         actual = read_regular(Path(root) / source)[0].decode("utf-8")
         try:
             actual = project_trace_runtime(source, actual)
+            actual = project_mmu_source(source, actual)
         except ValueError as error:
             raise StackEvidenceError(str(error)) from error
         if actual != reference_source(str(root), source):

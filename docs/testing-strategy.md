@@ -471,11 +471,23 @@ The same ELF runs at 128/256 MiB without increasing the eight-second guest
 timeout. Exact assembly-source/object admission and all original stack
 budgets remain required.
 
-This is design only. The prospective native case, target extension and
-three-phase commands do not exist yet. Independent design review is clean;
-implementation remains pending the separate design merge. The original
-50-command full gate, three granular retirements, prior authority and blocked
-B13 remain mandatory.
+Separate design #211 is merged after clean complete and Acceptance reviews.
+The dependent implementation introduces the actual-source native case,
+test-only MMU probes and the closed three-phase driver. These fixtures do not
+by themselves claim corrected runtime code, a usable retirement or completed
+implementation acceptance. The original 50-command full gate, three granular
+retirements, prior authority and blocked B13 remain mandatory.
+
+After design #211, initial evidence-scaffold iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping.KernelMappingAuthorityTest.test_eight_independent_facts_match_the_merged_contract
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping
+```
+
+The missing-family structural Red is not a runtime topology/work Red and
+cannot retire a transport identity. Actual fixed-source native and QEMU
+execution remains mandatory before production mapping changes.
 
 ## POSIX conformance evidence
 

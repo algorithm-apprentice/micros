@@ -21,7 +21,7 @@ The current implementation provides:
 - fixed-capacity process, thread, and hart identity tables with generation-safe
   handles and checked one-thread/one-hart production policies;
 - generation-safe per-process Sv39 roots with one private one-GiB user window,
-  shared immutable kernel subtrees, typed anonymous pages, and atomic teardown;
+  shared immutable kernel entries, typed anonymous pages, and atomic teardown;
 - exact saved user integer contexts, one static 16 KiB kernel stack per thread
   slot, scheduler-owned hart trap-stack selection, and validated first U-mode
   entry/resume through the common return plan;
@@ -1184,6 +1184,58 @@ independent implementation review before the first permanent commit.
 Only the exact reviewed committed declaration supports ordinary checks
 without the original author's journal.
 
+## Kernel mapping work and authority evidence
+
+MEM02 follows separately merged design #211,
+[ADR-0101](../adr/0101-minix-kernel-mapping-topology.md) and its
+[kernel-map contract](../architecture/kernel-mapping-topology.md).
+Stage the complete native/target fixtures, source/recipe bindings and
+documentation before recording an attempt:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target kernel_mapping_test
+"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --red
+"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --green
+"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --recertify
+```
+
+Successful Red exits one only after both actual native oracles and the actual
+128/256 MiB target oracle fail for their named old-runtime divergences.
+Original MMU/TTY faults, real large-alias loads, misalignment faults,
+resource restoration and clean shutdown must still pass. Compile, schema,
+timeout, source/tool drift and authority errors exit two, never runtime Red.
+Green and complete recertification exit zero.
+
+The native fixture uses fixed #210 source/headers for Red and actual current
+source/headers for Green. Seventeen inputs provide 85 complete observations;
+ordinary native execution has no collector state. The target baseline is the
+complete fixed Git source with only the exact immutable MMU C/assembly
+extensions. Its original recipe is retained; the current MMU workflow adds
+the new records and both memory sizes without changing its eight-second
+per-guest budget. Neither source path uses a fake CSR or hardware result.
+
+Focused iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^kernel-mapping$'
+cmake --workflow --preset test-qemu-mmu
+```
+
+Only the three production map owners and two narrow assertion adapters may
+change within an attempt. Other input changes require a fresh actual Red and
+Green; post-Green drift blocks recertification. Records live under
+`build/evidence-transitions/MEM02/`, with actual target build/source/artifact
+records under `build/kernel-mapping/`. An incomplete journal and an uncommitted
+completion declaration cannot retire an assertion.
+
+Recertification replays all native/target Green evidence and runs the exact
+B01-B12/B14 command set under the PID/root/plan-bound three-key provisional
+scope. Full fresh author acceptance and independent implementation review
+remain required before the first permanent commit. Ordinary committed
+authority does not require the original author's journal.
+
 ## Terminal-failure baseline and current evidence
 
 The PLAT02 driver follows the
@@ -1697,25 +1749,35 @@ MICROS_USER_EXECUTION_TEST_PASS mode=entered faults=isolated context=preserved s
 
 ## Sv39 MMU test
 
-Build and run the isolated page-table permission test with:
+Build and run the isolated kernel-mapping and page-table permission test with:
 
 ```bash
 cmake --workflow --preset test-qemu-mmu
 ```
 
 The production boot path allocates and validates the complete root, activates
-Sv39, and emits MMU readiness. The test then performs exactly two expected
+Sv39, and emits MMU readiness. The test retains its original pair of expected
 supervisor faults. A store to a known text instruction must raise store/AMO
 page-fault cause `15`, and an indirect call into writable kernel data must
 raise instruction page-fault cause `12`. The test trap path verifies the exact
 cause, `sepc`, `stval`, S-mode origin, and order before selecting explicit
 assembly resume labels.
 
-Only both hardware-enforced recoveries emit:
+That original pair retains its exact pass record and separate two-trap counter:
 
 ```text
 MICROS_MMU_TEST_PASS store-fault=text execute-fault=writable traps=0x0000000000000002
 ```
+
+The component also verifies largest-legal kernel topology and successful
+read-only 2 MiB/1 GiB aliases, then separately triggers two misaligned-leaf
+load page faults with cause `13`. It restores the real root before modifying
+test PTEs or releasing the two temporary frames and verifies complete resource
+restoration. Those probes use independent state and cannot satisfy either
+original permission fault. Their required records are defined by the
+[kernel-map contract](../architecture/kernel-mapping-topology.md#target-observation-and-acceptance).
+The same ELF runs at 128 MiB and 256 MiB with the unchanged eight-second
+per-guest timeout.
 
 The host gate rejects a missing, duplicated, malformed, unterminated, or early
 MMU-ready or test-pass record, plus any panic, explicit failure, timeout, or

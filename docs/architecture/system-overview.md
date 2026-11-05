@@ -133,7 +133,8 @@ The kernel validates the FDT, reads physical memory and reserved ranges,
 reserves firmware and every physical address through its linker-defined end,
 reclaims the parsed FDT blob, initializes the bootstrap frame allocator,
 binds a static typed ownership ledger to that allocator's exact geometry,
-creates 4 KiB-leaf kernel page tables through the `KERNEL_PAGE_TABLE` class,
+creates kernel page tables through the `KERNEL_PAGE_TABLE` class, selecting
+the largest legal 4 KiB, 2 MiB or 1 GiB leaf within each mapping domain,
 verifies agreement among the reachable table tree, allocator bitmap, and
 ledger, verifies exact supervisor-only RX, R, and RW/NX mappings, enables Sv39
 through an ordered translation fence, and starts timer interrupts. Managed RAM
@@ -142,13 +143,12 @@ platform constants in v0.1. The kernel maps the UART page and only the three
 PLIC pages required for source-10 priority, hart-0 supervisor enable, and
 hart-0 supervisor claim/complete.
 
-MEM01's cursor/range correction is merged. The separately reviewed Accepted
-[MEM02 kernel-map design](kernel-mapping-topology.md) replaces only the
-base-page kernel mapping and linear table searches with largest legal Sv39
-leaves and checked parent-indexed identities. Production still uses the
-4 KiB mapper until that design is merged and separately implemented.
-Private user leaves and complete owner/root validation cadence do not change
-in this outcome.
+MEM01's cursor/range correction is merged. The kernel now follows the
+separately reviewed [MEM02 kernel-map contract](kernel-mapping-topology.md):
+largest legal Sv39 leaves and checked parent-indexed table identities retain
+the exact mapping domains and permissions. Shared kernel root entries may
+be supervisor leaves or pointers to immutable subtrees. Private user leaves
+remain 4 KiB, and complete owner/root validation cadence is unchanged.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
