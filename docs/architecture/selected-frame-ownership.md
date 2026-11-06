@@ -6,12 +6,12 @@ This is the Accepted MEM03 contract under
 [ADR-0103](../adr/0103-selected-frame-ownership-validation.md).
 The evidence-envelope amendment below is Accepted under
 [ADR-0104](../adr/0104-precise-complete-validator-token-authority.md).
-Its independent design review is clean; separate merge still precedes the
-implementation restart.
+Its independent design review and separate merge #216 are complete.
 The [fixed-source study](../research/minix-selected-frame-ownership.md)
 records the MINIX baseline, complete caller census and consumer assumptions.
-No implementation is authorized until independent design review, Acceptance
-and separate merge.
+The following runtime contract remains authoritative. Its later
+validation-efficiency amendment is Accepted; its separate design merge and
+prerequisite implementation still precede the next runtime restart.
 
 The fixed source is merged EV01-C04 #214:
 
@@ -25,9 +25,18 @@ Runtime source is unchanged from MEM02 #212. The actual runtime prerequisite
 is MEM01 #210; separately merged #213/#214 supply the precise evidence keys.
 Design #215 is separately merged. The first uncommitted implementation
 stopped at the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md)
-after native Green and twelve QEMU recertification passes. Only the corrective
-design is active; implementation is blocked and must restart from current
-`main` after its separate merge.
+after native Green and twelve QEMU recertification passes. After corrective
+design #216 merged, the restarted candidate completed renewed acceptance and
+received independent implementation review. A launcher-boundary correction
+then renewed Red/Green and recertification; its following full run was stopped
+when the user prioritized the
+[measured validation-cost defect](../research/validation-feedback-cost.md).
+The exact uncommitted tree is archived reference, not a published outcome.
+
+Accepted [ADR-0105](../adr/0105-bounded-validation-feedback.md) defines the
+separate validation prerequisite and future restart boundary. MEM03 remains
+blocked; its runtime, keys, adapters and work expectations are not silently
+changed by that tooling design.
 
 The outcome closes only B02-F002/B02-E002: ordinary ownership operations
 check active metadata and the records they consume, rather than auditing

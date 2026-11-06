@@ -155,7 +155,11 @@ separates operation-local metadata/record checks from explicit complete
 diagnostics. Its evidence-key prerequisite #213/#214 and design #215 are
 merged. The first uncommitted implementation was archived after B14 exposed
 the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md).
-Only the corrective design is active. The committed runtime retains the
+Corrective design #216 is separately merged. Its later uncommitted candidate
+is now preserved while the user-prioritized
+[validation feedback design](validation-feedback.md) addresses measured
+repeated evidence work. That Accepted design changes no runtime authority.
+The committed runtime retains the
 complete-validation cadence described above until a separately reviewed
 implementation changes it.
 

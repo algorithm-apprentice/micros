@@ -309,6 +309,13 @@ It also rejects the superseded standalone `micros_trap_hart_id` and
 
 ## Native unit tests
 
+The current fast target still performs full Python discovery after excluding
+slow CTests. The measured cost and Accepted replacement are documented in
+[bounded validation feedback](../architecture/validation-feedback.md).
+Its runner/tier interfaces are not implemented yet; use existing focused
+unittest or CTest selectors for development, without calling those selections
+complete PR acceptance.
+
 Run the fast native development loop with:
 
 ```bash

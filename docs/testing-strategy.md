@@ -35,6 +35,16 @@ do not require an invented runtime test. Exploratory spikes are not merged.
 The full task and review loop is defined in
 [the AI-native development workflow](development/ai-native-workflow.md).
 
+The [validation-cost study](research/validation-feedback-cost.md) found that
+the existing fast and full native targets run identical Python discovery,
+and individual source checks repeatedly reconstruct complete authority.
+Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) defines
+[bounded feedback](architecture/validation-feedback.md): an owned checked
+source view, a small fast Python set, complete full discovery and live
+progress. Design Acceptance does not implement those changes or waive any gate.
+Unit tests remain the primary portable feedback; QEMU components and focused
+cross-service integration remain necessary at their actual boundaries.
+
 ## Structural and algorithmic baseline evidence
 
 For MINIX-derived runtime work, semantic output is necessary but not
@@ -546,10 +556,14 @@ changes, missing/duplicate definitions and helper/signature mutations must
 prove the corrected boundary. This design adds no executable test, fixture,
 generator, CTest or adapter.
 
-Independent design review is clean. Implementation remains blocked until the
-separate corrective-design merge. The restart must renew actual Red/Green, complete
-recertification and the unchanged fifty-command author gate; archived
-results are reference evidence, not current acceptance.
+The corrective design separately merged as #216. Its restarted uncommitted
+implementation passed actual Red/Green, complete recertification and a full
+gate before independent review found a launcher-boundary omission.
+The test-first correction renewed Red/Green and all thirteen units.
+Its subsequent full run was deliberately interrupted for the validation-cost
+prerequisite above; that current tree has no complete acceptance or
+implementation commit. The eventual restart must renew its required evidence.
+Archived results remain reference evidence, not a current completion claim.
 
 ## POSIX conformance evidence
 
