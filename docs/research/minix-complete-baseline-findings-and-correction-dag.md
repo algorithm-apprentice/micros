@@ -186,11 +186,18 @@ Its first uncommitted implementation passed actual native Red/Green and all
 twelve QEMU recertification commands, then stopped on B14's
 [prefix-token scope defect](complete-validator-token-scope-gap.md).
 The implementation is archived without retirement or a permanent commit.
-Only the corrective design under Accepted
-[ADR-0104](../adr/0104-precise-complete-validator-token-authority.md) is active;
-independent review is clean and separate merge precedes a fresh runtime restart.
-The correction changes no finding ownership or edge in the 59-node runtime
-correction graph and does not accept hosted CI.
+The corrective design under Accepted
+[ADR-0104](../adr/0104-precise-complete-validator-token-authority.md) separately
+merged as #216. Its restarted uncommitted candidate passed a full author gate
+before independent review found a launcher-boundary omission. The correction
+renewed actual Red/Green and recertification, but its following full run was
+stopped for the [measured validation-cost problem](validation-feedback-cost.md).
+No implementation commit or merge occurred.
+
+The user-prioritized Accepted
+[bounded feedback prerequisite](../architecture/validation-feedback.md) is
+the sole active design. It precedes another fresh MEM03 restart, without
+changing finding ownership, the 59-node runtime graph or hosted-CI acceptance.
 
 ## Consolidation invariants
 
@@ -329,7 +336,7 @@ blocking queue.
 | `PLAT03` | Runtime correction | `B01-F004` | `PLAT02` | Implementation #204 follows Accepted ADR-0096/0097 and the [trace contract](../architecture/panic-stack-trace.md). | Actual eighteen-case Red/Green, complete version-four fault/stack evidence, all 50 fresh author commands, journal-free prior authority and independent review complete. |
 | `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Implementation #210 follows design #209 and the [Accepted allocation contract](../architecture/bootstrap-allocation.md): canonical geometry, lower-bound search progress and whole-interval/word validity. | Actual three-oracle Red/Green, exact rollback/mutation guards, six-key retirement, full current acceptance and independent review complete. |
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Implementation #212 follows design #211 and the Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md): largest legal leaves and direct checked table/owner identities. | Actual native/target Red-Green, retained MMU guards, exact three-key retirement, full current recertification and independent review complete. |
-| `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. EV01-C04 and design #215 are merged; the first uncommitted implementation is blocked on Accepted ADR-0104's token-scope correction. | Renewed actual active/inactive/bitmap/object work, failure-atomic selected transitions, retained complete diagnostics and the exact 40-key authority transition after separate corrective-design merge. |
+| `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. Designs #215/#216 are merged; the later uncommitted candidate is preserved while the separate validation-feedback prerequisite is designed and implemented. | Fresh restart with actual active/inactive/bitmap/object work, failure-atomic selected transitions, complete diagnostics and the exact 40-key authority transition; no borrowed interrupted acceptance. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Move complete registry audits off ordinary scheduler paths; use direct hart identity and bounded stack ownership structures. | Object/hart/stack comparison counts and corruption diagnostics. |

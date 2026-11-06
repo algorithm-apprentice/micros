@@ -174,14 +174,35 @@ actual native Red/Green and all twelve QEMU recertification commands, but
 B14 rejected an accidentally prefix-wide token assertion while both complete
 scan helpers remained unchanged.
 
-The implementation was archived without a permanent commit or retirement.
-Only the corrective design under Accepted
-[ADR-0104](adr/0104-precise-complete-validator-token-authority.md) is active.
+The first implementation was archived without a permanent commit or retirement.
+The corrective design under Accepted
+[ADR-0104](adr/0104-precise-complete-validator-token-authority.md) defines the
+accepted token-scope repair.
 The [scope investigation](research/complete-validator-token-scope-gap.md)
 defines the two added identities and one frozen adapter, yielding the
 40-key/27-path envelope without changing runtime behavior or old hash values.
-Independent design review is clean; separate merge precedes a fresh
-implementation restart and complete renewed acceptance. The 66 remaining runtime findings,
+Independent design review was clean and the correction separately merged as
+#216, `80941ff270b5d75d7edfce65ca96f28e6501f20d`.
+The restarted uncommitted implementation completed actual Red/Green,
+recertification and one full author gate. Independent review then found a
+Python launcher-boundary omission; its test-first correction passed renewed
+Red/Green and recertification.
+
+The subsequent full run exposed impractical validation feedback: 43 CTests
+passed in 214.22 seconds, while the Python stage repeatedly reconstructed
+complete source/tool and journal proofs for individual source queries.
+The [cost investigation](research/validation-feedback-cost.md) measured one
+such query at approximately 86 seconds. The user prioritized correcting this
+before more runtime development. That candidate is preserved, its full run
+was intentionally stopped, and no implementation commit or merge occurred.
+
+Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) and its
+[feedback contract](architecture/validation-feedback.md) are the sole active
+design. Complete independent design review is clean. The validation
+implementation stays pending the separate design merge;
+MEM03 stays blocked until that prerequisite is implemented and reviewed.
+No current gate, source assertion or target/integration requirement has yet
+been removed or optimized. The 66 remaining runtime findings,
 including MEM04 and hosted-CI blockers, retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

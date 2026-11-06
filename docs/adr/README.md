@@ -120,3 +120,4 @@ to make the project appear more consistent than it was.
 | [0102](0102-granular-memory-native-source-authority.md) | Granular memory-native source authority | Accepted |
 | [0103](0103-selected-frame-ownership-validation.md) | Selected frame-ownership validation | Accepted |
 | [0104](0104-precise-complete-validator-token-authority.md) | Precise complete-validator token authority | Accepted |
+| [0105](0105-bounded-validation-feedback.md) | Bounded validation feedback | Accepted |

@@ -75,6 +75,10 @@ This directory contains the design baseline for `micros`.
 - [Validation evidence and owned build changes](architecture/validation-evidence.md)
   records the Accepted exact-candidate command-reuse and bounded CMake
   classification contract; existing fresh execution remains authoritative.
+- [Bounded validation feedback](architecture/validation-feedback.md)
+  defines the Accepted checked source-view boundary, distinct fast/full host tiers
+  and live progress while preserving actual acceptance and necessary target
+  and cross-service evidence.
 - [Evidence authority transition](architecture/evidence-authority-transition.md)
   separates historical source-transport identities from independent
   MINIX-derived correction oracles and defines fail-closed retirement.
@@ -131,6 +135,10 @@ This directory contains the design baseline for `micros`.
   preparation-lifetime prerequisite, without relaxing the 4 KiB budget.
 
 ## Research
+
+- [Validation feedback cost](research/validation-feedback-cost.md)
+  records the measured repeated authority-query cost, current tier/logging
+  defects and the distinct roles of unit, structural and integration tests.
 
 - [Complete-validator token scope gap](research/complete-validator-token-scope-gap.md)
   records the accidental preprocessed-prefix identity that blocked MEM03's

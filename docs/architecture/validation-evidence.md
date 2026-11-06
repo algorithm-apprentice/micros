@@ -19,6 +19,12 @@ command, and avoid unrelated guests for a strictly recognizable existing
 workflow-command edit. Required coverage, independent review and fail-closed
 fallback do not become optional.
 
+The Accepted [bounded feedback contract](validation-feedback.md) addresses a
+different cost: repeated authority derivation within a host workflow and
+withheld progress during execution. It does not replace these command receipts,
+enable cross-candidate reuse or remove a required gate. Its implementation
+remains pending the separate design merge.
+
 ## Preserved authority
 
 The planner remains repository-rooted. It discovers the branch range, index,

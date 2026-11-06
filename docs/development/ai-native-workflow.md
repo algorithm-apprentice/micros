@@ -55,6 +55,14 @@ Acceptance criteria are represented by tests or deterministic build checks.
 Prose explains why behavior is required; executable feedback demonstrates that
 the repository currently provides it.
 
+Repeated verification of one immutable proof is not another independent
+experiment. The measured
+[feedback-cost investigation](../research/validation-feedback-cost.md) and
+Accepted [ADR-0105](../adr/0105-bounded-validation-feedback.md) define a
+separate bounded-feedback prerequisite. Until its design and implementation
+merge, the existing commands and authority requirements remain in force;
+no unchecked cache or omitted unit/target/integration result is permitted.
+
 ### Independent review
 
 The authoring persona does not serve as the only reviewer. A separate review

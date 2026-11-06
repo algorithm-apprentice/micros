@@ -7,8 +7,11 @@ This is the fixed-source MEM03 study for B02-F002 and B02-E002 under
 It records the fixed design baseline, not current implementation acceptance.
 Design #215 is separately merged. The first uncommitted implementation was
 archived after the [complete-validator token-scope defect](complete-validator-token-scope-gap.md)
-blocked B14 recertification; Accepted ADR-0104 is the sole active corrective
-design before a fresh implementation restart.
+blocked B14 recertification. Accepted ADR-0104 separately merged as #216.
+The later uncommitted candidate is preserved while the
+[validation feedback prerequisite](../architecture/validation-feedback.md)
+addresses the measured development-tooling cost. This does not change the
+fixed MINIX/runtime baseline below or claim current MEM03 acceptance.
 
 The current source is independently reviewed EV01-C04 implementation #214:
 

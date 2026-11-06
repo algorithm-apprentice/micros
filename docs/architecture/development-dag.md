@@ -91,6 +91,13 @@ opens the evidence barrier only after current-candidate validation,
 independent review and its acceptance merge. It changes no runtime edge and
 does not accept the separately blocked hosted-CI implementation.
 
+The [validation feedback prerequisite](validation-feedback.md), Accepted
+under ADR-0105, temporarily blocks the uncommitted MEM03 implementation after
+measured repeated evidence verification made the native loop impractical.
+Its design and implementation are sequential tooling outcomes, not new
+runtime dependencies. They preserve the need for real target and cross-service
+acceptance; hosted CI and node Q remain separate blocked work.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may
