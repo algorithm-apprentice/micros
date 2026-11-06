@@ -937,6 +937,9 @@ def _gate_changes(path):
 
 
 def project_gate_adapter(path, text):
+    from tests.host.work_count_recipe import project_feedback_reader
+
+    text = project_feedback_reader(path, text)
     changes = _gate_changes(path)
     present = tuple(text.count(extended) for _, extended in changes)
     if not any(present):
@@ -1027,6 +1030,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.work_count_recipe import project_host_test_commands
+
+    text = project_host_test_commands(text)
     if not any(marker in text for marker in ("MEM02_NATIVE", "kernel_mapping", "MICROS_KERNEL_MAPPING")):
         return text
     addition = native_recipe()

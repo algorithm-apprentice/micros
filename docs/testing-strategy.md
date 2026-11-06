@@ -36,12 +36,16 @@ The full task and review loop is defined in
 [the AI-native development workflow](development/ai-native-workflow.md).
 
 The [validation-cost study](research/validation-feedback-cost.md) found that
-the existing fast and full native targets run identical Python discovery,
+the earlier fast and full native targets ran identical Python discovery,
 and individual source checks repeatedly reconstruct complete authority.
 Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) defines
 [bounded feedback](architecture/validation-feedback.md): an owned checked
 source view, a small fast Python set, complete full discovery and live
-progress. Design Acceptance does not implement those changes or waive any gate.
+progress. Its separate design #217 is merged. The dependent implementation
+now supplies the source view and runner: the fast host set is explicit, full
+mode still discovers every test, and final success follows complete closing
+verification. Workflow output is live without changing retained raw logs or
+receipt rules. Availability is not final implementation acceptance.
 Unit tests remain the primary portable feedback; QEMU components and focused
 cross-service integration remain necessary at their actual boundaries.
 
@@ -1306,6 +1310,13 @@ Performance budgets are:
 - stress suite: unconstrained by the fast feedback budget and run separately.
 
 Budgets are review signals, not reasons to hide necessary coverage.
+
+The initial bounded-feedback fast run contains 37 nonslow native CTests and
+90 Python unit cases. Its measured incremental execution was 10.84 seconds
+for CTest plus 5.182 seconds for Python, excluding configure/build work.
+That remains above the six-second review signal; it is not reported as a
+six-second pass. Complete native discovery, models and target/integration
+coverage remain required at their existing gates.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 `test-tty-model`, `test-ramfs-model`, `test-vfs-model`,

@@ -339,13 +339,16 @@ class PythonHostRuntimeTests(unittest.TestCase):
             "tools/validation_context.py",
             "tools/validation_execution.py",
             "tools/validation_plan.py",
+            "tools/run_host_tests.py",
             "tests/host/bootstrap_allocation_authority.py",
             "tests/host/diagnostic_history_authority.py",
+            "tests/host/evidence_authority_scope.py",
             "tests/host/kernel_mapping_authority.py",
             "tests/host/runtime_memory_authority.py",
             "tests/host/qemu_smoke_execution_cases.py",
             "tests/host/test_check_application_elf.py",
             "tests/host/test_qemu_runner_source_layout.py",
+            "tests/host/test_validation_execution.py",
             "tests/host/user_elf_cli_cases.py",
         }
         observed = set()

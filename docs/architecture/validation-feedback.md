@@ -5,8 +5,12 @@
 This is the Accepted contract for
 [ADR-0105](../adr/0105-bounded-validation-feedback.md).
 The paired tasks are `validation-efficiency-design` and
-`validation-efficiency-implementation`. Implementation remains pending the
-separate design merge. Complete independent design review is clean.
+`validation-efficiency-implementation`. Complete and Acceptance-only design
+reviews are clean. Separate design #217 merged as
+`7fe20afa839bc396b243537bb5a75b4c5f5d59ed`, with identical reviewed and squash
+tree `51fb987e80b8a7d25dc69113c7e64827326b86f0`.
+The dependent implementation supplies the interfaces below; its complete
+author gate and independent implementation review still precede publication.
 
 The [fixed-source investigation](../research/validation-feedback-cost.md)
 records the approximately 86-second local identity query, repeated complete
@@ -401,7 +405,7 @@ Expected code owners are:
 | Existing source/fixture readers | Consume a checked view or retain their cold behavior |
 | `tools/run_host_tests.py` | Exact selection, unittest execution, progress and final close/result |
 | `tools/validation_execution.py` | Live workflow forwarding and unchanged success publication boundary |
-| Existing recipe projection helper | Exact two-invocation historical inverse |
+| Existing recipe projection helper | Exact runner, source-reader and streaming historical inverses |
 | `CMakeLists.txt` | Existing native workflows delegated to the correct tier |
 | Focused host tests | Work-count, invalidation, selection, progress and lifecycle regressions |
 
@@ -496,3 +500,86 @@ problem is solved by a synthetic fixture alone.
 Hosted CI remains a separate blocked implementation. These local tooling
 changes do not supply a hosted green run, node Q, STACK13, RECERT01 or POSIX
 completion.
+
+## Implementation map and evidence boundary
+
+The source-view owner captures immutable source bytes, candidate/namespace
+identity, environment and the validated running Python boundary. Repository
+invocation prefixes are checked before their already admitted spellings are
+normalized, as in the earlier author proofs; the standard-library roots remain
+bound. An outside import root is an error, not normalization.
+
+Committed registry resolution shares one inventory. A terminal author view
+uses the inventory already owned by its verified author context, semantically
+replays the ordered journal once and retains exact selector/record/log
+identities. Closing verifies the complete external inputs and source
+snapshot without materializing another inventory or replaying identical logs.
+Journal input capture rechecks the ordinary namespace and selected attempt
+through the existing ownership helpers before and after reading, so linked
+parents cannot preserve authority with identical leaf bytes. Failed opening
+is sticky even if a test catches the first exception.
+
+The four existing authority owners now expose a verified journal/result pair
+internally while retaining their original `read_journal` interface. Their cold
+queries no longer replay the same proof again at the caller. Kernel logical
+and external readers and the runtime-memory source assertion consume the
+owned view. Directory, grant, object and TTY source assertions use the same
+adapter instead of rebuilding complete authority for each historical key.
+Ordinary cold APIs and their correctness tests remain independent.
+
+The two memory fixture CLI entries own a view around generation and close it
+before successful exit. Their library functions do not open nested owners.
+The host runner selects the exact fast set or complete unittest discovery,
+preserves focused/list semantics and publishes final `OK` only after closing.
+
+Canonical workflow policy remains in `tools/validation_execution.py`.
+The small `tools/validation_stream.py` leaf owns only the output pipe and its
+child group: it retains raw bytes, decodes display text incrementally and
+observes exit without reaping. Scoped cancellation handlers defer interruption
+until a spawned child is owned, then route cancellation through cleanup.
+The leader remains unreaped until its group has been terminated, including
+any remaining descendants at ordinary completion; prior signal handlers are
+restored afterward. Nondefault child-reaping policy is rejected before
+launch. It makes no coverage, source, postflight or receipt decision.
+
+Darwin returns `EPERM` when the private group contains only its unreaped
+zombie leader. That result is admitted only after a non-reaping exited-child
+observation and a successful system `libproc` query with a fixed two-PID
+buffer proves the complete group is exactly that same leader. A live child,
+extra member, truncated/failed query or other permission failure remains an
+error. This read-only check neither signals another process nor relaxes a
+permission boundary, and the child is reaped even when cleanup fails.
+
+The historical execution-source reader admits only three exact reversible
+edits: the streaming import, the same canonical child call through that leaf,
+and removal of duplicate completed-log replay. These forms were declared and
+round-tripped before editing the executor. The original complete execution
+identities remain unchanged; the new leaf's behavior is independently tested,
+not inferred from that historical inverse.
+
+The existing recipe/transport helper owns that inverse and the finite
+snapshot-reader adaptation. The latter restores only the declared import,
+captured-byte reads and execution-adapter call before the unchanged
+MEM02/MEM01/PLAT03/PLAT02/PLAT01 source-gate chain. Complete historical source
+and AST comparisons still reject outside edits; partial or mixed reader
+forms fail rather than bypassing an old assertion. The four source-assertion
+consumers admit only their exact single import substitution.
+
+Focused evidence covers duplicate replay, immutable reads, mode/namespace/
+environment/runtime/selector/log changes, process/lifetime isolation, sticky
+failure, exact selection, progress before completion, split/invalid UTF-8,
+nonzero exit, write failure, interruption and owned cleanup. A precise
+non-identity exception identifies the execution regression module as a
+consumer of already registered identities, not another identity owner.
+
+The first current fast workflow rebuilt 220 native steps, then passed all
+37 nonslow CTests in 16.29 seconds and 90 Python unit cases in 4.797 seconds.
+The separately observed incremental run passed the same 37/90 cases in
+10.84 and 5.182 seconds. Compilation and execution are distinct costs.
+This is useful seconds-scale feedback, but the complete fast target is still
+above the six-second review signal; no case is hidden or relabeled to claim
+that budget.
+
+Those observations are not complete native/target acceptance or proof of the
+archived MEM03 speedup. Complete author evidence and independent review are
+separate publication requirements.

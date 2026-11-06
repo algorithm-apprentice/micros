@@ -16,6 +16,7 @@ if __package__ in (None, ""):
 
 from tests.host.c_source_records import function_records
 from tests.host.evidence_authority_source import regular_source
+from tests.host.evidence_authority_scope import checked_source_view
 from tests.host.kernel_mapping_source import (
     OBSERVATION_PREFIX, RECIPE_ADMISSION, SOURCE_PROJECTION,
     current_function_names, observe_source, project_observations, validate_retained_source,
@@ -283,7 +284,9 @@ def main(argv=None):
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
-    except (OSError, ValueError, AssertionError, subprocess.SubprocessError) as error:
+        with checked_source_view(ROOT):
+            status = main()
+        raise SystemExit(status)
+    except (OSError, ValueError, RuntimeError, AssertionError, subprocess.SubprocessError) as error:
         print("MICROS_MEM02_GENERATION_ERROR " + str(error), file=sys.stderr)
         raise SystemExit(2) from error

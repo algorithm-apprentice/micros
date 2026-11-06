@@ -142,8 +142,15 @@ def project_gate_compatibility(relative, source):
         )
     elif relative == "tests/host/test_trap_syscall_source_layout.py":
         owner = "COPY01"
+        cold_import = "from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required\n"
+        scoped_import = (
+            "from tests.host.runtime_memory_authority import FIXTURE_PATH\n"
+            "from tests.host.evidence_authority_scope import memory_identity_required\n"
+        )
+        if cold_import in source and scoped_import in source:
+            raise AssertionError("COPY01 source reader has mixed authority imports")
         changes = (
-            ("from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required\n", ""),
+            (scoped_import if scoped_import in source else cold_import, ""),
             ("            FIXTURE_PATH,\n", ""),
             ("        memory_required = memory_identity_required(REPOSITORY_ROOT)\n", ""),
             (
@@ -164,7 +171,154 @@ def project_gate_compatibility(relative, source):
     return source
 
 
+def project_streaming_execution(source):
+    streaming_import = "from tools.validation_stream import stream_workflow\n"
+    if streaming_import not in source:
+        return source
+    changes = (
+        (streaming_import, ""),
+        (
+            '        log=attempt.recorded_log,\n'
+            '    )\n\n\ndef _fresh_workflow(',
+            '        log=attempt.recorded_log,\n'
+            '    )\n'
+            '    store.replay_log(attempt.recorded_log, sys.stdout)\n'
+            '\n\ndef _fresh_workflow(',
+        ),
+        (
+            '    completed = stream_workflow(\n'
+            '        tuple(entry["command"]), cwd=root, log=attempt.log,\n'
+            '    )\n',
+            '    completed = subprocess.run(\n'
+            '        tuple(entry["command"]), cwd=root, check=False,\n'
+            '        stdout=attempt.log, stderr=subprocess.STDOUT,\n'
+            '    )\n',
+        ),
+    )
+    for current, previous in changes:
+        if source.count(current) != 1:
+            raise AssertionError("live workflow output transport is not exact")
+        source = source.replace(current, previous, 1)
+    return source
+
+
+def project_feedback_reader(relative, source):
+    consumers = {
+        "tests/host/test_kernel_directory_layout.py": "kernel_mapping_authority",
+        "tests/host/test_grant_data_plane_source_layout.py": "diagnostic_history_authority",
+        "tests/host/test_kernel_object_source_layout.py": "diagnostic_history_authority",
+        "tests/host/test_tty_source_layout.py": "diagnostic_history_authority",
+    }
+    if relative in consumers:
+        current = "from tests.host.evidence_authority_scope import identity_required as diagnostic_identity_required\n"
+        previous = f"from tests.host.{consumers[relative]} import identity_required as diagnostic_identity_required\n"
+        if "tests.host.evidence_authority_scope" not in source:
+            return source
+        if source.count(current) != 1 or previous in source:
+            raise AssertionError("source assertion has partial, mixed or duplicate view imports")
+        return source.replace(current, previous, 1)
+    if relative != "tests/host/kernel_layout_source.py":
+        return source
+    scoped_import = (
+        "from tests.host.evidence_authority_scope import "
+        "identity_required as diagnostic_identity_required, source_bytes\n"
+    )
+    if not any(marker in source for marker in (
+        scoped_import, "source_bytes(root, selected)", "project_streaming_execution",
+    )):
+        return source
+    changes = (
+        (
+            scoped_import,
+            "from tests.host.kernel_mapping_authority import identity_required as diagnostic_identity_required\n",
+        ),
+        (
+            "    project_gate_compatibility, project_root_recipe, project_streaming_execution,\n",
+            "    project_gate_compatibility, project_root_recipe,\n",
+        ),
+        (
+            "    raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], source_bytes(root, selected))\n",
+            "    raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], selected.read_bytes())\n",
+        ),
+        (
+            "        project_terminal_source_bytes(relative, source_bytes(REPOSITORY_ROOT, path)),\n",
+            "        project_terminal_source_bytes(relative, path.read_bytes()),\n",
+        ),
+        ("        source_bytes(REPOSITORY_ROOT, path),\n", "        path.read_bytes(),\n"),
+        ("    source = project_streaming_execution(source)\n", ""),
+        (
+            "    data = source_bytes(REPOSITORY_ROOT, path) if relative is not None else path.read_bytes()\n",
+            "",
+        ),
+        ("project_trace_source_bytes(relative, data)", "project_trace_source_bytes(relative, path.read_bytes())"),
+    )
+    for name in ("restore_cmake_source", "restore_validation_plan_source"):
+        changes += ((
+            f'        return {name}(data.decode("utf-8")).encode()\n',
+            f'        return {name}(path.read_text(encoding="utf-8")).encode()\n',
+        ),)
+    for name in (
+        "restore_validation_context_source", "restore_validation_build_impact_source",
+        "restore_validation_inputs_source", "restore_validation_execution_source",
+    ):
+        changes += ((
+            f'        return {name}(\n            data.decode("utf-8")\n',
+            f'        return {name}(\n            path.read_text(encoding="utf-8")\n',
+        ),)
+    for current, previous in changes:
+        if source.count(current) != 1:
+            raise AssertionError("checked source-reader transport is partial, duplicated or changed")
+        source = source.replace(current, previous, 1)
+    return source
+
+
+def _host_target_prefix(target, arguments):
+    source = (
+        "    add_custom_target(\n"
+        f"        {target}\n"
+        "        COMMAND\n"
+        '            "${CMAKE_CTEST_COMMAND}"\n'
+        "            --test-dir\n"
+        '            "${CMAKE_BINARY_DIR}"\n'
+        "            --output-on-failure\n"
+    )
+    if target == "test-unit-fast":
+        source += "            -LE\n            slow\n"
+    return source + (
+        "        COMMAND\n"
+        '            "${MICROS_PYTHON}"\n'
+        "            ${MICROS_PYTHON_ARGS}\n"
+        + "".join("            " + argument + "\n" for argument in arguments)
+        + "        DEPENDS\n"
+    )
+
+
+def project_host_test_commands(source, *, require_current=False):
+    runner = '"${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_tests.py"'
+    if "tools/run_host_tests.py" not in source:
+        if require_current:
+            raise AssertionError("current native targets require the distinct host-test runner")
+        return source
+    old_arguments = ("-m", "unittest", "discover", "-s", "tests/host", "-p", '"test_*.py"')
+    replacements = tuple(
+        (
+            _host_target_prefix(target, (runner, "--tier", tier)),
+            _host_target_prefix(target, old_arguments),
+        )
+        for target, tier in (("test-unit-fast", "fast"), ("test-unit", "full"))
+    )
+    if source.count("tools/run_host_tests.py") != 2 or any(
+        source.count(current) != 1 or previous in source
+        for current, previous in replacements
+    ):
+        raise AssertionError("native host-test invocation is partial, mixed, duplicated or changed")
+    for current, previous in replacements:
+        source = source.replace(current, previous, 1)
+    return source
+
+
 def project_root_recipe(source):
+    source = project_host_test_commands(source)
     source = project_stack_recipe(source)
     if INCLUDE not in source:
         return source
@@ -179,6 +333,7 @@ def projected_recipe_digest(path):
         if path.name != "CMakeLists.txt":
             return hashlib.sha256(path.read_bytes()).hexdigest()
         source = path.read_text(encoding="utf-8")
+        project_host_test_commands(source, require_current=True)
         if STACK_INCLUDE in source:
             validate_stack_recipe(path.parent)
         if INCLUDE in source:

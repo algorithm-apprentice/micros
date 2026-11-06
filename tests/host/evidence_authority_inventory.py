@@ -123,7 +123,8 @@ FAMILY_OWNERS = {
     ),
 }
 
-NON_IDENTITY_EXCEPTIONS = ()
+# These regressions exercise the registered execution identities, not new ones.
+NON_IDENTITY_EXCEPTIONS = ("tests/host/test_validation_execution.py",)
 
 LOGICAL_FILE_TABLES = {
     "tests/host/test_endpoint_source_layout.py": ("STABLE_HASHES",),

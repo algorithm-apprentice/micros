@@ -63,6 +63,12 @@ separate bounded-feedback prerequisite. Until its design and implementation
 merge, the existing commands and authority requirements remain in force;
 no unchecked cache or omitted unit/target/integration result is permitted.
 
+Design #217 is separately merged. Its implementation exposes the
+[owned host runner](building.md#native-unit-tests), with explicit fast/full
+selection and live per-test feedback. Focused or fast success is development
+evidence, not a replacement for the minimum PR gate. Complete input checking
+and independent implementation review still govern publication.
+
 ### Independent review
 
 The authoring persona does not serve as the only reviewer. A separate review

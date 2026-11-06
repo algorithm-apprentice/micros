@@ -681,10 +681,52 @@ class DiagnosticSourceTest(unittest.TestCase):
         for changed in (
             source.replace("transports, required=required)", "transports, required=False)", 1),
             source.replace("if required and hashlib.sha256(restored)", "if False and hashlib.sha256(restored)", 1),
+            source.replace("source_bytes(root, selected)", "selected.read_bytes()", 1),
+            source.replace("diagnostic_identity_required, source_bytes\n", "diagnostic_identity_required\n", 1),
+            source.replace('data.decode("utf-8")', 'data.decode("ascii")', 1),
         ):
             self.assertNotEqual(source, changed)
             with self.assertRaises(AssertionError):
                 project_diagnostic_gate(name, changed)
+
+    def test_source_consumers_reuse_the_owned_view_without_rebuilding_proof(self):
+        from contextlib import ExitStack
+        from unittest.mock import patch
+        from tests.host import (
+            evidence_authority_scope as scope,
+            kernel_layout_source,
+            test_grant_data_plane_source_layout,
+            test_kernel_directory_layout,
+            test_kernel_object_source_layout,
+            test_tty_source_layout,
+        )
+
+        key = SOURCE_PROJECTION["retirement_keys"][0]
+        consumers = (
+            kernel_layout_source, test_kernel_directory_layout,
+            test_grant_data_plane_source_layout, test_kernel_object_source_layout,
+            test_tty_source_layout,
+        )
+        with ExitStack() as patches:
+            patches.enter_context(patch.object(scope, "_active", None))
+            patches.enter_context(patch.object(
+                scope, "_capture_snapshot", return_value=scope._Snapshot("fixture", {}),
+            ))
+            verify = patches.enter_context(patch.object(
+                scope, "_verify_authorities",
+                return_value=scope.VerifiedAuthority(frozenset({key}), ()),
+            ))
+            for provider in scope._providers():
+                patches.enter_context(patch.object(provider, "_provisional", None))
+            patches.enter_context(patch(
+                "tests.host.evidence_authority_inventory.current_inventory",
+                side_effect=AssertionError("source lookup rebuilt inventory outside its checked view"),
+            ))
+            with scope.checked_source_view(ROOT):
+                for consumer in consumers:
+                    for _ in range(3):
+                        self.assertFalse(consumer.diagnostic_identity_required(ROOT, key))
+            self.assertEqual(1, verify.call_count)
 
     def test_kernel_extension_keeps_exact_ordinary_owners_and_private_direction(self):
         from tests.host import diagnostic_history_source as source_contract

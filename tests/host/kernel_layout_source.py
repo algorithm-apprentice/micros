@@ -10,7 +10,7 @@ import stat
 from typing import Optional
 
 from tests.host.ast_evidence import ast_dump
-from tests.host.kernel_mapping_authority import identity_required as diagnostic_identity_required
+from tests.host.evidence_authority_scope import identity_required as diagnostic_identity_required, source_bytes
 from tests.host.kernel_mapping_source import project_mmu_source_bytes
 from tests.host.diagnostic_history_source import (
     diagnostic_kernel_members, project_diagnostic_context, project_diagnostic_external, project_diagnostic_gate,
@@ -26,7 +26,7 @@ from tests.host.stack_recipe import (
 from tests.host.stack_source_projection import project_stack_source
 from tests.host.work_count_recipe import (
     project_context_registration, project_external_evidence,
-    project_gate_compatibility, project_root_recipe,
+    project_gate_compatibility, project_root_recipe, project_streaming_execution,
 )
 
 
@@ -15844,7 +15844,7 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     physical, _, expected_sha256, transports = KERNEL_FILE_FACTS[logical]
     del physical
     selected = current_path(root, logical)
-    raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], selected.read_bytes())
+    raw = project_terminal_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], source_bytes(root, selected))
     raw = project_mmu_source_bytes(KERNEL_LOGICAL_TO_PHYSICAL[logical], raw)
     if b"MICROS_TEST_STACK_" in raw:
         raw = project_stack_source(
@@ -15920,7 +15920,7 @@ def _restored_external_bytes(path: Path, relative: str) -> bytes:
     _, expected_sha256, transports = EXTERNAL_SOURCE_FACTS[relative]
     return _restored_include_bytes(
         relative,
-        project_terminal_source_bytes(relative, path.read_bytes()),
+        project_terminal_source_bytes(relative, source_bytes(REPOSITORY_ROOT, path)),
         expected_sha256,
         transports,
         required=diagnostic_identity_required(
@@ -15933,7 +15933,7 @@ def _restored_generator_bytes(path: Path, relative: str) -> bytes:
     expected_sha256, expected_ast, transports = GENERATOR_FILE_FACTS[relative]
     restored = _restored_include_bytes(
         relative,
-        path.read_bytes(),
+        source_bytes(REPOSITORY_ROOT, path),
         expected_sha256,
         transports,
     )
@@ -16253,6 +16253,7 @@ def restore_validation_inputs_source(source: str) -> str:
 
 
 def restore_validation_execution_source(source: str) -> str:
+    source = project_streaming_execution(source)
     digest = hashlib.sha256(source.encode()).hexdigest()
     if digest == BASE_VALIDATION_EXECUTION_SHA256:
         return source
@@ -16887,28 +16888,29 @@ def read_bytes_path(path: Path) -> bytes:
         return _restored_external_bytes(path, relative)
     if relative in GENERATOR_FILE_FACTS:
         return _restored_generator_bytes(path, relative)
+    data = source_bytes(REPOSITORY_ROOT, path) if relative is not None else path.read_bytes()
     if relative == "CMakeLists.txt":
-        return restore_cmake_source(path.read_text(encoding="utf-8")).encode()
+        return restore_cmake_source(data.decode("utf-8")).encode()
     if relative == "tools/validation_context.py":
         return restore_validation_context_source(
-            path.read_text(encoding="utf-8")
+            data.decode("utf-8")
         ).encode()
     if relative == "tools/validation_plan.py":
-        return restore_validation_plan_source(path.read_text(encoding="utf-8")).encode()
+        return restore_validation_plan_source(data.decode("utf-8")).encode()
     if relative == "tools/validation_build_impact.py":
         return restore_validation_build_impact_source(
-            path.read_text(encoding="utf-8")
+            data.decode("utf-8")
         ).encode()
     if relative == "tools/validation_inputs.py":
         return restore_validation_inputs_source(
-            path.read_text(encoding="utf-8")
+            data.decode("utf-8")
         ).encode()
     if relative == "tools/validation_execution.py":
         return restore_validation_execution_source(
-            path.read_text(encoding="utf-8")
+            data.decode("utf-8")
         ).encode()
     raw = project_diagnostic_external(
-        relative, project_stack_external(relative, project_external_evidence(relative, project_trace_source_bytes(relative, path.read_bytes())))
+        relative, project_stack_external(relative, project_external_evidence(relative, project_trace_source_bytes(relative, data)))
     )
     if (
         relative is not None

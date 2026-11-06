@@ -8,7 +8,7 @@ import re
 import unittest
 
 from tests.host.ast_evidence import ast_dump
-from tests.host.diagnostic_history_authority import identity_required as diagnostic_identity_required
+from tests.host.evidence_authority_scope import identity_required as diagnostic_identity_required
 from tests.host.c_source_records import function_records, matching_lexical
 from tests.host.test_frame_ownership_source_layout import c_function_definitions, c_lexical_text, tokens
 from tests.host.test_pm_service_source_layout import cmake_commands

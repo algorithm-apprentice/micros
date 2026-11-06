@@ -197,12 +197,14 @@ before more runtime development. That candidate is preserved, its full run
 was intentionally stopped, and no implementation commit or merge occurred.
 
 Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) and its
-[feedback contract](architecture/validation-feedback.md) are the sole active
-design. Complete independent design review is clean. The validation
-implementation stays pending the separate design merge;
-MEM03 stays blocked until that prerequisite is implemented and reviewed.
-No current gate, source assertion or target/integration requirement has yet
-been removed or optimized. The 66 remaining runtime findings,
+[feedback contract](architecture/validation-feedback.md) passed complete and
+Acceptance-only independent review and separately merged as #217,
+`7fe20afa839bc396b243537bb5a75b4c5f5d59ed`.
+The validation implementation supplies checked source-view reuse, distinct
+host tiers and live byte-exact workflow progress. Publication requires
+complete acceptance and independent implementation review; only its separate
+merge permits a fresh MEM03 restart with renewed evidence.
+No behavioral, target or integration gate is removed. The 66 remaining runtime findings,
 including MEM04 and hosted-CI blockers, retain their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

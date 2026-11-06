@@ -2821,13 +2821,9 @@ if(MICROS_BUILD_HOST_TESTS)
         COMMAND
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
-            -m
-            unittest
-            discover
-            -s
-            tests/host
-            -p
-            "test_*.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_tests.py"
+            --tier
+            fast
         DEPENDS
             fdt_test
             frame_allocator_test
@@ -2943,13 +2939,9 @@ if(MICROS_BUILD_HOST_TESTS)
         COMMAND
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
-            -m
-            unittest
-            discover
-            -s
-            tests/host
-            -p
-            "test_*.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_tests.py"
+            --tier
+            full
         DEPENDS
             fdt_test
             frame_allocator_test

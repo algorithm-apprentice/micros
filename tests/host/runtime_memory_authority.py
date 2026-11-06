@@ -642,7 +642,7 @@ def validate_journal(context, journal):
     return result
 
 
-def read_journal(context):
+def read_verified_journal(context):
     directory = journal_directory(context.root)
     current = read_current(directory)
     if current is None:
@@ -665,8 +665,11 @@ def read_journal(context):
     if previous != current["sha256"] or read_current(directory) != current:
         raise ValueError("COPY01 selected record changed or does not bind its complete journal")
     journal = Journal(attempt_directory, current["attempt"], tuple(records), previous)
-    validate_journal(context, journal)
-    return journal
+    return journal, validate_journal(context, journal)
+
+
+def read_journal(context):
+    return read_verified_journal(context)[0]
 
 
 @contextmanager
@@ -744,8 +747,7 @@ def memory_identity_required(root):
     selected = read_current(journal_directory(root))
     if selected is not None and selected["count"] == 3:
         context = capture_author_context(root)
-        journal = read_journal(context)
-        result = validate_journal(context, journal)
+        _, result = read_verified_journal(context)
         recheck_context(context)
         return MEMORY_IDENTITY in result.active_identity_keys
     return True
