@@ -12,7 +12,8 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.ast_evidence import ast_dump
-from tests.host.runtime_memory_authority import FIXTURE_PATH, memory_identity_required
+from tests.host.runtime_memory_authority import FIXTURE_PATH
+from tests.host.evidence_authority_scope import memory_identity_required
 from tests.host.terminal_failure_source import project_terminal_workflows
 from tests.host import test_vm_service_source_layout as vm_layout
 from tests.host.test_endpoint_source_layout import (

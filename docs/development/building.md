@@ -309,12 +309,12 @@ It also rejects the superseded standalone `micros_trap_hart_id` and
 
 ## Native unit tests
 
-The current fast target still performs full Python discovery after excluding
-slow CTests. The measured cost and Accepted replacement are documented in
-[bounded validation feedback](../architecture/validation-feedback.md).
-Its runner/tier interfaces are not implemented yet; use existing focused
-unittest or CTest selectors for development, without calling those selections
-complete PR acceptance.
+The fast target runs nonslow native CTests and the closed, small Python unit
+set defined by [bounded validation feedback](../architecture/validation-feedback.md).
+The full target retains every CTest/model and complete Python discovery.
+Source-heavy checks share one checked immutable view instead of reconstructing
+the same authority for each file read. Final success follows the complete
+view-close checks; this is not unchecked or cross-invocation caching.
 
 Run the fast native development loop with:
 
@@ -336,6 +336,26 @@ The complete native milestone gate remains:
 ```bash
 cmake --workflow --preset test-unit
 ```
+
+The host portion is also directly available from the repository root:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier fast
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier full
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_kernel_address_space_source_layout.KernelAddressSpaceSourceLayoutTest.test_scratch_storage_has_one_configured_owner
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier full --list
+```
+
+Focused selection may repeat `--test`; it does not establish PR coverage.
+Listing executes no test or source proof. The runner reports each selected
+test's start, outcome and duration, then the slowest ten. Workflow execution
+forwards those records live while retaining the exact raw log and ordinary
+postflight/receipt requirements.
+
+Direct `python -m unittest` remains available for isolated proof-engine tests
+and cold-path diagnosis. Use the owned runner for a source-heavy selected
+suite when its shared checked view is intended. No test result substitutes
+for the affected QEMU component or cross-service integration gate.
 
 The COPY01 native fixture also requires the explicit compiler environment
 documented under [runtime memory evidence](#runtime-memory-work-and-authority-evidence).

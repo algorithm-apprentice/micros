@@ -20,6 +20,7 @@ from tests.host.bootstrap_allocation_source import (
 )
 from tests.host.c_source_records import function_records
 from tests.host.evidence_authority_source import regular_source
+from tests.host.evidence_authority_scope import checked_source_view
 from tests.host.work_count_types import Stage
 from tools.stack_artifact_files import read_regular
 from tools.stack_bound_manifest import owned_artifact
@@ -178,7 +179,9 @@ def main(argv=None):
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
-    except (OSError, ValueError, AssertionError, subprocess.SubprocessError) as error:
+        with checked_source_view(ROOT):
+            status = main()
+        raise SystemExit(status)
+    except (OSError, ValueError, RuntimeError, AssertionError, subprocess.SubprocessError) as error:
         print("MICROS_MEM01_GENERATION_ERROR " + str(error), file=sys.stderr)
         raise SystemExit(2) from error

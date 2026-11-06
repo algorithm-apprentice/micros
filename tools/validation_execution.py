@@ -9,6 +9,7 @@ import sys
 
 from tools import validation_context, validation_evidence
 from tools.python_host_runtime import documentation_command
+from tools.validation_stream import stream_workflow
 
 
 class ExecutionError(ValueError):
@@ -220,7 +221,6 @@ def _completed_log(store, attempt, entry):
         },
         log=attempt.recorded_log,
     )
-    store.replay_log(attempt.recorded_log, sys.stdout)
 
 
 def _fresh_workflow(
@@ -229,9 +229,8 @@ def _fresh_workflow(
     attempt = store.start(name)
     entry["status"] = "FAILED"
     print("FRESH " + shlex.join(entry["command"]), flush=True)
-    completed = subprocess.run(
-        tuple(entry["command"]), cwd=root, check=False,
-        stdout=attempt.log, stderr=subprocess.STDOUT,
+    completed = stream_workflow(
+        tuple(entry["command"]), cwd=root, log=attempt.log,
     )
     entry["exit_code"] = completed.returncode
     if completed.returncode != 0:

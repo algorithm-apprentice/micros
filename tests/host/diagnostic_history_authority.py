@@ -739,7 +739,7 @@ def validate_journal(context, journal):
     return result
 
 
-def read_journal(context):
+def read_verified_journal(context):
     from tools.stack_bound_manifest import owned_artifact
 
     directory = journal_directory(context.root)
@@ -764,8 +764,11 @@ def read_journal(context):
     if previous != current["sha256"] or read_selection(directory) != (current, selector_sha256):
         raise ValueError("PLAT01 selector changed or does not bind its complete raw record chain")
     journal = Journal(target, current["attempt"], tuple(records), previous, selector_sha256)
-    validate_journal(context, journal)
-    return journal
+    return journal, validate_journal(context, journal)
+
+
+def read_journal(context):
+    return read_verified_journal(context)[0]
 
 
 @contextmanager
@@ -857,8 +860,7 @@ def identity_required(root, key):
     selected = read_current(journal_directory(root))
     if selected is not None and selected["count"] == 3:
         context = capture_author_context(root)
-        journal = read_journal(context)
-        result = validate_journal(context, journal)
+        _, result = read_verified_journal(context)
         recheck_context(context)
         return key in result.active_identity_keys
     return True
