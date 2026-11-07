@@ -539,7 +539,7 @@ reviewed tree. Its 4,282 facts/seventeen families preserve every predecessor
 record and source guard; fresh committed/actual-main checks preserve ordinary
 authority without journals.
 
-The next Accepted [MEM03 contract](architecture/selected-frame-ownership.md)
+The Accepted [MEM03 contract](architecture/selected-frame-ownership.md)
 under [ADR-0103](adr/0103-selected-frame-ownership-validation.md) requires
 five passive native observation slices plus an ordinary control over one
 fixed 99-case matrix. Actual portable operations, runtime process release
@@ -575,6 +575,28 @@ through the checked runner. All six native products remain in one slow CTest
 required by the complete tier, not the fast target. Pre-Red non-retirement,
 original token/AST negatives, all prior facts and actual fresh work/semantic/
 recertification/full evidence remain required.
+
+That fresh implementation completed its renewed evidence and independently
+reviewed merge as #219. All fifty author commands were FRESH/exit0, including
+43 CTests, 1,526 Python tests, forty QEMU workflows, four standalone images
+and complete stack evidence. The full Python workload took 499.049 seconds;
+fast execution retained 37 CTests and 98 Python cases in 16.64 seconds.
+The exact reviewed/committed/remote/preview/squash tree is
+`5793c993338c22cf30aa552c9397c8aa234c33cc`.
+All five prior committed claims work without author journals.
+
+MEM04 design subsequently found missing per-clause identities for existing
+MEM03 source admission. Accepted
+[ADR-0106](adr/0106-granular-selected-ownership-native-source-authority.md)
+and the [EV01-C05 contract](architecture/selected-ownership-native-source-authority.md)
+require a separate documentation-only design, then actual missing-identity
+Red and complete independent equality for 484 existing clauses. Preserve
+all 4,290 predecessor records/eighteen fingerprints, the five claims and
+seventy prior retirements, unchanged source guards and closure rejection.
+The fixed C dependencies have two actual consumers; fixed headers have only
+the generator consumer. Raw retained MEM03 bodies must not be normalized
+like MEM01 bodies. Full acceptance and independent first-commit review
+remain required; this metadata outcome performs no runtime retirement.
 
 ## POSIX conformance evidence
 

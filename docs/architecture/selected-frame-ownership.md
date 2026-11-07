@@ -21,7 +21,7 @@ tree:   9f7802dfdfc84034b626068b5c160b90a645dad7
 MINIX:  4db99f4012570a577414fe2a43697b2f239b699e
 ```
 
-Runtime source is unchanged from MEM02 #212. The actual runtime prerequisite
+The fixed #214 runtime source is unchanged from MEM02 #212. The runtime prerequisite
 is MEM01 #210; separately merged #213/#214 supply the precise evidence keys.
 Design #215 is separately merged. The first uncommitted implementation
 stopped at the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md)
@@ -40,6 +40,15 @@ merged as `dedf9a8d9d72f153519ea07150e50594a6618c6b`, tree
 and clean independent review. The MEM03 restart binds that implementation
 base separately from the fixed #214 runtime and the two earlier designs.
 Its runtime, forty keys, six adapters and work expectations remain unchanged.
+
+The fresh implementation independently completed renewed actual Red/Green,
+thirteen-unit recertification, all fifty fresh author commands and clean
+independent first-commit review. It merged as #219,
+`da258293f507c745c8e157cd84bd13b2fb4b5e77`, with identical reviewed,
+committed, remote, preview and squash tree
+`5793c993338c22cf30aa552c9397c8aa234c33cc`.
+Fresh committed and actual-main checks preserve all prior authority without
+journals; exact completed-task refs and owned check worktrees were removed.
 
 The outcome closes only B02-F002/B02-E002: ordinary ownership operations
 check active metadata and the records they consume, rather than auditing
@@ -690,11 +699,10 @@ diagnostic/work guards.
 
 ## Granular source authority
 
-Preserve all 4,282 current complete facts and seventeen fingerprints.
-Declare one eight-fact MEM03 family from independent fixed-source,
-Accepted-contract, recipe and oracle inputs. Its eventual total is 4,290
-facts in eighteen families; this is a requirement, not a current inventory
-claim.
+The implementation preserves all 4,282 predecessor complete facts and
+seventeen fingerprints. Its independently declared eight-fact MEM03 family
+binds fixed-source, Accepted-contract, recipe and oracle inputs. The completed
+#219 catalog contains 4,290 facts in eighteen families.
 
 The corrected plan permits exactly 40 current transport identities
 to retire: fourteen still-active

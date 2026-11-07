@@ -208,14 +208,32 @@ publication; journal-free committed/main checks and exact ref cleanup passed.
 It supplies checked source-view reuse, distinct host tiers and live byte-exact
 progress, without removing behavioral, target or integration evidence.
 
-MEM03 restarts from that merged base with independently frozen declarations,
-an explicit fifth source-view provider and separate native-symbol-tool binding.
-Its six-product orchestration is slow/full-only. The fixed #214 runtime,
-forty keys, six adapters and independent 99-case expectations remain required.
-Actual Red/Green, thirteen-unit recertification, full acceptance and review
-must be renewed rather than borrowed from the archive. At #218, the 66
-remaining runtime findings, including MEM04 and hosted-CI blockers, retain
-their existing owners.
+MEM03's fresh restart from #218 independently renewed actual Red/Green,
+thirteen-unit recertification, all fifty fresh author commands and clean
+independent first-commit review. Implementation #219 merged as
+`da258293f507c745c8e157cd84bd13b2fb4b5e77`, with identical reviewed,
+committed, remote, preview and squash tree
+`5793c993338c22cf30aa552c9397c8aa234c33cc`.
+Its exact forty-key transaction preserves all predecessor records and
+diagnostic boundaries. Journal-free committed/main authority checks and
+completed-task ref cleanup passed. B02-F002/B02-E002 are closed, leaving
+65 pre-node runtime findings open.
+
+That real workload also verified the validation improvement: complete Python
+discovery ran 1,526 tests in 499.049 seconds, versus the earlier 1,470 tests
+in 18,841.945 seconds. The fast workflow took 16.64 seconds while preserving
+37 CTests and 98 Python cases. This does not claim the six-second signal or
+hosted-CI success; all complete native, target, integration and stack gates
+remain required.
+
+The following MEM04 design found the
+[MEM03 native-source authority gap](research/selected-ownership-native-source-authority-gap.md).
+Accepted [ADR-0106](adr/0106-granular-selected-ownership-native-source-authority.md)
+and [EV01-C05](architecture/selected-ownership-native-source-authority.md)
+define a separate 484-clause metadata prerequisite, preserving all 4,290
+current facts, eighteen fingerprints and existing checks. Only that design
+is active. MEM04 design is blocked until its implementation merges; MEM04
+implementation, hosted CI and later runtime findings retain their owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

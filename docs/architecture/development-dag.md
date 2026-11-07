@@ -95,9 +95,18 @@ The [validation feedback prerequisite](validation-feedback.md), Accepted
 under ADR-0105, interrupted the uncommitted MEM03 implementation after
 measured repeated evidence verification made the native loop impractical.
 Its sequential design #217 and implementation #218 are now separately merged,
-permitting a fresh MEM03 restart rather than borrowing the archived attempt.
-They add no runtime dependency and preserve real target and cross-service
-acceptance; hosted CI and node Q remain separate blocked work.
+and the fresh MEM03 restart independently completed acceptance and merged as
+#219. The archived attempts were not borrowed. These outcomes preserve real
+target and cross-service acceptance; hosted CI and node Q remain separate
+blocked work.
+
+MEM04 design then found missing granular identities for MEM03's existing
+native-source checks. Accepted
+[EV01-C05](selected-ownership-native-source-authority.md) is a separate
+documentation-first evidence prerequisite. Only its design is active;
+implementation waits for design merge, and MEM04 design waits for the
+prerequisite implementation. The 59-node runtime graph, finding ownership and
+MEM04's MEM02/MEM03 runtime prerequisites do not change.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
