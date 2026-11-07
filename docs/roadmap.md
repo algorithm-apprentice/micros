@@ -257,6 +257,13 @@ implementation publication.
 [Accepted ADR-0108](adr/0108-qemu-accepted-transcript-reporting.md) defines
 the separate MEM04-C01 reporting prerequisite. Its design and implementation
 must merge before MEM04 restarts from current main with renewed evidence.
+Design #223 is merged as `123034f6f5cb0bb2617b98b3e2022ceca2bb106e`,
+with identical reviewed and squash tree
+`44d9a1f0c13b7a817049fd5b8f1fc86987f4d788`.
+The separate implementation adds opt-in diagnostic output from the one
+accepted QEMU result, finite historical inverses and focused regressions.
+It preserves the original 4,774 facts and existing complete acceptance gate;
+its completion is not acceptance of the archived MEM04 candidate.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

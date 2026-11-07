@@ -5937,6 +5937,7 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --report-transcript
             --qemu
             "${MICROS_QEMU}"
             --kernel
@@ -5972,6 +5973,7 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --report-transcript
             --qemu
             "${MICROS_QEMU}"
             --kernel

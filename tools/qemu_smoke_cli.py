@@ -22,6 +22,7 @@ from tools.qemu_smoke_outcome import (
     matches_expected_result,
     classify_smoke,
     print_tap_result,
+    print_transcript,
 )
 
 from tools.qemu_smoke_arguments import (
@@ -225,10 +226,10 @@ def main(argv=None):
         return 0
 
     _, result, outcome, command = successful_runs[0]
-    return print_tap_result(
-        outcome,
-        result,
-        command,
-        expected_outcome=expected_outcome,
-        accepted=True,
+    status = print_tap_result(
+        outcome, result, command,
+        expected_outcome=expected_outcome, accepted=True,
     )
+    if arguments.report_transcript:
+        print_transcript(result.output)
+    return status

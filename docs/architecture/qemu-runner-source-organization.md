@@ -54,8 +54,13 @@ timeouts, and pass/panic/failure semantics remain unchanged.
 ## MEM04-C01 accepted-transcript reporting
 
 This extension is Accepted under
-[ADR-0108](../adr/0108-qemu-accepted-transcript-reporting.md), not implemented.
-Complete independent design/correction review is clean.
+[ADR-0108](../adr/0108-qemu-accepted-transcript-reporting.md).
+Complete independent design/correction and Acceptance-only reviews are clean.
+Design #223 separately merged as
+`123034f6f5cb0bb2617b98b3e2022ceca2bb106e`, with reviewed/squash tree
+`44d9a1f0c13b7a817049fd5b8f1fc86987f4d788`.
+The separate implementation supplies the reporting option and nine owners
+below; it does not supply MEM04's missing runtime Green.
 Its fixed source is MEM04 design #222,
 `91544f9e8ff9354975139c17907e282570adfcf2`, tree
 `034e9e7963d44e844ead3fbbb88ddf5ff83ff190`.
@@ -64,10 +69,10 @@ records the actual missing-success-output defect and complete direct
 source/recipe consumer chain.
 
 The paired tasks are `mem04-target-transcript-design` and
-`mem04-target-transcript-implementation`. The latter remains pending until
-the former separately merges. MEM04's archived implementation remains blocked
-until the prerequisite implementation also merges. No runtime-DAG edge or
-finding ownership changes.
+`mem04-target-transcript-implementation`. The implementation starts from
+merged #223, not the archived MEM04 branch. MEM04's archived implementation
+remains blocked until the prerequisite implementation also merges.
+No runtime-DAG edge or finding ownership changes.
 
 ### Interface, ownership and state
 
@@ -181,7 +186,14 @@ cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-address-space-handoff
 ```
 
-The new test module/option do not exist during design. Actual target evidence
+The test module and option were not authored during design. The regression
+first reached accepted baseline output with exactly one execution and failed
+on the missing witness, rather than an unknown parser option. The CLI's
+existing final-call continuation layout is compacted without changing values
+or evaluation order, preserving its 120-line ownership bound and complete
+historical source inverse.
+
+Actual target evidence
 must show each workflow's existing exact component-pass record once as a
 guest diagnostic after TAP success, with unchanged acceptance and deadlines.
 Unit fixtures prove host formatting only, not hardware behavior.

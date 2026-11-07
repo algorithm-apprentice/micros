@@ -1436,6 +1436,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.qemu_transcript_source import project_transcript_cmake
+
+    text = project_transcript_cmake(text)
     if not any(marker in text for marker in ("MEM03_NATIVE", "selected_ownership", "selected-ownership", "mem03_source_proof")):
         return text
     addition = native_recipe()

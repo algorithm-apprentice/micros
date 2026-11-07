@@ -290,6 +290,9 @@ def _project_runner_faults(source):
 
 
 def project_runner_source(relative, source):
+    from tests.host.qemu_transcript_source import project_transcript_source
+
+    source = project_transcript_source(relative, source)
     if relative == "tools/qemu_smoke_faults.py":
         return _project_runner_faults(source)
     if relative == "tools/qemu_smoke_arguments.py":
@@ -340,6 +343,9 @@ def project_diagnostic_context(source):
 
 
 def project_runner_options(observed):
+    from tests.host.qemu_transcript_source import project_transcript_options
+
+    observed = project_transcript_options(observed)
     if any(
         type(row) not in (tuple, list) or len(row) != 2
         or type(row[0]) is not int or type(row[1]) is not str

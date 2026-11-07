@@ -74,6 +74,11 @@ def _add_execution_arguments(
         default="pass",
         help="Observed outcome required for a successful test",
     )
+    parser.add_argument(
+        "--report-transcript",
+        action="store_true",
+        help="Print the accepted single-run decoded transcript as TAP diagnostics",
+    )
 
 
 def _add_platform_report_arguments(
@@ -400,4 +405,6 @@ def parse_arguments(argv):
         parser=parser,
         arguments=arguments,
     )
+    if arguments.report_transcript and len(arguments.memory) != 1:
+        parser.error("--report-transcript requires exactly one memory size")
     return arguments
