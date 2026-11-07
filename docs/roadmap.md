@@ -296,8 +296,17 @@ the exact fixed-source header extension and five qualified callback-free
 mapping helpers without changing existing callback authority, old facts,
 stack budgets or required coverage. Independent design review identified
 the following function-inventory boundary before another implementation
-restart. Complete correction review is clean; separate merge remains required
-before implementation restarts.
+restart. Complete correction review is clean and design #226 separately
+merged as `593b910cdaaff2a89018b0ffe7cd4e4bf853972c`, with identical reviewed
+and squash tree `315baff3f1d62776b36956dc583fa40e6388fa03`.
+The fresh candidate passed actual native/target Green. A single fresh
+ordinary/metadata stack check passed repaired visitor binding, then failed
+the fatal source-unit guard on the ordinary TTY inspector prototype.
+This caught the next boundary before recertification and the full producer.
+The candidate is archived without final acceptance.
+[Accepted ADR-0111](adr/0111-fatal-tty-header-extension.md) has clean
+independent design review; it adds one exact header admission and one
+immutable existing owner without changing runtime scope or stack budgets.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

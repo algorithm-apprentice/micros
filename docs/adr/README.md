@@ -126,3 +126,4 @@ to make the project appear more consistent than it was.
 | [0108](0108-qemu-accepted-transcript-reporting.md) | QEMU accepted transcript reporting | Accepted |
 | [0109](0109-handoff-preflight-error-ownership.md) | Handoff preflight error ownership | Accepted |
 | [0110](0110-kernel-visitor-extension-admission.md) | Kernel visitor extension admission | Accepted |
+| [0111](0111-fatal-tty-header-extension.md) | Fatal TTY header extension | Accepted |

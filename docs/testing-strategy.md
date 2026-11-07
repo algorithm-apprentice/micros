@@ -678,6 +678,21 @@ stack gate. All existing budgets and the blocked B13 admission remain.
 The implementation must restart and renew actual evidence after separate
 design merge; the archived 45 successful commands are not final acceptance.
 
+Visitor design #226 separately merged. The fresh candidate passed all 42
+stack evidence cases and the 82-case focused scaffold suite, then actual
+four-product/two-target Red and Green. The documented single-configuration
+ordinary/metadata check reached and passed current callback binding before
+the fatal source-unit guard rejected the ordinary TTY binding declaration.
+No new recertification, full producer or complete stack certificate is claimed.
+
+[Accepted ADR-0111](adr/0111-fatal-tty-header-extension.md) requires native
+regressions through the existing public fatal source-unit guard, including
+unchanged other-unit and observer-mode rejection. The resulting third
+stack-admission input is immutable before fresh Red. After design merge,
+the complete one-configuration proof must pass after actual Green and
+before expensive recertification/full acceptance. It remains a focused
+development check, not a substitute for the complete stack matrix.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

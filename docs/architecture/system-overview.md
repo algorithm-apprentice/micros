@@ -192,6 +192,12 @@ acceptance or publication. The
 [Accepted exact visitor-group extension](../adr/0110-kernel-visitor-extension-admission.md)
 admits that declaration and five qualified callback-free helpers while
 preserving every existing callback and stack obligation before a fresh restart.
+That design separately merged as #226. Its fresh candidate passed actual
+native/target Green and current visitor binding, then the early
+ordinary/metadata stack proof found a separate whole-header conflict in
+the fatal TTY source register. The candidate is archived; the
+[Accepted exact fatal-header extension](../adr/0111-fatal-tty-header-extension.md)
+retains all fatal-state, source/machine and stack obligations.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
