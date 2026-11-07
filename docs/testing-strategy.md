@@ -644,9 +644,22 @@ fails on the absent successful observation after one accepted execution.
 Independent source/option/recipe inverses retain the old expected values;
 the MEM03 forward-comparison adapter removes only the new recipe tokens from
 its observed side. Focused commands are in the linked reporting contract.
-MEM04 must renew its actual evidence after that prerequisite merges,
+Implementation #224 completed all fifty author commands and independent
+review and is separately merged. MEM04 renews its actual evidence from that base,
 reusing one owned workflow result for its within-phase consumers rather than
 running QEMU twice.
+
+That fresh attempt exposed a different stage-5 handoff failure before the
+new semantic witness. The original strict orphan regression expected `STATE`,
+but the caller now reached its explicit complete diagnostic and returned
+`OWNERSHIP`. Actual failure and debugger evidence are recorded in the
+[handoff dependency study](research/minix-selected-user-address-space.md#indirect-handoff-preflight-error-dependence).
+[Accepted ADR-0109](adr/0109-handoff-preflight-error-ownership.md) keeps the
+fixture unchanged and makes the caller's normalization explicit.
+Its seventeen-subject/29-path contract keeps all 33 retirement keys and active
+MEM03 guards. After separate design merge, renew Red, prove the original
+handoff regression and stage-8 witnesses, then complete every current gate.
+No stage-5 panic is accepted as the planned scoped-translation Red or Green.
 
 ## POSIX conformance evidence
 

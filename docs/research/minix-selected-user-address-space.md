@@ -5,9 +5,10 @@
 This is the fixed-source study for Accepted
 [ADR-0107](../adr/0107-selected-user-address-space-validation.md) and its
 [selected-operation contract](../architecture/selected-user-address-space.md),
-not an implementation result. Design Acceptance does not claim runtime
-execution or retirement. No MEM04 code, test, model, fixture, generator or
-executable prototype has been authored.
+not an implementation result. The original design authored no executable
+artifact. Later uncommitted attempts are archived without completed Green
+or retirement; the observed handoff dependency below motivates a separate
+documentation-only correction before another fresh implementation.
 
 The current source is independently reviewed EV01-C05 implementation #221:
 
@@ -305,3 +306,80 @@ Portable work and state changes require native actual-source evidence.
 Changed MMU/activation admission also requires an actual failing QEMU
 component case, not a native CSR stub or missing new interface. Existing
 target corruption, integration and stack gates remain mandatory.
+
+## Indirect handoff preflight error dependence
+
+The reporting prerequisite #223/#224 separately merged. The new fixed base is
+`9f2eb7db4d6397d7760bf0ba1674d465c9a1fab5`, tree
+`56f6e9eccae4803c7fc53148d0122ba9e7ccdcc5`; its runtime remains byte-identical
+to #221. MEM04 independently froze that base, registered its unchanged
+33-key plan and obtained actual native/target Red. Its current candidate
+then failed the handoff workflow before the new stage-8 witness.
+
+The failed candidate tree was `6c6f815693264d789ec29f8841a7564be8f0fb84`.
+All four current native products were captured and the user-address-space
+target passed; the handoff failure prevented Green publication. The 44-file
+candidate was archived, not committed. The selector still held only its
+actual Red event. Debugging output is diagnosis, not replacement phase
+evidence.
+
+### Actual caller and error path
+
+| Fixed current source | Relevant responsibility |
+| --- | --- |
+| `kernel/memory/user_address_space_handoff.c:218-276` | `validate_handoff_processes` checks each prepared context and maps context/mapping failures to address-space `STATE`. |
+| `kernel/execution/user_execution_validation.c:479-519` | `micros_user_execution_validate_context` calls the ordinary PC/SP mapping checks, not the explicit complete preparation validator. |
+| Same owner, lines 118-172 | `validate_user_mappings` converts any failed selected lookup to execution `MAPPING`. |
+| `kernel/memory/user_address_space_handoff.c:281-372,374-472` | Prepare/complete each subsequently invoke their existing complete locked root validator before mutation/commit. |
+| `kernel/memory/user_address_space_validation.c:771-856` | The complete orphan-owner check returns `OWNERSHIP`; the complete validator retains that diagnostic. |
+| `kernel/tests/memory/address_space_handoff_test_handoff.c:141-178` | The original orphan regression requires `STATE` and exact unchanged state before releasing the orphan. |
+
+With the original global point lookup, the orphan fails the PC/SP lookup,
+becomes `MAPPING`, then becomes handoff `STATE` before the later complete
+validator runs. With MEM04's selected walk, valid PC/SP pages remain valid;
+the later owning complete check detects the orphan as `OWNERSHIP`.
+No missing ownership rejection or unsafe handoff occurred. The changed
+public failure classification is nevertheless a real contract regression.
+
+The actual canonical diagnostic run reported
+`MICROS_TEST_FAILURE handoff-stage=0x0000000000000005`, followed by the
+owned `address-space-handoff-test` panic. A bounded existing-LLDB session
+against the same ELF, without source changes, stopped on the two calls to
+`micros_user_address_space_prepare_wired_handoff()`. The return register was
+5 (`STATE`) at `handoff_without_execution_is_rejected`, then 11
+(`OWNERSHIP`) at `orphan_process_frame_is_rejected`, where 5 was expected.
+The debug guest was terminated afterward; no paused/deadline-adjusted run
+was counted as acceptance.
+
+### Authority census and required adaptation
+
+The complete current inventory has 54 payload intersections with the handoff
+source. They are not 54 active identities to retire. Its exact whole-file key,
+
+```text
+tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/kernel/user_address_space_handoff.c/2
+```
+
+is already retired by `MEM03-selected-ownership`. The active MEM03 clauses
+cover the exact definitions, skeleton, signatures/callees and retained
+bodies. Both prepare/complete functions are already mutable under the fixed
+callee sets (`selected_ownership_source.py:296-297,726-766`).
+Two scalar error assignments change none of those active predicates.
+Aggregate, planner, source-membership and other payload intersections remain
+authoritative; no additional retirement or rebaseline is justified.
+
+EV01's `_expected_closures()` already includes the exact declared unit input
+paths (`evidence_authority_validation.py:396-408`). An explicitly declared
+dependent production path therefore gives a 29-path candidate domain while
+retaining the original 28-path affected-fact closure and 33 retirement keys.
+This needs a corrective design because ADR-0107 froze sixteen production
+subjects, not a change to the shared authority mechanism.
+
+The fixed MINIX selected-walk/bind trace above is unchanged. The typed
+one-way handoff is the existing staged substitution described by
+[the post-handoff study](minix-post-handoff-wired-address-resolution.md).
+Its internal error normalization is a compatible contract-preserving
+extension: keep diagnosis at the existing complete handoff boundary, add
+constant scalar work and no storage/call, and do not restore global work in
+ordinary PC/SP lookups. The [Accepted contract](../adr/0109-handoff-preflight-error-ownership.md)
+preserves the original target expectations and all twenty retained audits.

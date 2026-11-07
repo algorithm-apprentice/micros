@@ -260,10 +260,28 @@ must merge before MEM04 restarts from current main with renewed evidence.
 Design #223 is merged as `123034f6f5cb0bb2617b98b3e2022ceca2bb106e`,
 with identical reviewed and squash tree
 `44d9a1f0c13b7a817049fd5b8f1fc86987f4d788`.
-The separate implementation adds opt-in diagnostic output from the one
-accepted QEMU result, finite historical inverses and focused regressions.
-It preserves the original 4,774 facts and existing complete acceptance gate;
-its completion is not acceptance of the archived MEM04 candidate.
+Implementation #224 is independently reviewed and merged as
+`9f2eb7db4d6397d7760bf0ba1674d465c9a1fab5`, with identical reviewed,
+committed, remote, preview and squash tree
+`56f6e9eccae4803c7fc53148d0122ba9e7ccdcc5`.
+It supplies successful diagnostic output from one accepted QEMU result.
+All fifty fresh author commands and three same-run reusable profiles passed,
+as did independent review, committed/main journal-free checks and exact
+task-ref cleanup. It preserves all 4,774 predecessor facts and nineteen
+fingerprints. Complete Python discovery ran 1,543 cases in 489.779 seconds;
+the unchanged fast Python set ran 98 cases in 6.629 seconds.
+
+The fresh MEM04 restart recorded actual native/target Red, then the current
+handoff target failed at stage 5: removing the global PC/SP audit exposed
+`OWNERSHIP` where the existing handoff contract returns `STATE`. The actual
+failure and read-only debugger diagnosis are recorded in the
+[fixed-source study](research/minix-selected-user-address-space.md#indirect-handoff-preflight-error-dependence).
+The candidate is archived without Green or retirement.
+[Accepted ADR-0109](adr/0109-handoff-preflight-error-ownership.md) adds only
+explicit normalization at the owning complete handoff checks. Its design is
+independently reviewed; implementation remains blocked until separate merge.
+No fixture expectation or shared
+authority rule is relaxed.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
