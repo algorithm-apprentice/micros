@@ -499,7 +499,7 @@ micros_pm_control_runtime_validate_reservation(
             != MICROS_PM_CONTROL_OK
         || micros_kernel_objects_validate(objects)
             != MICROS_KERNEL_OBJECT_OK
-        || micros_frame_ownership_validate(ownership)
+        || micros_frame_ownership_validate_metadata(ownership)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;

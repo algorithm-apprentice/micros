@@ -51,7 +51,10 @@ micros_frame_ownership_vm_release_transferable_preflight(
         )) {
             return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
         }
-        owner = ownership->owners[frame_index];
+        error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
+        if (error != MICROS_FRAME_OWNERSHIP_OK) {
+            return error;
+        }
         if (owner.kind == MICROS_FRAME_OWNER_FREE) {
             return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
         }

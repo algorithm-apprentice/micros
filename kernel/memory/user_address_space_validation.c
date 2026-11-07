@@ -501,7 +501,7 @@ load_validation_context(
         return error;
     }
     if (
-        micros_frame_ownership_runtime_validate(objects)
+        micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;

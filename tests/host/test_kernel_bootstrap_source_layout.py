@@ -1722,6 +1722,7 @@ class KernelBootstrapSourceLayoutTest(unittest.TestCase):
             "micros_kernel_object_runtime_authoritative_registry",
             "micros_ipc_runtime_authoritative_registry", "micros_tty_handoff_runtime_state",
             "micros_bootstrap_control_validate", "micros_frame_ownership_runtime_validate",
+            "micros_frame_ownership_runtime_validate_metadata",
             "micros_grant_runtime_validate", "micros_tty_handoff_runtime_validate",
             "micros_user_address_space_validate", "micros_user_execution_inspect",
             "micros_user_execution_validate_context", "micros_vm_handoff_runtime_state",

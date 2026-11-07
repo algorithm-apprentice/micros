@@ -200,12 +200,22 @@ Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) and its
 [feedback contract](architecture/validation-feedback.md) passed complete and
 Acceptance-only independent review and separately merged as #217,
 `7fe20afa839bc396b243537bb5a75b4c5f5d59ed`.
-The validation implementation supplies checked source-view reuse, distinct
-host tiers and live byte-exact workflow progress. Publication requires
-complete acceptance and independent implementation review; only its separate
-merge permits a fresh MEM03 restart with renewed evidence.
-No behavioral, target or integration gate is removed. The 66 remaining runtime findings,
-including MEM04 and hosted-CI blockers, retain their existing owners.
+The validation implementation #218 merged as
+`dedf9a8d9d72f153519ea07150e50594a6618c6b`, with reviewed, committed, remote,
+preview and squash tree `3afdc8e5281fe5199cb2fd45cc4af3a12eaba1f0`.
+All fifty fresh author commands and clean independent review preceded
+publication; journal-free committed/main checks and exact ref cleanup passed.
+It supplies checked source-view reuse, distinct host tiers and live byte-exact
+progress, without removing behavioral, target or integration evidence.
+
+MEM03 restarts from that merged base with independently frozen declarations,
+an explicit fifth source-view provider and separate native-symbol-tool binding.
+Its six-product orchestration is slow/full-only. The fixed #214 runtime,
+forty keys, six adapters and independent 99-case expectations remain required.
+Actual Red/Green, thirteen-unit recertification, full acceptance and review
+must be renewed rather than borrowed from the archive. At #218, the 66
+remaining runtime findings, including MEM04 and hosted-CI blockers, retain
+their existing owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

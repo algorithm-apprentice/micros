@@ -159,7 +159,7 @@ enum micros_vm_handoff_error micros_vm_handoff_runtime_validate(
             handoff_state.thread
         )
         || ownership->phase != expected_ownership_phase
-        || micros_frame_ownership_runtime_validate(objects)
+        || micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_process_resolve(
             objects,

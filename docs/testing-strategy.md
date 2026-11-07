@@ -41,11 +41,12 @@ and individual source checks repeatedly reconstruct complete authority.
 Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) defines
 [bounded feedback](architecture/validation-feedback.md): an owned checked
 source view, a small fast Python set, complete full discovery and live
-progress. Its separate design #217 is merged. The dependent implementation
-now supplies the source view and runner: the fast host set is explicit, full
+progress. Separate design #217 and independently reviewed implementation #218
+are merged. The source view and runner now supply an explicit fast host set; full
 mode still discovers every test, and final success follows complete closing
 verification. Workflow output is live without changing retained raw logs or
-receipt rules. Availability is not final implementation acceptance.
+receipt rules. Their acceptance does not substitute for a later runtime
+correction's actual source and execution evidence.
 Unit tests remain the primary portable feedback; QEMU components and focused
 cross-service integration remain necessary at their actual boundaries.
 
@@ -568,6 +569,12 @@ Its subsequent full run was deliberately interrupted for the validation-cost
 prerequisite above; that current tree has no complete acceptance or
 implementation commit. The eventual restart must renew its required evidence.
 Archived results remain reference evidence, not a current completion claim.
+After the separately merged validation implementation #218, the fresh restart
+adds its exact provider/native-`nm` input and routes source consumers and B14
+through the checked runner. All six native products remain in one slow CTest
+required by the complete tier, not the fast target. Pre-Red non-retirement,
+original token/AST negatives, all prior facts and actual fresh work/semantic/
+recertification/full evidence remain required.
 
 ## POSIX conformance evidence
 

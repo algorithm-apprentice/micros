@@ -92,10 +92,11 @@ independent review and its acceptance merge. It changes no runtime edge and
 does not accept the separately blocked hosted-CI implementation.
 
 The [validation feedback prerequisite](validation-feedback.md), Accepted
-under ADR-0105, temporarily blocks the uncommitted MEM03 implementation after
+under ADR-0105, interrupted the uncommitted MEM03 implementation after
 measured repeated evidence verification made the native loop impractical.
-Its design and implementation are sequential tooling outcomes, not new
-runtime dependencies. They preserve the need for real target and cross-service
+Its sequential design #217 and implementation #218 are now separately merged,
+permitting a fresh MEM03 restart rather than borrowing the archived attempt.
+They add no runtime dependency and preserve real target and cross-service
 acceptance; hosted CI and node Q remain separate blocked work.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)

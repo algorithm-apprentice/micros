@@ -12,6 +12,13 @@ tree `51fb987e80b8a7d25dc69113c7e64827326b86f0`.
 The dependent implementation supplies the interfaces below; its complete
 author gate and independent implementation review still precede publication.
 
+Implementation #218 separately merged as
+`dedf9a8d9d72f153519ea07150e50594a6618c6b`, with identical reviewed and squash
+tree `3afdc8e5281fe5199cb2fd45cc4af3a12eaba1f0`. Its complete author gate,
+independent review, journal-free committed/main checks and exact completed-ref
+cleanup passed. MEM03's fresh integration and real author-case measurement
+remain distinct from that prerequisite's acceptance.
+
 The [fixed-source investigation](../research/validation-feedback-cost.md)
 records the approximately 86-second local identity query, repeated complete
 proof, identical Python fast/full selection and withheld progress.
@@ -519,7 +526,7 @@ through the existing ownership helpers before and after reading, so linked
 parents cannot preserve authority with identical leaf bytes. Failed opening
 is sticky even if a test catches the first exception.
 
-The four existing authority owners now expose a verified journal/result pair
+The four prerequisite authority owners expose a verified journal/result pair
 internally while retaining their original `read_journal` interface. Their cold
 queries no longer replay the same proof again at the caller. Kernel logical
 and external readers and the runtime-memory source assertion consume the
@@ -527,10 +534,18 @@ owned view. Directory, grant, object and TTY source assertions use the same
 adapter instead of rebuilding complete authority for each historical key.
 Ordinary cold APIs and their correctness tests remain independent.
 
-The two memory fixture CLI entries own a view around generation and close it
+The two prerequisite memory fixture CLI entries own a view around generation and close it
 before successful exit. Their library functions do not open nested owners.
 The host runner selects the exact fast set or complete unittest discovery,
 preserves focused/list semantics and publishes final `OK` only after closing.
+
+The fresh MEM03 integration adds its fifth provider and fixture-generator CLI.
+Its distinct native `nm` identity accompanies the compiler and complete
+external-input map; neither the two-element predecessor shape nor compiler
+identity may silently substitute for it. MEM03 also uses the verified
+journal/result pair. Its retained B14 suite invokes the same owned host
+runner inside the existing author-controlled provisional transaction, never
+the reverse. Cold authority tests remain isolated and independently meaningful.
 
 Canonical workflow policy remains in `tools/validation_execution.py`.
 The small `tools/validation_stream.py` leaf owns only the output pipe and its

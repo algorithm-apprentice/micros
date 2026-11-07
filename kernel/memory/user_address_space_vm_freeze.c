@@ -275,7 +275,7 @@ validate_vm_freeze_address_spaces(
 )
 {
     if (
-        micros_frame_ownership_runtime_validate(context->objects)
+        micros_frame_ownership_runtime_validate_metadata(context->objects)
             != MICROS_FRAME_OWNERSHIP_OK
         || table_at(context->kernel_report->root_physical_address)
                 ->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX]

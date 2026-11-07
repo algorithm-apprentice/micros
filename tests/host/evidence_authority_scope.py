@@ -91,11 +91,13 @@ def _providers():
         diagnostic_history_authority,
         kernel_mapping_authority,
         runtime_memory_authority,
+        selected_ownership_authority,
     )
 
     return (
         runtime_memory_authority, diagnostic_history_authority,
         bootstrap_allocation_authority, kernel_mapping_authority,
+        selected_ownership_authority,
     )
 
 
@@ -165,7 +167,14 @@ def _check_author_inputs(provider, context, journal, inputs):
         key: value for key, value in context.environment.immutable_inputs
         if key.startswith("@")
     }
-    if len(observed) != 2 or observed[0] != context.native_compiler or observed[1] != expected:
+    if provider.__name__ == "tests.host.selected_ownership_authority":
+        changed = (
+            len(observed) != 3 or observed[0] != context.native_compiler
+            or observed[1] != context.native_nm or observed[2] != expected
+        )
+    else:
+        changed = len(observed) != 2 or observed[0] != context.native_compiler or observed[1] != expected
+    if changed:
         raise ValueError("checked source-view external inputs changed")
     if _journal_inputs(provider, context.root, journal) != inputs:
         raise ValueError("checked source-view journal inputs changed")

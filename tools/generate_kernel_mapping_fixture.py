@@ -226,7 +226,11 @@ def source_bundle(root, stage, *, observed=True):
                 "kernel/memory/address_space.c", "kernel/memory/address_space_validation.c",
                 "kernel/memory/address_space_internal.h",
             ):
-                raise ValueError("MEM02 corrected native input remains pending its actual pre-production Red")
+                from tests.host.selected_ownership_source import native_assertion_admission
+                if "MEM02/native-input/" + name not in native_assertion_admission(
+                    root, "MEM02", name, data.decode("utf-8"), stage,
+                ):
+                    raise ValueError("MEM02 corrected native input remains pending its actual pre-production Red")
         inputs[name] = {
             "kind": "file", "mode": mode, "size": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),
