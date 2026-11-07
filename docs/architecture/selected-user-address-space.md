@@ -7,8 +7,12 @@ This is the Accepted MEM04 contract under
 The [fixed-source study](../research/minix-selected-user-address-space.md)
 records the MINIX baseline, current costs, controller call chains and
 complete-validator census. Independent design review found no substantive
-issue. Implementation is pending the separate design merge; Acceptance is
-not runtime or retirement evidence.
+issue, and design #222 separately merged. The first uncommitted attempt is
+archived without Green, retirement or implementation publication because
+successful QEMU output did not expose the required witnesses. The separate
+[MEM04-C01 prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
+must merge before a fresh implementation restart. Acceptance is not runtime
+or retirement evidence.
 
 ```text
 runtime reference: f28377decc0d20533e05330f2f2211db3f230910
@@ -671,6 +675,14 @@ Use these existing workflows, without new target identities or timeouts:
 cmake --workflow --preset test-qemu-user-address-space
 cmake --workflow --preset test-qemu-address-space-handoff
 ```
+
+The Accepted [ADR-0108](../adr/0108-qemu-accepted-transcript-reporting.md)
+prerequisite supplies opt-in accepted diagnostic output through their existing
+runner. After its separate implementation merge, the fresh MEM04 attempt
+freezes those reporting inputs and actual new base membership before renewed
+Red. Its host oracle consumes the same run's diagnostic witnesses on Green
+and recertification; a TAP success alone remains insufficient. The sixteen
+production subjects, 33-key plan and eight evidence owners do not expand.
 
 The user-address-space fixture retains the five existing corruption inputs:
 foreign-owner leaf, table-as-leaf, malformed leaf, alias and unreachable

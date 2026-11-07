@@ -628,6 +628,19 @@ results. The new native orchestration is one full-only slow CTest; fast
 membership and existing QEMU identities/timeouts remain unchanged.
 These are design requirements, not implemented tests or retirement evidence.
 
+The first uncommitted MEM04 attempt demonstrated that the existing runner
+suppresses guest output on success. Its aggregate TAP pass cannot satisfy
+the independent target oracle. The candidate is archived; no Green or
+retirement is claimed.
+[Accepted ADR-0108](adr/0108-qemu-accepted-transcript-reporting.md) and the
+[MEM04-C01 contract](architecture/qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
+define a separate single-run reporting prerequisite, with host output
+regressions and real canonical workflow evidence. It changes no legacy
+acceptance, timeout, fast membership or final native/target/integration/stack
+coverage. MEM04 must renew its actual evidence after that prerequisite merges,
+reusing one owned workflow result for its within-phase consumers rather than
+running QEMU twice.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

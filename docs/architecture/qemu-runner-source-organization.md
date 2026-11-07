@@ -51,6 +51,147 @@ serial trigger/payload pairs for the node-Q shell gate.
 The existing single-trigger interface, QEMU argv, output classification,
 timeouts, and pass/panic/failure semantics remain unchanged.
 
+## MEM04-C01 accepted-transcript reporting
+
+This extension is Accepted under
+[ADR-0108](../adr/0108-qemu-accepted-transcript-reporting.md), not implemented.
+Complete independent design/correction review is clean.
+Its fixed source is MEM04 design #222,
+`91544f9e8ff9354975139c17907e282570adfcf2`, tree
+`034e9e7963d44e844ead3fbbb88ddf5ff83ff190`.
+The [output-boundary study](../research/minix-qemu-runner-source-organization.md#mem04-successful-output-boundary)
+records the actual missing-success-output defect and complete direct
+source/recipe consumer chain.
+
+The paired tasks are `mem04-target-transcript-design` and
+`mem04-target-transcript-implementation`. The latter remains pending until
+the former separately merges. MEM04's archived implementation remains blocked
+until the prerequisite implementation also merges. No runtime-DAG edge or
+finding ownership changes.
+
+### Interface, ownership and state
+
+`--report-transcript` is a `store_true` execution option, registered once
+immediately after `--expect` on the existing parser. Its default is false.
+After all existing argument validations, reject a requested report unless
+the resolved `arguments.memory` contains exactly one entry, using:
+`--report-transcript requires exactly one memory size`.
+This preserves existing first-error order and default multi-memory behavior.
+
+Keep the sole existing execution, classification and complete acceptance
+path. Failed acceptance returns through the existing `print_tap_result()`
+unchanged. Accepted single-run reporting calls that original formatter with
+the original values, then conditionally publishes `result.output`, and
+returns its original exit code. The optional report never authorizes or
+reclassifies a result.
+
+The outcome owner appends only `print_transcript(output)`, without a new
+facade alias: iterate decoded
+`splitlines(keepends=True)`, writing each fragment with one `# ` prefix and
+no added line terminator. It does not strip whitespace, filter records,
+create a file, flush/close a caller's stream, catch output errors, inspect
+acceptance, import another owner or execute QEMU. An empty string prints
+nothing. A partial final fragment stays partial. This preserves the captured
+decoded text, not original bytes already decoded or normalized by execution.
+Accepted expected-panic output is eligible; rejected runs retain their
+original failure formatting and exit code, without a second copy.
+
+There is no multi-run report container. Rejecting that new option combination
+before execution gives each successful report one unambiguous owned result.
+Neither current MEM04 workflow requests multiple memory sizes.
+
+### Exact implementation owners
+
+| Path | Only authorized change |
+| --- | --- |
+| `tools/qemu_smoke_arguments.py` | Add the option and its final single-memory argument check. |
+| `tools/qemu_smoke_outcome.py` | Add the small decoded-line formatter; retain every existing function. |
+| `tools/qemu_smoke_cli.py` | Import that formatter and publish the accepted single result after original TAP success. |
+| `CMakeLists.txt` | Add one option token immediately after the original runner path in each of the two targets below. |
+| `tests/host/qemu_transcript_source.py` | Independent exact source/option/recipe additions and finite inverses. No new historical digest or runtime dependency. |
+| `tests/host/test_qemu_transcript.py` | Deterministic observable reporting, single-execution, parser and finite-inverse regressions in ordinary full discovery. |
+| `tests/host/diagnostic_history_source.py` | Compose the new source and observed-option inverses before the existing PLAT01 inverses. |
+| `tests/host/selected_ownership_source.py` | Compose the new recipe inverse before the unchanged MEM03 recipe checks. |
+| `tests/host/test_selected_ownership.py` | Apply only the prerequisite recipe inverse to the actual current text in the existing forward recipe comparison; retain its expected bytes and subsequent inverse/corruption checks. |
+
+The two target names are `test-qemu-user-address-space` and
+`test-qemu-address-space-handoff`. Keep their guards, interpreter, runner,
+guest configuration, markers, legacy requirements, dependencies and 8/20
+timeouts exact. No preset, target, generator, CTest, Python fast-member or
+runner-family member is added.
+
+The finite source inverse recognizes the complete independently written
+option/validation, formatter and CLI additions, including their exact owner,
+placement, signatures, import and forwarding. Partial, duplicate, reordered
+or altered additions cannot be erased. Removing these additions must recover
+the original complete source through the existing PLAT01 transport.
+The option inverse removes only the one observed option at its specified
+position on the same parser. The recipe inverse removes only the two exact
+tokens in their unique target/runner anchors, rejecting partial, duplicate,
+relocated or extra occurrences. Historical inputs without the extension
+remain valid inputs to these transport functions.
+
+Current behavioral/recipe tests require the extension to exist; historical
+passthrough is not permission to omit it from the current product. Existing
+outside-byte comparisons remain authoritative. Do not replace their expected
+hashes with hashes of current files or weaken helper-source/loader closure.
+Preserve all predecessor facts/fingerprints/claims/retirements; this outcome
+adds no runtime authority transition or new baseline family.
+
+The current normalization chain is MEM03, MEM02, MEM01, panic-trace, terminal,
+diagnostic and stack/root-recipe projection. Put the new inverse inside the
+MEM03 projection entry point for its direct and indirect consumers.
+The MEM03 test also compares raw current CMake with `extend_cmake(original)`
+before calling that entry point. In this one forward comparison, apply
+`project_transcript_cmake(current)` to the observed side only. Keep the
+independently pinned original input, extender and expected hashes unchanged.
+Keep the original inverse assertion and corruption case on raw current text;
+the new reporting tests independently require both current option tokens.
+On the later MEM04 restart, its new native-recipe inverse runs first, followed
+by this prerequisite inverse and the unchanged predecessor chain. MEM04
+freezes the actual prerequisite-bearing base rather than borrowing an old
+CMake hash or Red record.
+
+### Work, failure and acceptance
+
+For `n` decoded output characters, optional formatting is `O(n)` work in
+average, worst and amortized terms, with `O(n)` temporary split-line storage
+and constant call depth. Execution already owns the captured result; no
+second guest, capture, parser or persistent cache is introduced. Default
+execution adds only constant flag checks. This is diagnostic work after
+acceptance, not added guest work or a kernel hot-path change.
+
+Before production editing, write a regression that supplies the real
+baseline CLI with an explicitly requested-report namespace, an accepted
+captured result and a counted execution boundary. It must reach original
+successful acceptance, execute once, and fail specifically because the
+witness is missing. An unrecognized CLI option alone is not that Red.
+Then test the actual new parser/CLI end to end with deterministic captured
+results. Cover default suppression, requested pass/expected-panic output,
+failure/timeout/serial-input rejection without duplication, empty and
+unterminated output, and multi-memory rejection before execution.
+
+Use in-memory malformed-extension cases and the existing source, recipe,
+inventory and stack checks to prove narrow admission. No new full proof
+belongs inside a per-record lookup. Focused implementation iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_qemu_transcript tests.host.test_run_qemu_smoke tests.host.test_qemu_runner_source_layout tests.host.test_diagnostic_history tests.host.test_selected_ownership tests.host.test_validation_context tests.host.test_validation_build_impact tests.host.test_stack_observer_abi tests.host.test_evidence_authority
+cmake --workflow --preset test-qemu-user-address-space
+cmake --workflow --preset test-qemu-address-space-handoff
+```
+
+The new test module/option do not exist during design. Actual target evidence
+must show each workflow's existing exact component-pass record once as a
+guest diagnostic after TAP success, with unchanged acceptance and deadlines.
+Unit fixtures prove host formatting only, not hardware behavior.
+
+Before independent first-commit review, establish native no-work state and
+run the unchanged complete fresh fifty-command author producer, including
+all current target/image/stack coverage and three same-run reusable profiles.
+No native, target or integration gate is waived. Successful prerequisite
+publication does not certify the archived MEM04 implementation.
+
 ## Preserved behavior
 
 The [fixed responsibility study](../research/minix-qemu-runner-source-organization.md)

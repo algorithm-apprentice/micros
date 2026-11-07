@@ -123,3 +123,4 @@ to make the project appear more consistent than it was.
 | [0105](0105-bounded-validation-feedback.md) | Bounded validation feedback | Accepted |
 | [0106](0106-granular-selected-ownership-native-source-authority.md) | Granular selected-ownership native source authority | Accepted |
 | [0107](0107-selected-user-address-space-validation.md) | Selected user address-space validation | Accepted |
+| [0108](0108-qemu-accepted-transcript-reporting.md) | QEMU accepted transcript reporting | Accepted |

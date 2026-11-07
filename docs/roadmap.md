@@ -249,9 +249,15 @@ checked selected lookup, translation, allocation preflight and root
 preparation/activation. Bounded VM/TTY binding inspection removes hidden
 global validation without replacing command authorization. The proposal
 also preserves complete diagnosis and fixes the directly coupled allocator
-cursor compensation gap. Only design is active; no MEM04 runtime or
-executable evidence exists. Hosted CI and later runtime findings retain
-their separate owners.
+cursor compensation gap. Design #222 is separately merged. Its uncommitted
+implementation reached actual Red and current native evidence, but the
+canonical successful QEMU output omitted the semantic witnesses required
+for Green. The candidate is archived without a Green event, retirement or
+implementation publication.
+[Accepted ADR-0108](adr/0108-qemu-accepted-transcript-reporting.md) defines
+the separate MEM04-C01 reporting prerequisite. Its design and implementation
+must merge before MEM04 restarts from current main with renewed evidence.
+Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
