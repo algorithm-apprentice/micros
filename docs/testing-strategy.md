@@ -637,7 +637,14 @@ retirement is claimed.
 define a separate single-run reporting prerequisite, with host output
 regressions and real canonical workflow evidence. It changes no legacy
 acceptance, timeout, fast membership or final native/target/integration/stack
-coverage. MEM04 must renew its actual evidence after that prerequisite merges,
+coverage. Design #223 is separately merged. The implementation adds
+`tests/host/test_qemu_transcript.py` to ordinary full discovery and enables
+the option on only the two existing memory workflows. Its baseline regression
+fails on the absent successful observation after one accepted execution.
+Independent source/option/recipe inverses retain the old expected values;
+the MEM03 forward-comparison adapter removes only the new recipe tokens from
+its observed side. Focused commands are in the linked reporting contract.
+MEM04 must renew its actual evidence after that prerequisite merges,
 reusing one owned workflow result for its within-phase consumers rather than
 running QEMU twice.
 

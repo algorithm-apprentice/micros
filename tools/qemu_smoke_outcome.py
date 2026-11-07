@@ -474,3 +474,8 @@ def print_tap_result(
         SmokeOutcome.UNEXPECTED_EXIT: 3,
         SmokeOutcome.TIMEOUT: 4,
     }.get(outcome, 3)
+
+
+def print_transcript(output):
+    for line in output.splitlines(keepends=True):
+        print(f"# {line}", end="")

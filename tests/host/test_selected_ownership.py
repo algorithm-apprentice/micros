@@ -395,7 +395,9 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
             cwd=ROOT, text=True, timeout=30,
         )
         current = (ROOT / "CMakeLists.txt").read_text()
-        self.assertEqual(source.extend_cmake(original), current)
+        from tests.host.qemu_transcript_source import project_transcript_cmake
+
+        self.assertEqual(source.extend_cmake(original), project_transcript_cmake(current))
         self.assertEqual(original, source.project_cmake(current))
         with self.assertRaises(ValueError):
             source.project_cmake(current.replace("MICROS_SELECTED_OWNERSHIP_LAUNCHER=1", "MICROS_SELECTED_OWNERSHIP_LAUNCHER=0", 1))
