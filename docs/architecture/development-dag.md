@@ -107,10 +107,14 @@ documentation-first evidence prerequisite. Separate design #220 and
 independently reviewed implementation #221 are now merged.
 The Accepted [MEM04 selected-operation contract](selected-user-address-space.md)
 has completed independent design review and separately merged as #222.
-The first uncommitted implementation is archived and blocked on the
+The first uncommitted implementation was archived for the
 [MEM04-C01 successful-output prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting).
-Its design and implementation execute sequentially before a fresh MEM04
-restart with renewed evidence. Its five selected-operation migrations and explicit
+Separate design #223 and independently reviewed implementation #224 are now
+merged. The fresh restart exposed an indirect handoff error dependency and
+is also archived without Green or retirement.
+[Accepted ADR-0109](../adr/0109-handoff-preflight-error-ownership.md) has clean
+independent design review; MEM04 implementation stays blocked until its
+separate design merge. Its five selected-operation migrations and explicit
 twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime
 prerequisites do not change.

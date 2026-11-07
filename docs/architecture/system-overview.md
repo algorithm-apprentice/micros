@@ -179,7 +179,12 @@ Design #222 is merged; the committed runtime still has the complete-root
 cadence described above. An uncommitted implementation was archived when the
 successful QEMU runner withheld its semantic witnesses. The separate
 [MEM04-C01 reporting prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
-must complete before a fresh MEM04 restart; no Green or retirement is claimed.
+is independently reviewed and merged as #223/#224. The fresh restart exposed
+a handoff error dependency on the old global PC/SP lookup audit. Its
+[Accepted caller-owned correction](../adr/0109-handoff-preflight-error-ownership.md)
+keeps full diagnosis at the existing handoff boundary without restoring
+global hot-path checks. That candidate is also archived; no MEM04 Green or
+retirement is claimed.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

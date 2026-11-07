@@ -3,7 +3,8 @@
 ## Status and fixed baseline
 
 This is the Accepted MEM04 contract under
-[ADR-0107](../adr/0107-selected-user-address-space-validation.md).
+[ADR-0107](../adr/0107-selected-user-address-space-validation.md), with the
+Accepted [ADR-0109 dependency refinement](../adr/0109-handoff-preflight-error-ownership.md).
 The [fixed-source study](../research/minix-selected-user-address-space.md)
 records the MINIX baseline, current costs, controller call chains and
 complete-validator census. Independent design review found no substantive
@@ -11,8 +12,13 @@ issue, and design #222 separately merged. The first uncommitted attempt is
 archived without Green, retirement or implementation publication because
 successful QEMU output did not expose the required witnesses. The separate
 [MEM04-C01 prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
-must merge before a fresh implementation restart. Acceptance is not runtime
-or retirement evidence.
+has separately merged as design #223 and implementation #224.
+That fresh restart is also archived without Green or retirement after
+exposing an indirect handoff error dependency. The
+[Accepted ADR-0109 correction](../adr/0109-handoff-preflight-error-ownership.md)
+has completed independent design review. Implementation remains blocked
+until its separate merge. The dependency section below explicitly retains
+the original 28-path affected-fact closure while adding one production path.
 
 ```text
 runtime reference: f28377decc0d20533e05330f2f2211db3f230910
@@ -402,12 +408,95 @@ diagnostic bodies. The old all-root operation may mutate its runtime view
 while enumerating; new shared callers must not mistake that temporary
 selection for their requested process.
 
+## Handoff preflight error ownership
+
+This section is Accepted under
+[ADR-0109](../adr/0109-handoff-preflight-error-ownership.md).
+It is a corrective design, not an implemented exception. Its
+[observed source dependency](../research/minix-selected-user-address-space.md#indirect-handoff-preflight-error-dependence)
+requires one additional owning source, not a restored global lookup audit.
+
+The explicit dependent production path is:
+
+```text
+kernel/memory/user_address_space_handoff.c
+```
+
+In each of `micros_user_address_space_prepare_wired_handoff()` and
+`micros_user_address_space_complete_wired_handoff()`, retain the existing
+`micros_user_address_space_validate_locked()` call and its non-OK guard.
+Inside that guard, set the returned error to `STATE` before the existing
+scratch-release cleanup. Change only those two scalar assignments.
+
+Handoff owns this normalization because it already reports an unusable
+prepared execution state as `STATE`. Previously its context check inherited
+complete-root rejection accidentally through the PC/SP lookups. The selected
+lookup must not restore that hidden scan. The explicit complete validator
+retains its own specific diagnostic errors and all rejection/ownership checks.
+
+Preserve every other error and its order: runtime/phase, object/ledger
+metadata, missing/invalid context, scratch admission, reachable-set
+selection, required `VM_WIRED` targets and lower ownership preflight.
+In particular, target mismatch still returns `OWNERSHIP`; this is not a
+blanket error mapping. No PTE, owner, target, phase, scratch lifecycle or
+non-failing commit changes. No validation call is added or moved, so the
+25-to-20 complete-audit caller ledger and MEM05's later algorithm ownership
+remain intact.
+
+### Exact dependency and authority partition
+
+After the separate corrective design merge, the source domain is seventeen production
+files and twelve frozen candidate/assertion paths: 29 total. The original
+33 active retirement keys still derive exactly their original 28-path
+closure. Independently declare the handoff path as the sole
+`dependent_production_paths` member, disjoint from that closure and included
+in the seventeen production paths. Candidate-domain equality is exactly
+the derived closure plus this one dependency, not an open extra-path allowance.
+
+Include that exact dependency in every B01-B12/B14 unit input projection and
+in the reference/current production snapshots. Exclude it from immutable
+command/oracle inputs only by this explicit partition. The existing EV01
+closure rules already union affected-fact paths with declared unit input
+paths; do not change the shared rules.
+
+The handoff file's whole-file historical key is already retired by MEM03.
+Do not add it to MEM04's claim. Preserve every active MEM03 clause: the
+definition set, signatures, CPP guards, exact callee sets, skeleton and all
+other function bodies. The two functions are already mutable under their
+fixed call sets; scalar normalization invalidates no additional active key.
+
+The new MEM04 source guard must admit only the two exact scalar insertions
+at the specified guards and recover the fixed original bodies after their
+removal. All other handoff bytes remain checked. Freeze this inverse before
+new production editing. Keep 33 keys, the 26/6/1 oracle partition, eight new
+evidence owners, 4,774 predecessor facts, nineteen fingerprints, five prior
+claims and seventy prior retirements unchanged.
+
+### Required evidence
+
+Retain the original strict handoff fixture unchanged, including `STATE` for
+an orphan process frame/missing context and `OWNERSHIP` for a transferable
+target. The earlier sixteen-subject candidate fails that orphan regression;
+do not accept its stage-5 panic as the planned semantic Red.
+
+Restart from the corrected design's current main and renew the original
+native/target Red before production edits. The corrected Green must pass
+those original handoff assertions and reach the independent stage-8 scoped
+translation witness. Keep same-run target ownership, complete native
+composition, B01-B12/B14 recertification and the full producer.
+
+The existing MEM04 target-capture owner must show the already captured output
+when capture/schema checking fails, then propagate failure without recording
+Green. This diagnostic path must not execute a second guest or become a
+replacement oracle. No additional evidence file or target fixture is needed.
+
 ## Exact source subjects and existing identities
 
 The production subjects are the existing public/private user-address-space
 headers; runtime, validation, mapping, activation, mutation, TTY and VM
 scratch owners; scheduler context; VM core/runtime and their headers; and
-TTY runtime validation/header. This is sixteen production files.
+TTY runtime validation/header. These are the sixteen original production
+subjects. The one explicit handoff dependency above gives seventeen total.
 
 Two existing target fixture owners receive frozen, exact expectation/
 observation adaptations:
@@ -488,7 +577,7 @@ file-scope storage, types or includes that would invalidate their retained
 skeletons. A needed expansion beyond this exact scope is a design finding,
 not permission to append retirement keys during implementation.
 
-The direct existing closure has 28 paths: sixteen production subjects,
+The direct existing 33-key closure has 28 paths: sixteen original production subjects,
 two target fixtures and ten declaration/assertion owners. It excludes
 shared C inspectors, operation-count policy, stack tooling and aggregate
 historical reference records. A shared payload intersection, including a
@@ -530,8 +619,10 @@ source projection. Preserve all old fingerprints; the resulting catalog has
 4,782 facts in twenty families. A completed transition adds one sixth claim
 and only its 33 new retired keys.
 
-The direct 28-path closure has sixteen production subjects and twelve
-frozen candidate/declaration/assertion paths. The two target fixture
+The direct 28-path closure has sixteen original production subjects and
+twelve frozen candidate/declaration/assertion paths. The explicit dependent
+handoff source makes the complete candidate domain 29 paths, with seventeen
+production subjects. The two target fixture
 adaptations and ten existing assertion/declaration owners are frozen before
 actual Red. Both native-binding literal modules remain byte-identical.
 An owner being in the candidate closure is not permission to change it
@@ -681,8 +772,9 @@ prerequisite supplies opt-in accepted diagnostic output through their existing
 runner. After its separate implementation merge, the fresh MEM04 attempt
 freezes those reporting inputs and actual new base membership before renewed
 Red. Its host oracle consumes the same run's diagnostic witnesses on Green
-and recertification; a TAP success alone remains insufficient. The sixteen
-production subjects, 33-key plan and eight evidence owners do not expand.
+and recertification; a TAP success alone remains insufficient. The reporting
+prerequisite itself adds no runtime scope. ADR-0109 separately adds only the
+explicit handoff dependency; the 33-key plan and eight evidence owners remain.
 
 The user-address-space fixture retains the five existing corruption inputs:
 foreign-owner leaf, table-as-leaf, malformed leaf, alias and unreachable

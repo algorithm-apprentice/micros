@@ -222,12 +222,19 @@ Real coverage Red, complete current acceptance, journal-free committed/main
 checks and exact cleanup passed.
 
 The Accepted [MEM04 contract](../architecture/selected-user-address-space.md)
-under [ADR-0107](../adr/0107-selected-user-address-space-validation.md) is now
-the sole active design. It includes bootstrap allocation's selected-prefix
+under [ADR-0107](../adr/0107-selected-user-address-space-validation.md) merged
+as design #222. The separate reporting prerequisite #223/#224 is also merged.
+The fresh uncommitted runtime attempt is archived after a demonstrated
+handoff error dependency; [Accepted ADR-0109](../adr/0109-handoff-preflight-error-ownership.md)
+has clean independent design review and awaits separate merge.
+MEM04 includes bootstrap allocation's selected-prefix
 check rather than leaving that ordinary per-page audit unowned, and retains
 an explicit twenty-row complete-audit ledger for existing diagnostics,
 certification and downstream correction owners. No global
 all-audits-removed claim or runtime retirement is made by this design.
+The Accepted one-file handoff dependency keeps the existing twenty audit
+callers and 33 retirement keys; its whole-file identity already belongs to
+committed MEM03 retirement and must not be retired twice.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 
