@@ -242,6 +242,13 @@ public declaration. The candidate is archived. The sole active
 adds only a fixed-source one-declaration header admission and exact
 five-helper callback-free admission for the existing visitor group.
 No runtime finding, existing callback authority or stack budget is waived.
+That design separately merged as #226. The fresh native/target Green
+candidate passed current visitor binding but failed the next fatal
+source-unit header predicate in an early ordinary/metadata check.
+It is archived.
+[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) has clean
+independent review and preserves all fatal proof obligations, seventeen
+production subjects, 29 candidate paths and the 33-key retirement scope.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

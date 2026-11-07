@@ -482,3 +482,84 @@ Its current author selector was withdrawn under its lock; immutable historical
 events remain. No implementation review, permanent MEM04 commit, stack
 certificate or merge was claimed. A separate documentation-only design must
 merge before a fresh implementation with these newly frozen inputs.
+
+## Fatal TTY header certificate gap
+
+Corrective visitor design #226 separately merged as
+`593b910cdaaff2a89018b0ffe7cd4e4bf853972c`, tree
+`315baff3f1d62776b36956dc583fa40e6388fa03`.
+The next candidate independently froze that 1,496-member base and all
+predecessor facts before test or runtime edits. Both visitor regressions
+failed against the original predicates, then all 42 stack evidence cases
+and the 82-case focused scaffold suite passed.
+
+Actual attempt `4d8aa5a9c5a94a10896d8788e1d43078` completed all four native
+products and both canonical target captures for Red and Green. All three
+Green oracles passed at tree `870036df6db027f9e0c34840bb48729c3ac31370`.
+The subsequent documented one-configuration `riscv64-debug` stack check
+built fresh ordinary/metadata images and passed passivity, actual callback
+binding and assembly collection. It then failed in the fatal source-unit
+guard, before a complete stack proof or certificate.
+Neither recertification nor the final full producer ran for this candidate.
+
+### Exact source conflict
+
+`tools/stack_bound_fatal.py:439-469`, `require_fatal_source_units()`,
+compares each projected `SOURCE_UNITS` input with its fixed source.
+The register includes `kernel/tty/tty_handoff_runtime.h` at line 96.
+The complete current register comparison found exactly one mismatch:
+
+| Input | SHA-256 |
+| --- | --- |
+| Fixed EV03 TTY runtime header | `6d8ae31b436a6d32f591b30346bd1d145634ae786425a12dcedc68df1ecda65c` |
+| Archived current TTY runtime header | `d0c766991bdefc5aa66c064d747068bcc65fd3c850b9f5373dfaab533872b511` |
+
+Removing only the ordinary
+`micros_tty_handoff_runtime_inspect_device_binding` declaration and its
+adjoining blank line recovers the fixed header byte-for-byte.
+The inspector is already required by MEM04's bounded binding contract.
+It adds no fatal type, field, layout, callback, CSR or state transition.
+The failure is another whole-header admission conflict, not a measured
+stack-budget excess.
+
+### Remaining fixed-source boundary census
+
+The census covers the seventeen production paths and both adapted target
+fixtures, rather than only the predicate that failed first.
+
+| Existing stack boundary | Intersection and disposition |
+| --- | --- |
+| Eight callback groups | Only the mapping source prefix and public user-address-space header intersect. ADR-0110 covers their one declaration and five qualified callback-free helpers; actual current-image binding passed before this failure. |
+| Fatal `SOURCE_UNITS` | Only the TTY runtime header differs after existing projections; all other register entries match. This is the one newly required admission. |
+| Console, panic and assembly source/layout | Their fixed console/architecture sources and three architecture context headers are outside the changed paths. |
+| Trap snapshot and saved supervisor continuations | The trap, grant, IPC and user-runtime source/storage registers are outside the changed paths. |
+| Producer-generation sources | The object, bootstrap, PM and application-generation register is outside the changed paths. |
+| Immutable target-test table | The grant command/copy/header register is unchanged; neither adapted memory fixture belongs to it. |
+| Observer and recipe authority | Observer sources are unchanged. The additive native recipe retains the already declared finite MEM04/earlier inverse chain; its current gates remain mandatory. |
+
+This source census does not replace actual object/link joining, complete
+machine closure or stack-budget acceptance in any configuration.
+
+The current inventory has no fact owned by `tools/stack_bound_fatal.py`.
+The existing `stack_bound_bindings.py` authority-commit record retains its
+23-path payload, which does not include this TTY header. Its original pin
+still identifies valid source and is not changed or retired. The correction
+refines the exact fatal-source structural predicate without creating a
+new transport identity or changing an old fact/fingerprint.
+
+### Required adaptation and archive
+
+[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) specifies
+original-or-one-exact-declaration admission at this one existing source-unit
+boundary. Expected tokens come from the fixed source plus the independently
+declared prototype, never from filtering or hashing the candidate.
+All fatal function, source/machine, qualifier, edge and budget obligations
+remain. The extra immutable owner is the existing fatal tool; runtime and
+retirement domains do not grow.
+
+The complete candidate is archived at tree
+`870036df6db027f9e0c34840bb48729c3ac31370`; its selected author journal was
+withdrawn under its writer lock while immutable events remain.
+No implementation review, permanent commit, complete stack certificate or
+MEM04 publication is claimed. A separate design-only merge must precede
+another fresh implementation and renewed actual evidence.

@@ -437,6 +437,39 @@ node is `(function-key, qualifier)`, with exactly `UNQUALIFIED` and
 `quiesced=true`, with SIE and SEIE clear. It is derived only from the
 normal-return and preservation proof below.
 
+#### MEM04 fatal TTY header extension
+
+[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) addresses the
+[next observed source-unit rejection](../research/minix-selected-user-address-space.md#fatal-tty-header-certificate-gap)
+after the repaired visitor binding passed in a fresh ordinary/metadata
+image pair. Implementation still requires its separate design merge.
+
+Only the existing `kernel/tty/tty_handoff_runtime.h` source-unit entry may
+admit either its original fixed header or the exact ordinary
+`micros_tty_handoff_runtime_inspect_device_binding` prototype specified in
+ADR-0111, immediately before the final outer include-guard terminator.
+Construct the expected extension from the unchanged fixed EV03 source.
+Keep complete comparison outside that one declaration, current tokenization
+and owned-source checks. A duplicate, relocated, conditional, changed or
+extra declaration must fail; no other header gains an extension rule.
+
+Only the existing predicate in `tools/stack_bound_fatal.py` and focused
+cases in `tests/host/test_stack_bound_evidence.py` may change. The fatal
+tool becomes the third immutable MEM04 stack-admission input alongside the
+ADR-0110 binding/test owners, never another mutable production subject.
+The failure diagnostic may identify the offending source path.
+
+Retain the complete source-unit set, terminal-control declarations,
+diagnostic storage/layout, observer-source guards and every source/machine
+and fatal-context obligation below. No function anchor, effect, qualifier,
+edge, frame, epoch or stack budget changes.
+
+After separate design merge, native tests exercise the public source-unit
+guard and its positive/negative controls in the existing stack evidence
+module. A fresh complete one-configuration ordinary/metadata proof follows
+actual MEM04 Green before recertification and the full producer. It is not
+a substitute for all 44 configurations, 113 ELFs and ten observed scopes.
+
 #### Closed source and effect register
 
 | Site or function | Permitted proof role |

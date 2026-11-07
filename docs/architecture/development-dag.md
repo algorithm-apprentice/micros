@@ -118,9 +118,14 @@ candidate completed actual Green and recertification but its full stack gate
 rejected the new ordinary public declaration at the old whole-header guard.
 The candidate is archived.
 [Accepted ADR-0110](../adr/0110-kernel-visitor-extension-admission.md) has clean
-independent correction review; MEM04 stays blocked until separate merge.
+independent correction review and separately merged as #226.
 It covers both the exact header extension and the five callback-free mapping
 helpers rejected by the following historical-function boundary.
+The fresh candidate passed actual native/target Green and current visitor
+binding, then an early stack check rejected the ordinary TTY inspector
+prototype at the fatal source-unit guard. The candidate is archived.
+[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) has clean
+independent design review; MEM04 remains blocked until separate merge.
 Its five selected-operation migrations and explicit
 twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime

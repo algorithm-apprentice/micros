@@ -21,8 +21,12 @@ The subsequent candidate completed actual Green and recertification, but
 its final stack gate rejected the unrelated new public prototype.
 [Accepted ADR-0110](../adr/0110-kernel-visitor-extension-admission.md) defines
 the required bounded header and callback-free helper admission.
-That candidate is archived;
-implementation remains blocked until this separate design merges.
+That candidate is archived. Corrective design #226 separately merged, and
+the fresh candidate passed actual native/target Green and repaired current
+visitor binding in an early ordinary/metadata stack check. The following
+fatal source-unit guard rejected the ordinary TTY inspector declaration.
+The candidate is archived; implementation remains blocked for the separate
+[Accepted ADR-0111 correction](../adr/0111-fatal-tty-header-extension.md).
 The dependency section below retains
 the original 28-path affected-fact closure while adding one production path.
 
@@ -598,11 +602,14 @@ requires exact origin and actual machine no-indirect-call evidence, rather
 than rejecting them solely because the original source predates them.
 All existing callback data, body anchors and source-machine obligations
 stay unchanged.
-After separate Acceptance/merge, only these two existing evidence owners
-join the immutable scaffold:
+ADR-0110's two existing owners remain bounded as specified there.
+[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) adds only the
+fatal-source predicate owner for the exact TTY declaration. After its
+separate Acceptance/merge, the complete immutable stack-admission register is:
 
 ```text
 tools/stack_bound_bindings.py
+tools/stack_bound_fatal.py
 tests/host/test_stack_bound_evidence.py
 ```
 
