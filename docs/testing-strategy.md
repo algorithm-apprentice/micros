@@ -607,6 +607,27 @@ The 4,774-fact catalog preserves every predecessor record and fingerprint.
 Focused Green does not replace the required full producer, independent
 first-commit review or journal-free committed publication evidence.
 
+EV01-C05 implementation #221 completed that final acceptance and merged with
+the exact reviewed tree. Its final full run retains 43 CTests and 1,534
+Python tests; current same-run receipts, complete target/stack evidence,
+independent review and committed/main authority checks passed.
+
+Accepted [ADR-0107](adr/0107-selected-user-address-space-validation.md) and
+the [MEM04 contract](architecture/selected-user-address-space.md) require
+actual-source native selected-path/context work and state evidence plus
+real QEMU activation/missing-translation Red. The current three-level walk
+must not lose table ownership-before-dereference, reserved-slot authority,
+output atomicity or protected-root lifetime when full audits are removed.
+Include the valid cursor-behind-allocated-words allocation-failure case:
+ordinary releases alone do not restore the original cursor.
+
+Its 33-key prospective transition preserves all 4,774 predecessor records
+and nineteen fingerprints. Frozen target adaptations retain complete
+diagnostic/release/destroy rejection while observing the changed selected
+results. The new native orchestration is one full-only slow CTest; fast
+membership and existing QEMU identities/timeouts remain unchanged.
+These are design requirements, not implemented tests or retirement evidence.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

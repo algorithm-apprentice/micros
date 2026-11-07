@@ -169,8 +169,14 @@ User lookup, translation and activation still perform complete root checks.
 MEM04 owns that later correction. Its design found the separate
 [selected-ownership native authority gap](../research/selected-ownership-native-source-authority-gap.md).
 Accepted [EV01-C05](selected-ownership-native-source-authority.md) names existing
-source clauses without changing admission or runtime behavior; MEM04 design
-waits for that prerequisite's separately reviewed implementation.
+source clauses without changing admission or runtime behavior; its
+independently reviewed implementation #221 is now merged.
+The Accepted [MEM04 contract](selected-user-address-space.md) defines checked
+selected paths, bounded controller-binding inspection and root preparation,
+including bootstrap allocation's selected preflight and exact cursor
+compensation. It explicitly separates scoped results from complete diagnosis.
+This is design only; the committed runtime still has the complete-root
+cadence described above.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
