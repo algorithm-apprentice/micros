@@ -175,8 +175,11 @@ The Accepted [MEM04 contract](selected-user-address-space.md) defines checked
 selected paths, bounded controller-binding inspection and root preparation,
 including bootstrap allocation's selected preflight and exact cursor
 compensation. It explicitly separates scoped results from complete diagnosis.
-This is design only; the committed runtime still has the complete-root
-cadence described above.
+Design #222 is merged; the committed runtime still has the complete-root
+cadence described above. An uncommitted implementation was archived when the
+successful QEMU runner withheld its semantic witnesses. The separate
+[MEM04-C01 reporting prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
+must complete before a fresh MEM04 restart; no Green or retirement is claimed.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

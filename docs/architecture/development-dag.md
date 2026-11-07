@@ -106,8 +106,11 @@ native-source checks. Accepted
 documentation-first evidence prerequisite. Separate design #220 and
 independently reviewed implementation #221 are now merged.
 The Accepted [MEM04 selected-operation contract](selected-user-address-space.md)
-has completed independent design review; implementation remains pending
-separate design merge. Its five selected-operation migrations and explicit
+has completed independent design review and separately merged as #222.
+The first uncommitted implementation is archived and blocked on the
+[MEM04-C01 successful-output prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting).
+Its design and implementation execute sequentially before a fresh MEM04
+restart with renewed evidence. Its five selected-operation migrations and explicit
 twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime
 prerequisites do not change.
