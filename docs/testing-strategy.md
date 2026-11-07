@@ -661,6 +661,23 @@ MEM03 guards. After separate design merge, renew Red, prove the original
 handoff regression and stage-8 witnesses, then complete every current gate.
 No stage-5 panic is accepted as the planned scoped-translation Red or Green.
 
+Corrective design #225 is separately merged. The next candidate passed
+actual Green, all thirteen recertifications, 44 CTests, 1,559 Python cases
+and every current QEMU/standalone-image workflow. Its full producer then
+failed the stack source-header predicate because the public preparation
+prototype changed the whole token vector, not the visitor contract.
+The [source comparison](research/minix-selected-user-address-space.md#kernel-visitor-header-certificate-gap)
+and [Accepted ADR-0110](adr/0110-kernel-visitor-extension-admission.md) define
+one exact registered-group header extension and admission of five qualified
+callback-free mapping helpers. B14 includes real compiled linked-catalogue
+regressions for the following historical-function boundary, not just
+header-predicate cases. Both source/origin and actual machine-indirect
+rejection remain required. These focused regressions do not replace the
+complete 44-configuration/113-ELF/ten-scope
+stack gate. All existing budgets and the blocked B13 admission remain.
+The implementation must restart and renew actual evidence after separate
+design merge; the archived 45 successful commands are not final acceptance.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

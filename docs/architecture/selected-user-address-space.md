@@ -16,8 +16,14 @@ has separately merged as design #223 and implementation #224.
 That fresh restart is also archived without Green or retirement after
 exposing an indirect handoff error dependency. The
 [Accepted ADR-0109 correction](../adr/0109-handoff-preflight-error-ownership.md)
-has completed independent design review. Implementation remains blocked
-until its separate merge. The dependency section below explicitly retains
+has completed independent design review and separately merged as #225.
+The subsequent candidate completed actual Green and recertification, but
+its final stack gate rejected the unrelated new public prototype.
+[Accepted ADR-0110](../adr/0110-kernel-visitor-extension-admission.md) defines
+the required bounded header and callback-free helper admission.
+That candidate is archived;
+implementation remains blocked until this separate design merges.
+The dependency section below retains
 the original 28-path affected-fact closure while adding one production path.
 
 ```text
@@ -582,6 +588,29 @@ two target fixtures and ten declaration/assertion owners. It excludes
 shared C inspectors, operation-count policy, stack tooling and aggregate
 historical reference records. A shared payload intersection, including a
 stack authority anchor, is not automatically a byte identity to retire.
+
+The Accepted [ADR-0110 extension](../adr/0110-kernel-visitor-extension-admission.md)
+addresses that exact visitor-group boundary without retiring its authority
+pin. It permits only the original public header or its one independently
+specified preparation prototype for the registered kernel-visitor group.
+It also declares exactly five callback-free mapping helper signatures and
+requires exact origin and actual machine no-indirect-call evidence, rather
+than rejecting them solely because the original source predates them.
+All existing callback data, body anchors and source-machine obligations
+stay unchanged.
+After separate Acceptance/merge, only these two existing evidence owners
+join the immutable scaffold:
+
+```text
+tools/stack_bound_bindings.py
+tests/host/test_stack_bound_evidence.py
+```
+
+They are exact frozen registration/admission adapters, not mutable
+production candidates. Seventeen production subjects, 29 candidate paths,
+the original 33 keys and eight new evidence owners do not expand.
+The exception changes no shared transition, path, source parser, collector,
+receipt, stack budget or workflow.
 
 Both MEM02 and MEM03 native consumers of changed headers remain consistent.
 Use exact finite header extensions/inverses; a trailing-byte mutation of an

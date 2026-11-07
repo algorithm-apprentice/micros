@@ -282,6 +282,22 @@ explicit normalization at the owning complete handoff checks. Its design is
 independently reviewed; implementation remains blocked until separate merge.
 No fixture expectation or shared
 authority rule is relaxed.
+Corrective design #225 separately merged as
+`36b26b658abef6a29e7b9ffc8340b3576ea3ccd7`, tree
+`ef91993f3c5aea07158df9fbb5ba1fe1ba77cb45`.
+The next candidate completed actual native/target Red, Green and all thirteen
+recertifications. Its complete producer passed 44 CTests, all 1,559 Python
+cases, all forty QEMU workflows and four standalone-image workflows, then
+stopped at the kernel-visitor whole-header check in stack certification.
+The only header change is the already Accepted ordinary preparation prototype.
+The candidate is archived without final acceptance or publication.
+[Accepted ADR-0110](adr/0110-kernel-visitor-extension-admission.md) defines
+the exact fixed-source header extension and five qualified callback-free
+mapping helpers without changing existing callback authority, old facts,
+stack budgets or required coverage. Independent design review identified
+the following function-inventory boundary before another implementation
+restart. Complete correction review is clean; separate merge remains required
+before implementation restarts.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
