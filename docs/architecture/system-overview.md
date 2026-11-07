@@ -148,7 +148,7 @@ separately reviewed [MEM02 kernel-map contract](kernel-mapping-topology.md):
 largest legal Sv39 leaves and checked parent-indexed table identities retain
 the exact mapping domains and permissions. Shared kernel root entries may
 be supervisor leaves or pointers to immutable subtrees. Private user leaves
-remain 4 KiB, and complete owner/root validation cadence is unchanged.
+remain 4 KiB.
 
 MEM03's [Accepted selected-ownership contract](selected-frame-ownership.md)
 separates operation-local metadata/record checks from explicit complete
@@ -158,12 +158,19 @@ the [complete-validator token-scope defect](../research/complete-validator-token
 Corrective design #216 is separately merged. Its later uncommitted candidate
 was preserved for the user-prioritized
 [validation feedback prerequisite](validation-feedback.md). Its separately
-reviewed implementation #218 is now merged and permits a fresh MEM03
-restart with one checked source view and full-only native orchestration.
-That tooling outcome changes no runtime authority.
-The committed runtime retains the
-complete-validation cadence described above until a separately reviewed
-implementation changes it.
+reviewed implementation #218 enabled a fresh MEM03 restart with one checked
+source view and full-only native orchestration. That restart is now merged
+as #219 after renewed native Red/Green, thirteen-unit recertification,
+complete acceptance and independent review. Selected ownership operations
+use active metadata and selected records; all eight complete-audit boundaries
+and complete diagnostic bodies remain.
+
+User lookup, translation and activation still perform complete root checks.
+MEM04 owns that later correction. Its design found the separate
+[selected-ownership native authority gap](../research/selected-ownership-native-source-authority-gap.md).
+Accepted [EV01-C05](selected-ownership-native-source-authority.md) names existing
+source clauses without changing admission or runtime behavior; MEM04 design
+waits for that prerequisite's separately reviewed implementation.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

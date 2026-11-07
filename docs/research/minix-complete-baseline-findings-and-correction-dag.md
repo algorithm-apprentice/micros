@@ -197,9 +197,25 @@ No implementation commit or merge occurred.
 The user-prioritized Accepted
 [bounded feedback prerequisite](../architecture/validation-feedback.md)
 separately merged as design #217 and independently reviewed implementation
-#218. MEM03 now restarts from that exact new base with fresh declarations and
-execution evidence. Finding ownership, the 59-node runtime graph and hosted-CI
-acceptance remain unchanged; the archive is not current retirement evidence.
+#218. MEM03 restarted from that exact new base with fresh declarations and
+execution evidence. Actual Red/Green, thirteen-unit recertification, all
+fifty fresh author commands and independent first-commit review passed.
+Implementation #219 merged as
+`da258293f507c745c8e157cd84bd13b2fb4b5e77`, with identical
+reviewed/committed/remote/preview/squash tree
+`5793c993338c22cf30aa552c9397c8aa234c33cc`.
+Journal-free committed/main checks and exact cleanup passed.
+B02-F002/B02-E002 are closed, leaving 65 pre-node runtime findings open.
+The archives are not this retirement evidence.
+
+The next MEM04 design found the
+[selected-ownership native-source authority gap](selected-ownership-native-source-authority-gap.md).
+Accepted [ADR-0106](../adr/0106-granular-selected-ownership-native-source-authority.md)
+defines [EV01-C05](../architecture/selected-ownership-native-source-authority.md):
+484 exact existing clauses, unchanged guards and no runtime retirement.
+This separate evidence design is the sole active task; MEM04 design waits
+for its separately reviewed implementation. Finding ownership, the 59-node
+runtime graph and hosted-CI acceptance remain unchanged.
 
 ## Consolidation invariants
 

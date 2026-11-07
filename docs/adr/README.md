@@ -121,3 +121,4 @@ to make the project appear more consistent than it was.
 | [0103](0103-selected-frame-ownership-validation.md) | Selected frame-ownership validation | Accepted |
 | [0104](0104-precise-complete-validator-token-authority.md) | Precise complete-validator token authority | Accepted |
 | [0105](0105-bounded-validation-feedback.md) | Bounded validation feedback | Accepted |
+| [0106](0106-granular-selected-ownership-native-source-authority.md) | Granular selected-ownership native source authority | Accepted |
