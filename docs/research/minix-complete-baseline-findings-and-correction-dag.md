@@ -213,8 +213,10 @@ The next MEM04 design found the
 Accepted [ADR-0106](../adr/0106-granular-selected-ownership-native-source-authority.md)
 defines [EV01-C05](../architecture/selected-ownership-native-source-authority.md):
 484 exact existing clauses, unchanged guards and no runtime retirement.
-This separate evidence design is the sole active task; MEM04 design waits
-for its separately reviewed implementation. Finding ownership, the 59-node
+Separate design #220 is merged as
+`1d9eab05afab16a4caff519a84790541036ee240`; its metadata-only implementation
+is the sole active task. MEM04 design waits for complete acceptance and
+independently reviewed implementation merge. Finding ownership, the 59-node
 runtime graph and hosted-CI acceptance remain unchanged.
 
 ## Consolidation invariants

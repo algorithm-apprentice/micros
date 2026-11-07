@@ -462,6 +462,124 @@ def _memory_native_binding_reference(root, policy, policy_tree):
     return reference, rows, fingerprints
 
 
+def selected_ownership_native_reference(root=ROOT):
+    contract = (root / "docs/architecture/selected-ownership-native-source-authority.md").read_text()
+    policy = re.search(r"^policy commit:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    tree = re.search(r"^policy tree:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    return _selected_ownership_native_reference(root, policy, tree)
+
+
+@lru_cache(maxsize=4)
+def _selected_ownership_native_reference(root, policy, policy_tree):
+    from tests.host.c_source_records import compact, function_records
+
+    def fixed_bytes(reference, path):
+        return subprocess.check_output(
+            ("git", "show", reference + ":" + path), cwd=root, timeout=30,
+        )
+
+    observed_tree = subprocess.check_output(
+        ("git", "rev-parse", policy + "^{tree}"), cwd=root, text=True, timeout=30,
+    ).strip()
+    if observed_tree != policy_tree:
+        raise ValueError("fixed selected-ownership policy commit/tree disagree")
+    owner = "tests/host/selected_ownership_source.py"
+    tree = ast.parse(fixed_bytes(policy, owner).decode())
+    roles, projection, recipe = (
+        literal_value(single_assignment(tree, name).value)
+        for name in ("SOURCE_ROLES", "SOURCE_PROJECTION", "RECIPE_ADMISSION")
+    )
+    names = {"_function_calls", "_current_calls", "_helper_contracts", "header_additions", "_source_skeleton"}
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    if len(functions) != len(names):
+        raise ValueError("fixed selected-ownership policy lost a comparison helper")
+    namespace = {"re": re}
+    # Only these pure helpers from the fixed commit execute, never candidate declarations.
+    exec(compile(ast.Module(body=functions, type_ignores=[]), policy + ":" + owner, "exec"), namespace)
+    runtime = projection["source_reference"]
+    reference = (("policy", policy, policy_tree), ("MEM03", runtime))
+    rows = []
+
+    def append(kind, path, contract, name=""):
+        generator = "tools/generate_selected_ownership_fixture.py"
+        assertions = (
+            (owner, generator) if path.endswith(".c") else (generator,)
+        ) if kind == "native-input" else (owner,)
+        rows.append((
+            "MEM03/" + kind + "/" + path + ("/" + name if name else ""),
+            path, assertions, contract,
+        ))
+
+    helpers = namespace["_helper_contracts"]()
+    for path in roles["production_paths"]:
+        original = fixed_bytes(runtime, path).decode()
+        if path.endswith(".h"):
+            if original.count("\n#endif") != 1:
+                raise ValueError("fixed selected-ownership header has an unexpected boundary")
+            expected = original.replace(
+                "\n#endif", "\n" + "\n".join(namespace["header_additions"](path)) + "\n\n#endif", 1,
+            )
+            append("header", path, {
+                "comparison": "compact-header-sha256",
+                "expected": hashlib.sha256(compact(expected).encode()).hexdigest(),
+            })
+            continue
+        records = function_records(original)
+        additions = projection["new_helpers"].get(path, ())
+        for name, record in records.items():
+            content = (
+                ("calls", tuple(sorted(namespace["_current_calls"](name, record.body))))
+                if name in projection["mutable_functions"][path] else
+                ("body-bytes-sha256", hashlib.sha256(record.body.encode()).hexdigest())
+            )
+            append("function", path, {
+                "comparison": "function", "signature": compact(record.signature),
+                "guards": record.guards, "content": content,
+            }, name)
+        for name in additions:
+            signature, calls = helpers[name]
+            append("function", path, {
+                "comparison": "function", "signature": compact(signature),
+                "guards": (), "content": ("calls", tuple(sorted(calls))),
+            }, name)
+        append("definitions", path, {
+            "comparison": "definition-set", "expected": tuple(sorted(set(records) | set(additions))),
+        })
+        append("skeleton", path, {
+            "comparison": "compact-skeleton-sha256",
+            "expected": hashlib.sha256(namespace["_source_skeleton"](original, records).encode()).hexdigest(),
+        })
+
+    members = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", runtime), cwd=root, timeout=30,
+    ).decode().split("\0")))
+    selected = {
+        path for path in members if path.endswith(".h") and path.startswith(("include/", "arch/", "kernel/"))
+    } | set(recipe["native_source_members"])
+    data = subprocess.check_output(("git", "archive", runtime, *sorted(selected)), cwd=root, timeout=30)
+    native = {}
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        for member in archive:
+            if member.isdir():
+                continue
+            if not member.isfile() or member.name not in selected or member.name in native:
+                raise ValueError("fixed selected-ownership archive has an unexpected entry")
+            native[member.name] = archive.extractfile(member).read()
+    if len(native) != 207 or set(native) != selected:
+        raise ValueError("fixed selected-ownership native membership changed")
+    for path, data in native.items():
+        if path not in roles["production_paths"]:
+            append("native-input", path, {
+                "comparison": "file-bytes-sha256", "expected": hashlib.sha256(data).hexdigest(),
+            })
+    rows = tuple(sorted(rows))
+    if len(rows) != len({row[0] for row in rows}) or len(rows) != 484:
+        raise ValueError("fixed selected-ownership clause census changed")
+    inventory_tree = ast.parse(fixed_bytes(policy, "tests/host/evidence_authority_inventory.py").decode())
+    previous = literal_value(single_assignment(inventory_tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
+    return reference, rows, previous
+
+
 class InventoryTests(unittest.TestCase):
     def test_fatal_firmware_facts_remain_artifacts_not_runtime_baseline_oracles(self):
         inventory = evidence_authority_inventory.current_inventory(ROOT)
@@ -573,8 +691,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(18, len(inventory.families))
-        self.assertEqual(4290, len(inventory.facts))
+        self.assertEqual(19, len(inventory.families))
+        self.assertEqual(4774, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1786,6 +1904,360 @@ class MemoryNativeBindingTests(unittest.TestCase):
                     continue
                 key = claim.claimed_identity_keys[0]
                 self.assertFalse(kernel_mapping_authority.identity_required(ROOT, key), key)
+
+
+class SelectedOwnershipNativeBindingTests(unittest.TestCase):
+    OWNER = "tests/host/selected_ownership_native_source_bindings.py"
+    FAMILY = "selected-ownership-native-admission"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.reference, cls.rows, cls.previous = selected_ownership_native_reference()
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.facts = tuple(fact for fact in cls.inventory.facts if fact.family == cls.FAMILY)
+        cls.declaration = (ROOT / cls.OWNER).read_text()
+
+    @classmethod
+    def expected_facts(cls):
+        consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+        return tuple(evidence_authority.Fact(
+            cls.OWNER + ":native-source-admission:" + scope, cls.FAMILY, cls.OWNER,
+            "native-source-admission", scope, evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, tuple(sorted({cls.OWNER, subject, *assertions})),
+            digest((cls.reference, scope, subject, assertions, contract)),
+        ) for scope, subject, assertions, contract in cls.rows)
+
+    @classmethod
+    def fixture(cls, directory):
+        root = Path(directory)
+        for path in {value for fact in cls.expected_facts() for value in fact.payload_paths}:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(cls.declaration if path == cls.OWNER else "")
+        return root
+
+    @classmethod
+    def materialize(cls, root):
+        return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
+
+    @staticmethod
+    def declaration_text(reference, rows):
+        return "BINDING_REFERENCE = " + repr(reference) + "\nNATIVE_SOURCE_BINDINGS = " + repr(rows) + "\n"
+
+    def test_existing_current_rejections_have_individual_inventory_keys(self):
+        from tests.host import selected_ownership_source as source
+        from tests.host.c_source_records import compact, function_records
+        from tests.host.work_count_types import Stage
+        from tools import generate_selected_ownership_fixture as generator
+
+        subject = "kernel/memory/user_address_space_validation.c"
+        current = (ROOT / subject).read_text()
+        source.validate_retained_source(ROOT, subject, current, Stage.GREEN)
+        name = "micros_user_address_space_validate"
+        record = function_records(current)[name]
+        fragment = record.signature + "{" + record.body + "}"
+        self.assertEqual(1, current.count(fragment))
+        changed_body = record.body + "\n "
+        self.assertEqual(compact(record.body), compact(changed_body))
+        changed = current.replace(fragment, record.signature + "{" + changed_body + "}", 1)
+        with self.assertRaisesRegex(ValueError, "retained diagnostic or unrelated body"):
+            source.validate_retained_source(ROOT, subject, changed, Stage.GREEN)
+        with self.assertRaisesRegex(ValueError, "missing or unadmitted definitions"):
+            source.validate_retained_source(
+                ROOT, subject, current + "\nstatic void native_identity_probe(void) {}\n", Stage.GREEN,
+            )
+
+        generator.source_bundle(ROOT, Stage.GREEN, "ordinary")
+        read = generator.read_regular
+        headers = (
+            "include/micros/user_address_space.h",
+            "kernel/memory/user_address_space_internal.h",
+        )
+        for selected in headers:
+            def changed_read(path):
+                data, identity = read(path)
+                return (data + b"\n" if path == ROOT / selected else data), identity
+
+            with self.subTest(guard=selected), patch.object(
+                generator, "read_regular", side_effect=changed_read,
+            ), self.assertRaisesRegex(ValueError, "unadmitted native dependency"):
+                generator.source_bundle(ROOT, Stage.GREEN, "ordinary")
+
+        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        required = (
+            "MEM03/function/" + subject + "/" + name,
+            "MEM03/definitions/" + subject,
+            *("MEM03/native-input/" + path for path in headers),
+        )
+        for scope in required:
+            with self.subTest(scope=scope):
+                self.assertTrue(
+                    self.OWNER + ":native-source-admission:" + scope in keys,
+                    "missing identity for an existing rejecting MEM03 assertion: " + scope,
+                )
+
+    def test_complete_bindings_preserve_fixed_policy_and_every_predecessor(self):
+        from tests.host import selected_ownership_native_source_bindings as declarations
+
+        self.assertEqual(self.reference, declarations.BINDING_REFERENCE)
+        self.assertEqual(self.rows, declarations.NATIVE_SOURCE_BINDINGS)
+        self.assertEqual(self.expected_facts(), self.facts)
+        self.assertEqual(484, len(self.facts))
+        self.assertEqual(
+            fact_set_digest(self.expected_facts()),
+            dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
+        )
+        self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
+        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        self.assertEqual(4290, len(retained))
+        self.assertEqual(18, len(self.previous))
+        for family, expected in self.previous.items():
+            with self.subTest(family=family):
+                self.assertEqual(expected, fact_set_digest(fact for fact in retained if fact.family == family))
+        self.assertEqual(
+            {"body-bytes-sha256": 216, "calls": 35},
+            Counter(row[3]["content"][0] for row in self.rows if row[0].startswith("MEM03/function/")),
+        )
+        self.assertEqual(
+            {1: 153, 2: 43},
+            Counter(len(row[2]) for row in self.rows if row[0].startswith("MEM03/native-input/")),
+        )
+
+    def test_existing_admission_normalizations_and_consumers_remain_distinct(self):
+        from tests.host import selected_ownership_source as source
+        from tests.host.work_count_types import Stage
+
+        for path in source.SOURCE_ROLES["production_paths"]:
+            with self.subTest(positive=path):
+                source.validate_retained_source(ROOT, path, (ROOT / path).read_text(), Stage.GREEN)
+        header = "include/micros/frame_ownership.h"
+        current = (ROOT / header).read_text()
+        source.validate_retained_source(ROOT, header, current + "\n ", Stage.GREEN)
+        fixed_c = next(
+            row[1] for row in self.rows
+            if row[0].startswith("MEM03/native-input/") and row[1].endswith(".c")
+        )
+        current = (ROOT / fixed_c).read_text()
+        source.validate_retained_source(ROOT, fixed_c, current, Stage.GREEN)
+        with self.assertRaisesRegex(ValueError, "fixed or noncandidate source changed"):
+            source.validate_retained_source(ROOT, fixed_c, current + "\n ", Stage.GREEN)
+        for path in ("include/micros/user_address_space.h", "kernel/memory/user_address_space_internal.h"):
+            with self.subTest(header=path), self.assertRaisesRegex(ValueError, "no fixed source binding"):
+                source.validate_retained_source(ROOT, path, (ROOT / path).read_text(), Stage.GREEN)
+
+    def test_declaration_is_literal_only_and_cannot_execute_or_rebind(self):
+        reference = "BINDING_REFERENCE = " + repr(self.reference) + "\n"
+        rows = "NATIVE_SOURCE_BINDINGS = " + repr(self.rows) + "\n"
+        malformed = (
+            "", reference, rows, reference + reference + rows,
+            self.declaration + "\nextra = 1\n",
+            self.declaration + "\nraise RuntimeError('must not execute')\n",
+            self.declaration + "\ndef hidden():\n    BINDING_REFERENCE = 0\n",
+            reference + "NATIVE_SOURCE_BINDINGS: tuple = " + repr(self.rows),
+            reference + "NATIVE_SOURCE_BINDINGS = tuple()\n",
+            reference + "NATIVE_SOURCE_BINDINGS = []\n",
+            reference + "NATIVE_SOURCE_BINDINGS = True\n",
+            reference + "NATIVE_SOURCE_BINDINGS = None\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-selected-native-literals-") as directory:
+            root = self.fixture(directory)
+            for index, text in enumerate(malformed):
+                with self.subTest(case=index):
+                    (root / self.OWNER).write_text(text)
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+
+    def test_scope_value_owner_and_reference_drift_cannot_rebaseline_bindings(self):
+        first = self.rows[0]
+        variants = {
+            "missing": self.rows[:-1],
+            "extra": (*self.rows, first),
+            "duplicate": (*self.rows[:-1], first),
+            "order": tuple(reversed(self.rows)),
+            "scope": ((first[0].replace("MEM03/", "MEM99/", 1), *first[1:]), *self.rows[1:]),
+            "subject": ((first[0], "kernel/memory/frame_ownership.c", *first[2:]), *self.rows[1:]),
+            "assertion": ((*first[:2], ("tests/host/kernel_mapping_source.py",), first[3]), *self.rows[1:]),
+            "comparison": ((*first[:3], {**first[3], "comparison": "other"}), *self.rows[1:]),
+            "value": ((*first[:3], {**first[3], "expected": ("invented_definition",)}), *self.rows[1:]),
+            "field": ((*first[:3], {**first[3], "extra": 0}), *self.rows[1:]),
+        }
+        for suffix, assertions in (
+            (".c", ("tools/generate_selected_ownership_fixture.py",)),
+            (".h", ("tests/host/selected_ownership_source.py", "tools/generate_selected_ownership_fixture.py")),
+        ):
+            index = next(
+                index for index, row in enumerate(self.rows)
+                if row[0].startswith("MEM03/native-input/") and row[1].endswith(suffix)
+            )
+            row = self.rows[index]
+            variants["consumers" + suffix] = (
+                *self.rows[:index], (*row[:2], assertions, row[3]), *self.rows[index + 1:],
+            )
+        index = next(
+            index for index, row in enumerate(self.rows)
+            if row[3].get("content", ("",))[0] == "body-bytes-sha256"
+        )
+        row = self.rows[index]
+        variants["body-normalization"] = (
+            *self.rows[:index],
+            (*row[:3], {**row[3], "content": ("lexical-body-sha256", row[3]["content"][1])}),
+            *self.rows[index + 1:],
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-selected-native-drift-") as directory:
+            root = self.fixture(directory)
+            for label, rows in variants.items():
+                with self.subTest(case=label):
+                    (root / self.OWNER).write_text(self.declaration_text(self.reference, rows))
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+            changed = (("policy", "0" * 40, self.reference[0][2]), self.reference[1])
+            (root / self.OWNER).write_text(self.declaration_text(changed, self.rows))
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+
+    def test_payloads_are_exact_ordinary_files_not_candidate_expectations(self):
+        selected = (
+            self.OWNER, "kernel/memory/user_address_space_validation.c",
+            "include/micros/user_address_space.h", "tests/host/selected_ownership_source.py",
+            "tools/generate_selected_ownership_fixture.py",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-selected-native-paths-") as directory:
+            root = self.fixture(directory)
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            (root / selected[1]).write_text("candidate bytes cannot replace the historical expectation\n")
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            peer = root / "payload-peer"
+            peer.write_text("not an admitted source")
+            for relative in selected:
+                path = root / relative
+                saved = path.read_bytes()
+                for kind in ("missing", "symlink", "hardlink"):
+                    with self.subTest(path=relative, kind=kind):
+                        path.unlink()
+                        if kind == "symlink":
+                            path.symlink_to(peer)
+                        elif kind == "hardlink":
+                            os.link(peer, path)
+                        with self.assertRaises(ValueError):
+                            self.materialize(root)
+                        if path.exists() or path.is_symlink():
+                            path.unlink()
+                        path.write_bytes(saved)
+            parent = root / "kernel/memory"
+            moved = root / "saved-memory"
+            parent.rename(moved)
+            parent.symlink_to(moved, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+            parent.unlink()
+            moved.rename(parent)
+
+    def test_selected_clause_closure_preserves_real_overlap_rejection(self):
+        scopes = {
+            "MEM03/function/kernel/memory/user_address_space_validation.c/micros_user_address_space_validate",
+            "MEM03/definitions/kernel/memory/user_address_space_validation.c",
+            "MEM03/native-input/include/micros/user_address_space.h",
+            "MEM03/native-input/kernel/memory/user_address_space_internal.h",
+        }
+        facts = tuple(fact for fact in self.facts if fact.scope in scopes)
+        self.assertEqual(4, len(facts))
+        keys = tuple(fact.key for fact in facts)
+        units = facts[0].consumer_units
+        subjects = (
+            "include/micros/user_address_space.h", "kernel/memory/user_address_space_internal.h",
+            "kernel/memory/user_address_space_validation.c",
+        )
+        paths = tuple(sorted({path for fact in facts for path in fact.payload_paths}))
+        plan = evidence_authority.synthetic_plan(evidence_authority.synthetic_inventory())
+        plan = dataclasses.replace(
+            plan, owner_unit="B02", finding_ids=("B02-F999",),
+            affected_identity_keys=keys, retained_identity_keys=(), planned_retirement_identity_keys=keys,
+            replacement_oracles=(dataclasses.replace(
+                plan.replacement_oracles[0], replaces_identity_keys=keys,
+            ),),
+            recertification_units=units,
+            unit_commands=tuple((unit, ("validate-" + unit.lower(),)) for unit in units),
+        )
+        authority = dataclasses.replace(
+            evidence_authority.synthetic_task_authorities(plan)[plan.owner_task],
+            command_input_paths=(
+                "tests/host/c_source_records.py", "tests/host/work_count_evidence.py",
+                "tools/stack_bound_assembly.py",
+            ),
+            unit_input_paths=tuple((unit, subjects) for unit in units),
+        )
+        environment = evidence_authority.synthetic_environment(plan)
+        immutable = dict(environment.immutable_inputs)
+        del immutable["tools/command_registry.py"]
+        immutable.update(
+            (path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in authority.command_input_paths
+        )
+        candidate = tuple((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths)
+        selected = tuple(item for item in candidate if item[0] in subjects)
+        environment = dataclasses.replace(
+            environment, immutable_inputs=tuple(sorted(immutable.items())),
+            red_candidate_inputs=candidate, current_candidate_inputs=candidate,
+            unit_inputs=tuple((unit, selected) for unit in units),
+        )
+        registry = evidence_authority.synthetic_transition_registry(plan)
+        result = evidence_authority.validate_transition(
+            self.inventory, {plan.owner_task: authority}, registry, plan, (), environment,
+        )
+        self.assertTrue(result.ok, result)
+        self.assertIs(evidence_authority.TransitionState.REPLACEMENT_REGISTERED, result.state)
+        self.assertFalse(result.retired_identity_keys)
+        for overlap in (subjects[2], self.OWNER, "tests/host/selected_ownership_source.py"):
+            with self.subTest(overlap=overlap):
+                changed_authority = dataclasses.replace(
+                    authority, command_input_paths=(*authority.command_input_paths, overlap),
+                )
+                changed_environment = dataclasses.replace(
+                    environment,
+                    immutable_inputs=(*environment.immutable_inputs, (overlap, dict(candidate)[overlap])),
+                )
+                result = evidence_authority.validate_transition(
+                    self.inventory, {plan.owner_task: changed_authority}, registry,
+                    plan, (), changed_environment,
+                )
+                self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+    def test_all_five_committed_claims_remain_journal_free(self):
+        from tests.host import (
+            bootstrap_allocation_authority, diagnostic_history_authority,
+            kernel_mapping_authority, runtime_memory_authority, selected_ownership_authority,
+        )
+
+        with ExitStack() as stack:
+            for module in (
+                bootstrap_allocation_authority, diagnostic_history_authority,
+                kernel_mapping_authority, runtime_memory_authority,
+            ):
+                for name in ("read_current", "read_journal", "validate_journal"):
+                    stack.enter_context(patch.object(
+                        module, name, side_effect=AssertionError("ordinary authority must not use a journal"),
+                    ))
+            for name in (
+                "read_selection", "read_phase_record", "read_verified_journal",
+                "validate_journal", "capture_author_context",
+            ):
+                stack.enter_context(patch.object(
+                    selected_ownership_authority, name,
+                    side_effect=AssertionError("MEM03 ordinary authority must not use an author attempt"),
+                ))
+            _, authorities, _, registry = selected_ownership_authority.task_definition(ROOT)
+            self.assertEqual(5, len(registry.claims))
+            self.assertEqual(70, sum(len(claim.claimed_identity_keys) for claim in registry.claims))
+            result = evidence_authority.validate_transition(self.inventory, authorities, registry, None, (), None)
+            self.assertTrue(result.ok, result)
+            retired = {key for claim in registry.claims for key in claim.claimed_identity_keys}
+            self.assertEqual({fact.key for fact in self.inventory.facts} - retired, set(result.active_identity_keys))
+            self.assertFalse(runtime_memory_authority.memory_identity_required(ROOT))
+            for claim in registry.claims:
+                if claim.owner_task != "COPY01":
+                    self.assertFalse(
+                        selected_ownership_authority.identity_required(ROOT, claim.claimed_identity_keys[0]),
+                        claim.owner_task,
+                    )
 
 
 class TransitionTests(unittest.TestCase):

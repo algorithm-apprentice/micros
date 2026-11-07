@@ -598,6 +598,15 @@ the generator consumer. Raw retained MEM03 bodies must not be normalized
 like MEM01 bodies. Full acceptance and independent first-commit review
 remain required; this metadata outcome performs no runtime retirement.
 
+Separate EV01-C05 design #220 is merged. The dependent implementation first
+froze the complete old/new records, then demonstrated four real missing-key
+failures after the original source guards rejected the corresponding
+mutations. Its eight focused regressions and existing dependent tests pass:
+103 tests across `test_evidence_authority` and `test_selected_ownership`.
+The 4,774-fact catalog preserves every predecessor record and fingerprint.
+Focused Green does not replace the required full producer, independent
+first-commit review or journal-free committed publication evidence.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

@@ -125,6 +125,9 @@ FAMILY_OWNERS = {
         "tests/host/selected_ownership_authority.py",
         "tests/host/selected_ownership_source.py",
     ),
+    "selected-ownership-native-admission": (
+        "tests/host/selected_ownership_native_source_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
@@ -247,6 +250,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "9fdb9c93e92ff742f563d63e54e574e5e630260c07dddeec9997ed2d8144ec16",
     "selected-ownership-baseline":
         "473d2640bd3d9a756183d51b2d6d6ad31aa890f9f8efeebdf1d76d42d514ed2c",
+    "selected-ownership-native-admission":
+        "4678706adb8ef75162ed57b16821af9262b06ed642a721f482778dbba381d3ff",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -261,6 +266,14 @@ _MEMORY_NATIVE_COUNTS = {
     "MEM02/skeleton": 2,
     "MEM02/header": 1,
     "MEM02/include": 1,
+}
+
+_SELECTED_OWNERSHIP_NATIVE_COUNTS = {
+    "function": 251,
+    "definitions": 17,
+    "skeleton": 17,
+    "header": 3,
+    "native-input": 196,
 }
 
 _IDENTITY_NAME = re.compile(
@@ -946,9 +959,108 @@ def _memory_native_binding_facts(root, family, relative):
     return tuple(facts)
 
 
+def _selected_ownership_native_row(row):
+    if (
+        type(row) is not tuple or len(row) != 4
+        or any(type(value) is not str or not value for value in row[:2])
+        or type(row[2]) is not tuple
+        or any(type(path) is not str for path in row[2])
+        or type(row[3]) is not dict
+    ):
+        raise ValueError("selected-ownership native authority has a malformed row")
+    scope, subject, assertions, contract = row
+    parts = scope.split("/", 2)
+    if len(parts) != 3 or parts[0] != "MEM03" or parts[1] not in _SELECTED_OWNERSHIP_NATIVE_COUNTS:
+        raise ValueError("selected-ownership native authority has an unknown clause")
+    _, kind, suffix = parts
+    source = "tests/host/selected_ownership_source.py"
+    generator = "tools/generate_selected_ownership_fixture.py"
+    if kind == "native-input":
+        if not subject.endswith((".c", ".h")):
+            raise ValueError("selected-ownership native authority has an unknown dependency kind")
+        expected_assertions = (source, generator) if subject.endswith(".c") else (generator,)
+    else:
+        expected_assertions = (source,)
+    if assertions != expected_assertions:
+        raise ValueError("selected-ownership native authority changed assertion ownership")
+    if kind == "function":
+        prefix = subject + "/"
+        if not suffix.startswith(prefix) or re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", suffix[len(prefix):],
+        ) is None:
+            raise ValueError("selected-ownership native authority has an invalid function scope")
+    elif suffix != subject:
+        raise ValueError("selected-ownership native authority borrowed another subject")
+    comparisons = {
+        "function": ("function", {"comparison", "signature", "guards", "content"}),
+        "definitions": ("definition-set", {"comparison", "expected"}),
+        "skeleton": ("compact-skeleton-sha256", {"comparison", "expected"}),
+        "header": ("compact-header-sha256", {"comparison", "expected"}),
+        "native-input": ("file-bytes-sha256", {"comparison", "expected"}),
+    }
+    comparison, fields = comparisons[kind]
+    if set(contract) != fields or contract["comparison"] != comparison:
+        raise ValueError("selected-ownership native authority changed a comparison schema")
+    return kind
+
+
+def _selected_ownership_native_facts(root, family, relative):
+    if relative != "tests/host/selected_ownership_native_source_bindings.py":
+        raise ValueError("selected-ownership native authority has an undeclared owner")
+    tree = ast.parse(regular_source(root, relative).read_text(encoding="utf-8"))
+    statements = tree.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(
+        statements[0].value, ast.Constant,
+    ) and type(statements[0].value.value) is str:
+        statements = statements[1:]
+    names = ("BINDING_REFERENCE", "NATIVE_SOURCE_BINDINGS")
+    if len(statements) != 2 or any(
+        not isinstance(node, ast.Assign) or _assignment_name(node) not in names
+        for node in statements
+    ):
+        raise ValueError("selected-ownership native authority permits only literal declarations")
+    reference, rows = (literal_value(single_assignment(tree, name).value) for name in names)
+    if type(reference) is not tuple or len(reference) != 2:
+        raise ValueError("selected-ownership native authority has an invalid reference")
+    for entry, (tag, size) in zip(reference, (("policy", 3), ("MEM03", 2))):
+        if (
+            type(entry) is not tuple or len(entry) != size or entry[0] != tag
+            or any(
+                type(value) is not str or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in entry[1:]
+            )
+        ):
+            raise ValueError("selected-ownership native authority has an invalid fixed reference")
+    if type(rows) is not tuple or len(rows) != sum(_SELECTED_OWNERSHIP_NATIVE_COUNTS.values()):
+        raise ValueError("selected-ownership native authority omitted or added a binding")
+    facts, scopes, counts, checked_paths = [], [], Counter(), {relative}
+    consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+    for row in rows:
+        counts[_selected_ownership_native_row(row)] += 1
+        scope, subject, assertions, contract = row
+        scopes.append(scope)
+        paths = tuple(sorted({relative, subject, *assertions}))
+        for path in paths:
+            if path not in checked_paths:
+                regular_source(root, path)
+                checked_paths.add(path)
+        facts.append(Fact(
+            relative + ":native-source-admission:" + scope, family, relative,
+            "native-source-admission", scope, AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, paths, digest((reference, scope, subject, assertions, contract)),
+        ))
+    if scopes != sorted(set(scopes)) or counts != _SELECTED_OWNERSHIP_NATIVE_COUNTS or (
+        fact_set_digest(facts) != DECLARED_FAMILY_FACT_DIGESTS[family]
+    ):
+        raise ValueError("selected-ownership native authority differs from its independent declaration")
+    return tuple(facts)
+
+
 def _facts_for_owner(root, family, relative, directory=None):
     if family == "memory-native-admission":
         return _memory_native_binding_facts(root, family, relative)
+    if family == "selected-ownership-native-admission":
+        return _selected_ownership_native_facts(root, family, relative)
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     if relative == "tests/host/kernel_layout_source.py":
         value = literal_value(single_assignment(tree, "BOUNDED_FRAME_VALIDATION_SHA256").value)

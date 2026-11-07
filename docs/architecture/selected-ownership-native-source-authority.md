@@ -14,9 +14,11 @@ MEM03 runtime:  8927f9956eb270962517b19715a12bc93a5fa466
 runtime tree:   9f7802dfdfc84034b626068b5c160b90a645dad7
 ```
 
-Independent read-only design review found no substantive issue. Acceptance
-does not supply the declaration or its implementation; separate design merge
-must precede implementation work.
+Independent read-only design review found no substantive issue. Separate
+design #220 merged as `1d9eab05afab16a4caff519a84790541036ee240`, with identical
+reviewed/committed/remote/preview/squash tree
+`d5c3f3d4adf653f278d47c03b3f1e58a7dc8315e`.
+The separate metadata implementation is now the sole active task.
 
 The outcome is precise inventory authority for **484 already defined
 current-source clauses**, not 484 new tests or runtime operations. No
@@ -320,3 +322,39 @@ Obtain independent review before the first permanent implementation commit.
 Verify all five prior authorities without journals, exact reviewed/committed/
 remote/preview/squash tree equality and completed-ref cleanup. Then resume
 MEM04 design, not implementation. No runtime finding closes through EV01-C05.
+
+## Implementation map
+
+The separate implementation adds the one literal-only declaration and closed
+materialization through the existing inventory owner. It changes no current
+source guard, native generator, fixture, shared inspector, collector,
+transition rule, checked-view policy, build recipe or production source.
+
+Before any extractor or regression edit, all 4,290 complete predecessor
+records, eighteen fingerprints, five claims and seventy retired keys were
+retained independently. The 484 expected rows and complete facts were frozen
+from the fixed policy/runtime. Their new-family fingerprint is:
+
+```text
+4678706adb8ef75162ed57b16821af9262b06ed642a721f482778dbba381d3ff
+```
+
+The declaration is read as two checked literal assignments, never executed.
+Materialization binds exact current-clause subjects and actual assertion
+owners, checks ordinary files and the closed sorted census, and rejects
+schema, ownership, reference or value drift against that independent
+fingerprint. The complete catalog is 4,774 facts in nineteen families.
+Every old complete record and fingerprint remains identical.
+
+Eight focused regressions live in the existing authority test owner.
+The real Red first proved that unchanged retained-body, definition-set and
+native-header guards reject their inputs, then failed on the four missing
+inventory keys. Green also proves exact fixed-policy equality, raw-body
+versus compact comparison fidelity, distinct C/header consumers, declaration
+and path negatives, unchanged overlap rejection and all five prior claims
+without reading author journals.
+
+Focused validation passed 103 tests across the two documented modules.
+This is not final publication evidence: the complete current author plan,
+independent first-commit review and committed/squash authority checks remain
+required before the implementation merges and MEM04 design resumes.
