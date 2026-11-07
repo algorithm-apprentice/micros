@@ -103,9 +103,10 @@ blocked work.
 MEM04 design then found missing granular identities for MEM03's existing
 native-source checks. Accepted
 [EV01-C05](selected-ownership-native-source-authority.md) is a separate
-documentation-first evidence prerequisite. Only its design is active;
-implementation waits for design merge, and MEM04 design waits for the
-prerequisite implementation. The 59-node runtime graph, finding ownership and
+documentation-first evidence prerequisite. Separate design #220 is now
+merged; its metadata-only implementation is the sole active task. MEM04 design remains
+blocked on that implementation's acceptance and merge.
+The 59-node runtime graph, finding ownership and
 MEM04's MEM02/MEM03 runtime prerequisites do not change.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)

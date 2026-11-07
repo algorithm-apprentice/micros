@@ -231,8 +231,12 @@ The following MEM04 design found the
 Accepted [ADR-0106](adr/0106-granular-selected-ownership-native-source-authority.md)
 and [EV01-C05](architecture/selected-ownership-native-source-authority.md)
 define a separate 484-clause metadata prerequisite, preserving all 4,290
-current facts, eighteen fingerprints and existing checks. Only that design
-is active. MEM04 design is blocked until its implementation merges; MEM04
+predecessor facts, eighteen fingerprints and existing checks. Separate design
+#220 merged as `1d9eab05afab16a4caff519a84790541036ee240`.
+Its independently frozen declaration and closed materialization now supply
+4,774 facts in nineteen families without any new retirement. That
+implementation is the sole active task and still requires complete acceptance
+and independent review. MEM04 design is blocked until it merges; MEM04
 implementation, hosted CI and later runtime findings retain their owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
