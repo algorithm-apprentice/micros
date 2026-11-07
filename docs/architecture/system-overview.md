@@ -184,7 +184,14 @@ a handoff error dependency on the old global PC/SP lookup audit. Its
 [Accepted caller-owned correction](../adr/0109-handoff-preflight-error-ownership.md)
 keeps full diagnosis at the existing handoff boundary without restoring
 global hot-path checks. That candidate is also archived; no MEM04 Green or
-retirement is claimed.
+retirement was claimed for it. Corrective design #225 then merged and a fresh
+candidate completed actual Green and recertification. Its full stack gate
+rejected the unrelated new root-preparation prototype at the existing
+whole-header callback check. The candidate is archived without final
+acceptance or publication. The
+[Accepted exact visitor-group extension](../adr/0110-kernel-visitor-extension-admission.md)
+admits that declaration and five qualified callback-free helpers while
+preserving every existing callback and stack obligation before a fresh restart.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

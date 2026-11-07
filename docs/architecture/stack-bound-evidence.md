@@ -168,6 +168,88 @@ current acceptance remain separate from the abandoned reference.
 
 ## Indirect-call closure
 
+### MEM04 kernel-visitor extension admission
+
+This is the Accepted exception under
+[ADR-0110](../adr/0110-kernel-visitor-extension-admission.md), not implemented.
+The [observed header conflict](../research/minix-selected-user-address-space.md#kernel-visitor-header-certificate-gap)
+blocked the uncommitted MEM04 full gate after native, QEMU and standalone
+image acceptance passed.
+
+The header admission applies only to the existing registered `kernel-visitor`
+group. Preserve its complete original token sequence, or admit the
+same sequence with the exact Accepted `micros_user_address_space_prepare_activation`
+declaration immediately before the final outer include-guard terminator.
+Its return type, name, two parameter types/names and pointer shape are exactly
+those in ADR-0110. The expected extension is constructed from the unchanged
+fixed EV03 source, never by filtering or rehashing candidate declarations.
+
+Use the existing tokenization/whitespace policy and keep regular-file checks.
+Reject all other changes to the complete header. Admit no second prototype,
+definition, conditional version, callback field or unrelated API.
+An identical original header remains valid for historical/Red inputs;
+MEM04's actual current header must independently satisfy its full byte-level
+interface contract and target compilation.
+
+The group must be the exact existing registered declaration, not just a
+caller-supplied object named `kernel-visitor`. All other seven groups retain
+their original rule. `AUTHORITY_COMMIT`, `reference_source()`, callback group
+data, providers/constructors, occurrence matching, body/compound anchors,
+linked targets and source-machine validation below remain unchanged.
+
+The same group also needs exact admission for five new callback-free
+functions, all in `kernel/memory/user_address_space_mapping.c`:
+`selected_slot_is_required`, `selected_table_is_distinct`,
+`micros_user_address_space_select_path`, `prepare_selected_path` and
+`read_selected_leaf`. The header repair alone does not satisfy the existing
+unconditional historical-function lookup. ADR-0110 independently freezes
+their complete signatures, including storage class and parameter names.
+
+For each retained helper, require its exact qualified unit and identical
+actual source origin, an ordinary non-symlink source, one matching unguarded
+function record and the independently declared signature. Existing
+whole-unit callback-type scope checks still run; neither visitor types nor
+recognized callback expressions may occur in these helpers.
+Do not exempt the mapping unit or its existing callback-bearing functions.
+Other new functions still fail the original historical-source boundary.
+
+Use the complete catalog to locate the actual object and symbol. Reject
+pending indirect sites and independently decode machine instructions to
+reject an indirect call or tail transfer under the existing call/switch
+rules, even if the supplied pending list is empty. Source-only absence
+cannot substitute for this machine check. Direct calls and every frame
+remain in the complete graph; this rule adds no callback target or edge
+waiver. Existing diagnostic and VM lifetime exceptions are unchanged.
+
+Implementation changes only these two admissions in
+`tools/stack_bound_bindings.py` and focused cases in
+`tests/host/test_stack_bound_evidence.py`. Freeze those exact adapters with
+the MEM04 scaffold before renewed actual Red. No new stack authority family,
+retirement or mutable production input is introduced.
+
+Native cases must reject altered visitor signatures, extra or changed APIs,
+duplicate/wrong/misplaced preparation declarations, changed guards/includes,
+non-file/symlink headers and extension attempts in other or foreign groups.
+Real compiled linked-catalogue cases must exercise the complete binding
+entry point, all five helpers, wrong signatures/guards, foreign names or
+origins, added callback types/occurrences, absent objects/symbols and an
+actual indirect site hidden from the pending inventory. Keep machine
+decoding real and include this existing module in B14 before the final
+stack matrix.
+Retain the original callback constructor/provider and machine-call cases.
+After separate design merge, narrow iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_stack_bound_evidence
+```
+
+The complete `test-stack-evidence` workflow still certifies every current
+ordinary/metadata/observed configuration and unchanged stack budget.
+Passing these admission predicates does not certify a complete call graph
+or stack bound.
+
+### Unchanged callback binding obligations
+
 A binding names image/variant, caller function, exact machine-call
 occurrence, source call expression, callback type/member, and the complete
 target set. Source anchors include the whole enclosing compound chain and

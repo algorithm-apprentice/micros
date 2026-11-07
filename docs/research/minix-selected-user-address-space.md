@@ -383,3 +383,102 @@ extension: keep diagnosis at the existing complete handoff boundary, add
 constant scalar work and no storage/call, and do not restore global work in
 ordinary PC/SP lookups. The [Accepted contract](../adr/0109-handoff-preflight-error-ownership.md)
 preserves the original target expectations and all twenty retained audits.
+
+## Kernel-visitor header certificate gap
+
+Corrective design #225 separately merged as
+`36b26b658abef6a29e7b9ffc8340b3576ea3ccd7`, tree
+`ef91993f3c5aea07158df9fbb5ba1fe1ba77cb45`.
+The next candidate completed actual native/target Red, Green and all thirteen
+affected-unit recertifications without changing the strict handoff fixture.
+
+At candidate tree `a4db6e50985fd8d387f5cdacad45f4c5d91e76ca`, the full producer
+passed 44 CTests, all 1,559 Python cases, all forty QEMU workflows and four
+standalone-image workflows. The following stack workflow failed at
+`kernel-visitor callback header contract changed`. The producer recorded
+45 successful commands, one failed stack command and four not-run final
+documentation/diff checks. It is not complete acceptance.
+
+### Actual source and independent comparison
+
+`tools/stack_bound_bindings.py:116-123`, `require_callback_type_scope()`,
+requires an ordinary header and compares its complete token vector with
+`reference_source()`. The latter reads fixed commit
+`fc98edd26505ac522d3752ad85f09366e8085f32` (lines 19-22).
+The `kernel-visitor` group at
+`tools/stack_bound_callback_contracts.py:57-71` selects
+`include/micros/user_address_space.h`; its visitor field offset is 16 and
+its production providers/constructors remain unchanged.
+
+Read-only comparison established:
+
+- the fixed EV03 header and fixed #221 runtime header have identical tokens;
+- fixed header SHA-256 is
+  `9488d9db5c064467837cde6a6236421e20e7e04c24d15e9eddc22d055a3cf492`;
+- candidate header SHA-256 is
+  `90180d0645120efb6b2415e15235dfb630ed9e4240165b00dd19ec76ea5f4bce`;
+- removing only the one independently specified preparation prototype and
+  its adjoining blank line recovers the fixed runtime header exactly.
+
+The declaration is the public interface already required by ADR-0107.
+It carries a process handle and scalar root output, not a visitor, callback
+field, indirect target, provider or constructor. No callback ABI change or
+measured stack excess was observed; the source guard stopped certification
+before a complete stack result existed.
+
+The current inventory classifies module boundaries for
+`stack_bound_bindings.py`/`stack_bound_callback_contracts.py` and the former's
+`AUTHORITY_COMMIT` transport record, whose payload has 23 paths.
+The pin remains valid original-source authority. This is not permission to
+retire it because one payload header gains an unrelated declaration.
+
+### Following function-inventory boundary
+
+Independent design review found that a header-only repair would still
+block the candidate. `bind_current_callbacks()` at
+`tools/stack_bound_bindings.py:178-213` looks up every linked function in
+each callback group's source prefix in the fixed historical source before
+asking whether it has callback occurrences.
+
+Only one of the seventeen production subjects intersects the eight
+registered source prefixes:
+`kernel/memory/user_address_space_mapping.c`. Compared with the unchanged
+EV03 pin, it introduces exactly five functions:
+`selected_slot_is_required`, `selected_table_is_distinct`,
+`micros_user_address_space_select_path`, `prepare_selected_path` and
+`read_selected_leaf`. None uses the visitor types or a callback. All five
+are retained in the archived candidate's metadata kernel; the retained
+`riscv64-debug` map lists them at lines 43139-43558 and the artifact seal
+identifies tree `a4db6e50985fd8d387f5cdacad45f4c5d91e76ca`.
+No runtime or gate rerun was needed to establish this rejection.
+
+These are not new callback providers. Their exact qualified names and
+signatures can be independently declared, while unchanged type-scope
+anchors plus actual object/origin and machine-indirect checks establish
+their callback-free boundary. An exemption for the whole mapping unit,
+or merely trusting its empty pending-call list, would be incorrect.
+
+### Required adaptation
+
+The [Accepted stack contract](../adr/0110-kernel-visitor-extension-admission.md)
+retains complete header comparison and admits only the original or its one
+exact known extension for the registered visitor group. Expected forms come
+from the fixed source, not the candidate. It also declares the five
+callback-free signatures before implementation and requires actual
+source/origin and machine checks without relaxing any existing visitor
+anchor. Every other header token and callback/source/machine obligation
+remains checked. Unknown functions are not admitted.
+
+The MINIX selected-walk mechanism and typed-handoff adaptation are unchanged.
+This is a compatible development-evidence extension, not a runtime
+algorithm or new callback mechanism. Header comparison remains linear in
+header length. The five-name selection is constant-sized and adds at most
+five uses of the existing source/object/machine checks per admitted image;
+their existing analysis costs still apply. There is no runtime storage or
+work increase and no new expected body hash.
+
+The complete uncommitted candidate and all actual phase logs were archived.
+Its current author selector was withdrawn under its lock; immutable historical
+events remain. No implementation review, permanent MEM04 commit, stack
+certificate or merge was claimed. A separate documentation-only design must
+merge before a fresh implementation with these newly frozen inputs.

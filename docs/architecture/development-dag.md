@@ -113,8 +113,15 @@ Separate design #223 and independently reviewed implementation #224 are now
 merged. The fresh restart exposed an indirect handoff error dependency and
 is also archived without Green or retirement.
 [Accepted ADR-0109](../adr/0109-handoff-preflight-error-ownership.md) has clean
-independent design review; MEM04 implementation stays blocked until its
-separate design merge. Its five selected-operation migrations and explicit
+independent design review and separately merged as #225. The subsequent
+candidate completed actual Green and recertification but its full stack gate
+rejected the new ordinary public declaration at the old whole-header guard.
+The candidate is archived.
+[Accepted ADR-0110](../adr/0110-kernel-visitor-extension-admission.md) has clean
+independent correction review; MEM04 stays blocked until separate merge.
+It covers both the exact header extension and the five callback-free mapping
+helpers rejected by the following historical-function boundary.
+Its five selected-operation migrations and explicit
 twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime
 prerequisites do not change.

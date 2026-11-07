@@ -226,7 +226,7 @@ under [ADR-0107](../adr/0107-selected-user-address-space-validation.md) merged
 as design #222. The separate reporting prerequisite #223/#224 is also merged.
 The fresh uncommitted runtime attempt is archived after a demonstrated
 handoff error dependency; [Accepted ADR-0109](../adr/0109-handoff-preflight-error-ownership.md)
-has clean independent design review and awaits separate merge.
+has clean independent design review and separately merged as #225.
 MEM04 includes bootstrap allocation's selected-prefix
 check rather than leaving that ordinary per-page audit unowned, and retains
 an explicit twenty-row complete-audit ledger for existing diagnostics,
@@ -235,6 +235,13 @@ all-audits-removed claim or runtime retirement is made by this design.
 The Accepted one-file handoff dependency keeps the existing twenty audit
 callers and 33 retirement keys; its whole-file identity already belongs to
 committed MEM03 retirement and must not be retired twice.
+The following candidate completed actual Green/recertification and 45 full
+producer commands, but stack certification rejected its unrelated new
+public declaration. The candidate is archived. The sole active
+[Accepted ADR-0110 design](../adr/0110-kernel-visitor-extension-admission.md)
+adds only a fixed-source one-declaration header admission and exact
+five-helper callback-free admission for the existing visitor group.
+No runtime finding, existing callback authority or stack budget is waived.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 
