@@ -254,4 +254,14 @@ void micros_frame_ownership_vm_release_process_commit_prevalidated(
     const struct micros_frame_vm_process_release_plan *plan
 );
 
+enum micros_frame_ownership_error
+micros_frame_ownership_validate_metadata(
+    const struct micros_frame_ownership *ownership
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_validate_active(
+    const struct micros_frame_ownership *ownership
+);
+
 #endif

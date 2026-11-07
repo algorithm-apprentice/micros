@@ -361,7 +361,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
         goto done;
     }
     if (
-        micros_frame_ownership_runtime_validate(context.objects)
+        micros_frame_ownership_runtime_validate_metadata(context.objects)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;

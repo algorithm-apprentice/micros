@@ -197,13 +197,22 @@ def call_targets(node):
 
 def assert_word_bounded_scans(text):
     preprocessed = clang_preprocessed(text)
-    if (
-        function_token_digest(preprocessed, "validate_active_frames")
-        != ACTIVE_TOKENS_SHA256
-        or function_token_digest(preprocessed, "inactive_state_is_zero")
-        != INACTIVE_TOKENS_SHA256
+    from tests.host.evidence_authority_scope import identity_required
+    from tests.host.selected_ownership_source import assert_complete_helper_tokens
+
+    for name, key, expected in (
+        ("validate_active_frames",
+         "tests/host/test_frame_validation_hot_path.py:data-entry:ACTIVE_TOKENS_SHA256",
+         ACTIVE_TOKENS_SHA256),
+        ("inactive_state_is_zero",
+         "tests/host/test_frame_validation_hot_path.py:data-entry:INACTIVE_TOKENS_SHA256",
+         INACTIVE_TOKENS_SHA256),
     ):
-        raise AssertionError("validator work shape differs from reviewed identity")
+        if identity_required(ROOT, key):
+            if function_token_digest(preprocessed, name) != expected:
+                raise AssertionError("validator work shape differs from reviewed identity")
+        else:
+            assert_complete_helper_tokens(preprocessed, name)
     tree = clang_ast(text)
     active = function_decl(tree, "validate_active_frames")
     if (

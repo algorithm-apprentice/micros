@@ -573,8 +573,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(17, len(inventory.families))
-        self.assertEqual(4282, len(inventory.facts))
+        self.assertEqual(18, len(inventory.families))
+        self.assertEqual(4290, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1535,12 +1535,12 @@ class MemoryNativeBindingTests(unittest.TestCase):
         from tests.host.work_count_types import Stage
         from tools import generate_kernel_mapping_fixture as generator
 
-        subject = "kernel/memory/frame_ownership_validation.c"
+        subject = "kernel/memory/frame_allocator.c"
         current = (ROOT / subject).read_text()
         allocation.validate_retained_source(ROOT, subject, current, stage=Stage.GREEN)
         changed = current.replace(
-            "return micros_frame_ownership_validate(ownership);",
-            "return MICROS_FRAME_OWNERSHIP_OK;", 1,
+            "right > UINT64_MAX - left",
+            "right >= UINT64_MAX - left", 1,
         )
         self.assertNotEqual(current, changed)
         with self.assertRaisesRegex(ValueError, "retained original body"):
@@ -1551,7 +1551,7 @@ class MemoryNativeBindingTests(unittest.TestCase):
 
         generator.source_bundle(ROOT, Stage.GREEN, observed=False)
         read = generator.read_regular
-        for selected in (subject, "include/micros/frame_ownership.h"):
+        for selected in (subject, "include/micros/frame_allocator.h"):
             def changed_read(path):
                 data, identity = read(path)
                 return (data + b"\n" if path == ROOT / selected else data), identity
@@ -1564,9 +1564,9 @@ class MemoryNativeBindingTests(unittest.TestCase):
         declared = {row[0] for row in declarations.NATIVE_SOURCE_BINDINGS}
         keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
         required = (
-            "MEM01/function/" + subject + "/micros_frame_ownership_vm_transition_preflight",
+            "MEM01/function/" + subject + "/add_u64",
             "MEM02/native-input/" + subject,
-            "MEM02/native-input/include/micros/frame_ownership.h",
+            "MEM02/native-input/include/micros/frame_allocator.h",
         )
         for scope in required:
             with self.subTest(scope=scope):

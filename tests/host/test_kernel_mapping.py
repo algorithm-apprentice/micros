@@ -217,6 +217,7 @@ class KernelMappingSourceTest(unittest.TestCase):
 
     def test_native_mmu_recipe_restores_the_complete_predecessor_and_keeps_budgets(self):
         from tests.host import kernel_mapping_source as source
+        from tests.host.selected_ownership_source import project_cmake as project_selected_cmake
         from tests.host.work_count_recipe import project_host_test_commands
 
         original = subprocess.check_output(
@@ -224,7 +225,10 @@ class KernelMappingSourceTest(unittest.TestCase):
             cwd=ROOT, text=True, timeout=30,
         )
         current = (ROOT / "CMakeLists.txt").read_text()
-        self.assertEqual(project_host_test_commands(current), source.extend_cmake(original))
+        self.assertEqual(
+            project_host_test_commands(project_selected_cmake(current)),
+            source.extend_cmake(original),
+        )
         self.assertEqual(original, source.project_cmake(current))
         changed = current.replace(source.mmu_recipe_extension(), "", 1)
         with self.assertRaises(ValueError):

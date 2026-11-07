@@ -8,10 +8,13 @@ It records the fixed design baseline, not current implementation acceptance.
 Design #215 is separately merged. The first uncommitted implementation was
 archived after the [complete-validator token-scope defect](complete-validator-token-scope-gap.md)
 blocked B14 recertification. Accepted ADR-0104 separately merged as #216.
-The later uncommitted candidate is preserved while the
-[validation feedback prerequisite](../architecture/validation-feedback.md)
-addresses the measured development-tooling cost. This does not change the
-fixed MINIX/runtime baseline below or claim current MEM03 acceptance.
+The later uncommitted candidate was preserved for the
+[validation feedback prerequisite](../architecture/validation-feedback.md).
+Its implementation #218 is now separately merged, allowing a fresh MEM03
+restart on `dedf9a8d9d72f153519ea07150e50594a6618c6b` with renewed source,
+tool and execution evidence. Its runtime directories still equal fixed
+#214. This does not change the MINIX/runtime baseline below or turn archived
+measurements into current MEM03 acceptance.
 
 The current source is independently reviewed EV01-C04 implementation #214:
 

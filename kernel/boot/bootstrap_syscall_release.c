@@ -246,7 +246,7 @@ static void validate_console_begin_runtime(
             registry,
             context->objects
         ) != MICROS_TTY_HANDOFF_OK
-        || micros_frame_ownership_runtime_validate(
+        || micros_frame_ownership_runtime_validate_metadata(
             context->objects
         ) != MICROS_FRAME_OWNERSHIP_OK
     ) {

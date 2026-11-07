@@ -44,8 +44,9 @@ micros_frame_ownership_prepare_handoff(
     if (!micros_frame_owner_is_valid(expected_owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
-    if (!micros_frame_ownership_geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    error = micros_frame_ownership_validate_metadata(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
     }
     error = micros_frame_ownership_physical_address_to_index(
         ownership,
@@ -55,7 +56,10 @@ micros_frame_ownership_prepare_handoff(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    stored_owner = ownership->owners[frame_index];
+    error = micros_frame_ownership_selected_record(ownership, frame_index, &stored_owner);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
     if (stored_owner.kind == MICROS_FRAME_OWNER_FREE) {
         return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
     }
@@ -101,7 +105,7 @@ micros_frame_ownership_prepare_wired_process_user_set(
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
-    error = micros_frame_ownership_validate(ownership);
+    error = micros_frame_ownership_validate_active(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
@@ -194,7 +198,7 @@ micros_frame_ownership_complete_handoff(
     if (ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP) {
         return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
     }
-    error = micros_frame_ownership_validate(ownership);
+    error = micros_frame_ownership_validate_active(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }

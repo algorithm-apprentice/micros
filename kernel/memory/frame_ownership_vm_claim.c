@@ -12,6 +12,7 @@ micros_frame_ownership_vm_claim_preflight(
 )
 {
     struct micros_frame_vm_claim_plan candidate;
+    struct micros_frame_owner owner;
     uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
@@ -30,10 +31,11 @@ micros_frame_ownership_vm_claim_preflight(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    if (
-        ownership->owners[frame_index].kind
-            != MICROS_FRAME_OWNER_FREE
-    ) {
+    error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (owner.kind != MICROS_FRAME_OWNER_FREE) {
         return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
     }
     if (

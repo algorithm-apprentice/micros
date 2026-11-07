@@ -502,3 +502,57 @@ void micros_frame_ownership_allocator_mark_free(
         allocator->allocation_cursor = frame_index;
     }
 }
+
+bool micros_frame_ownership_active_geometry_matches(
+    const struct micros_frame_ownership *ownership
+)
+{
+    const struct micros_frame_allocator *allocator;
+    uint64_t expected_bitmap_offset = 0;
+    uint64_t previous_end = 0;
+    size_t index;
+
+    if (
+        micros_frame_ownership_require_initialized(ownership)
+            != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        return false;
+    }
+    allocator = ownership->allocator;
+    if (
+        !allocator->initialized
+        || ownership->managed_range_count == 0
+        || ownership->managed_range_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES
+        || ownership->managed_frame_count == 0
+        || ownership->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || allocator->managed_range_count != ownership->managed_range_count
+        || allocator->managed_frame_count != ownership->managed_frame_count
+    ) {
+        return false;
+    }
+    for (index = 0; index < ownership->managed_range_count; ++index) {
+        const struct micros_frame_range_snapshot *snapshot =
+            &ownership->managed_ranges[index];
+        const struct micros_managed_frame_range *current =
+            &allocator->managed_ranges[index];
+        uint64_t range_size;
+
+        if (
+            snapshot->frame_count == 0
+            || snapshot->frame_count > ownership->managed_frame_count - expected_bitmap_offset
+            || snapshot->base % MICROS_FRAME_SIZE != 0
+            || snapshot->bitmap_offset != expected_bitmap_offset
+            || snapshot->frame_count > (UINT64_MAX - snapshot->base) / MICROS_FRAME_SIZE
+            || (index != 0 && snapshot->base < previous_end)
+            || snapshot->base != current->base
+            || snapshot->frame_count != current->frame_count
+            || snapshot->bitmap_offset != current->bitmap_offset
+        ) {
+            return false;
+        }
+        range_size = snapshot->frame_count * MICROS_FRAME_SIZE;
+        previous_end = snapshot->base + range_size;
+        expected_bitmap_offset += snapshot->frame_count;
+    }
+    return expected_bitmap_offset == ownership->managed_frame_count;
+}

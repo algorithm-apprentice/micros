@@ -32,7 +32,7 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
             registry,
             objects
         ) != MICROS_BOOTSTRAP_OK
-        || micros_frame_ownership_runtime_validate(objects)
+        || micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_grant_runtime_validate() != MICROS_GRANT_OK
         || (

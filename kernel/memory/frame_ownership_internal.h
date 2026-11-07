@@ -91,4 +91,15 @@ micros_frame_ownership_vm_process_set_preflight(
         table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT]
 );
 
+bool micros_frame_ownership_active_geometry_matches(
+    const struct micros_frame_ownership *ownership
+);
+
+enum micros_frame_ownership_error
+micros_frame_ownership_selected_record(
+    const struct micros_frame_ownership *ownership,
+    uint64_t frame_index,
+    struct micros_frame_owner *owner
+);
+
 #endif

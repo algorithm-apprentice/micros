@@ -477,6 +477,66 @@ static enum micros_frame_ownership_error validate_process_owners(
 }
 
 enum micros_frame_ownership_error
+micros_frame_ownership_runtime_validate_metadata(
+    const struct micros_kernel_objects *objects
+)
+{
+    const struct micros_kernel_objects *authoritative_objects;
+    enum micros_frame_ownership_error error;
+
+    if (!ownership_runtime_ready) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_NOT_INITIALIZED;
+    }
+    if (riscv_irq_is_enabled()) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    error = micros_frame_ownership_validate_metadata(&bootstrap_ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    authoritative_objects = micros_kernel_object_runtime_registry();
+    if (
+        objects == NULL
+        || authoritative_objects == NULL
+        || objects != authoritative_objects
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+static enum micros_frame_ownership_error validate_active_process_owners(
+    const struct micros_kernel_objects *objects
+)
+{
+    uint64_t frame_index;
+
+    for (
+        frame_index = 0;
+        frame_index < bootstrap_ownership.managed_frame_count;
+        ++frame_index
+    ) {
+        struct micros_frame_owner owner =
+            bootstrap_ownership.owners[frame_index];
+        const struct micros_process *process;
+
+        if (!owner_is_process_bound(owner)) {
+            continue;
+        }
+        if (
+            micros_process_resolve(
+                objects,
+                (struct micros_process_handle){owner.slot, owner.generation},
+                &process
+            ) != MICROS_KERNEL_OBJECT_OK
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+enum micros_frame_ownership_error
 micros_frame_ownership_runtime_initialize(void)
 {
     enum micros_frame_ownership_error error;
@@ -620,7 +680,11 @@ micros_frame_ownership_runtime_complete_handoff(
     if (!ownership_mutation_is_allowed()) {
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    error = micros_frame_ownership_runtime_validate(objects);
+    error = micros_frame_ownership_runtime_validate_metadata(objects);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    error = validate_active_process_owners(objects);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
@@ -826,7 +890,7 @@ micros_frame_ownership_runtime_release_process(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    ownership_error = micros_frame_ownership_runtime_validate(
+    ownership_error = micros_frame_ownership_runtime_validate_metadata(
         objects
     );
     if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {

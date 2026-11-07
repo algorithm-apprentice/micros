@@ -300,7 +300,7 @@ micros_user_address_space_prepare_wired_handoff(void)
         goto done;
     }
     if (
-        micros_frame_ownership_runtime_validate(objects)
+        micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_kernel_objects_validate(objects)
             != MICROS_KERNEL_OBJECT_OK
@@ -391,7 +391,7 @@ micros_user_address_space_complete_wired_handoff(void)
         goto done;
     }
     if (
-        micros_frame_ownership_runtime_validate(objects)
+        micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_kernel_objects_validate(objects)
             != MICROS_KERNEL_OBJECT_OK

@@ -715,6 +715,11 @@ def validate_retained_source(root, path, text, stage):
     original = baseline_source(str(root), path)
     if stage is Stage.RED or path not in SOURCE_ROLES["candidate_paths"][:3]:
         if text != original:
+            from tests.host.selected_ownership_source import native_assertion_admission
+            if stage is Stage.GREEN and "MEM02/native-input/" + path in native_assertion_admission(
+                root, "MEM02", path, text, stage,
+            ):
+                return
             raise ValueError("MEM02 fixed or noncandidate native source changed: " + path)
         return
     bindings = SOURCE_PROJECTION["current_bindings"]
@@ -780,6 +785,8 @@ def observation_sites(root, path, stage):
         *COMMON_OBSERVATIONS.get(path, ()),
         *mapping,
     )
+    from tests.host.selected_ownership_source import legacy_observation_sites
+    result = legacy_observation_sites(root, "MEM02", path, stage, result)
     keys = [(row[0], row[1]) for row in result]
     if len(keys) != len(set(keys)) or any(
         kind not in STATE_WORK_CONTRACT["work"]["kinds"]
@@ -937,8 +944,10 @@ def _gate_changes(path):
 
 
 def project_gate_adapter(path, text):
+    from tests.host.selected_ownership_source import project_legacy_adapter
     from tests.host.work_count_recipe import project_feedback_reader
 
+    text = project_legacy_adapter(path, text)
     text = project_feedback_reader(path, text)
     changes = _gate_changes(path)
     present = tuple(text.count(extended) for _, extended in changes)
@@ -1030,6 +1039,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.selected_ownership_source import project_cmake as project_selected_cmake
+
+    text = project_selected_cmake(text)
     from tests.host.work_count_recipe import project_host_test_commands
 
     text = project_host_test_commands(text)

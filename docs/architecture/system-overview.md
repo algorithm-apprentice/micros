@@ -156,9 +156,11 @@ diagnostics. Its evidence-key prerequisite #213/#214 and design #215 are
 merged. The first uncommitted implementation was archived after B14 exposed
 the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md).
 Corrective design #216 is separately merged. Its later uncommitted candidate
-is now preserved while the user-prioritized
-[validation feedback design](validation-feedback.md) addresses measured
-repeated evidence work. That Accepted design changes no runtime authority.
+was preserved for the user-prioritized
+[validation feedback prerequisite](validation-feedback.md). Its separately
+reviewed implementation #218 is now merged and permits a fresh MEM03
+restart with one checked source view and full-only native orchestration.
+That tooling outcome changes no runtime authority.
 The committed runtime retains the
 complete-validation cadence described above until a separately reviewed
 implementation changes it.

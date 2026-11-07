@@ -472,7 +472,7 @@ enum micros_vm_boot_error micros_vm_boot_build(
         ownership->allocator != allocator
         || ownership->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-        || micros_frame_ownership_validate(ownership)
+        || micros_frame_ownership_validate_active(ownership)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         return clear_build_failure(
@@ -721,7 +721,7 @@ enum micros_vm_boot_error micros_vm_boot_validate_authority(
         ownership->allocator != allocator
         || ownership->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP
-        || micros_frame_ownership_validate(ownership)
+        || micros_frame_ownership_validate_active(ownership)
             != MICROS_FRAME_OWNERSHIP_OK
         || micros_vm_boot_validate(info, &summary)
             != MICROS_VM_BOOT_OK

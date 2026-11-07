@@ -42,8 +42,9 @@ enum micros_frame_ownership_error micros_frame_ownership_allocate(
     if (!owner_is_allocatable(owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
-    if (!micros_frame_ownership_geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    error = micros_frame_ownership_validate_metadata(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
     }
 
     saved_cursor = ownership->allocator->allocation_cursor;
@@ -115,8 +116,9 @@ enum micros_frame_ownership_error micros_frame_ownership_release(
     if (!micros_frame_owner_is_valid(expected_owner)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
-    if (!micros_frame_ownership_geometry_matches(ownership)) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    error = micros_frame_ownership_validate_metadata(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
     }
     error = micros_frame_ownership_physical_address_to_index(
         ownership,
@@ -126,7 +128,10 @@ enum micros_frame_ownership_error micros_frame_ownership_release(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    stored_owner = ownership->owners[frame_index];
+    error = micros_frame_ownership_selected_record(ownership, frame_index, &stored_owner);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
     if (stored_owner.kind == MICROS_FRAME_OWNER_FREE) {
         return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
     }
@@ -181,6 +186,7 @@ collect_process_release_summary(
         size_t word_index = (size_t)(frame_index / 64);
         uint64_t bit = UINT64_C(1) << (frame_index % 64);
         struct micros_frame_owner owner;
+        enum micros_frame_ownership_error error;
 
         if ((release_bitmap[word_index] & bit) == 0) {
             continue;
@@ -188,7 +194,10 @@ collect_process_release_summary(
         if (frame_index >= ownership->managed_frame_count) {
             return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
         }
-        owner = ownership->owners[frame_index];
+        error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
+        if (error != MICROS_FRAME_OWNERSHIP_OK) {
+            return error;
+        }
         if (owner.kind == MICROS_FRAME_OWNER_FREE) {
             return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
         }
@@ -315,7 +324,7 @@ micros_frame_ownership_release_process_set(
     if (!micros_frame_process_handle_is_valid(process)) {
         return MICROS_FRAME_OWNERSHIP_ERROR_OWNER;
     }
-    error = micros_frame_ownership_validate(ownership);
+    error = micros_frame_ownership_validate_metadata(ownership);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }

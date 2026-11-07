@@ -113,4 +113,9 @@ micros_frame_ownership_runtime_release_process(
     struct micros_process_handle process
 );
 
+enum micros_frame_ownership_error
+micros_frame_ownership_runtime_validate_metadata(
+    const struct micros_kernel_objects *objects
+);
+
 #endif

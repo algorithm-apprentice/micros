@@ -7,7 +7,7 @@ import re
 
 from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
-    panic_trace_source, terminal_failure_source,
+    panic_trace_source, selected_ownership_source, terminal_failure_source,
 )
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
@@ -121,10 +121,17 @@ FAMILY_OWNERS = {
     "memory-native-admission": (
         "tests/host/memory_native_source_bindings.py",
     ),
+    "selected-ownership-baseline": (
+        "tests/host/selected_ownership_authority.py",
+        "tests/host/selected_ownership_source.py",
+    ),
 }
 
-# These regressions exercise the registered execution identities, not new ones.
-NON_IDENTITY_EXCEPTIONS = ("tests/host/test_validation_execution.py",)
+# These regressions exercise registered declarations, not additional identities.
+NON_IDENTITY_EXCEPTIONS = (
+    "tests/host/test_selected_ownership.py",
+    "tests/host/test_validation_execution.py",
+)
 
 LOGICAL_FILE_TABLES = {
     "tests/host/test_endpoint_source_layout.py": ("STABLE_HASHES",),
@@ -238,6 +245,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "f2388c75814e42ff852e397a35e37bddf80f171f65074ade752dae10e6ddff92",
     "memory-native-admission":
         "9fdb9c93e92ff742f563d63e54e574e5e630260c07dddeec9997ed2d8144ec16",
+    "selected-ownership-baseline":
+        "473d2640bd3d9a756183d51b2d6d6ad31aa890f9f8efeebdf1d76d42d514ed2c",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -969,6 +978,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return bootstrap_allocation_source.declaration_facts(root, relative)
     if family == kernel_mapping_source.FAMILY:
         return kernel_mapping_source.declaration_facts(root, relative)
+    if family == selected_ownership_source.FAMILY:
+        return selected_ownership_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

@@ -1263,6 +1263,56 @@ scope. Full fresh author acceptance and independent implementation review
 remain required before the first permanent commit. Ordinary committed
 authority does not require the original author's journal.
 
+## Selected ownership work and authority evidence
+
+MEM03 follows separately merged designs #215/#216 and the
+[selected ownership contract](../architecture/selected-frame-ownership.md).
+The fresh restart also binds the reviewed validation prerequisite #218 while
+retaining fixed #214 runtime source and independent work expectations.
+Configure the native profile and stage the complete source, recipe, fixture,
+adapter and documentation inputs before observing actual Red:
+
+```bash
+cmake --preset host-debug
+"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --red
+"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --green
+"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --recertify
+```
+
+Red exits one only after all three actual fixed-source work oracles fail for
+their declared divergences while semantic and complete-diagnostic guards
+pass. Compile, schema, source/tool, scope and incomplete-run failures exit
+two; they are not runtime Red. Green and complete recertification exit zero.
+Do not build the current six-product fixture before the runtime correction
+provides its new interfaces; the Red driver compiles the fixed source stage.
+
+The six native products execute one 99-case corpus: five passive observation
+slices and one ordinary control. One `selected-ownership` CTest is labeled
+`slow` and belongs only to `test-unit`; the fast target does not depend on
+these six products. The small pre-exec launcher regression remains directly
+runnable:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_selected_ownership.SelectedOwnershipNativeTest.test_launcher_rejects_consumed_environment_before_interpreter_exec
+```
+
+Only the twenty declared production subjects may change within an attempt.
+All six adapters, source-view integration, recipes, fixture/model code and
+documentation are frozen before Red. The current native `nm` is a distinct
+external input, not inferred from compiler identity.
+
+Recertification executes the exact B01-B12/B14 command set under its
+PID/root/plan-bound forty-key provisional scope. B14 uses the owned host
+runner for live per-test feedback and one checked source proof. No view
+opens an author transaction or makes an incomplete selector terminal.
+Records remain under `build/evidence-transitions/MEM03/`.
+
+After terminal success, warm all native products, require a no-work build,
+and run the complete fresh author producer. That gate retains 43 CTests,
+complete Python discovery, all target/image/stack coverage and blocked B13.
+Independent review still precedes the first permanent commit. No archived
+acceptance or prerequisite timing replaces the restarted real author run.
+
 ## Terminal-failure baseline and current evidence
 
 The PLAT02 driver follows the

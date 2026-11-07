@@ -516,6 +516,9 @@ def validate_retained_source(root, path, text, *, stage):
 
     if stage not in (Stage.RED, Stage.GREEN) or type(text) is not str:
         raise ValueError("MEM01 source projection has an unknown stage or representation")
+    from tests.host.selected_ownership_source import native_assertion_admission
+
+    retired = native_assertion_admission(root, "MEM01", path, text, stage)
     original = baseline_source(Path(root), path)
     if stage is Stage.RED:
         if text != original:
@@ -543,10 +546,12 @@ def validate_retained_source(root, path, text, *, stage):
     after = function_records(observed)
     additions = SOURCE_PROJECTION["new_helpers"].get(path, ())
     names = {row[0] for row in additions}
-    if set(after) != set(before) | names:
+    if "MEM01/definitions/" + path not in retired and set(after) != set(before) | names:
         raise ValueError("MEM01 source added or omitted an unadmitted definition")
     mutable = SOURCE_PROJECTION["mutable_functions"][path]
     for name, old in before.items():
+        if "MEM01/function/" + path + "/" + name in retired:
+            continue
         current = after[name]
         if compact(current.signature) != compact(old.signature) or current.guards != old.guards:
             raise ValueError("MEM01 changed an original signature or CPP owner: " + name)
@@ -580,11 +585,13 @@ def validate_retained_source(root, path, text, *, stage):
         raise ValueError("MEM01 changed an unrelated type, include, macro or storage owner")
 
 
-def observation_sites(path, stage):
+def observation_sites(path, stage, root=None):
     if stage not in (Stage.RED, Stage.GREEN) or path not in RECIPE_ADMISSION["generated_subjects"]:
         raise ValueError("MEM01 observations have an unknown source/stage")
     selected = RED_OBSERVATIONS if stage is Stage.RED else GREEN_OBSERVATIONS
     result = (*COMMON_OBSERVATIONS.get(path, ()), *selected.get(path, ()))
+    from tests.host.selected_ownership_source import legacy_observation_sites
+    result = legacy_observation_sites(root, "MEM01", path, stage, result)
     keys = [(row[0], row[1]) for row in result]
     if len(keys) != len(set(keys)) or any(
         kind not in STATE_WORK_CONTRACT["work"]["kinds"] for _, _, kind, _, _ in result
@@ -601,7 +608,7 @@ def _observation_call(site):
     )
 
 
-def _observation_spans(path, text, stage):
+def _observation_spans(path, text, stage, root=None):
     from tests.host.c_source_records import tokens
     from tests.host.work_count_lexical import compound_layout, function_spans, matches_at, positional_tokens
     from tests.host.work_count_projection import resolve_regions
@@ -609,7 +616,7 @@ def _observation_spans(path, text, stage):
 
     spans = function_spans(text)
     result = []
-    for site in observation_sites(path, stage):
+    for site in observation_sites(path, stage, root=root):
         function, _, _, regions, primitive = site
         if function not in spans:
             raise ValueError("MEM01 observation function is absent: " + function)
@@ -642,9 +649,9 @@ def _observation_spans(path, text, stage):
     return tuple(result)
 
 
-def _render_observations(path, text, stage):
+def _render_observations(path, text, stage, root=None):
     edits = {}
-    for site, begin, _ in _observation_spans(path, text, stage):
+    for site, begin, _ in _observation_spans(path, text, stage, root=root):
         edits.setdefault(begin, []).append(_observation_call(site))
     for begin in sorted(edits, reverse=True):
         text = text[:begin] + "".join(edits[begin]) + text[begin:]
@@ -654,7 +661,7 @@ def _render_observations(path, text, stage):
 def observe_source(path, text, *, stage, root=None):
     root = Path(__file__).resolve().parents[2] if root is None else Path(root)
     validate_retained_source(root, path, text, stage=stage)
-    return _render_observations(path, text, stage)
+    return _render_observations(path, text, stage, root=root)
 
 
 def project_observations(path, text, *, stage, root=None):
@@ -662,7 +669,7 @@ def project_observations(path, text, *, stage, root=None):
     if type(text) is not str or not text.startswith(OBSERVATION_PREFIX):
         raise ValueError("MEM01 observation preamble is not the fixed native-only declaration")
     original = text[len(OBSERVATION_PREFIX):]
-    for site in observation_sites(path, stage):
+    for site in observation_sites(path, stage, root=root):
         call = _observation_call(site)
         if original.count(call) != 1:
             raise ValueError("MEM01 observation is missing, changed or duplicated")
@@ -671,7 +678,7 @@ def project_observations(path, text, *, stage, root=None):
     if original != expected:
         raise ValueError("MEM01 observations altered an actual selected source body")
     validate_retained_source(root, path, original, stage=stage)
-    if _render_observations(path, original, stage) != text:
+    if _render_observations(path, original, stage, root=root) != text:
         raise ValueError("MEM01 observation moved away from its exact primitive/compound")
     return original
 

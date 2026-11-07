@@ -3084,6 +3084,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_custom_command(
         OUTPUT ${MEM01_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_allocation_fixture.py"
         DEPENDS ${MEM01_NATIVE_INPUTS} ${MEM01_NATIVE_HEADERS}
@@ -3154,6 +3155,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_custom_command(
         OUTPUT ${MEM02_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_kernel_mapping_fixture.py"
         DEPENDS ${MEM02_NATIVE_INPUTS} ${MEM02_NATIVE_HEADERS}
@@ -3180,6 +3182,255 @@ if(MICROS_BUILD_HOST_TESTS)
     add_test(NAME kernel-mapping COMMAND kernel_mapping_test)
     add_dependencies(test-unit-fast kernel_mapping_test)
     add_dependencies(test-unit kernel_mapping_test)
+
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS mem03_source_proof=1)
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_ownership_source.py
+            tests/host/selected_ownership_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_ownership_source.py
+            tests/host/selected_ownership_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    set(MEM03_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-ownership")
+    set(MEM03_NATIVE_INPUTS
+        kernel/memory/frame_allocator.c
+        kernel/memory/bootstrap_memory.c
+        kernel/pm/pm_control_core.c
+        kernel/pm/pm_control_validation.c
+        kernel/pm/pm_control_runtime_core.c
+        kernel/vm/vm_handoff_core.c
+        kernel/memory/frame_ownership.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/frame_ownership_bootstrap.c
+        kernel/memory/frame_ownership_handoff.c
+        kernel/memory/frame_ownership_vm_claim.c
+        kernel/memory/frame_ownership_vm_freeze.c
+        kernel/memory/frame_ownership_vm_release.c
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+        kernel/endpoint/endpoint.c
+        kernel/endpoint/endpoint_codec.c
+        kernel/endpoint/endpoint_identity.c
+        kernel/endpoint/endpoint_registry.c
+        kernel/endpoint/endpoint_privilege.c
+        kernel/endpoint/endpoint_completion_validation.c
+        kernel/endpoint/endpoint_queue_validation.c
+        kernel/endpoint/endpoint_object_validation.c
+        kernel/endpoint/endpoint_publication.c
+        kernel/endpoint/endpoint_close.c
+        kernel/ipc/ipc_common.c
+        kernel/ipc/ipc_queue.c
+        kernel/ipc/ipc_completion.c
+        kernel/ipc/ipc_tokens.c
+        kernel/ipc/ipc_notifications.c
+        kernel/ipc/ipc_deadlock.c
+        kernel/ipc/ipc_rendezvous.c
+        kernel/ipc/ipc_close.c
+        kernel/ipc/ipc_reply.c
+        kernel/ipc/ipc.c
+    )
+    file(GLOB_RECURSE MEM03_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
+    )
+    set(MEM03_NATIVE_OUTPUTS)
+    set(MEM03_SOURCES_0)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_0 "${MEM03_NATIVE_ROOT}/aggregate/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_0})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/aggregate/${mem03_relative_header}")
+    endforeach()
+    set(MEM03_SOURCES_1)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_1 "${MEM03_NATIVE_ROOT}/active-frame/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_1})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/active-frame/${mem03_relative_header}")
+    endforeach()
+    set(MEM03_SOURCES_2)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_2 "${MEM03_NATIVE_ROOT}/inactive-frame/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_2})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/inactive-frame/${mem03_relative_header}")
+    endforeach()
+    set(MEM03_SOURCES_3)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_3 "${MEM03_NATIVE_ROOT}/active-geometry/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_3})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/active-geometry/${mem03_relative_header}")
+    endforeach()
+    set(MEM03_SOURCES_4)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_4 "${MEM03_NATIVE_ROOT}/inactive-geometry/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_4})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/inactive-geometry/${mem03_relative_header}")
+    endforeach()
+    set(MEM03_SOURCES_5)
+    foreach(mem03_source IN LISTS MEM03_NATIVE_INPUTS)
+        list(APPEND MEM03_SOURCES_5 "${MEM03_NATIVE_ROOT}/ordinary/${mem03_source}")
+    endforeach()
+    list(APPEND MEM03_NATIVE_OUTPUTS ${MEM03_SOURCES_5})
+    foreach(mem03_header IN LISTS MEM03_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
+        list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/ordinary/${mem03_relative_header}")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${MEM03_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_ownership_fixture.py"
+        DEPENDS ${MEM03_NATIVE_INPUTS} ${MEM03_NATIVE_HEADERS}
+            tools/generate_selected_ownership_fixture.py
+            tests/host/selected_ownership_source.py
+            tests/host/selected_ownership_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+            tests/host/selected_ownership_test.h
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/test_frame_ownership_source_layout.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(selected_ownership_aggregate_test ${MEM03_SOURCES_0}
+        tests/host/selected_ownership_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_ownership_aggregate_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/aggregate" "${MEM03_NATIVE_ROOT}/aggregate/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_aggregate_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_aggregate_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_SELECTED_OWNERSHIP_COUNTS=1)
+    add_executable(selected_ownership_active_frame_test ${MEM03_SOURCES_1}
+        tests/host/selected_ownership_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_ownership_active_frame_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/active-frame" "${MEM03_NATIVE_ROOT}/active-frame/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_active_frame_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_active_frame_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_active_frame_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_active_frame_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_active_frame_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_SELECTED_OWNERSHIP_COUNTS=1)
+    add_executable(selected_ownership_inactive_frame_test ${MEM03_SOURCES_2}
+        tests/host/selected_ownership_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_ownership_inactive_frame_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/inactive-frame" "${MEM03_NATIVE_ROOT}/inactive-frame/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_inactive_frame_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_inactive_frame_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_inactive_frame_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_inactive_frame_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_inactive_frame_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_SELECTED_OWNERSHIP_COUNTS=1)
+    add_executable(selected_ownership_active_geometry_test ${MEM03_SOURCES_3}
+        tests/host/selected_ownership_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_ownership_active_geometry_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/active-geometry" "${MEM03_NATIVE_ROOT}/active-geometry/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_active_geometry_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_active_geometry_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_active_geometry_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_active_geometry_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_active_geometry_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_SELECTED_OWNERSHIP_COUNTS=1)
+    add_executable(selected_ownership_inactive_geometry_test ${MEM03_SOURCES_4}
+        tests/host/selected_ownership_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_ownership_inactive_geometry_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/inactive-geometry" "${MEM03_NATIVE_ROOT}/inactive-geometry/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_inactive_geometry_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_inactive_geometry_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_inactive_geometry_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_inactive_geometry_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_inactive_geometry_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_SELECTED_OWNERSHIP_COUNTS=1)
+    add_executable(selected_ownership_ordinary_test ${MEM03_SOURCES_5}
+        tests/host/selected_ownership_test.c
+    )
+    target_include_directories(selected_ownership_ordinary_test PRIVATE
+        "${MEM03_NATIVE_ROOT}/ordinary" "${MEM03_NATIVE_ROOT}/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_ownership_ordinary_test PRIVATE c_std_17)
+    target_compile_options(selected_ownership_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_ownership_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_ownership_ordinary_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_ownership_ordinary_test PRIVATE
+        MICROS_SELECTED_OWNERSHIP_LAUNCHER=1
+        "MICROS_SELECTED_OWNERSHIP_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_OWNERSHIP_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_ownership.py\""
+        "MICROS_SELECTED_OWNERSHIP_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+    add_test(NAME selected-ownership COMMAND selected_ownership_ordinary_test
+        "$<TARGET_FILE:selected_ownership_aggregate_test>"
+        "$<TARGET_FILE:selected_ownership_active_frame_test>"
+        "$<TARGET_FILE:selected_ownership_inactive_frame_test>"
+        "$<TARGET_FILE:selected_ownership_active_geometry_test>"
+        "$<TARGET_FILE:selected_ownership_inactive_geometry_test>"
+    )
+    set_tests_properties(selected-ownership PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_ownership_aggregate_test selected_ownership_active_frame_test selected_ownership_inactive_frame_test selected_ownership_active_geometry_test selected_ownership_inactive_geometry_test selected_ownership_ordinary_test)
 
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")

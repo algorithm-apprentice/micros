@@ -235,7 +235,7 @@ micros_user_address_space_create(struct micros_process_handle process)
         goto done;
     }
     if (
-        micros_frame_ownership_runtime_validate(objects)
+        micros_frame_ownership_runtime_validate_metadata(objects)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;

@@ -10,8 +10,8 @@ Its independent design review and separate merge #216 are complete.
 The [fixed-source study](../research/minix-selected-frame-ownership.md)
 records the MINIX baseline, complete caller census and consumer assumptions.
 The following runtime contract remains authoritative. Its later
-validation-efficiency amendment is Accepted; its separate design merge and
-prerequisite implementation still precede the next runtime restart.
+validation-efficiency amendment separately merged as design #217 and
+implementation #218, permitting the fresh runtime restart described below.
 
 The fixed source is merged EV01-C04 #214:
 
@@ -34,9 +34,12 @@ when the user prioritized the
 The exact uncommitted tree is archived reference, not a published outcome.
 
 Accepted [ADR-0105](../adr/0105-bounded-validation-feedback.md) defines the
-separate validation prerequisite and future restart boundary. MEM03 remains
-blocked; its runtime, keys, adapters and work expectations are not silently
-changed by that tooling design.
+separate validation prerequisite and restart boundary. Implementation #218
+merged as `dedf9a8d9d72f153519ea07150e50594a6618c6b`, tree
+`3afdc8e5281fe5199cb2fd45cc4af3a12eaba1f0`, after complete current acceptance
+and clean independent review. The MEM03 restart binds that implementation
+base separately from the fixed #214 runtime and the two earlier designs.
+Its runtime, forty keys, six adapters and work expectations remain unchanged.
 
 The outcome closes only B02-F002/B02-E002: ordinary ownership operations
 check active metadata and the records they consume, rather than auditing
@@ -480,10 +483,12 @@ logical-output transcripts, not ASLR-dependent native pointer bytes.
 Within each process, failures preserve byte-exact full snapshots and valid
 mutations match independently applied expected state updates.
 
-Add one `selected-ownership` CTest to both native tiers, orchestrating the
-six declared executables. They are six build products, not six duplicate
-behavioral CTests. The complete native count therefore advances from 42 to
-43; no target workflow is added.
+Add one `selected-ownership` CTest, labeled `slow`, to the complete native
+tier, orchestrating the six declared executables. ADR-0105 refines the
+original both-tier placement: `test-unit-fast` neither builds those products
+as dependencies nor executes the orchestration. They remain six build
+products, not six duplicate behavioral CTests. The complete native count
+therefore advances from 42 to 43; no target workflow is added.
 
 Keep explicit fixed/current source/header dependencies, ordinary reusable
 profile eligibility and existing CMake parser policy. Generated translations
@@ -765,9 +770,12 @@ tools/generate_kernel_mapping_fixture.py
 
 The literal binding owner remains byte-identical to #214. The six legacy
 adapters must be independently specified, installed before actual Red and
-frozen by exact finite inverses against #214. Their presence does not relax
-an assertion before the MEM03 transition permits it. Only the twenty production
-files may change during the actual correction attempt.
+frozen by exact finite inverses against the reviewed #218 base. A separate
+finite prerequisite projection proves those base bytes retain #214's
+original policy. The existing checked-view delegation already supplies two
+of the six adapters without another import change. Their presence does not
+relax an assertion before the MEM03 transition permits it. Only the twenty
+production files may change during the actual correction attempt.
 
 All other existing inputs and the eight new evidence owners are immutable
 within that attempt. Complete-current record conservation is independent of
@@ -816,6 +824,56 @@ The bootstrap read-only dependency gate may recognize the new read-only
 metadata entry without admitting an upward mutation. Freeze that fixture
 change before actual Red. No old hash or family fingerprint is rebaselined.
 
+## Validation-aware restart
+
+The new base has 1,476 tracked members and the same runtime source as #214;
+the eight evidence owners extend it to 1,484. The independently declared
+membership binds every base mode and Git blob, not only a file count.
+The original runtime hashes, helper-token identities, oracle partition,
+99 cases, 495 snapshots and 58 current guards do not move to that new base.
+
+The source-view owner explicitly adds MEM03 as its fifth provider. Its native
+compiler, distinct native `nm`, complete external inputs, selected journal
+and frozen adapters remain checked at opening and closing. The verified
+journal/result pair avoids duplicate semantic replay; cold authority APIs
+and the provisional author transaction retain their own checks.
+
+Memory-native admissions and complete-helper token assertions consume the
+same per-key source-view adapter. Tests of changed or partial authority use
+explicit cold/isolated contexts rather than borrowing a passing live view.
+The fixture-generator CLI owns a checked view; its library calls do not
+create nested owners.
+
+The two earlier memory fixture generators explicitly depend on the newly
+consumed source-authority and view code, including its staged-candidate
+metadata helpers. Those source dependencies do not make the six MEM03
+executables dependencies of the fast target.
+
+The three memory fixture-generation commands share one depth-one Ninja job
+pool: their checked candidate capture calls the existing `git write-tree`,
+which takes the shared worktree index lock. This serializes only those
+generation commands, not native compilation or linking. The shared input and
+context algorithms, historical source guards, and build parallelism setting
+remain unchanged; no retry or stale-lock recovery is introduced.
+
+B14's retained suite delegates to the existing host runner, including its
+source-scope and runner regressions, while retaining the exact author
+transaction and per-unit publication rules. Per-test progress is visible and
+captured in the unit log; view closure precedes a successful unit result.
+Neither that read view nor a fast run grants author-retirement authority.
+
+The native recipe extends the exact #218 CMake source. Its inverse also
+admits the unchanged #214 predecessor reached through ADR-0105's exact
+two-invocation projection; every other byte remains checked. The launcher
+rejects nonempty `__PYVENV_LAUNCHER__` before interpreter execution, where
+CPython could otherwise consume it before a Python-side check.
+
+Renew actual Red, Green and recertification on this base. The archived
+candidate and its old selector/records remain reference evidence only.
+Measure the real terminal-journal source query and complete native run after
+the renewed transition; the prerequisite's committed-foundation timings do
+not by themselves prove the original five-hour author case is corrected.
+
 ## Actual Red, Green and recertification
 
 Declare three independent oracles:
@@ -852,8 +910,7 @@ ${MICROS_PYTHON} -E -S -B tools/check_selected_ownership.py --green
 ${MICROS_PYTHON} -E -S -B tools/check_selected_ownership.py --recertify
 ```
 
-These are future implementation commands, not files claimed to exist now.
-The driver binds fixed references, immutable input/source/tool membership,
+The implementation driver binds fixed references, immutable input/source/tool membership,
 actual executions and per-unit results under ADR-0082. A staged completion
 claim cannot suppress an original assertion.
 
