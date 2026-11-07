@@ -214,10 +214,22 @@ Accepted [ADR-0106](../adr/0106-granular-selected-ownership-native-source-author
 defines [EV01-C05](../architecture/selected-ownership-native-source-authority.md):
 484 exact existing clauses, unchanged guards and no runtime retirement.
 Separate design #220 is merged as
-`1d9eab05afab16a4caff519a84790541036ee240`; its metadata-only implementation
-is the sole active task. MEM04 design waits for complete acceptance and
-independently reviewed implementation merge. Finding ownership, the 59-node
-runtime graph and hosted-CI acceptance remain unchanged.
+`1d9eab05afab16a4caff519a84790541036ee240`. Its independently reviewed
+metadata-only implementation #221 merged as
+`f28377decc0d20533e05330f2f2211db3f230910`, with identical reviewed and squash
+tree `4b56076479ac53092c4c83d9c9b52829b66139ba`.
+Real coverage Red, complete current acceptance, journal-free committed/main
+checks and exact cleanup passed.
+
+The Accepted [MEM04 contract](../architecture/selected-user-address-space.md)
+under [ADR-0107](../adr/0107-selected-user-address-space-validation.md) is now
+the sole active design. It includes bootstrap allocation's selected-prefix
+check rather than leaving that ordinary per-page audit unowned, and retains
+an explicit twenty-row complete-audit ledger for existing diagnostics,
+certification and downstream correction owners. No global
+all-audits-removed claim or runtime retirement is made by this design.
+Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
+unchanged.
 
 ## Consolidation invariants
 
@@ -357,7 +369,7 @@ blocking queue.
 | `MEM01` | Runtime correction | `B01-F006`, `B02-F001` | `EV04` | Implementation #210 follows design #209 and the [Accepted allocation contract](../architecture/bootstrap-allocation.md): canonical geometry, lower-bound search progress and whole-interval/word validity. | Actual three-oracle Red/Green, exact rollback/mutation guards, six-key retirement, full current acceptance and independent review complete. |
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Implementation #212 follows design #211 and the Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md): largest legal leaves and direct checked table/owner identities. | Actual native/target Red-Green, retained MMU guards, exact three-key retirement, full current recertification and independent review complete. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. Designs #215/#216 and validation prerequisite #218 are merged; the fresh restart retains the fixed runtime and adds checked-view/full-only evidence integration. | Actual active/inactive/bitmap/object work, failure-atomic selected transitions, complete diagnostics and the exact 40-key authority transition; no borrowed interrupted acceptance. |
-| `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level walks and selected context/owner checks instead of complete state validation. | Exact PTE-level, owner, activation, and fault-path counts. |
+| `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level lookup/translation/allocation-prefix walks and selected root/context/owner preparation instead of complete state validation. | Exact PTE-level, owner, activation, fault-path and allocation-compensation evidence. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Move complete registry audits off ordinary scheduler paths; use direct hart identity and bounded stack ownership structures. | Object/hart/stack comparison counts and corruption diagnostics. |
 | `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Retain one prevalidated return plan without rebuilding queues or repeating memory/context validation. | Queue-shift, zero-quantum, plan-compare, commit-store, and target return traces. |

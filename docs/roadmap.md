@@ -233,11 +233,25 @@ and [EV01-C05](architecture/selected-ownership-native-source-authority.md)
 define a separate 484-clause metadata prerequisite, preserving all 4,290
 predecessor facts, eighteen fingerprints and existing checks. Separate design
 #220 merged as `1d9eab05afab16a4caff519a84790541036ee240`.
-Its independently frozen declaration and closed materialization now supply
-4,774 facts in nineteen families without any new retirement. That
-implementation is the sole active task and still requires complete acceptance
-and independent review. MEM04 design is blocked until it merges; MEM04
-implementation, hosted CI and later runtime findings retain their owners.
+Its independently frozen declaration and closed materialization supply
+4,774 facts in nineteen families without any new retirement. Implementation
+#221 completed real coverage Red, all fifty fresh author commands and clean
+independent first-commit review, then merged as
+`f28377decc0d20533e05330f2f2211db3f230910`.
+The identical reviewed/committed/remote/preview/squash tree is
+`4b56076479ac53092c4c83d9c9b52829b66139ba`.
+Fresh committed/actual-main authority checks and protected task-ref cleanup
+passed.
+
+Accepted [ADR-0107](adr/0107-selected-user-address-space-validation.md) and
+the [MEM04 contract](architecture/selected-user-address-space.md) now define
+checked selected lookup, translation, allocation preflight and root
+preparation/activation. Bounded VM/TTY binding inspection removes hidden
+global validation without replacing command authorization. The proposal
+also preserves complete diagnosis and fixes the directly coupled allocator
+cursor compensation gap. Only design is active; no MEM04 runtime or
+executable evidence exists. Hosted CI and later runtime findings retain
+their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

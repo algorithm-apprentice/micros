@@ -18,12 +18,19 @@ Independent read-only design review found no substantive issue. Separate
 design #220 merged as `1d9eab05afab16a4caff519a84790541036ee240`, with identical
 reviewed/committed/remote/preview/squash tree
 `d5c3f3d4adf653f278d47c03b3f1e58a7dc8315e`.
-The separate metadata implementation is now the sole active task.
+The separate metadata implementation is independently reviewed and merged
+as #221, `f28377decc0d20533e05330f2f2211db3f230910`, with identical
+reviewed/committed/remote/preview/squash tree
+`4b56076479ac53092c4c83d9c9b52829b66139ba`.
+Real coverage Red, complete old/new record equality, all fifty fresh author
+commands and independent first-commit review passed. Fresh committed and
+actual-main checks preserve all five authorities without journals; exact
+completed refs and the owned check worktree are removed.
 
 The outcome is precise inventory authority for **484 already defined
 current-source clauses**, not 484 new tests or runtime operations. No
-assertion is suppressed and no identity is retired. MEM04 design remains
-blocked until the separately reviewed implementation merges.
+assertion is suppressed and no identity is retired. This resumes MEM04
+design, not its runtime implementation.
 
 ## Preserved authority
 
@@ -355,6 +362,15 @@ and path negatives, unchanged overlap rejection and all five prior claims
 without reading author journals.
 
 Focused validation passed 103 tests across the two documented modules.
-This is not final publication evidence: the complete current author plan,
-independent first-commit review and committed/squash authority checks remain
-required before the implementation merges and MEM04 design resumes.
+Final producer `45ae81554fe14d73a1a2fcc431e9fe76` passed all fifty fresh
+commands, including 43 CTests, 1,534 Python tests, forty QEMU workflows,
+four standalone images and complete stack evidence. Its three same-run
+receipts matched current exact profiles before commit.
+
+An earlier complete run's native receipt was invalidated when fast execution
+performed a generated-header follow-up and relinked two fixtures. No stale
+receipt was used: an actual native no-work build preceded the renewed final
+producer. Independent implementation review found no substantive issue
+before the first permanent commit. Fresh committed and actual-main
+three-case authority checks passed; exact publication and cleanup closed
+EV01-C05 without a runtime retirement or hosted-CI success claim.
