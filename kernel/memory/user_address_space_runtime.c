@@ -269,3 +269,19 @@ _Noreturn void micros_user_address_space_panic_invariant(const char *reason) {
 
     MICROS_PANIC(hart_id, reason);
 }
+
+enum micros_user_address_space_error micros_user_address_space_require_idle(
+    const struct micros_user_address_space_runtime_view *view)
+{
+    if (view == NULL || view->ledger == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    if (scratch_busy) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+    }
+    if (riscv_irq_is_enabled() || view->ledger->managed_frame_count == 0
+        || view->ledger->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}

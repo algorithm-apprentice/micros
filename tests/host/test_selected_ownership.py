@@ -351,7 +351,9 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
             )
 
     def test_native_generators_serialize_their_shared_index_metadata_only(self):
-        recipe = (ROOT / "CMakeLists.txt").read_text()
+        from tests.host.selected_address_space_source import project_cmake
+
+        recipe = project_cmake((ROOT / "CMakeLists.txt").read_text())
         self.assertTrue(
             "set_property(GLOBAL APPEND PROPERTY JOB_POOLS mem03_source_proof=1)" in recipe,
             "memory fixture generation requires its depth-one source-proof pool",
@@ -368,10 +370,12 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
         self.assertNotRegex(recipe, r"JOB_POOL_(?:COMPILE|LINK)\s+mem03_source_proof")
 
     def test_scaffold_restores_exact_legacy_adapters_and_the_complete_previous_recipe(self):
+        from tests.host.selected_address_space_source import project_legacy_adapter as project_next
+
         source.validate_scaffold(ROOT)
         for path in source.SOURCE_ROLES["fixed_adapters"]:
             original = source.baseline_adapter_source(str(ROOT), path)
-            actual = (ROOT / path).read_text()
+            actual = project_next(ROOT, path, (ROOT / path).read_text())
             self.assertEqual(source.extend_legacy_adapter(path, original), actual)
             self.assertEqual(original, source.project_legacy_adapter(path, actual))
             with self.subTest(path=path), self.assertRaises(ValueError):

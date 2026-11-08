@@ -171,7 +171,10 @@ current acceptance remain separate from the abandoned reference.
 ### MEM04 kernel-visitor extension admission
 
 This is the Accepted exception under
-[ADR-0110](../adr/0110-kernel-visitor-extension-admission.md), not implemented.
+[ADR-0110](../adr/0110-kernel-visitor-extension-admission.md), separately
+merged as design #226. Its two existing implementation owners are frozen
+with the restarted MEM04 scaffold; native admission success alone is not
+a complete stack certificate.
 The [observed header conflict](../research/minix-selected-user-address-space.md#kernel-visitor-header-certificate-gap)
 blocked the uncommitted MEM04 full gate after native, QEMU and standalone
 image acceptance passed.
@@ -442,7 +445,9 @@ normal-return and preservation proof below.
 [Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) addresses the
 [next observed source-unit rejection](../research/minix-selected-user-address-space.md#fatal-tty-header-certificate-gap)
 after the repaired visitor binding passed in a fresh ordinary/metadata
-image pair. Implementation still requires its separate design merge.
+image pair. The corrective design separately merged as #227. Its existing
+fatal predicate and regression owner join the fresh immutable scaffold;
+complete current stack certification remains required.
 
 Only the existing `kernel/tty/tty_handoff_runtime.h` source-unit entry may
 admit either its original fixed header or the exact ordinary

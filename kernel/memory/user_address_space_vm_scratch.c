@@ -238,7 +238,8 @@ validate_vm_scratch_frame(
 
 static enum micros_user_address_space_error
 prepare_vm_scratch_mapping_leaf(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t physical_address,
     struct micros_user_address_space_vm_scratch_plan *candidate
 )
@@ -248,6 +249,7 @@ prepare_vm_scratch_mapping_leaf(
     uint64_t *leaf_pte;
 
     error = micros_user_address_space_locate_leaf_slot_locked(
+        runtime,
         process,
         MICROS_VM_SCRATCH_VIRTUAL_ADDRESS,
         &leaf_entry,
@@ -281,7 +283,8 @@ prepare_vm_scratch_mapping_leaf(
 
 static enum micros_user_address_space_error
 prepare_vm_scratch_removal_leaf(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t physical_address,
     struct micros_user_address_space_vm_scratch_plan *candidate
 )
@@ -291,6 +294,7 @@ prepare_vm_scratch_removal_leaf(
     uint64_t *leaf_pte;
 
     error = micros_user_address_space_locate_leaf_slot_locked(
+        runtime,
         process,
         MICROS_VM_SCRATCH_VIRTUAL_ADDRESS,
         &leaf_entry,
@@ -389,7 +393,8 @@ micros_user_address_space_prepare_vm_scratch_mapping(
         goto done_with_scratch;
     }
     error = prepare_vm_scratch_mapping_leaf(
-        context.resolved,
+        &runtime,
+        process,
         physical_address,
         &candidate
     );
@@ -504,7 +509,8 @@ micros_user_address_space_prepare_vm_scratch_removal(
         goto done_with_scratch;
     }
     error = prepare_vm_scratch_removal_leaf(
-        context.resolved,
+        &runtime,
+        process,
         physical_address,
         &candidate
     );

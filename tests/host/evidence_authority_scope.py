@@ -92,12 +92,13 @@ def _providers():
         kernel_mapping_authority,
         runtime_memory_authority,
         selected_ownership_authority,
+        selected_address_space_authority,
     )
 
     return (
         runtime_memory_authority, diagnostic_history_authority,
         bootstrap_allocation_authority, kernel_mapping_authority,
-        selected_ownership_authority,
+        selected_ownership_authority, selected_address_space_authority,
     )
 
 
@@ -167,7 +168,9 @@ def _check_author_inputs(provider, context, journal, inputs):
         key: value for key, value in context.environment.immutable_inputs
         if key.startswith("@")
     }
-    if provider.__name__ == "tests.host.selected_ownership_authority":
+    if provider.__name__ in (
+        "tests.host.selected_ownership_authority", "tests.host.selected_address_space_authority",
+    ):
         changed = (
             len(observed) != 3 or observed[0] != context.native_compiler
             or observed[1] != context.native_nm or observed[2] != expected

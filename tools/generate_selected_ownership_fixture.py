@@ -117,7 +117,15 @@ def source_bundle(root, stage, channel):
             data, identity = read_regular(regular_source(root, name))
             mode = identity["mode"]
             if data != original and name not in source.SOURCE_ROLES["production_paths"]:
-                raise ValueError("MEM03 changed an unadmitted native dependency: " + name)
+                from tests.host.selected_address_space_source import native_assertion_admission
+                try:
+                    admitted = "MEM03/native-input/" + name in native_assertion_admission(
+                        root, "MEM03", name, data.decode("utf-8"), stage,
+                    )
+                except ValueError as error:
+                    raise ValueError("MEM03 changed an unadmitted native dependency: " + name) from error
+                if not admitted:
+                    raise ValueError("MEM03 changed an unadmitted native dependency: " + name)
         inputs[name] = {
             "kind": "file", "mode": mode, "size": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),

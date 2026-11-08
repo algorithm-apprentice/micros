@@ -51,4 +51,8 @@ micros_vm_handoff_runtime_scratch_authority(
         *authority
 );
 
+enum micros_vm_scratch_authority_status
+micros_vm_handoff_runtime_inspect_scratch_binding(
+    struct micros_user_address_space_vm_scratch_authority *binding);
+
 #endif

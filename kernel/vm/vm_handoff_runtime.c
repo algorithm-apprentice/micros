@@ -279,3 +279,13 @@ micros_vm_handoff_runtime_scratch_authority(
     *authority = candidate;
     return MICROS_VM_SCRATCH_AUTHORITY_ACTIVE;
 }
+
+enum micros_vm_scratch_authority_status
+micros_vm_handoff_runtime_inspect_scratch_binding(
+    struct micros_user_address_space_vm_scratch_authority *binding)
+{
+    if (micros_vm_handoff_inspect_scratch_binding(&handoff_state, binding) != MICROS_VM_HANDOFF_OK) {
+        return MICROS_VM_SCRATCH_AUTHORITY_INVALID;
+    }
+    return binding->active ? MICROS_VM_SCRATCH_AUTHORITY_ACTIVE : MICROS_VM_SCRATCH_AUTHORITY_NONE;
+}

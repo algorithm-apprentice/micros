@@ -435,4 +435,9 @@ enum micros_vm_self_fault_action micros_vm_self_fault_classify(
     enum micros_bootstrap_service_state service_state
 );
 
+struct micros_user_address_space_vm_scratch_authority;
+enum micros_vm_handoff_error micros_vm_handoff_inspect_scratch_binding(
+    const struct micros_vm_handoff_state *state,
+    struct micros_user_address_space_vm_scratch_authority *binding);
+
 #endif

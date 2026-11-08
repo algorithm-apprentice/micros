@@ -101,8 +101,9 @@ static void release_scratch(
 
 static enum micros_user_address_space_error
 prepare_tty_uart_leaf(
+    struct micros_user_address_space_runtime_view *runtime,
     const struct micros_frame_ownership *ledger,
-    const struct micros_process *process,
+    struct micros_process_handle process,
     struct micros_user_address_space_tty_uart_plan *candidate
 )
 {
@@ -123,6 +124,7 @@ prepare_tty_uart_leaf(
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
     }
     error = micros_user_address_space_locate_leaf_slot_locked(
+        runtime,
         process,
         MICROS_TTY_UART_VIRTUAL_BASE,
         &leaf_entry,
@@ -234,8 +236,9 @@ micros_user_address_space_prepare_tty_uart_mapping(
         goto done_with_scratch;
     }
     error = prepare_tty_uart_leaf(
+        &runtime,
         ledger,
-        resolved,
+        process,
         &candidate
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -362,7 +365,8 @@ micros_user_address_space_validate_tty_uart_mapping(
         goto done_with_scratch;
     }
     error = micros_user_address_space_lookup_leaf_locked(
-        resolved,
+        &runtime,
+        process,
         MICROS_TTY_UART_VIRTUAL_BASE,
         &leaf_entry,
         NULL,

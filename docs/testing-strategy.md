@@ -693,6 +693,26 @@ the complete one-configuration proof must pass after actual Green and
 before expensive recertification/full acceptance. It remains a focused
 development check, not a substitute for the complete stack matrix.
 
+Corrective design #227 is separately merged. The fresh
+[implementation map](architecture/selected-user-address-space.md#implementation-and-evidence-map)
+records the 523-reference/529-current native corpus, thirty current binding/
+argument/rebound checks, four products and exact dependent-source guard.
+Its capture-diagnostic regression verifies the same failed output is
+surfaced without another execution. The strict handoff fixture remains
+unchanged; successful final acceptance must reach the scoped target witness.
+All three stack admission boundaries have native regressions against their
+original predicates, including other-source and terminal/trace observer
+controls. Complete actual ordinary/metadata proof still follows Green.
+
+Focused harness iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_selected_address_space tests.host.test_stack_bound_evidence tests.host.test_evidence_authority_scope tests.host.test_python_host_runtime.PythonHostRuntimeTests.test_python_process_construction_has_one_reviewed_owner_inventory
+```
+
+This is not a substitute for renewed actual Red/Green/recertification, the
+complete fifty-command producer or independent implementation review.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

@@ -1,4 +1,5 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "micros/user_address_space_core.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -867,6 +868,79 @@ enum micros_vm_handoff_error micros_vm_handoff_state_validate(
     )
         ? MICROS_VM_HANDOFF_OK
         : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+}
+
+static bool scratch_binding_record_is_valid(const struct micros_vm_handoff_state *state)
+{
+    const struct micros_vm_kernel_mapping_record *record =
+        &state->mappings[state->load.process.slot];
+
+    return record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
+        && micros_vm_handoff_process_handles_equal(record->process, state->load.process)
+        && record->load_token == state->load.load_token
+        && record->mapping_generation == 0
+        && record->exit_token == 0
+        && record->root_physical_address == 0
+        && micros_vm_handoff_bytes_are_zero(record->table_frames, sizeof(record->table_frames))
+        && record->entry == 0
+        && record->stack_pointer == 0
+        && record->entry_count < MICROS_APPLICATION_RESIDENT_PAGE_MAX;
+}
+
+static bool scratch_binding_load_is_valid(const struct micros_vm_handoff_state *state)
+{
+    if (state->phase == MICROS_VM_HANDOFF_PHASE_PREPARED) {
+        return state->last_load_token == 0 && state->last_mapping_generation == 0
+            && micros_vm_handoff_bytes_are_zero(&state->load, sizeof(state->load));
+    }
+    if (state->load.phase == MICROS_VM_LOAD_PHASE_IDLE) {
+        return micros_vm_handoff_bytes_are_zero(&state->load, sizeof(state->load));
+    }
+    if (!active_load_identity_is_valid(state)) {
+        return false;
+    }
+    if (state->load.phase == MICROS_VM_LOAD_PHASE_FROZEN) {
+        return state->load.scratch_phase == MICROS_VM_SCRATCH_CLEAR
+            && micros_vm_handoff_bytes_are_zero(&state->load.scratch, sizeof(state->load.scratch));
+    }
+    if (state->load.scratch_phase == MICROS_VM_SCRATCH_CLEAR) {
+        return micros_vm_handoff_bytes_are_zero(&state->load.scratch, sizeof(state->load.scratch));
+    }
+    return scratch_binding_record_is_valid(state)
+        && micros_vm_handoff_mapping_entry_is_valid(&state->load.scratch);
+}
+
+enum micros_vm_handoff_error micros_vm_handoff_inspect_scratch_binding(
+    const struct micros_vm_handoff_state *state,
+    struct micros_user_address_space_vm_scratch_authority *binding)
+{
+    struct micros_user_address_space_vm_scratch_authority candidate = {0};
+
+    if (state == NULL || binding == NULL
+        || !micros_vm_handoff_pointer_is_aligned(state, _Alignof(struct micros_vm_handoff_state))
+        || !micros_vm_handoff_pointer_is_aligned(
+            binding, _Alignof(struct micros_user_address_space_vm_scratch_authority))) {
+        return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
+    }
+    if (state->phase == MICROS_VM_HANDOFF_PHASE_UNINITIALIZED) {
+        *binding = candidate;
+        return MICROS_VM_HANDOFF_OK;
+    }
+    if (!vm_handoff_identity_is_valid(state) || !scratch_binding_load_is_valid(state)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    candidate.process = state->process;
+    candidate.root_physical_address = state->root_physical_address;
+    candidate.virtual_address = MICROS_VM_SCRATCH_VIRTUAL_ADDRESS;
+    candidate.active = state->phase == MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        && state->load.phase == MICROS_VM_LOAD_PHASE_LOADING
+        && state->load.scratch_phase == MICROS_VM_SCRATCH_MAPPED;
+    if (candidate.active) {
+        candidate.load_token = state->load.load_token;
+        candidate.physical_address = state->load.scratch.physical_address;
+    }
+    *binding = candidate;
+    return MICROS_VM_HANDOFF_OK;
 }
 
 static uint64_t page_digest_byte(uint64_t digest, uint8_t byte)

@@ -25,8 +25,12 @@ That candidate is archived. Corrective design #226 separately merged, and
 the fresh candidate passed actual native/target Green and repaired current
 visitor binding in an early ordinary/metadata stack check. The following
 fatal source-unit guard rejected the ordinary TTY inspector declaration.
-The candidate is archived; implementation remains blocked for the separate
-[Accepted ADR-0111 correction](../adr/0111-fatal-tty-header-extension.md).
+The candidate remains archived.
+The [Accepted ADR-0111 correction](../adr/0111-fatal-tty-header-extension.md)
+separately merged as #227, commit
+`60e8b8e160b1c063e448cd32b0418535dd63bbb7`, tree
+`28a01d02f4c12a148627f23d31cb0de512c657f4`.
+Implementation restarts from that exact main with newly frozen inputs.
 The dependency section below retains
 the original 28-path affected-fact closure while adding one production path.
 
@@ -37,7 +41,7 @@ MINIX reference:   4db99f4012570a577414fe2a43697b2f239b699e
 MINIX tree:        80db89de58d5ecaf31efe48b4d1d98c7e285e81f
 ```
 
-The runtime is byte-identical to MEM03 #219. EV01-C05 #220/#221 supplied
+The fixed runtime reference is byte-identical to MEM03 #219. EV01-C05 #220/#221 supplied
 individual current-source identities without changing admission. Its 484
 records and both older memory-native declarations remain unchanged.
 
@@ -422,7 +426,7 @@ selection for their requested process.
 
 This section is Accepted under
 [ADR-0109](../adr/0109-handoff-preflight-error-ownership.md).
-It is a corrective design, not an implemented exception. Its
+The separately merged corrective design governs the owning implementation. Its
 [observed source dependency](../research/minix-selected-user-address-space.md#indirect-handoff-preflight-error-dependence)
 requires one additional owning source, not a restored global lookup audit.
 
@@ -904,3 +908,88 @@ Independent review precedes the first permanent implementation commit.
 Publication requires clean staged/worktree evidence, ordinary journal-free
 committed authority, exact reviewed/committed/remote/preview/squash content
 and protected cleanup of only the completed task refs.
+
+## Implementation and evidence map
+
+The existing runtime owners retain their responsibilities: runtime admission
+owns the read-only scratch guard; mapping owns checked selected paths and
+ordinary results; validation owns bounded binding/root checks alongside
+unchanged complete diagnostics; mutation owns the retained allocation prefix
+and exact saved-cursor compensation. Activation owns protected preparation
+and hardware commit. Scheduler context consumes that preparation. VM and
+TTY owners inspect committed bindings without replacing command authority.
+The sole additional handoff owner normalizes only the two specified complete
+diagnostic failures, with no added audit or changed target/commit behavior.
+
+The eight evidence owners supply four actual-source native products.
+The frozen corpus contains 523 reference queries, 529 current queries,
+separate cursor/scoped-result witnesses, and thirty current-only binding/
+argument/rebound-view checks. Ordinary linkage contains no observer support.
+Path/context work composes aggregate work over the unchanged 27-owner/
+14-kind collector. Independent snapshots cover allocator/cursor, ledger,
+objects, PTEs, scratch, bindings, outputs, IRQ state and activation calls.
+
+The fresh source freeze precedes test/production edits and binds the actual
+1,497-member #227 base. Runtime bodies remain pinned to #221, while scaffold
+predecessors use the new implementation base. All 4,774 original facts,
+nineteen fingerprints, five claims and seventy retirements remain unchanged;
+the new family has eight facts and the original 33-key partition.
+The explicit handoff dependency is separate from the derived affected-fact
+closure. Its exact two-site source inverse and every existing active MEM03
+clause remain checked, including in the ordinary native product gate.
+
+The three existing stack-admission owners are separately frozen immutable
+inputs, not production candidates. Their input identities follow focused
+native Red/Green for the visitor header, five helper functions and fatal TTY
+header; they are not new runtime oracles or a rebaseline of original stack
+authority. Exact header, qualified helper, source/origin, machine-indirect
+and fatal/observer source controls run in the existing stack evidence module.
+B14 includes that module. After actual Green, the documented fresh
+one-configuration ordinary/metadata proof must complete before
+recertification/full acceptance. All existing fatal/callback anchors and
+complete stack gates remain.
+
+The MEM04 recipe inverse precedes the reporting inverse and MEM03 chain.
+The existing MEM03 extender composes the frozen MEM04 native addition for
+its forward-comparison test; its original input/hashes and C01 observed-side
+reporting projection remain intact. MEM04 and the newly affected MEM03
+native coordinator each own one existing checked source view, rather than
+replaying terminal evidence for every source lookup.
+
+Historical recipe readers admit only the fixed current predecessor or its
+existing exact host-command inverse. The old three-generator pool assertion
+uses the finite MEM04 recipe inverse; the current fourth generator remains
+mandatory in MEM04's own recipe. The one shifted private-header include
+transport adds the exact TTY edge without hiding current declarations.
+TTY's historical function inventory excludes only independently checked
+MEM04 additions, while current direction checks distinguish C tag names from
+real function references. Original hashes and all real owner edges remain
+authoritative, including the legacy generator's rejection diagnostic.
+
+The two frozen target adaptations report actual results, SATP and state/
+output comparisons. Current success uses the merged single-run transcript
+boundary. Failed capture displays its already owned output before rejecting
+the phase; it neither records Green nor executes another guest. B02/B05
+recertification consumes the same fresh target result within that phase.
+The original separate handoff preflight fixture is unchanged.
+After actual native/target oracle capture, recertification runs B14's retained
+checks first to fail early on scaffold defects. All other required units
+still execute, and the published unit record order remains B01-B12/B14.
+
+Focused harness iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_selected_address_space tests.host.test_stack_bound_evidence tests.host.test_evidence_authority_scope tests.host.test_python_host_runtime.PythonHostRuntimeTests.test_python_process_construction_has_one_reviewed_owner_inventory
+```
+
+After the current implementation builds, the native product gate also runs as:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target selected_address_space_aggregate_test selected_address_space_path_test selected_address_space_context_test selected_address_space_ordinary_test
+ctest --test-dir build/host-debug --output-on-failure -R '^selected-address-space$'
+```
+
+Neither invocation substitutes for actual `--red`, `--green`, `--recertify`,
+the complete producer or independent first-commit review. Archived results
+remain historical, not evidence for this restart.

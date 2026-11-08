@@ -123,4 +123,6 @@ micros_user_address_space_handle_test_trap(
 );
 #endif
 
+enum micros_user_address_space_error micros_user_address_space_prepare_activation(struct micros_process_handle process, uint64_t *root_physical_address);
+
 #endif

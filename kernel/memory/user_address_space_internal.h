@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "kernel/tty/tty_handoff_core.h"
 #include "kernel/vm/vm_handoff_core.h"
 #include "micros/frame_ownership.h"
 #include "micros/kernel_address_space.h"
@@ -297,7 +298,8 @@ micros_user_address_space_visit_mappings_locked(
 
 enum micros_user_address_space_error
 micros_user_address_space_lookup_leaf_locked(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t virtual_address,
     struct micros_sv39_decoded_pte *leaf_entry,
     uint64_t **leaf_pte,
@@ -307,7 +309,8 @@ micros_user_address_space_lookup_leaf_locked(
 
 enum micros_user_address_space_error
 micros_user_address_space_locate_leaf_slot_locked(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t virtual_address,
     struct micros_sv39_decoded_pte *leaf_entry,
     uint64_t **leaf_pte,
@@ -383,5 +386,43 @@ micros_user_address_space_prepare_vm_teardown(
 void micros_user_address_space_commit_vm_teardown_prevalidated(
     struct micros_user_address_space_vm_teardown_plan *plan
 );
+
+struct micros_user_address_space_bindings {
+    struct micros_user_address_space_vm_scratch_authority vm;
+    struct micros_tty_device_authority tty;
+    bool tty_active;
+};
+
+struct micros_user_address_space_path {
+    struct micros_user_address_space_page_table *tables[MICROS_SV39_LEVEL_COUNT];
+    uint64_t addresses[MICROS_SV39_LEVEL_COUNT];
+    struct micros_user_address_space_page_indices indices;
+    uint16_t table_count;
+    struct micros_sv39_decoded_pte leaf;
+    struct micros_process_handle process;
+    bool exceptional;
+};
+
+_Static_assert(sizeof(struct micros_user_address_space_path) <= 128,
+               "selected paths must remain bounded automatic state");
+_Static_assert(sizeof(struct micros_user_address_space_bindings) <= 128,
+               "selected bindings must remain bounded automatic state");
+
+enum micros_user_address_space_error micros_user_address_space_require_idle(
+    const struct micros_user_address_space_runtime_view *view);
+enum micros_user_address_space_error micros_user_address_space_load_selected_bindings(
+    const struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_bindings *bindings);
+enum micros_user_address_space_error micros_user_address_space_check_selected_table(
+    const struct micros_frame_ownership *ledger, struct micros_process_handle process, uint64_t physical_address);
+enum micros_user_address_space_error micros_user_address_space_classify_selected_leaf(
+    const struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process,
+    uint64_t virtual_address, const struct micros_sv39_decoded_pte *leaf,
+    const struct micros_user_address_space_bindings *bindings, bool *exceptional);
+enum micros_user_address_space_error micros_user_address_space_select_path(
+    struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, uint64_t virtual_address,
+    const struct micros_user_address_space_bindings *bindings, struct micros_user_address_space_path *path);
+enum micros_user_address_space_error micros_user_address_space_validate_selected_root(
+    struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, const struct micros_user_address_space_bindings *bindings);
 
 #endif

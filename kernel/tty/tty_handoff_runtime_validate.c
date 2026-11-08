@@ -357,6 +357,62 @@ micros_tty_handoff_runtime_device_authority(
     return MICROS_TTY_DEVICE_AUTHORITY_ACTIVE;
 }
 
+static bool tty_handoff_selected_binding_is_valid(
+    const struct micros_tty_handoff_runtime_state *state,
+    const struct micros_kernel_objects *objects)
+{
+    const struct micros_process *process;
+    const struct micros_thread *thread;
+
+    if (objects == NULL
+        || micros_process_resolve(objects, state->process, &process) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_resolve(objects, state->thread, &thread) != MICROS_KERNEL_OBJECT_OK
+        || process->address_space_root != state->root_physical_address
+        || process->primary_endpoint != state->endpoint
+        || !tty_handoff_process_handles_equal(thread->owner, state->process)
+        || !thread->context_attached) {
+        return false;
+    }
+    if (state->handoff.console_phase == MICROS_TTY_CONSOLE_MAPPED) {
+        return process->privilege_profile == 0
+            && thread->runtime_flags == MICROS_THREAD_RTS_INACTIVE
+            && !thread->scheduler_assigned;
+    }
+    return process->privilege_profile == state->profile_id && thread->scheduler_assigned;
+}
+
+enum micros_tty_device_authority_status
+micros_tty_handoff_runtime_inspect_device_binding(
+    const struct micros_kernel_objects *objects,
+    struct micros_tty_device_authority *binding)
+{
+    const struct micros_tty_handoff_runtime_state *state = &tty_handoff_context()->tty_handoff_state;
+    struct micros_tty_device_authority candidate = {0};
+    bool active;
+
+    if (binding == NULL) {
+        return MICROS_TTY_DEVICE_AUTHORITY_INVARIANT;
+    }
+    if (state->service_id == 0) {
+        *binding = candidate;
+        return MICROS_TTY_DEVICE_AUTHORITY_NONE;
+    }
+    if (!tty_handoff_identity_is_valid(state)) {
+        return MICROS_TTY_DEVICE_AUTHORITY_INVARIANT;
+    }
+    active = state->handoff.console_phase == MICROS_TTY_CONSOLE_MAPPED
+        || state->handoff.console_phase == MICROS_TTY_CONSOLE_STARTING
+        || state->handoff.console_phase == MICROS_TTY_CONSOLE_OWNED;
+    if (active && !tty_handoff_selected_binding_is_valid(state, objects)) {
+        return MICROS_TTY_DEVICE_AUTHORITY_INVARIANT;
+    }
+    candidate.process = state->process;
+    candidate.root_physical_address = state->root_physical_address;
+    candidate.console_phase = state->handoff.console_phase;
+    *binding = candidate;
+    return active ? MICROS_TTY_DEVICE_AUTHORITY_ACTIVE : MICROS_TTY_DEVICE_AUTHORITY_NONE;
+}
+
 enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
     const struct micros_bootstrap_control_state *bootstrap,
     const struct micros_endpoint_registry *registry,

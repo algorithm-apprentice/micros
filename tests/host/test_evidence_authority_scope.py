@@ -338,22 +338,27 @@ class AuthorViewInputsTest(unittest.TestCase):
         self.provider.recheck_context.assert_not_called()
 
     def test_selected_ownership_view_binds_its_distinct_native_symbols_tool(self):
-        self.provider.__name__ = "tests.host.selected_ownership_authority"
-        self.context.native_nm = {"path": "/fixture/nm", "identity": "original"}
-        external = {"@fixture/tool": "stable"}
-        self.provider.external_inputs.return_value = (None, self.context.native_nm, external)
-        proof = self.scope._verify_authorities(self.root)
-        self.assertEqual(frozenset({"fixture:retired"}), proof.retired_keys)
-        proof.checks[0]()
-        for observed in (
-            (None, {"path": "/fixture/nm", "identity": "changed"}, external),
-            (None, external),
+        for provider_name in (
+            "tests.host.selected_ownership_authority",
+            "tests.host.selected_address_space_authority",
         ):
-            with self.subTest(observed=observed), self.assertRaises(ValueError):
-                self.provider.external_inputs.return_value = observed
-                proof.checks[0]()
-        self.inventory.assert_not_called()
-        self.assertEqual(1, self.provider.read_verified_journal.call_count)
+            self.provider.read_verified_journal.reset_mock()
+            self.provider.__name__ = provider_name
+            self.context.native_nm = {"path": "/fixture/nm", "identity": "original"}
+            external = {"@fixture/tool": "stable"}
+            self.provider.external_inputs.return_value = (None, self.context.native_nm, external)
+            proof = self.scope._verify_authorities(self.root)
+            self.assertEqual(frozenset({"fixture:retired"}), proof.retired_keys)
+            proof.checks[0]()
+            for observed in (
+                (None, {"path": "/fixture/nm", "identity": "changed"}, external),
+                (None, external),
+            ):
+                with self.subTest(observed=observed), self.assertRaises(ValueError):
+                    self.provider.external_inputs.return_value = observed
+                    proof.checks[0]()
+            self.inventory.assert_not_called()
+            self.assertEqual(1, self.provider.read_verified_journal.call_count)
 
     def test_selector_drift_during_proof_verification_blocks_publication(self):
         original = self.provider.read_verified_journal.return_value

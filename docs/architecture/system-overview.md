@@ -165,8 +165,9 @@ complete acceptance and independent review. Selected ownership operations
 use active metadata and selected records; all eight complete-audit boundaries
 and complete diagnostic bodies remain.
 
-User lookup, translation and activation still perform complete root checks.
-MEM04 owns that later correction. Its design found the separate
+At the fixed MEM04 baseline, user lookup, translation and activation perform
+complete root checks. MEM04 owns their selected-operation replacement.
+Its design found the separate
 [selected-ownership native authority gap](../research/selected-ownership-native-source-authority-gap.md).
 Accepted [EV01-C05](selected-ownership-native-source-authority.md) names existing
 source clauses without changing admission or runtime behavior; its
@@ -175,8 +176,8 @@ The Accepted [MEM04 contract](selected-user-address-space.md) defines checked
 selected paths, bounded controller-binding inspection and root preparation,
 including bootstrap allocation's selected preflight and exact cursor
 compensation. It explicitly separates scoped results from complete diagnosis.
-Design #222 is merged; the committed runtime still has the complete-root
-cadence described above. An uncommitted implementation was archived when the
+Design #222 is merged; its fixed runtime had the complete-root cadence
+described above. An uncommitted implementation was archived when the
 successful QEMU runner withheld its semantic witnesses. The separate
 [MEM04-C01 reporting prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
 is independently reviewed and merged as #223/#224. The fresh restart exposed
@@ -198,6 +199,13 @@ ordinary/metadata stack proof found a separate whole-header conflict in
 the fatal TTY source register. The candidate is archived; the
 [Accepted exact fatal-header extension](../adr/0111-fatal-tty-header-extension.md)
 retains all fatal-state, source/machine and stack obligations.
+That correction separately merged as #227. The fresh
+[implementation map](selected-user-address-space.md#implementation-and-evidence-map)
+binds all three immutable stack adapters and the explicit handoff dependency;
+no archived native, target or stack result substitutes for renewed evidence.
+The implementation uses checked selected paths and protected root preparation
+for those ordinary operations. Complete diagnostics and the twenty explicit
+residual audit boundaries remain in their owning operations.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

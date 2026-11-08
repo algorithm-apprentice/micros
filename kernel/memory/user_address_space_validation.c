@@ -856,6 +856,205 @@ micros_user_address_space_validate_locked(
 }
 
 enum micros_user_address_space_error
+micros_user_address_space_load_selected_bindings(
+    const struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_bindings *bindings)
+{
+    struct micros_user_address_space_bindings candidate;
+    enum micros_vm_scratch_authority_status vm_status;
+    enum micros_tty_device_authority_status tty_status;
+
+    if (runtime == NULL || bindings == NULL || runtime->ledger == NULL || runtime->objects == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    vm_status = micros_vm_handoff_runtime_inspect_scratch_binding(&candidate.vm);
+    if (vm_status != MICROS_VM_SCRATCH_AUTHORITY_NONE && vm_status != MICROS_VM_SCRATCH_AUTHORITY_ACTIVE) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    tty_status = micros_tty_handoff_runtime_inspect_device_binding(runtime->objects, &candidate.tty);
+    if (tty_status != MICROS_TTY_DEVICE_AUTHORITY_NONE && tty_status != MICROS_TTY_DEVICE_AUTHORITY_ACTIVE) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    candidate.tty_active = tty_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE;
+    if (micros_frame_ownership_runtime_validate_metadata(runtime->objects) != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    bindings->vm = candidate.vm;
+    bindings->tty = candidate.tty;
+    bindings->tty_active = candidate.tty_active;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error micros_user_address_space_check_selected_table(
+    const struct micros_frame_ownership *ledger,
+    struct micros_process_handle process,
+    uint64_t physical_address)
+{
+    struct micros_frame_owner owner;
+
+    if (micros_frame_ownership_lookup(ledger, physical_address, &owner) != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    return micros_user_address_space_validate_frame_owner(
+        ledger->phase, MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE, process, owner
+    );
+}
+
+enum micros_user_address_space_error micros_user_address_space_classify_selected_leaf(
+    const struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    uint64_t virtual_address,
+    const struct micros_sv39_decoded_pte *leaf,
+    const struct micros_user_address_space_bindings *bindings,
+    bool *exceptional)
+{
+    struct micros_frame_owner owner;
+    enum micros_user_address_space_leaf_class classification;
+    enum micros_user_address_space_error error;
+    bool is_device;
+
+    if (leaf->kind != MICROS_SV39_PTE_LEAF || (leaf->permissions & MICROS_SV39_PERMISSION_USER) == 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+    }
+    error = micros_user_address_space_classify_tty_device_leaf(
+        bindings->tty_active, &bindings->tty, process, runtime->process_root, virtual_address,
+        leaf, &is_device
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (is_device) {
+        *exceptional = true;
+        return MICROS_USER_ADDRESS_SPACE_OK;
+    }
+    if (micros_frame_ownership_lookup(runtime->ledger, leaf->physical_address, &owner) != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    error = micros_user_address_space_classify_managed_leaf(
+        runtime->ownership_phase, process, runtime->process_root, virtual_address,
+        leaf, owner, &bindings->vm, &classification
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    *exceptional = classification != MICROS_USER_ADDRESS_SPACE_LEAF_REGULAR;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static bool selected_kernel_root_is_valid(const struct micros_user_address_space_runtime_view *runtime)
+{
+    struct micros_frame_owner owner;
+
+    return micros_frame_ownership_lookup(
+        runtime->ledger, runtime->kernel_report->root_physical_address, &owner
+    ) == MICROS_FRAME_OWNERSHIP_OK
+        && owner.kind == MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE
+        && owner.generation == 0 && owner.slot == 0 && owner.reserved == 0;
+}
+
+static enum micros_user_address_space_error validate_selected_shared_entries(
+    const struct micros_user_address_space_runtime_view *runtime)
+{
+    const struct micros_user_address_space_page_table *kernel_root =
+        table_at(runtime->kernel_report->root_physical_address);
+    const struct micros_user_address_space_page_table *root = table_at(runtime->process_root);
+    size_t root_index;
+
+    if (kernel_root->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX] != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    for (root_index = 0; root_index < MICROS_SV39_TABLE_ENTRY_COUNT; ++root_index) {
+        uint64_t root_pte;
+        uint64_t kernel_pte;
+
+        if (root_index == MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX) {
+            continue;
+        }
+        root_pte = root->entries[root_index];
+        kernel_pte = kernel_root->entries[root_index];
+        if (root_pte != kernel_pte) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error validate_selected_private_descriptor(
+    const struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process)
+{
+    const struct micros_user_address_space_page_table *root = table_at(runtime->process_root);
+    struct micros_sv39_decoded_pte entry;
+    enum micros_user_address_space_error error;
+
+    error = decode_pte(root->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX], &entry);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (entry.kind == MICROS_SV39_PTE_ABSENT) {
+        return MICROS_USER_ADDRESS_SPACE_OK;
+    }
+    if (entry.kind != MICROS_SV39_PTE_TABLE) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+    }
+    if (entry.physical_address == runtime->process_root) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    return micros_user_address_space_check_selected_table(runtime->ledger, process, entry.physical_address);
+}
+
+static enum micros_user_address_space_error validate_selected_controller_slots(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    const struct micros_user_address_space_bindings *bindings)
+{
+    unsigned int slot;
+
+    for (slot = 0; slot < 2; ++slot) {
+        struct micros_process_handle owner = slot == 0 ? bindings->vm.process : bindings->tty.process;
+        uint64_t root = slot == 0 ? bindings->vm.root_physical_address : bindings->tty.root_physical_address;
+        uint64_t virtual_address = slot == 0 ? bindings->vm.virtual_address : MICROS_TTY_UART_VIRTUAL_BASE;
+        struct micros_user_address_space_path path;
+        enum micros_user_address_space_error error;
+
+        if (owner.generation == 0 || !micros_user_address_space_process_handles_equal(owner, process)
+            || root != runtime->process_root) {
+            continue;
+        }
+        error = micros_user_address_space_select_path(runtime, process, virtual_address, bindings, &path);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_selected_root(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    const struct micros_user_address_space_bindings *bindings)
+{
+    enum micros_user_address_space_error error;
+
+    error = micros_user_address_space_check_selected_table(runtime->ledger, process, runtime->process_root);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (!selected_kernel_root_is_valid(runtime)) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    error = validate_selected_shared_entries(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = validate_selected_private_descriptor(runtime, process);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    return validate_selected_controller_slots(runtime, process, bindings);
+}
+
+enum micros_user_address_space_error
 micros_user_address_space_validate_all_process_roots_locked(
     struct micros_user_address_space_runtime_view *runtime,
     const struct micros_kernel_objects *objects,

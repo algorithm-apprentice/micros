@@ -7,7 +7,7 @@ import re
 
 from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
-    panic_trace_source, selected_ownership_source, terminal_failure_source,
+    panic_trace_source, selected_address_space_source, selected_ownership_source, terminal_failure_source,
 )
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
@@ -128,11 +128,16 @@ FAMILY_OWNERS = {
     "selected-ownership-native-admission": (
         "tests/host/selected_ownership_native_source_bindings.py",
     ),
+    "selected-address-space-baseline": (
+        "tests/host/selected_address_space_authority.py",
+        "tests/host/selected_address_space_source.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
 NON_IDENTITY_EXCEPTIONS = (
     "tests/host/test_selected_ownership.py",
+    "tests/host/test_selected_address_space.py",
     "tests/host/test_validation_execution.py",
 )
 
@@ -252,6 +257,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "473d2640bd3d9a756183d51b2d6d6ad31aa890f9f8efeebdf1d76d42d514ed2c",
     "selected-ownership-native-admission":
         "4678706adb8ef75162ed57b16821af9262b06ed642a721f482778dbba381d3ff",
+    "selected-address-space-baseline":
+        "205d2a15b6dd9c1b8cc3688f53194b5844b2f13e1975cf156e8f6b02cfcfbfe4",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -1092,6 +1099,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return kernel_mapping_source.declaration_facts(root, relative)
     if family == selected_ownership_source.FAMILY:
         return selected_ownership_source.declaration_facts(root, relative)
+    if family == selected_address_space_source.FAMILY:
+        return selected_address_space_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)
