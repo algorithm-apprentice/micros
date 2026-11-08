@@ -130,6 +130,9 @@ This directory contains the design baseline for `micros`.
 - [Selected frame ownership and complete audits](architecture/selected-frame-ownership.md)
   defines MEM03's Accepted active-metadata/selected-record/whole-active boundaries,
   retained complete diagnostics and the Accepted precise-token authority amendment.
+- [Selected release and wired-handoff plans](architecture/selected-release-and-wired-handoff.md)
+  records the Accepted, independently reviewed MEM05 index, selected-set and
+  bootstrap-plan design; its separate merge still precedes implementation.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -153,6 +156,9 @@ This directory contains the design baseline for `micros`.
 - [MINIX selected frame-ownership baseline](research/minix-selected-frame-ownership.md)
   traces selected metadata and separate diagnostics, the current 26 direct
   audit call sites and the obligations their consumers currently inherit.
+- [MINIX selected release and wired-handoff baseline](research/minix-selected-release-and-wired-handoff.md)
+  traces fixed teardown/startup mechanisms, current selected-set and
+  per-process rescans, mutation coherence and MEM05's reviewed scope/bounds.
 
 - [Memory-native source authority gap](research/memory-native-source-authority-gap.md)
   records the fixed current-source guards, missing individual identities and

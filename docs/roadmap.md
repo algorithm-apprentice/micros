@@ -380,6 +380,25 @@ and 103 retirements. No guard is relaxed and no identity retires.
 Full current acceptance and independent implementation review remain
 required; MEM05 stays blocked until that separate merge.
 
+EV01-C07 implementation #232 has now passed that acceptance and merged as
+`abe05cdd7bced5e77e86c1ec12754d017f920cab`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`2c34dac3c259a4975d1c213e3e14c18d8a075658`.
+The final producer passed all fifty commands fresh, 44 CTests, all 1,584
+Python cases in 572.589 seconds and complete current target/image/stack
+coverage. Same-run receipts, independent review, journal-free main authority
+and protected task-ref cleanup passed without a new retirement.
+
+MEM05 design is complete through the
+[fixed-source study](research/minix-selected-release-and-wired-handoff.md) and
+[Accepted ADR-0114](adr/0114-selected-release-and-wired-handoff-plans.md).
+The [contract](architecture/selected-release-and-wired-handoff.md) defines
+process-owned indexing, selected-word sets and one protected handoff plan,
+with exact source roles, native bounds and truthful target witnesses.
+Independent design/correction review is clean.
+Its separate merge still precedes implementation; no MEM05 code, test,
+model or executable prototype is present in this design phase.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

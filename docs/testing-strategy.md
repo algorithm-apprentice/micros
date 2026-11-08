@@ -789,6 +789,22 @@ The nine-case focused selection also includes existing complete-current
 inventory, MEM04 historical conservation and all six journal-free claims.
 The complete owned three-module suite and full current producer remain
 separate mandatory acceptance, not inferred from that focused result.
+Implementation #232 completed both: 135 selected cases in 291.252 seconds,
+then all fifty fresh author commands, 44 CTests and all 1,584 Python cases
+in 572.589 seconds. Complete current target/image/stack coverage, same-run
+receipts, independent review, journal-free main checks and protected ref
+cleanup passed.
+
+MEM05's [Accepted contract](architecture/selected-release-and-wired-handoff.md)
+now requires actual-source selected-set/process-owner/root/handoff work
+evidence and a real target selected-release distinction. It specifies
+five native products, 128 common rows, independent per-dimension bounds,
+current-only index/selection guards and the complete source-adapter scope.
+Current target records retain full diagnosis and separately witness scoped
+release. Independent design/correction review is clean; separate design merge still
+precedes implementation.
+Metadata registration and prior passing work
+bounds do not count as those future runtime results.
 
 ## POSIX conformance evidence
 

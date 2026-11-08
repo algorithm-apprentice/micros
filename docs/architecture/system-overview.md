@@ -218,6 +218,11 @@ Resumed MEM05 research found a separate
 The [Accepted EV01-C07 contract](selected-ownership-observation-authority.md) names
 existing primitive/coverage predicates only. MEM05 remains a blocked
 design; no release/handoff algorithm is accepted by this metadata work.
+That metadata implementation is now independently reviewed and merged as
+#232. MEM05's [selected release/handoff design](selected-release-and-wired-handoff.md)
+is Accepted after clean independent design/correction review.
+Its separate merge still precedes implementation. Runtime release and
+handoff retain the baseline behavior described above.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
