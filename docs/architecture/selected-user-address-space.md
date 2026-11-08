@@ -31,6 +31,16 @@ separately merged as #227, commit
 `60e8b8e160b1c063e448cd32b0418535dd63bbb7`, tree
 `28a01d02f4c12a148627f23d31cb0de512c657f4`.
 Implementation restarts from that exact main with newly frozen inputs.
+That fresh implementation has now completed actual Red/Green,
+thirteen-unit recertification, all fifty fresh author commands and clean
+independent review, then separately merged as #228,
+`8bd33e58a8e661cff78a8e4aad9d6cbc6a406120`, with reviewed and squash tree
+`fb74bc2458a4a3bf4fce45b4e396fa7fb0cde465`.
+Journal-free committed/main authority and exact ref cleanup passed.
+The following MEM05 design found the separate
+[current-source naming gap](../research/selected-address-space-native-source-authority-gap.md).
+[Accepted EV01-C06](selected-address-space-native-source-authority.md)
+names existing clauses without changing this runtime contract.
 The dependency section below retains
 the original 28-path affected-fact closure while adding one production path.
 

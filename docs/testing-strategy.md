@@ -713,6 +713,31 @@ Focused harness iteration uses:
 This is not a substitute for renewed actual Red/Green/recertification, the
 complete fifty-command producer or independent implementation review.
 
+MEM04 implementation #228 completed that acceptance and independently merged.
+The final current run passed 44 CTests, all 1,570 Python cases, all forty
+QEMU workflows, four standalone images and complete 44-configuration/
+113-ELF/ten-scope stack coverage. Fast membership stayed at 37 CTests and
+98 Python cases; the latter took 6.150 seconds. Current same-run receipts
+and journal-free committed/main authority were independently checked.
+
+The next [source-authority study](research/selected-address-space-native-source-authority-gap.md)
+found real MEM04 current-source and observation rejections without individual
+inventory keys. [Accepted ADR-0112](adr/0112-granular-selected-address-space-native-source-authority.md)
+requires metadata-only missing-coverage Red after the original guards reject
+fixed-file, dependent-body, header, whole-handoff and observation mutations.
+An observation case must pass the function guard and fail the separate
+primitive/compound check. Green then proves complete independent 477-record
+equality and conservation of all 4,782 old records/twenty fingerprints/six
+claims/103 retirements. No existing source, observation, native or target
+check is relaxed. Full current acceptance and independent review remain
+required after the separate design merge.
+The corrected contract also distinguishes MEM04's fixed historical
+predecessor comparison from the independently checked complete current
+catalog. Existing historical scaffold negatives use exact fixed registration
+inputs before testing stack drift; production guards are not relaxed to
+make those fixtures pass. Current journal-free MEM04 authority and malformed
+catalog rejection remain required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
