@@ -135,6 +135,9 @@ FAMILY_OWNERS = {
     "selected-address-space-native-admission": (
         "tests/host/selected_address_space_native_source_bindings.py",
     ),
+    "selected-ownership-observation-admission": (
+        "tests/host/selected_ownership_observation_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
@@ -264,6 +267,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "205d2a15b6dd9c1b8cc3688f53194b5844b2f13e1975cf156e8f6b02cfcfbfe4",
     "selected-address-space-native-admission":
         "eae7b3d815f8f239094921fe2cd97b2508ada96b0e53eff394f84a9359477f88",
+    "selected-ownership-observation-admission":
+        "0760c510cdc26d7dc638959e8bcda5c8df72e0b3016ba81533f373130c78a0e4",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -296,6 +301,26 @@ _SELECTED_ADDRESS_SPACE_NATIVE_COUNTS = {
     "dependent-file": 1,
     "native-input": 198,
     "observation": 33,
+}
+
+_SELECTED_OWNERSHIP_OBSERVATION_COUNTS = {
+    "kernel/memory/frame_allocator.c": (2, 10),
+    "kernel/memory/frame_ownership.c": (7, 17),
+    "kernel/memory/frame_ownership_validation.c": (16, 37),
+    "kernel/memory/frame_ownership_bootstrap.c": (7, 25),
+    "kernel/memory/frame_ownership_handoff.c": (4, 19),
+    "kernel/memory/frame_ownership_vm_claim.c": (2, 4),
+    "kernel/memory/frame_ownership_vm_freeze.c": (2, 13),
+    "kernel/memory/frame_ownership_vm_release.c": (4, 21),
+    "kernel/memory/bootstrap_memory.c": (11, 5),
+    "kernel/objects/kernel_objects.c": (2, 2),
+    "kernel/objects/kernel_object_validation.c": (10, 11),
+    "kernel/objects/kernel_object_state.c": (12, 5),
+    "kernel/objects/kernel_object_identity.c": (12, 0),
+    "kernel/objects/kernel_object_stack.c": (3, 0),
+    "kernel/objects/kernel_object_process.c": (6, 1),
+    "kernel/scheduler/scheduler_core.c": (13, 3),
+    "kernel/scheduler/scheduler_core_validate.c": (7, 6),
 }
 
 _IDENTITY_NAME = re.compile(
@@ -1173,6 +1198,132 @@ def _selected_address_space_native_facts(root, family, relative):
     return tuple(facts)
 
 
+def _selected_ownership_observation_row(row):
+    if (
+        type(row) is not tuple or len(row) != 4
+        or any(type(value) is not str or not value for value in row[:2])
+        or row[2] != ("tests/host/selected_ownership_source.py",)
+        or type(row[3]) is not dict
+    ):
+        raise ValueError("selected-ownership observation authority has a malformed row or assertion owner")
+    scope, subject, _, contract = row
+    prefix = "MEM03/observation/" + subject + "/"
+    if (
+        subject not in _SELECTED_OWNERSHIP_OBSERVATION_COUNTS or not scope.startswith(prefix)
+        or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", scope[len(prefix):]) is None
+    ):
+        raise ValueError("selected-ownership observation authority has an unknown subject or function scope")
+    memory = subject.startswith("kernel/memory/")
+    coverage = "memory-fields-and-loops" if memory else "loops-only"
+    if (
+        set(contract) != {"comparison", "coverage", "sites"}
+        or contract["comparison"] != "current-primitive-bindings"
+        or contract["coverage"] != coverage or type(contract["sites"]) is not tuple
+    ):
+        raise ValueError("selected-ownership observation authority changed its comparison or coverage schema")
+    expected_owner = "KERNEL_MEMORY" if memory else (
+        "KERNEL_SCHEDULER" if subject.startswith("kernel/scheduler/") else "KERNEL_OBJECTS"
+    )
+    for site in contract["sites"]:
+        if (
+            type(site) is not tuple or len(site) != 10
+            or any(type(site[index]) is not str for index in (0, 1, 2, 3, 4, 6, 7))
+            or site[0] != scope[len(prefix):]
+            or re.fullmatch(r"(?:current-)?site-[0-9]{4}", site[1]) is None
+            or site[2] != expected_owner
+            or site[3] not in ("other", "active-frame", "inactive-frame", "active-geometry", "inactive-geometry")
+            or site[4] not in ("RECORD_VISIT", "RANGE_VISIT", "BITMAP_WORD_LOAD", "INDEX_PROBE", "COMPLETE_VALIDATOR_CALL")
+            or type(site[5]) is not tuple or type(site[8]) is not int or site[8] != 1
+            or type(site[9]) is not tuple
+        ):
+            raise ValueError("selected-ownership observation authority has an invalid primitive record")
+        for region in site[5]:
+            if (
+                type(region) is not tuple or len(region) != 2 or type(region[0]) is not str
+                or not region[0] or type(region[1]) is not int or region[1] < 0
+            ):
+                raise ValueError("selected-ownership observation authority has an invalid enclosing region")
+        if site[7] == "entry":
+            valid = site[4] == "COMPLETE_VALIDATOR_CALL" and not site[5] and not site[6] and not site[9]
+        elif site[7] == "loop-entry":
+            valid = (
+                site[4] == "INDEX_PROBE" and bool(site[5]) and site[5][-1][0] == site[6]
+                and site[6].startswith(("for (", "while (")) and not site[9]
+            )
+        elif site[7] == "before":
+            valid = (
+                memory and site[4] != "COMPLETE_VALIDATOR_CALL" and bool(site[6])
+                and len(site[9]) == 2 and type(site[9][0]) is str
+                and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", site[9][0]) is not None
+                and type(site[9][1]) is int and site[9][1] >= 0
+            )
+        else:
+            valid = False
+        if not valid:
+            raise ValueError("selected-ownership observation authority changed a primitive placement or witness")
+    return contract["sites"]
+
+
+def _selected_ownership_observation_facts(root, family, relative):
+    if relative != "tests/host/selected_ownership_observation_bindings.py":
+        raise ValueError("selected-ownership observation authority has an undeclared owner")
+    tree = ast.parse(regular_source(root, relative).read_text(encoding="utf-8"))
+    statements = tree.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(
+        statements[0].value, ast.Constant,
+    ) and type(statements[0].value.value) is str:
+        statements = statements[1:]
+    names = ("BINDING_REFERENCE", "NATIVE_SOURCE_BINDINGS")
+    if len(statements) != 2 or any(
+        not isinstance(node, ast.Assign) or _assignment_name(node) not in names
+        for node in statements
+    ):
+        raise ValueError("selected-ownership observation authority permits only literal declarations")
+    reference, rows = (literal_value(single_assignment(tree, name).value) for name in names)
+    if type(reference) is not tuple or len(reference) != 2:
+        raise ValueError("selected-ownership observation authority has an invalid reference")
+    for entry, (tag, size) in zip(reference, (("policy", 3), ("MEM03", 2))):
+        if (
+            type(entry) is not tuple or len(entry) != size or entry[0] != tag
+            or any(
+                type(value) is not str or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in entry[1:]
+            )
+        ):
+            raise ValueError("selected-ownership observation authority has an invalid fixed reference")
+    if type(rows) is not tuple or len(rows) != 120:
+        raise ValueError("selected-ownership observation authority omitted or added a binding")
+    facts, scopes, identifiers, checked_paths = [], [], [], {relative}
+    functions, site_counts, empty = Counter(), Counter(), 0
+    consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+    for row in rows:
+        sites = _selected_ownership_observation_row(row)
+        scope, subject, assertions, contract = row
+        functions[subject] += 1
+        site_counts[subject] += len(sites)
+        empty += not sites
+        identifiers.extend(site[1] for site in sites)
+        scopes.append(scope)
+        paths = tuple(sorted({relative, subject, *assertions}))
+        for path in paths:
+            if path not in checked_paths:
+                regular_source(root, path)
+                checked_paths.add(path)
+        facts.append(Fact(
+            relative + ":native-source-admission:" + scope, family, relative,
+            "native-source-admission", scope, AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, paths, digest((reference, scope, subject, assertions, contract)),
+        ))
+    counts = {subject: (count, site_counts[subject]) for subject, count in functions.items()}
+    if (
+        scopes != sorted(set(scopes)) or counts != _SELECTED_OWNERSHIP_OBSERVATION_COUNTS
+        or empty != 57 or len(identifiers) != len(set(identifiers)) or len(identifiers) != 179
+        or fact_set_digest(facts) != DECLARED_FAMILY_FACT_DIGESTS[family]
+    ):
+        raise ValueError("selected-ownership observation authority differs from its independent declaration")
+    return tuple(facts)
+
+
 def _facts_for_owner(root, family, relative, directory=None):
     if family == "memory-native-admission":
         return _memory_native_binding_facts(root, family, relative)
@@ -1180,6 +1331,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return _selected_ownership_native_facts(root, family, relative)
     if family == "selected-address-space-native-admission":
         return _selected_address_space_native_facts(root, family, relative)
+    if family == "selected-ownership-observation-admission":
+        return _selected_ownership_observation_facts(root, family, relative)
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     if relative == "tests/host/kernel_layout_source.py":
         value = literal_value(single_assignment(tree, "BOUNDED_FRAME_VALIDATION_SHA256").value)

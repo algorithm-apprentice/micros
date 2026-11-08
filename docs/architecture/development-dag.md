@@ -152,6 +152,10 @@ and [EV01-C07](selected-ownership-observation-authority.md) define the
 120-function metadata prerequisite. Its design is the sole active outcome;
 MEM05 design is blocked until that separate pair merges.
 No runtime edge, finding owner, algorithm or hosted-CI acceptance changes.
+The complete and Acceptance-only design reviews are now clean, and design
+#231 is separately merged. Its metadata implementation is the sole active
+outcome; MEM05 design remains blocked until its current acceptance and
+independently reviewed implementation merge.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage

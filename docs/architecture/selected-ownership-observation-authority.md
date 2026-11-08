@@ -4,9 +4,12 @@
 
 This is the documentation-only EV01-C07 contract defined by Accepted
 [ADR-0113](../adr/0113-granular-selected-ownership-observation-authority.md).
-Independent design review is clean. The paired implementation remains
-pending the separate design merge. MEM05 design is blocked on this
-prerequisite; its runtime algorithm is not specified here.
+Complete and Acceptance-only design reviews are clean. Separate design #231
+merged as `1725b9d70d630c566bb6d9945f29729a47d710a5`, tree
+`ae74883c3c94f4ead680ceb6a32ba97952fa71da`.
+Its metadata implementation is now the sole active outcome. MEM05 design
+remains blocked until that implementation completes; its runtime algorithm
+is not specified here.
 
 The [fixed-source study](../research/selected-ownership-observation-authority-gap.md)
 records independently enforced MEM03 observation predicates that have no
@@ -314,3 +317,42 @@ EV01-C07 closes no runtime finding and supplies no replacement algorithm.
 MEM05 still requires its own fixed MINIX/current study, exact authority and
 failure contract, actual-source Red/Green, recertification and independent
 review after this prerequisite merges.
+
+## Implementation map
+
+Before any declaration, extractor or test edit, the author independently
+froze all 5,259 old records, twenty-one fingerprints, six claims and
+103 retired keys, plus every expected new row and complete fact.
+The installed declaration is byte-identical to that fixed-policy literal
+artifact. Its complete new-family fingerprint is:
+
+```text
+0760c510cdc26d7dc638959e8bcda5c8df72e0b3016ba81533f373130c78a0e4
+```
+
+The existing inventory owner checks the literal-only schema, exact
+subject/function/coverage ownership, ordered primitive records, placement
+and witness shapes, per-subject counts, empty contracts, unique sites and
+the independently frozen fingerprint. It never executes the declaration
+or derives an expectation from current C bytes.
+
+Existing inventory tests reconstruct the 120 expected records through
+six pure comparison helpers read from fixed Git policy, with original
+runtime bytes and fixed current function selections. They do not execute
+the candidate declaration to construct expected data.
+Three actual missing-key failures followed successful function admission
+and the unchanged loop-anchor, bitmap-primitive and empty-helper rejections.
+
+Focused Green covers complete fixed-policy equality, every predecessor
+fingerprint, the two distinct coverage modes, current exact inverse
+rendering, literal/value/placement/path negatives and narrow synthetic
+closure. Existing current-catalog and six-claim journal-free tests consume
+the entire expanded inventory. The nine-case focused selection passed.
+Direct complete-field comparison against the pre-edit snapshots also
+preserves every old record/claim/retirement and matches all 120 new facts.
+
+Only the three specified executable owners change. All source/observation
+guards, catalogues, native fixtures, work oracles, generators, collector,
+parser, transition/view policy, runtime and build recipes remain unchanged.
+Complete current acceptance and independent implementation review remain
+required before publication.
