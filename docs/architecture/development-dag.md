@@ -168,10 +168,15 @@ before production edits or formal Red at the
 [same-slot count-evidence conflict](selected-release-and-wired-handoff.md#mem05-c01-count-evidence-scope).
 The documentation-only MEM05-C01 correction under
 [Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
-is the sole active outcome. It changes no runtime node or edge.
-MEM05 implementation restarts from current main only after that separate
-reviewed design merges; the archived scaffold and preliminary probes
-confer no retirement or acceptance.
+separately merged as #234. It changes no runtime node or edge.
+The fresh implementation then reached the
+[MEM05-C02 handed-off fixture conflict](selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-coherence).
+The candidate is archived without Green or retirement.
+[Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md)
+has clean independent design review and is the sole active documentation-only
+correction; implementation remains blocked until its separate merge.
+Its one additional frozen target owner changes no runtime dependency,
+finding owner or hosted-CI acceptance.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage

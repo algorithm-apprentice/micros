@@ -412,6 +412,24 @@ results, runtime scope and all final gates. MEM05 implementation is
 blocked until that separate documentation-only correction is reviewed,
 Accepted and merged. B02-F006/F007 and hosted CI remain open.
 
+Corrective design #234 separately merged as
+`7b5aa73cd42a2742cea014c8773879845f78ccd4`, tree
+`3b2bacb362577a1538cc4e0fc3c89bef31df6e27`.
+The fresh implementation completed its current native executions and the
+user-address-space QEMU gate, then the existing handoff corruption fixture
+failed at stage 8. Its direct owner/count mutation is no longer a valid
+indexed ledger, although that case still requires complete ownership `OK`.
+The [fixed-source investigation](research/minix-selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-conflict)
+records the actual failure and preserved candidate.
+
+[Accepted ADR-0116](adr/0116-handed-off-leaf-fixture-coherence.md) defines
+one additional frozen target owner and an existing-interface replacement
+for that fixture setup. The unaccepted implementation is archived.
+This documentation-only MEM05-C02 correction has clean independent design
+review and is the sole active outcome; runtime implementation restarts
+only after its separate merge. No Green event, new retirement, runtime finding
+closure or hosted-CI acceptance is claimed.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
