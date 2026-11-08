@@ -818,6 +818,21 @@ gate remain required. The implementation is archived before production
 edits or formal Red and restarts only after the corrective design merge;
 the diagnostic probe is not runtime Green or retirement evidence.
 
+Corrective design #234 separately merged. The fresh actual implementation
+then encountered the
+[MEM05-C02 handoff fixture conflict](research/minix-selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-conflict).
+The unchanged target directly reclassifies a mapped wired owner and
+expects a valid ledger, but does not maintain the new index.
+The component's stage-8 failure is real; no Green or retirement was
+published.
+[Accepted ADR-0116](adr/0116-handed-off-leaf-fixture-coherence.md) preserves
+complete validation and the valid-ledger/invalid-leaf distinction through
+existing VM claim/release, a valid wired-leaf relocation and an isolated
+transferable-leaf insertion. Its one
+additional target input is frozen before renewed Red; original target
+results, records, deadlines and all final gates remain required.
+The archived candidate supplies diagnosis, not replacement acceptance.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

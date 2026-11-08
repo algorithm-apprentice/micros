@@ -301,11 +301,22 @@ preparation found the
 The scaffold is archived without production edits, formal events or
 retirement. MEM05-C01 under
 [Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
-is the sole active corrective design; MEM05 implementation remains blocked
-until its separate review, Acceptance and merge.
+separately merged as #234.
 The correction retains the whole-slot algorithm and admits one exact
 current-fixture result/output adaptation. It adds no runtime finding,
 node, edge, retirement key or validation waiver.
+
+The fresh implementation then exposed the
+[MEM05-C02 handed-off corruption fixture conflict](minix-selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-conflict).
+The candidate is archived without Green, recertification or retirement.
+[Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md)
+has clean independent design review and is the sole active documentation-only
+correction. It preserves the Accepted index algorithm and complete checks with one
+additional frozen target owner and a valid-ledger/invalid-leaf setup
+through existing VM ownership interfaces.
+The 82-key partition and all runtime finding owners remain unchanged;
+MEM05 implementation restarts only after the separate design merge.
+Hosted CI and later MINIX/POSIX outcomes remain separately owned.
 
 ## Consolidation invariants
 

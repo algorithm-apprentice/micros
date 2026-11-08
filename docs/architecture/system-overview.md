@@ -223,10 +223,15 @@ That metadata implementation is now independently reviewed and merged as
 is Accepted after clean independent design/correction review.
 Design #233 is separately merged. Pre-Red implementation preparation found
 the [same-slot count-evidence conflict](selected-release-and-wired-handoff.md#mem05-c01-count-evidence-scope).
-The unaccepted scaffold is archived and implementation is blocked on
-the separate Accepted ADR-0115 correction. No production change or formal
-Red event occurred; runtime release and handoff retain the baseline
-behavior described above.
+The unaccepted scaffold is archived before production changes or a formal
+Red event. The separate Accepted ADR-0115 correction merged as #234.
+Its fresh implementation subsequently reached the
+[handed-off fixture conflict](selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-coherence):
+one old valid-ledger test mutation leaves the new index stale.
+That candidate is archived without Green or retirement.
+Accepted ADR-0116 has clean independent design review and defines the
+separate test-input/source-scope correction;
+the runtime algorithm and complete-index obligations are not relaxed.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

@@ -12,6 +12,12 @@ Red. Its corrective design is Accepted after clean independent review under
 [ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md).
 This study does not retire an identity or close a runtime finding.
 
+Corrective design #234 is now separately merged. The fresh implementation
+subsequently exposed the
+[handed-off corruption-fixture conflict](#mem05-c02-handed-off-corruption-fixture-conflict).
+That candidate is archived; Accepted ADR-0116 is the sole active
+documentation-only correction before another implementation restart.
+
 ```text
 micros commit: abe05cdd7bced5e77e86c1ec12754d017f920cab (#232)
 micros tree:   2c34dac3c259a4975d1c213e3e14c18d8a075658
@@ -409,3 +415,82 @@ Separate current controls retain valid mixed-generation counting, reject a
 reached invalid target and distinguish another slot's corruption from
 complete diagnosis. All existing source roles, old facts, work bounds,
 target protocols and final gates remain unchanged.
+
+## MEM05-C02 handed-off corruption fixture conflict
+
+The effective design/base for the blocked attempt is #234,
+`7b5aa73cd42a2742cea014c8773879845f78ccd4`, tree
+`3b2bacb362577a1538cc4e0fc3c89bef31df6e27`.
+The runtime reference remains #232. The unaccepted implementation tree is
+`9081ccee1db9ce563aa82c1d41d6b365ac109ff7`.
+
+The actual current phase command was:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/check_selected_release_handoff.py --green
+```
+
+It completed the five current native executions and the user-address-space
+QEMU workflow, then the handoff workflow exited nonzero with:
+
+```text
+MICROS_TEST_FAILURE handoff-stage=0x0000000000000008
+MICROS_PANIC reason=address-space-handoff-test
+```
+
+The required `MEM04_HANDOFF` witness was not reached. The controller
+correctly rejected the phase; no Green or recertification event was
+published. This is not a timeout or permission to drop a target gate.
+The tools mentioned above belong to the archived implementation, not this
+documentation-only branch.
+
+The fixed source makes the conflict explicit:
+
+| Fixed source at #232 | Evidence |
+| --- | --- |
+| `kernel/tests/memory/address_space_handoff_test.c:25-36` | Stage 8 follows successful handed-off runtime and negative-access checks |
+| `kernel/tests/memory/address_space_handoff_test_runtime.c:446-523` | The first foreign-owner case already requires `OWNERSHIP`, grant rejection and complete failure-state preservation |
+| Same owner, `526-552` | The second case directly changes a mapped wired owner to ownerless transferable, adjusts kind counts, requires complete ownership `OK`, then requires address-space `OWNERSHIP` |
+| `kernel/tests/memory/address_space_handoff_test_handoff.c:178-201` | `wired_snapshot_tracks_authority` records one retained allocation in `stale_snapshot_frame` and releases it before handoff |
+| `kernel/memory/bootstrap_memory.c:726-791` | Existing trusted-kernel VM claim/release wrappers supply protected preflight and non-failing commits without a new user operation |
+| `kernel/tests/memory/address_space_handoff_test_runtime.c:29-82` | The successful handed-off root checks restore the kernel root before later corruption cases |
+
+The original second mutation is a valid standalone owner/count/bitmap
+ledger at #232. Under Accepted ADR-0114 it leaves a transferable record
+reachable through a process-owned index and retains the old slot count.
+Complete index validation must reject it. Changing that validator to
+return `OK` would contradict the independently specified index invariants.
+Changing only the fixture's expected result would instead lose its
+valid-ledger/invalid-leaf distinction.
+
+The narrow authority census found that
+`tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/kernel/address_space_handoff_test_runtime.c/2`
+is already retired by committed MEM04. The target's three
+`KERNEL_CLASSIFICATION_FACTS` fast/PR/full identities remain active and
+need no change. No new retirement key is required.
+The fixture nevertheless lies outside MEM05's existing candidate and
+immutable-adapter registers, requiring an explicit source-envelope
+correction before editing it.
+
+The Accepted [MEM05-C02 contract](../architecture/selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-coherence)
+uses the already released frame through existing VM claim/release
+interfaces. It first relocates the original wired mapping to the already
+empty test slot and proves a valid root, then inserts the unauthorized
+transferable leaf in the original slot. The ledger stays valid in both
+layouts without creating an orphan as a second rejection reason.
+Exact restoration proves no new resource survives the case.
+This is an evidence repair derived from Accepted ownership authority,
+not another MINIX algorithm or an optimization.
+
+The preserved implementation has local stash
+`bd9e1dcc40963e7d9cedd3d26230295304a2317f`.
+`archive/mem05-handoff-fixture-gap` retains its base.
+The complete patch SHA-256 is
+`9925e8b0ed616fdb1d62ea56d443a87bbb0e5f7b711f4d81c25d2051647b53a7`.
+Older archive refs remain unchanged.
+Its last actual Red attempt is `917ca08348c3414e997b011248f7d0a7`,
+with raw record SHA-256
+`5fe9d16d52c8ae8096c32189f4a4083070d53b8a07c4aedc6f47b856fcc6b33f`.
+That record is historical reference only after immutable inputs change.
+No implementation commit, PR, clean implementation review, runtime
+retirement or final acceptance is claimed.

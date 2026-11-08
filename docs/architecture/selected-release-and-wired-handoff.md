@@ -8,10 +8,16 @@ Its contracts and exact evidence scope are specified below.
 Complete independent design/correction review is clean.
 Design #233 is separately merged. Its pre-Red implementation preparation
 found the [MEM05-C01 count-evidence conflict](#mem05-c01-count-evidence-scope).
-Implementation is blocked on the separate corrective design under
-[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md).
-The unaccepted scaffold is archived; no production edit, formal Red event,
-identity retirement or runtime acceptance is claimed.
+The separate corrective design under
+[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
+merged as #234. Its fresh implementation then reached the
+[MEM05-C02 handoff-fixture conflict](#mem05-c02-handed-off-corruption-fixture-coherence).
+That unaccepted candidate is archived without Green, recertification or
+retirement. Implementation is blocked on the documentation-only correction
+under [Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md).
+Independent design review is clean. The Accepted thirty-path evidence
+envelope takes effect only after that separate design merges; the runtime
+algorithm remains unchanged.
 
 The [fixed MINIX/current study](../research/minix-selected-release-and-wired-handoff.md)
 owns the reference trace and current costs. The current source pin is:
@@ -770,17 +776,19 @@ The seven assertion/generator adapters are independently specified and
 frozen before production Red. Their original declarations, values and
 unaffected predicates remain checked.
 
-Add exactly one fixed dependent target input:
+MEM05-C02 defines exactly these two fixed dependent target inputs:
 
 ```text
+kernel/tests/memory/address_space_handoff_test_runtime.c
 kernel/tests/memory/user_address_space_test_validation.c
 ```
 
-Its historical whole-file key is already retired by MEM04.
-Do not claim it again. The candidate domain is the 28-path direct closure
-plus this one explicitly declared dependent path: twenty-nine paths.
+Both historical whole-file keys are already retired by MEM04.
+Do not claim either again. After the corrective design merge, the
+candidate domain is the 28-path direct closure plus these two explicitly
+declared dependent paths: thirty paths.
 Every B01-B12/B14 unit input projection includes that same exact domain.
-The target adaptation is frozen before Red, not mutable runtime scope.
+Both target adaptations are frozen before Red, not mutable runtime scope.
 
 ## Current versus historical evidence
 
@@ -903,6 +911,93 @@ pre-Red adaptation. No source path, retirement key, oracle owner or final
 gate is added or removed. The archived scaffold and preliminary runs
 provide no author event; restart from corrected main and freeze all inputs
 before renewed real Red.
+
+### MEM05-C02 handed-off corruption fixture coherence
+
+This is the Accepted correction under
+[ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md).
+Independent design review is clean; its separate merge precedes the fresh
+implementation. It does not weaken complete index validation or change
+an expected runtime error.
+
+At fixed #232,
+`address_space_handoff_test_runtime.c:reject_corrupt_frame_owners`
+has two cases. Preserve the first foreign-process-owner case exactly.
+Its second case directly replaces one wired owner with `VM_TRANSFERABLE`
+and adjusts kind counts. It then requires a valid complete ownership
+ledger and an invalid process leaf. That setup leaves MEM05's process
+index stale and cannot satisfy the first assertion.
+
+Replace only the second setup/cleanup with this existing-interface sequence:
+
+1. Require SIE clear, the kernel root still active, and the selected
+   grantee `TEST_DATA_ADDRESS` PTE present with its existing user read/write
+   mapping. Resolve the distinct grantee `TEST_UNMAPPED_ADDRESS` PTE and
+   require its word to be zero. Save both exact PTE words. Recheck that
+   `stale_snapshot_frame` is a managed `FREE` frame; do not use a fallback
+   frame or direct allocator mutation.
+2. Encode a replacement PTE for that free physical frame through the
+   existing Sv39 codec. Take the existing complete fixture snapshot before
+   claiming the frame or changing the PTE.
+3. Use `micros_frame_ownership_runtime_vm_claim_preflight` and its matching
+   prevalidated commit to claim exactly that frame as ownerless
+   `VM_TRANSFERABLE`. Do not modify the original wired owner, its links,
+   its slot count or its kind count manually.
+4. Move the original wired PTE into the empty test slot and clear its
+   original slot. Require complete ownership and grantee address-space
+   validation to return `OK`. The original wired frame remains reachable
+   exactly once, so an orphan cannot become another rejection reason.
+5. Install the prepared transferable PTE in the original data slot.
+   Require `micros_frame_ownership_runtime_validate` to return `OK`, then
+   require complete grantee address-space validation to return
+   `OWNERSHIP`. These are independently specified results, not
+   alternatives selected from observed output. Keep the kernel root
+   active throughout; never enter the altered user root or dereference
+   its temporary mapping.
+6. Restore both exact original PTE words before returning from the diagnostic
+   case, even if a diagnostic result was unexpected. Release the temporary
+   frame through the existing runtime transferable-release
+   preflight/commit. A failed setup or cleanup is a component failure,
+   never a bypass or success-shaped repair.
+7. Require the existing complete snapshot comparison to recover the
+   original allocator, ownership/index, object, endpoint, grant,
+   page-table and user-data state. Also require the original root and
+   interrupt state. No temporary allocation may remain.
+
+`stale_snapshot_frame` is established by the earlier
+`wired_snapshot_tracks_authority` control, which allocates and releases
+one retained frame. The recheck in step 1 is mandatory.
+A valid free index is not below the allocator's lower-bound cursor.
+VM claim does not advance that cursor, so its matching release restores
+the original availability and cursor as well as the owner counts.
+
+This can be one cohesive private helper in the existing target owner.
+Reuse its existing fixture storage and bounded local claim/release plans;
+no private-header, global capacity buffer or production API change is
+needed. Preserve the outer `reject_corrupt_frame_owners` order and its
+following malformed-PTE check.
+
+The same frozen fixture must pass at fixed #232 and with the current
+index. It uses no new index fields, layout-dependent branch or baseline
+compatibility macro. It changes no target marker, record grammar,
+workflow, deadline or original expected result.
+
+The added owner is
+`kernel/tests/memory/address_space_handoff_test_runtime.c`.
+Its old whole-file transport is already retired by MEM04; its active
+fast/PR/full classification identities remain unchanged. The direct
+28-path/82-key selection stays fixed. Together with the already declared
+user-address-space target, the effective candidate domain becomes thirty
+paths, of which seventeen are runtime and thirteen are frozen before Red.
+Bind all thirteen through `@mem05/frozen-candidates` and all thirty through
+every affected-unit projection. The original C01 envelope is historical;
+this is its sole additional path.
+
+Archive the blocked implementation and restart from the separately merged
+correction with a fresh base and renewed actual Red. The stage-8 failure
+and archived native/target results provide no Green, retirement or final
+acceptance. All existing native, QEMU, integration, stack and independent
+review requirements remain.
 
 ### Truthful target witness evolution
 
@@ -1052,9 +1147,10 @@ Historical predecessor comparison first validates the complete current
 inventory, then positively selects the fixed #232 family set. It is not
 an exclusion filter for unknown future metadata.
 
-The twenty-nine candidate paths are exactly the domain declared above.
+After MEM05-C02's separate merge, the thirty candidate paths are exactly
+the domain declared above.
 Only its seventeen production subjects may change after Red.
-Its eleven assertion/declaration owners and one dependent target fixture
+Its eleven assertion/declaration owners and two dependent target fixtures
 are frozen before Red even though the affected facts place them inside
 the candidate domain. Bind those bytes additionally through the immutable
 external input `@mem05/frozen-candidates`; changing one invalidates the
