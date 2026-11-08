@@ -237,7 +237,7 @@ callers and 33 retirement keys; its whole-file identity already belongs to
 committed MEM03 retirement and must not be retired twice.
 The following candidate completed actual Green/recertification and 45 full
 producer commands, but stack certification rejected its unrelated new
-public declaration. The candidate is archived. The sole active
+public declaration. The candidate is archived. The subsequent
 [Accepted ADR-0110 design](../adr/0110-kernel-visitor-extension-admission.md)
 adds only a fixed-source one-declaration header admission and exact
 five-helper callback-free admission for the existing visitor group.
@@ -252,6 +252,19 @@ production subjects, 29 candidate paths and the 33-key retirement scope.
 That design separately merged as #227. The fresh implementation follows the
 exact [evidence map](../architecture/selected-user-address-space.md#implementation-and-evidence-map)
 and must renew every author phase; none of the archives closes a finding.
+That fresh MEM04 implementation completed actual Red/Green, thirteen-unit
+recertification, all fifty author commands and independent review, then
+merged as #228 with identical reviewed/published/squash content and
+journal-free committed authority. Its exact 33-key transition closes the
+named selected-operation scope, not the residual release/handoff and
+command-owner algorithms.
+
+MEM05 design is next but its early read-only census found missing per-clause
+MEM04 native/source authority. The
+[Accepted EV01-C06 contract](../architecture/selected-address-space-native-source-authority.md)
+and [ADR-0112](../adr/0112-granular-selected-address-space-native-source-authority.md)
+define a metadata-only prerequisite with 477 existing clauses and no new
+retirement. MEM05 design remains blocked until that pair separately merges.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

@@ -316,6 +316,27 @@ Its [evidence map](architecture/selected-user-address-space.md#implementation-an
 retains seventeen production subjects, 29 candidate paths and the original
 33 keys, with three exact immutable stack-admission owners. Complete renewed
 acceptance and independent implementation review remain required.
+Those gates have now passed. MEM04 implementation #228 merged as
+`8bd33e58a8e661cff78a8e4aad9d6cbc6a406120`, with identical reviewed,
+committed, remote, preview and squash tree
+`fb74bc2458a4a3bf4fce45b4e396fa7fb0cde465`.
+The final actual attempt passed all thirteen recertification units; B14
+ran 503 cases in 377.115 seconds. All fifty final commands passed fresh,
+including 44 CTests, all 1,570 Python cases in 568.821 seconds, all forty
+QEMU workflows, four standalone images and the complete 44/113/ten-scope
+stack gate. Three current same-run receipts, independent review,
+journal-free committed/main checks and exact task-ref cleanup passed.
+The 33-key transition preserves every predecessor record and reaches
+103 total retired identities; later audit owners remain unchanged.
+
+MEM05's early read-only design census then found the
+[MEM04 native/source-authority gap](research/selected-address-space-native-source-authority-gap.md).
+[Accepted ADR-0112](adr/0112-granular-selected-address-space-native-source-authority.md)
+and its [EV01-C06 contract](architecture/selected-address-space-native-source-authority.md)
+name 477 already enforced function/file/definition/skeleton/observation
+clauses. The design is the sole active prerequisite; it changes no guard,
+runtime behavior or retirement. MEM05 design resumes only after the
+separate metadata design/implementation pair is reviewed and merged.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

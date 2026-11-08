@@ -132,6 +132,15 @@ twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime
 prerequisites do not change.
 
+The fresh MEM04 implementation has completed those gates and independently
+merged as #228. MEM05 is next in the preferred runtime order, but its
+read-only source census found missing individual MEM04 assertion identities.
+[Accepted ADR-0112](../adr/0112-granular-selected-address-space-native-source-authority.md)
+and [EV01-C06](selected-address-space-native-source-authority.md) define a
+separate metadata-only prerequisite. MEM05 design remains blocked and its
+implementation pending until that reviewed design/implementation pair
+merges. No runtime edge, finding owner or hosted-CI acceptance changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

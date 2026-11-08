@@ -206,6 +206,13 @@ no archived native, target or stack result substitutes for renewed evidence.
 The implementation uses checked selected paths and protected root preparation
 for those ordinary operations. Complete diagnostics and the twenty explicit
 residual audit boundaries remain in their owning operations.
+The complete implementation is independently reviewed and merged as #228,
+with actual native/target/stack acceptance and journal-free main authority.
+The next release/handoff design found a distinct
+[MEM04 source-authority naming gap](../research/selected-address-space-native-source-authority-gap.md).
+The [Accepted EV01-C06 metadata prerequisite](selected-address-space-native-source-authority.md)
+preserves the implemented mechanisms and all existing checks before MEM05
+design resumes.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
