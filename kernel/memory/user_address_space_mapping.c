@@ -290,9 +290,176 @@ micros_user_address_space_visit_mappings_locked(
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
+static bool selected_slot_is_required(
+    const struct micros_user_address_space_bindings *bindings,
+    struct micros_process_handle process,
+    uint64_t root,
+    uint64_t virtual_address)
+{
+    return (bindings->vm.active
+            && micros_user_address_space_process_handles_equal(bindings->vm.process, process)
+            && bindings->vm.root_physical_address == root
+            && bindings->vm.virtual_address == virtual_address)
+        || (bindings->tty_active
+            && micros_tty_device_leaf_required(&bindings->tty, process, root)
+            && virtual_address == MICROS_TTY_UART_VIRTUAL_BASE);
+}
+
+static bool selected_table_is_distinct(
+    const struct micros_user_address_space_path *path,
+    uint64_t physical_address,
+    unsigned int depth)
+{
+    if (depth > 0 && physical_address == path->addresses[0]) {
+        return false;
+    }
+    if (depth > 1 && physical_address == path->addresses[1]) {
+        return false;
+    }
+    return true;
+}
+
+enum micros_user_address_space_error micros_user_address_space_select_path(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    uint64_t virtual_address,
+    const struct micros_user_address_space_bindings *bindings,
+    struct micros_user_address_space_path *path)
+{
+    struct micros_user_address_space_path candidate;
+    const struct micros_process *resolved;
+    enum micros_user_address_space_error error;
+    uint64_t page_address = virtual_address - virtual_address % MICROS_SV39_PAGE_SIZE;
+    unsigned int depth;
+
+    if (runtime == NULL || bindings == NULL || path == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    error = micros_user_address_space_runtime_resolve_process(runtime, process, true, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = micros_user_address_space_read_page_indices(virtual_address, &candidate.indices);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    candidate.process = process;
+    candidate.addresses[0] = resolved->address_space_root;
+    candidate.addresses[1] = 0;
+    candidate.addresses[2] = 0;
+    candidate.tables[0] = NULL;
+    candidate.tables[1] = NULL;
+    candidate.tables[2] = NULL;
+    candidate.exceptional = false;
+    for (depth = 0; depth < MICROS_SV39_LEVEL_COUNT; ++depth) {
+        struct micros_user_address_space_page_table *table;
+        struct micros_sv39_decoded_pte entry;
+        uint16_t index = depth == 0 ? candidate.indices.root
+            : depth == 1 ? candidate.indices.middle : candidate.indices.leaf;
+        uint64_t physical_address = candidate.addresses[depth];
+
+        error = micros_user_address_space_check_selected_table(runtime->ledger, process, physical_address);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+        if (!selected_table_is_distinct(&candidate, physical_address, depth)) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+        }
+        table = table_at(physical_address);
+        candidate.tables[depth] = table;
+        candidate.table_count = (uint16_t)(depth + 1);
+        error = decode_pte(table->entries[index], &entry);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+        if (entry.kind == MICROS_SV39_PTE_ABSENT) {
+            if (selected_slot_is_required(bindings, process, runtime->process_root, page_address)) {
+                return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+            }
+            candidate.leaf = entry;
+            break;
+        }
+        if (depth + 1 < MICROS_SV39_LEVEL_COUNT) {
+            if (entry.kind != MICROS_SV39_PTE_TABLE) {
+                return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+            }
+            candidate.addresses[depth + 1] = entry.physical_address;
+            continue;
+        }
+        candidate.leaf = entry;
+        error = micros_user_address_space_classify_selected_leaf(
+            runtime, process, page_address, &entry, bindings, &candidate.exceptional
+        );
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+        break;
+    }
+    if (depth == MICROS_SV39_LEVEL_COUNT) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    path->tables[0] = candidate.tables[0];
+    path->tables[1] = candidate.tables[1];
+    path->tables[2] = candidate.tables[2];
+    path->addresses[0] = candidate.addresses[0];
+    path->addresses[1] = candidate.addresses[1];
+    path->addresses[2] = candidate.addresses[2];
+    path->indices = candidate.indices;
+    path->table_count = candidate.table_count;
+    path->leaf = candidate.leaf;
+    path->process = candidate.process;
+    path->exceptional = candidate.exceptional;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error prepare_selected_path(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    uint64_t virtual_address,
+    struct micros_user_address_space_path *path)
+{
+    struct micros_user_address_space_bindings bindings;
+    const struct micros_process *resolved;
+    enum micros_user_address_space_error error;
+
+    error = micros_user_address_space_runtime_resolve_process(runtime, process, true, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = micros_user_address_space_load_selected_bindings(runtime, &bindings);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    return micros_user_address_space_select_path(runtime, process, virtual_address, &bindings, path);
+}
+
+static enum micros_user_address_space_error read_selected_leaf(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
+    uint64_t virtual_address,
+    struct micros_sv39_decoded_pte *leaf)
+{
+    struct micros_user_address_space_path path;
+    enum micros_user_address_space_error error;
+
+    error = prepare_selected_path(runtime, process, virtual_address, &path);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (path.leaf.kind == MICROS_SV39_PTE_ABSENT) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
+    }
+    if (path.exceptional) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    *leaf = path.leaf;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
 enum micros_user_address_space_error
 micros_user_address_space_lookup_leaf_locked(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t virtual_address,
     struct micros_sv39_decoded_pte *leaf_entry,
     uint64_t **leaf_pte,
@@ -300,158 +467,62 @@ micros_user_address_space_lookup_leaf_locked(
     uint64_t *leaf_physical_address
 )
 {
-    struct micros_user_address_space_page_table *root =
-        table_at(process->address_space_root);
-    struct micros_sv39_decoded_pte root_entry;
-    struct micros_sv39_decoded_pte middle_entry;
-    struct micros_user_address_space_page_table *middle;
-    struct micros_user_address_space_page_table *leaf;
-    uint16_t root_index;
-    uint16_t middle_index;
-    uint16_t leaf_index;
+    struct micros_user_address_space_path path;
     enum micros_user_address_space_error error;
 
-    if (
-        micros_sv39_vpn_index(
-            virtual_address,
-            2,
-            &root_index
-        ) != MICROS_SV39_OK
-        || root_index != MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX
-        || micros_sv39_vpn_index(
-            virtual_address,
-            1,
-            &middle_index
-        ) != MICROS_SV39_OK
-        || micros_sv39_vpn_index(
-            virtual_address,
-            0,
-            &leaf_index
-        ) != MICROS_SV39_OK
-    ) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
+    if (leaf_entry == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
-    error = decode_pte(root->entries[root_index], &root_entry);
+    error = prepare_selected_path(runtime, process, virtual_address, &path);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    if (root_entry.kind == MICROS_SV39_PTE_ABSENT) {
+    if (path.leaf.kind == MICROS_SV39_PTE_ABSENT) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
     }
-    if (root_entry.kind != MICROS_SV39_PTE_TABLE) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-    }
-    middle = table_at(root_entry.physical_address);
-    error = decode_pte(
-        middle->entries[middle_index],
-        &middle_entry
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    if (middle_entry.kind == MICROS_SV39_PTE_ABSENT) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
-    }
-    if (middle_entry.kind != MICROS_SV39_PTE_TABLE) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-    }
-    leaf = table_at(middle_entry.physical_address);
-    error = decode_pte(leaf->entries[leaf_index], leaf_entry);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    if (leaf_entry->kind == MICROS_SV39_PTE_ABSENT) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
-    }
-    if (leaf_entry->kind != MICROS_SV39_PTE_LEAF) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-    }
+    *leaf_entry = path.leaf;
     if (leaf_pte != NULL) {
-        *leaf_pte = &leaf->entries[leaf_index];
+        *leaf_pte = &path.tables[2]->entries[path.indices.leaf];
     }
     if (middle_physical_address != NULL) {
-        *middle_physical_address = root_entry.physical_address;
+        *middle_physical_address = path.addresses[1];
     }
     if (leaf_physical_address != NULL) {
-        *leaf_physical_address = middle_entry.physical_address;
+        *leaf_physical_address = path.addresses[2];
     }
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 enum micros_user_address_space_error
 micros_user_address_space_locate_leaf_slot_locked(
-    const struct micros_process *process,
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_process_handle process,
     uint64_t virtual_address,
     struct micros_sv39_decoded_pte *leaf_entry,
     uint64_t **leaf_pte,
     uint64_t *leaf_table_physical_address
 )
 {
-    struct micros_user_address_space_page_table *root =
-        table_at(process->address_space_root);
-    struct micros_sv39_decoded_pte root_entry;
-    struct micros_sv39_decoded_pte middle_entry;
-    struct micros_user_address_space_page_table *middle;
-    struct micros_user_address_space_page_table *leaf;
-    uint16_t root_index;
-    uint16_t middle_index;
-    uint16_t leaf_index;
+    struct micros_user_address_space_path path;
     enum micros_user_address_space_error error;
 
     if (
         leaf_entry == NULL
         || leaf_pte == NULL
         || leaf_table_physical_address == NULL
-        || micros_sv39_vpn_index(
-            virtual_address,
-            2,
-            &root_index
-        ) != MICROS_SV39_OK
-        || root_index != MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX
-        || micros_sv39_vpn_index(
-            virtual_address,
-            1,
-            &middle_index
-        ) != MICROS_SV39_OK
-        || micros_sv39_vpn_index(
-            virtual_address,
-            0,
-            &leaf_index
-        ) != MICROS_SV39_OK
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
     }
-    error = decode_pte(root->entries[root_index], &root_entry);
+    error = prepare_selected_path(runtime, process, virtual_address, &path);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    if (root_entry.kind == MICROS_SV39_PTE_ABSENT) {
+    if (path.table_count != MICROS_SV39_LEVEL_COUNT) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
     }
-    if (root_entry.kind != MICROS_SV39_PTE_TABLE) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-    }
-    middle = table_at(root_entry.physical_address);
-    error = decode_pte(
-        middle->entries[middle_index],
-        &middle_entry
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    if (middle_entry.kind == MICROS_SV39_PTE_ABSENT) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
-    }
-    if (middle_entry.kind != MICROS_SV39_PTE_TABLE) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-    }
-    leaf = table_at(middle_entry.physical_address);
-    error = decode_pte(leaf->entries[leaf_index], leaf_entry);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    *leaf_pte = &leaf->entries[leaf_index];
-    *leaf_table_physical_address = middle_entry.physical_address;
+    *leaf_entry = path.leaf;
+    *leaf_pte = &path.tables[2]->entries[path.indices.leaf];
+    *leaf_table_physical_address = path.addresses[2];
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
@@ -469,7 +540,6 @@ micros_user_address_space_lookup(
     const struct micros_process *resolved;
     struct micros_sv39_decoded_pte leaf_entry;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
 
@@ -494,43 +564,16 @@ micros_user_address_space_lookup(
         error = MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_require_idle(&runtime);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = micros_user_address_space_validate_locked(
-        &runtime,
-        &scratch,
-        process,
-        &resolved
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    error = micros_user_address_space_lookup_leaf_locked(
-        resolved,
-        virtual_address,
-        &leaf_entry,
-        NULL,
-        NULL,
-        NULL
-    );
+    error = read_selected_leaf(&runtime, process, virtual_address, &leaf_entry);
     if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-        error = micros_user_address_space_reject_exceptional_leaf(
-            process,
-            resolved->address_space_root,
-            virtual_address,
-            &leaf_entry
-        );
-        if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-            *physical_address = leaf_entry.physical_address;
-            *permissions = leaf_entry.permissions
-                & ~MICROS_SV39_PERMISSION_USER;
-        }
+        *physical_address = leaf_entry.physical_address;
+        *permissions = leaf_entry.permissions & ~MICROS_SV39_PERMISSION_USER;
     }
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     (void)ledger;
     (void)kernel_report;
@@ -553,7 +596,6 @@ micros_user_address_space_translate(
     const struct micros_process *resolved;
     struct micros_sv39_decoded_pte leaf_entry;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     enum micros_user_address_space_error error;
     uint64_t offset;
     uintptr_t saved_status;
@@ -583,47 +625,18 @@ micros_user_address_space_translate(
         error = MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_require_idle(&runtime);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = micros_user_address_space_validate_locked(
-        &runtime,
-        &scratch,
-        process,
-        &resolved
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    error = micros_user_address_space_lookup_leaf_locked(
-        resolved,
-        user_address,
-        &leaf_entry,
-        NULL,
-        NULL,
-        NULL
-    );
+    error = read_selected_leaf(&runtime, process, user_address, &leaf_entry);
     if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-        error = micros_user_address_space_reject_exceptional_leaf(
-            process,
-            resolved->address_space_root,
-            user_address,
-            &leaf_entry
-        );
-        if (error == MICROS_USER_ADDRESS_SPACE_OK) {
-            offset = user_address % MICROS_SV39_PAGE_SIZE;
-            *physical_address = leaf_entry.physical_address + offset;
-            *permissions =
-                leaf_entry.permissions
-                & ~MICROS_SV39_PERMISSION_USER;
-            *contiguous_bytes =
-                (size_t)(MICROS_SV39_PAGE_SIZE - offset);
-        }
+        offset = user_address % MICROS_SV39_PAGE_SIZE;
+        *physical_address = leaf_entry.physical_address + offset;
+        *permissions = leaf_entry.permissions & ~MICROS_SV39_PERMISSION_USER;
+        *contiguous_bytes = (size_t)(MICROS_SV39_PAGE_SIZE - offset);
     }
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     (void)ledger;
     (void)kernel_report;

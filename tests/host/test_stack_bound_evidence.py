@@ -66,6 +66,110 @@ def compile_console_fixture(directory, observed=False):
     return load_object(output)
 
 
+VISITOR_PREPARATION = (
+    "enum micros_user_address_space_error micros_user_address_space_prepare_activation("
+    "struct micros_process_handle process, uint64_t *root_physical_address);"
+)
+
+
+TTY_BINDING_INSPECTION = (
+    "enum micros_tty_device_authority_status\n"
+    "micros_tty_handoff_runtime_inspect_device_binding(\n"
+    "    const struct micros_kernel_objects *objects,\n"
+    "    struct micros_tty_device_authority *binding);\n"
+)
+
+
+def fatal_source_fixture(root):
+    from tools.stack_bound_bindings import reference_source
+    from tools.stack_bound_fatal import HISTORY, SOURCE_UNITS, WORK_COLLECTOR
+
+    units = set(SOURCE_UNITS) | {
+        "include/micros/diagnostic.h", "kernel/diagnostic/diagnostic_history_core.h",
+        HISTORY, WORK_COLLECTOR, "tests/work/work_counts.h", "include/micros/work_observation.h",
+    }
+    for unit in units:
+        target = root / unit
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / unit).read_bytes())
+    header = reference_source(str(ROOT), "kernel/tty/tty_handoff_runtime.h")
+    (root / "kernel/tty/tty_handoff_runtime.h").write_text(header)
+    return header
+
+
+def compile_selected_mapping_fixture(
+    root, indirect=False, unit="kernel/memory/user_address_space_mapping.c", unknown=False,
+):
+    from tools.stack_bound_artifacts import load_c_object
+    from tools.stack_bound_bindings import reference_source
+    from tools.stack_bound_callback_contracts import GROUPS
+    from tools.stack_bound_catalog import DefinedFunction
+    from tools.stack_bound_collect import LinkedCatalog
+    from tools.stack_bound_objects import function_symbols, load_object
+    from tools.stack_bound_types import SourceOrigin
+
+    body = (
+        '#include "micros/user_address_space.h"\n'
+        "struct micros_user_address_space_bindings;\n"
+        "struct micros_user_address_space_path;\n"
+        "struct micros_user_address_space_runtime_view;\n"
+        "struct micros_sv39_decoded_pte;\n"
+        "extern int (*foreign_callback)(void);\n"
+        "static bool selected_slot_is_required("
+        "const struct micros_user_address_space_bindings *bindings, "
+        "struct micros_process_handle process, uint64_t root, uint64_t virtual_address) {\n"
+        "    (void)bindings; (void)process; (void)root; (void)virtual_address;\n"
+        + ("    return foreign_callback() != 0;\n" if indirect else "    return true;\n")
+        + "}\n"
+        "static bool selected_table_is_distinct("
+        "const struct micros_user_address_space_path *path, uint64_t physical_address, unsigned int depth) {\n"
+        "    (void)path; (void)physical_address; (void)depth; return true;\n}\n"
+        "enum micros_user_address_space_error micros_user_address_space_select_path("
+        "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+        "uint64_t virtual_address, const struct micros_user_address_space_bindings *bindings, "
+        "struct micros_user_address_space_path *path) {\n"
+        "    (void)runtime;\n"
+        "    return selected_slot_is_required(bindings, process, 0, virtual_address)\n"
+        "        && selected_table_is_distinct(path, 0, 0) ? MICROS_USER_ADDRESS_SPACE_OK\n"
+        "        : MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;\n}\n"
+        "static enum micros_user_address_space_error prepare_selected_path("
+        "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+        "uint64_t virtual_address, struct micros_user_address_space_path *path) {\n"
+        "    return micros_user_address_space_select_path(runtime, process, virtual_address, 0, path);\n}\n"
+        "static enum micros_user_address_space_error read_selected_leaf("
+        "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+        "uint64_t virtual_address, struct micros_sv39_decoded_pte *leaf) {\n"
+        "    (void)leaf; return prepare_selected_path(runtime, process, virtual_address, 0);\n}\n"
+        "int callback_fixture_root(void) {\n"
+        "    return read_selected_leaf(0, (struct micros_process_handle){0}, 0, 0);\n}\n"
+    )
+    if unknown:
+        body = body.replace("selected_table_is_distinct", "foreign_table_check")
+    source, output = compile_fixture(root, body)
+    evidence = load_c_object(output, source, variant="fixture", image="kernel.elf", translation_unit=unit)
+    symbols = function_symbols(load_object(output))
+    keys = {frame.function.symbol: frame.function for frame in evidence.frames}
+    catalog = LinkedCatalog(
+        evidence.frames,
+        tuple(DefinedFunction(
+            frame.function, 0x40000000 + index * 0x10000, symbols[frame.function.symbol].size,
+            symbols[frame.function.symbol].binding != 0,
+        ) for index, frame in enumerate(evidence.frames)),
+        tuple(CallSite(call.caller, call.offset, (keys[call.target_symbol],), call.kind)
+              for call in evidence.calls if call.target_symbol is not None),
+        tuple(call for call in evidence.calls if call.target_symbol is None),
+        tuple((frame.function, "fixture.obj") for frame in evidence.frames),
+        tuple(SourceOrigin(origin.function, unit, origin.line) for origin in evidence.origins),
+    )
+    group = next(group for group in GROUPS if unit.startswith(group.source_prefix))
+    header = reference_source(str(ROOT), group.header)
+    for path, content in ((unit, body), (group.header, header), ("CMakeCache.txt", "")):
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+    return catalog, body, header
+
+
 class StackBoundEvidenceTest(unittest.TestCase):
     def test_nested_frames_add_but_sequential_callees_take_the_maximum(self):
         main, first, second, leaf = map(function, ("main", "first", "second", "leaf"))
@@ -496,6 +600,276 @@ class StackBoundEvidenceTest(unittest.TestCase):
             ROOT, group, caller, active | {collector, collect_constructor}, frozenset(),
         )
         self.assertEqual((collector, validator), targets["visitor"])
+
+    def test_kernel_visitor_accepts_only_the_exact_ordinary_header_extension(self):
+        from tools.stack_bound_bindings import reference_source, require_callback_type_scope
+        from tools.stack_bound_callback_contracts import GROUPS
+
+        group = next(group for group in GROUPS if group.identifier == "kernel-visitor")
+        original = reference_source(str(ROOT), group.header)
+        prefix, suffix = original.rsplit("\n#endif", 1)
+        extended = prefix + "\n" + VISITOR_PREPARATION + "\n#endif" + suffix
+        with tempfile.TemporaryDirectory(prefix="micros-stack-visitor-header-") as directory:
+            root = Path(directory)
+            header = root / group.header
+            header.parent.mkdir(parents=True)
+            with patch("tools.stack_bound_bindings.reference_source", return_value=original):
+                for content in (original, extended, extended.replace("uint64_t *root_", "uint64_t\n *root_")):
+                    header.write_text(content)
+                    self.assertEqual(frozenset(), require_callback_type_scope(root, group, ()))
+                for content in (
+                    extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION * 2),
+                    extended.replace("uint64_t *root_physical_address", "uint32_t *root_physical_address"),
+                    extended.replace("struct micros_process_handle process", "struct micros_process_handle other"),
+                    original.replace("#include <stdbool.h>", VISITOR_PREPARATION + "\n#include <stdbool.h>"),
+                    extended.replace(VISITOR_PREPARATION, "#if 1\n" + VISITOR_PREPARATION + "\n#endif"),
+                    extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION[:-1] + " { return 0; }"),
+                    extended.replace("typedef bool", "typedef int"),
+                    extended.replace("micros_user_address_space_destroy", "foreign_destroy"),
+                    extended.replace("#include <stdint.h>", "#include <stdint.h>\n#include <limits.h>"),
+                    extended.replace("#define MICROS_USER_ADDRESS_SPACE_H", "#define OTHER_GUARD"),
+                    extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION + "\nvoid extra_api(void);"),
+                ):
+                    with self.subTest(content=content):
+                        header.write_text(content)
+                        with self.assertRaisesRegex(StackEvidenceError, "header"):
+                            require_callback_type_scope(root, group, ())
+                header.write_text(extended)
+                foreign = replace(group, constructors=())
+                with self.assertRaisesRegex(StackEvidenceError, "header"):
+                    require_callback_type_scope(root, foreign, ())
+                moved = header.with_suffix(".original")
+                header.rename(moved)
+                header.symlink_to(moved)
+                with self.assertRaisesRegex(StackEvidenceError, "header"):
+                    require_callback_type_scope(root, group, ())
+                header.unlink()
+                header.mkdir()
+                with self.assertRaisesRegex(StackEvidenceError, "header"):
+                    require_callback_type_scope(root, group, ())
+
+    def test_other_callback_headers_do_not_gain_the_visitor_extension(self):
+        from tools.stack_bound_bindings import reference_source, require_callback_type_scope
+        from tools.stack_bound_callback_contracts import GROUPS
+
+        for group in GROUPS:
+            if group.identifier == "kernel-visitor":
+                continue
+            with self.subTest(group=group.identifier):
+                original = reference_source(str(ROOT), group.header)
+                prefix, suffix = original.rsplit("\n#endif", 1)
+                with tempfile.TemporaryDirectory(prefix="micros-stack-other-header-") as directory:
+                    root = Path(directory)
+                    header = root / group.header
+                    header.parent.mkdir(parents=True)
+                    header.write_text(prefix + "\n" + VISITOR_PREPARATION + "\n#endif" + suffix)
+                    with patch("tools.stack_bound_bindings.reference_source", return_value=original):
+                        with self.assertRaisesRegex(StackEvidenceError, "header"):
+                            require_callback_type_scope(root, group, ())
+
+    def test_kernel_visitor_binds_all_five_callback_free_helpers_without_losing_direct_edges(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-selected-mapping-") as directory:
+            root = Path(directory)
+            catalog, _, header = compile_selected_mapping_fixture(root)
+            self.assertEqual({
+                "selected_slot_is_required", "selected_table_is_distinct",
+                "micros_user_address_space_select_path", "prepare_selected_path",
+                "read_selected_leaf", "callback_fixture_root",
+            }, {frame.function.symbol for frame in catalog.frames})
+            self.assertTrue(catalog.calls)
+            with patch(
+                "tools.stack_bound_bindings.reference_source",
+                side_effect=lambda _, path: header if path.endswith(".h") else
+                "int callback_fixture_root(void) { return 0; }\n",
+            ):
+                self.assertEqual(((), ()), bind_current_callbacks(root, root, catalog))
+
+    def test_kernel_visitor_helper_admission_rejects_source_and_catalog_substitution(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+        from tools.stack_bound_types import SourceOrigin
+
+        unit = "kernel/memory/user_address_space_mapping.c"
+        with tempfile.TemporaryDirectory(prefix="micros-stack-selected-scope-") as directory:
+            root = Path(directory)
+            catalog, body, header = compile_selected_mapping_fixture(root)
+            with patch(
+                "tools.stack_bound_bindings.reference_source",
+                side_effect=lambda _, path: header if path.endswith(".h") else
+                "int callback_fixture_root(void) { return 0; }\n",
+            ):
+                for changed in (
+                    body.replace("depth", "other"),
+                    body.replace("static bool selected_table_is_distinct", "bool selected_table_is_distinct"),
+                    "#if 1\n" + body + "#endif\n",
+                    body.replace("return true;", "micros_user_mapping_visitor visitor = 0; return visitor != 0;", 1),
+                    body.replace("return true;", "return walk->visitor(0, 0, 0, 0);", 1),
+                    body.replace("selected_table_is_distinct", "foreign_table_check"),
+                ):
+                    with self.subTest(changed=changed):
+                        (root / unit).write_text(changed)
+                        with self.assertRaisesRegex(StackEvidenceError, "callback|source|signature"):
+                            bind_current_callbacks(root, root, catalog)
+                (root / unit).write_text(body)
+                selected = next(frame.function for frame in catalog.frames if frame.function.symbol == "read_selected_leaf")
+                for changed in (
+                    replace(catalog, origins=tuple(
+                        SourceOrigin(origin.function, "kernel/foreign.c", origin.line)
+                        if origin.function == selected else origin for origin in catalog.origins
+                    )),
+                    replace(catalog, objects=catalog.objects[:-1]),
+                    replace(catalog, objects=tuple(
+                        (key, "absent.obj" if key == selected else path) for key, path in catalog.objects
+                    )),
+                ):
+                    with self.subTest(changed=changed), self.assertRaises((StackEvidenceError, OSError)):
+                        bind_current_callbacks(root, root, changed)
+                source = root / unit
+                saved = source.with_suffix(".saved")
+                source.rename(saved)
+                source.symlink_to(saved)
+                with self.assertRaisesRegex(StackEvidenceError, "source"):
+                    bind_current_callbacks(root, root, catalog)
+                source.unlink()
+                saved.rename(source)
+                compile_fixture(root, "int unrelated_function(void) { return 0; }\n")
+                with self.assertRaisesRegex(StackEvidenceError, "symbol|indirect"):
+                    bind_current_callbacks(root, root, catalog)
+
+    def test_selected_mapping_machine_indirect_calls_fail_even_when_omitted_from_pending(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-selected-indirect-") as directory:
+            root = Path(directory)
+            catalog, _, header = compile_selected_mapping_fixture(root, indirect=True)
+            self.assertEqual(1, len(catalog.pending))
+            self.assertIsNone(catalog.pending[0].target_symbol)
+            with patch(
+                "tools.stack_bound_bindings.reference_source",
+                side_effect=lambda _, path: header if path.endswith(".h") else
+                "int callback_fixture_root(void) { return 0; }\n",
+            ):
+                for changed in (catalog, replace(catalog, pending=())):
+                    with self.subTest(pending=changed.pending), self.assertRaisesRegex(StackEvidenceError, "indirect"):
+                        bind_current_callbacks(root, root, changed)
+
+    def test_selected_mapping_names_do_not_authorize_other_units_or_groups(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        for unit, unknown in (
+            ("kernel/memory/user_address_space_mapping.c", True),
+            ("kernel/memory/user_address_space_mapping.c.foreign", False),
+            ("servers/vm/foreign.c", False),
+        ):
+            with self.subTest(unit=unit), tempfile.TemporaryDirectory(prefix="micros-stack-selected-foreign-") as directory:
+                root = Path(directory)
+                catalog, _, header = compile_selected_mapping_fixture(root, unit=unit, unknown=unknown)
+                with patch(
+                    "tools.stack_bound_bindings.reference_source",
+                    side_effect=lambda _, path: header if path.endswith(".h") else
+                    "int callback_fixture_root(void) { return 0; }\n",
+                ):
+                    with self.assertRaisesRegex(StackEvidenceError, "source"):
+                        bind_current_callbacks(root, root, catalog)
+
+    def test_fatal_source_guard_accepts_only_the_exact_tty_binding_declaration(self):
+        from tools.stack_bound_bindings import reference_source
+        from tools.stack_bound_fatal import require_fatal_source_units
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-fatal-header-") as directory:
+            root = Path(directory)
+            original = fatal_source_fixture(root)
+            header = root / "kernel/tty/tty_handoff_runtime.h"
+            prefix, suffix = original.rsplit("\n#endif", 1)
+            extended = prefix + "\n" + TTY_BINDING_INSPECTION + "\n#endif" + suffix
+            with patch(
+                "tools.stack_bound_fatal.reference_source",
+                side_effect=lambda _, unit: reference_source(str(ROOT), unit),
+            ):
+                for terminal, trace in ((False, False), (True, False), (False, True), (True, True)):
+                    for content in (original, extended):
+                        with self.subTest(terminal=terminal, trace=trace, extended=content != original):
+                            header.write_text(content)
+                            self.assertIsNone(require_fatal_source_units(root, terminal_test=terminal, trace_test=trace))
+
+    def test_fatal_tty_header_extension_preserves_all_original_tokens_and_owned_paths(self):
+        from tools.stack_bound_bindings import reference_source
+        from tools.stack_bound_fatal import require_fatal_source_units
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-fatal-header-negative-") as directory:
+            root = Path(directory)
+            original = fatal_source_fixture(root)
+            header = root / "kernel/tty/tty_handoff_runtime.h"
+            prefix, suffix = original.rsplit("\n#endif", 1)
+            extended = prefix + "\n" + TTY_BINDING_INSPECTION + "\n#endif" + suffix
+            with patch(
+                "tools.stack_bound_fatal.reference_source",
+                side_effect=lambda _, unit: reference_source(str(ROOT), unit),
+            ):
+                for content in (
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION * 2),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace(
+                        "enum micros_tty_device_authority_status", "enum micros_tty_handoff_error",
+                    )),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("const struct", "struct")),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("*objects", "*other")),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("*binding", "binding")),
+                    TTY_BINDING_INSPECTION + original,
+                    extended.replace(TTY_BINDING_INSPECTION, "#if 1\n" + TTY_BINDING_INSPECTION + "#endif\n"),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace(";\n", " { return 0; }\n")),
+                    extended.replace("uint64_t root_physical_address", "uint32_t root_physical_address"),
+                    extended.replace("MICROS_TTY_DEVICE_AUTHORITY_NONE = 0", "MICROS_TTY_DEVICE_AUTHORITY_NONE = 1"),
+                    extended.replace("micros_tty_handoff_runtime_panic", "foreign_panic"),
+                    extended.replace('#include "kernel/tty/tty_handoff_core.h"', "#include <stdint.h>"),
+                    extended.replace("#define MICROS_KERNEL_TTY_HANDOFF_RUNTIME_H", "#define OTHER_GUARD"),
+                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION + "void extra_api(void);\n"),
+                ):
+                    with self.subTest(content=content):
+                        header.write_text(content)
+                        with self.assertRaisesRegex(StackEvidenceError, "fatal source/type/CSR contract changed"):
+                            require_fatal_source_units(root)
+                header.write_text(extended)
+                saved = header.with_suffix(".original")
+                header.rename(saved)
+                header.symlink_to(saved)
+                with self.assertRaises((StackEvidenceError, OSError)):
+                    require_fatal_source_units(root)
+                header.unlink()
+                header.mkdir()
+                with self.assertRaises((StackEvidenceError, OSError)):
+                    require_fatal_source_units(root)
+
+    def test_fatal_tty_extension_does_not_weaken_other_units_or_observer_modes(self):
+        from tools.stack_bound_bindings import reference_source
+        from tools.stack_bound_fatal import WORK_COLLECTOR, require_fatal_source_units
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-fatal-other-source-") as directory:
+            root = Path(directory)
+            original = fatal_source_fixture(root)
+            with patch(
+                "tools.stack_bound_fatal.reference_source",
+                side_effect=lambda _, unit: reference_source(str(ROOT), unit),
+            ):
+                for unit in ("kernel/tty/tty_handoff_runtime_internal.h", "arch/riscv64/interrupt.h"):
+                    path = root / unit
+                    content = path.read_text()
+                    prefix, suffix = content.rsplit("\n#endif", 1)
+                    path.write_text(prefix + "\n" + TTY_BINDING_INSPECTION + "\n#endif" + suffix)
+                    with self.subTest(unit=unit), self.assertRaises(StackEvidenceError):
+                        require_fatal_source_units(root)
+                    path.write_text(content)
+                prefix, suffix = original.rsplit("\n#endif", 1)
+                (root / "kernel/tty/tty_handoff_runtime.h").write_text(
+                    prefix + "\n" + TTY_BINDING_INSPECTION + "\n#endif" + suffix,
+                )
+                collector = root / WORK_COLLECTOR
+                collector.write_bytes(collector.read_bytes() + b"\n")
+                for terminal, trace in ((True, False), (False, True), (True, True)):
+                    with self.subTest(terminal=terminal, trace=trace), self.assertRaisesRegex(
+                        StackEvidenceError, "original EV02",
+                    ):
+                        require_fatal_source_units(root, terminal_test=terminal, trace_test=trace)
 
     def test_callback_binding_requires_the_complete_source_machine_and_origin_inventory(self):
         from tools.stack_bound_artifacts import load_c_object

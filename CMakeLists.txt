@@ -3432,6 +3432,227 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-ownership PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_ownership_aggregate_test selected_ownership_active_frame_test selected_ownership_inactive_frame_test selected_ownership_active_geometry_test selected_ownership_inactive_geometry_test selected_ownership_ordinary_test)
 
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_address_space_source.py
+            tests/host/selected_address_space_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_address_space_source.py
+            tests/host/selected_address_space_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_address_space_source.py
+            tests/host/selected_address_space_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    set(MEM04_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-address-space")
+    set(MEM04_NATIVE_INPUTS
+        kernel/memory/frame_allocator.c
+        kernel/memory/bootstrap_memory.c
+        kernel/memory/frame_ownership.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/frame_ownership_bootstrap.c
+        kernel/memory/frame_ownership_handoff.c
+        kernel/memory/frame_ownership_vm_claim.c
+        kernel/memory/frame_ownership_vm_freeze.c
+        kernel/memory/frame_ownership_vm_release.c
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/objects/kernel_object_runtime.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+        kernel/scheduler/scheduler_context.c
+        kernel/endpoint/endpoint.c
+        kernel/endpoint/endpoint_codec.c
+        kernel/endpoint/endpoint_identity.c
+        kernel/endpoint/endpoint_registry.c
+        kernel/endpoint/endpoint_publication.c
+        kernel/endpoint/endpoint_privilege.c
+        kernel/endpoint/endpoint_completion_validation.c
+        kernel/endpoint/endpoint_queue_validation.c
+        kernel/endpoint/endpoint_object_validation.c
+        kernel/ipc/ipc_runtime.c
+        kernel/memory/sv39.c
+        kernel/memory/address_space.c
+        kernel/memory/user_address_space.c
+        kernel/memory/user_address_space_core.c
+        kernel/memory/user_address_space_table.c
+        kernel/memory/user_address_space_runtime.c
+        kernel/memory/user_address_space_mapping.c
+        kernel/memory/user_address_space_validation.c
+        kernel/memory/user_address_space_mutation.c
+        kernel/memory/user_address_space_activation.c
+        kernel/vm/vm_handoff_core.c
+        kernel/vm/vm_handoff_boot.c
+        kernel/vm/vm_handoff_runtime.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_handoff_runtime_state.c
+        kernel/tty/tty_handoff_runtime_validate.c
+        kernel/boot/bootstrap_control_core.c
+    )
+    file(GLOB_RECURSE MEM04_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
+    )
+    set(MEM04_NATIVE_OUTPUTS)
+    set(MEM04_SOURCES_0)
+    foreach(mem04_source IN LISTS MEM04_NATIVE_INPUTS)
+        list(APPEND MEM04_SOURCES_0 "${MEM04_NATIVE_ROOT}/aggregate/${mem04_source}")
+    endforeach()
+    list(APPEND MEM04_NATIVE_OUTPUTS ${MEM04_SOURCES_0})
+    foreach(mem04_header IN LISTS MEM04_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem04_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem04_header}")
+        list(APPEND MEM04_NATIVE_OUTPUTS "${MEM04_NATIVE_ROOT}/aggregate/${mem04_relative_header}")
+    endforeach()
+    set(MEM04_SOURCES_1)
+    foreach(mem04_source IN LISTS MEM04_NATIVE_INPUTS)
+        list(APPEND MEM04_SOURCES_1 "${MEM04_NATIVE_ROOT}/path/${mem04_source}")
+    endforeach()
+    list(APPEND MEM04_NATIVE_OUTPUTS ${MEM04_SOURCES_1})
+    foreach(mem04_header IN LISTS MEM04_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem04_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem04_header}")
+        list(APPEND MEM04_NATIVE_OUTPUTS "${MEM04_NATIVE_ROOT}/path/${mem04_relative_header}")
+    endforeach()
+    set(MEM04_SOURCES_2)
+    foreach(mem04_source IN LISTS MEM04_NATIVE_INPUTS)
+        list(APPEND MEM04_SOURCES_2 "${MEM04_NATIVE_ROOT}/context/${mem04_source}")
+    endforeach()
+    list(APPEND MEM04_NATIVE_OUTPUTS ${MEM04_SOURCES_2})
+    foreach(mem04_header IN LISTS MEM04_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem04_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem04_header}")
+        list(APPEND MEM04_NATIVE_OUTPUTS "${MEM04_NATIVE_ROOT}/context/${mem04_relative_header}")
+    endforeach()
+    set(MEM04_SOURCES_3)
+    foreach(mem04_source IN LISTS MEM04_NATIVE_INPUTS)
+        list(APPEND MEM04_SOURCES_3 "${MEM04_NATIVE_ROOT}/ordinary/${mem04_source}")
+    endforeach()
+    list(APPEND MEM04_NATIVE_OUTPUTS ${MEM04_SOURCES_3})
+    foreach(mem04_header IN LISTS MEM04_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem04_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem04_header}")
+        list(APPEND MEM04_NATIVE_OUTPUTS "${MEM04_NATIVE_ROOT}/ordinary/${mem04_relative_header}")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${MEM04_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_address_space_fixture.py"
+        DEPENDS ${MEM04_NATIVE_INPUTS} ${MEM04_NATIVE_HEADERS}
+            tests/host/selected_address_space_test.c
+            tests/host/selected_address_space_test.h
+            tests/host/selected_address_space_source.py
+            tests/host/selected_address_space_evidence.py
+            tests/host/selected_address_space_authority.py
+            tests/host/test_selected_address_space.py
+            tools/generate_selected_address_space_fixture.py
+            tools/check_selected_address_space.py
+            tests/host/evidence_authority_scope.py
+            tests/host/selected_ownership_source.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(selected_address_space_aggregate_test ${MEM04_SOURCES_0}
+        tests/host/selected_address_space_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_address_space_aggregate_test PRIVATE
+        "${MEM04_NATIVE_ROOT}/aggregate" "${MEM04_NATIVE_ROOT}/aggregate/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_address_space_aggregate_test PRIVATE c_std_17)
+    target_compile_options(selected_address_space_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_address_space_aggregate_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_address_space_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_address_space_aggregate_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_address_space_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_AS_NATIVE_CHANNEL=0)
+    add_executable(selected_address_space_path_test ${MEM04_SOURCES_1}
+        tests/host/selected_address_space_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_address_space_path_test PRIVATE
+        "${MEM04_NATIVE_ROOT}/path" "${MEM04_NATIVE_ROOT}/path/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_address_space_path_test PRIVATE c_std_17)
+    target_compile_options(selected_address_space_path_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_address_space_path_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_address_space_path_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_address_space_path_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_address_space_path_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_AS_NATIVE_CHANNEL=1)
+    add_executable(selected_address_space_context_test ${MEM04_SOURCES_2}
+        tests/host/selected_address_space_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_address_space_context_test PRIVATE
+        "${MEM04_NATIVE_ROOT}/context" "${MEM04_NATIVE_ROOT}/context/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_address_space_context_test PRIVATE c_std_17)
+    target_compile_options(selected_address_space_context_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_address_space_context_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_address_space_context_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_address_space_context_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_address_space_context_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_AS_NATIVE_CHANNEL=2)
+    add_executable(selected_address_space_ordinary_test ${MEM04_SOURCES_3}
+        tests/host/selected_address_space_test.c
+    )
+    target_include_directories(selected_address_space_ordinary_test PRIVATE
+        "${MEM04_NATIVE_ROOT}/ordinary" "${MEM04_NATIVE_ROOT}/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_address_space_ordinary_test PRIVATE c_std_17)
+    target_compile_options(selected_address_space_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_address_space_ordinary_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_address_space_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_address_space_ordinary_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_address_space_ordinary_test PRIVATE
+        MICROS_SELECTED_ADDRESS_SPACE_LAUNCHER=1
+        "MICROS_SELECTED_ADDRESS_SPACE_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_ADDRESS_SPACE_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_address_space.py\""
+        "MICROS_SELECTED_ADDRESS_SPACE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+    add_test(NAME selected-address-space COMMAND selected_address_space_ordinary_test
+        "$<TARGET_FILE:selected_address_space_aggregate_test>"
+        "$<TARGET_FILE:selected_address_space_path_test>"
+        "$<TARGET_FILE:selected_address_space_context_test>"
+    )
+    set_tests_properties(selected-address-space PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_address_space_aggregate_test selected_address_space_path_test selected_address_space_context_test selected_address_space_ordinary_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()

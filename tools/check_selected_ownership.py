@@ -242,7 +242,10 @@ def main(argv=None):
     if arguments.phase == "native":
         if Path.cwd().resolve() != ROOT:
             raise ValueError("MEM03 native orchestration requires its declared source root")
-        check_native_products(ROOT, arguments.executable)
+        from tests.host.evidence_authority_scope import checked_source_view
+
+        with checked_source_view(ROOT):
+            check_native_products(ROOT, arguments.executable)
         print("MICROS_MEM03_CURRENT_PASS cases=99 snapshots=495 guards=58 ordinary=99")
         return 0
     require_invocation(arguments.phase, runtime)

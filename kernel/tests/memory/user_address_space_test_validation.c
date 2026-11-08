@@ -1,5 +1,7 @@
 #include "kernel/tests/memory/user_address_space_test_internal.h"
 
+#include "arch/riscv64/mmu.h"
+#include "arch/riscv64/platform.h"
 #include "micros/sv39.h"
 
 bool micros_user_address_space_test_root_matches_kernel(
@@ -72,66 +74,137 @@ bool micros_user_address_space_test_validate_kernel_roots(
     );
 }
 
+static void write_selected_field(const char *name, uint64_t value)
+{
+    uart_write(name);
+    uart_write_hex64(value);
+}
+
+static bool poisoned_table_is_rejected(
+    struct micros_user_address_space_test_context *context,
+    bool poison_root
+)
+{
+    struct micros_process *process =
+        &context->objects->processes[context->process_one.slot];
+    struct micros_user_address_space_test_page_table *root =
+        micros_user_address_space_test_table_at(context->process_one_root);
+    uint64_t saved_entry = root->entries[MICROS_USER_ADDRESS_SPACE_TEST_USER_ROOT_INDEX];
+    uint64_t physical_address = UINT64_C(0xfeedfacefeedface);
+    uint32_t permissions = UINT32_MAX;
+    uint64_t before_satp = micros_user_address_space_test_read_satp();
+    uint64_t after_satp;
+    uint64_t poison_entry;
+    enum micros_user_address_space_error lookup;
+    enum micros_user_address_space_error activation;
+    bool poison_unchanged;
+    bool state_unchanged;
+    bool outputs_unchanged;
+
+    if (before_satp != (MICROS_RISCV_SATP_MODE_SV39
+            | (context->kernel_report->root_physical_address >> 12))
+        || micros_sv39_make_table_pte(UINT64_C(0x1000), &poison_entry) != MICROS_SV39_OK
+        || !micros_user_address_space_test_snapshot_runtime(
+            context, context->process_one, MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS
+        )) {
+        return false;
+    }
+    if (poison_root) {
+        process->address_space_root = UINT64_C(0x1000);
+    } else {
+        root->entries[MICROS_USER_ADDRESS_SPACE_TEST_USER_ROOT_INDEX] = poison_entry;
+    }
+    lookup = micros_user_address_space_lookup(
+        context->process_one, MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
+        &physical_address, &permissions
+    );
+    activation = micros_user_address_space_activate(context->process_one);
+    after_satp = micros_user_address_space_test_read_satp();
+    poison_unchanged = poison_root
+        ? process->address_space_root == UINT64_C(0x1000)
+        : root->entries[MICROS_USER_ADDRESS_SPACE_TEST_USER_ROOT_INDEX] == poison_entry;
+    process->address_space_root = context->process_one_root;
+    root->entries[MICROS_USER_ADDRESS_SPACE_TEST_USER_ROOT_INDEX] = saved_entry;
+    state_unchanged = micros_user_address_space_test_snapshot_matches(context);
+    outputs_unchanged = physical_address == UINT64_C(0xfeedfacefeedface)
+        && permissions == UINT32_MAX;
+    uart_write("MEM04_TABLE version=1");
+    write_selected_field(" case=", poison_root ? 0 : 1);
+    write_selected_field(" lookup=", lookup);
+    write_selected_field(" activation=", activation);
+    write_selected_field(" before_satp=", before_satp);
+    write_selected_field(" after_satp=", after_satp);
+    write_selected_field(" poison_unchanged=", poison_unchanged);
+    write_selected_field(" state_unchanged=", state_unchanged);
+    write_selected_field(" outputs_unchanged=", outputs_unchanged);
+    uart_write("\n");
+    uart_flush();
+    return lookup == MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        && activation == MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        && before_satp == after_satp
+        && poison_unchanged && state_unchanged && outputs_unchanged;
+}
+
 static bool corrupted_tree_is_rejected(
     struct micros_user_address_space_test_context *context,
     uint64_t virtual_address,
-    enum micros_user_address_space_error expected_error
+    enum micros_user_address_space_error expected_error,
+    uint32_t case_id
 )
 {
     uint64_t unchanged = UINT64_C(0xfeedfacefeedface);
-    uint64_t expected_satp = micros_user_address_space_test_read_satp();
+    uint64_t before_satp = micros_user_address_space_test_read_satp();
+    uint64_t after_satp;
+    uint64_t restored_satp;
+    uint64_t process_satp = MICROS_RISCV_SATP_MODE_SV39 | (context->process_one_root >> 12);
+    enum micros_user_address_space_error diagnostic;
+    enum micros_user_address_space_error activation;
+    enum micros_user_address_space_error release;
+    enum micros_user_address_space_error destroy;
+    bool state_unchanged;
 
-    if (!micros_user_address_space_test_snapshot_runtime(
-            context,
-            context->process_one,
-            virtual_address
-        )
-        || micros_user_address_space_validate(context->process_one)
-            != expected_error
-        || !micros_user_address_space_test_snapshot_matches(context)
-        || micros_user_address_space_test_read_satp()
-            != expected_satp) {
+    if (before_satp != (MICROS_RISCV_SATP_MODE_SV39
+            | (context->kernel_report->root_physical_address >> 12))
+        || !micros_user_address_space_test_snapshot_runtime(
+            context, context->process_one, virtual_address
+        )) {
         return false;
     }
-    if (!micros_user_address_space_test_snapshot_runtime(
-            context,
-            context->process_one,
-            virtual_address
-        )
-        || micros_user_address_space_activate(context->process_one)
-            != expected_error
-        || !micros_user_address_space_test_snapshot_matches(context)
-        || micros_user_address_space_test_read_satp()
-            != expected_satp) {
+    diagnostic = micros_user_address_space_validate(context->process_one);
+    state_unchanged = micros_user_address_space_test_snapshot_matches(context)
+        && micros_user_address_space_test_read_satp() == before_satp;
+    activation = micros_user_address_space_activate(context->process_one);
+    after_satp = micros_user_address_space_test_read_satp();
+    state_unchanged = micros_user_address_space_test_snapshot_matches(context) && state_unchanged;
+    if (micros_user_address_space_activate_kernel() != MICROS_USER_ADDRESS_SPACE_OK) {
         return false;
     }
-    if (!micros_user_address_space_test_snapshot_runtime(
-            context,
-            context->process_one,
-            virtual_address
-        )
-        || micros_user_address_space_release_page(
-               context->process_one,
-               virtual_address,
-               &unchanged
-           ) != expected_error
-        || unchanged != UINT64_C(0xfeedfacefeedface)
-        || !micros_user_address_space_test_snapshot_matches(context)
-        || micros_user_address_space_test_read_satp()
-            != expected_satp) {
-        return false;
-    }
-    return (
-        micros_user_address_space_test_snapshot_runtime(
-            context,
-            context->process_one,
-            virtual_address
-        )
-        && micros_user_address_space_destroy(context->process_one)
-            == expected_error
-        && micros_user_address_space_test_snapshot_matches(context)
-        && micros_user_address_space_test_read_satp() == expected_satp
+    restored_satp = micros_user_address_space_test_read_satp();
+    release = micros_user_address_space_release_page(
+        context->process_one, virtual_address, &unchanged
     );
+    state_unchanged = micros_user_address_space_test_snapshot_matches(context) && state_unchanged;
+    destroy = micros_user_address_space_destroy(context->process_one);
+    state_unchanged = micros_user_address_space_test_snapshot_matches(context)
+        && micros_user_address_space_test_read_satp() == restored_satp && state_unchanged;
+    uart_write("MEM04_ACTIVATION version=1");
+    write_selected_field(" case=", case_id);
+    write_selected_field(" diagnostic=", diagnostic);
+    write_selected_field(" activation=", activation);
+    write_selected_field(" release=", release);
+    write_selected_field(" destroy=", destroy);
+    write_selected_field(" before_satp=", before_satp);
+    write_selected_field(" after_satp=", after_satp);
+    write_selected_field(" process_satp=", process_satp);
+    write_selected_field(" restored_satp=", restored_satp);
+    write_selected_field(" state_unchanged=", state_unchanged);
+    write_selected_field(" output_unchanged=", unchanged == UINT64_C(0xfeedfacefeedface));
+    uart_write("\n");
+    uart_flush();
+    return diagnostic == expected_error && release == expected_error && destroy == expected_error
+        && activation == MICROS_USER_ADDRESS_SPACE_OK && after_satp == process_satp
+        && restored_satp == before_satp && state_unchanged
+        && unchanged == UINT64_C(0xfeedfacefeedface);
 }
 
 static bool foreign_owner_leaf_is_rejected(
@@ -156,7 +229,8 @@ static bool foreign_owner_leaf_is_rejected(
     rejected = corrupted_tree_is_rejected(
         context,
         MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
-        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        0
     );
     if (rejected) {
         *leaf = original_pte;
@@ -186,7 +260,8 @@ static bool page_table_leaf_is_rejected(
     rejected = corrupted_tree_is_rejected(
         context,
         MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
-        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        1
     );
     if (rejected) {
         *leaf = original_pte;
@@ -206,7 +281,8 @@ static bool malformed_leaf_is_rejected(
     rejected = corrupted_tree_is_rejected(
         context,
         MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
-        MICROS_USER_ADDRESS_SPACE_ERROR_PTE
+        MICROS_USER_ADDRESS_SPACE_ERROR_PTE,
+        2
     );
     if (rejected) {
         *leaf = original_pte;
@@ -236,7 +312,8 @@ static bool alias_leaf_is_rejected(
     rejected = corrupted_tree_is_rejected(
         context,
         MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
-        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        3
     );
     if (rejected) {
         *alias_leaf = original_alias_pte;
@@ -256,7 +333,8 @@ static bool unreachable_owned_frame_is_rejected(
     rejected = corrupted_tree_is_rejected(
         context,
         MICROS_USER_ADDRESS_SPACE_TEST_REUSE_VIRTUAL_ADDRESS,
-        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        4
     );
     if (rejected) {
         *leaf = original_pte;
@@ -284,7 +362,9 @@ bool micros_user_address_space_test_reject_corruption(
     }
     original_pte = *leaf;
     return (
-        foreign_owner_leaf_is_rejected(
+        poisoned_table_is_rejected(context, true)
+        && poisoned_table_is_rejected(context, false)
+        && foreign_owner_leaf_is_rejected(
             context,
             leaf,
             original_pte,

@@ -342,6 +342,7 @@ micros_user_address_space_prepare_wired_handoff(void)
             NULL
         );
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
             goto done_with_scratch;
         }
         error = select_reachable_process_user_targets(
@@ -429,6 +430,7 @@ micros_user_address_space_complete_wired_handoff(void)
             NULL
         );
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
             goto done_with_scratch;
         }
         if (

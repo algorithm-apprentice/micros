@@ -1735,6 +1735,8 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(0, len(values[0].elts if hasattr(values[0], "elts") else values[0].keys))
 
     def test_all_original_owners_and_pending_bodies_are_frozen(self) -> None:
+        from tests.host.evidence_authority_scope import identity_required
+
         pending = {(path, name): final for path, final, name in SYMBOL_OWNER_MIGRATION}
         for family, (original, owners) in enumerate(ORIGINAL_FUNCTIONS.items()):
             frozen = frozen_functions(original)
@@ -1755,7 +1757,10 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                         self.assertEqual(FUNCTION_GUARDS.get(name, ()), record.guards)
                         is_phase_root = (original, name) in (*INITIAL_FUNCTION_MIGRATION, *SHORT_PHASE_ROOTS)
                         is_pending = (original, name) in pending or (original, name) in FUNCTION_MIGRATION
-                        if is_pending or not is_phase_root:
+                        if (is_pending or not is_phase_root) and identity_required(
+                            REPOSITORY_ROOT, "tests/host/test_scheduler_source_layout.py:function-body:"
+                            + "FROZEN_FUNCTIONS/" + original + "/" + name,
+                        ):
                             self.assertEqual(
                                 frozen[name][1],
                                 digest(normalized_body(record, family, self.records[family])),

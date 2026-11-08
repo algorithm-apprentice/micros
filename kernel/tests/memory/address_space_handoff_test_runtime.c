@@ -555,16 +555,42 @@ static bool reject_corrupt_frame_owners(
     return true;
 }
 
+static uint64_t selected_handoff_read_satp(void)
+{
+    uint64_t value;
+
+    __asm__ volatile("csrr %0, satp" : "=r"(value));
+    return value;
+}
+
+static void write_selected_handoff_field(const char *name, uint64_t value)
+{
+    uart_write(name);
+    uart_write_hex64(value);
+}
+
 static bool reject_corrupt_leaf_pte(
     struct micros_address_space_handoff_test_context *fixture
 )
 {
+    enum micros_user_address_space_error diagnostic;
+    enum micros_user_address_space_error translated;
+    uint64_t before_satp = selected_handoff_read_satp();
+    uint64_t after_satp;
+    bool poison_unchanged;
+    bool state_unchanged;
+    bool outputs_unchanged;
+
     fixture->corrupt_pte = handoff_test_leaf_pte_for(fixture,
         fixture->objects,
         fixture->processes[HANDOFF_GRANTEE],
         TEST_DATA_ADDRESS
     );
-    if (fixture->corrupt_pte == NULL) {
+    if (fixture->corrupt_pte == NULL
+        || !handoff_test_snapshot_state(
+            fixture, fixture->ledger, fixture->objects,
+            fixture->endpoint_registry, fixture->grant_registry
+        )) {
         return false;
     }
     fixture->saved_pte = *fixture->corrupt_pte;
@@ -572,25 +598,33 @@ static bool reject_corrupt_leaf_pte(
     fixture->physical_address = UINT64_C(0xfeedfacefeedface);
     fixture->permissions = UINT32_MAX;
     fixture->contiguous = SIZE_MAX;
-    if (
-        micros_user_address_space_translate(
-            fixture->processes[HANDOFF_GRANTEE],
-            TEST_UNMAPPED_ADDRESS,
-            &fixture->physical_address,
-            &fixture->permissions,
-            &fixture->contiguous
-        ) != MICROS_USER_ADDRESS_SPACE_ERROR_PTE
-        || fixture->physical_address != UINT64_C(0xfeedfacefeedface)
-        || fixture->permissions != UINT32_MAX
-        || fixture->contiguous != SIZE_MAX
-    ) {
-        return false;
-    }
+    diagnostic = micros_user_address_space_validate(fixture->processes[HANDOFF_GRANTEE]);
+    translated = micros_user_address_space_translate(
+        fixture->processes[HANDOFF_GRANTEE], TEST_UNMAPPED_ADDRESS,
+        &fixture->physical_address, &fixture->permissions, &fixture->contiguous
+    );
+    after_satp = selected_handoff_read_satp();
+    poison_unchanged = *fixture->corrupt_pte == UINT64_C(1);
+    outputs_unchanged = fixture->physical_address == UINT64_C(0xfeedfacefeedface)
+        && fixture->permissions == UINT32_MAX && fixture->contiguous == SIZE_MAX;
     *fixture->corrupt_pte = fixture->saved_pte;
-
-
-
-    return true;
+    state_unchanged = handoff_test_state_matches(
+        fixture, fixture->ledger, fixture->objects,
+        fixture->endpoint_registry, fixture->grant_registry
+    );
+    uart_write("MEM04_HANDOFF version=1");
+    write_selected_handoff_field(" diagnostic=", diagnostic);
+    write_selected_handoff_field(" translated=", translated);
+    write_selected_handoff_field(" before_satp=", before_satp);
+    write_selected_handoff_field(" after_satp=", after_satp);
+    write_selected_handoff_field(" poison_unchanged=", poison_unchanged);
+    write_selected_handoff_field(" state_unchanged=", state_unchanged);
+    write_selected_handoff_field(" outputs_unchanged=", outputs_unchanged);
+    uart_write("\n");
+    uart_flush();
+    return diagnostic == MICROS_USER_ADDRESS_SPACE_ERROR_PTE
+        && translated == MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED
+        && before_satp == after_satp && poison_unchanged && state_unchanged && outputs_unchanged;
 }
 
 bool handoff_test_verify_corruption_rejection(

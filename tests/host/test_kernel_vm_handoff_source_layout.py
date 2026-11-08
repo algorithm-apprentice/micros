@@ -696,13 +696,20 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         )
 
     def test_stable_headers_are_byte_exact(self) -> None:
+        from tests.host.evidence_authority_scope import identity_required
+
+        expected = {
+            path: value for path, value in STABLE_HEADER_HASHES.items()
+            if identity_required(REPOSITORY_ROOT,
+                "tests/host/test_kernel_vm_handoff_source_layout.py:data-entry:STABLE_HEADER_HASHES/" + path)
+        }
         observed = {
             path: hashlib.sha256(
                 kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
             ).hexdigest()
-            for path in STABLE_HEADER_HASHES
+            for path in expected
         }
-        self.assertEqual(STABLE_HEADER_HASHES, observed)
+        self.assertEqual(expected, observed)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
         cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")

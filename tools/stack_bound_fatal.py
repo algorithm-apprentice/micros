@@ -449,8 +449,22 @@ def require_fatal_source_units(root, *, terminal_test=False, trace_test=False):
             projected = project_fatal_uart(restored) if unit == UART else (
                 project_fatal_report(restored) if unit == REPORT else restored
             )
-            if tokens(projected) != tokens(reference_source(str(root), unit)):
-                raise StackEvidenceError("fatal source/type/CSR contract changed from its fixed stage")
+            reference = reference_source(str(root), unit)
+            actual_tokens = tokens(projected)
+            admitted = actual_tokens == tokens(reference)
+            if not admitted and unit == "kernel/tty/tty_handoff_runtime.h":
+                prefix, terminator, suffix = reference.rpartition("\n#endif")
+                declaration = (
+                    "enum micros_tty_device_authority_status\n"
+                    "micros_tty_handoff_runtime_inspect_device_binding(\n"
+                    "    const struct micros_kernel_objects *objects,\n"
+                    "    struct micros_tty_device_authority *binding);\n"
+                )
+                admitted = bool(terminator) and not suffix.strip() and actual_tokens == tokens(
+                    prefix + "\n" + declaration + terminator + suffix,
+                )
+            if not admitted:
+                raise StackEvidenceError("fatal source/type/CSR contract changed from its fixed stage: " + unit)
         public = read_regular(owned_file(root, "include/micros/diagnostic.h"))[0].decode("utf-8")
         header = read_regular(owned_file(root, "kernel/diagnostic/diagnostic_history_core.h"))[0].decode("utf-8")
         history = read_regular(owned_file(root, HISTORY))[0].decode("utf-8")

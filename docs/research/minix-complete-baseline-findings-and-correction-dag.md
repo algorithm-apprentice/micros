@@ -249,6 +249,9 @@ It is archived.
 [Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) has clean
 independent review and preserves all fatal proof obligations, seventeen
 production subjects, 29 candidate paths and the 33-key retirement scope.
+That design separately merged as #227. The fresh implementation follows the
+exact [evidence map](../architecture/selected-user-address-space.md#implementation-and-evidence-map)
+and must renew every author phase; none of the archives closes a finding.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

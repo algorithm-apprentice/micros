@@ -131,14 +131,6 @@ static bool frame_index_for_physical_address(
     );
 }
 
-static enum micros_user_address_space_error decode_pte(
-    uint64_t pte,
-    struct micros_sv39_decoded_pte *decoded
-)
-{
-    return micros_user_address_space_decode_pte(pte, decoded);
-}
-
 static void release_owned_frame_or_panic(
     struct micros_frame_owner owner,
     uint64_t physical_address
@@ -203,6 +195,8 @@ struct user_page_allocation {
     uint64_t root_pte;
     uint64_t middle_pte;
     uint64_t user_pte;
+    struct micros_frame_allocator *allocator;
+    uint64_t original_cursor;
     uint32_t permissions;
     uint16_t root_index;
     uint16_t middle_index;
@@ -212,86 +206,56 @@ struct user_page_allocation {
 };
 
 static enum micros_user_address_space_error
-inspect_page_allocation(struct user_page_allocation *allocation)
+inspect_page_allocation(
+    struct user_page_allocation *allocation,
+    const struct micros_user_address_space_path *path)
 {
-    struct micros_sv39_decoded_pte root_entry;
-    struct micros_sv39_decoded_pte middle_entry;
-    struct micros_sv39_decoded_pte leaf_entry;
+    if (path->leaf.kind != MICROS_SV39_PTE_ABSENT) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT;
+    }
+    allocation->root = path->tables[0];
+    allocation->root_index = path->indices.root;
+    allocation->middle_index = path->indices.middle;
+    allocation->leaf_index = path->indices.leaf;
+    allocation->need_middle = path->table_count < 2;
+    allocation->need_leaf = path->table_count < 3;
+    allocation->middle = allocation->need_middle ? NULL : path->tables[1];
+    allocation->leaf = allocation->need_leaf ? NULL : path->tables[2];
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error preflight_selected_allocation(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct user_page_allocation *allocation)
+{
+    struct micros_user_address_space_bindings bindings;
+    struct micros_user_address_space_path path;
     enum micros_user_address_space_error error;
 
-    if (
-        micros_sv39_vpn_index(
-            allocation->virtual_address,
-            2,
-            &allocation->root_index
-        ) != MICROS_SV39_OK
-        || allocation->root_index
-            != MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX
-        || micros_sv39_vpn_index(
-            allocation->virtual_address,
-            1,
-            &allocation->middle_index
-        ) != MICROS_SV39_OK
-        || micros_sv39_vpn_index(
-            allocation->virtual_address,
-            0,
-            &allocation->leaf_index
-        ) != MICROS_SV39_OK
-    ) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;
+    error = micros_user_address_space_require_idle(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
     }
-    allocation->root =
-        table_at(allocation->resolved->address_space_root);
-    error = decode_pte(
-        allocation->root->entries[allocation->root_index],
-        &root_entry
+    error = micros_user_address_space_load_selected_bindings(runtime, &bindings);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = micros_user_address_space_select_path(
+        runtime, allocation->process, allocation->virtual_address, &bindings, &path
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    allocation->need_middle =
-        root_entry.kind == MICROS_SV39_PTE_ABSENT;
-    if (
-        !allocation->need_middle
-        && root_entry.kind != MICROS_SV39_PTE_TABLE
-    ) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+    if (active_root() == runtime->process_root) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
     }
-    if (allocation->need_middle) {
-        allocation->middle = NULL;
-        allocation->need_leaf = true;
-    } else {
-        allocation->middle = table_at(root_entry.physical_address);
-        error = decode_pte(
-            allocation->middle->entries[allocation->middle_index],
-            &middle_entry
-        );
-        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-            return error;
-        }
-        allocation->need_leaf =
-            middle_entry.kind == MICROS_SV39_PTE_ABSENT;
-        if (
-            !allocation->need_leaf
-            && middle_entry.kind != MICROS_SV39_PTE_TABLE
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
-        }
-    }
-    if (allocation->need_leaf) {
-        return MICROS_USER_ADDRESS_SPACE_OK;
-    }
-    allocation->leaf = table_at(middle_entry.physical_address);
-    error = decode_pte(
-        allocation->leaf->entries[allocation->leaf_index],
-        &leaf_entry
-    );
+    error = inspect_page_allocation(allocation, &path);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    return leaf_entry.kind == MICROS_SV39_PTE_ABSENT
-        ? MICROS_USER_ADDRESS_SPACE_OK
-        : MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT;
+    allocation->allocator = runtime->ledger->allocator;
+    allocation->original_cursor = allocation->allocator->allocation_cursor;
+    return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 static enum micros_user_address_space_error
@@ -398,6 +362,7 @@ static void rollback_page_allocation(
             allocation->new_middle
         );
     }
+    allocation->allocator->allocation_cursor = allocation->original_cursor;
 }
 
 static void commit_page_allocation(
@@ -431,7 +396,6 @@ micros_user_address_space_allocate_page(
     const struct micros_kernel_address_space_report *kernel_report;
     const struct micros_process *resolved;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     struct user_page_allocation allocation;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
@@ -461,23 +425,6 @@ micros_user_address_space_allocate_page(
         error = MICROS_USER_ADDRESS_SPACE_ERROR_PERMISSION;
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done;
-    }
-    error = micros_user_address_space_validate_locked(
-        &runtime,
-        &scratch,
-        process,
-        &resolved
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    if (active_root() == resolved->address_space_root) {
-        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
-        goto done_with_scratch;
-    }
     allocation.process = process;
     allocation.resolved = resolved;
     allocation.virtual_address = virtual_address;
@@ -485,20 +432,18 @@ micros_user_address_space_allocate_page(
     allocation.new_middle = 0;
     allocation.new_leaf = 0;
     allocation.new_user = 0;
-    error = inspect_page_allocation(&allocation);
+    error = preflight_selected_allocation(&runtime, &allocation);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = prepare_page_allocation(&allocation);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         rollback_page_allocation(&allocation);
-        goto done_with_scratch;
+        goto done;
     }
     commit_page_allocation(&allocation, physical_address);
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     (void)ledger;
     (void)kernel_report;
@@ -525,6 +470,7 @@ struct user_page_release {
 };
 
 static enum micros_user_address_space_error inspect_page_release(
+    struct micros_user_address_space_runtime_view *runtime,
     struct user_page_release *release,
     uint64_t virtual_address
 )
@@ -532,7 +478,8 @@ static enum micros_user_address_space_error inspect_page_release(
     enum micros_user_address_space_error error;
 
     error = micros_user_address_space_lookup_leaf_locked(
-        release->resolved,
+        runtime,
+        release->process,
         virtual_address,
         &release->leaf_entry,
         &release->leaf_pte,
@@ -722,7 +669,7 @@ micros_user_address_space_release_page(
     release.resolved = resolved;
     release.scratch = &scratch;
     release.process = process;
-    error = inspect_page_release(&release, virtual_address);
+    error = inspect_page_release(&runtime, &release, virtual_address);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done_with_scratch;
     }

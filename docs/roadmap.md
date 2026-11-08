@@ -307,6 +307,15 @@ The candidate is archived without final acceptance.
 [Accepted ADR-0111](adr/0111-fatal-tty-header-extension.md) has clean
 independent design review; it adds one exact header admission and one
 immutable existing owner without changing runtime scope or stack budgets.
+Corrective design #227 separately merged as
+`60e8b8e160b1c063e448cd32b0418535dd63bbb7`, with identical reviewed,
+committed, remote, preview and squash tree
+`28a01d02f4c12a148627f23d31cb0de512c657f4`.
+The fresh implementation independently freezes its 1,497-member base.
+Its [evidence map](architecture/selected-user-address-space.md#implementation-and-evidence-map)
+retains seventeen production subjects, 29 candidate paths and the original
+33 keys, with three exact immutable stack-admission owners. Complete renewed
+acceptance and independent implementation review remain required.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

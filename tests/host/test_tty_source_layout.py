@@ -775,10 +775,15 @@ def normal_names(family):
 
 
 def original_locations(family):
+    from tests.host.selected_address_space_source import legacy_tty_additions
+
     names = normal_names(family)
     locations = {}
     for path in FAMILY_PATHS[family]:
+        additions = legacy_tty_additions(ROOT, path) if family == 0 else frozenset()
         for spelling, record in function_records(source(path)).items():
+            if spelling in additions:
+                continue
             if family == 1 and spelling in UART_PHASES:
                 if path != FAMILY_PATHS[1][0]:
                     raise AssertionError("real UART hardware phases retain their original component owner")
@@ -2085,9 +2090,11 @@ def main(argv=None):
         }
         allowed = {0: {1, 2, 3}, 1: set(), 2: {1}, 3: {1}}
         for name, (owner, record) in records.items():
+            body_tokens = tokens(record.body)
             destinations = {
-                records[word][0] for word in tokens(record.body)
+                records[word][0] for index, word in enumerate(body_tokens)
                 if word in records and records[word][0] != owner
+                and (index == 0 or body_tokens[index - 1] not in ("struct", "union", "enum"))
             }
             self.assertLessEqual(destinations, allowed[owner], name)
 

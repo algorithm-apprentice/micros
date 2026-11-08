@@ -15862,6 +15862,9 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     required = diagnostic_identity_required(
         root, "tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/" + logical + "/2",
     )
+    from tests.host.selected_address_space_source import project_include_transports
+
+    transports = project_include_transports(root, logical, raw, transports, required)
     return _restored_include_bytes(logical, raw, expected_sha256, transports, required=required)
 
 
@@ -17245,7 +17248,10 @@ def _restore_gate_ast(tree: ast.Module) -> ast.Module:
 
 
 def restored_gate_ast_sha256(root: Path, relative: str) -> str:
+    from tests.host.selected_address_space_source import project_legacy_adapter
+
     source = (root / relative).read_text(encoding="utf-8")
+    source = project_legacy_adapter(root, relative, source)
     source = project_diagnostic_gate(relative, source)
     source = project_gate_compatibility(relative, source)
     tree = _restore_gate_ast(ast.parse(source))

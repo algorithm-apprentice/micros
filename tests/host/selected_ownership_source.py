@@ -726,12 +726,17 @@ def _current_calls(name, before):
 
 def validate_retained_source(root, path, text, stage):
     from tests.host.c_source_records import compact, function_records
+    from tests.host.selected_address_space_source import native_assertion_admission as next_admission
+
+    retired = next_admission(root, "MEM03", path, text, stage)
 
     if stage not in (Stage.RED, Stage.GREEN) or type(text) is not str:
         raise ValueError("MEM03 source admission has an unknown stage or representation")
     original = baseline_source(str(root), path)
     if stage is Stage.RED or path not in SOURCE_ROLES["production_paths"]:
         if text != original:
+            if "MEM03/native-input/" + path in retired:
+                return
             raise ValueError("MEM03 fixed or noncandidate source changed: " + path)
         return
     if path.endswith(".h"):
@@ -743,10 +748,12 @@ def validate_retained_source(root, path, text, stage):
         return
     before, after = function_records(original), function_records(text)
     additions = SOURCE_PROJECTION["new_helpers"].get(path, ())
-    if set(after) != set(before) | set(additions):
+    if "MEM03/definitions/" + path not in retired and set(after) != set(before) | set(additions):
         raise ValueError("MEM03 current source has missing or unadmitted definitions")
     mutable = SOURCE_PROJECTION["mutable_functions"][path]
     for name, old in before.items():
+        if "MEM03/function/" + path + "/" + name in retired:
+            continue
         current = after[name]
         if compact(current.signature) != compact(old.signature) or current.guards != old.guards:
             raise ValueError("MEM03 changed an original signature or CPP owner: " + name)
@@ -1424,6 +1431,8 @@ def native_recipe():
 
 
 def extend_cmake(text):
+    from tests.host.selected_address_space_source import native_recipe as selected_address_space_recipe
+
     anchor = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
     if hashlib.sha256(text.encode()).hexdigest() != RECIPE_ADMISSION["base_cmake_sha256"] or text.count(anchor) != 1:
         raise ValueError("MEM03 native recipe lacks its complete reviewed validation base")
@@ -1432,10 +1441,13 @@ def extend_cmake(text):
         if text.count(output) != 1:
             raise ValueError("MEM03 source-proof pool lacks its exact predecessor generator")
         text = text.replace(output, output + "        JOB_POOL mem03_source_proof\n", 1)
-    return text.replace(anchor, native_recipe() + anchor, 1)
+    return text.replace(anchor, native_recipe() + selected_address_space_recipe() + anchor, 1)
 
 
 def project_cmake(text):
+    from tests.host.selected_address_space_source import project_cmake as project_selected_address_space
+
+    text = project_selected_address_space(text)
     from tests.host.qemu_transcript_source import project_transcript_cmake
 
     text = project_transcript_cmake(text)
@@ -1473,16 +1485,19 @@ def _native_scopes(family, path):
 
 def native_assertion_admission(root, family, path, text, stage):
     from tests.host.evidence_authority_scope import identity_required
+    from tests.host.selected_address_space_source import native_assertion_admission as next_admission
+
+    inherited = next_admission(root, family, path, text, stage)
 
     if stage not in (Stage.RED, Stage.GREEN):
         raise ValueError("MEM03 legacy admission has an unknown source stage")
     scopes = _native_scopes(family, path)
     if stage is Stage.RED or not scopes:
-        return frozenset()
+        return inherited
     selected = frozenset(scope for key, scope in scopes if not identity_required(root, key))
     if selected:
         validate_retained_source(root, path, text, Stage.GREEN)
-    return selected
+    return selected | inherited
 
 
 def legacy_observation_sites(root, family, path, stage, sites):
@@ -1654,6 +1669,10 @@ def extend_legacy_adapter(path, text):
 
 
 def project_legacy_adapter(path, text):
+    from tests.host.selected_address_space_source import project_legacy_adapter as project_next
+
+    if "tests.host.selected_address_space_source" in text:
+        text = project_next(Path(__file__).resolve().parents[2], path, text)
     if path == "tests/host/test_kernel_bootstrap_source_layout.py":
         if "micros_frame_ownership_runtime_validate_metadata" not in text:
             return text
@@ -1687,6 +1706,7 @@ def extend_bootstrap_readonly_fixture(text):
 
 def validate_scaffold(root):
     from tests.host.work_count_recipe import project_host_test_commands
+    from tests.host.selected_address_space_source import project_legacy_adapter as project_next
 
     root = Path(root)
     cmake = regular_source(root, "CMakeLists.txt").read_text()
@@ -1694,7 +1714,7 @@ def validate_scaffold(root):
     if project_cmake(cmake) == cmake:
         raise ValueError("MEM03 six-product/one-CTest integration is absent")
     for path in SOURCE_ROLES["fixed_adapters"]:
-        actual = regular_source(root, path).read_text()
+        actual = project_next(root, path, regular_source(root, path).read_text())
         original = baseline_adapter_source(str(root), path)
         if actual != extend_legacy_adapter(path, original):
             raise ValueError("MEM03 frozen native/identity adapter is absent or altered: " + path)

@@ -691,8 +691,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(19, len(inventory.families))
-        self.assertEqual(4774, len(inventory.facts))
+        self.assertEqual(20, len(inventory.families))
+        self.assertEqual(4782, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT

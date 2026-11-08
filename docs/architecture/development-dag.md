@@ -125,7 +125,8 @@ The fresh candidate passed actual native/target Green and current visitor
 binding, then an early stack check rejected the ordinary TTY inspector
 prototype at the fatal source-unit guard. The candidate is archived.
 [Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) has clean
-independent design review; MEM04 remains blocked until separate merge.
+independent design review and separately merged as #227. MEM04 restarts
+from that main with a fresh base and three immutable stack-admission inputs.
 Its five selected-operation migrations and explicit
 twenty-row residual-audit ledger preserve downstream task ownership.
 The 59-node runtime graph, finding ownership and MEM04's MEM02/MEM03 runtime

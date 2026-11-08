@@ -77,6 +77,7 @@ enum micros_scheduler_error scheduler_runtime_validate_selected_thread(
 {
     const struct micros_thread *thread;
     const struct micros_process *process;
+    uint64_t root;
 
     if (
         objects == NULL
@@ -93,12 +94,12 @@ enum micros_scheduler_error scheduler_runtime_validate_selected_thread(
             &process
         ) != MICROS_KERNEL_OBJECT_OK
         || process->address_space_root == 0
-        || micros_user_address_space_validate(thread->owner)
+        || micros_user_address_space_prepare_activation(thread->owner, &root)
             != MICROS_USER_ADDRESS_SPACE_OK
     ) {
         return MICROS_SCHEDULER_ERROR_CONTEXT;
     }
-    runtime->selected_root = process->address_space_root;
+    runtime->selected_root = root;
     return MICROS_SCHEDULER_OK;
 }
 

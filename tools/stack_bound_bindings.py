@@ -116,10 +116,21 @@ def source_callback_occurrences(record, group):
 
 def require_callback_type_scope(root, group, units):
     header = Path(root) / group.header
-    if (
-        header.is_symlink() or not header.is_file()
-        or tokens(header.read_text()) != tokens(reference_source(str(root), group.header))
-    ):
+    if header.is_symlink() or not header.is_file():
+        raise StackEvidenceError(f"{group.identifier} callback header contract changed")
+    reference = reference_source(str(root), group.header)
+    actual_tokens = tokens(header.read_text())
+    admitted = actual_tokens == tokens(reference)
+    if not admitted and group in GROUPS and group.identifier == "kernel-visitor":
+        prefix, terminator, suffix = reference.rpartition("\n#endif")
+        declaration = (
+            "enum micros_user_address_space_error micros_user_address_space_prepare_activation("
+            "struct micros_process_handle process, uint64_t *root_physical_address);"
+        )
+        admitted = bool(terminator) and not suffix.strip() and actual_tokens == tokens(
+            prefix + "\n" + declaration + terminator + suffix,
+        )
+    if not admitted:
         raise StackEvidenceError(f"{group.identifier} callback header contract changed")
     expression = r"\b(?:" + "|".join(map(re.escape, group.types)) + r")\b"
     callback_free = set()
@@ -147,6 +158,52 @@ def require_callback_type_scope(root, group, units):
             except StackEvidenceError as error:
                 raise StackEvidenceError(f"{group.identifier} callback type/argument scope: {error}") from error
     return frozenset(callback_free)
+
+
+def selected_mapping_no_callback_scope(root, group, key, origin):
+    unit = "kernel/memory/user_address_space_mapping.c"
+    if group not in GROUPS or group.identifier != "kernel-visitor" or key.translation_unit != unit:
+        return False
+    signatures = {
+        "selected_slot_is_required": (
+            "static bool selected_slot_is_required("
+            "const struct micros_user_address_space_bindings *bindings, "
+            "struct micros_process_handle process, uint64_t root, uint64_t virtual_address)"
+        ),
+        "selected_table_is_distinct": (
+            "static bool selected_table_is_distinct("
+            "const struct micros_user_address_space_path *path, uint64_t physical_address, unsigned int depth)"
+        ),
+        "micros_user_address_space_select_path": (
+            "enum micros_user_address_space_error micros_user_address_space_select_path("
+            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+            "uint64_t virtual_address, const struct micros_user_address_space_bindings *bindings, "
+            "struct micros_user_address_space_path *path)"
+        ),
+        "prepare_selected_path": (
+            "static enum micros_user_address_space_error prepare_selected_path("
+            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+            "uint64_t virtual_address, struct micros_user_address_space_path *path)"
+        ),
+        "read_selected_leaf": (
+            "static enum micros_user_address_space_error read_selected_leaf("
+            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
+            "uint64_t virtual_address, struct micros_sv39_decoded_pte *leaf)"
+        ),
+    }
+    if key.symbol not in signatures:
+        return False
+    source = Path(root) / unit
+    if origin != unit or source.is_symlink() or not source.is_file():
+        raise StackEvidenceError("kernel-visitor callback-free function has a foreign source origin")
+    record = function_records(source.read_text()).get(key.symbol)
+    if (
+        record is None or record.guards
+        or tokens(record.signature) != tokens(signatures[key.symbol])
+        or source_callback_occurrences(record, group)
+    ):
+        raise StackEvidenceError("kernel-visitor callback-free function signature or scope changed")
+    return True
 
 
 def configured_callback_flags(directory):
@@ -189,16 +246,18 @@ def bind_current_callbacks(root, directory, catalog):
                     "micros_tty_control_diagnostic_register", "micros_tty_control_diagnostic_read",
                 )
             )
-            if key.translation_unit in callback_free or diagnostic_wrapper:
+            selected_mapping = selected_mapping_no_callback_scope(root, group, key, origins[key])
+            if key.translation_unit in callback_free or diagnostic_wrapper or selected_mapping:
+                scope = "kernel-visitor" if selected_mapping else "diagnostic"
                 if origins[key] != key.translation_unit:
-                    raise StackEvidenceError("diagnostic callback-free function borrowed another source origin")
+                    raise StackEvidenceError(f"{scope} callback-free function borrowed another source origin")
                 obj = load_object(Path(directory) / objects[key])
                 symbol = function_symbols(obj).get(key.symbol)
                 if symbol is None or grouped.get(key) or any(
                     call.target_symbol is None
                     for call in call_instructions(obj, symbol, key, switch_jumps(obj, symbol))
                 ):
-                    raise StackEvidenceError("diagnostic callback-free source has an actual indirect call")
+                    raise StackEvidenceError(f"{scope} callback-free source has an actual indirect call")
                 continue
             reference = function_records(reference_source(str(root), origins[key])).get(key.symbol)
             if reference is None:

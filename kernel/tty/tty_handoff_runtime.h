@@ -137,4 +137,9 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
     const struct micros_kernel_objects *objects
 );
 
+enum micros_tty_device_authority_status
+micros_tty_handoff_runtime_inspect_device_binding(
+    const struct micros_kernel_objects *objects,
+    struct micros_tty_device_authority *binding);
+
 #endif
