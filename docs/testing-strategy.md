@@ -760,6 +760,25 @@ This metadata gate does not retire an identity or replace the complete
 fresh author plan, current receipts, independent review or journal-free
 publication checks.
 
+EV01-C06 implementation #230 completed those gates and merged with the
+exact reviewed tree. The full gate passed 44 CTests and 1,578 Python cases
+in 560.893 seconds, all current target/image/stack coverage and three
+same-run receipts. Independent review, journal-free committed/main checks
+and protected completed-ref cleanup passed.
+
+The separate [MEM03 observer study](research/selected-ownership-observation-authority-gap.md)
+then demonstrated loop-anchor, bitmap-primitive and empty-helper mutations
+that pass function admission but fail the unchanged observer.
+[Accepted ADR-0113](adr/0113-granular-selected-ownership-observation-authority.md)
+requires 120 precise existing contracts, including all 57 empty sets and
+179 unchanged site records. The design authors no executable evidence.
+After separate design merge, implementation must demonstrate actual
+missing-key Red, complete independent old/new record equality, strict
+schema/path/consumer negatives and unchanged ordinary authority.
+The [EV01-C07 acceptance contract](architecture/selected-ownership-observation-authority.md#implementation-and-acceptance-boundary)
+uses the existing checked host runner for focused iteration and retains the
+complete fifty-command producer, current receipts and independent review.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

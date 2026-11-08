@@ -97,6 +97,9 @@ This directory contains the design baseline for `micros`.
 - [Granular selected address-space native source authority](architecture/selected-address-space-native-source-authority.md)
   defines the Accepted EV01-C06 names for existing MEM04 source and observation
   comparisons, without changing admission or authorizing runtime retirement.
+- [Granular selected-ownership observation authority](architecture/selected-ownership-observation-authority.md)
+  defines Accepted EV01-C07's complete function-local MEM03 primitive/coverage
+  identities without changing a source or observation predicate.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -156,6 +159,9 @@ This directory contains the design baseline for `micros`.
   closed 328-clause census repaired by separately merged EV01-C04.
 - [Selected address-space native source authority gap](research/selected-address-space-native-source-authority-gap.md)
   records the fixed MEM04 guards and 477-clause census that precede MEM05 design.
+- [Selected-ownership observation authority gap](research/selected-ownership-observation-authority-gap.md)
+  records distinct MEM03 primitive/coverage rejections and the closed
+  120-function census found when MEM05 design resumed.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,

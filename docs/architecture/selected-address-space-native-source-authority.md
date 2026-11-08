@@ -440,3 +440,13 @@ Only the five specified executable owners change. Production, source
 guards, native generation, observations, collector, stack, build and
 transition/view policy remain unchanged. The full current author gate and
 independent implementation review remain required before publication.
+
+Implementation #230 has completed those requirements and merged as
+`5748ec20dcdb568a5ccfca2eccfcda09c6dd3f8c`, with exact reviewed and squash
+tree `21b1b87ca2a5053d2d909d84cfd3507499949fd6`.
+All fifty commands, same-run receipts, complete current stack coverage,
+independent review, journal-free committed/main checks and protected
+completed-ref cleanup passed.
+The resumed MEM05 study found the separate
+[MEM03 observation prerequisite](selected-ownership-observation-authority.md).
+It does not change or rebaseline this 477-record family.
