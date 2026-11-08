@@ -778,6 +778,17 @@ schema/path/consumer negatives and unchanged ordinary authority.
 The [EV01-C07 acceptance contract](architecture/selected-ownership-observation-authority.md#implementation-and-acceptance-boundary)
 uses the existing checked host runner for focused iteration and retains the
 complete fifty-command producer, current receipts and independent review.
+Design #231 is separately merged. The implementation first froze every
+complete expected old/new record, then recorded three missing-key failures
+after the unchanged function/source guard accepted and the observer rejected
+the corresponding mutations.
+Its [implementation map](architecture/selected-ownership-observation-authority.md#implementation-map)
+records strict literal/site/coverage/path/closure tests, all seventeen
+ordinary/inverse observation controls and complete predecessor conservation.
+The nine-case focused selection also includes existing complete-current
+inventory, MEM04 historical conservation and all six journal-free claims.
+The complete owned three-module suite and full current producer remain
+separate mandatory acceptance, not inferred from that focused result.
 
 ## POSIX conformance evidence
 

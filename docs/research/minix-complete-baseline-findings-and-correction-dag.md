@@ -280,6 +280,11 @@ and [EV01-C07](../architecture/selected-ownership-observation-authority.md)
 define 120 existing function-local primitive/coverage identities.
 This is the sole active metadata design; MEM05 design is blocked on its
 separate reviewed implementation. No runtime finding, node or edge changes.
+The complete and Acceptance-only design reviews are clean and design #231
+is separately merged. The dependent metadata implementation preserves every
+old record and guard while materializing the 120 named comparisons.
+Its complete acceptance and independent implementation review still precede
+MEM05 design resumption.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

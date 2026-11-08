@@ -369,6 +369,17 @@ This documentation-only prerequisite is now the sole active outcome.
 MEM05 design is blocked; its implementation and algorithm remain unstarted.
 No old fact, source guard, runtime finding or hosted-CI result is changed.
 
+EV01-C07 design #231 has separately merged as
+`1725b9d70d630c566bb6d9945f29729a47d710a5`, with identical reviewed and
+squash tree `ae74883c3c94f4ead680ceb6a32ba97952fa71da`.
+Its [metadata implementation map](architecture/selected-ownership-observation-authority.md#implementation-map)
+records the independently frozen 120-row declaration, three genuine
+missing-key Red failures and focused Green. The 5,379-record current catalog
+preserves every old record, twenty-one predecessor fingerprints, six claims
+and 103 retirements. No guard is relaxed and no identity retires.
+Full current acceptance and independent implementation review remain
+required; MEM05 stays blocked until that separate merge.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
