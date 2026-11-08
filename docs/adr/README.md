@@ -128,3 +128,4 @@ to make the project appear more consistent than it was.
 | [0110](0110-kernel-visitor-extension-admission.md) | Kernel visitor extension admission | Accepted |
 | [0111](0111-fatal-tty-header-extension.md) | Fatal TTY header extension | Accepted |
 | [0112](0112-granular-selected-address-space-native-source-authority.md) | Granular selected address-space native source authority | Accepted |
+| [0113](0113-granular-selected-ownership-observation-authority.md) | Granular selected-ownership observation authority | Accepted |

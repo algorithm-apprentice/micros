@@ -141,9 +141,17 @@ separate metadata-only prerequisite. MEM05 design remains blocked and its
 implementation pending until that reviewed design/implementation pair
 merges. No runtime edge, finding owner or hosted-CI acceptance changes.
 The prerequisite design separately merged as #229 after clean independent
-correction and Acceptance review. Its metadata implementation is now the
-sole active outcome; MEM05 design resumes only after that implementation
-completes its current acceptance and separate merge.
+correction and Acceptance review. Its metadata implementation completed
+full current acceptance, clean independent review and separate merge as #230.
+Journal-free committed/main authority and exact completed-ref cleanup passed.
+
+Resumed MEM05 research then found a distinct
+[MEM03 observation-authority gap](../research/selected-ownership-observation-authority-gap.md).
+[Accepted ADR-0113](../adr/0113-granular-selected-ownership-observation-authority.md)
+and [EV01-C07](selected-ownership-observation-authority.md) define the
+120-function metadata prerequisite. Its design is the sole active outcome;
+MEM05 design is blocked until that separate pair merges.
+No runtime edge, finding owner, algorithm or hosted-CI acceptance changes.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage

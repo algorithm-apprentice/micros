@@ -269,6 +269,17 @@ The independently reviewed prerequisite design is merged as #229.
 Its metadata implementation adds only the named existing clauses and
 bounded historical-catalog/test adaptations; it preserves all six
 committed authorities and 103 retirements without runtime changes.
+Implementation #230 has completed full current acceptance and independent
+review, then merged with identical reviewed and squash content.
+Journal-free main authority and exact task-ref cleanup passed.
+
+Resumed MEM05 research found the separate
+[MEM03 observation-authority gap](selected-ownership-observation-authority-gap.md).
+[Accepted ADR-0113](../adr/0113-granular-selected-ownership-observation-authority.md)
+and [EV01-C07](../architecture/selected-ownership-observation-authority.md)
+define 120 existing function-local primitive/coverage identities.
+This is the sole active metadata design; MEM05 design is blocked on its
+separate reviewed implementation. No runtime finding, node or edge changes.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

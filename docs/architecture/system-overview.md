@@ -211,8 +211,13 @@ with actual native/target/stack acceptance and journal-free main authority.
 The next release/handoff design found a distinct
 [MEM04 source-authority naming gap](../research/selected-address-space-native-source-authority-gap.md).
 The [Accepted EV01-C06 metadata prerequisite](selected-address-space-native-source-authority.md)
-preserves the implemented mechanisms and all existing checks before MEM05
-design resumes.
+preserves the implemented mechanisms and all existing checks. Its
+independently reviewed implementation #230 is merged.
+Resumed MEM05 research found a separate
+[MEM03 observation-authority gap](../research/selected-ownership-observation-authority-gap.md).
+The [Accepted EV01-C07 contract](selected-ownership-observation-authority.md) names
+existing primitive/coverage predicates only. MEM05 remains a blocked
+design; no release/handoff algorithm is accepted by this metadata work.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

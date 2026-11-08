@@ -348,6 +348,27 @@ unchanged. Complete current acceptance and independent implementation
 review are still required; no MEM05 runtime correction is claimed.
 Hosted CI and later runtime findings retain their separate owners.
 
+EV01-C06 implementation #230 has now completed those gates and merged as
+`5748ec20dcdb568a5ccfca2eccfcda09c6dd3f8c`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`21b1b87ca2a5053d2d909d84cfd3507499949fd6`.
+All fifty final commands passed fresh: 44 CTests, all 1,578 Python cases
+in 560.893 seconds, forty QEMU workflows, four standalone images and the
+complete 44/113/ten-scope stack gate. Same-run receipts, independent
+review, journal-free committed/main checks and protected ref cleanup passed.
+All six claims and 103 retirements remain unchanged.
+
+Resumed MEM05 design found the distinct
+[MEM03 observation-authority gap](research/selected-ownership-observation-authority-gap.md):
+its mutable-function guard can accept a source change that the separate
+primitive/coverage predicate rejects, without an individual identity.
+[Accepted ADR-0113](adr/0113-granular-selected-ownership-observation-authority.md)
+and the [EV01-C07 contract](architecture/selected-ownership-observation-authority.md)
+name 120 existing current function contracts, including 57 empty sets.
+This documentation-only prerequisite is now the sole active outcome.
+MEM05 design is blocked; its implementation and algorithm remain unstarted.
+No old fact, source guard, runtime finding or hosted-CI result is changed.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
