@@ -130,3 +130,4 @@ to make the project appear more consistent than it was.
 | [0112](0112-granular-selected-address-space-native-source-authority.md) | Granular selected address-space native source authority | Accepted |
 | [0113](0113-granular-selected-ownership-observation-authority.md) | Granular selected-ownership observation authority | Accepted |
 | [0114](0114-selected-release-and-wired-handoff-plans.md) | Selected release and wired-handoff plans | Accepted |
+| [0115](0115-selected-count-generation-evidence-scope.md) | Selected-count generation evidence scope | Accepted |

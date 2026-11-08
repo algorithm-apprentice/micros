@@ -163,7 +163,15 @@ Its [fixed-source study](../research/minix-selected-release-and-wired-handoff.md
 and [Accepted contract](selected-release-and-wired-handoff.md) keep the
 exact source, failure and evidence scope explicit.
 Complete independent design/correction review is clean.
-MEM05 implementation remains pending the separate design merge.
+Design #233 has separately merged. Its implementation preparation stopped
+before production edits or formal Red at the
+[same-slot count-evidence conflict](selected-release-and-wired-handoff.md#mem05-c01-count-evidence-scope).
+The documentation-only MEM05-C01 correction under
+[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
+is the sole active outcome. It changes no runtime node or edge.
+MEM05 implementation restarts from current main only after that separate
+reviewed design merges; the archived scaffold and preliminary probes
+confer no retirement or acceptance.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage

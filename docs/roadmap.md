@@ -399,6 +399,19 @@ Independent design/correction review is clean.
 Its separate merge still precedes implementation; no MEM05 code, test,
 model or executable prototype is present in this design phase.
 
+Design #233 has now separately merged. During pre-Red fixture preparation,
+the author verified a conflict between the new whole-slot count contract
+and one retained same-slot/different-generation MEM03 guard.
+The [fixed-source probe](research/minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict)
+confirmed the original `OK`/zero result; the Accepted consumed-chain check
+requires `INVARIANT` with output preservation.
+The incomplete scaffold is archived before production edits or formal
+Red. [Accepted ADR-0115](adr/0115-selected-count-generation-evidence-scope.md)
+defines the exact current-fixture exception while preserving historical
+results, runtime scope and all final gates. MEM05 implementation is
+blocked until that separate documentation-only correction is reviewed,
+Accepted and merged. B02-F006/F007 and hosted CI remain open.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

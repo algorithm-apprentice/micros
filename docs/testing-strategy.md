@@ -806,6 +806,18 @@ precedes implementation.
 Metadata registration and prior passing work
 bounds do not count as those future runtime results.
 
+After design #233 merged, a fixed-source native probe exposed the
+[MEM05-C01 count-evidence conflict](research/minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict):
+the old same-slot/other-generation guard expects `OK`/zero despite a
+malformed reached target, while the new complete consumed-chain scope
+requires `INVARIANT` and output preservation.
+[Accepted ADR-0115](adr/0115-selected-count-generation-evidence-scope.md)
+specifies that one current-fixture exception and paired scope controls.
+Historical expectations, the common 128 rows and every existing final
+gate remain required. The implementation is archived before production
+edits or formal Red and restarts only after the corrective design merge;
+the diagnostic probe is not runtime Green or retirement evidence.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
