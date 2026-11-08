@@ -285,6 +285,13 @@ is separately merged. The dependent metadata implementation preserves every
 old record and guard while materializing the 120 named comparisons.
 Its complete acceptance and independent implementation review still precede
 MEM05 design resumption.
+Those requirements are complete and implementation #232 is independently
+reviewed and merged. The
+[MEM05 fixed-source study](minix-selected-release-and-wired-handoff.md) and
+[Accepted release/handoff contract](../architecture/selected-release-and-wired-handoff.md)
+have clean independent design/correction review.
+B02-F006/F007 remain open; the separate design merge still precedes
+implementation and actual runtime acceptance.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

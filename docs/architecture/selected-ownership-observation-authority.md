@@ -356,3 +356,14 @@ guards, catalogues, native fixtures, work oracles, generators, collector,
 parser, transition/view policy, runtime and build recipes remain unchanged.
 Complete current acceptance and independent implementation review remain
 required before publication.
+
+Implementation #232 has completed those requirements and merged as
+`abe05cdd7bced5e77e86c1ec12754d017f920cab`, with exact reviewed and squash
+tree `2c34dac3c259a4975d1c213e3e14c18d8a075658`.
+All fifty final commands passed fresh, including 44 CTests and all 1,584
+Python cases in 572.589 seconds. Current target/image/stack coverage,
+same-run receipts, independent review, journal-free committed/main authority
+and exact completed-ref cleanup passed.
+All predecessor records and six claims/103 retirements remain unchanged.
+MEM05 design may now resume; this metadata outcome changes no runtime
+algorithm or finding status.

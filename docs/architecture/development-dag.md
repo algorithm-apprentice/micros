@@ -156,6 +156,14 @@ The complete and Acceptance-only design reviews are now clean, and design
 #231 is separately merged. Its metadata implementation is the sole active
 outcome; MEM05 design remains blocked until its current acceptance and
 independently reviewed implementation merge.
+Implementation #232 has completed those gates and separately merged,
+including journal-free main authority and protected completed-ref cleanup.
+MEM05 design has resumed on that current main.
+Its [fixed-source study](../research/minix-selected-release-and-wired-handoff.md)
+and [Accepted contract](selected-release-and-wired-handoff.md) keep the
+exact source, failure and evidence scope explicit.
+Complete independent design/correction review is clean.
+MEM05 implementation remains pending the separate design merge.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
