@@ -140,6 +140,10 @@ and [EV01-C06](selected-address-space-native-source-authority.md) define a
 separate metadata-only prerequisite. MEM05 design remains blocked and its
 implementation pending until that reviewed design/implementation pair
 merges. No runtime edge, finding owner or hosted-CI acceptance changes.
+The prerequisite design separately merged as #229 after clean independent
+correction and Acceptance review. Its metadata implementation is now the
+sole active outcome; MEM05 design resumes only after that implementation
+completes its current acceptance and separate merge.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage

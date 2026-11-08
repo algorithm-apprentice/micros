@@ -7,6 +7,12 @@ This is the Accepted EV01-C06 contract under
 The [fixed-source study](../research/selected-address-space-native-source-authority-gap.md)
 identifies missing names for existing MEM04 source and observation clauses.
 MEM05 design remains blocked; its implementation is pending.
+Independent complete correction and Acceptance-only design reviews are clean.
+The separate design #229 merged as
+`e98f92290e88d928ba6ff4478dd6e33d00718d46`, with identical reviewed and squash
+tree `0fbefc0997e873c2b02f1e904d626c05baa0b4ba`.
+The metadata implementation follows that merged contract; it does not start
+MEM05 runtime work.
 
 ```text
 policy commit:  8bd33e58a8e661cff78a8e4aad9d6cbc6a406120
@@ -369,8 +375,13 @@ policy disjoint and actual subject/declaration overlap rejected.
 Focused iteration after implementation is:
 
 ```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_selected_address_space
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_evidence_authority --test test_selected_address_space
 ```
+
+The existing owned runner selects the same complete module case inventory
+while supplying ADR-0105's checked source view and live per-test progress.
+Direct unscoped discovery must not repeatedly reconstruct authority for this
+multi-module iteration. No test or closing-input check is removed.
 
 Before independent first-commit review run:
 
@@ -388,3 +399,44 @@ task files. Publish only identical reviewed/committed/remote/preview/squash
 content, verify all six prior authorities without journals, and clean
 completed refs. Only then resume MEM05 design; EV01-C06 closes no runtime
 finding.
+
+## Implementation map
+
+The one new declaration contains only the two permitted literal assignments.
+Before any declaration, extractor or test edit, the author independently
+retained all 4,782 old records, twenty fingerprints, six claims and
+103 retired keys, and froze all 477 expected rows and complete facts from
+the fixed policy/runtime. The new family fingerprint is:
+
+```text
+eae7b3d815f8f239094921fe2cd97b2508ada96b0e53eff394f84a9359477f88
+```
+
+The existing inventory owner checks the literal-only schema, scope/type/
+consumer mapping, exact cardinalities and complete frozen fingerprint.
+Subjects and assertion owners must remain ordinary unlinked files; their
+current contents cannot replace a fixed expectation.
+
+Existing inventory regressions independently reconstruct the complete
+expected records from fixed Git policy and runtime, compare all fields and
+predecessors, distinguish raw/compact/byte comparisons, and exercise
+malformed declarations, reference/value drift, path ownership and synthetic
+closure overlap. Seven actual coverage failures followed the original
+guards' rejections before registration; the observation case passed its
+function guard before failing its distinct shape check.
+
+The existing MEM04 authority uses `historical_predecessor_records()` only
+after complete current-inventory validation. It selects the fixed
+nineteen-family register and retains the old count/digest checks. Current
+transition validation still receives all 5,259 records.
+Historical regression inputs use the exact seven #228 registration files,
+prove the unmodified positive fixture, then reject each changed stack input.
+Current-catalog negatives reject invalid additions and rebaselined
+predecessors rather than hiding them in that historical view.
+
+Complete direct comparison with the pre-edit freeze preserves every old
+record/fingerprint/claim/retirement and matches every new fact.
+Only the five specified executable owners change. Production, source
+guards, native generation, observations, collector, stack, build and
+transition/view policy remain unchanged. The full current author gate and
+independent implementation review remain required before publication.
