@@ -6,8 +6,12 @@ This is the Accepted MEM05 design under
 [ADR-0114](../adr/0114-selected-release-and-wired-handoff-plans.md).
 Its contracts and exact evidence scope are specified below.
 Complete independent design/correction review is clean.
-The paired implementation remains pending separate design merge.
-No implementation or runtime acceptance is claimed.
+Design #233 is separately merged. Its pre-Red implementation preparation
+found the [MEM05-C01 count-evidence conflict](#mem05-c01-count-evidence-scope).
+Implementation is blocked on the separate corrective design under
+[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md).
+The unaccepted scaffold is archived; no production edit, formal Red event,
+identity retirement or runtime acceptance is claimed.
 
 The [fixed MINIX/current study](../research/minix-selected-release-and-wired-handoff.md)
 owns the reference trace and current costs. The current source pin is:
@@ -814,7 +818,9 @@ No behavioral oracle is marked passed merely because it did not execute.
 ### Legacy native fixtures
 
 Preserve the original MEM01/MEM03/MEM04 case inventories, results, passive
-controls and work bounds. Their existing baseline compile flags select
+controls and work bounds, subject only to the exact current-count exception
+in [MEM05-C01](#mem05-c01-count-evidence-scope) after that correction is
+separately Accepted and merged. Their existing baseline compile flags select
 the original structure/interface in actual historical builds:
 
 ```text
@@ -839,6 +845,64 @@ The legacy raw bitmap may remain only as independent fixture input.
 An adapter constructs its current indexed selection before capture;
 neither that fixture scan nor historical ABI handling is production work.
 Do not move any actual production planning or cleanup outside capture.
+
+### MEM05-C01 count evidence scope
+
+This correction is Accepted after clean independent design/correction
+review under
+[ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md).
+Its separate Acceptance and merge precede the fresh implementation.
+It preserves the count algorithm specified above: validate the complete
+selected slot chain, including different encoded generations, then publish
+only the matching generation's count. No other slot is searched.
+
+The fixed #232 current MEM03 fixture's `selected_count_guard` first
+rejects an invalid handoff target for the exact generation, then queries
+the same slot with the next encoded generation. That second query formerly
+returned `OK` and zero because the old implementation skipped the target
+check for a nonmatching generation. The original source and actual probe
+are recorded in the
+[fixed-source investigation](../research/minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict).
+
+After this corrective design merges, change only that second current
+expectation in `tests/host/selected_ownership_test.c`:
+
+| Scope | Same-slot other-generation query with the original invalid target |
+| --- | --- |
+| Fixed #232 implementation and its historical current fixture | `OK`, output zero |
+| Actual MEM05 current fixture | `INVARIANT`, original `UINT64_MAX` output preserved |
+
+Keep the first rejection, exact geometry/process/owner/target inputs,
+generation increment, guard name `selected-process-count`, invocation order
+and complete snapshot comparisons. Do not repair the target or substitute
+another slot before the second negative query. Do not add a fallback,
+normalize the result or remove this guard.
+
+The historical guard is inside MEM03's non-baseline branch. A historical
+check of it must use fixed #232 policy, fixture and interfaces in their
+historical current stage; an old baseline-only build does not execute this
+guard. Keep all old facts, literal expectations and recorded results.
+No historical native rerun is added to the canonical five-product phase
+solely to relabel that old result as current.
+
+Add current-only cases to the existing MEM05 owner-index oracle:
+
+- the same-slot invalid target rejects both the matching and nonmatching
+  encoded-generation query, preserving the original output and complete
+  ledger/index/allocator state;
+- the same nonmatching query with a valid target succeeds with count zero;
+  mixed encoded generations remain valid portable state; and
+- an invalid target in another slot does not reject a valid selected-slot
+  query with an independently known nonzero count. Complete validation
+  still rejects the corrupted ledger, and neither query mutates state.
+
+These are scope and failure controls, not changes to the common 128-row
+matrix, its numeric work bounds or the required actual Red.
+The existing immutable MEM03 fixture owner receives this one additional
+pre-Red adaptation. No source path, retirement key, oracle owner or final
+gate is added or removed. The archived scaffold and preliminary runs
+provide no author event; restart from corrected main and freeze all inputs
+before renewed real Red.
 
 ### Truthful target witness evolution
 
@@ -1013,7 +1077,7 @@ independently specified prerequisite adaptations before Red:
 | `tests/host/test_selected_address_space.py` | Fixed #228 scaffold policy/read inputs and current audit/source-adapter negatives use their correct, explicitly pinned scopes |
 | `tests/host/test_kernel_address_space_source_layout.py` | Require the two actual indexed-selection objects and one checked mode in the same sole runtime owner under verified MEM05 admission |
 | `tests/host/bootstrap_allocation_test.c` | Existing baseline/current selected-set call adaptation |
-| `tests/host/selected_ownership_test.c` | Selected-set arguments and independent complete expected index transitions |
+| `tests/host/selected_ownership_test.c` | Selected-set arguments and independent complete expected index transitions; the one current same-slot count expectation specified by MEM05-C01 after its separate design merge |
 | `tests/host/selected_address_space_test.c` and `.h` | Independent allocation index expectations and complete current scratch-selection/mode snapshots |
 | `tests/host/frame_ownership_test_fixture.c` and `frame_ownership_test_internal.h` | One context-owned selection beside the independent raw selection input |
 | `tests/host/frame_ownership_test_bootstrap.c`, `frame_ownership_test_handoff.c`, `frame_ownership_test_model.c` and `frame_ownership_test_validation.c` | Matching selection calls, explicit malformed-header counterparts, and independent index membership/order in the existing model |

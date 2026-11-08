@@ -2,12 +2,15 @@
 
 ## Status and source pins
 
-This is MEM05's read-only baseline study for B02-F006 and B02-F007 under
+This is MEM05's fixed-source baseline study for B02-F006 and B02-F007 under
 [ADR-0080](../adr/0080-minix-structural-and-algorithmic-baseline.md).
 The [Accepted contract](../architecture/selected-release-and-wired-handoff.md)
-has clean independent design/correction review; its separate merge still
-precedes implementation. This study does not retire an identity, supply
-runtime evidence or close a finding.
+has clean independent design/correction review and separately merged as
+#233. The later [count-evidence conflict](#mem05-c01-same-slot-count-evidence-conflict)
+stopped implementation preparation before production changes or formal
+Red. Its corrective design is Accepted after clean independent review under
+[ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md).
+This study does not retire an identity or close a runtime finding.
 
 ```text
 micros commit: abe05cdd7bced5e77e86c1ec12754d017f920cab (#232)
@@ -342,3 +345,67 @@ and no runtime reproduction was needed. Complete correction review of
 `b8886fe901500719c2b169f9ed388a59b8556bed` concluded that the High finding
 is resolved and no substantive design issue remains.
 Acceptance is not implementation or runtime evidence.
+
+## MEM05-C01 same-slot count evidence conflict
+
+The separately merged design is commit
+`d256a5bb1ed8bf67e435a36107c9cec931a49d46`, tree
+`2b134a5cf27d467ae072801dca79b110b5a74dd8`.
+During its implementation's immutable fixture preparation, inspection found
+one retained MEM03 result incompatible with the Accepted count scope.
+Production remained at the fixed #232 runtime throughout.
+
+The fixed sources establish both sides:
+
+| Fixed source | Evidence |
+| --- | --- |
+| `kernel/memory/frame_ownership_validation.c:35-82` at #232 | `count_process` checks owner encoding while scanning physical records, but calls `selected_record` only after slot and generation match |
+| `tests/host/selected_ownership_test.c:1216-1235` at #232 | `selected_count_guard` writes `HANDOFF_TARGET_COUNT` to frame 0, requires exact-generation `INVARIANT`, then increments only the query generation and requires `OK`/zero |
+| `docs/architecture/selected-release-and-wired-handoff.md:145-156` at #233 | The new count validates every reached record's encoding/bit/target relation in the complete selected slot chain |
+| Same #233 contract, `Legacy native fixtures` and immutable fixture table | All MEM03 results are preserved; the current fixture's named adaptations cover selected-set arguments and expected index transitions, not this changed result/output |
+
+The new index deliberately permits several encoded generations in one
+portable slot. It therefore consumes the malformed record even when the
+requested generation differs. Checking it only after generation filtering
+would contradict the Accepted whole-slot relation proof.
+Moving the second test query to another slot would instead hide the input
+that exposes the conflict.
+
+A minimal native probe compiled the actual fixed #232
+`frame_allocator.c`, `frame_ownership.c`, `frame_ownership_validation.c`
+and `frame_ownership_bootstrap.c` with their fixed headers, strict C17
+warnings and ASan/UBSan. It initialized 65 frames, allocated one
+`PROCESS_USER` frame to slot 0/generation 1, injected target value 3, and
+called the real count function for generations 1 and 2 in slot 0.
+Its exact output was:
+
+```text
+14 18446744073709551615 0 0
+```
+
+The columns are exact-query result/output followed by other-generation
+result/output. The process exited zero without stderr.
+The focused command below passed one test in 2.416 seconds in the abandoned
+implementation scaffold, not in this documentation-only tree:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_selected_release_handoff.SelectedReleaseHandoffNativeTest.test_fixed_foreign_generation_count_keeps_its_historical_target_scope
+```
+
+The preserved scaffold tree is
+`3cefa0b69d9f72f4a72d38d8cd4ae6037027a4fb`; its local stash is
+`3156e3722a299e0051f0a50bc69d203f0ae9703f`.
+`archive/mem05-count-scope-gap` retains its base. The complete patch digest is
+`29c1d809f3487d8517fc7a6332a26c2ab11875d563bb373d1a022eb7edab64a7`.
+The scaffold is incomplete and unaccepted. No production edit, formal
+Red/Green/recertification event, retirement, implementation commit or PR
+exists for it. Earlier five-product and target probes are likewise not
+formal author evidence.
+
+Accepted [ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
+retains the runtime algorithm and specifies only the missing current
+expectation: `INVARIANT` with unchanged output for that same-slot query.
+Separate current controls retain valid mixed-generation counting, reject a
+reached invalid target and distinguish another slot's corruption from
+complete diagnosis. All existing source roles, old facts, work bounds,
+target protocols and final gates remain unchanged.

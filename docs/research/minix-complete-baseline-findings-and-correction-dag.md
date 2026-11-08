@@ -295,6 +295,18 @@ implementation and actual runtime acceptance.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 
+MEM05 design #233 is now separately merged. Its pre-Red implementation
+preparation found the
+[same-slot count-evidence conflict](minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict).
+The scaffold is archived without production edits, formal events or
+retirement. MEM05-C01 under
+[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
+is the sole active corrective design; MEM05 implementation remains blocked
+until its separate review, Acceptance and merge.
+The correction retains the whole-slot algorithm and admits one exact
+current-fixture result/output adaptation. It adds no runtime finding,
+node, edge, retirement key or validation waiver.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and

@@ -221,8 +221,12 @@ design; no release/handoff algorithm is accepted by this metadata work.
 That metadata implementation is now independently reviewed and merged as
 #232. MEM05's [selected release/handoff design](selected-release-and-wired-handoff.md)
 is Accepted after clean independent design/correction review.
-Its separate merge still precedes implementation. Runtime release and
-handoff retain the baseline behavior described above.
+Design #233 is separately merged. Pre-Red implementation preparation found
+the [same-slot count-evidence conflict](selected-release-and-wired-handoff.md#mem05-c01-count-evidence-scope).
+The unaccepted scaffold is archived and implementation is blocked on
+the separate Accepted ADR-0115 correction. No production change or formal
+Red event occurred; runtime release and handoff retain the baseline
+behavior described above.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
