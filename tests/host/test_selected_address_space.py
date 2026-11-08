@@ -320,17 +320,28 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
 
     def test_changed_stack_admission_scaffold_cannot_reuse_runtime_evidence(self):
         from tests.host import selected_address_space_source as source
+        from tests.host.selected_address_space_authority import git
 
         read = source.read_regular_source
+        historical = {
+            path: git(ROOT, "show", "8bd33e58a8e661cff78a8e4aad9d6cbc6a406120:" + path)
+            for path in SOURCE_PROJECTION["registration_paths"]
+        }
+
+        def historical_read(root, path):
+            return historical[path] if path in historical else read(root, path)
+
+        with mock.patch.object(source, "read_regular_source", side_effect=historical_read):
+            source.validate_scaffold(ROOT)
         for changed in (
             "tools/stack_bound_bindings.py", "tools/stack_bound_fatal.py",
             "tests/host/test_stack_bound_evidence.py",
         ):
             def read_changed(root, path):
-                return read(root, path) + (b"\n" if path == changed else b"")
+                return historical_read(root, path) + (b"\n" if path == changed else b"")
 
             with self.subTest(changed=changed), mock.patch.object(source, "read_regular_source", side_effect=read_changed):
-                with self.assertRaisesRegex(ValueError, "stack"):
+                with self.assertRaisesRegex(ValueError, "frozen stack admission scaffold changed: " + changed):
                     source.validate_scaffold(ROOT)
 
     def test_complete_predecessor_records_and_fingerprints_are_conserved(self):
@@ -338,19 +349,49 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
         from tests.host.evidence_authority_source import literal_value, single_assignment
         from tests.host.evidence_authority_types import fact_set_digest
         from tests.host.evidence_authority_validation import validate_inventory
+        from tests.host.selected_address_space_authority import historical_predecessor_records
 
         inventory = current_inventory(ROOT)
         self.assertTrue(validate_inventory(inventory).ok)
-        prior = tuple(fact for fact in inventory.facts if fact.family != FAMILY)
+        prior = historical_predecessor_records(ROOT, inventory)
         affected = tuple(fact for fact in inventory.facts if fact.key in SOURCE_PROJECTION["retirement_keys"])
         self.assertEqual(FROZEN_PREDECESSOR_SHA256, fact_set_digest(prior))
         self.assertEqual(FROZEN_AFFECTED_SHA256, fact_set_digest(affected))
         original = ast.parse(fixed_source(str(ROOT), "tests/host/evidence_authority_inventory.py").decode())
         fingerprints = literal_value(single_assignment(original, "DECLARED_FAMILY_FACT_DIGESTS").value)
         self.assertEqual(
-            fingerprints, {name: value for name, value in inventory.declared_family_fact_digests if name != FAMILY},
+            fingerprints, {
+                name: value for name, value in inventory.declared_family_fact_digests
+                if name in {fact.family for fact in prior}
+            },
         )
-        self.assertEqual(8, len(inventory.facts) - len(prior))
+        self.assertEqual(8, sum(fact.family == FAMILY for fact in inventory.facts))
+
+    def test_historical_view_cannot_hide_invalid_current_records_or_rebaseline_predecessors(self):
+        from dataclasses import replace
+        from tests.host import evidence_authority_inventory as current
+        from tests.host.evidence_authority_types import fact_set_digest
+        from tests.host.selected_address_space_authority import declared_scope
+
+        inventory = current.current_inventory(ROOT)
+        new = next(fact for fact in inventory.facts if fact.family == "selected-address-space-native-admission")
+        old = next(fact for fact in inventory.facts if fact.family == "selected-ownership-native-admission")
+        changed_old = tuple(replace(fact, evidence_value="0" * 64) if fact == old else fact for fact in inventory.facts)
+        rebaselined = tuple(
+            (name, fact_set_digest(fact for fact in changed_old if fact.family == name)) if name == old.family
+            else (name, value) for name, value in inventory.declared_family_fact_digests
+        )
+        cases = (
+            replace(inventory, facts=tuple(fact for fact in inventory.facts if fact != new)),
+            replace(inventory, facts=tuple(replace(fact, evidence_value="0" * 64) if fact == new else fact for fact in inventory.facts)),
+            replace(inventory, facts=(*inventory.facts, replace(new, key="unknown", family="unregistered"))),
+            replace(inventory, facts=changed_old, declared_family_fact_digests=rebaselined),
+        )
+        declared_scope(ROOT)
+        for index, changed in enumerate(cases):
+            with self.subTest(case=index), mock.patch.object(current, "current_inventory", return_value=changed):
+                with self.assertRaisesRegex(ValueError, "inventory|historical|predecessor"):
+                    declared_scope(ROOT)
 
     def test_uncommitted_declaration_without_terminal_execution_retires_nothing(self):
         from tests.host import selected_address_space_authority as authority

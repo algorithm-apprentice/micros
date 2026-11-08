@@ -337,6 +337,15 @@ name 477 already enforced function/file/definition/skeleton/observation
 clauses. The design is the sole active prerequisite; it changes no guard,
 runtime behavior or retirement. MEM05 design resumes only after the
 separate metadata design/implementation pair is reviewed and merged.
+The design #229 has separately merged as
+`e98f92290e88d928ba6ff4478dd6e33d00718d46`, with reviewed and squash tree
+`0fbefc0997e873c2b02f1e904d626c05baa0b4ba`.
+Its [metadata implementation map](architecture/selected-address-space-native-source-authority.md#implementation-map)
+records the independently frozen 477-row addition, genuine missing-key
+Red and bounded historical/current compatibility. All 4,782 predecessor
+records, twenty fingerprints, six claims and 103 retirements remain
+unchanged. Complete current acceptance and independent implementation
+review are still required; no MEM05 runtime correction is claimed.
 Hosted CI and later runtime findings retain their separate owners.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer

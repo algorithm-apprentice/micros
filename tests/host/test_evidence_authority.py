@@ -580,6 +580,158 @@ def _selected_ownership_native_reference(root, policy, policy_tree):
     return reference, rows, previous
 
 
+def selected_address_space_production_rows(fixed_bytes, runtime, roles, projection, recipe, subsets, helpers):
+    from tests.host.c_source_records import compact, function_records
+
+    owner = "tests/host/selected_address_space_source.py"
+    rows = []
+
+    def append(kind, path, contract, name=""):
+        rows.append((
+            "MEM04/" + kind + "/" + path + ("/" + name if name else ""),
+            path, (owner,), contract,
+        ))
+
+    added_contracts = helpers["_helper_contracts"]()
+    for path in roles["production_paths"]:
+        original = fixed_bytes(runtime, path).decode()
+        if path in roles["dependent_production_paths"]:
+            append("dependent-file", path, {
+                "comparison": "file-bytes-sha256",
+                "expected": hashlib.sha256(helpers["extend_handoff_preflight"](original).encode()).hexdigest(),
+            })
+            continue
+        if path.endswith(".h"):
+            append("header", path, {
+                "comparison": "file-bytes-sha256",
+                "expected": hashlib.sha256(helpers["extended_header"](path, original).encode()).hexdigest(),
+            })
+            continue
+        before = function_records(original)
+        additions = projection["new_helpers"].get(path, ())
+        removed = projection["removed_functions"].get(path, ())
+        mutable = projection["mutable_functions"][path]
+        for name, record in before.items():
+            if name in removed:
+                continue
+            signature = compact(record.signature)
+            if name not in mutable:
+                content = ("body-bytes-sha256", hashlib.sha256(record.body.encode()).hexdigest())
+            else:
+                signature = helpers["_current_signature"](name, record.signature)
+                calls = tuple(sorted(helpers["_current_calls"](name, record.body)))
+                dependent = helpers["_dependent_body"](path, name, record.body)
+                content = ("calls", calls) if dependent is None else (
+                    "calls-and-compact-body-sha256", calls, hashlib.sha256(dependent.encode()).hexdigest(),
+                )
+            append("function", path, {
+                "comparison": "function", "signature": signature,
+                "guards": record.guards, "content": content,
+            }, name)
+        for name in additions:
+            signature, calls = added_contracts[name]
+            append("function", path, {
+                "comparison": "function", "signature": compact(signature),
+                "guards": (), "content": ("calls", tuple(sorted(calls))),
+            }, name)
+        current = tuple(sorted(set(before).difference(removed) | set(additions)))
+        append("definitions", path, {"comparison": "definition-set", "expected": current})
+        append("skeleton", path, {
+            "comparison": "compact-skeleton-sha256",
+            "expected": hashlib.sha256(helpers["_extended_skeleton"](path, original).encode()).hexdigest(),
+        })
+        if path in recipe["native_source_members"]:
+            selected = subsets.get(path, current)
+            if path == "kernel/vm/vm_handoff_runtime.c":
+                selected = (*selected, "micros_vm_handoff_runtime_inspect_scratch_binding")
+            for name in sorted(set(selected) & (set(additions) | set(mutable))):
+                append("observation", path, {
+                    "comparison": "current-observation-shape",
+                    "automatic": projection["current_automatic_primitives"].get(name, ()),
+                    "explicit": projection["current_extra_primitives"].get(name, ()),
+                }, name)
+    return rows
+
+
+def selected_address_space_native_reference(root=ROOT):
+    contract = (root / "docs/architecture/selected-address-space-native-source-authority.md").read_text()
+    policy = re.search(r"^policy commit:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    tree = re.search(r"^policy tree:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    return _selected_address_space_native_reference(root, policy, tree)
+
+
+@lru_cache(maxsize=4)
+def _selected_address_space_native_reference(root, policy, policy_tree):
+    from tests.host.c_source_records import function_records
+
+    def fixed_bytes(reference, path):
+        return subprocess.check_output(("git", "show", reference + ":" + path), cwd=root, timeout=30)
+
+    observed_tree = subprocess.check_output(
+        ("git", "rev-parse", policy + "^{tree}"), cwd=root, text=True, timeout=30,
+    ).strip()
+    if observed_tree != policy_tree:
+        raise ValueError("fixed selected-address-space policy commit/tree disagree")
+    owner = "tests/host/selected_address_space_source.py"
+    tree = ast.parse(fixed_bytes(policy, owner).decode())
+    roles, projection, recipe = (
+        literal_value(single_assignment(tree, name).value)
+        for name in ("SOURCE_ROLES", "SOURCE_PROJECTION", "RECIPE_ADMISSION")
+    )
+    names = {
+        "_function_calls", "_current_signature", "_current_calls", "_helper_contracts",
+        "header_additions", "extended_header", "_dependent_body", "_source_skeleton",
+        "_extended_skeleton", "extend_handoff_preflight",
+    }
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    if len(functions) != len(names):
+        raise ValueError("fixed selected-address-space policy lost a comparison helper")
+    namespace = {"function_records": function_records, "SOURCE_PROJECTION": projection}
+    # Execute only pure comparison helpers from fixed Git, never the candidate declaration.
+    exec(compile(ast.Module(body=functions, type_ignores=[]), policy + ":" + owner, "exec"), namespace)
+    subset_node = single_assignment(tree, "NATIVE_FUNCTION_SUBSETS").value
+    if not isinstance(subset_node, ast.Dict):
+        raise ValueError("fixed selected-address-space subsets are not a dictionary")
+    subsets = {
+        literal_value(key): literal_value(value)
+        for key, value in zip(subset_node.keys, subset_node.values)
+        if literal_value(key) in roles["production_paths"]
+    }
+    runtime = projection["source_reference"]
+    reference = (("policy", policy, policy_tree), ("MEM04", runtime))
+    rows = selected_address_space_production_rows(
+        fixed_bytes, runtime, roles, projection, recipe, subsets, namespace,
+    )
+    members = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", runtime), cwd=root, timeout=30,
+    ).decode().split("\0")))
+    selected = {
+        path for path in members if path.endswith(".h") and path.startswith(("arch/", "include/", "kernel/"))
+    } | set(recipe["native_source_members"])
+    data = subprocess.check_output(("git", "archive", runtime, *sorted(selected)), cwd=root, timeout=30)
+    native = {}
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        for member in archive:
+            if member.isdir():
+                continue
+            if not member.isfile() or member.name not in selected or member.name in native:
+                raise ValueError("fixed selected-address-space archive has an unexpected entry")
+            native[member.name] = archive.extractfile(member).read()
+    if len(native) != 212 or set(native) != selected:
+        raise ValueError("fixed selected-address-space native membership changed")
+    for path, data in native.items():
+        if path not in roles["production_paths"]:
+            rows.append(("MEM04/native-input/" + path, path, (owner,), {
+                "comparison": "file-bytes-sha256", "expected": hashlib.sha256(data).hexdigest(),
+            }))
+    rows = tuple(sorted(rows))
+    if len(rows) != len({row[0] for row in rows}) or len(rows) != 477:
+        raise ValueError("fixed selected-address-space clause census changed")
+    inventory_tree = ast.parse(fixed_bytes(policy, "tests/host/evidence_authority_inventory.py").decode())
+    previous = literal_value(single_assignment(inventory_tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
+    return reference, rows, previous
+
+
 class InventoryTests(unittest.TestCase):
     def test_fatal_firmware_facts_remain_artifacts_not_runtime_baseline_oracles(self):
         inventory = evidence_authority_inventory.current_inventory(ROOT)
@@ -691,8 +843,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(20, len(inventory.families))
-        self.assertEqual(4782, len(inventory.facts))
+        self.assertEqual(21, len(inventory.families))
+        self.assertEqual(5259, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1904,6 +2056,320 @@ class MemoryNativeBindingTests(unittest.TestCase):
                     continue
                 key = claim.claimed_identity_keys[0]
                 self.assertFalse(kernel_mapping_authority.identity_required(ROOT, key), key)
+
+
+class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
+    OWNER = "tests/host/selected_address_space_native_source_bindings.py"
+    FAMILY = "selected-address-space-native-admission"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.reference, cls.rows, cls.previous = selected_address_space_native_reference()
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.facts = tuple(fact for fact in cls.inventory.facts if fact.family == cls.FAMILY)
+        cls.declaration = (ROOT / cls.OWNER).read_text()
+
+    @classmethod
+    def expected_facts(cls):
+        consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+        return tuple(evidence_authority.Fact(
+            cls.OWNER + ":native-source-admission:" + scope, cls.FAMILY, cls.OWNER,
+            "native-source-admission", scope, evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, tuple(sorted({cls.OWNER, subject, *assertions})),
+            digest((cls.reference, scope, subject, assertions, contract)),
+        ) for scope, subject, assertions, contract in cls.rows)
+
+    @classmethod
+    def fixture(cls, directory):
+        root = Path(directory)
+        for path in {value for fact in cls.expected_facts() for value in fact.payload_paths}:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(cls.declaration if path == cls.OWNER else "")
+        return root
+
+    @classmethod
+    def materialize(cls, root):
+        return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
+
+    def test_existing_rejections_have_individual_inventory_keys(self):
+        from tests.host.c_source_records import function_records
+        from tests.host import selected_address_space_source as source
+        from tests.host.work_count_types import Stage
+
+        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        prefix = self.OWNER + ":native-source-admission:MEM04/"
+        for kind, path, message in (
+            ("native-input", "kernel/memory/user_address_space.c", "fixed or noncandidate"),
+            ("header", "include/micros/user_address_space.h", "byte-level extension"),
+            ("dependent-file", "kernel/memory/user_address_space_handoff.c", "two error assignments"),
+        ):
+            with self.subTest(kind=kind, path=path):
+                original = (ROOT / path).read_text()
+                source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+                with self.assertRaisesRegex(ValueError, message):
+                    source.validate_retained_source(ROOT, path, original + "\n", Stage.GREEN)
+                key = prefix + kind + "/" + path
+                self.assertTrue(key in keys, "missing existing assertion identity: " + key)
+        path = "kernel/memory/user_address_space_mutation.c"
+        original = (ROOT / path).read_text()
+        records = function_records(original)
+        for name, message in (
+            ("clear_release_bitmap", "retained diagnostic or unrelated body"),
+            ("micros_user_address_space_release_page", "retained command/release"),
+        ):
+            with self.subTest(function=name):
+                record = records[name]
+                fragment = record.signature + "{" + record.body + "}"
+                self.assertEqual(1, original.count(fragment))
+                body = ("\n" + record.body) if name == "clear_release_bitmap" else record.body.replace(
+                    "return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;",
+                    "return MICROS_USER_ADDRESS_SPACE_ERROR_RANGE;", 1,
+                )
+                self.assertNotEqual(record.body, body)
+                changed = original.replace(fragment, record.signature + "{" + body + "}", 1)
+                with self.assertRaisesRegex(ValueError, message):
+                    source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+                key = prefix + "function/" + path + "/" + name
+                self.assertTrue(key in keys, "missing existing assertion identity: " + key)
+        with self.subTest(definitions=path):
+            changed = original.replace("preflight_selected_allocation", "foreign_allocation_preflight")
+            with self.assertRaisesRegex(ValueError, "definitions"):
+                source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+            key = prefix + "definitions/" + path
+            self.assertTrue(key in keys, "missing existing assertion identity: " + key)
+        path = "kernel/memory/user_address_space_mapping.c"
+        with self.subTest(observation=path):
+            original = (ROOT / path).read_text()
+            before = "decode_pte(table->entries[index], &entry)"
+            self.assertEqual(1, original.count(before))
+            changed = original.replace(before, "decode_pte(table->entries[(index)], &entry)", 1)
+            source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+            with self.assertRaisesRegex(ValueError, "frozen primitive/compound inventory"):
+                source.observation_sites(ROOT, path, changed, Stage.GREEN)
+            key = prefix + "observation/" + path + "/micros_user_address_space_select_path"
+            self.assertTrue(key in keys, "missing existing assertion identity: " + key)
+
+    def test_complete_bindings_preserve_fixed_policy_and_every_predecessor(self):
+        from tests.host import selected_address_space_native_source_bindings as declarations
+
+        self.assertEqual(self.reference, declarations.BINDING_REFERENCE)
+        self.assertEqual(self.rows, declarations.NATIVE_SOURCE_BINDINGS)
+        self.assertEqual(self.expected_facts(), self.facts)
+        self.assertEqual(477, len(self.facts))
+        self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
+        self.assertEqual((5259, 21), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual(
+            fact_set_digest(self.expected_facts()),
+            dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
+        )
+        self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
+        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        self.assertEqual(4782, len(retained))
+        self.assertEqual(20, len(self.previous))
+        for family, expected in self.previous.items():
+            with self.subTest(family=family):
+                self.assertEqual(expected, fact_set_digest(fact for fact in retained if fact.family == family))
+        self.assertEqual(
+            {"body-bytes-sha256": 178, "calls": 31, "calls-and-compact-body-sha256": 9},
+            Counter(row[3]["content"][0] for row in self.rows if row[0].startswith("MEM04/function/")),
+        )
+        observations = [row[3] for row in self.rows if row[0].startswith("MEM04/observation/")]
+        self.assertEqual(33, len(observations))
+        self.assertEqual(28, sum(not row["automatic"] for row in observations))
+        self.assertEqual(5, sum(len(row["explicit"]) for row in observations))
+        self.assertTrue(all(row[2] == ("tests/host/selected_address_space_source.py",) for row in self.rows))
+
+    def test_byte_and_compact_dependent_comparisons_keep_their_distinct_semantics(self):
+        from tests.host.c_source_records import function_records
+        from tests.host import selected_address_space_source as source
+        from tests.host.work_count_types import Stage
+        from tools.generate_selected_address_space_fixture import source_bundle
+
+        inputs, _ = source_bundle(ROOT, Stage.GREEN, "ordinary")
+        self.assertEqual(212, len(inputs))
+        for path in (
+            "include/micros/user_address_space.h",
+            "kernel/memory/user_address_space_handoff.c",
+            "kernel/memory/user_address_space.c",
+        ):
+            original = (ROOT / path).read_text()
+            source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                source.validate_retained_source(ROOT, path, original + "\n ", Stage.GREEN)
+        path = "kernel/memory/user_address_space_mutation.c"
+        original = (ROOT / path).read_text()
+        record = function_records(original)["micros_user_address_space_release_page"]
+        fragment = record.signature + "{" + record.body + "}"
+        changed = original.replace(fragment, record.signature + "{" + record.body + "\n }", 1)
+        source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+        self.assertEqual(
+            source.observation_sites(ROOT, path, original, Stage.GREEN),
+            source.observation_sites(ROOT, path, changed, Stage.GREEN),
+        )
+
+    def test_literal_schema_and_source_binding_drift_cannot_create_authority(self):
+        def declaration(reference, rows):
+            return "BINDING_REFERENCE = " + repr(reference) + "\nNATIVE_SOURCE_BINDINGS = " + repr(rows) + "\n"
+
+        first = self.rows[0]
+        variants = [
+            "", "BINDING_REFERENCE = " + repr(self.reference),
+            self.declaration + "\nimport os\n",
+            self.declaration + "\nraise RuntimeError('must not execute')\n",
+            self.declaration + "\ndef hidden():\n    BINDING_REFERENCE = 0\n",
+            self.declaration + "\nBINDING_REFERENCE = " + repr(self.reference),
+            declaration(self.reference, list(self.rows)),
+            declaration(self.reference, True),
+            declaration(self.reference, self.rows[:-1]),
+            declaration(self.reference, (*self.rows, first)),
+            declaration(self.reference, (*self.rows[:-1], first)),
+            declaration(self.reference, tuple(reversed(self.rows))),
+            declaration((("policy", "0" * 40, self.reference[0][2]), self.reference[1]), self.rows),
+        ]
+        changes = (
+            (first[0].replace("MEM04/", "MEM99/", 1), *first[1:]),
+            (first[0], "kernel/memory/frame_ownership.c", *first[2:]),
+            (*first[:2], ("tools/generate_selected_address_space_fixture.py",), first[3]),
+            (*first[:3], {**first[3], "comparison": "other"}),
+            (*first[:3], {**first[3], "expected": "0" * 64}),
+            (*first[:3], {**first[3], "extra": 0}),
+        )
+        variants.extend(declaration(self.reference, (changed, *self.rows[1:])) for changed in changes)
+        for kind, change in (
+            ("function", lambda contract: {**contract, "guards": ("if FOREIGN",)}),
+            ("header", lambda contract: {**contract, "comparison": "compact-header-sha256"}),
+            ("observation", lambda contract: {**contract, "automatic": (("invented",),)}),
+        ):
+            index = next(index for index, row in enumerate(self.rows) if row[0].startswith("MEM04/" + kind + "/"))
+            row = self.rows[index]
+            variants.append(declaration(self.reference, (
+                *self.rows[:index], (*row[:3], change(row[3])), *self.rows[index + 1:],
+            )))
+        with tempfile.TemporaryDirectory(prefix="micros-address-native-schema-") as directory:
+            root = self.fixture(directory)
+            for index, text in enumerate(variants):
+                with self.subTest(case=index):
+                    (root / self.OWNER).write_text(text)
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+
+    def test_payloads_are_exact_ordinary_files_not_candidate_expectations(self):
+        selected = (
+            self.OWNER, "kernel/memory/user_address_space.c",
+            "include/micros/user_address_space.h", "kernel/memory/user_address_space_handoff.c",
+            "tests/host/selected_address_space_source.py",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-address-native-paths-") as directory:
+            root = self.fixture(directory)
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            (root / selected[1]).write_text("candidate bytes cannot supply a fixed expectation\n")
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            peer = root / "payload-peer"
+            peer.write_text("not an admitted source")
+            for relative in selected:
+                path = root / relative
+                saved = path.read_bytes()
+                for kind in ("missing", "symlink", "hardlink"):
+                    with self.subTest(path=relative, kind=kind):
+                        path.unlink()
+                        if kind == "symlink":
+                            path.symlink_to(peer)
+                        elif kind == "hardlink":
+                            os.link(peer, path)
+                        with self.assertRaises(ValueError):
+                            self.materialize(root)
+                        if path.exists() or path.is_symlink():
+                            path.unlink()
+                        path.write_bytes(saved)
+            parent = root / "kernel/memory"
+            moved = root / "saved-memory"
+            parent.rename(moved)
+            parent.symlink_to(moved, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+            parent.unlink()
+            moved.rename(parent)
+
+    def test_selected_clause_closure_keeps_shared_policy_disjoint_and_rejects_real_overlap(self):
+        scopes = {
+            "MEM04/native-input/kernel/memory/user_address_space.c",
+            "MEM04/function/kernel/memory/user_address_space_mutation.c/micros_user_address_space_release_page",
+            "MEM04/dependent-file/kernel/memory/user_address_space_handoff.c",
+            "MEM04/observation/kernel/memory/user_address_space_mapping.c/micros_user_address_space_select_path",
+        }
+        facts = tuple(fact for fact in self.facts if fact.scope in scopes)
+        self.assertEqual(4, len(facts))
+        keys = tuple(fact.key for fact in facts)
+        units = facts[0].consumer_units
+        subjects = tuple(sorted({row[1] for row in self.rows if row[0] in scopes}))
+        paths = tuple(sorted({path for fact in facts for path in fact.payload_paths}))
+        plan = evidence_authority.synthetic_plan(evidence_authority.synthetic_inventory())
+        plan = dataclasses.replace(
+            plan, owner_unit="B02", finding_ids=("B02-F999",),
+            affected_identity_keys=keys, retained_identity_keys=(), planned_retirement_identity_keys=keys,
+            replacement_oracles=(dataclasses.replace(plan.replacement_oracles[0], replaces_identity_keys=keys),),
+            recertification_units=units,
+            unit_commands=tuple((unit, ("validate-" + unit.lower(),)) for unit in units),
+        )
+        authority = dataclasses.replace(
+            evidence_authority.synthetic_task_authorities(plan)[plan.owner_task],
+            command_input_paths=("tests/host/c_source_records.py", "tests/host/work_count_evidence.py", "tools/stack_bound_fatal.py"),
+            unit_input_paths=tuple((unit, subjects) for unit in units),
+        )
+        environment = evidence_authority.synthetic_environment(plan)
+        immutable = dict(environment.immutable_inputs)
+        del immutable["tools/command_registry.py"]
+        immutable.update((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in authority.command_input_paths)
+        candidate = tuple((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths)
+        environment = dataclasses.replace(
+            environment, immutable_inputs=tuple(sorted(immutable.items())),
+            red_candidate_inputs=candidate, current_candidate_inputs=candidate,
+            unit_inputs=tuple((unit, tuple(row for row in candidate if row[0] in subjects)) for unit in units),
+        )
+        registry = evidence_authority.synthetic_transition_registry(plan)
+        result = evidence_authority.validate_transition(self.inventory, {plan.owner_task: authority}, registry, plan, (), environment)
+        self.assertTrue(result.ok, result)
+        self.assertIs(evidence_authority.TransitionState.REPLACEMENT_REGISTERED, result.state)
+        self.assertFalse(result.retired_identity_keys)
+        for overlap in (subjects[0], self.OWNER, "tests/host/selected_address_space_source.py"):
+            with self.subTest(overlap=overlap):
+                changed_authority = dataclasses.replace(authority, command_input_paths=(*authority.command_input_paths, overlap))
+                changed_environment = dataclasses.replace(
+                    environment, immutable_inputs=(*environment.immutable_inputs, (overlap, dict(candidate)[overlap])),
+                )
+                result = evidence_authority.validate_transition(
+                    self.inventory, {plan.owner_task: changed_authority}, registry, plan, (), changed_environment,
+                )
+                self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+    def test_all_six_committed_claims_remain_journal_free_with_the_complete_catalog(self):
+        from tests.host import (
+            bootstrap_allocation_authority, diagnostic_history_authority, kernel_mapping_authority,
+            runtime_memory_authority, selected_address_space_authority, selected_ownership_authority,
+        )
+
+        with ExitStack() as stack:
+            for module in (
+                bootstrap_allocation_authority, diagnostic_history_authority,
+                kernel_mapping_authority, runtime_memory_authority,
+            ):
+                for name in ("read_current", "read_journal", "validate_journal"):
+                    stack.enter_context(patch.object(module, name, side_effect=AssertionError("ordinary authority must not use a journal")))
+            for module in (selected_ownership_authority, selected_address_space_authority):
+                for name in ("read_selection", "read_phase_record", "read_verified_journal", "validate_journal", "capture_author_context"):
+                    stack.enter_context(patch.object(module, name, side_effect=AssertionError("committed memory authority must not use an author attempt")))
+            _, authorities, _, registry = selected_address_space_authority.task_definition(ROOT)
+            self.assertEqual(6, len(registry.claims))
+            retired = {key for claim in registry.claims for key in claim.claimed_identity_keys}
+            self.assertEqual(103, len(retired))
+            result = evidence_authority.validate_transition(self.inventory, authorities, registry, None, (), None)
+            self.assertTrue(result.ok, result)
+            self.assertEqual({fact.key for fact in self.inventory.facts} - retired, set(result.active_identity_keys))
+            self.assertFalse(retired & {fact.key for fact in self.facts})
+            for claim in registry.claims:
+                if claim.owner_task != "COPY01":
+                    self.assertFalse(selected_address_space_authority.identity_required(ROOT, claim.claimed_identity_keys[0]))
 
 
 class SelectedOwnershipNativeBindingTests(unittest.TestCase):

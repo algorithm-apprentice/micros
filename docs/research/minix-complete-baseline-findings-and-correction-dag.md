@@ -265,6 +265,10 @@ MEM04 native/source authority. The
 and [ADR-0112](../adr/0112-granular-selected-address-space-native-source-authority.md)
 define a metadata-only prerequisite with 477 existing clauses and no new
 retirement. MEM05 design remains blocked until that pair separately merges.
+The independently reviewed prerequisite design is merged as #229.
+Its metadata implementation adds only the named existing clauses and
+bounded historical-catalog/test adaptations; it preserves all six
+committed authorities and 103 retirements without runtime changes.
 Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
 unchanged.
 

@@ -737,6 +737,28 @@ catalog. Existing historical scaffold negatives use exact fixed registration
 inputs before testing stack drift; production guards are not relaxed to
 make those fixtures pass. Current journal-free MEM04 authority and malformed
 catalog rejection remain required.
+Design #229 is separately merged. The metadata implementation first froze
+complete expected old/new records, then demonstrated seven missing-key
+failures after the original source/observation guards rejected their
+corresponding mutations. It also reproduced the original historical
+catalog and wrong-boundary scaffold failures before applying the bounded
+existing-owner adaptations. The
+[implementation map](architecture/selected-address-space-native-source-authority.md#implementation-map)
+keeps those regressions separate from current complete-catalog conservation.
+
+Focused iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_evidence_authority --test test_selected_address_space
+```
+
+The owned runner preserves the complete selected case set while reusing its
+checked source view and reporting live progress. This avoids repeated cold
+authority reconstruction in direct unscoped multi-module discovery.
+
+This metadata gate does not retire an identity or replace the complete
+fresh author plan, current receipts, independent review or journal-free
+publication checks.
 
 ## POSIX conformance evidence
 
