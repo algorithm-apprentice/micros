@@ -249,6 +249,13 @@ is a metadata-only prerequisite; it changes no object, hart, scheduler or
 memory behavior. OBJ01 design is blocked until that separately reviewed
 design/implementation pair merges.
 
+EV01-C08's design has now independently merged as #237.
+Its [metadata implementation map](selected-release-handoff-native-source-authority.md#implementation-map)
+records fixed-reference declaration, real missing-key Red and focused
+Green while preserving all seven claims and runtime guards.
+Full current acceptance and independent implementation review still
+precede its separate merge and OBJ01 design resumption.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

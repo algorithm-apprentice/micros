@@ -249,25 +249,39 @@ class SelectedReleaseHandoffInterfaceTest(unittest.TestCase):
 
 class SelectedReleaseHandoffDeclarationTest(unittest.TestCase):
     def test_scaffold_rejects_changed_frozen_and_nonmutable_inputs(self):
-        source.validate_scaffold(ROOT)
-        read = source.read_scaffold_input
-        for selected in (
-            "CMakeLists.txt",
-            "tests/host/kernel_mapping_source.py",
-            "tests/host/memory_native_source_bindings.py",
-            "kernel/tests/memory/address_space_handoff_test_runtime.c",
-            "kernel/tests/memory/user_address_space_test_validation.c",
-            "tests/host/evidence_authority_inventory.py",
-            "tests/host/evidence_authority_scope.py",
-            "tests/host/frame_ownership_test_model.c",
-        ):
-            def changed(root, path):
-                data = read(root, path)
-                return data + b"\n" if path == selected else data
+        from tests.host.test_evidence_authority import selected_release_handoff_native_reference
 
-            with self.subTest(path=selected), mock.patch.object(source, "read_scaffold_input", side_effect=changed):
-                with self.assertRaises(ValueError):
-                    source.validate_scaffold(ROOT)
+        _, _, _, policy, fixed = selected_release_handoff_native_reference()
+        paths = {
+            path for group in ("fixed_adapters", "unchanged_candidates", "immutable_adapters", "immutable_additions")
+            for path in policy.SOURCE_ROLES[group]
+        }
+        self.assertEqual(44, len(paths))
+
+        def read(root, path):
+            if Path(root).resolve() != ROOT or path not in paths:
+                raise ValueError("historical MEM05 scaffold requested an undeclared input")
+            return fixed[path][0]
+
+        with mock.patch.object(source, "read_scaffold_input", side_effect=read):
+            source.validate_scaffold(ROOT)
+            for selected, message in (
+                ("CMakeLists.txt", "five-product/full-only recipe"),
+                ("tests/host/kernel_mapping_source.py", "frozen legacy source adapter"),
+                ("tests/host/memory_native_source_bindings.py", "original literal binding module"),
+                ("kernel/tests/memory/address_space_handoff_test_runtime.c", "frozen target fixture"),
+                ("kernel/tests/memory/user_address_space_test_validation.c", "frozen target fixture"),
+                ("tests/host/evidence_authority_inventory.py", "closed inventory registration"),
+                ("tests/host/evidence_authority_scope.py", "immutable fixture/authority adapter"),
+                ("tests/host/frame_ownership_test_model.c", "immutable fixture/authority adapter"),
+            ):
+                def changed(root, path):
+                    data = read(root, path)
+                    return data + b"\n" if path == selected else data
+
+                with self.subTest(path=selected), mock.patch.object(source, "read_scaffold_input", side_effect=changed):
+                    with self.assertRaisesRegex(ValueError, message):
+                        source.validate_scaffold(ROOT)
 
     def test_only_the_four_owned_audits_have_declared_replacement_boundaries(self):
         expected = source.declared_audit_boundaries(str(ROOT))

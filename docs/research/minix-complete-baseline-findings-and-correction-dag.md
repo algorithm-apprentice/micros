@@ -340,6 +340,15 @@ active; OBJ01 design is blocked and its implementation pending until the
 reviewed pair merges. The 59-node runtime graph, finding ownership and
 hosted-CI boundary remain unchanged.
 
+EV01-C08 design #237 has now separately merged after clean correction and
+Acceptance-only review. Its
+[metadata implementation map](../architecture/selected-release-handoff-native-source-authority.md#implementation-map)
+records the complete independent 453-row addition, genuine missing-key
+Red and focused Green without changing any old fact, guard or retirement.
+Only that implementation is active. Complete current acceptance and
+independent implementation review still precede its merge and OBJ01
+design resumption.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and

@@ -143,6 +143,9 @@ FAMILY_OWNERS = {
         "tests/host/selected_release_handoff_authority.py",
         "tests/host/selected_release_handoff_source.py",
     ),
+    "selected-release-handoff-native-admission": (
+        "tests/host/selected_release_handoff_native_source_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
@@ -276,6 +279,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "0760c510cdc26d7dc638959e8bcda5c8df72e0b3016ba81533f373130c78a0e4",
     "selected-release-handoff-baseline":
         "ee6bff3827e7ea4de238e0078ee2090b42afc8ac95282114165d38b4f797c357",
+    "selected-release-handoff-native-admission":
+        "08a95d81ec96b31541097261f3be1e783856a14db2bc4d617c9f2c66abf240d8",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -308,6 +313,14 @@ _SELECTED_ADDRESS_SPACE_NATIVE_COUNTS = {
     "dependent-file": 1,
     "native-input": 198,
     "observation": 33,
+}
+
+_SELECTED_RELEASE_HANDOFF_NATIVE_COUNTS = {
+    "function": 226,
+    "definitions": 13,
+    "skeleton": 13,
+    "header": 4,
+    "native-input": 197,
 }
 
 _SELECTED_OWNERSHIP_OBSERVATION_COUNTS = {
@@ -1205,6 +1218,159 @@ def _selected_address_space_native_facts(root, family, relative):
     return tuple(facts)
 
 
+def _selected_release_handoff_native_row(row):
+    if (
+        type(row) is not tuple or len(row) != 4
+        or any(type(value) is not str or not value for value in row[:2])
+        or type(row[2]) is not tuple or type(row[3]) is not dict
+    ):
+        raise ValueError("selected-release/handoff native authority has a malformed row")
+    scope, subject, assertions, contract = row
+    parts = scope.split("/", 2)
+    if len(parts) != 3 or parts[0] != "MEM05" or parts[1] not in _SELECTED_RELEASE_HANDOFF_NATIVE_COUNTS:
+        raise ValueError("selected-release/handoff native authority has an unknown clause")
+    _, kind, suffix = parts
+    source = "tests/host/selected_release_handoff_source.py"
+    expected_assertions = (
+        (source, "tools/generate_selected_release_handoff_fixture.py")
+        if kind == "native-input" else (source,)
+    )
+    if assertions != expected_assertions:
+        raise ValueError("selected-release/handoff native authority changed assertion ownership")
+    if kind == "function":
+        prefix = subject + "/"
+        if not subject.endswith(".c") or not suffix.startswith(prefix) or re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", suffix[len(prefix):],
+        ) is None:
+            raise ValueError("selected-release/handoff native authority has an invalid function scope")
+    elif suffix != subject:
+        raise ValueError("selected-release/handoff native authority borrowed another subject")
+    if (
+        kind == "native-input" and not subject.endswith((".c", ".h"))
+        or kind == "header" and not subject.endswith(".h")
+        or kind in ("definitions", "skeleton") and not subject.endswith(".c")
+    ):
+        raise ValueError("selected-release/handoff native authority has an unknown subject kind")
+    if kind != "function":
+        comparison = {
+            "definitions": "definition-set", "skeleton": "compact-skeleton-sha256",
+            "header": "file-bytes-sha256", "native-input": "file-bytes-sha256",
+        }[kind]
+        if set(contract) != {"comparison", "expected"} or contract["comparison"] != comparison:
+            raise ValueError("selected-release/handoff native authority changed a comparison schema")
+        expected = contract["expected"]
+        if kind == "definitions":
+            if (
+                type(expected) is not tuple or not expected
+                or any(type(name) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None for name in expected)
+                or expected != tuple(sorted(set(expected)))
+            ):
+                raise ValueError("selected-release/handoff native authority has an invalid definition set")
+        elif type(expected) is not str or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+            raise ValueError("selected-release/handoff native authority has an invalid byte identity")
+        return kind
+    fields = {"comparison", "signature", "guards", "body_sha256"}
+    comparison = contract.get("comparison")
+    if comparison == "current-function":
+        fields.update(("calls", "primitives", "no_body_directives"))
+    elif comparison != "raw-function":
+        raise ValueError("selected-release/handoff native authority has an unknown function comparison")
+    if (
+        set(contract) != fields or type(contract["signature"]) is not str or not contract["signature"]
+        or type(contract["guards"]) is not tuple
+        or any(type(guard) is not str or not guard for guard in contract["guards"])
+        or type(contract["body_sha256"]) is not str
+    ):
+        raise ValueError("selected-release/handoff native authority changed its function schema")
+    body = contract["body_sha256"]
+    if (comparison == "raw-function" or body) and re.fullmatch(r"[0-9a-f]{64}", body) is None:
+        raise ValueError("selected-release/handoff native authority has an invalid body identity")
+    if comparison == "raw-function":
+        return kind
+    calls = contract["calls"]
+    if (
+        type(calls) is not tuple
+        or any(type(name) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None for name in calls)
+        or calls != tuple(sorted(set(calls))) or type(contract["primitives"]) is not tuple
+        or type(contract["no_body_directives"]) is not int or contract["no_body_directives"] not in (0, 1)
+    ):
+        raise ValueError("selected-release/handoff native authority has invalid current-function fields")
+    for primitive in contract["primitives"]:
+        if (
+            type(primitive) is not tuple or len(primitive) != 7
+            or any(type(primitive[index]) is not str or not primitive[index] for index in range(5))
+            or primitive[0] not in ("wrap", "insert")
+            or primitive[1] not in ("frames", "plans", "context")
+            or primitive[2] != "KERNEL_MEMORY"
+            or primitive[3] not in (
+                "INDEX_PROBE", "RECORD_VISIT", "BITMAP_WORD_LOAD", "LINK_TRAVERSE",
+                "CLEAR_UNIT", "CLEARED_BYTE", "PTE_VISIT", "COMPLETE_VALIDATOR_CALL",
+            )
+            or type(primitive[5]) is not tuple
+            or type(primitive[6]) is not int or not 1 <= primitive[6] < 1 << 64
+        ):
+            raise ValueError("selected-release/handoff native authority has an invalid primitive shape")
+        for region in primitive[5]:
+            if (
+                type(region) is not tuple or len(region) != 2 or type(region[0]) is not str
+                or not region[0] or type(region[1]) is not int or region[1] < 0
+            ):
+                raise ValueError("selected-release/handoff native authority has an invalid enclosing region")
+    return kind
+
+
+def _selected_release_handoff_native_facts(root, family, relative):
+    if relative != "tests/host/selected_release_handoff_native_source_bindings.py":
+        raise ValueError("selected-release/handoff native authority has an undeclared owner")
+    tree = ast.parse(regular_source(root, relative).read_text(encoding="utf-8"))
+    statements = tree.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(
+        statements[0].value, ast.Constant,
+    ) and type(statements[0].value.value) is str:
+        statements = statements[1:]
+    names = ("BINDING_REFERENCE", "NATIVE_SOURCE_BINDINGS")
+    if len(statements) != 2 or any(
+        not isinstance(node, ast.Assign) or _assignment_name(node) not in names
+        for node in statements
+    ):
+        raise ValueError("selected-release/handoff native authority permits only literal declarations")
+    reference, rows = (literal_value(single_assignment(tree, name).value) for name in names)
+    if type(reference) is not tuple or len(reference) != 2:
+        raise ValueError("selected-release/handoff native authority has an invalid reference")
+    for entry, (tag, size) in zip(reference, (("policy", 3), ("MEM05", 2))):
+        if (
+            type(entry) is not tuple or len(entry) != size or entry[0] != tag
+            or any(
+                type(value) is not str or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in entry[1:]
+            )
+        ):
+            raise ValueError("selected-release/handoff native authority has an invalid fixed reference")
+    if type(rows) is not tuple or len(rows) != sum(_SELECTED_RELEASE_HANDOFF_NATIVE_COUNTS.values()):
+        raise ValueError("selected-release/handoff native authority omitted or added a binding")
+    facts, scopes, counts, checked_paths = [], [], Counter(), {relative}
+    consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+    for row in rows:
+        counts[_selected_release_handoff_native_row(row)] += 1
+        scope, subject, assertions, contract = row
+        scopes.append(scope)
+        paths = tuple(sorted({relative, subject, *assertions}))
+        for path in paths:
+            if path not in checked_paths:
+                regular_source(root, path)
+                checked_paths.add(path)
+        facts.append(Fact(
+            relative + ":native-source-admission:" + scope, family, relative,
+            "native-source-admission", scope, AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, paths, digest((reference, scope, subject, assertions, contract)),
+        ))
+    if scopes != sorted(set(scopes)) or counts != _SELECTED_RELEASE_HANDOFF_NATIVE_COUNTS or (
+        fact_set_digest(facts) != DECLARED_FAMILY_FACT_DIGESTS[family]
+    ):
+        raise ValueError("selected-release/handoff native authority differs from its independent declaration")
+    return tuple(facts)
+
+
 def _selected_ownership_observation_row(row):
     if (
         type(row) is not tuple or len(row) != 4
@@ -1338,6 +1504,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return _selected_ownership_native_facts(root, family, relative)
     if family == "selected-address-space-native-admission":
         return _selected_address_space_native_facts(root, family, relative)
+    if family == "selected-release-handoff-native-admission":
+        return _selected_release_handoff_native_facts(root, family, relative)
     if family == "selected-ownership-observation-admission":
         return _selected_ownership_observation_facts(root, family, relative)
     tree = ast.parse((root / relative).read_text(encoding="utf-8"))

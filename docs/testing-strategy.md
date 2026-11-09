@@ -859,6 +859,17 @@ independent. No declaration, test or extractor is authored before the
 separate design merge, and no existing runtime, target or integration gate
 is removed.
 
+EV01-C08 design #237 is now separately merged. The
+[metadata implementation map](architecture/selected-release-handoff-native-source-authority.md#implementation-map)
+records exact literal/schema/path checks, independent complete-record
+conservation and both source/generator coverage. Eleven missing-key
+subcases failed only after their unchanged original predicates rejected
+the corresponding mutations; all nine focused cases then passed.
+The historical forty-four-input scaffold and all seven journal-free
+claims remain separate from complete-current catalog validation.
+The two-module host suite and full current producer are still mandatory,
+not inferred from focused Green.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

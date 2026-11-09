@@ -464,6 +464,17 @@ This documentation-only prerequisite is the sole active outcome.
 OBJ01 design is blocked until its separate reviewed design/implementation
 pair merges; no OBJ01 runtime correction or hosted-CI acceptance is claimed.
 
+EV01-C08 design #237 separately merged as
+`d047b387c54e53a7455596052c119ec82a3f2825`, with identical reviewed and
+squash tree `2f851fce3e990a047e198d5e8d0f8b4932f91df3`.
+Its [metadata implementation map](architecture/selected-release-handoff-native-source-authority.md#implementation-map)
+records the independent pre-edit freeze, eleven actual missing-identity
+subcase failures and focused Green. The 5,840-record catalog preserves all
+5,387 predecessors, twenty-three old fingerprints, seven claims and
+185 retirements. Complete current acceptance and independent
+implementation review remain required; OBJ01 design stays blocked until
+the separate metadata implementation merges.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
