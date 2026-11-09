@@ -92,9 +92,12 @@ class BootstrapAllocationAuthorityTest(unittest.TestCase):
         )
         inventory = current_inventory(ROOT)
         expected = ast.literal_eval(declaration.value)
+        from tests.host.evidence_authority_inventory import historical_object_binding_facts
+
+        historical = historical_object_binding_facts(ROOT, inventory.facts)
         for family, fingerprint in expected.items():
             self.assertEqual(
-                fingerprint, fact_set_digest(fact for fact in inventory.facts if fact.family == family), family,
+                fingerprint, fact_set_digest(fact for fact in historical if fact.family == family), family,
             )
         facts = tuple(fact for fact in inventory.facts if fact.family == source.FAMILY)
         self.assertEqual(8, len(facts))

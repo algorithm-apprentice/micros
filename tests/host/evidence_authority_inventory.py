@@ -2,8 +2,11 @@
 
 import ast
 from collections import Counter
+from dataclasses import replace
+from functools import lru_cache
 from pathlib import Path
 import re
+import subprocess
 
 from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
@@ -11,7 +14,7 @@ from tests.host import (
     selected_release_handoff_source, terminal_failure_source,
 )
 from tests.host.evidence_authority_source import (
-    kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
+    kernel_directory, kernel_sources, literal_value, portable_object_owners, regular_source, single_assignment,
 )
 from tests.host.evidence_authority_types import (
     AuthorityClass,
@@ -146,6 +149,9 @@ FAMILY_OWNERS = {
     "selected-release-handoff-native-admission": (
         "tests/host/selected_release_handoff_native_source_bindings.py",
     ),
+    "panic-trace-source-admission": (
+        "tests/host/panic_trace_source_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
@@ -238,7 +244,7 @@ DECLARED_FAMILY_FACT_DIGESTS = {
     "fixture-artifacts":
         "3cff438cd00a5ee1b78bffdedb2b9e66c123c9972ab048eda1854aff2918d149",
     "kernel-structure":
-        "667e133360ea23123cabcda1f600e18b7b0ab1419d415f6b25bf885a0d69523d",
+        "d59cdd2d80bb8db137162c32ecc835101d78fb02a92f25a6a4c4cb2e87e8dd7f",
     "recipe-impact":
         "a14c50d641800083794bfa4f67e3b275e02528b181afc82879a6dae9f0f898dd",
     "service-structure":
@@ -281,6 +287,24 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "ee6bff3827e7ea4de238e0078ee2090b42afc8ac95282114165d38b4f797c357",
     "selected-release-handoff-native-admission":
         "08a95d81ec96b31541097261f3be1e783856a14db2bc4d617c9f2c66abf240d8",
+    "panic-trace-source-admission":
+        "d4b71eb39f3ed6f8c383fe84734d167b6dbc399bb8f6c44cd7966180f56d4224",
+}
+
+_PANIC_SOURCE_ASSERTIONS = {
+    "kernel/objects/kernel_object_hart.c": ("trace_preservation", "trace_fault_artifacts"),
+    "kernel/objects/kernel_object_identity.c": ("trace_preservation", "trace_fault_artifacts"),
+    "kernel/objects/kernel_object_process.c": ("trace_preservation",),
+    "kernel/objects/kernel_object_runtime.c": (
+        "trace_preservation", "trace_fault_artifacts", "checked_source_record",
+    ),
+    "kernel/objects/kernel_object_thread.c": ("trace_preservation",),
+    "kernel/tests/trap/trap_test.c": ("trace_fault_artifacts",),
+    "kernel/trap/trap.c": ("trace_fault_artifacts",),
+    "kernel/trap/trap_context.c": ("trace_fault_artifacts",),
+    "kernel/trap/trap_interrupt.c": ("trace_fault_artifacts",),
+    "kernel/trap/trap_route_core.c": ("trace_fault_artifacts",),
+    "kernel/trap/trap_test_hooks.c": ("trace_fault_artifacts",),
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -696,7 +720,7 @@ def _kernel_classification_path(root, literals, leaf):
     return old_path if (root / old_path).is_file() else None
 
 
-def _object_reconstruction_sources(root, directory):
+def _object_payload_bindings(root, directory):
     path = regular_source(root, "tests/host/test_kernel_object_source_layout.py")
     tree = ast.parse(path.read_text(encoding="utf-8"))
     sources = literal_value(single_assignment(tree, "CORE_SOURCES").value)
@@ -706,10 +730,15 @@ def _object_reconstruction_sources(root, directory):
         or not headers or headers[0] != "kernel/kernel_object_private.h"
     ):
         raise ValueError("object reconstruction source/header membership changed")
-    return kernel_sources(root, (*sources, headers[0]), directory).values()
+    owners = portable_object_owners(tree, sources)
+    paths = kernel_sources(root, (*sources, headers[0]), directory)
+    bindings = {"BASELINE_BODIES/0/" + name: (paths[path],) for name, path in owners.items()}
+    bindings["BASELINE_SIGNATURES/0"] = tuple(paths[path] for path in sources)
+    bindings["BASE_CORE_DIGEST"] = tuple(paths.values())
+    return tree, bindings
 
 
-def _semantic_payload_paths(root, name, leaf, literals, relative, directory):
+def _semantic_payload_paths(root, name, leaf, literals, relative, directory, object_bindings=None):
     paths = set()
     if (
         relative == "tests/host/kernel_layout_source.py"
@@ -723,9 +752,20 @@ def _semantic_payload_paths(root, name, leaf, literals, relative, directory):
         and leaf[0].startswith("kernel/") and len(Path(leaf[0]).parts) == 2
     ):
         if leaf[0] == "kernel/kernel_objects.c" and (relative, name) in OBJECT_RECONSTRUCTION_ROWS:
-            paths.update(_object_reconstruction_sources(root, directory))
+            bindings = object_bindings or _object_payload_bindings(root, directory)[1]
+            paths.update(bindings["BASE_CORE_DIGEST"])
         else:
             paths.update(kernel_sources(root, leaf, directory).values())
+    elif relative == "tests/host/test_kernel_object_source_layout.py" and (
+        name == "BASELINE_BODIES" and len(leaf) == 2 and leaf[0] == "0"
+        or name == "BASELINE_SIGNATURES" and leaf == ("0",)
+        or name == "BASE_CORE_DIGEST" and not leaf
+    ):
+        bindings = object_bindings or _object_payload_bindings(root, directory)[1]
+        scope = "/".join((name, *leaf))
+        if scope not in bindings:
+            raise ValueError("unknown portable object identity")
+        paths.update(bindings[scope])
     elif name == "BASELINE_BODIES":
         path = _baseline_body_path(literals, leaf)
         if path and (root / path).is_file():
@@ -754,7 +794,7 @@ def _owner_boundary_fact(family, relative):
 
 
 def _assignment_facts(
-    root, family, relative, tree, literals, declared_paths, directory
+    root, family, relative, tree, literals, declared_paths, directory, object_bindings=None
 ):
     facts = []
     for node in tree.body:
@@ -780,7 +820,7 @@ def _assignment_facts(
             payload_set = {
                 relative,
                 *leaf_paths,
-                *_semantic_payload_paths(root, name, leaf, literals, relative, directory),
+                *_semantic_payload_paths(root, name, leaf, literals, relative, directory, object_bindings),
             }
             if payload_set == {relative}:
                 payload_set.update(declared_paths)
@@ -1497,7 +1537,127 @@ def _selected_ownership_observation_facts(root, family, relative):
     return tuple(facts)
 
 
-def _facts_for_owner(root, family, relative, directory=None):
+def _panic_trace_source_records(root, family, relative):
+    if relative != "tests/host/panic_trace_source_bindings.py":
+        raise ValueError("panic source authority has an undeclared owner")
+    tree = ast.parse(regular_source(root, relative).read_text(encoding="utf-8"))
+    statements = tree.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(
+        statements[0].value, ast.Constant,
+    ) and type(statements[0].value.value) is str:
+        statements = statements[1:]
+    names = ("BINDING_REFERENCE", "SOURCE_BINDINGS")
+    if len(statements) != 2 or any(
+        not isinstance(node, ast.Assign) or _assignment_name(node) not in names for node in statements
+    ):
+        raise ValueError("panic source authority permits only literal declarations")
+    reference, rows = (literal_value(single_assignment(tree, name).value) for name in names)
+    if type(reference) is not tuple or len(reference) != 2:
+        raise ValueError("panic source authority has an invalid reference")
+    for entry, (tag, count) in zip(reference, (("policy", 3), ("PLAT03", 2))):
+        if (
+            type(entry) is not tuple or len(entry) != count or entry[0] != tag
+            or any(type(value) is not str or re.fullmatch(r"[0-9a-f]{40}", value) is None for value in entry[1:])
+        ):
+            raise ValueError("panic source authority has an invalid fixed reference")
+    if type(rows) is not tuple or len(rows) != len(_PANIC_SOURCE_ASSERTIONS):
+        raise ValueError("panic source authority omitted or added a binding")
+    facts, scopes, checked = [], [], {relative}
+    for row in rows:
+        if (
+            type(row) is not tuple or len(row) != 4
+            or type(row[0]) is not str or type(row[1]) is not str
+            or row[1] not in _PANIC_SOURCE_ASSERTIONS
+            or row[0] != "PLAT03/projected-source/" + row[1]
+            or row[2] != ("tools/stack_bound_fatal.py",) or type(row[3]) is not dict
+        ):
+            raise ValueError("panic source authority has an unknown subject, scope or assertion owner")
+        scope, subject, owners, contract = row
+        if (
+            set(contract) != {"comparison", "projection_owner", "projection", "assertions", "sha256"}
+            or contract["comparison"] != "projected-file"
+            or contract["projection_owner"] != "tests/host/panic_trace_source.py"
+            or contract["projection"] != "project_trace_runtime"
+            or contract["assertions"] != _PANIC_SOURCE_ASSERTIONS[subject]
+            or type(contract["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}", contract["sha256"]) is None
+        ):
+            raise ValueError("panic source authority changed its projection or comparison contract")
+        scopes.append(scope)
+        paths = tuple(sorted({relative, subject, *owners}))
+        for path in paths:
+            if path not in checked:
+                regular_source(root, path)
+                checked.add(path)
+        facts.append(Fact(
+            relative + ":source-admission:" + scope, family, relative, "source-admission", scope,
+            AuthorityClass.TRANSPORT_IDENTITY, "B01",
+            tuple(f"B{index:02d}" for index in (*range(1, 13), 14)), paths,
+            digest((reference, scope, subject, owners, contract)),
+        ))
+    if scopes != sorted(set(scopes)) or fact_set_digest(facts) != DECLARED_FAMILY_FACT_DIGESTS[family]:
+        raise ValueError("panic source authority differs from its independent declaration")
+    return reference, tuple(facts)
+
+
+@lru_cache(maxsize=4)
+def _object_binding_predecessors(root, reference):
+    def fixed(path):
+        return subprocess.check_output(
+            ("git", "show", reference + ":" + path), cwd=root, text=True, timeout=30,
+        )
+
+    owner = "tests/host/test_kernel_object_source_layout.py"
+    tree = ast.parse(fixed(owner))
+    sources = literal_value(single_assignment(tree, "CORE_SOURCES").value)
+    headers = literal_value(single_assignment(tree, "PRIVATE_HEADERS").value)
+    directory = literal_value(single_assignment(ast.parse(
+        fixed("tests/host/kernel_layout_source.py"),
+    ), "KERNEL_FILE_FACTS").value)
+    owners = portable_object_owners(tree, sources)
+    bindings = {"BASELINE_BODIES/0/" + name: (directory[path][0],) for name, path in owners.items()}
+    bindings["BASELINE_SIGNATURES/0"] = tuple(directory[path][0] for path in sources)
+    bindings["BASE_CORE_DIGEST"] = (*bindings["BASELINE_SIGNATURES/0"], directory[headers[0]][0])
+    files = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", reference), cwd=root, timeout=30,
+    ).decode().split("\0")))
+    before = tuple(sorted({owner} | {
+        node.value for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and type(node.value) is str and node.value in files
+    }))
+    old_metadata = (before, _fact_primary_unit(before), _consumer_units(owner, before))
+    return tuple(
+        (owner + ":data-entry:" + scope, old_metadata, (tuple(sorted({owner, *paths})), "B03", ("B03", "B14")))
+        for scope, paths in sorted(bindings.items())
+    )
+
+
+def historical_object_binding_facts(root, facts):
+    reference, _ = _panic_trace_source_records(
+        root, "panic-trace-source-admission", "tests/host/panic_trace_source_bindings.py",
+    )
+    rows = {key: (before, after) for key, before, after in _object_binding_predecessors(
+        str(Path(root).resolve()), reference[0][1],
+    )}
+    result, seen = [], set()
+    for fact in facts:
+        if fact.key in rows:
+            before, after = rows[fact.key]
+            if fact.key in seen or (fact.payload_paths, fact.primary_unit, fact.consumer_units) != after:
+                raise ValueError("historical object binding has duplicate or changed corrected metadata")
+            seen.add(fact.key)
+            fact = replace(fact, payload_paths=before[0], primary_unit=before[1], consumer_units=before[2])
+        elif fact.owner_path == "tests/host/test_kernel_object_source_layout.py" and (
+            fact.scope.startswith("BASELINE_BODIES/0/")
+            or fact.scope in ("BASELINE_SIGNATURES/0", "BASE_CORE_DIGEST")
+        ):
+            raise ValueError("historical object binding has an unknown affected identity")
+        result.append(fact)
+    if seen != set(rows):
+        raise ValueError("historical object binding omitted an affected identity")
+    return tuple(result)
+
+
+def _facts_for_owner(root, family, relative, directory=None, object_inputs=None):
     if family == "memory-native-admission":
         return _memory_native_binding_facts(root, family, relative)
     if family == "selected-ownership-native-admission":
@@ -1508,7 +1668,13 @@ def _facts_for_owner(root, family, relative, directory=None):
         return _selected_release_handoff_native_facts(root, family, relative)
     if family == "selected-ownership-observation-admission":
         return _selected_ownership_observation_facts(root, family, relative)
-    tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+    if family == "panic-trace-source-admission":
+        return _panic_trace_source_records(root, family, relative)[1]
+    if relative == "tests/host/test_kernel_object_source_layout.py":
+        object_inputs = object_inputs or _object_payload_bindings(root, directory)
+        tree = object_inputs[0]
+    else:
+        tree = ast.parse((root / relative).read_text(encoding="utf-8"))
     if relative == "tests/host/kernel_layout_source.py":
         value = literal_value(single_assignment(tree, "BOUNDED_FRAME_VALIDATION_SHA256").value)
         if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
@@ -1560,6 +1726,7 @@ def _facts_for_owner(root, family, relative, directory=None):
             _literal_assignments(tree),
             declared_paths,
             directory,
+            object_inputs[1] if object_inputs is not None else None,
         ),
         *_function_facts(
             root, family, relative, tree, declared_paths
@@ -1570,6 +1737,7 @@ def _facts_for_owner(root, family, relative, directory=None):
 def current_inventory(root):
     root = Path(root).resolve()
     directory = kernel_directory(root)
+    object_inputs = _object_payload_bindings(root, directory)
     families = tuple(
         Family(family, owners)
         for family, owners in FAMILY_OWNERS.items()
@@ -1578,7 +1746,7 @@ def current_inventory(root):
         fact
         for family, owners in FAMILY_OWNERS.items()
         for owner in owners
-        for fact in _facts_for_owner(root, family, owner, directory)
+        for fact in _facts_for_owner(root, family, owner, directory, object_inputs)
     )
     closure = _import_closure(root)
     discovered = tuple(sorted(

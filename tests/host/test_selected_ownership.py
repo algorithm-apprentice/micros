@@ -131,10 +131,13 @@ class SelectedOwnershipAuthorityTest(unittest.TestCase):
             ast.parse(fixed), "DECLARED_FAMILY_FACT_DIGESTS",
         ).value)
         inventory = current_inventory(ROOT)
+        from tests.host.evidence_authority_inventory import historical_object_binding_facts
+
+        historical = historical_object_binding_facts(ROOT, inventory.facts)
         for family, fingerprint in previous.items():
             with self.subTest(family=family):
                 self.assertEqual(
-                    fingerprint, fact_set_digest(fact for fact in inventory.facts if fact.family == family),
+                    fingerprint, fact_set_digest(fact for fact in historical if fact.family == family),
                 )
         observed = tuple(fact for fact in inventory.facts if fact.family == source.FAMILY)
         self.assertEqual(8, len(observed), "MEM03 independent evidence family is not registered")

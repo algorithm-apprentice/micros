@@ -14,10 +14,14 @@ policy tree:   ce73f3875dd354ef6c8452808d53ab2b9e14d522
 panic source:  e12b2d6c163ac92282d380eff5be419fad7f7a30
 ```
 
-Complete independent correction review is clean. Only this design is
-active until its separate merge; the dependent implementation remains
-pending. OBJ01 design is blocked until that implementation independently
-merges. No OBJ01 mechanism, implementation or retirement is authorized here.
+Complete independent correction and Acceptance-only reviews are clean.
+The separate design #239 merged as
+`92cbd2b45f96df3bda616daab75262d36a2180b7`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`ebb45050815ba7e6dc7b185c83676492020e5e06`.
+Its metadata implementation is now the sole active outcome.
+OBJ01 design is blocked until that implementation independently merges.
+No OBJ01 mechanism, implementation or retirement is authorized here.
 
 ## Fifty exact metadata corrections
 
@@ -315,3 +319,53 @@ only completed task refs while preserving purposeful archives.
 
 Only after that separate merge may OBJ01 design resume. This metadata
 outcome closes no runtime finding and does not accept hosted CI.
+
+## Implementation map
+
+The fresh implementation starts from design #239's 1,533-member tree.
+Before any declaration, extractor, bridge or regression edit, an
+independent freeze retained every complete old record, all before/after
+metadata, the eleven expected rows/facts and all seven claims.
+The resulting current complete fact digest is:
+
+```text
+2406b1b080963f2e5adc920fc78ea29c1fd8743dd38f25218003bd994a8e2646
+```
+
+Only these family fingerprints differ from the fixed pre-edit catalog:
+
+| Family | Independently declared fingerprint |
+| --- | --- |
+| `kernel-structure` | `d59cdd2d80bb8db137162c32ecc835101d78fb02a92f25a6a4c4cb2e87e8dd7f` |
+| `panic-trace-source-admission` | `d4b71eb39f3ed6f8c383fe84734d167b6dbc399bb8f6c44cd7966180f56d4224` |
+
+The literal declaration matches its independent 4,714-byte freeze.
+The existing source helper owns the dedicated portable-name decoder;
+`literal_value` remains unchanged. The inventory reads that owner once
+per materialization, binds all fifty records, validates the eleven-row
+family and provides the checked historical metadata inverse.
+Its only fixed-data memoization is immutable Git-derived metadata, not
+candidate-source or authority success.
+
+MEM04 and MEM05 each validate the complete current catalog before the
+shared inverse and their original nineteen/twenty-two-family historical
+selection. Their original complete digests, affected records, claims
+and retirements remain unchanged. Existing conservation regressions use
+that same historical metadata boundary without changing old expectations.
+
+Two actual focused tests demonstrated 61 missing-binding/key subcase
+failures, zero errors, zero skips and zero not-run results before the
+metadata implementation. Existing object body/signature/byte-inverse
+positives and negatives passed first. Panic controls exercise every named
+consumer and both getters. For the runtime unit, they also prove the
+legitimate already-projected source positive before changing it, so the
+outer equality rather than the stricter overlay inverse owns the negative.
+Synthetic frame/link surroundings isolate source policy only; they are
+not machine or stack evidence.
+
+The same two tests then passed. Nine focused schema, path, conservation
+and historical-inverse cases passed in 38.841 seconds.
+An independent complete comparison matched all 5,851 actual records to
+the pre-edit freeze and preserved all seven claims/185 retirements.
+Complete host/author acceptance, current native/target/image/stack proof
+and independent implementation review still precede publication.

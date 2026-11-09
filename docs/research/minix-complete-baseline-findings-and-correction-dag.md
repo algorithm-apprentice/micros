@@ -361,6 +361,16 @@ Only the prerequisite design is active. OBJ01 design remains blocked until
 its reviewed pair merges; the runtime graph and all finding owners remain
 unchanged.
 
+EV01-C09 design #239 has now separately merged after clean independent
+correction and Acceptance-only reviews. Fresh journal-free committed/main
+checks and protected ref cleanup passed. Its
+[metadata implementation](../architecture/object-and-panic-source-authority.md#implementation-map)
+is the sole active outcome, with independently frozen records and genuine
+missing-coverage Red followed by focused Green.
+OBJ01 design remains blocked until complete current acceptance,
+independent implementation review and the separate implementation merge.
+No runtime finding closes through this metadata work.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and

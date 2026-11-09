@@ -211,6 +211,13 @@ OBJ01 implementation remain pending, and OBJ01 design is blocked until
 the prerequisite pair merges. No runtime node, edge, finding owner or
 hosted-CI acceptance changes.
 
+EV01-C09 design #239 has now separately merged after clean correction
+and Acceptance-only reviews. Its
+[metadata implementation](object-and-panic-source-authority.md#implementation-map)
+is the sole active outcome. OBJ01 design remains blocked until complete
+current acceptance, independent review and that implementation merge.
+The runtime graph and finding ownership remain unchanged.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may
