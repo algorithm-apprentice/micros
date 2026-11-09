@@ -256,6 +256,16 @@ Green while preserving all seven claims and runtime guards.
 Full current acceptance and independent implementation review still
 precede its separate merge and OBJ01 design resumption.
 
+EV01-C08 implementation #238 has now passed those gates and independently
+merged. Fresh committed/main checks preserve all seven claims without
+author journals. Resumed OBJ01 research found a separate
+[object and panic source-authority gap](../research/object-and-panic-source-authority-gap.md):
+fifty object identities bind unrelated files, and eleven existing panic
+source policies lack individual names.
+[Accepted EV01-C09](object-and-panic-source-authority.md) is the sole active
+metadata prerequisite. OBJ01 design is blocked until that reviewed pair
+merges; no object, hart, stack or scheduler correction is yet accepted.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

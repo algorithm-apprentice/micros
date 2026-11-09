@@ -103,6 +103,9 @@ This directory contains the design baseline for `micros`.
 - [Granular selected release/handoff native source authority](architecture/selected-release-handoff-native-source-authority.md)
   defines Accepted EV01-C08's precise names for existing MEM05 source comparisons,
   preserving both fixed-input assertion owners before OBJ01 design resumes.
+- [Object and panic source authority](architecture/object-and-panic-source-authority.md)
+  defines Accepted EV01-C09's exact portable-object payload repair and existing panic
+  source-policy names, without changing runtime or stack admission.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -174,6 +177,9 @@ This directory contains the design baseline for `micros`.
 - [Selected release/handoff native source authority gap](research/selected-release-handoff-native-source-authority-gap.md)
   records the existing MEM05 comparisons and closed 453-clause census
   that block OBJ01's granular source-replacement scope.
+- [Object and panic source-authority gap](research/object-and-panic-source-authority-gap.md)
+  records fifty misbound object identities and eleven existing projected-file
+  policies found when OBJ01 research resumed after #238.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,

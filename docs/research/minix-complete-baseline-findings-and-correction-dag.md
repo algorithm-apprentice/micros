@@ -349,6 +349,18 @@ Only that implementation is active. Complete current acceptance and
 independent implementation review still precede its merge and OBJ01
 design resumption.
 
+EV01-C08 implementation #238 has now completed that acceptance and
+independently merged, with exact publication-tree equality, journal-free
+main authority and protected completed-ref cleanup. OBJ01 research resumed
+and found the separate
+[object and panic source-authority gap](object-and-panic-source-authority-gap.md).
+[Accepted ADR-0118](../adr/0118-precise-object-and-panic-source-authority.md)
+and [EV01-C09](../architecture/object-and-panic-source-authority.md) define
+fifty metadata repairs and eleven existing-predicate names.
+Only the prerequisite design is active. OBJ01 design remains blocked until
+its reviewed pair merges; the runtime graph and all finding owners remain
+unchanged.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
