@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 
@@ -126,38 +127,46 @@ model_prepare_wired_set_error(
         return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
     }
     for (
-        index = 0;
+        index = frame_count;
         index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
         ++index
     ) {
+        if ((
+            selected_bitmap[index / 64]
+            & (UINT64_C(1) << (index % 64))
+        ) != 0) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+        }
+    }
+    for (index = 0; index < frame_count; ++index) {
         bool selected = (
             selected_bitmap[index / 64]
             & (UINT64_C(1) << (index % 64))
         ) != 0;
 
-        if (index >= frame_count) {
-            if (selected) {
-                return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
-            }
+        if (!selected) {
             continue;
         }
         if (
             model_owners[index].kind
                 == MICROS_FRAME_OWNER_PROCESS_USER
         ) {
-            if (!selected) {
-                return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
-            }
             if (
                 model_targets[index]
                     != MICROS_FRAME_HANDOFF_NONE
             ) {
                 return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
             }
-        } else if (selected) {
+        } else {
             return model_owner_is_free(model_owners[index])
                 ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
                 : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
+        }
+    }
+    for (index = 0; index < frame_count; ++index) {
+        if (model_owners[index].kind == MICROS_FRAME_OWNER_PROCESS_USER
+            && (selected_bitmap[index / 64] & (UINT64_C(1) << (index % 64))) == 0) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
         }
     }
     return MICROS_FRAME_OWNERSHIP_OK;
@@ -235,6 +244,78 @@ static void model_apply_handoff(
         }
         model_targets[index] = MICROS_FRAME_HANDOFF_NONE;
     }
+}
+
+struct model_frame_order {
+    uint64_t ordinal;
+    uint32_t frame;
+};
+
+static bool model_owner_is_indexed(struct micros_frame_owner owner)
+{
+    return owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+        || owner.kind == MICROS_FRAME_OWNER_PROCESS_USER || owner.kind == MICROS_FRAME_OWNER_VM_WIRED;
+}
+
+static int compare_model_ordinals(const void *left, const void *right)
+{
+    const struct model_frame_order *a = left;
+    const struct model_frame_order *b = right;
+
+    return a->ordinal > b->ordinal ? -1 : a->ordinal < b->ordinal ? 1 : 0;
+}
+
+static bool compare_model_index(
+    struct frame_ownership_test_context *context,
+    const struct micros_frame_owner *owners,
+    size_t frame_count,
+    size_t step,
+    uint32_t seed
+)
+{
+    struct model_frame_order order[TEST_FRAME_COUNT];
+    uint32_t previous[MICROS_PROCESS_CAPACITY] = {0};
+    size_t count = 0;
+    size_t index;
+
+    EXPECT_TRUE(frame_count <= TEST_FRAME_COUNT);
+    memset(context->model_links, 0, frame_count * sizeof(context->model_links[0]));
+    memset(context->model_process_frames, 0, sizeof(context->model_process_frames));
+    for (index = 0; index < frame_count; ++index) {
+        struct micros_frame_owner before = context->model_previous_owners[index];
+        struct micros_frame_owner owner = owners[index];
+
+        if (!model_owner_is_indexed(owner)) {
+            context->model_ordinals[index] = 0;
+        } else {
+            EXPECT_TRUE(owner.slot < MICROS_PROCESS_CAPACITY);
+            if (!model_owner_is_indexed(before) || before.slot != owner.slot || before.generation != owner.generation) {
+                context->model_ordinals[index] = ++context->model_next_ordinal;
+            }
+            order[count++] = (struct model_frame_order){context->model_ordinals[index], (uint32_t)index};
+        }
+        context->model_previous_owners[index] = owner;
+    }
+    qsort(order, count, sizeof(order[0]), compare_model_ordinals);
+    for (index = 0; index < count; ++index) {
+        uint32_t frame = order[index].frame;
+        uint16_t slot = owners[frame].slot;
+
+        context->model_links[frame].previous = previous[slot];
+        if (previous[slot] == 0) {
+            context->model_process_frames[slot].head = frame + 1;
+        } else {
+            context->model_links[previous[slot] - 1].next = frame + 1;
+        }
+        ++context->model_process_frames[slot].count;
+        previous[slot] = frame + 1;
+    }
+    if (memcmp(context->ownership.owner_links, context->model_links, sizeof(context->model_links)) != 0
+        || memcmp(context->ownership.process_frames, context->model_process_frames, sizeof(context->model_process_frames)) != 0) {
+        fprintf(stderr, "seed=0x%08x step=%zu process-index mismatch\n", seed, step);
+        return false;
+    }
+    return true;
 }
 
 static bool compare_model(
@@ -328,6 +409,9 @@ static bool compare_model(
             );
             return false;
         }
+    }
+    if (!compare_model_index(context, model_owners, frame_count, step, seed)) {
+        return false;
     }
     if (
         (
@@ -853,8 +937,7 @@ static bool run_model_release_set(
         micros_frame_ownership_release_process_set(
             &context->ownership,
             process,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         ) != expected_error
     ) {
         fprintf(
@@ -958,8 +1041,7 @@ static bool run_model_wired_set(
     if (
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         ) != expected_error
     ) {
         fprintf(
@@ -1064,6 +1146,10 @@ bool frame_ownership_test_matches_seeded_reference_model(
     size_t step;
 
     EXPECT_TRUE(frame_ownership_test_initialize_fixture(context, TEST_FRAME_COUNT));
+    memset(context->model_previous_owners, 0, sizeof(context->model_previous_owners));
+    memset(context->model_ordinals, 0, sizeof(context->model_ordinals));
+    memset(context->model_links, 0, sizeof(context->model_links));
+    context->model_next_ordinal = 0;
     for (step = 0; step < MODEL_STEPS; ++step) {
         uint32_t value = next_random(&random_state);
         uint32_t operation;

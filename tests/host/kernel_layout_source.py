@@ -15865,6 +15865,9 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
     from tests.host.selected_address_space_source import project_include_transports
 
     transports = project_include_transports(root, logical, raw, transports, required)
+    from tests.host.selected_release_handoff_source import project_include_transports as project_selected
+
+    transports = project_selected(root, logical, raw, transports, required)
     return _restored_include_bytes(logical, raw, expected_sha256, transports, required=required)
 
 

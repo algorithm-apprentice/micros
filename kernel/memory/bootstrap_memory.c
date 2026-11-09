@@ -629,8 +629,7 @@ micros_frame_ownership_runtime_prepare_handoff(
 
 enum micros_frame_ownership_error
 micros_frame_ownership_runtime_prepare_wired_process_user_set(
-    const uint64_t *selected_bitmap,
-    size_t selected_word_count
+    const struct micros_frame_selection *selection
 )
 {
     if (!ownership_runtime_ready) {
@@ -641,16 +640,14 @@ micros_frame_ownership_runtime_prepare_wired_process_user_set(
     }
     return micros_frame_ownership_prepare_wired_process_user_set(
         &bootstrap_ownership,
-        selected_bitmap,
-        selected_word_count
+        selection
     );
 }
 
 enum micros_frame_ownership_error
 micros_frame_ownership_runtime_release_process_set(
     struct micros_process_handle process,
-    const uint64_t *release_bitmap,
-    size_t release_word_count
+    const struct micros_frame_selection *selection
 )
 {
     if (!ownership_runtime_ready) {
@@ -662,8 +659,7 @@ micros_frame_ownership_runtime_release_process_set(
     return micros_frame_ownership_release_process_set(
         &bootstrap_ownership,
         process,
-        release_bitmap,
-        release_word_count
+        selection
     );
 }
 

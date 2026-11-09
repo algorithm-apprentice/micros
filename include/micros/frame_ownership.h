@@ -1,6 +1,7 @@
 #ifndef MICROS_FRAME_OWNERSHIP_H
 #define MICROS_FRAME_OWNERSHIP_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -54,6 +55,35 @@ struct micros_frame_range_snapshot {
     uint64_t bitmap_offset;
 };
 
+struct micros_frame_owner_links {
+    uint32_t previous;
+    uint32_t next;
+};
+
+struct micros_process_frame_index {
+    uint32_t head;
+    uint32_t count;
+};
+
+struct micros_frame_selection {
+    size_t word_count;
+    uint64_t frame_count;
+    uint64_t bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+    uint16_t words[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+    uint16_t positions[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+};
+
+_Static_assert(sizeof(struct micros_frame_owner_links) == 8,
+               "frame links must remain compact indices");
+_Static_assert(sizeof(struct micros_process_frame_index) == 8,
+               "process frame indexes must remain compact");
+_Static_assert(sizeof(struct micros_frame_selection) == 49168,
+               "RV64 frame selections have a fixed storage bound");
+_Static_assert(MICROS_FRAME_ALLOCATOR_BITMAP_WORDS <= UINT16_MAX,
+               "selection positions must encode every published word");
+_Static_assert(MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES < UINT32_MAX,
+               "owner links must encode every managed frame plus one");
+
 struct micros_frame_ownership {
     uint64_t initialization_magic;
     struct micros_frame_allocator *allocator;
@@ -69,6 +99,9 @@ struct micros_frame_ownership {
         owners[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
     uint8_t
         handoff_targets[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+    struct micros_frame_owner_links
+        owner_links[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+    struct micros_process_frame_index process_frames[MICROS_PROCESS_CAPACITY];
 };
 
 struct micros_frame_vm_claim_plan {
@@ -163,8 +196,7 @@ micros_frame_ownership_prepare_handoff(
 enum micros_frame_ownership_error
 micros_frame_ownership_prepare_wired_process_user_set(
     struct micros_frame_ownership *ownership,
-    const uint64_t *selected_bitmap,
-    size_t selected_word_count
+    const struct micros_frame_selection *selection
 );
 
 enum micros_frame_ownership_error micros_frame_ownership_lookup(
@@ -184,8 +216,7 @@ enum micros_frame_ownership_error
 micros_frame_ownership_release_process_set(
     struct micros_frame_ownership *ownership,
     struct micros_process_handle process,
-    const uint64_t *release_bitmap,
-    size_t release_word_count
+    const struct micros_frame_selection *selection
 );
 
 enum micros_frame_ownership_error
@@ -262,6 +293,20 @@ micros_frame_ownership_validate_metadata(
 enum micros_frame_ownership_error
 micros_frame_ownership_validate_active(
     const struct micros_frame_ownership *ownership
+);
+
+bool micros_frame_selection_add(
+    struct micros_frame_selection *selection,
+    uint64_t frame_index
+);
+
+bool micros_frame_selection_contains(
+    const struct micros_frame_selection *selection,
+    uint64_t frame_index
+);
+
+bool micros_frame_selection_clear(
+    struct micros_frame_selection *selection
 );
 
 #endif

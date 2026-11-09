@@ -80,11 +80,13 @@ def _definitions(text, names):
 
 
 def _bootstrap_unit(text, stage):
+    from tests.host.selected_release_handoff_source import legacy_binding_prefix
+
     names = source.SOURCE_PROJECTION["native_bootstrap_closure"]
     if stage is Stage.GREEN:
         names = (*names, *source.SOURCE_PROJECTION["new_helpers"]["kernel/memory/bootstrap_memory.c"])
     return (
-        '#include "tests/host/selected_ownership_test.h"\n'
+        legacy_binding_prefix(text) + '#include "tests/host/selected_ownership_test.h"\n'
         '#include "micros/kernel_object_runtime.h"\n'
         "#include <string.h>\n"
         "static struct micros_frame_allocator bootstrap_allocator;\n"

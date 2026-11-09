@@ -113,8 +113,10 @@ def _definitions(text, names, *, bind_tables=False):
 
 
 def _bootstrap_unit(text, observed):
+    from tests.host.selected_release_handoff_source import legacy_binding_prefix
+
     return (
-        _prefix(observed)
+        _prefix(observed) + legacy_binding_prefix(text)
         + "static struct micros_frame_allocator bootstrap_allocator;\n"
         "static struct micros_frame_ownership bootstrap_ownership;\n"
         "static bool ownership_runtime_ready;\n"

@@ -4,32 +4,6 @@
 #include "micros/frame_ownership_runtime.h"
 #include "micros/user_execution.h"
 
-static bool scratch_bitmap_contains(
-    const struct micros_user_address_space_scratch_lease *lease,
-    const uint64_t *bitmap,
-    uint64_t frame_index
-)
-{
-    return micros_user_address_space_bitmap_contains(
-        bitmap,
-        lease->word_count,
-        frame_index
-    );
-}
-
-static bool scratch_bitmap_add(
-    const struct micros_user_address_space_scratch_lease *lease,
-    uint64_t *bitmap,
-    uint64_t frame_index
-)
-{
-    return micros_user_address_space_bitmap_add(
-        bitmap,
-        lease->word_count,
-        frame_index
-    );
-}
-
 static enum micros_user_address_space_error
 require_bootstrap(
     struct micros_user_address_space_runtime_view *view,
@@ -55,7 +29,7 @@ static enum micros_user_address_space_error acquire_scratch(
     struct micros_user_address_space_scratch_lease *lease
 )
 {
-    return micros_user_address_space_acquire_scratch(view, lease);
+    return micros_user_address_space_acquire_selected_scratch(view, lease);
 }
 
 static void release_scratch(
@@ -71,161 +45,63 @@ map_ownership_error(enum micros_frame_ownership_error error)
     return micros_user_address_space_map_ownership_error(error);
 }
 
-static bool find_one_prepared_thread(
+static bool build_handoff_summary(
+    const struct micros_frame_ownership *ledger,
     const struct micros_kernel_objects *objects,
-    struct micros_process_handle process,
-    struct micros_thread_handle *thread_handle
+    struct micros_user_address_space_handoff_process summary[MICROS_PROCESS_CAPACITY]
 )
 {
-    size_t count = 0;
-    size_t index;
+    struct micros_frame_owner owner;
+    const struct micros_process *process;
+    const struct micros_thread *thread;
+    size_t slot;
+    size_t thread_index;
+    uint64_t frame_index;
 
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || !micros_user_address_space_process_handles_equal(
-                thread->owner,
-                process
-            )
-        ) {
+    if (ledger->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
+        return false;
+    }
+    for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        summary[slot] = (struct micros_user_address_space_handoff_process){0, 0, 0, 0};
+    }
+    for (frame_index = 0; frame_index < ledger->managed_frame_count; ++frame_index) {
+        owner = ledger->owners[frame_index];
+        if (owner.kind == MICROS_FRAME_OWNER_FREE || owner.slot >= MICROS_PROCESS_CAPACITY) {
             continue;
         }
-        if (!thread->context_attached) {
-            return false;
-        }
-        *thread_handle = (struct micros_thread_handle){
-            .slot = (uint16_t)index,
-            .generation = thread->generation,
-        };
-        ++count;
-    }
-    return count == 1;
-}
-
-static bool process_has_no_owned_frames(
-    const struct micros_frame_ownership *ledger,
-    struct micros_process_handle process
-)
-{
-    uint64_t frame_index;
-
-    for (
-        frame_index = 0;
-        frame_index < ledger->managed_frame_count;
-        ++frame_index
-    ) {
-        const struct micros_frame_owner *owner =
-            &ledger->owners[frame_index];
-
-        if (
-            owner->slot == process.slot
-            && owner->generation == process.generation
-            && owner->kind != MICROS_FRAME_OWNER_FREE
-        ) {
-            return false;
+        process = &objects->processes[owner.slot];
+        if (process->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE && process->generation == owner.generation) {
+            ++summary[owner.slot].owned_frame_count;
         }
     }
-    return true;
-}
-
-static bool reachable_user_targets_are_wired(
-    const struct micros_frame_ownership *ledger,
-    const struct micros_user_address_space_scratch_lease *lease,
-    struct micros_process_handle process
-)
-{
-    uint64_t frame_index;
-
-    for (
-        frame_index = 0;
-        frame_index < ledger->managed_frame_count;
-        ++frame_index
-    ) {
-        const struct micros_frame_owner *owner =
-            &ledger->owners[frame_index];
-
-        if (
-            scratch_bitmap_contains(
-                lease,
-                lease->reachable_bitmap,
-                frame_index
-            )
-            && owner->kind == MICROS_FRAME_OWNER_PROCESS_USER
-            && owner->slot == process.slot
-            && owner->generation == process.generation
-            && ledger->handoff_targets[frame_index]
-                != MICROS_FRAME_HANDOFF_VM_WIRED
-        ) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static enum micros_user_address_space_error
-select_reachable_process_user_targets(
-    const struct micros_frame_ownership *ledger,
-    struct micros_user_address_space_scratch_lease *scratch,
-    struct micros_process_handle process
-)
-{
-    uint64_t frame_index;
-
-    for (
-        frame_index = 0;
-        frame_index < ledger->managed_frame_count;
-        ++frame_index
-    ) {
-        const struct micros_frame_owner *owner =
-            &ledger->owners[frame_index];
-
-        if (
-            !scratch_bitmap_contains(
-                scratch,
-                scratch->reachable_bitmap,
-                frame_index
-            )
-            || owner->kind != MICROS_FRAME_OWNER_PROCESS_USER
-        ) {
+    for (thread_index = 0; thread_index < MICROS_THREAD_CAPACITY; ++thread_index) {
+        thread = &objects->threads[thread_index];
+        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
             continue;
         }
-        if (
-            owner->slot != process.slot
-            || owner->generation != process.generation
-            || scratch_bitmap_contains(
-                scratch,
-                scratch->release_bitmap,
-                frame_index
-            )
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+        if (thread->owner.slot >= MICROS_PROCESS_CAPACITY) {
+            return false;
         }
-        if (
-            !scratch_bitmap_add(
-                scratch,
-                scratch->release_bitmap,
-                frame_index
-            )
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
-        }
+        summary[thread->owner.slot].thread_slot = (uint16_t)thread_index;
+        summary[thread->owner.slot].thread_generation = thread->generation;
+        ++summary[thread->owner.slot].thread_count;
     }
-    return MICROS_USER_ADDRESS_SPACE_OK;
+    return true;
 }
 
 static enum micros_user_address_space_error
 validate_handoff_processes(
-    const struct micros_frame_ownership *ledger,
-    const struct micros_kernel_objects *objects
+    const struct micros_kernel_objects *objects,
+    const struct micros_user_address_space_handoff_process summary[MICROS_PROCESS_CAPACITY]
 )
 {
     size_t index;
+    const struct micros_thread *thread;
 
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_process *record =
             &objects->processes[index];
+        const struct micros_user_address_space_handoff_process *state = &summary[index];
         struct micros_process_handle process;
         struct micros_thread_handle thread_handle;
         enum micros_user_execution_error execution_error;
@@ -242,7 +118,8 @@ validate_handoff_processes(
                 record->live_thread_count != 0
                 || record->primary_endpoint
                     != MICROS_PROCESS_ENDPOINT_NONE
-                || !process_has_no_owned_frames(ledger, process)
+                || state->thread_count != 0
+                || state->owned_frame_count != 0
             ) {
                 return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
             }
@@ -250,17 +127,23 @@ validate_handoff_processes(
         }
         if (
             record->live_thread_count != 1
-            || !find_one_prepared_thread(
-                objects,
-                process,
-                &thread_handle
-            )
+            || state->thread_count != 1
+            || state->thread_slot >= MICROS_THREAD_CAPACITY
         ) {
             return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
         }
+        thread = &objects->threads[state->thread_slot];
+        if (!thread->context_attached || thread->generation != state->thread_generation
+            || thread->owner.slot != process.slot || thread->owner.generation != process.generation) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        }
+        thread_handle = (struct micros_thread_handle){
+            .slot = state->thread_slot,
+            .generation = state->thread_generation,
+        };
         execution_error = micros_user_execution_validate_context(
             thread_handle,
-            &objects->threads[thread_handle.slot].user_context
+            &thread->user_context
         );
         if (execution_error != MICROS_USER_EXECUTION_OK) {
             return (
@@ -285,6 +168,8 @@ micros_user_address_space_prepare_wired_handoff(void)
     const struct micros_kernel_address_space_report *kernel_report;
     struct micros_user_address_space_runtime_view runtime;
     struct micros_user_address_space_scratch_lease scratch;
+    struct micros_user_address_space_handoff_process summary[MICROS_PROCESS_CAPACITY];
+    struct micros_user_address_space_bootstrap_plan plan;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
     size_t process_index;
@@ -308,7 +193,11 @@ micros_user_address_space_prepare_wired_handoff(void)
         error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
         goto done;
     }
-    error = validate_handoff_processes(ledger, objects);
+    if (!build_handoff_summary(ledger, objects, summary)) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done;
+    }
+    error = validate_handoff_processes(objects, summary);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -335,29 +224,21 @@ micros_user_address_space_prepare_wired_handoff(void)
             .slot = (uint16_t)process_index,
             .generation = record->generation,
         };
-        error = micros_user_address_space_validate_locked(
+        error = micros_user_address_space_collect_bootstrap_handoff_locked(
             &runtime,
             &scratch,
             process,
-            NULL
+            summary[process_index].owned_frame_count,
+            &plan
         );
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
             error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
             goto done_with_scratch;
         }
-        error = select_reachable_process_user_targets(
-            ledger,
-            &scratch,
-            process
-        );
-        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-            goto done_with_scratch;
-        }
     }
     error = map_ownership_error(
         micros_frame_ownership_runtime_prepare_wired_process_user_set(
-            scratch.release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            scratch.release_selection
         )
     );
 
@@ -377,6 +258,8 @@ micros_user_address_space_complete_wired_handoff(void)
     const struct micros_kernel_address_space_report *kernel_report;
     struct micros_user_address_space_runtime_view runtime;
     struct micros_user_address_space_scratch_lease scratch;
+    struct micros_user_address_space_handoff_process summary[MICROS_PROCESS_CAPACITY];
+    struct micros_user_address_space_bootstrap_plan plan;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
     size_t index;
@@ -400,7 +283,11 @@ micros_user_address_space_complete_wired_handoff(void)
         error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
         goto done;
     }
-    error = validate_handoff_processes(ledger, objects);
+    if (!build_handoff_summary(ledger, objects, summary)) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done;
+    }
+    error = validate_handoff_processes(objects, summary);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -423,23 +310,18 @@ micros_user_address_space_complete_wired_handoff(void)
             .slot = (uint16_t)index,
             .generation = record->generation,
         };
-        error = micros_user_address_space_validate_locked(
+        error = micros_user_address_space_collect_bootstrap_handoff_locked(
             &runtime,
             &scratch,
             process,
-            NULL
+            summary[index].owned_frame_count,
+            &plan
         );
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
             error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
             goto done_with_scratch;
         }
-        if (
-            !reachable_user_targets_are_wired(
-                ledger,
-                &scratch,
-                process
-            )
-        ) {
+        if (!plan.wired_targets) {
             error = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
             goto done_with_scratch;
         }

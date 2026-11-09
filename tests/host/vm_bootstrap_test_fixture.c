@@ -260,11 +260,15 @@ static bool allocate_and_stage_build_frames(
         (UINT64_C(1) << 1)
         | (UINT64_C(1) << 2)
         | (UINT64_C(1) << 4);
+    memset(&context->build_selection, 0, sizeof(context->build_selection));
+    context->build_selection.word_count = 1;
+    context->build_selection.frame_count = 3;
+    context->build_selection.bitmap[0] = context->build_bitmap[0];
+    context->build_selection.positions[0] = 1;
     if (
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->build_ownership,
-            context->build_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            &context->build_selection
         ) != MICROS_FRAME_OWNERSHIP_OK
     ) {
         return false;

@@ -1048,7 +1048,8 @@ def validate_execution_log(context, replay, *, phase, attempt, reference=None):
 
 
 def check_native_products(root, executable_paths):
-    from tests.host.selected_address_space_source import declared_audit_boundaries, measure_audit_boundaries
+    from tests.host.selected_address_space_source import measure_audit_boundaries
+    from tests.host.selected_release_handoff_source import legacy_expected_audits
 
     root = Path(root).resolve()
     expected = tuple(root / "build/host-debug" / name for name in RECIPE_ADMISSION["native_targets"])
@@ -1095,7 +1096,7 @@ def check_native_products(root, executable_paths):
     if (
         any(failures.values()) or not all(semantic_results(ordinary["semantics"]).values())
         or query_failures(ordinary["queries"]) or binding_failures(ordinary["bindings"])
-        or audits["migrated"] or audits["retained"] != declared_audit_boundaries(root)["retained"]
+        or audits["migrated"] or audits["retained"] != legacy_expected_audits(root)
     ):
         raise ValueError("MEM04 CTest failed selected semantics, work or diagnostic boundaries: " + json.dumps(failures))
     if (

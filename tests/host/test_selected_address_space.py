@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -17,6 +18,7 @@ from tests.host.selected_address_space_source import (
     observe_source, project_observations, validate_retained_source,
 )
 from tests.host.work_count_types import Stage
+from tests.host.test_evidence_authority import historical_memory_policy
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -222,6 +224,7 @@ class SelectedAddressSpaceCaptureTest(unittest.TestCase):
 
 
 class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
+    @historical_memory_policy()
     def test_private_include_projection_retains_the_added_edge_and_declarations(self):
         from tests.host import kernel_layout_source
         from tests.host.selected_address_space_source import project_include_transports
@@ -269,9 +272,10 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
                 with self.subTest(body=body), self.assertRaises(AssertionError):
                     case.test_runtime_state_leaf_keeps_actual_owner_directions_acyclic()
 
+    @historical_memory_policy()
     def test_handoff_dependency_admits_only_the_two_owned_error_assignments(self):
         from tests.host import selected_ownership_source as previous
-        from tests.host.selected_address_space_source import extend_handoff_preflight
+        from tests.host.selected_address_space_source import extend_handoff_preflight, validate_retained_source
 
         path = "kernel/memory/user_address_space_handoff.c"
         original = fixed_source(str(ROOT), path).decode()
@@ -319,30 +323,45 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
                 validate_declarations(changed)
 
     def test_changed_stack_admission_scaffold_cannot_reuse_runtime_evidence(self):
-        from tests.host import selected_address_space_source as source
         from tests.host.selected_address_space_authority import git
 
-        read = source.read_regular_source
+        reference = "8bd33e58a8e661cff78a8e4aad9d6cbc6a406120"
+        policy_path = "tests/host/selected_address_space_source.py"
+        source = ModuleType("historical_mem04_scaffold")
+        source.__file__ = str(ROOT / policy_path)
+        exec(compile(git(ROOT, "show", reference + ":" + policy_path), source.__file__, "exec"), source.__dict__)
+        paths = {
+            "CMakeLists.txt", source.AUTHORITY_PATH, source.SOURCE_PATH,
+            *source.SOURCE_ROLES["fixed_adapters"], *source.SOURCE_ROLES["unchanged_candidates"],
+            *source.SOURCE_ROLES["immutable_additions"], *source.SOURCE_ROLES["dependent_production_paths"],
+            *source.SOURCE_ROLES["stack_admission_inputs"], *source.SOURCE_PROJECTION["registration_paths"],
+        }
         historical = {
-            path: git(ROOT, "show", "8bd33e58a8e661cff78a8e4aad9d6cbc6a406120:" + path)
-            for path in SOURCE_PROJECTION["registration_paths"]
+            path: git(ROOT, "show", reference + ":" + path) for path in sorted(paths)
         }
 
         def historical_read(root, path):
-            return historical[path] if path in historical else read(root, path)
+            if Path(root).resolve() != ROOT or path not in historical:
+                raise ValueError("historical MEM04 scaffold attempted an undeclared current read")
+            return historical[path]
 
-        with mock.patch.object(source, "read_regular_source", side_effect=historical_read):
-            source.validate_scaffold(ROOT)
-        for changed in (
-            "tools/stack_bound_bindings.py", "tools/stack_bound_fatal.py",
-            "tests/host/test_stack_bound_evidence.py",
-        ):
-            def read_changed(root, path):
-                return historical_read(root, path) + (b"\n" if path == changed else b"")
+        def historical_regular(root, path):
+            raw = historical_read(root, path)
+            return SimpleNamespace(read_text=lambda encoding="utf-8": raw.decode(encoding))
 
-            with self.subTest(changed=changed), mock.patch.object(source, "read_regular_source", side_effect=read_changed):
-                with self.assertRaisesRegex(ValueError, "frozen stack admission scaffold changed: " + changed):
-                    source.validate_scaffold(ROOT)
+        with mock.patch.object(source, "regular_source", side_effect=historical_regular):
+            with mock.patch.object(source, "read_regular_source", side_effect=historical_read):
+                source.validate_scaffold(ROOT)
+            for changed in (
+                "tools/stack_bound_bindings.py", "tools/stack_bound_fatal.py",
+                "tests/host/test_stack_bound_evidence.py",
+            ):
+                def read_changed(root, path):
+                    return historical_read(root, path) + (b"\n" if path == changed else b"")
+
+                with self.subTest(changed=changed), mock.patch.object(source, "read_regular_source", side_effect=read_changed):
+                    with self.assertRaisesRegex(ValueError, "frozen stack admission scaffold changed: " + changed):
+                        source.validate_scaffold(ROOT)
 
     def test_complete_predecessor_records_and_fingerprints_are_conserved(self):
         from tests.host.evidence_authority_inventory import current_inventory
@@ -403,9 +422,10 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
         ):
             self.assertEqual(frozenset(), authority.retired_identity_keys(ROOT))
 
+    @historical_memory_policy()
     def test_current_header_admission_is_byte_exact_and_does_not_authorize_legacy_retirement(self):
         from tests.host import selected_ownership_source as previous
-        from tests.host.evidence_authority_scope import identity_required
+        from tests.host.selected_address_space_source import validate_retained_source
 
         for path in SOURCE_ROLES["production_paths"]:
             if not path.endswith(".h"):
@@ -419,7 +439,7 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 validate_retained_source(ROOT, path, current, Stage.RED)
             with mock.patch(
-                identity_required.__module__ + ".identity_required", return_value=True,
+                "tests.host.evidence_authority_scope.identity_required", return_value=True,
             ), self.assertRaises(ValueError):
                 previous.validate_retained_source(ROOT, path, current, Stage.GREEN)
 

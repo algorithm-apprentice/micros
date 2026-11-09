@@ -105,6 +105,30 @@ void frame_ownership_test_select_release_index(
         |= UINT64_C(1) << (frame_index % 64);
 }
 
+struct micros_frame_selection *frame_ownership_test_selection_input(
+    struct frame_ownership_test_context *context
+)
+{
+    struct micros_frame_selection *selection = &context->selection;
+    size_t word;
+
+    memset(selection, 0, sizeof(*selection));
+    for (word = 0; word < MICROS_FRAME_ALLOCATOR_BITMAP_WORDS; ++word) {
+        uint64_t bits = context->release_bitmap[word];
+
+        if (bits == 0) {
+            continue;
+        }
+        selection->bitmap[word] = bits;
+        selection->words[selection->word_count] = (uint16_t)word;
+        selection->positions[word] = (uint16_t)++selection->word_count;
+        for (unsigned bit = 0; bit < 64; ++bit) {
+            selection->frame_count += (bits >> bit) & 1;
+        }
+    }
+    return selection;
+}
+
 void frame_ownership_test_snapshot(
     struct frame_ownership_test_context *context
 )

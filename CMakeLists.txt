@@ -3653,6 +3653,263 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-address-space PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_address_space_aggregate_test selected_address_space_path_test selected_address_space_context_test selected_address_space_ordinary_test)
 
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_release_handoff_source.py
+            tests/host/selected_release_handoff_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_release_handoff_source.py
+            tests/host/selected_release_handoff_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_release_handoff_source.py
+            tests/host/selected_release_handoff_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/selected_release_handoff_source.py
+            tests/host/selected_release_handoff_authority.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    set(MEM05_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-release-handoff")
+    set(MEM05_NATIVE_INPUTS
+        kernel/memory/frame_allocator.c
+        kernel/memory/bootstrap_memory.c
+        kernel/memory/frame_ownership.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/frame_ownership_bootstrap.c
+        kernel/memory/frame_ownership_handoff.c
+        kernel/memory/frame_ownership_vm_claim.c
+        kernel/memory/frame_ownership_vm_freeze.c
+        kernel/memory/frame_ownership_vm_release.c
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/objects/kernel_object_runtime.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+        kernel/scheduler/scheduler_context.c
+        kernel/endpoint/endpoint.c
+        kernel/endpoint/endpoint_codec.c
+        kernel/endpoint/endpoint_identity.c
+        kernel/endpoint/endpoint_registry.c
+        kernel/endpoint/endpoint_publication.c
+        kernel/endpoint/endpoint_privilege.c
+        kernel/endpoint/endpoint_completion_validation.c
+        kernel/endpoint/endpoint_queue_validation.c
+        kernel/endpoint/endpoint_object_validation.c
+        kernel/ipc/ipc_runtime.c
+        kernel/memory/sv39.c
+        kernel/memory/address_space.c
+        kernel/memory/user_address_space.c
+        kernel/memory/user_address_space_core.c
+        kernel/memory/user_address_space_table.c
+        kernel/memory/user_address_space_runtime.c
+        kernel/memory/user_address_space_mapping.c
+        kernel/memory/user_address_space_validation.c
+        kernel/memory/user_address_space_mutation.c
+        kernel/memory/user_address_space_activation.c
+        kernel/vm/vm_handoff_core.c
+        kernel/vm/vm_handoff_boot.c
+        kernel/vm/vm_handoff_runtime.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_handoff_runtime_state.c
+        kernel/tty/tty_handoff_runtime_validate.c
+        kernel/boot/bootstrap_control_core.c
+        kernel/memory/user_address_space_handoff.c
+        kernel/execution/user_execution_validation.c
+    )
+    file(GLOB_RECURSE MEM05_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
+    )
+    set(MEM05_NATIVE_OUTPUTS)
+    set(MEM05_SOURCES_0)
+    foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
+        list(APPEND MEM05_SOURCES_0 "${MEM05_NATIVE_ROOT}/aggregate/${mem05_source}")
+    endforeach()
+    list(APPEND MEM05_NATIVE_OUTPUTS ${MEM05_SOURCES_0})
+    foreach(mem05_header IN LISTS MEM05_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
+        list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/aggregate/${mem05_relative_header}")
+    endforeach()
+    set(MEM05_SOURCES_1)
+    foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
+        list(APPEND MEM05_SOURCES_1 "${MEM05_NATIVE_ROOT}/frames/${mem05_source}")
+    endforeach()
+    list(APPEND MEM05_NATIVE_OUTPUTS ${MEM05_SOURCES_1})
+    foreach(mem05_header IN LISTS MEM05_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
+        list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/frames/${mem05_relative_header}")
+    endforeach()
+    set(MEM05_SOURCES_2)
+    foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
+        list(APPEND MEM05_SOURCES_2 "${MEM05_NATIVE_ROOT}/plans/${mem05_source}")
+    endforeach()
+    list(APPEND MEM05_NATIVE_OUTPUTS ${MEM05_SOURCES_2})
+    foreach(mem05_header IN LISTS MEM05_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
+        list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/plans/${mem05_relative_header}")
+    endforeach()
+    set(MEM05_SOURCES_3)
+    foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
+        list(APPEND MEM05_SOURCES_3 "${MEM05_NATIVE_ROOT}/context/${mem05_source}")
+    endforeach()
+    list(APPEND MEM05_NATIVE_OUTPUTS ${MEM05_SOURCES_3})
+    foreach(mem05_header IN LISTS MEM05_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
+        list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/context/${mem05_relative_header}")
+    endforeach()
+    set(MEM05_SOURCES_4)
+    foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
+        list(APPEND MEM05_SOURCES_4 "${MEM05_NATIVE_ROOT}/ordinary/${mem05_source}")
+    endforeach()
+    list(APPEND MEM05_NATIVE_OUTPUTS ${MEM05_SOURCES_4})
+    foreach(mem05_header IN LISTS MEM05_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
+        list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/ordinary/${mem05_relative_header}")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${MEM05_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_release_handoff_fixture.py"
+        DEPENDS ${MEM05_NATIVE_INPUTS} ${MEM05_NATIVE_HEADERS}
+            tests/host/selected_release_handoff_test.c
+            tests/host/selected_release_handoff_test.h
+            tests/host/selected_release_handoff_source.py
+            tests/host/selected_release_handoff_evidence.py
+            tests/host/selected_release_handoff_authority.py
+            tests/host/test_selected_release_handoff.py
+            tools/generate_selected_release_handoff_fixture.py
+            tools/check_selected_release_handoff.py
+            tests/host/evidence_authority_scope.py
+            tests/host/selected_ownership_source.py
+            tests/host/selected_address_space_source.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(selected_release_handoff_aggregate_test ${MEM05_SOURCES_0}
+        tests/host/selected_release_handoff_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_release_handoff_aggregate_test PRIVATE
+        "${MEM05_NATIVE_ROOT}/aggregate" "${MEM05_NATIVE_ROOT}/aggregate/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_release_handoff_aggregate_test PRIVATE c_std_17)
+    target_compile_options(selected_release_handoff_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_release_handoff_aggregate_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_release_handoff_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_release_handoff_aggregate_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_release_handoff_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_MEM05_NATIVE_CHANNEL=0)
+    add_executable(selected_release_handoff_frames_test ${MEM05_SOURCES_1}
+        tests/host/selected_release_handoff_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_release_handoff_frames_test PRIVATE
+        "${MEM05_NATIVE_ROOT}/frames" "${MEM05_NATIVE_ROOT}/frames/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_release_handoff_frames_test PRIVATE c_std_17)
+    target_compile_options(selected_release_handoff_frames_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_release_handoff_frames_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_release_handoff_frames_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_release_handoff_frames_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_release_handoff_frames_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_MEM05_NATIVE_CHANNEL=1)
+    add_executable(selected_release_handoff_plans_test ${MEM05_SOURCES_2}
+        tests/host/selected_release_handoff_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_release_handoff_plans_test PRIVATE
+        "${MEM05_NATIVE_ROOT}/plans" "${MEM05_NATIVE_ROOT}/plans/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_release_handoff_plans_test PRIVATE c_std_17)
+    target_compile_options(selected_release_handoff_plans_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_release_handoff_plans_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_release_handoff_plans_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_release_handoff_plans_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_release_handoff_plans_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_MEM05_NATIVE_CHANNEL=2)
+    add_executable(selected_release_handoff_context_test ${MEM05_SOURCES_3}
+        tests/host/selected_release_handoff_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(selected_release_handoff_context_test PRIVATE
+        "${MEM05_NATIVE_ROOT}/context" "${MEM05_NATIVE_ROOT}/context/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_release_handoff_context_test PRIVATE c_std_17)
+    target_compile_options(selected_release_handoff_context_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_release_handoff_context_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_release_handoff_context_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_release_handoff_context_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_release_handoff_context_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_MEM05_NATIVE_CHANNEL=3)
+    add_executable(selected_release_handoff_ordinary_test ${MEM05_SOURCES_4}
+        tests/host/selected_release_handoff_test.c
+    )
+    target_include_directories(selected_release_handoff_ordinary_test PRIVATE
+        "${MEM05_NATIVE_ROOT}/ordinary" "${MEM05_NATIVE_ROOT}/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(selected_release_handoff_ordinary_test PRIVATE c_std_17)
+    target_compile_options(selected_release_handoff_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(selected_release_handoff_ordinary_test PRIVATE MICROS_BUILD_USER_ADDRESS_SPACE_TEST=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(selected_release_handoff_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(selected_release_handoff_ordinary_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(selected_release_handoff_ordinary_test PRIVATE
+        MICROS_SELECTED_RELEASE_HANDOFF_LAUNCHER=1
+        "MICROS_SELECTED_RELEASE_HANDOFF_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_RELEASE_HANDOFF_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_release_handoff.py\""
+        "MICROS_SELECTED_RELEASE_HANDOFF_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+    add_test(NAME selected-release-handoff COMMAND selected_release_handoff_ordinary_test
+        "$<TARGET_FILE:selected_release_handoff_aggregate_test>"
+        "$<TARGET_FILE:selected_release_handoff_frames_test>"
+        "$<TARGET_FILE:selected_release_handoff_plans_test>"
+        "$<TARGET_FILE:selected_release_handoff_context_test>"
+    )
+    set_tests_properties(selected-release-handoff PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_release_handoff_aggregate_test selected_release_handoff_frames_test selected_release_handoff_plans_test selected_release_handoff_context_test selected_release_handoff_ordinary_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()

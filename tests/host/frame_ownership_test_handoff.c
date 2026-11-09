@@ -77,13 +77,17 @@ static bool expect_wired_set_failure(
     enum micros_frame_ownership_error expected_error
 )
 {
+    struct micros_frame_selection *selection = frame_ownership_test_selection_input(context);
+
+    if (word_count != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS) {
+        selection->word_count = MICROS_FRAME_ALLOCATOR_BITMAP_WORDS + 1;
+    }
     frame_ownership_test_snapshot(context);
     EXPECT_ERROR(
         expected_error,
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            context->release_bitmap,
-            word_count
+            selection
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
@@ -624,8 +628,7 @@ static bool invalid_wired_sets_are_rejected(
         MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT,
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            NULL,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            NULL
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
@@ -723,8 +726,7 @@ static bool complete_wired_set_is_staged(
         MICROS_FRAME_OWNERSHIP_OK,
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     EXPECT_TRUE(
@@ -751,8 +753,7 @@ static bool repeated_and_post_handoff_wired_sets_are_rejected(
         MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION,
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
@@ -765,8 +766,7 @@ static bool repeated_and_post_handoff_wired_sets_are_rejected(
         MICROS_FRAME_OWNERSHIP_ERROR_PHASE,
         micros_frame_ownership_prepare_wired_process_user_set(
             &context->ownership,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));

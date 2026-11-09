@@ -430,6 +430,18 @@ review and is the sole active outcome; runtime implementation restarts
 only after its separate merge. No Green event, new retirement, runtime finding
 closure or hosted-CI acceptance is claimed.
 
+MEM05-C02 design #235 has now separately merged as
+`8f3b19ccae21a06345d05415708cd2dc1db32e76`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`1a7500dac64cf8605faa2b699c68b2caf6217f6b`.
+Complete and Acceptance-only reviews are clean. Fresh committed and
+actual-main inspections preserve all prior authority without journals;
+completed design refs are removed and purposeful archives preserved.
+The fresh [MEM05 evidence map](architecture/selected-release-and-wired-handoff.md#implementation-and-evidence-map)
+uses the independently frozen 1,518-file base and thirty-path domain.
+It must renew all actual phases and final acceptance before any runtime
+finding closes.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

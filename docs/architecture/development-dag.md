@@ -173,8 +173,9 @@ The fresh implementation then reached the
 [MEM05-C02 handed-off fixture conflict](selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-coherence).
 The candidate is archived without Green or retirement.
 [Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md)
-has clean independent design review and is the sole active documentation-only
-correction; implementation remains blocked until its separate merge.
+has clean complete and Acceptance-only design review and separately merged
+as #235. The fresh MEM05 implementation is the sole active outcome and
+follows its [evidence map](selected-release-and-wired-handoff.md#implementation-and-evidence-map).
 Its one additional frozen target owner changes no runtime dependency,
 finding owner or hosted-CI acceptance.
 

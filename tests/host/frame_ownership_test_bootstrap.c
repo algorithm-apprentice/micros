@@ -699,14 +699,18 @@ static bool expect_release_set_failure(
     enum micros_frame_ownership_error expected_error
 )
 {
+    struct micros_frame_selection *selection = frame_ownership_test_selection_input(context);
+
+    if (word_count != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS) {
+        selection->word_count = MICROS_FRAME_ALLOCATOR_BITMAP_WORDS + 1;
+    }
     frame_ownership_test_snapshot(context);
     EXPECT_ERROR(
         expected_error,
         micros_frame_ownership_release_process_set(
             &context->ownership,
             process,
-            context->release_bitmap,
-            word_count
+            selection
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
@@ -800,8 +804,7 @@ static bool empty_process_release_is_noop(
         micros_frame_ownership_release_process_set(
             &context->ownership,
             fixture->process_one,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
@@ -952,8 +955,7 @@ static bool selected_process_frames_are_released(
         micros_frame_ownership_release_process_set(
             &context->ownership,
             fixture->process_one,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     EXPECT_ERROR(

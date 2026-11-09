@@ -509,8 +509,7 @@ bool frame_ownership_test_operates_at_maximum_managed_capacity(
         micros_frame_ownership_release_process_set(
             &context->ownership,
             boundary_process,
-            context->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            frame_ownership_test_selection_input(context)
         )
     );
     output = 0;

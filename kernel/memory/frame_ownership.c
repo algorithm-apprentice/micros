@@ -556,3 +556,317 @@ bool micros_frame_ownership_active_geometry_matches(
     }
     return expected_bitmap_offset == ownership->managed_frame_count;
 }
+
+static bool selection_header_is_valid(
+    const struct micros_frame_selection *selection
+)
+{
+    if (selection == NULL) {
+        return false;
+    }
+    return selection->word_count <= MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        && selection->frame_count <= MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        && (selection->word_count == 0) == (selection->frame_count == 0)
+        && selection->word_count <= selection->frame_count;
+}
+
+bool micros_frame_selection_contains(
+    const struct micros_frame_selection *selection,
+    uint64_t frame_index
+)
+{
+    size_t word_index;
+    uint16_t position;
+    uint64_t word;
+    uint64_t bit;
+
+    if (
+        !selection_header_is_valid(selection)
+        || frame_index >= MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+    ) {
+        return false;
+    }
+    word_index = (size_t)(frame_index / 64);
+    bit = UINT64_C(1) << (frame_index % 64);
+    position = selection->positions[word_index];
+    word = selection->bitmap[word_index];
+    return position != 0 && position <= selection->word_count
+        && selection->words[position - 1] == word_index && word != 0 && (word & bit) != 0;
+}
+
+bool micros_frame_selection_add(
+    struct micros_frame_selection *selection,
+    uint64_t frame_index
+)
+{
+    size_t word_index;
+    uint16_t position;
+    uint64_t word;
+    uint64_t bit;
+
+    if (
+        !selection_header_is_valid(selection)
+        || frame_index >= MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+    ) {
+        return false;
+    }
+    word_index = (size_t)(frame_index / 64);
+    bit = UINT64_C(1) << (frame_index % 64);
+    position = selection->positions[word_index];
+    word = selection->bitmap[word_index];
+    if (position != 0) {
+        if (position > selection->word_count || selection->words[position - 1] != word_index || word == 0) {
+            return false;
+        }
+        if ((word & bit) != 0) {
+            return true;
+        }
+        if (selection->frame_count == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
+            return false;
+        }
+    } else {
+        if (
+            word != 0
+            || selection->word_count == MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            || selection->frame_count == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        ) {
+            return false;
+        }
+        selection->words[selection->word_count] = (uint16_t)word_index;
+        selection->positions[word_index] = (uint16_t)(selection->word_count + 1);
+        ++selection->word_count;
+    }
+    selection->bitmap[word_index] = word | bit;
+    ++selection->frame_count;
+    return true;
+}
+
+enum micros_frame_ownership_error micros_frame_ownership_check_selection(
+    const struct micros_frame_selection *selection,
+    uint64_t managed_frame_count
+)
+{
+    uint64_t population = 0;
+    size_t position;
+    size_t word_index;
+    uint64_t word;
+    unsigned bit_index;
+
+    if (
+        !selection_header_is_valid(selection)
+        || managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    for (position = 0; position < selection->word_count; ++position) {
+        word_index = selection->words[position];
+        if (word_index >= MICROS_FRAME_ALLOCATOR_BITMAP_WORDS || selection->positions[word_index] != position + 1) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+        }
+        word = selection->bitmap[word_index];
+        if (word == 0) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+        }
+        for (bit_index = 0; bit_index < 64; ++bit_index) {
+            if ((word & (UINT64_C(1) << bit_index)) == 0) {
+                continue;
+            }
+            if ((uint64_t)word_index * 64 + bit_index >= managed_frame_count) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+            }
+            ++population;
+        }
+    }
+    return population == selection->frame_count
+        ? MICROS_FRAME_OWNERSHIP_OK : MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+}
+
+bool micros_frame_selection_clear(struct micros_frame_selection *selection)
+{
+    size_t position;
+    size_t word_index;
+
+    if (
+        micros_frame_ownership_check_selection(selection, MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES)
+            != MICROS_FRAME_OWNERSHIP_OK
+    ) {
+        return false;
+    }
+    for (position = 0; position < selection->word_count; ++position) {
+        word_index = selection->words[position];
+        selection->bitmap[word_index] = 0;
+        selection->positions[word_index] = 0;
+        selection->words[position] = 0;
+    }
+    selection->word_count = 0;
+    selection->frame_count = 0;
+    return true;
+}
+
+static bool index_owner_matches_slot(
+    const struct micros_frame_ownership *ownership,
+    uint32_t encoded,
+    uint16_t slot
+)
+{
+    struct micros_frame_owner owner;
+
+    if (encoded == 0 || encoded > ownership->managed_frame_count) {
+        return false;
+    }
+    owner = ownership->owners[encoded - 1];
+    return micros_frame_owner_is_valid(owner)
+        && micros_frame_owner_kind_is_process_bound(owner.kind)
+        && owner.slot == slot;
+}
+
+static bool index_head_is_valid(
+    const struct micros_frame_ownership *ownership,
+    uint16_t slot
+)
+{
+    struct micros_process_frame_index index;
+    struct micros_frame_owner_links links;
+
+    index = ownership->process_frames[slot];
+    if (
+        (index.head == 0) != (index.count == 0)
+        || index.count > ownership->managed_frame_count
+        || index.count > ownership->owned_frame_count
+    ) {
+        return false;
+    }
+    if (index.head == 0) {
+        return true;
+    }
+    if (!index_owner_matches_slot(ownership, index.head, slot)) {
+        return false;
+    }
+    links = ownership->owner_links[index.head - 1];
+    return links.previous == 0 && links.next != index.head
+        && links.next <= ownership->managed_frame_count
+        && (index.count == 1) == (links.next == 0);
+}
+
+bool micros_frame_ownership_index_can_insert(
+    const struct micros_frame_ownership *ownership,
+    uint16_t slot,
+    uint64_t frame_index,
+    uint32_t additions
+)
+{
+    struct micros_frame_owner_links links;
+    struct micros_frame_owner owner;
+    struct micros_process_frame_index index;
+
+    if (slot >= MICROS_PROCESS_CAPACITY || frame_index >= ownership->managed_frame_count || additions == 0) {
+        return false;
+    }
+    links = ownership->owner_links[frame_index];
+    owner = ownership->owners[frame_index];
+    if (
+        links.previous != 0 || links.next != 0
+        || micros_frame_owner_kind_is_process_bound(owner.kind)
+        || !index_head_is_valid(ownership, slot)
+    ) {
+        return false;
+    }
+    index = ownership->process_frames[slot];
+    return additions <= ownership->managed_frame_count - index.count;
+}
+
+bool micros_frame_ownership_index_can_remove(
+    const struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+)
+{
+    struct micros_frame_owner owner;
+    struct micros_frame_owner_links links;
+    struct micros_process_frame_index index;
+    uint32_t encoded;
+
+    if (frame_index >= ownership->managed_frame_count) {
+        return false;
+    }
+    owner = ownership->owners[frame_index];
+    links = ownership->owner_links[frame_index];
+    if (!micros_frame_owner_is_valid(owner)) {
+        return false;
+    }
+    if (!micros_frame_owner_kind_is_process_bound(owner.kind)) {
+        return links.previous == 0 && links.next == 0;
+    }
+    index = ownership->process_frames[owner.slot];
+    encoded = (uint32_t)(frame_index + 1);
+    if (
+        index.head == 0 || index.head > ownership->managed_frame_count
+        || index.count == 0 || index.count > ownership->managed_frame_count
+        || index.count > ownership->owned_frame_count
+        || (links.previous == 0) != (index.head == encoded)
+        || links.previous == encoded || links.next == encoded
+        || (links.previous != 0 && links.previous == links.next)
+        || (index.count == 1) != (links.previous == 0 && links.next == 0)
+    ) {
+        return false;
+    }
+    if (links.previous != 0) {
+        if (!index_owner_matches_slot(ownership, links.previous, owner.slot)
+            || ownership->owner_links[links.previous - 1].next != encoded) {
+            return false;
+        }
+    }
+    if (links.next != 0) {
+        if (!index_owner_matches_slot(ownership, links.next, owner.slot)
+            || ownership->owner_links[links.next - 1].previous != encoded) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void micros_frame_ownership_index_insert_prevalidated(
+    struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+)
+{
+    struct micros_frame_owner owner;
+    struct micros_process_frame_index *index;
+    uint32_t head;
+
+    owner = ownership->owners[frame_index];
+    index = &ownership->process_frames[owner.slot];
+    head = index->head;
+    ownership->owner_links[frame_index] = (struct micros_frame_owner_links){0, head};
+    if (head != 0) {
+        ownership->owner_links[head - 1].previous = (uint32_t)(frame_index + 1);
+    }
+    index->head = (uint32_t)(frame_index + 1);
+    ++index->count;
+}
+
+void micros_frame_ownership_index_remove_prevalidated(
+    struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+)
+{
+    struct micros_frame_owner owner;
+    struct micros_process_frame_index *index;
+    struct micros_frame_owner_links links;
+
+    owner = ownership->owners[frame_index];
+    if (!micros_frame_owner_kind_is_process_bound(owner.kind)) {
+        return;
+    }
+    index = &ownership->process_frames[owner.slot];
+    links = ownership->owner_links[frame_index];
+    if (links.previous == 0) {
+        index->head = links.next;
+    } else {
+        ownership->owner_links[links.previous - 1].next = links.next;
+    }
+    if (links.next != 0) {
+        ownership->owner_links[links.next - 1].previous = links.previous;
+    }
+    ownership->owner_links[frame_index] = (struct micros_frame_owner_links){0, 0};
+    --index->count;
+}

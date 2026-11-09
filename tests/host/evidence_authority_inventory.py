@@ -7,7 +7,8 @@ import re
 
 from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
-    panic_trace_source, selected_address_space_source, selected_ownership_source, terminal_failure_source,
+    panic_trace_source, selected_address_space_source, selected_ownership_source,
+    selected_release_handoff_source, terminal_failure_source,
 )
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, regular_source, single_assignment,
@@ -137,6 +138,10 @@ FAMILY_OWNERS = {
     ),
     "selected-ownership-observation-admission": (
         "tests/host/selected_ownership_observation_bindings.py",
+    ),
+    "selected-release-handoff-baseline": (
+        "tests/host/selected_release_handoff_authority.py",
+        "tests/host/selected_release_handoff_source.py",
     ),
 }
 
@@ -269,6 +274,8 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "eae7b3d815f8f239094921fe2cd97b2508ada96b0e53eff394f84a9359477f88",
     "selected-ownership-observation-admission":
         "0760c510cdc26d7dc638959e8bcda5c8df72e0b3016ba81533f373130c78a0e4",
+    "selected-release-handoff-baseline":
+        "ee6bff3827e7ea4de238e0078ee2090b42afc8ac95282114165d38b4f797c357",
 }
 
 _MEMORY_NATIVE_COUNTS = {
@@ -1366,6 +1373,8 @@ def _facts_for_owner(root, family, relative, directory=None):
         return selected_ownership_source.declaration_facts(root, relative)
     if family == selected_address_space_source.FAMILY:
         return selected_address_space_source.declaration_facts(root, relative)
+    if family == selected_release_handoff_source.FAMILY:
+        return selected_release_handoff_source.declaration_facts(root, relative)
     declared_paths = _path_strings(root, tree)
     if family == "stack-source-bindings":
         declared_paths = set(STACK_BINDING_PAYLOAD_PATHS)

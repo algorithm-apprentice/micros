@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -316,10 +317,79 @@ class SelectedOwnershipObservationTest(unittest.TestCase):
             with self.subTest(mutation=index), self.assertRaises(ValueError):
                 source._validate_observation_coverage(ROOT, path, changed, Stage.RED)
         unchanged = "kernel/memory/frame_ownership_vm_freeze.c"
-        text = source.baseline_source(str(ROOT), unchanged)
-        for channel in source.STATE_WORK_CONTRACT["channels"]:
-            observed = source.observe_source(ROOT, unchanged, text, Stage.GREEN, channel)
-            self.assertEqual(text, source.project_observations(ROOT, unchanged, observed, Stage.GREEN, channel))
+        from tests.host import evidence_authority_scope
+        import tests.host as package
+        from tests.host.selected_address_space_authority import git
+
+        reference = "abe05cdd7bced5e77e86c1ec12754d017f920cab"
+        self.assertEqual(
+            "2c34dac3c259a4975d1c213e3e14c18d8a075658",
+            git(ROOT, "rev-parse", reference + "^{tree}").decode().strip(),
+        )
+        inputs = {}
+
+        def fixed(path):
+            if path not in inputs:
+                inputs[path] = git(ROOT, "show", reference + ":" + path)
+            return inputs[path]
+
+        policies = {}
+        for name in ("selected_ownership_source", "selected_address_space_source"):
+            path = "tests/host/" + name + ".py"
+            policy = ModuleType("historical_" + name)
+            policy.__file__ = str(ROOT / path)
+            exec(compile(fixed(path), policy.__file__, "exec"), policy.__dict__)
+            policies[name] = policy
+        claims = []
+        retired = set()
+        names = (
+            "runtime_memory", "diagnostic_history", "bootstrap_allocation",
+            "kernel_mapping", "selected_ownership", "selected_address_space",
+        )
+        for name in names:
+            tree = ast.parse(fixed("tests/host/" + name + "_authority.py"))
+            claim = literal_value(single_assignment(tree, "COMPLETED_CLAIM").value)
+            claims.append(claim[1])
+            if name == "runtime_memory":
+                retired.add(claim[2])
+            else:
+                tree = ast.parse(fixed("tests/host/" + name + "_source.py"))
+                projection = literal_value(single_assignment(tree, "SOURCE_PROJECTION").value)
+                self.assertFalse(retired.intersection(projection["retirement_keys"]))
+                retired.update(projection["retirement_keys"])
+        self.assertEqual(["COPY01", "PLAT01", "MEM01", "MEM02", "MEM03", "MEM04"], claims)
+        self.assertEqual(103, len(retired))
+        historical = policies["selected_ownership_source"]
+        next_policy = policies["selected_address_space_source"]
+        text = fixed(unchanged).decode()
+
+        def historical_identity(root, key):
+            self.assertEqual(ROOT, Path(root).resolve())
+            return key not in retired
+
+        with (
+            mock.patch.object(source, "observe_source", side_effect=AssertionError("historical freeze used live current policy")),
+            mock.patch.object(source, "project_observations", side_effect=AssertionError("historical freeze used live current policy")),
+            mock.patch.object(evidence_authority_scope, "_active", None),
+            mock.patch.object(evidence_authority_scope, "identity_required", side_effect=historical_identity),
+            mock.patch.object(evidence_authority_scope, "_providers", side_effect=AssertionError("historical freeze consulted current authority")),
+            mock.patch.dict(sys.modules, {"tests.host.selected_address_space_source": next_policy}),
+            mock.patch.object(package, "selected_address_space_source", next_policy),
+        ):
+            for channel in historical.STATE_WORK_CONTRACT["channels"]:
+                observed = historical.observe_source(ROOT, unchanged, text, Stage.GREEN, channel)
+                self.assertEqual(text, historical.project_observations(ROOT, unchanged, observed, Stage.GREEN, channel))
+            observed = historical.observe_source(ROOT, unchanged, text, Stage.GREEN, "aggregate")
+            first = observed.index("MICROS_TEST_WORK_HIT(")
+            end = observed.index(";", first) + 1
+            call = observed[first:end]
+            without = observed[:first] + observed[end:]
+            for changed in (
+                without, observed[:first] + call + observed[first:], without + call,
+                observed.replace(call, call.replace("MICROS_WORK_OWNER_KERNEL_MEMORY", "MICROS_WORK_OWNER_KERNEL_OBJECTS"), 1),
+            ):
+                with self.subTest(historical_mutation=changed), self.assertRaises(ValueError):
+                    historical.project_observations(ROOT, unchanged, changed, Stage.GREEN, "aggregate")
 
 
 class SelectedOwnershipIntegrationTest(unittest.TestCase):
@@ -448,8 +518,14 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
         self.assertNotEqual(original, changed)
         with (
             mock.patch.object(evidence_authority_scope, "_active", None),
+            mock.patch.object(evidence_authority_scope, "identity_required", return_value=True),
+            mock.patch.object(evidence_authority_scope, "_providers", side_effect=AssertionError(
+                "synthetic active-key model consulted live authority providers",
+            )),
             mock.patch.object(selected_ownership_authority, "retired_identity_keys", return_value=frozenset()),
         ):
+            bootstrap_allocation_source.validate_retained_source(ROOT, path, original, stage=Stage.GREEN)
+            kernel_mapping_source.validate_retained_source(ROOT, path, original, Stage.GREEN)
             with self.assertRaises(ValueError):
                 bootstrap_allocation_source.validate_retained_source(ROOT, path, changed, stage=Stage.GREEN)
             with self.assertRaises(ValueError):

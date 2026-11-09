@@ -13,11 +13,12 @@ The separate corrective design under
 merged as #234. Its fresh implementation then reached the
 [MEM05-C02 handoff-fixture conflict](#mem05-c02-handed-off-corruption-fixture-coherence).
 That unaccepted candidate is archived without Green, recertification or
-retirement. Implementation is blocked on the documentation-only correction
-under [Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md).
-Independent design review is clean. The Accepted thirty-path evidence
-envelope takes effect only after that separate design merges; the runtime
-algorithm remains unchanged.
+retirement. The documentation-only correction under
+[Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md)
+has clean independent review and separately merged as #235.
+The fresh [implementation/evidence map](#implementation-and-evidence-map)
+uses its thirty-path envelope. The runtime algorithm remains unchanged;
+archived executions are not current acceptance.
 
 The [fixed MINIX/current study](../research/minix-selected-release-and-wired-handoff.md)
 owns the reference trace and current costs. The current source pin is:
@@ -1606,3 +1607,71 @@ squash content with the required attribution.
 Verify fresh journal-free committed and actual-main authority, then remove
 only completed task refs while preserving purposeful archives.
 Hosted CI, VM02 and later MINIX/POSIX findings remain separately owned.
+
+## Implementation and evidence map
+
+The effective design and implementation base is #235,
+`8f3b19ccae21a06345d05415708cd2dc1db32e76`, tree
+`1a7500dac64cf8605faa2b699c68b2caf6217f6b`.
+Its independently captured base has 1,518 files. The fixed runtime remains
+#232. The archived implementation is reference only and supplies no event
+for this fresh attempt.
+
+The [source declaration](../../tests/host/selected_release_handoff_source.py)
+binds complete current interfaces, 23 helpers, 32 mutable functions and nine
+removals before production edits. Its 55 current function contracts and
+566-function/532-site fixed primitive inventory remain independent of
+edited production. Byte-identical unselected functions retain their exact
+fixed observation bindings; changed functions use the separately declared
+current bindings. Array declarators are not runtime accesses.
+The scratch owner includes the private selection-preflight declaration
+directly rather than duplicating it or exposing another public API.
+
+Seven finite source/generator inverses preserve predecessor bytes.
+The recipe inverse admits the fixed predecessor in its original form or
+after the already specified two-command host-runner projection; all other
+predecessor bytes remain exact.
+Verified per-key forwarding retains the other 114 MEM03 observation
+contracts and all 33 MEM04 current-observation contracts. Every reached
+new helper is measured, including comparison and completed-store
+placement, with the original legacy channel ownership.
+MEM03's frame components still contain only owner-record visits; added
+index and link work remains in its inclusive aggregate, not those components.
+The current audit view requires sixteen retained calls and four replacement
+boundaries; the historical twenty-row declaration remains unchanged.
+
+Historical mutation probes use fixed #232 source/policy and the six prior
+claims/103 retirement decisions in an isolated context. Separate current
+probes exercise actual source and unretired comparisons.
+The separate synthetic all-active-keys control accepts its fixed original
+before rejecting a mutation and never consults a live authority provider.
+The ownership model derives index order independently; failure snapshots
+include every new field and both complete scratch selections/mode.
+
+The [native fixture](../../tests/host/selected_release_handoff_test.c)
+has 128 common rows and 154 current-only guard records.
+Its context-before-root guard isolates an off-path table in a complete
+native host page before applying protection. This preserves the same
+forbidden early walk on hosts whose protection page exceeds one RISC-V
+frame, without protecting earlier context paths.
+The [generator](../../tools/generate_selected_release_handoff_fixture.py)
+uses the 214 fixed native inputs or admitted actual current sources.
+Five products add one full-only slow CTest and retain the existing
+depth-one generator pool; fast-tier membership is unchanged.
+
+Both dependent target files are independently frozen before Red.
+The existing handoff owner implements the C02 positive relocation,
+transferable-leaf rejection and complete cleanup through existing
+interfaces. The same fixture compiles against fixed and current layouts;
+it has no new index-field dependency or compatibility macro.
+
+The [phase controller](../../tools/check_selected_release_handoff.py) and
+[authority owner](../../tests/host/selected_release_handoff_authority.py)
+bind the exact staged membership, thirty candidate paths, thirteen frozen
+candidate inputs and all remaining immutable source/tool inputs.
+Each native product and target executes once per phase. B14 precedes
+the other recertification workflows, with the same fresh target captures
+supplying B02/B05. Preparation/syntax checks and archived results cannot
+replace a genuine Red, Green or recertification event.
+Publication still requires full current acceptance, independent review,
+identical publication trees and journal-free authority.

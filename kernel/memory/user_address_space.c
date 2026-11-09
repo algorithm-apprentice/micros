@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "kernel/memory/user_address_space_internal.h"
+#include "kernel/objects/kernel_object_runtime_internal.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
@@ -19,32 +20,6 @@ static struct micros_user_address_space_page_table *table_at(
 static void clear_page(uint64_t physical_address)
 {
     micros_user_address_space_clear_page(physical_address);
-}
-
-static bool scratch_bitmap_contains(
-    const struct micros_user_address_space_scratch_lease *lease,
-    const uint64_t *bitmap,
-    uint64_t frame_index
-)
-{
-    return micros_user_address_space_bitmap_contains(
-        bitmap,
-        lease->word_count,
-        frame_index
-    );
-}
-
-static bool scratch_bitmap_add(
-    const struct micros_user_address_space_scratch_lease *lease,
-    uint64_t *bitmap,
-    uint64_t frame_index
-)
-{
-    return micros_user_address_space_bitmap_add(
-        bitmap,
-        lease->word_count,
-        frame_index
-    );
 }
 
 static enum micros_user_address_space_error acquire_scratch(
@@ -307,70 +282,32 @@ done:
     return error;
 }
 
-static enum micros_user_address_space_error
-copy_reachable_frames_to_release_set(
-    const struct micros_frame_ownership *ledger,
-    struct micros_user_address_space_scratch_lease *scratch
-)
-{
-    uint64_t frame_index;
-
-    for (
-        frame_index = 0;
-        frame_index < ledger->managed_frame_count;
-        ++frame_index
-    ) {
-        if (
-            scratch_bitmap_contains(
-                scratch,
-                scratch->reachable_bitmap,
-                frame_index
-            )
-            && !scratch_bitmap_add(
-                scratch,
-                scratch->release_bitmap,
-                frame_index
-            )
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
-        }
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
-}
-
 static void clear_released_frames_or_panic(
     const struct micros_frame_ownership *ledger,
     const struct micros_user_address_space_scratch_lease *scratch
 )
 {
+    const struct micros_frame_selection *selection = scratch->release_selection;
     uint64_t frame_index;
+    uint64_t physical_address;
+    uint64_t word;
+    size_t position;
+    size_t word_index;
+    unsigned bit_index;
 
-    for (
-        frame_index = 0;
-        frame_index < ledger->managed_frame_count;
-        ++frame_index
-    ) {
-        uint64_t physical_address;
-
-        if (
-            !scratch_bitmap_contains(
-                scratch,
-                scratch->release_bitmap,
-                frame_index
-            )
-        ) {
-            continue;
+    for (position = 0; position < selection->word_count; ++position) {
+        word_index = selection->words[position];
+        word = selection->bitmap[word_index];
+        for (bit_index = 0; bit_index < 64; ++bit_index) {
+            if ((word & (UINT64_C(1) << bit_index)) == 0) {
+                continue;
+            }
+            frame_index = (uint64_t)word_index * 64 + bit_index;
+            if (!physical_address_for_frame_index(ledger, frame_index, &physical_address)) {
+                panic_invariant("user-address-space-destroy-index");
+            }
+            clear_page(physical_address);
         }
-        if (
-            !physical_address_for_frame_index(
-                ledger,
-                frame_index,
-                &physical_address
-            )
-        ) {
-            panic_invariant("user-address-space-destroy-index");
-        }
-        clear_page(physical_address);
     }
 }
 
@@ -383,6 +320,9 @@ micros_user_address_space_destroy(struct micros_process_handle process)
     const struct micros_process *resolved;
     struct micros_user_address_space_runtime_view runtime;
     struct micros_user_address_space_scratch_lease scratch;
+    struct micros_user_address_space_bootstrap_plan plan;
+    struct micros_kernel_objects *mutable_objects;
+    struct micros_process *mutable_process;
     uint64_t root_physical_address;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
@@ -405,19 +345,20 @@ micros_user_address_space_destroy(struct micros_process_handle process)
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_acquire_selected_scratch(&runtime, &scratch);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = micros_user_address_space_validate_locked(
+    error = micros_user_address_space_collect_bootstrap_release_locked(
         &runtime,
         &scratch,
         process,
-        &resolved
+        &plan
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done_with_scratch;
     }
+    resolved = plan.process;
     if (
         resolved->live_thread_count != 0
         || active_root() == resolved->address_space_root
@@ -425,33 +366,29 @@ micros_user_address_space_destroy(struct micros_process_handle process)
         error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
         goto done_with_scratch;
     }
-    root_physical_address = resolved->address_space_root;
-    error = copy_reachable_frames_to_release_set(
-        ledger,
-        &scratch
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+    root_physical_address = plan.root_physical_address;
+    mutable_objects = micros_kernel_object_runtime_authoritative_registry();
+    if (mutable_objects == NULL || mutable_objects != objects) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done_with_scratch;
+    }
+    mutable_process = &mutable_objects->processes[process.slot];
+    if (mutable_process != resolved || mutable_process->address_space_root != root_physical_address
+        || mutable_process->generation != process.generation) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
         goto done_with_scratch;
     }
     error = map_ownership_error(
         micros_frame_ownership_runtime_release_process_set(
             process,
-            scratch.release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            scratch.release_selection
         )
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done_with_scratch;
     }
     clear_released_frames_or_panic(ledger, &scratch);
-    if (
-        micros_kernel_object_runtime_detach_address_space(
-            process,
-            root_physical_address
-        ) != MICROS_KERNEL_OBJECT_OK
-    ) {
-        panic_invariant("user-address-space-destroy-detach");
-    }
+    mutable_process->address_space_root = 0;
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
 done_with_scratch:

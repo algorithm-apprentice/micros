@@ -91,6 +91,10 @@ struct selected_address_space_context {
     bool kernel_ready_before;
     bool scratch_busy_before;
     uint64_t scratch_before[2][MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+    struct micros_frame_selection selection_before[2];
+    uint8_t scratch_mode_before;
+#endif
     unsigned char kernel_page_before[MICROS_SV39_PAGE_SIZE];
     uint64_t table_addresses[3];
     size_t table_count;
@@ -249,9 +253,15 @@ static void save_state(void)
     }
     memcpy(context.kernel_page_before, context.arena, sizeof(context.kernel_page_before));
     context.scratch_busy_before = micros_as_native_scratch_busy();
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+    context.scratch_mode_before = micros_as_native_scratch_mode();
+#endif
     for (index = 0; index < 2; ++index) {
         memcpy(context.scratch_before[index], micros_as_native_scratch_bitmap(index != 0),
                sizeof(context.scratch_before[index]));
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+        context.selection_before[index] = *micros_as_native_scratch_selection(index != 0);
+#endif
     }
     for (index = 0; index < context.table_count; ++index) {
         memcpy(&context.tables_before[index],
@@ -297,7 +307,18 @@ static bool state_matches(bool include_cursor)
                    sizeof(context.scratch_before[index])) != 0) {
             return false;
         }
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+        if (memcmp(&context.selection_before[index], micros_as_native_scratch_selection(index != 0),
+                   sizeof(context.selection_before[index])) != 0) {
+            return false;
+        }
+#endif
     }
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+    if (context.scratch_mode_before != micros_as_native_scratch_mode()) {
+        return false;
+    }
+#endif
     for (index = 0; index < context.table_count; ++index) {
         if (memcmp(&context.tables_before[index],
                    (const void *)(uintptr_t)context.table_addresses[index],
@@ -555,6 +576,22 @@ static bool model_allocated_page(uint64_t address)
     uint64_t next_table = first;
     size_t index;
 
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+    struct micros_process_frame_index *slot = &context.ownership_before.process_frames[context.process.slot];
+    uint32_t previous_head = slot->head;
+
+    for (index = 0; index < count; ++index) {
+        uint64_t frame = first + index;
+
+        context.ownership_before.owner_links[frame].previous = frame == user_index ? 0 : (uint32_t)(frame + 2);
+        context.ownership_before.owner_links[frame].next = frame == first ? previous_head : (uint32_t)frame;
+    }
+    if (previous_head != 0) {
+        context.ownership_before.owner_links[previous_head - 1].previous = (uint32_t)(first + 1);
+    }
+    slot->head = (uint32_t)(user_index + 1);
+    slot->count += (uint32_t)count;
+#endif
     for (index = 0; index < count; ++index) {
         uint64_t frame = first + index;
         enum micros_frame_owner_kind kind = frame == user_index

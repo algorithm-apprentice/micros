@@ -39,12 +39,21 @@ struct micros_user_address_space_runtime_view {
     enum micros_frame_ownership_phase ownership_phase;
 };
 
+enum micros_user_address_space_scratch_mode {
+    MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE = 0,
+    MICROS_USER_ADDRESS_SPACE_SCRATCH_FULL,
+    MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED,
+};
+
 struct micros_user_address_space_scratch_lease {
     bool active;
+    uint8_t mode;
     uint64_t frame_count;
     size_t word_count;
     uint64_t *reachable_bitmap;
     uint64_t *release_bitmap;
+    struct micros_frame_selection *reachable_selection;
+    struct micros_frame_selection *release_selection;
 };
 
 struct micros_user_address_space_tty_uart_plan {
@@ -424,5 +433,47 @@ enum micros_user_address_space_error micros_user_address_space_select_path(
     const struct micros_user_address_space_bindings *bindings, struct micros_user_address_space_path *path);
 enum micros_user_address_space_error micros_user_address_space_validate_selected_root(
     struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, const struct micros_user_address_space_bindings *bindings);
+
+struct micros_user_address_space_bootstrap_plan {
+    const struct micros_process *process;
+    uint64_t root_physical_address;
+    uint64_t frame_count;
+    bool wired_targets;
+};
+
+struct micros_user_address_space_handoff_process {
+    uint64_t owned_frame_count;
+    uint32_t thread_generation;
+    uint16_t thread_slot;
+    uint16_t thread_count;
+};
+
+_Static_assert(sizeof(struct micros_user_address_space_bootstrap_plan) == 32,
+               "bootstrap root plans must remain bounded automatic state");
+_Static_assert(sizeof(struct micros_user_address_space_handoff_process) == 16,
+               "handoff process summaries must remain compact");
+
+enum micros_user_address_space_error
+micros_user_address_space_acquire_selected_scratch(
+    const struct micros_user_address_space_runtime_view *view,
+    struct micros_user_address_space_scratch_lease *lease
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_collect_bootstrap_release_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    struct micros_user_address_space_bootstrap_plan *plan
+);
+
+enum micros_user_address_space_error
+micros_user_address_space_collect_bootstrap_handoff_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    uint64_t expected_owned_frames,
+    struct micros_user_address_space_bootstrap_plan *plan
+);
 
 #endif

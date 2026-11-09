@@ -33,15 +33,13 @@ micros_frame_ownership_runtime_prepare_handoff(
 
 enum micros_frame_ownership_error
 micros_frame_ownership_runtime_prepare_wired_process_user_set(
-    const uint64_t *selected_bitmap,
-    size_t selected_word_count
+    const struct micros_frame_selection *selection
 );
 
 enum micros_frame_ownership_error
 micros_frame_ownership_runtime_release_process_set(
     struct micros_process_handle process,
-    const uint64_t *release_bitmap,
-    size_t release_word_count
+    const struct micros_frame_selection *selection
 );
 
 enum micros_frame_ownership_error

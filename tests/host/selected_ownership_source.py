@@ -740,6 +740,8 @@ def validate_retained_source(root, path, text, stage):
             raise ValueError("MEM03 fixed or noncandidate source changed: " + path)
         return
     if path.endswith(".h"):
+        if "MEM03/header/" + path in retired:
+            return
         if original.count("\n#endif") != 1:
             raise ValueError("MEM03 header has an unexpected original boundary")
         expected = original.replace("\n#endif", "\n" + "\n".join(header_additions(path)) + "\n\n#endif", 1)
@@ -763,11 +765,13 @@ def validate_retained_source(root, path, text, stage):
             raise ValueError("MEM03 operation escaped its exact admitted callees: " + name)
     contracts = _helper_contracts()
     for name in additions:
+        if "MEM03/function/" + path + "/" + name in retired:
+            continue
         current = after[name]
         signature, calls = contracts[name]
         if compact(current.signature) != compact(signature) or current.guards or _function_calls(current.body) != calls:
             raise ValueError("MEM03 helper escaped its exact signature/call admission: " + name)
-    if _source_skeleton(text, after) != _source_skeleton(original, before):
+    if "MEM03/skeleton/" + path not in retired and _source_skeleton(text, after) != _source_skeleton(original, before):
         raise ValueError("MEM03 changed unrelated include, type or storage ownership")
 
 
@@ -1091,11 +1095,15 @@ def _observation_bindings(root, path, text, stage, channel):
     from tests.host.work_count_lexical import compound_layout, function_spans, matches_at, positional_tokens
     from tests.host.work_count_projection import resolve_regions
     from tests.host.work_count_types import Region
+    from tests.host.selected_release_handoff_source import legacy_replaced_functions
 
     spans = function_spans(text)
+    replaced = legacy_replaced_functions(root, "MEM03", path, text, stage)
     result = []
     for site in observation_sites(root, path, stage, channel):
         function, identifier, _, _, kind, regions, primitive, placement, units, witness = site
+        if function in replaced:
+            continue
         if function not in spans or units != 1:
             raise ValueError("MEM03 observation has an absent function or invalid units")
         span = spans[function]
@@ -1139,9 +1147,11 @@ def _observation_bindings(root, path, text, stage, channel):
 
 def _validate_observation_coverage(root, path, text, stage):
     from tests.host.work_count_lexical import function_spans, positional_tokens
+    from tests.host.selected_release_handoff_source import legacy_replaced_functions
 
     if path not in (*OBSERVED_MEMORY_PATHS, *OBSERVED_OBJECT_PATHS):
         return
+    replaced = legacy_replaced_functions(root, "MEM03", path, text, stage)
     fields, loops = set(), set()
     names = OBSERVED_MEMORY_FUNCTIONS.get(path)
     if path == "kernel/memory/bootstrap_memory.c":
@@ -1149,7 +1159,7 @@ def _validate_observation_coverage(root, path, text, stage):
     if names is not None and stage is Stage.GREEN:
         names = (*names, *SOURCE_PROJECTION["new_helpers"].get(path, ()))
     for name, span in function_spans(text).items():
-        if names is not None and name not in names:
+        if name in replaced or names is not None and name not in names:
             continue
         body = positional_tokens(text[span.body_start:span.body_end])
         values = tuple(item.value for item in body)
@@ -1187,11 +1197,21 @@ def _render_observations(root, path, text, stage, channel):
 
 
 def observe_source(root, path, text, stage, channel):
+    from tests.host.selected_release_handoff_source import legacy_observe_source
+
     validate_retained_source(root, path, text, stage)
+    current = legacy_observe_source(root, "MEM03", path, text, stage, channel)
+    if current is not None:
+        return current
     return _render_observations(root, path, text, stage, channel)
 
 
 def project_observations(root, path, text, stage, channel):
+    from tests.host.selected_release_handoff_source import project_legacy_observations
+
+    current = project_legacy_observations(root, "MEM03", path, text, stage, channel)
+    if current is not None:
+        return current
     if not text.startswith(OBSERVATION_PREFIX):
         raise ValueError("MEM03 observation preamble is not its private native declaration")
     restored = text[len(OBSERVATION_PREFIX):]
@@ -1432,6 +1452,7 @@ def native_recipe():
 
 def extend_cmake(text):
     from tests.host.selected_address_space_source import native_recipe as selected_address_space_recipe
+    from tests.host.selected_release_handoff_source import native_recipe as selected_release_handoff_recipe
 
     anchor = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
     if hashlib.sha256(text.encode()).hexdigest() != RECIPE_ADMISSION["base_cmake_sha256"] or text.count(anchor) != 1:
@@ -1441,7 +1462,7 @@ def extend_cmake(text):
         if text.count(output) != 1:
             raise ValueError("MEM03 source-proof pool lacks its exact predecessor generator")
         text = text.replace(output, output + "        JOB_POOL mem03_source_proof\n", 1)
-    return text.replace(anchor, native_recipe() + selected_address_space_recipe() + anchor, 1)
+    return text.replace(anchor, native_recipe() + selected_address_space_recipe() + selected_release_handoff_recipe() + anchor, 1)
 
 
 def project_cmake(text):

@@ -613,11 +613,16 @@ def _observation_spans(path, text, stage, root=None):
     from tests.host.work_count_lexical import compound_layout, function_spans, matches_at, positional_tokens
     from tests.host.work_count_projection import resolve_regions
     from tests.host.work_count_types import Region
+    from tests.host.selected_release_handoff_source import legacy_replaced_functions
 
+    root = Path(__file__).resolve().parents[2] if root is None else Path(root)
     spans = function_spans(text)
+    replaced = legacy_replaced_functions(root, "MEM01", path, text, stage)
     result = []
     for site in observation_sites(path, stage, root=root):
         function, _, _, regions, primitive = site
+        if function in replaced:
+            continue
         if function not in spans:
             raise ValueError("MEM01 observation function is absent: " + function)
         function_span = spans[function]
@@ -637,7 +642,7 @@ def _observation_spans(path, text, stage, root=None):
         begin = function_span.body_start + body[selected[0]].start
         finish = function_span.body_start + body[selected[0] + len(fragment) - 1].end
         result.append((site, begin, finish))
-    for function in set(MEASURED_FUNCTIONS.get(path, ())) & set(spans):
+    for function in (set(MEASURED_FUNCTIONS.get(path, ())) & set(spans)) - replaced:
         span = spans[function]
         for token in positional_tokens(text[span.body_start:span.body_end]):
             if token.value != "allocated_bitmap":
@@ -659,13 +664,23 @@ def _render_observations(path, text, stage, root=None):
 
 
 def observe_source(path, text, *, stage, root=None):
+    from tests.host.selected_release_handoff_source import legacy_observe_source
+
     root = Path(__file__).resolve().parents[2] if root is None else Path(root)
     validate_retained_source(root, path, text, stage=stage)
+    current = legacy_observe_source(root, "MEM01", path, text, stage)
+    if current is not None:
+        return current
     return _render_observations(path, text, stage, root=root)
 
 
 def project_observations(path, text, *, stage, root=None):
+    from tests.host.selected_release_handoff_source import project_legacy_observations
+
     root = Path(__file__).resolve().parents[2] if root is None else Path(root)
+    current = project_legacy_observations(root, "MEM01", path, text, stage)
+    if current is not None:
+        return current
     if type(text) is not str or not text.startswith(OBSERVATION_PREFIX):
         raise ValueError("MEM01 observation preamble is not the fixed native-only declaration")
     original = text[len(OBSERVATION_PREFIX):]

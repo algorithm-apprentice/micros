@@ -1003,30 +1003,38 @@ def extend_handoff_preflight(original):
 
 def validate_retained_source(root, path, text, stage):
     from tests.host.c_source_records import compact
+    from tests.host.selected_release_handoff_source import native_assertion_admission as next_admission
 
     if stage not in (Stage.RED, Stage.GREEN) or type(text) is not str:
         raise ValueError("MEM04 source admission has an unknown stage or representation")
+    retired = next_admission(root, "MEM04", path, text, stage)
     original = fixed_source(str(root), path).decode()
     if stage is Stage.RED or path not in SOURCE_ROLES["production_paths"]:
         if text != original:
+            if "MEM04/native-input/" + path in retired:
+                return
             raise ValueError("MEM04 fixed or noncandidate native source changed: " + path)
         return
     if path in SOURCE_ROLES["dependent_production_paths"]:
+        if "MEM04/dependent-file/" + path in retired:
+            return
         if text != extend_handoff_preflight(original):
             raise ValueError("MEM04 handoff dependency changed beyond its two error assignments")
         return
     if path.endswith(".h"):
+        if "MEM04/header/" + path in retired:
+            return
         if text != extended_header(path, original):
             raise ValueError("MEM04 header differs from its exact byte-level extension: " + path)
         return
     before, after = function_records(original), function_records(text)
     additions = SOURCE_PROJECTION["new_helpers"].get(path, ())
     removed = SOURCE_PROJECTION["removed_functions"].get(path, ())
-    if set(after) != set(before).difference(removed) | set(additions):
+    if "MEM04/definitions/" + path not in retired and set(after) != set(before).difference(removed) | set(additions):
         raise ValueError("MEM04 current source has missing or unadmitted definitions: " + path)
     mutable = SOURCE_PROJECTION["mutable_functions"][path]
     for name, old in before.items():
-        if name in removed:
+        if name in removed or "MEM04/function/" + path + "/" + name in retired:
             continue
         current = after[name]
         signature = _current_signature(name, old.signature) if name in mutable else compact(old.signature)
@@ -1042,11 +1050,13 @@ def validate_retained_source(root, path, text, stage):
                 raise ValueError("MEM04 changed a retained command/release operation beyond its selected handle: " + name)
     contracts = _helper_contracts()
     for name in additions:
+        if "MEM04/function/" + path + "/" + name in retired:
+            continue
         current = after[name]
         signature, calls = contracts[name]
         if compact(current.signature) != compact(signature) or current.guards or _function_calls(current.body) != calls:
             raise ValueError("MEM04 helper escaped its exact signature/call admission: " + name)
-    if _source_skeleton(text) != _extended_skeleton(path, original):
+    if "MEM04/skeleton/" + path not in retired and _source_skeleton(text) != _extended_skeleton(path, original):
         raise ValueError("MEM04 changed unrelated includes, types or storage: " + path)
 
 def _matching(values, start, opening, closing):
@@ -1210,8 +1220,10 @@ def _explicit_sites(path, name, body, declarations):
 
 def observation_sites(root, path, text, stage):
     from tests.host.c_source_records import tokens
+    from tests.host.selected_release_handoff_source import legacy_replaced_functions
 
     records = function_records(text)
+    replaced = legacy_replaced_functions(root, "MEM04", path, text, stage)
     original = baseline_observations(str(root), path)
     selected = NATIVE_FUNCTION_SUBSETS.get(path, tuple(records))
     if stage is Stage.GREEN and path == "kernel/vm/vm_handoff_runtime.c":
@@ -1220,6 +1232,8 @@ def observation_sites(root, path, text, stage):
     mutable = set(SOURCE_PROJECTION["mutable_functions"].get(path, ()))
     result = {}
     for name in selected:
+        if name in replaced:
+            continue
         if name not in records:
             raise ValueError("MEM04 observed native closure omitted a declared definition")
         body = records[name].body
@@ -1259,9 +1273,14 @@ def _observation_call(site, fragment=None):
 
 
 def observe_source(root, path, text, channel, stage=Stage.RED):
+    from tests.host.selected_release_handoff_source import legacy_observe_source
+
     if channel not in CHANNELS:
         raise ValueError("MEM04 observation channel is unknown")
     validate_retained_source(root, path, text, stage)
+    current = legacy_observe_source(root, "MEM04", path, text, stage, channel)
+    if current is not None:
+        return current
     if channel == "ordinary":
         return text
     spans = function_spans(text)
@@ -1293,8 +1312,13 @@ def observe_source(root, path, text, channel, stage=Stage.RED):
 
 
 def project_observations(root, path, text, channel, stage=Stage.RED):
+    from tests.host.selected_release_handoff_source import project_legacy_observations
+
     if channel not in CHANNELS:
         raise ValueError("MEM04 observation channel is unknown")
+    current = project_legacy_observations(root, "MEM04", path, text, stage, channel)
+    if current is not None:
+        return current
     original = source_bytes(root, path, stage).decode()
     if channel == "ordinary":
         if text != original:
@@ -1337,6 +1361,8 @@ def replace_body(text, name, body):
 
 
 def bind_native(path, text, stage=Stage.RED):
+    from tests.host.selected_release_handoff_source import legacy_binding_prefix, legacy_scratch_binding
+
     prefix = NATIVE_PREFIX
     if path == "arch/riscv64/interrupt.h":
         for name, body in (
@@ -1348,7 +1374,7 @@ def bind_native(path, text, stage=Stage.RED):
         return prefix + text
     if path == "kernel/memory/bootstrap_memory.c":
         return (
-            prefix + '#include "micros/kernel_object_runtime.h"\n#include <string.h>\n'
+            prefix + legacy_binding_prefix(text) + '#include "micros/kernel_object_runtime.h"\n#include <string.h>\n'
             "#define riscv_irq_is_enabled micros_as_native_irq_enabled\n"
             "static struct micros_frame_allocator bootstrap_allocator;\n"
             "static struct micros_frame_ownership bootstrap_ownership;\n"
@@ -1420,6 +1446,9 @@ def bind_native(path, text, stage=Stage.RED):
             + definitions(text, ("micros_bootstrap_control_find_binding",))
         )
     if path == "kernel/memory/user_address_space_runtime.c":
+        current = legacy_scratch_binding(text, stage)
+        if current is not None:
+            return current
         return prefix + replace_body(text, "read_satp", "    return micros_as_native_read_satp();") + (
             "\nconst uint64_t *micros_as_native_scratch_bitmap(bool release)\n"
             "{ return release ? release_bitmap : reachable_bitmap; }\n"
@@ -1554,6 +1583,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.selected_release_handoff_source import project_cmake as project_next
+
+    text = project_next(text)
     if not any(marker in text for marker in ("MEM04_NATIVE", "selected_address_space", "selected-address-space")):
         return text
     addition = native_recipe()
@@ -1608,11 +1640,14 @@ def legacy_tty_additions(root, logical):
 
 def native_assertion_admission(root, family, path, text, stage):
     from tests.host.evidence_authority_scope import identity_required
+    from tests.host.selected_release_handoff_source import native_assertion_admission as next_admission
+
+    inherited = next_admission(root, family, path, text, stage)
 
     if stage not in (Stage.RED, Stage.GREEN):
         raise ValueError("MEM04 legacy admission has an unknown source stage")
     if stage is Stage.RED or family == "MEM01":
-        return frozenset()
+        return inherited
     owners = {
         "MEM02": "tests/host/memory_native_source_bindings.py",
         "MEM03": "tests/host/selected_ownership_native_source_bindings.py",
@@ -1629,7 +1664,7 @@ def native_assertion_admission(root, family, path, text, stage):
     selected = frozenset(scope for key, scope in scopes if not identity_required(root, key))
     if selected:
         validate_retained_source(root, path, text, Stage.GREEN)
-    return selected
+    return selected | inherited
 
 
 def _legacy_changes(path):
@@ -1832,6 +1867,9 @@ def extend_legacy_adapter(path, text):
 
 
 def project_legacy_adapter(root, path, text):
+    from tests.host.selected_release_handoff_source import project_legacy_adapter as project_next
+
+    text = project_next(root, path, text)
     if path not in SOURCE_ROLES["fixed_adapters"] or path.startswith("kernel/tests/"):
         return text
     original = fixed_source(str(root), path).decode()
@@ -1891,9 +1929,14 @@ def declared_audit_boundaries(root):
 
 
 def measure_audit_boundaries(root, stage):
+    from tests.host.selected_release_handoff_source import legacy_audit_boundaries
+
     root = Path(root).resolve()
     if stage not in (Stage.RED, Stage.GREEN):
         raise ValueError("MEM04 audit scope has an unknown stage")
+    current = legacy_audit_boundaries(root, stage)
+    if current is not None:
+        return current
     paths = original_audit_paths(str(root))
     current = tuple(
         name for name in subprocess.check_output(("git", "ls-files"), cwd=root, timeout=30).decode().splitlines()
