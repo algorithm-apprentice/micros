@@ -266,6 +266,13 @@ source policies lack individual names.
 metadata prerequisite. OBJ01 design is blocked until that reviewed pair
 merges; no object, hart, stack or scheduler correction is yet accepted.
 
+EV01-C09's independently reviewed design has separately merged as #239.
+Its [metadata implementation map](object-and-panic-source-authority.md#implementation-map)
+records the independently frozen fifty repairs and eleven additions,
+genuine missing-coverage Red and focused Green. The implementation is
+the sole active outcome; complete acceptance and independent review still
+precede its merge and OBJ01 design resumption.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

@@ -22,6 +22,7 @@ from unittest.mock import patch
 
 from tests.host import evidence_authority
 from tests.host import evidence_authority_inventory
+from tests.host.evidence_authority_inventory import historical_object_binding_facts
 from tests.host.ast_evidence import ast_dump
 from tests.host.evidence_authority_source import literal_value, single_assignment
 from tests.host.evidence_authority_types import digest, fact_set_digest
@@ -32,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 if TYPE_CHECKING:
     # Keep literal metadata discoverable without executing its declaration.
-    from tests.host import selected_release_handoff_native_source_bindings
+    from tests.host import panic_trace_source_bindings, selected_release_handoff_native_source_bindings
 
 
 @lru_cache(maxsize=1)
@@ -288,6 +289,7 @@ def prior_standalone_binding_facts(facts, root=ROOT):
 
 
 def prior_binding_facts(facts, root=ROOT):
+    facts = historical_object_binding_facts(root, facts)
     facts = prior_standalone_binding_facts(facts, root)
     rows, _ = relocated_binding_reference(root)
     admitted = {
@@ -1158,8 +1160,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(24, len(inventory.families))
-        self.assertEqual(5840, len(inventory.facts))
+        self.assertEqual(25, len(inventory.families))
+        self.assertEqual(5851, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -1743,7 +1745,7 @@ class RelocatedBindingTests(unittest.TestCase):
             self.assertEqual(expected_metadata, (fact.payload_paths, fact.primary_unit, fact.consumer_units))
             self.assertIs(evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, fact.authority_class)
         projected = prior_binding_facts(retained)
-        standalone_view = prior_standalone_binding_facts(retained)
+        standalone_view = historical_object_binding_facts(ROOT, prior_standalone_binding_facts(retained))
         self.assertEqual(104, sum(before != after for before, after in zip(standalone_view, projected)))
         for family, expected in fingerprints.items():
             self.assertEqual(expected, fact_set_digest(fact for fact in projected if fact.family == family), family)
@@ -2018,6 +2020,7 @@ class StandaloneBindingTests(unittest.TestCase):
         historical = prior_standalone_binding_facts(self.inventory.facts)
         self.assertEqual(1, sum(current != prior for current, prior in zip(self.inventory.facts, historical)))
         self.assertEqual(before, next(fact for fact in historical if fact.key == self.KEY))
+        historical = historical_object_binding_facts(ROOT, historical)
         for family, expected in fingerprints.items():
             self.assertEqual(
                 expected, fact_set_digest(fact for fact in historical if fact.family == family), family,
@@ -2029,9 +2032,12 @@ class StandaloneBindingTests(unittest.TestCase):
         ).groups()
         self.assertEqual(old, fingerprints["authority-core"])
         expected = {**fingerprints, "authority-core": new}
+        current_object_history = historical_object_binding_facts(ROOT, self.inventory.facts)
         self.assertEqual(expected, {
-            family: fingerprint for family, fingerprint in self.inventory.declared_family_fact_digests
-            if family in expected
+            family: fact_set_digest(
+                fact for fact in current_object_history if fact.family == family
+            )
+            for family in expected
         })
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
 
@@ -2173,7 +2179,9 @@ class MemoryNativeBindingTests(unittest.TestCase):
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
         )
         self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
-        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        retained = tuple(
+            fact for fact in historical_object_binding_facts(ROOT, self.inventory.facts) if fact.family in self.previous
+        )
         self.assertEqual(3954, len(retained))
         self.assertEqual(16, len(self.previous))
         for family, expected in self.previous.items():
@@ -2490,13 +2498,15 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(120, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
         )
         self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
-        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        retained = tuple(
+            fact for fact in historical_object_binding_facts(ROOT, self.inventory.facts) if fact.family in self.previous
+        )
         self.assertEqual(5259, len(retained))
         self.assertEqual(21, len(self.previous))
         for family, expected in self.previous.items():
@@ -2826,13 +2836,15 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(477, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
         )
         self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
-        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        retained = tuple(
+            fact for fact in historical_object_binding_facts(ROOT, self.inventory.facts) if fact.family in self.previous
+        )
         self.assertEqual(4782, len(retained))
         self.assertEqual(20, len(self.previous))
         for family, expected in self.previous.items():
@@ -3144,7 +3156,9 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
         )
         self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
-        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        retained = tuple(
+            fact for fact in historical_object_binding_facts(ROOT, self.inventory.facts) if fact.family in self.previous
+        )
         self.assertEqual(4290, len(retained))
         self.assertEqual(18, len(self.previous))
         for family, expected in self.previous.items():
@@ -3438,7 +3452,7 @@ class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(453, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -3451,11 +3465,12 @@ class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
         self.assertEqual(23, sum(row["no_body_directives"] for row in current))
         self.assertEqual(15, sum(not row["primitives"] for row in current))
         self.assertEqual(1, sum(bool(row["body_sha256"]) for row in current))
-        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        retained = tuple(
+            fact for fact in historical_object_binding_facts(ROOT, self.inventory.facts) if fact.family in self.previous
+        )
         self.assertEqual((5387, 23), (len(retained), len(self.previous)))
         for family, expected in self.previous.items():
             with self.subTest(family=family):
-                self.assertEqual(expected, dict(self.inventory.declared_family_fact_digests)[family])
                 self.assertEqual(expected, fact_set_digest(fact for fact in retained if fact.family == family))
 
     def test_literal_schema_and_consumer_drift_cannot_create_authority(self):
@@ -3792,6 +3807,437 @@ class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "complete interface"):
                 source.validate_retained_source(ROOT, path, original + "\n", Stage.GREEN)
             require_key("header/" + path)
+
+
+@lru_cache(maxsize=4)
+def object_panic_reference(root=ROOT):
+    from tests.host.c_source_records import function_records
+
+    study = (root / "docs/research/object-and-panic-source-authority-gap.md").read_text()
+    reference = re.search(r"The fixed source is\s+`([0-9a-f]{40})`", study).group(1)
+    owner = "tests/host/test_kernel_object_source_layout.py"
+    declaration = "tests/host/panic_trace_source_bindings.py"
+
+    def fixed(path, commit=reference):
+        return subprocess.check_output(
+            ("git", "show", commit + ":" + path), cwd=root, text=True, timeout=30,
+        )
+
+    def value(text, name):
+        return literal_value(single_assignment(ast.parse(text), name).value)
+
+    relocated_binding_reference(root)
+    gate = fixed(owner)
+    directory = value(fixed("tests/host/kernel_layout_source.py"), "KERNEL_FILE_FACTS")
+    sources = tuple(directory[path][0] for path in value(gate, "CORE_SOURCES"))
+    header = directory[value(gate, "PRIVATE_HEADERS")[0]][0]
+    definitions = {path: function_records(fixed(path)) for path in sources}
+    bodies = value(gate, "BASELINE_BODIES")[0]
+    subjects = {}
+    for name in bodies:
+        matches = tuple(
+            path for path, records in definitions.items()
+            if name in records or "kernel_object_" + name in records
+        )
+        if len(matches) != 1:
+            raise ValueError("fixed object body has no unique actual C owner")
+        subjects["BASELINE_BODIES/0/" + name] = (matches[0],)
+    subjects["BASELINE_SIGNATURES/0"] = sources
+    subjects["BASE_CORE_DIGEST"] = (*sources, header)
+    files = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", reference), cwd=root, timeout=30,
+    ).decode().split("\0")))
+    old_paths = tuple(sorted({owner} | {
+        node.value for node in ast.walk(ast.parse(gate))
+        if isinstance(node, ast.Constant) and type(node.value) is str and node.value in files
+    }))
+    changes = {}
+    for scope, paths in subjects.items():
+        expected = (
+            bodies[scope.removeprefix("BASELINE_BODIES/0/")] if scope.startswith("BASELINE_BODIES/0/")
+            else value(gate, "BASELINE_SIGNATURES")[0] if scope == "BASELINE_SIGNATURES/0"
+            else value(gate, "BASE_CORE_DIGEST")
+        )
+        before = evidence_authority.Fact(
+            owner + ":data-entry:" + scope, "kernel-structure", owner, "data-entry", scope,
+            evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+            evidence_authority_inventory._fact_primary_unit(old_paths),
+            evidence_authority_inventory._consumer_units(owner, old_paths), old_paths, expected,
+        )
+        paths = tuple(sorted({owner, *paths}))
+        changes[before.key] = (before, dataclasses.replace(
+            before, payload_paths=paths, primary_unit="B03", consumer_units=("B03", "B14"),
+        ))
+    policy = fixed("tests/host/panic_trace_source.py")
+    panic_reference = value(policy, "SOURCE_PROJECTION")["source_reference"]
+    consumers = (
+        ("trace_preservation", {unit for unit, name in value(policy, "FATAL_EFFECT_CONTRACT")["selected_resolvers"]}),
+        ("trace_fault_artifacts", {
+            unit for unit, name in value(fixed("tools/stack_bound_fatal_effects.py"), "TRACE_FAULT_FUNCTIONS")
+        }),
+        ("checked_source_record", {
+            unit for unit, name in value(fixed("tools/stack_bound_fatal.py"), "TRACE_FIXTURE_GETTERS")
+        }),
+    )
+    binding = (
+        ("policy", reference, subprocess.check_output(
+            ("git", "rev-parse", reference + "^{tree}"), cwd=root, text=True, timeout=30,
+        ).strip()),
+        ("PLAT03", panic_reference),
+    )
+    rows, facts = [], []
+    for subject in sorted(set().union(*(units for _, units in consumers))):
+        scope, owners = "PLAT03/projected-source/" + subject, ("tools/stack_bound_fatal.py",)
+        contract = {
+            "comparison": "projected-file",
+            "projection_owner": "tests/host/panic_trace_source.py",
+            "projection": "project_trace_runtime",
+            "assertions": tuple(name for name, units in consumers if subject in units),
+            "sha256": hashlib.sha256(fixed(subject, panic_reference).encode()).hexdigest(),
+        }
+        rows.append((scope, subject, owners, contract))
+        facts.append(evidence_authority.Fact(
+            declaration + ":source-admission:" + scope, "panic-trace-source-admission", declaration,
+            "source-admission", scope, evidence_authority.AuthorityClass.TRANSPORT_IDENTITY, "B01",
+            tuple(f"B{index:02d}" for index in (*range(1, 13), 14)),
+            tuple(sorted((declaration, subject, *owners))), digest((binding, scope, subject, owners, contract)),
+        ))
+    fingerprints = value(fixed("tests/host/evidence_authority_inventory.py"), "DECLARED_FAMILY_FACT_DIGESTS")
+    return changes, binding, tuple(rows), tuple(facts), fingerprints
+
+
+class ObjectPanicSourceBindingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.changes, cls.reference, cls.rows, cls.expected_facts, cls.previous = object_panic_reference()
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.by_key = {fact.key: fact for fact in cls.inventory.facts}
+
+    def test_existing_object_assertions_bind_their_actual_sources(self):
+        from tests.host import test_kernel_object_source_layout as gate
+
+        case = gate.KernelObjectSourceLayoutTest()
+        case.test_complete_original_bodies_and_all_parameter_types_remain_exact()
+        case.test_portable_complete_byte_inverse_is_independent_and_rejects_changed_code()
+        read = gate.source
+        subject = "kernel/kernel_object_hart.c"
+        original = read(subject)
+        for changed in (
+            original.replace("(uintptr_t)candidate == hart_context", "(uintptr_t)candidate != hart_context", 1),
+            original.replace("uintptr_t hart_context,", "uint64_t hart_context,", 1),
+        ):
+            self.assertNotEqual(original, changed)
+            with patch.object(gate, "source", side_effect=lambda path: changed if path == subject else read(path)):
+                with self.assertRaises(AssertionError):
+                    case.test_complete_original_bodies_and_all_parameter_types_remain_exact()
+        self.assertEqual(50, len(self.changes))
+        for key, (_, expected) in self.changes.items():
+            with self.subTest(key=key):
+                self.assertEqual(expected, self.by_key[key], "existing identity omits its actual object source")
+
+    def check_preservation_sources(self):
+        from tools import stack_bound_fatal as fatal
+
+        class AfterSources(Exception):
+            pass
+
+        with patch.object(fatal, "trace_object_layout", return_value={"registry_bytes": 1}), patch.object(
+            fatal, "bound_data_object", side_effect=AfterSources,
+        ), self.assertRaises(AfterSources):
+            fatal.trace_preservation(ROOT, SimpleNamespace(objects={}, sections={}), ())
+
+    def check_fault_sources(self):
+        from tools import stack_bound_fatal as fatal
+        from tools.stack_bound_types import Frame, FunctionKey, SourceOrigin
+
+        keys = tuple(FunctionKey("source", "kernel/micros.elf", unit, name) for unit, name in fatal.TRACE_FAULT_FUNCTIONS)
+        objects, definitions, origins, names = {}, [], [], []
+        for index, key in enumerate(keys):
+            unit, name = key.translation_unit, key.symbol
+            relative = "CMakeFiles/micros.dir/" + unit + ".obj"
+            obj = objects.setdefault(relative, SimpleNamespace(
+                symbols={}, sections=(None, SimpleNamespace(name=".text")), data=b"source-policy fixture",
+            ))
+            obj.symbols[name] = SimpleNamespace(name=name, section_index=1, value=index * 4, size=4)
+            definitions.append(SimpleNamespace(function=key, size=4, address=0x1000 + index * 4))
+            source = fatal.read_regular(ROOT / unit)[0].decode()
+            origins.append(SourceOrigin(key, unit, fatal.definition_line(source, name)))
+            names.append((key, relative))
+        catalog = SimpleNamespace(
+            frames=tuple(Frame(key, 16) for key in keys), definitions=tuple(definitions),
+            origins=tuple(origins), objects=tuple(names), calls=(), pending=(),
+        )
+        artifacts = SimpleNamespace(
+            variant="source", image_name="kernel/micros.elf", objects=objects,
+            image=SimpleNamespace(symbols=()), map_text="",
+        )
+        addresses = {row.function: row.address for row in definitions}
+        with (
+            patch.object(fatal, "function_symbols", side_effect=lambda obj: obj.symbols),
+            patch.object(fatal, "object_frames", side_effect=lambda obj, symbols: {name: 16 for name in symbols}),
+            patch.object(fatal, "verify_linked_object", return_value={}),
+            patch.object(fatal, "join_function_locations", return_value=addresses),
+            patch.object(fatal, "function_flow", return_value=SimpleNamespace(calls=())),
+        ):
+            _, _, accepted = fatal.trace_fault_artifacts(ROOT, ROOT, catalog, artifacts)
+        self.assertEqual(tuple(row[0] for row in accepted), keys)
+
+    def test_existing_panic_assertions_have_individual_names(self):
+        from tools import stack_bound_fatal as fatal
+        from tools.stack_bound_types import FunctionKey, SourceOrigin, StackEvidenceError
+
+        self.check_preservation_sources()
+        self.check_fault_sources()
+        getter_keys = tuple(
+            FunctionKey("source", "kernel/micros.elf", unit, name) for unit, name in fatal.TRACE_FIXTURE_GETTERS
+        )
+
+        def check_getters(selected=getter_keys):
+            for key in selected:
+                origin = SourceOrigin(
+                    key, key.translation_unit,
+                    fatal.definition_line(fatal.read_regular(ROOT / key.translation_unit)[0].decode(), key.symbol),
+                )
+                self.assertEqual(key.symbol, fatal.checked_source_record(ROOT, key, origin, trace_test=True).name)
+
+        check_getters()
+        read = fatal.read_regular
+        for scope, subject, _, contract in self.rows:
+            # Reach the file equality rather than failing the stricter overlay inverse first.
+            projected = fatal.project_trace_runtime(subject, read(ROOT / subject)[0].decode()).encode()
+
+            def projected_read(path):
+                data, identity = read(path)
+                return (projected if path == ROOT / subject else data), identity
+
+            def changed_read(path):
+                data, identity = projected_read(path)
+                return (data + b"\n" if path == ROOT / subject else data), identity
+
+            for consumer in contract["assertions"]:
+                check, message = {
+                    "trace_preservation": (self.check_preservation_sources, "selected-owner provider changed"),
+                    "trace_fault_artifacts": (self.check_fault_sources, "fault prefix borrowed"),
+                    "checked_source_record": (check_getters, "getter changed its fixed provider"),
+                }[consumer]
+                for getter in getter_keys if consumer == "checked_source_record" else (None,):
+                    with patch.object(fatal, "read_regular", side_effect=projected_read):
+                        if getter is not None:
+                            check_getters((getter,))
+                        else:
+                            check()
+                    with self.subTest(subject=subject, consumer=consumer, getter=getter), patch.object(
+                        fatal, "read_regular", side_effect=changed_read,
+                    ), self.assertRaisesRegex(StackEvidenceError, message):
+                        if getter is not None:
+                            check_getters((getter,))
+                        else:
+                            check()
+        for expected in self.expected_facts:
+            with self.subTest(scope=expected.scope):
+                self.assertTrue(
+                    expected.key in self.by_key,
+                    "missing existing panic source-policy identity: " + expected.key,
+                )
+
+    def test_complete_metadata_and_historical_records_match_fixed_sources(self):
+        owner = "tests/host/panic_trace_source_bindings.py"
+        tree = ast.parse((ROOT / owner).read_text())
+        self.assertEqual(self.reference, literal_value(single_assignment(tree, "BINDING_REFERENCE").value))
+        self.assertEqual(self.rows, literal_value(single_assignment(tree, "SOURCE_BINDINGS").value))
+        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
+        actual = tuple(fact for fact in self.inventory.facts if fact.family == "panic-trace-source-admission")
+        self.assertEqual(self.expected_facts, actual)
+        self.assertEqual(11, len(actual))
+        self.assertEqual({1: 8, 2: 2, 3: 1}, Counter(len(row[3]["assertions"]) for row in self.rows))
+        historical = historical_object_binding_facts(ROOT, self.inventory.facts)
+        by_key = {fact.key: fact for fact in historical}
+        for key, (before, after) in self.changes.items():
+            self.assertEqual(after, self.by_key[key])
+            self.assertEqual(before, by_key[key])
+        self.assertEqual(50, sum(current != prior for current, prior in zip(self.inventory.facts, historical)))
+        self.assertEqual(5840, sum(fact.family in self.previous for fact in historical))
+        for family, expected in self.previous.items():
+            self.assertEqual(expected, fact_set_digest(fact for fact in historical if fact.family == family), family)
+            if family != "kernel-structure":
+                self.assertEqual(expected, dict(self.inventory.declared_family_fact_digests)[family])
+
+    def object_fixture(self, directory):
+        root = Path(directory)
+        paths = {path for _, after in self.changes.values() for path in after.payload_paths}
+        for path in (*sorted(paths), "tests/host/kernel_layout_source.py"):
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((ROOT / path).read_bytes())
+        return root
+
+    def test_portable_owner_decoder_rejects_nonliteral_and_incomplete_ownership(self):
+        owner = "tests/host/test_kernel_object_source_layout.py"
+        original = (ROOT / owner).read_text()
+        names = '"micros_kernel_objects_initialize micros_kernel_objects_validate".split()'
+        self.assertEqual(1, original.count(names))
+        mutations = (
+            original.replace(names, names[:-1] + '" ")'),
+            original.replace(names, names[:-1] + 'maxsplit=2)'),
+            original.replace(names, 'unknown_names.split()'),
+            original.replace(names, '["micros_kernel_objects_initialize", 1]'),
+            original.replace(names, '["micros_kernel_objects_initialize", "micros_kernel_objects_initialize"]'),
+            original.replace('8: ["micros_kernel_objects_validate_base"],', '9: ["micros_kernel_objects_validate_base"],'),
+            original.replace("ORIGINAL_FUNCTIONS = {\n    0:", "ORIGINAL_FUNCTIONS = {\n    False:"),
+            original + "\nCORE_SOURCES = ()\n",
+            original + "\ndef hidden(CORE_SOURCES):\n    return CORE_SOURCES\n",
+            original + "\nORIGINAL_FUNCTIONS[0][0] = []\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-object-source-schema-") as directory:
+            root = self.object_fixture(directory)
+            mapping = evidence_authority_inventory.kernel_directory(root)
+            _, bindings = evidence_authority_inventory._object_payload_bindings(root, mapping)
+            self.assertEqual(50, len(bindings))
+            for changed in mutations:
+                self.assertNotEqual(original, changed)
+                (root / owner).write_text(changed)
+                with self.subTest(changed=changed[-80:]), self.assertRaises(ValueError):
+                    evidence_authority_inventory._object_payload_bindings(root, mapping)
+            (root / owner).write_text(original)
+            subject = root / "kernel/objects/kernel_object_context.c"
+            saved = subject.read_bytes()
+            subject.unlink()
+            with self.assertRaises(ValueError):
+                evidence_authority_inventory._object_payload_bindings(root, mapping)
+            subject.write_bytes(saved)
+            old = root / "kernel/kernel_object_context.c"
+            old.write_bytes(saved)
+            with self.assertRaises(ValueError):
+                evidence_authority_inventory._object_payload_bindings(root, mapping)
+            old.unlink()
+            header = root / "kernel/objects/kernel_object_private.h"
+            header.unlink()
+            header.symlink_to(subject)
+            with self.assertRaises(ValueError):
+                evidence_authority_inventory._object_payload_bindings(root, mapping)
+
+    def panic_fixture(self, directory, declaration=None):
+        root = Path(directory)
+        owner = self.expected_facts[0].owner_path
+        for path in sorted({path for fact in self.expected_facts for path in fact.payload_paths}):
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                (ROOT / owner).read_text() if path == owner and declaration is None
+                else declaration if path == owner else ""
+            )
+        return root
+
+    def test_panic_declaration_rejects_schema_reference_and_consumer_drift(self):
+        owner = self.expected_facts[0].owner_path
+        family = self.expected_facts[0].family
+
+        def encoded(reference, rows):
+            return "BINDING_REFERENCE = " + repr(reference) + "\nSOURCE_BINDINGS = " + repr(rows) + "\n"
+
+        declaration = (ROOT / owner).read_text()
+        runtime = next(index for index, row in enumerate(self.rows) if len(row[3]["assertions"]) == 3)
+        variants = [
+            "", declaration + "\nimport os\n", declaration + "\nraise RuntimeError('must not execute')\n",
+            declaration + "\nSOURCE_BINDINGS = ()\n", encoded(self.reference, list(self.rows)),
+            encoded(self.reference, self.rows[:-1]), encoded(self.reference, (*self.rows[:-1], self.rows[0])),
+            encoded((("policy", "a" * 40, self.reference[0][2]), self.reference[1]), self.rows),
+        ]
+        for field, value in (
+            (0, "PLAT03/unknown"), (1, "../outside.c"), (2, ("tools/another_guard.py",)),
+            (3, {**self.rows[runtime][3], "assertions": self.rows[runtime][3]["assertions"][:2]}),
+            (3, {**self.rows[runtime][3], "sha256": "0" * 64}),
+            (3, {**self.rows[runtime][3], "projection": "unprojected"}),
+        ):
+            rows = list(self.rows)
+            row = list(rows[runtime])
+            row[field] = value
+            rows[runtime] = tuple(row)
+            variants.append(encoded(self.reference, tuple(rows)))
+        with tempfile.TemporaryDirectory(prefix="micros-panic-source-schema-") as directory:
+            root = self.panic_fixture(directory)
+            self.assertEqual(self.expected_facts, evidence_authority_inventory._facts_for_owner(root, family, owner))
+            for variant in variants:
+                (root / owner).write_text(variant)
+                with self.subTest(variant=variant[:60]), self.assertRaises(ValueError):
+                    evidence_authority_inventory._facts_for_owner(root, family, owner)
+            (root / owner).write_text(declaration)
+            subject = root / self.rows[0][1]
+            subject.write_text("current bytes do not declare a historical expectation\n")
+            self.assertEqual(self.expected_facts, evidence_authority_inventory._facts_for_owner(root, family, owner))
+            peer = root / "peer"
+            peer.write_text("not an admitted source")
+            for path in (subject, root / "tools/stack_bound_fatal.py", root / owner):
+                saved = path.read_bytes()
+                for kind in ("missing", "symlink", "hardlink"):
+                    path.unlink()
+                    if kind == "symlink":
+                        path.symlink_to(peer)
+                    elif kind == "hardlink":
+                        os.link(peer, path)
+                    with self.subTest(path=path, kind=kind), self.assertRaises(ValueError):
+                        evidence_authority_inventory._facts_for_owner(root, family, owner)
+                    if path.exists() or path.is_symlink():
+                        path.unlink()
+                    path.write_bytes(saved)
+
+    def test_historical_inverse_checks_metadata_without_overwriting_other_fields(self):
+        selected = next(iter(self.changes.values()))[1]
+        for changed in (
+            dataclasses.replace(selected, payload_paths=selected.payload_paths[:-1]),
+            dataclasses.replace(selected, primary_unit="B14"),
+            dataclasses.replace(selected, consumer_units=("B14",)),
+        ):
+            facts = tuple(changed if fact.key == selected.key else fact for fact in self.inventory.facts)
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                historical_object_binding_facts(ROOT, facts)
+        for facts in (
+            tuple(fact for fact in self.inventory.facts if fact.key != selected.key),
+            (*self.inventory.facts, selected),
+            (*self.inventory.facts, dataclasses.replace(selected, key=selected.key + "/unknown")),
+        ):
+            with self.assertRaises(ValueError):
+                historical_object_binding_facts(ROOT, facts)
+        changed = dataclasses.replace(selected, evidence_value="0" * 64)
+        facts = tuple(changed if fact.key == selected.key else fact for fact in self.inventory.facts)
+        historical = historical_object_binding_facts(ROOT, facts)
+        self.assertEqual("0" * 64, next(fact.evidence_value for fact in historical if fact.key == selected.key))
+        self.assertNotEqual(
+            self.previous["kernel-structure"],
+            fact_set_digest(fact for fact in historical if fact.family == "kernel-structure"),
+        )
+
+    def test_both_memory_predecessors_validate_current_before_historical_projection(self):
+        from tests.host import selected_address_space_authority, selected_release_handoff_authority
+
+        new = next(fact for fact in self.inventory.facts if fact.family == "panic-trace-source-admission")
+        bad = dataclasses.replace(
+            self.inventory, facts=tuple(fact for fact in self.inventory.facts if fact.key != new.key),
+        )
+        old = next(iter(self.changes.values()))[1]
+        altered = tuple(dataclasses.replace(fact, evidence_value="0" * 64) if fact.key == old.key else fact for fact in self.inventory.facts)
+        rebaselined = dataclasses.replace(
+            self.inventory, facts=altered, declared_family_fact_digests=tuple(
+                (name, fact_set_digest(fact for fact in altered if fact.family == name)) if name == old.family
+                else (name, value) for name, value in self.inventory.declared_family_fact_digests
+            ),
+        )
+        for module, count, families in (
+            (selected_address_space_authority, 4774, 19),
+            (selected_release_handoff_authority, 5379, 22),
+        ):
+            prior = module.historical_predecessor_records(ROOT, self.inventory)
+            self.assertEqual(count, len(prior))
+            self.assertEqual(families, len({fact.family for fact in prior}))
+            self.assertEqual(module.SOURCE_PROJECTION["predecessor_facts_sha256"], fact_set_digest(prior))
+            with patch.object(
+                evidence_authority_inventory, "historical_object_binding_facts",
+                side_effect=AssertionError("invalid current inventory reached historical projection"),
+            ), self.assertRaisesRegex(ValueError, "inventory"):
+                module.historical_predecessor_records(ROOT, bad)
+            with self.assertRaisesRegex(ValueError, "historical|predecessor"):
+                module.historical_predecessor_records(ROOT, rebaselined)
 
 
 class TransitionTests(unittest.TestCase):

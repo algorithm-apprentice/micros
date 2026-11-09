@@ -160,12 +160,15 @@ class KernelMappingAuthorityTest(unittest.TestCase):
                 for target in node.targets
             )
         )
+        from tests.host.evidence_authority_inventory import historical_object_binding_facts
+
+        historical = historical_object_binding_facts(ROOT, inventory.facts)
         for family, expected in ast.literal_eval(declaration.value).items():
             with self.subTest(family=family):
                 self.assertEqual(
                     expected,
                     fact_set_digest(
-                        fact for fact in inventory.facts if fact.family == family
+                        fact for fact in historical if fact.family == family
                     ),
                 )
 

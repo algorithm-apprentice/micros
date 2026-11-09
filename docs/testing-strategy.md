@@ -884,6 +884,17 @@ inverse follows complete current-catalog validation; it cannot conceal a
 bad new fact or authorize current source. No executable artifact precedes
 separate design merge, and unit, target and integration gates remain required.
 
+That separate design #239 is now merged after clean complete correction
+and Acceptance-only review. Its
+[metadata implementation map](architecture/object-and-panic-source-authority.md#implementation-map)
+records genuine 61-subcase missing-binding/key Red after the actual source
+predicates' positive/negative controls, followed by focused Green.
+Runtime source-policy fixtures reach the post-projection equality rather
+than mislabeling the earlier strict overlay rejection.
+The original source/stack/machine guards and all historical expectations
+remain active. Complete current host/author acceptance and independent
+implementation review are still required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

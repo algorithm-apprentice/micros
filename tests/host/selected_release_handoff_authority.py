@@ -145,6 +145,7 @@ def base_membership(root):
 
 
 def historical_predecessor_records(root, inventory):
+    from tests.host.evidence_authority_inventory import historical_object_binding_facts
     from tests.host.evidence_authority_validation import validate_inventory
 
     checked = validate_inventory(inventory)
@@ -154,12 +155,16 @@ def historical_predecessor_records(root, inventory):
         root, "show", DESIGN_PINS["runtime_reference"] + ":tests/host/evidence_authority_inventory.py",
     ).decode())
     expected = literal_value(single_assignment(tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
-    current = dict(inventory.declared_family_fact_digests)
     if type(expected) is not dict or len(expected) != 22 or FAMILY in expected:
         raise ValueError("MEM05 historical family register changed")
-    if any(current.get(name) != fingerprint for name, fingerprint in expected.items()):
+    records = tuple(
+        fact for fact in historical_object_binding_facts(root, inventory.facts) if fact.family in expected
+    )
+    if any(
+        fact_set_digest(fact for fact in records if fact.family == name) != fingerprint
+        for name, fingerprint in expected.items()
+    ):
         raise ValueError("MEM05 changed a historical family fingerprint")
-    records = tuple(fact for fact in inventory.facts if fact.family in expected)
     if len(records) != 5379 or fact_set_digest(records) != SOURCE_PROJECTION["predecessor_facts_sha256"]:
         raise ValueError("MEM05 changed a complete predecessor record")
     return records

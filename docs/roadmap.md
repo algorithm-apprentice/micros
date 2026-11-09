@@ -494,6 +494,18 @@ source comparisons. Only that documentation-only design is active.
 OBJ01 design is blocked until its separately reviewed prerequisite pair
 merges; no OBJ01 runtime algorithm, retirement or finding closure is claimed.
 
+EV01-C09 design #239 has separately merged as
+`92cbd2b45f96df3bda616daab75262d36a2180b7`, with identical reviewed and
+squash tree `ebb45050815ba7e6dc7b185c83676492020e5e06`.
+Complete correction and Acceptance-only review, fresh journal-free
+committed/main checks and protected completed-ref cleanup passed.
+Its [metadata implementation map](architecture/object-and-panic-source-authority.md#implementation-map)
+records the independent pre-edit freeze, 61 actual missing-binding/key
+subcase failures and focused Green. The 5,851-record/25-family candidate
+changes only fifty old metadata tuples and adds eleven existing-policy
+names. Full current acceptance and independent implementation review
+remain required before its separate merge and OBJ01 design resumption.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

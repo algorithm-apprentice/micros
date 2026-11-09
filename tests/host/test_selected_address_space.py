@@ -380,8 +380,8 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
         fingerprints = literal_value(single_assignment(original, "DECLARED_FAMILY_FACT_DIGESTS").value)
         self.assertEqual(
             fingerprints, {
-                name: value for name, value in inventory.declared_family_fact_digests
-                if name in {fact.family for fact in prior}
+                name: fact_set_digest(fact for fact in prior if fact.family == name)
+                for name in {fact.family for fact in prior}
             },
         )
         self.assertEqual(8, sum(fact.family == FAMILY for fact in inventory.facts))

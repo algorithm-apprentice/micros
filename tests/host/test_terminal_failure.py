@@ -69,7 +69,9 @@ class TerminalAuthorityTest(unittest.TestCase):
         inventory = current_inventory(ROOT)
         self.assertEqual(12, len(expected))
         self.assertEqual(3920, sum(fact.family in expected for fact in inventory.facts))
-        historical = prior_standalone_binding_facts(inventory.facts)
+        from tests.host.evidence_authority_inventory import historical_object_binding_facts
+
+        historical = historical_object_binding_facts(ROOT, prior_standalone_binding_facts(inventory.facts))
         for family, fingerprint in expected.items():
             self.assertEqual(
                 fingerprint, fact_set_digest(fact for fact in historical if fact.family == family),
