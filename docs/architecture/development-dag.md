@@ -218,6 +218,15 @@ is the sole active outcome. OBJ01 design remains blocked until complete
 current acceptance, independent review and that implementation merge.
 The runtime graph and finding ownership remain unchanged.
 
+EV01-C09 implementation #240 has now passed complete current acceptance,
+independent review, exact-tree publication and journal-free main checks.
+OBJ01 design resumes under
+[Accepted ADR-0119](../adr/0119-selected-object-and-hart-validation.md) and
+the [selected object/hart contract](selected-object-and-hart-validation.md).
+It owns only B03-F001/F003/F004; OBJ02, IPC01 and later corrections remain
+separate. The design is the sole active outcome and its implementation is
+pending separate review, Acceptance and merge. No runtime edge changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

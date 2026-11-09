@@ -273,6 +273,14 @@ genuine missing-coverage Red and focused Green. The implementation is
 the sole active outcome; complete acceptance and independent review still
 precede its merge and OBJ01 design resumption.
 
+EV01-C09 implementation #240 has now completed those gates and separately
+merged without a runtime change or new retirement. The
+[Accepted OBJ01 contract](selected-object-and-hart-validation.md) is the
+sole active design. It replaces sixteen scheduler entry audits with
+selected checks, direct current identity and a geometric complete stack
+proof, while retaining the other twenty-six direct audit boundaries.
+No OBJ01 implementation begins before its own review, Acceptance and merge.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

@@ -19,9 +19,13 @@ The separate design #239 merged as
 `92cbd2b45f96df3bda616daab75262d36a2180b7`, with identical reviewed,
 committed, remote, preview, squash and main tree
 `ebb45050815ba7e6dc7b185c83676492020e5e06`.
-Its metadata implementation is now the sole active outcome.
-OBJ01 design is blocked until that implementation independently merges.
-No OBJ01 mechanism, implementation or retirement is authorized here.
+Its metadata implementation has independently merged as #240,
+`9b880468192e61177ffe57ec69079fe398160a42`, with identical reviewed and
+squash tree `80b93b111b5a1387d812da87c539e56da042777b`.
+OBJ01 design has resumed under its separate
+[Accepted contract](selected-object-and-hart-validation.md).
+No OBJ01 mechanism, implementation or retirement is authorized by this
+metadata outcome.
 
 ## Fifty exact metadata corrections
 
@@ -369,3 +373,13 @@ An independent complete comparison matched all 5,851 actual records to
 the pre-edit freeze and preserved all seven claims/185 retirements.
 Complete host/author acceptance, current native/target/image/stack proof
 and independent implementation review still precede publication.
+
+Those gates have now passed for #240. The complete host selection passed
+165 cases in 377.022 seconds. All fifty final commands passed fresh:
+45 CTests in 360.21 seconds, all 1,650 Python cases in 727.215 seconds,
+forty QEMU workflows, four standalone images and complete 44/113/ten-scope
+stack coverage. Three same-run profiles and independent implementation
+review were clean. Exact publication trees and fresh journal-free
+committed/actual-main checks passed. Completed task refs/worktrees were
+removed; twelve local and two remote purposeful archive refs and seventeen
+exact stashes remained unchanged.
