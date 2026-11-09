@@ -324,6 +324,22 @@ completed-ref cleanup passed. The fresh MEM05 implementation is the
 sole active outcome, with thirty candidate paths and the unchanged
 82-key partition. No archived execution closes a runtime finding.
 
+MEM05 implementation #236 has now passed complete current acceptance and
+clean independent review, then separately merged with exact reviewed/
+published/squash content. Fresh committed/main authority is journal-free;
+completed refs were removed and purposeful archives preserved.
+This closes only B02-F006/F007.
+
+OBJ01 is the next preferred runtime outcome, with its MEM04 prerequisite
+already merged. Its read-only source census found the
+[MEM05 native-source authority gap](selected-release-handoff-native-source-authority-gap.md).
+[Accepted ADR-0117](../adr/0117-granular-selected-release-handoff-native-source-authority.md)
+and [EV01-C08](../architecture/selected-release-handoff-native-source-authority.md)
+define the separate 453-clause metadata prerequisite. Only that design is
+active; OBJ01 design is blocked and its implementation pending until the
+reviewed pair merges. The 59-node runtime graph, finding ownership and
+hosted-CI boundary remain unchanged.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
@@ -463,7 +479,7 @@ blocking queue.
 | `MEM02` | Runtime correction | `B02-F003`, `B02-F004` | `MEM01` | Implementation #212 follows design #211 and the Accepted [kernel-map contract](../architecture/kernel-mapping-topology.md): largest legal leaves and direct checked table/owner identities. | Actual native/target Red-Green, retained MMU guards, exact three-key retirement, full current recertification and independent review complete. |
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. Designs #215/#216 and validation prerequisite #218 are merged; the fresh restart retains the fixed runtime and adds checked-view/full-only evidence integration. | Actual active/inactive/bitmap/object work, failure-atomic selected transitions, complete diagnostics and the exact 40-key authority transition; no borrowed interrupted acceptance. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level lookup/translation/allocation-prefix walks and selected root/context/owner preparation instead of complete state validation. | Exact PTE-level, owner, activation, fault-path and allocation-compensation evidence. |
-| `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Build selected release/handoff sets once and commit without full-capacity or per-process owner rescans. | Selected-frame/root counts, rollback, and target handoff recertification. |
+| `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Implementation #236 follows the Accepted [selected release/handoff contract](../architecture/selected-release-and-wired-handoff.md), with coherent owner indexing, selected-word sets and protected release/handoff plans. | Actual native/target Red-Green, exact 82-key transition, thirteen-unit recertification, full current acceptance and independent review complete. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Move complete registry audits off ordinary scheduler paths; use direct hart identity and bounded stack ownership structures. | Object/hart/stack comparison counts and corruption diagnostics. |
 | `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Retain one prevalidated return plan without rebuilding queues or repeating memory/context validation. | Queue-shift, zero-quantum, plan-compare, commit-store, and target return traces. |
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Use selected endpoint/object/completion plans and retained immutable authorization instead of nested global validation. | Per-operation endpoint/object/translation counts and failure-atomic completion cases. |

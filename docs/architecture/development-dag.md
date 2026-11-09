@@ -179,6 +179,20 @@ follows its [evidence map](selected-release-and-wired-handoff.md#implementation-
 Its one additional frozen target owner changes no runtime dependency,
 finding owner or hosted-CI acceptance.
 
+MEM05 implementation #236 has now passed complete current acceptance and
+independent review, separately merged, and preserved journal-free
+committed/main authority with exact publication-tree equality and protected
+ref cleanup. OBJ01 is next in the preferred correction order; its actual
+MEM04 prerequisite is already merged. VM02 remains later in that order.
+The read-only OBJ01 census found the
+[MEM05 current-source authority gap](../research/selected-release-handoff-native-source-authority-gap.md).
+[Accepted ADR-0117](../adr/0117-granular-selected-release-handoff-native-source-authority.md)
+and [EV01-C08](selected-release-handoff-native-source-authority.md) define
+one separate metadata-only prerequisite. Its design is the sole active
+outcome; OBJ01 design is blocked and its implementation pending until that
+separate pair merges. No runtime edge, finding owner or hosted-CI
+acceptance changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

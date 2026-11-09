@@ -132,3 +132,4 @@ to make the project appear more consistent than it was.
 | [0114](0114-selected-release-and-wired-handoff-plans.md) | Selected release and wired-handoff plans | Accepted |
 | [0115](0115-selected-count-generation-evidence-scope.md) | Selected-count generation evidence scope | Accepted |
 | [0116](0116-handed-off-leaf-fixture-coherence.md) | Handed-off leaf fixture coherence | Accepted |
+| [0117](0117-granular-selected-release-handoff-native-source-authority.md) | Granular selected release/handoff native source authority | Accepted |

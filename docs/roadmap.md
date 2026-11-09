@@ -442,6 +442,28 @@ uses the independently frozen 1,518-file base and thirty-path domain.
 It must renew all actual phases and final acceptance before any runtime
 finding closes.
 
+MEM05 implementation #236 has now completed those requirements and merged
+as `aba02c1f8a583866a85c3012d20c6007b9445a22`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`7609a9578e8010c735310923a90953833c93e3d5`.
+Its final actual attempt passed all thirteen affected units; B14 ran
+568 cases in 537.810 seconds. All fifty final commands passed fresh:
+45 CTests, all 1,635 Python cases in 729.431 seconds, forty QEMU workflows,
+four standalone images and complete 44/113/ten-scope stack coverage.
+Same-run receipts, clean independent review, fresh journal-free
+committed/main authority and exact completed-ref cleanup passed.
+This closes only B02-F006/F007.
+
+The next preferred OBJ01 design found the
+[MEM05 native-source authority gap](research/selected-release-handoff-native-source-authority-gap.md).
+[Accepted ADR-0117](adr/0117-granular-selected-release-handoff-native-source-authority.md)
+and [EV01-C08](architecture/selected-release-handoff-native-source-authority.md)
+name 453 existing source comparisons while preserving all 5,387 current
+facts, twenty-three fingerprints, seven claims and 185 retirements.
+This documentation-only prerequisite is the sole active outcome.
+OBJ01 design is blocked until its separate reviewed design/implementation
+pair merges; no OBJ01 runtime correction or hosted-CI acceptance is claimed.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

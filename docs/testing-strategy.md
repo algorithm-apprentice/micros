@@ -840,6 +840,25 @@ historical source checks. Its native protection guard uses an isolated
 host-sized page rather than assuming a RISC-V frame is a host protection
 page. No target, native, integration or stack obligation is removed.
 
+MEM05 implementation #236 has completed its renewed real Red/Green,
+thirteen-unit recertification and all fifty fresh author commands.
+The final gate passed 45 CTests, all 1,635 Python cases, forty QEMU
+workflows, four standalone images and complete 44/113/ten-scope stack
+coverage. Independent review, same-run receipts, journal-free main authority
+and protected task-ref cleanup passed. The legacy MEM03 component schema
+remains record-only for frame slices; index/link work remains measured in
+the inclusive aggregate.
+
+The [Accepted EV01-C08 contract](architecture/selected-release-handoff-native-source-authority.md)
+names the existing MEM05 source comparisons needed by the next OBJ01
+design. It preserves their raw/compact/primitive distinctions and both
+fixed-input assertion owners; it is not a new functional or MINIX algorithm
+oracle. Its historical scaffold regression receives fixed original inputs
+with positive controls, while complete-current catalog checks remain
+independent. No declaration, test or extractor is authored before the
+separate design merge, and no existing runtime, target or integration gate
+is removed.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
