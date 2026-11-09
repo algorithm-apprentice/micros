@@ -15,7 +15,7 @@ import unittest
 from tests.host.runtime_memory_evidence import native_compiler
 from tests.host.selected_ownership_source import (
     RECIPE_ADMISSION, SOURCE_PROJECTION, STATE_WORK_CONTRACT, assert_complete_helper_tokens,
-    declared_audit_boundaries, header_additions, measure_audit_boundaries, validate_retained_source,
+    declared_audit_boundaries, measure_audit_boundaries,
 )
 from tests.host.work_count_evidence import Capture, Kind, Owner, Snapshot, Stage, Status, compose_snapshots
 from tools.generate_selected_ownership_fixture import prepare_sources, source_bundle
@@ -420,9 +420,12 @@ def measure_native(root, stage):
 
 
 def check_current_fixture_syntax(root):
+    from tests.host import selected_release_handoff_source as current_interfaces
+
     root = Path(root).resolve()
     compiler = native_compiler(root)
-    fixtures = snapshot_files(root, FIXTURE_PATHS)
+    paths = (*FIXTURE_PATHS, current_interfaces.SOURCE_PATH)
+    fixtures = snapshot_files(root, paths)
     with tempfile.TemporaryDirectory(prefix="micros-mem03-fixture-syntax-") as temporary:
         generated = Path(temporary)
         prepare_sources(root, generated, Stage.RED, "ordinary")
@@ -431,11 +434,9 @@ def check_current_fixture_syntax(root):
             "kernel/memory/frame_ownership_internal.h",
         ):
             target = generated / path
-            text = target.read_text()
-            if text.count("\n#endif") != 1:
-                raise ValueError("MEM03 fixture syntax input lacks its fixed header boundary")
-            text = text.replace("\n#endif", "\n" + "\n".join(header_additions(path)) + "\n\n#endif", 1)
-            validate_retained_source(root, path, text, Stage.GREEN)
+            text = current_interfaces.declared_header(root, path)
+            if hashlib.sha256(text.encode()).hexdigest() != current_interfaces.SOURCE_PROJECTION["declared_header_sha256"][path]:
+                raise ValueError("MEM03 fixture syntax interface differs from its independent MEM05 declaration")
             target.write_text(text)
         command = native_command(root, compiler, generated, generated / "unused", Stage.GREEN, "ordinary")
         prefix = command[:command.index(str(generated / RECIPE_ADMISSION["native_source_members"][0]))]
@@ -451,7 +452,7 @@ def check_current_fixture_syntax(root):
         )
         if checked.returncode or checked.stdout or checked.stderr:
             raise ValueError("MEM03 current fixture does not compile against its declared interfaces:\n" + checked.stdout + checked.stderr)
-        if snapshot_files(root, FIXTURE_PATHS) != fixtures or native_compiler(root) != compiler:
+        if snapshot_files(root, paths) != fixtures or native_compiler(root) != compiler:
             raise ValueError("MEM03 fixture syntax inputs changed during compilation")
         return command
 

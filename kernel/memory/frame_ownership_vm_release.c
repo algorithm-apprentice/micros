@@ -71,6 +71,9 @@ micros_frame_ownership_vm_release_transferable_preflight(
         ) {
             return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
         }
+        if (!micros_frame_ownership_index_can_remove(ownership, frame_index)) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
         candidate.frame_indices[index] = frame_index;
     }
     if (
@@ -183,6 +186,7 @@ void micros_frame_ownership_vm_release_process_commit_prevalidated(
     for (index = 0; index < plan->data_frame_count; ++index) {
         uint64_t frame_index = plan->data_frame_indices[index];
 
+        micros_frame_ownership_index_remove_prevalidated(ownership, frame_index);
         micros_frame_ownership_allocator_mark_free(ownership->allocator, frame_index);
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};
@@ -196,6 +200,7 @@ void micros_frame_ownership_vm_release_process_commit_prevalidated(
     ) {
         uint64_t frame_index = plan->table_frame_indices[index];
 
+        micros_frame_ownership_index_remove_prevalidated(ownership, frame_index);
         micros_frame_ownership_allocator_mark_free(ownership->allocator, frame_index);
         ownership->owners[frame_index] =
             (struct micros_frame_owner){0, 0, 0, 0};

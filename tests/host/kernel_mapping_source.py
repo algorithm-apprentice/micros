@@ -808,11 +808,15 @@ def _observation_positions(root, path, text, stage):
     from tests.host.work_count_lexical import compound_layout, function_spans, matches_at, positional_tokens
     from tests.host.work_count_projection import resolve_regions
     from tests.host.work_count_types import Region
+    from tests.host.selected_release_handoff_source import legacy_replaced_functions
 
     spans = function_spans(text)
+    replaced = legacy_replaced_functions(root, "MEM02", path, text, stage)
     result = []
     for site in observation_sites(root, path, stage):
         function, identifier, kind, regions, primitive, placement, units = site
+        if function in replaced:
+            continue
         if function not in spans:
             raise ValueError("MEM02 observation function is absent: " + function)
         if placement not in ("before", "after", "entry") or type(units) is not int or units < 1:
@@ -855,11 +859,21 @@ def _render_observations(root, path, text, stage):
 
 
 def observe_source(root, path, text, stage):
+    from tests.host.selected_release_handoff_source import legacy_observe_source
+
     validate_retained_source(root, path, text, stage)
+    current = legacy_observe_source(root, "MEM02", path, text, stage)
+    if current is not None:
+        return current
     return _render_observations(root, path, text, stage)
 
 
 def project_observations(root, path, text, stage):
+    from tests.host.selected_release_handoff_source import project_legacy_observations
+
+    current = project_legacy_observations(root, "MEM02", path, text, stage)
+    if current is not None:
+        return current
     if not text.startswith(OBSERVATION_PREFIX):
         raise ValueError("MEM02 observation preamble is not its native-only declaration")
     original = text[len(OBSERVATION_PREFIX):]

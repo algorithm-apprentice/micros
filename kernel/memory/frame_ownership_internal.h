@@ -102,4 +102,31 @@ micros_frame_ownership_selected_record(
     struct micros_frame_owner *owner
 );
 
+bool micros_frame_ownership_index_can_insert(
+    const struct micros_frame_ownership *ownership,
+    uint16_t slot,
+    uint64_t frame_index,
+    uint32_t additions
+);
+
+bool micros_frame_ownership_index_can_remove(
+    const struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+);
+
+void micros_frame_ownership_index_insert_prevalidated(
+    struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+);
+
+void micros_frame_ownership_index_remove_prevalidated(
+    struct micros_frame_ownership *ownership,
+    uint64_t frame_index
+);
+
+enum micros_frame_ownership_error micros_frame_ownership_check_selection(
+    const struct micros_frame_selection *selection,
+    uint64_t managed_frame_count
+);
+
 #endif

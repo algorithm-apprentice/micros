@@ -833,6 +833,13 @@ additional target input is frozen before renewed Red; original target
 results, records, deadlines and all final gates remain required.
 The archived candidate supplies diagnosis, not replacement acceptance.
 
+Design #235 has now separately merged. The fresh
+[implementation/evidence map](architecture/selected-release-and-wired-handoff.md#implementation-and-evidence-map)
+binds both dependent targets and retains the actual-current and isolated
+historical source checks. Its native protection guard uses an isolated
+host-sized page rather than assuming a RISC-V frame is a host protection
+page. No target, native, integration or stack obligation is removed.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

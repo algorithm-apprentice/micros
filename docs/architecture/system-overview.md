@@ -232,6 +232,10 @@ That candidate is archived without Green or retirement.
 Accepted ADR-0116 has clean independent design review and defines the
 separate test-input/source-scope correction;
 the runtime algorithm and complete-index obligations are not relaxed.
+Design #235 is now separately merged. The fresh
+[implementation/evidence map](selected-release-and-wired-handoff.md#implementation-and-evidence-map)
+binds its corrected base and both immutable targets before renewed
+runtime evidence.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

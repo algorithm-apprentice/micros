@@ -15,8 +15,9 @@ This study does not retire an identity or close a runtime finding.
 Corrective design #234 is now separately merged. The fresh implementation
 subsequently exposed the
 [handed-off corruption-fixture conflict](#mem05-c02-handed-off-corruption-fixture-conflict).
-That candidate is archived; Accepted ADR-0116 is the sole active
-documentation-only correction before another implementation restart.
+That candidate is archived. Accepted ADR-0116 has clean independent
+complete/Acceptance review and separately merged as #235; its fresh
+implementation must renew every actual phase before acceptance.
 
 ```text
 micros commit: abe05cdd7bced5e77e86c1ec12754d017f920cab (#232)

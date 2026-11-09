@@ -3,10 +3,10 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(MICROS_SELECTED_OWNERSHIP_LAUNCHER)
-#include <stdlib.h>
 #include <unistd.h>
 #endif
 
@@ -76,6 +76,13 @@ struct selected_test_context {
     size_t data_count;
     bool fragmented;
     bool irq;
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    struct micros_frame_selection selection;
+    uint64_t ordinals[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+    uint32_t ordered_frames[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+    uint64_t next_ordinal;
+    bool expected_index_changed;
+#endif
 #if defined(MICROS_TEST_WORK_COUNTS)
     struct micros_test_work_snapshot observation;
 #endif
@@ -124,6 +131,110 @@ static struct micros_frame_owner process_owner(enum micros_frame_owner_kind kind
     };
 }
 
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+static bool indexed_owner(struct micros_frame_owner owner)
+{
+    return owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+        || owner.kind == MICROS_FRAME_OWNER_PROCESS_USER || owner.kind == MICROS_FRAME_OWNER_VM_WIRED;
+}
+
+static int compare_index_ordinals(const void *left, const void *right)
+{
+    uint64_t a = context.ordinals[*(const uint32_t *)left];
+    uint64_t b = context.ordinals[*(const uint32_t *)right];
+
+    return a > b ? -1 : a < b ? 1 : 0;
+}
+
+static bool rebuild_expected_index(void)
+{
+    struct micros_frame_ownership *expected = &context.expected_ownership;
+    uint32_t previous[MICROS_PROCESS_CAPACITY] = {0};
+    size_t count = 0;
+    uint64_t index;
+
+    memset(expected->owner_links, 0, sizeof(expected->owner_links));
+    memset(expected->process_frames, 0, sizeof(expected->process_frames));
+    for (index = 0; index < expected->managed_frame_count; ++index) {
+        if (indexed_owner(expected->owners[index])) {
+            REQUIRE(context.ordinals[index] != 0 && expected->owners[index].slot < MICROS_PROCESS_CAPACITY);
+            context.ordered_frames[count++] = (uint32_t)index;
+        }
+    }
+    qsort(context.ordered_frames, count, sizeof(context.ordered_frames[0]), compare_index_ordinals);
+    for (index = 0; index < count; ++index) {
+        uint32_t frame = context.ordered_frames[index];
+        uint16_t slot = expected->owners[frame].slot;
+
+        expected->owner_links[frame].previous = previous[slot];
+        if (previous[slot] == 0) {
+            expected->process_frames[slot].head = frame + 1;
+        } else {
+            expected->owner_links[previous[slot] - 1].next = frame + 1;
+        }
+        ++expected->process_frames[slot].count;
+        previous[slot] = frame + 1;
+    }
+    context.expected_index_changed = false;
+    return true;
+}
+#endif
+
+static void prepare_selection_input(void)
+{
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    struct micros_frame_selection *selection = &context.selection;
+
+    memset(selection, 0, sizeof(*selection));
+    for (size_t word = 0; word < MICROS_FRAME_ALLOCATOR_BITMAP_WORDS; ++word) {
+        uint64_t bits = context.bitmap[word];
+
+        if (bits == 0) {
+            continue;
+        }
+        selection->bitmap[word] = bits;
+        selection->words[selection->word_count] = (uint16_t)word;
+        selection->positions[word] = (uint16_t)++selection->word_count;
+        for (unsigned bit = 0; bit < 64; ++bit) {
+            selection->frame_count += (bits >> bit) & 1;
+        }
+    }
+#endif
+}
+
+static enum micros_frame_ownership_error release_selected_input(
+    struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *bitmap,
+    size_t words
+)
+{
+#if defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    return micros_frame_ownership_release_process_set(ownership, process, bitmap, words);
+#else
+    if (bitmap != NULL && words != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS) {
+        context.selection.word_count = MICROS_FRAME_ALLOCATOR_BITMAP_WORDS + 1;
+    }
+    return micros_frame_ownership_release_process_set(ownership, process, bitmap == NULL ? NULL : &context.selection);
+#endif
+}
+
+static enum micros_frame_ownership_error stage_selected_input(
+    struct micros_frame_ownership *ownership,
+    const uint64_t *bitmap,
+    size_t words
+)
+{
+#if defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    return micros_frame_ownership_prepare_wired_process_user_set(ownership, bitmap, words);
+#else
+    if (bitmap != NULL && words != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS) {
+        context.selection.word_count = MICROS_FRAME_ALLOCATOR_BITMAP_WORDS + 1;
+    }
+    return micros_frame_ownership_prepare_wired_process_user_set(ownership, bitmap == NULL ? NULL : &context.selection);
+#endif
+}
+
 static bool initialize(uint64_t frames, bool fragmented)
 {
     size_t index;
@@ -139,6 +250,12 @@ static bool initialize(uint64_t frames, bool fragmented)
     memset(context.bitmap, 0, sizeof(context.bitmap));
     memset(context.memory, 0, sizeof(context.memory));
     memset(context.reserved, 0, sizeof(context.reserved));
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    memset(context.ordinals, 0, sizeof(context.ordinals));
+    memset(&context.selection, 0, sizeof(context.selection));
+    context.next_ordinal = 0;
+    context.expected_index_changed = false;
+#endif
     micros_selected_native_reset();
     if (fragmented) {
         REQUIRE(frames == 96);
@@ -195,6 +312,11 @@ static bool allocate_setup(struct micros_frame_owner owner, uint64_t index)
     REQUIRE(micros_frame_ownership_allocate(ledger(), owner, &address) == MICROS_FRAME_OWNERSHIP_OK);
     REQUIRE(address == frame_address(index));
     REQUIRE(memcmp(&ledger()->owners[index], &owner, sizeof(owner)) == 0);
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    if (indexed_owner(owner)) {
+        context.ordinals[index] = ++context.next_ordinal;
+    }
+#endif
     return true;
 }
 
@@ -212,6 +334,10 @@ static bool claim_setup(uint64_t index)
 
 static void save_expected(void)
 {
+    prepare_selection_input();
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    context.expected_index_changed = false;
+#endif
     context.expected_allocator = *allocator();
     context.expected_ownership = *ledger();
     context.expected_objects = context.objects;
@@ -243,12 +369,25 @@ static void expected_owner(uint64_t index, struct micros_frame_owner owner)
     if (owner.kind != MICROS_FRAME_OWNER_FREE) {
         ++context.expected_ownership.owner_counts[owner.kind];
     }
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    if (indexed_owner(before) && !indexed_owner(owner)) {
+        context.ordinals[index] = 0;
+        context.expected_index_changed = true;
+    } else if (indexed_owner(owner) && (!indexed_owner(before)
+               || before.slot != owner.slot || before.generation != owner.generation)) {
+        context.ordinals[index] = ++context.next_ordinal;
+        context.expected_index_changed = true;
+    }
+#endif
     context.expected_ownership.owners[index] = owner;
     context.expected_ownership.handoff_targets[index] = MICROS_FRAME_HANDOFF_NONE;
 }
 
 static bool storage_matches_expected(void)
 {
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+    REQUIRE(!context.expected_index_changed || rebuild_expected_index());
+#endif
     REQUIRE(memcmp(allocator(), &context.expected_allocator, sizeof(context.expected_allocator)) == 0);
     REQUIRE(memcmp(ledger(), &context.expected_ownership, sizeof(context.expected_ownership)) == 0);
     REQUIRE(memcmp(&context.objects, &context.expected_objects, sizeof(context.objects)) == 0);
@@ -455,6 +594,11 @@ static bool prepare_set(uint64_t frames, size_t count, enum operation operation)
             ledger(), context.process, context.data, count, context.tables, &plan
         ) == MICROS_FRAME_OWNERSHIP_OK);
         micros_frame_ownership_vm_freeze_commit_prevalidated(ledger(), &plan);
+#if !defined(MICROS_SELECTED_OWNERSHIP_BASELINE)
+        for (index = 0; index < count + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+            context.ordinals[index] = ++context.next_ordinal;
+        }
+#endif
     }
     REQUIRE(micros_frame_ownership_runtime_validate(&context.objects) == MICROS_FRAME_OWNERSHIP_OK);
     save_expected();
@@ -623,8 +767,9 @@ static bool prepare_bitmap(uint64_t frames, enum operation operation)
             MICROS_FRAME_HANDOFF_VM_TRANSFERABLE
         ) == MICROS_FRAME_OWNERSHIP_OK);
     }
+    prepare_selection_input();
     if (operation == OP_COMPLETE_HANDOFF) {
-        REQUIRE(micros_frame_ownership_prepare_wired_process_user_set(
+        REQUIRE(stage_selected_input(
             ledger(), context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
         ) == MICROS_FRAME_OWNERSHIP_OK);
     }
@@ -655,11 +800,11 @@ static bool bitmap_case(uint64_t frames, enum operation operation)
     REQUIRE(prepare_bitmap(frames, operation));
     REQUIRE(begin_capture());
     if (operation == OP_RELEASE_BITMAP) {
-        result = micros_frame_ownership_release_process_set(
+        result = release_selected_input(
             ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
         );
     } else if (operation == OP_STAGE_WIRED) {
-        result = micros_frame_ownership_prepare_wired_process_user_set(
+        result = stage_selected_input(
             ledger(), context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
         );
     } else {
@@ -828,7 +973,7 @@ static bool empty_bootstrap_guard(void)
     REQUIRE(initialize(65, false));
     REQUIRE(create_process(0));
     save_expected();
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_OK);
     REQUIRE(state_matches_expected());
@@ -867,7 +1012,7 @@ static bool empty_phase_guard(void)
     REQUIRE(state_matches_expected());
     REQUIRE(micros_frame_ownership_complete_handoff(ledger()) == MICROS_FRAME_OWNERSHIP_OK);
     save_expected();
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_PHASE);
     REQUIRE(state_matches_expected());
@@ -879,14 +1024,15 @@ static bool selection_guard(void)
     REQUIRE(initialize(65, false));
     REQUIRE(create_process(0));
     save_expected();
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, NULL, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT);
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS - 1
     ) == MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT);
     context.bitmap[1] = UINT64_C(1) << 1;
-    REQUIRE(micros_frame_ownership_release_process_set(
+    prepare_selection_input();
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED);
     REQUIRE(state_matches_expected());
@@ -954,7 +1100,7 @@ static bool whole_active_counts_guard(void)
     ledger()->owner_counts[MICROS_FRAME_OWNER_KERNEL_RETAINED] = 1;
     context.bitmap[0] = 1;
     save_expected();
-    REQUIRE(micros_frame_ownership_prepare_wired_process_user_set(
+    REQUIRE(stage_selected_input(
         ledger(), context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
     REQUIRE(storage_matches_expected());
@@ -1078,7 +1224,7 @@ static bool malformed_metadata_guards(void)
     REQUIRE(micros_frame_ownership_allocate(
         ledger(), kernel_owner(MICROS_FRAME_OWNER_KERNEL_TEMPORARY), &context.output
     ) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
     REQUIRE(storage_matches_expected());
@@ -1198,7 +1344,7 @@ static bool selected_mutation_guard(void)
     REQUIRE(micros_frame_ownership_prepare_handoff(
         ledger(), TEST_BASE, process_owner(MICROS_FRAME_OWNER_PROCESS_USER), MICROS_FRAME_HANDOFF_VM_WIRED
     ) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
-    REQUIRE(micros_frame_ownership_release_process_set(
+    REQUIRE(release_selected_input(
         ledger(), context.process, context.bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
     REQUIRE(storage_matches_expected());
@@ -1228,8 +1374,7 @@ static bool selected_count_guard(void)
     REQUIRE(storage_matches_expected());
     foreign = context.process;
     ++foreign.generation;
-    context.expected_output = 0;
-    REQUIRE(micros_frame_ownership_count_process(ledger(), foreign, &context.output) == MICROS_FRAME_OWNERSHIP_OK);
+    REQUIRE(micros_frame_ownership_count_process(ledger(), foreign, &context.output) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
     REQUIRE(storage_matches_expected());
     return true;
 }

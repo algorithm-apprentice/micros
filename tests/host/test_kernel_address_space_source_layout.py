@@ -918,6 +918,8 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
                 )
 
     def test_scratch_storage_has_one_configured_owner(self) -> None:
+        from tests.host.selected_release_handoff_source import current_scratch_storage
+
         patterns = {
             "reachable_bitmap": re.compile(
                 r"(?m)^static\s+uint64_t\s+"
@@ -932,6 +934,13 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
             ),
         }
 
+        obsolete = set(patterns) if current_scratch_storage(REPOSITORY_ROOT) else set()
+        if obsolete:
+            patterns.update({
+                "reachable_selection": re.compile(r"(?m)^static\s+struct\s+micros_frame_selection\s+reachable_selection\s*;"),
+                "release_selection": re.compile(r"(?m)^static\s+struct\s+micros_frame_selection\s+release_selection\s*;"),
+                "scratch_mode": re.compile(r"(?m)^static\s+uint8_t\s+scratch_mode\s*;"),
+            })
         self.assertIn(SCRATCH_OWNER, ACCEPTED_SCRATCH_OWNERS)
         for name, pattern in patterns.items():
             owners = []
@@ -943,7 +952,7 @@ class KernelAddressSpaceSourceLayoutTest(unittest.TestCase):
                 ):
                     owners.append(relative_path)
             with self.subTest(storage=name):
-                self.assertEqual([SCRATCH_OWNER], owners)
+                self.assertEqual([] if name in obsolete else [SCRATCH_OWNER], owners)
 
     def test_split_tests_do_not_duplicate_mutable_state(self) -> None:
         families = (

@@ -341,6 +341,7 @@ class AuthorViewInputsTest(unittest.TestCase):
         for provider_name in (
             "tests.host.selected_ownership_authority",
             "tests.host.selected_address_space_authority",
+            "tests.host.selected_release_handoff_authority",
         ):
             self.provider.read_verified_journal.reset_mock()
             self.provider.__name__ = provider_name

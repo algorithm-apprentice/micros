@@ -1233,3 +1233,268 @@ bool micros_user_address_space_vm_table_plan_matches_memory(
     }
     return true;
 }
+
+static enum micros_user_address_space_error bootstrap_collect_frame(
+    const struct micros_frame_ownership *ledger,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    uint64_t physical_address,
+    enum micros_frame_owner_kind kind,
+    bool include_tables,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    struct micros_frame_owner owner;
+    uint64_t frame_index;
+
+    if (
+        micros_frame_ownership_lookup(ledger, physical_address, &owner) != MICROS_FRAME_OWNERSHIP_OK
+        || owner.kind != kind || owner.slot != process.slot || owner.generation != process.generation
+        || !frame_index_for_physical_address(ledger, physical_address, &frame_index)
+        || micros_frame_selection_contains(lease->reachable_selection, frame_index)
+        || !micros_frame_selection_add(lease->reachable_selection, frame_index)
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    if (include_tables || kind == MICROS_FRAME_OWNER_PROCESS_USER) {
+        if (micros_frame_selection_contains(lease->release_selection, frame_index)
+            || !micros_frame_selection_add(lease->release_selection, frame_index)) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+        }
+    }
+    if (kind == MICROS_FRAME_OWNER_PROCESS_USER
+        && ledger->handoff_targets[frame_index] != MICROS_FRAME_HANDOFF_VM_WIRED) {
+        plan->wired_targets = false;
+    }
+    ++plan->frame_count;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error bootstrap_collect_leaf_table(
+    const struct micros_frame_ownership *ledger,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    uint64_t physical_address,
+    bool include_tables,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    const struct micros_user_address_space_page_table *table;
+    struct micros_sv39_decoded_pte entry;
+    enum micros_user_address_space_error error;
+    size_t index;
+
+    error = bootstrap_collect_frame(
+        ledger, lease, process, physical_address, MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE, include_tables, plan
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    table = table_at(physical_address);
+    for (index = 0; index < MICROS_SV39_TABLE_ENTRY_COUNT; ++index) {
+        error = decode_pte(table->entries[index], &entry);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+        if (entry.kind == MICROS_SV39_PTE_ABSENT) {
+            continue;
+        }
+        if (entry.kind != MICROS_SV39_PTE_LEAF || (entry.permissions & MICROS_SV39_PERMISSION_USER) == 0) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        }
+        error = bootstrap_collect_frame(
+            ledger, lease, process, entry.physical_address, MICROS_FRAME_OWNER_PROCESS_USER, include_tables, plan
+        );
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error bootstrap_collect_middle_table(
+    const struct micros_frame_ownership *ledger,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    uint64_t physical_address,
+    bool include_tables,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    const struct micros_user_address_space_page_table *table;
+    struct micros_sv39_decoded_pte entry;
+    enum micros_user_address_space_error error;
+    size_t index;
+
+    error = bootstrap_collect_frame(
+        ledger, lease, process, physical_address, MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE, include_tables, plan
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    table = table_at(physical_address);
+    for (index = 0; index < MICROS_SV39_TABLE_ENTRY_COUNT; ++index) {
+        error = decode_pte(table->entries[index], &entry);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+        if (entry.kind == MICROS_SV39_PTE_ABSENT) {
+            continue;
+        }
+        if (entry.kind != MICROS_SV39_PTE_TABLE) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        }
+        error = bootstrap_collect_leaf_table(ledger, lease, process, entry.physical_address, include_tables, plan);
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error bootstrap_collect_root(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    bool include_tables,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    struct micros_user_address_space_bootstrap_plan candidate;
+    const struct micros_process *resolved;
+    const struct micros_user_address_space_page_table *root;
+    struct micros_sv39_decoded_pte entry;
+    enum micros_user_address_space_error error;
+
+    if (runtime == NULL || lease == NULL || plan == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    error = micros_user_address_space_runtime_require_bootstrap(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (
+        !lease->active || lease->mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED
+        || lease->reachable_selection == NULL || lease->release_selection == NULL
+        || lease->reachable_bitmap != lease->reachable_selection->bitmap
+        || lease->release_bitmap != lease->release_selection->bitmap
+        || lease->frame_count != runtime->ledger->managed_frame_count
+        || lease->word_count != (size_t)((lease->frame_count + 63) / 64)
+        || micros_frame_ownership_runtime_validate_metadata(runtime->objects) != MICROS_FRAME_OWNERSHIP_OK
+        || !micros_frame_selection_clear(lease->reachable_selection)
+        || (include_tables && !micros_frame_selection_clear(lease->release_selection))
+    ) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    error = resolve_process_with_root(runtime, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    candidate.process = resolved;
+    candidate.root_physical_address = resolved->address_space_root;
+    candidate.frame_count = 0;
+    candidate.wired_targets = true;
+    error = bootstrap_collect_frame(
+        runtime->ledger, lease, process, candidate.root_physical_address,
+        MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE, include_tables, &candidate
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (!selected_kernel_root_is_valid(runtime)) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    error = validate_selected_shared_entries(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    root = table_at(candidate.root_physical_address);
+    error = decode_pte(root->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX], &entry);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (entry.kind != MICROS_SV39_PTE_ABSENT) {
+        if (entry.kind != MICROS_SV39_PTE_TABLE) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        }
+        error = bootstrap_collect_middle_table(
+            runtime->ledger, lease, process, entry.physical_address, include_tables, &candidate
+        );
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+    }
+    *plan = candidate;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_collect_bootstrap_release_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    struct micros_user_address_space_bootstrap_plan candidate;
+    struct micros_frame_owner owner;
+    struct micros_frame_owner_links links;
+    uint64_t count;
+    uint64_t frame_index;
+    uint32_t node;
+    enum micros_frame_ownership_error ownership_error;
+    enum micros_user_address_space_error error;
+
+    if (plan == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    error = bootstrap_collect_root(runtime, lease, process, true, &candidate);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    ownership_error = micros_frame_ownership_count_process(runtime->ledger, process, &count);
+    if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+        return micros_user_address_space_map_ownership_error(ownership_error);
+    }
+    if (count != candidate.frame_count) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    node = runtime->ledger->process_frames[process.slot].head;
+    for (; node != 0; node = links.next) {
+        frame_index = node - 1;
+        owner = runtime->ledger->owners[frame_index];
+        links = runtime->ledger->owner_links[frame_index];
+        if (owner.generation == process.generation
+            && !micros_frame_selection_contains(lease->reachable_selection, frame_index)) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+        }
+    }
+    *plan = candidate;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_collect_bootstrap_handoff_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    uint64_t expected_owned_frames,
+    struct micros_user_address_space_bootstrap_plan *plan
+)
+{
+    struct micros_user_address_space_bootstrap_plan candidate;
+    enum micros_user_address_space_error error;
+
+    if (plan == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    error = bootstrap_collect_root(runtime, lease, process, false, &candidate);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (candidate.frame_count != expected_owned_frames) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    *plan = candidate;
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}

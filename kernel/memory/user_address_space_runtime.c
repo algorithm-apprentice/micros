@@ -5,23 +5,24 @@
 
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/mmu.h"
+#include "kernel/memory/frame_ownership_internal.h"
 #include "micros/frame_allocator.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
 
-static uint64_t reachable_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
-static uint64_t release_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
-static bool scratch_busy;
+static struct micros_frame_selection reachable_selection;
+static struct micros_frame_selection release_selection;
+static uint8_t scratch_mode;
 
 #ifdef MICROS_BUILD_USER_ADDRESS_SPACE_TEST
 static size_t test_fail_after_allocations = SIZE_MAX;
 static size_t test_successful_allocations;
 #endif
 
-_Static_assert(sizeof(reachable_bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
+_Static_assert(sizeof(reachable_selection.bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
                "reachability bitmap must cover every managed frame");
-_Static_assert(sizeof(release_bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
+_Static_assert(sizeof(release_selection.bitmap) * 8 == MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES,
                "release bitmap must cover every managed frame");
 
 static void clear_scratch_bitmap(uint64_t *bitmap, size_t word_count) {
@@ -191,50 +192,128 @@ enum micros_user_address_space_error micros_user_address_space_runtime_resolve_p
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
-enum micros_user_address_space_error
-micros_user_address_space_acquire_scratch(const struct micros_user_address_space_runtime_view *view,
-                                          struct micros_user_address_space_scratch_lease *lease) {
-    size_t word_count;
-
+static enum micros_user_address_space_error scratch_request_error(
+    const struct micros_user_address_space_runtime_view *view,
+    struct micros_user_address_space_scratch_lease *lease
+)
+{
     if (view == NULL || lease == NULL || view->ledger == NULL) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
-    if (scratch_busy) {
+    if (scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE
+        && scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_FULL
+        && scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    if (scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
     }
     if (riscv_irq_is_enabled() || view->ledger->managed_frame_count == 0 ||
         view->ledger->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
     }
+    if (reachable_selection.word_count != 0 || reachable_selection.frame_count != 0
+        || release_selection.word_count != 0 || release_selection.frame_count != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_acquire_scratch(const struct micros_user_address_space_runtime_view *view,
+                                          struct micros_user_address_space_scratch_lease *lease) {
+    size_t word_count;
+    enum micros_user_address_space_error error = scratch_request_error(view, lease);
+
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
     word_count = (size_t)((view->ledger->managed_frame_count + 63) / 64);
-    scratch_busy = true;
-    clear_scratch_bitmap(reachable_bitmap, word_count);
-    clear_scratch_bitmap(release_bitmap, word_count);
+    scratch_mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_FULL;
+    clear_scratch_bitmap(reachable_selection.bitmap, word_count);
+    clear_scratch_bitmap(release_selection.bitmap, word_count);
     *lease = (struct micros_user_address_space_scratch_lease){
         .active = true,
+        .mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_FULL,
         .frame_count = view->ledger->managed_frame_count,
         .word_count = word_count,
-        .reachable_bitmap = reachable_bitmap,
-        .release_bitmap = release_bitmap,
+        .reachable_bitmap = reachable_selection.bitmap,
+        .release_bitmap = release_selection.bitmap,
+        .reachable_selection = NULL,
+        .release_selection = NULL,
+    };
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error
+micros_user_address_space_acquire_selected_scratch(
+    const struct micros_user_address_space_runtime_view *view,
+    struct micros_user_address_space_scratch_lease *lease
+)
+{
+    size_t word_count;
+    enum micros_user_address_space_error error = scratch_request_error(view, lease);
+
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    word_count = (size_t)((view->ledger->managed_frame_count + 63) / 64);
+    scratch_mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED;
+    *lease = (struct micros_user_address_space_scratch_lease){
+        .active = true,
+        .mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED,
+        .frame_count = view->ledger->managed_frame_count,
+        .word_count = word_count,
+        .reachable_bitmap = reachable_selection.bitmap,
+        .release_bitmap = release_selection.bitmap,
+        .reachable_selection = &reachable_selection,
+        .release_selection = &release_selection,
     };
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 void micros_user_address_space_release_scratch(
     struct micros_user_address_space_scratch_lease *lease) {
-    if (lease == NULL || !lease->active || !scratch_busy ||
-        lease->reachable_bitmap != reachable_bitmap || lease->release_bitmap != release_bitmap ||
-        lease->word_count > MICROS_FRAME_ALLOCATOR_BITMAP_WORDS) {
+    const struct micros_frame_ownership *ledger = micros_frame_ownership_runtime_ledger();
+
+    if (lease == NULL || !lease->active || ledger == NULL || riscv_irq_is_enabled()
+        || (scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_FULL
+            && scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED)
+        || lease->mode != scratch_mode
+        || lease->reachable_bitmap != reachable_selection.bitmap
+        || lease->release_bitmap != release_selection.bitmap
+        || lease->frame_count == 0 || lease->frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || lease->frame_count != ledger->managed_frame_count
+        || lease->word_count != (size_t)((lease->frame_count + 63) / 64)) {
         micros_user_address_space_panic_invariant("user-address-space-scratch-release");
     }
-    clear_scratch_bitmap(reachable_bitmap, lease->word_count);
-    clear_scratch_bitmap(release_bitmap, lease->word_count);
+    if (scratch_mode == MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED) {
+        if (lease->reachable_selection != &reachable_selection || lease->release_selection != &release_selection
+            || micros_frame_ownership_check_selection(&reachable_selection, lease->frame_count) != MICROS_FRAME_OWNERSHIP_OK
+            || micros_frame_ownership_check_selection(&release_selection, lease->frame_count) != MICROS_FRAME_OWNERSHIP_OK) {
+            micros_user_address_space_panic_invariant("user-address-space-scratch-release");
+        }
+        if (!micros_frame_selection_clear(&reachable_selection) || !micros_frame_selection_clear(&release_selection)) {
+            micros_user_address_space_panic_invariant("user-address-space-scratch-release");
+        }
+    } else {
+        if (lease->reachable_selection != NULL || lease->release_selection != NULL
+            || reachable_selection.word_count != 0 || reachable_selection.frame_count != 0
+            || release_selection.word_count != 0 || release_selection.frame_count != 0) {
+            micros_user_address_space_panic_invariant("user-address-space-scratch-release");
+        }
+        clear_scratch_bitmap(reachable_selection.bitmap, lease->word_count);
+        clear_scratch_bitmap(release_selection.bitmap, lease->word_count);
+    }
     lease->active = false;
+    lease->mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE;
     lease->frame_count = 0;
     lease->word_count = 0;
     lease->reachable_bitmap = NULL;
     lease->release_bitmap = NULL;
-    scratch_busy = false;
+    lease->reachable_selection = NULL;
+    lease->release_selection = NULL;
+    scratch_mode = MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE;
 }
 
 bool micros_user_address_space_process_handles_equal(struct micros_process_handle left,
@@ -276,7 +355,7 @@ enum micros_user_address_space_error micros_user_address_space_require_idle(
     if (view == NULL || view->ledger == NULL) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
-    if (scratch_busy) {
+    if (scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
     }
     if (riscv_irq_is_enabled() || view->ledger->managed_frame_count == 0

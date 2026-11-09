@@ -22,6 +22,12 @@ struct frame_ownership_test_context {
     struct micros_frame_ownership ownership_snapshot;
     struct micros_frame_allocator allocator_snapshot;
     uint64_t release_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+    struct micros_frame_selection selection;
+    struct micros_frame_owner model_previous_owners[TEST_FRAME_COUNT];
+    uint64_t model_ordinals[TEST_FRAME_COUNT];
+    uint64_t model_next_ordinal;
+    struct micros_frame_owner_links model_links[MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES];
+    struct micros_process_frame_index model_process_frames[MICROS_PROCESS_CAPACITY];
 };
 
 struct frame_ownership_test_context *
@@ -54,6 +60,10 @@ void frame_ownership_test_clear_release_bitmap(
 void frame_ownership_test_select_release_index(
     struct frame_ownership_test_context *context,
     uint64_t frame_index
+);
+
+struct micros_frame_selection *frame_ownership_test_selection_input(
+    struct frame_ownership_test_context *context
 );
 
 void frame_ownership_test_snapshot(

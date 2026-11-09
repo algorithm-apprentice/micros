@@ -443,6 +443,82 @@ bool handoff_test_verify_post_handoff_failures(
 
     return true;
 }
+static bool reject_transferable_leaf(
+    struct micros_address_space_handoff_test_context *fixture
+)
+{
+    const struct micros_kernel_address_space_report *kernel_report =
+        micros_kernel_address_space_report();
+    struct micros_frame_vm_claim_plan claim;
+    struct micros_frame_vm_transferable_release_plan release;
+    struct micros_frame_owner owner;
+    struct micros_sv39_decoded_pte leaf;
+    uint64_t *selected;
+    uint64_t *spare;
+    uint64_t original;
+    uint64_t replacement;
+    bool passed;
+    bool unchanged;
+
+    if (riscv_irq_is_enabled() || kernel_report == NULL
+        || micros_user_address_space_active_root() != kernel_report->root_physical_address
+        || micros_frame_ownership_lookup(fixture->ledger, fixture->stale_snapshot_frame, &owner)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || owner.kind != MICROS_FRAME_OWNER_FREE) {
+        return false;
+    }
+    selected = handoff_test_leaf_pte_for(
+        fixture, fixture->objects, fixture->processes[HANDOFF_GRANTEE], TEST_DATA_ADDRESS
+    );
+    spare = handoff_test_leaf_pte_for(
+        fixture, fixture->objects, fixture->processes[HANDOFF_GRANTEE], TEST_UNMAPPED_ADDRESS
+    );
+    if (selected == NULL || spare == NULL || selected == spare || *spare != 0) {
+        return false;
+    }
+    original = *selected;
+    if (micros_sv39_decode_pte(original, &leaf) != MICROS_SV39_OK
+        || leaf.kind != MICROS_SV39_PTE_LEAF
+        || leaf.physical_address != fixture->user_physical[HANDOFF_GRANTEE][2]
+        || leaf.permissions != (MICROS_SV39_PERMISSION_READ | MICROS_SV39_PERMISSION_WRITE | MICROS_SV39_PERMISSION_USER)
+        || micros_sv39_make_leaf_pte(fixture->stale_snapshot_frame, leaf.permissions, &replacement) != MICROS_SV39_OK
+        || !handoff_test_snapshot_state(
+            fixture, fixture->ledger, fixture->objects, fixture->endpoint_registry, fixture->grant_registry
+        )
+        || micros_frame_ownership_runtime_vm_claim_preflight(fixture->stale_snapshot_frame, &claim)
+            != MICROS_FRAME_OWNERSHIP_OK) {
+        return false;
+    }
+    micros_frame_ownership_runtime_vm_claim_commit_prevalidated(&claim);
+    if (micros_frame_ownership_runtime_vm_release_transferable_preflight(
+        &fixture->stale_snapshot_frame, 1, &release
+    ) != MICROS_FRAME_OWNERSHIP_OK) {
+        return false;
+    }
+    *spare = original;
+    *selected = 0;
+    passed = (
+        micros_frame_ownership_runtime_validate(fixture->objects) == MICROS_FRAME_OWNERSHIP_OK
+        && micros_user_address_space_validate(fixture->processes[HANDOFF_GRANTEE]) == MICROS_USER_ADDRESS_SPACE_OK
+    );
+    if (passed) {
+        *selected = replacement;
+        passed = (
+            micros_frame_ownership_runtime_validate(fixture->objects) == MICROS_FRAME_OWNERSHIP_OK
+            && micros_user_address_space_validate(fixture->processes[HANDOFF_GRANTEE])
+                == MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
+        );
+    }
+    *selected = original;
+    *spare = 0;
+    micros_frame_ownership_runtime_vm_release_transferable_commit_prevalidated(&release);
+    unchanged = handoff_test_state_matches(
+        fixture, fixture->ledger, fixture->objects, fixture->endpoint_registry, fixture->grant_registry
+    );
+    return passed && unchanged && !riscv_irq_is_enabled()
+        && micros_user_address_space_active_root() == kernel_report->root_physical_address;
+}
+
 static bool reject_corrupt_frame_owners(
     struct micros_address_space_handoff_test_context *fixture
 )
@@ -523,36 +599,7 @@ static bool reject_corrupt_frame_owners(
     ((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
         ->owners[fixture->frame_index] = fixture->saved_owner;
 
-    ((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owners[fixture->frame_index] =
-        (struct micros_frame_owner){
-            .generation = 0,
-            .slot = 0,
-            .kind = MICROS_FRAME_OWNER_VM_TRANSFERABLE,
-            .reserved = 0,
-        };
-    --((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owner_counts[MICROS_FRAME_OWNER_VM_WIRED];
-    ++((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owner_counts[MICROS_FRAME_OWNER_VM_TRANSFERABLE];
-    if (
-        micros_frame_ownership_runtime_validate(fixture->objects)
-            != MICROS_FRAME_OWNERSHIP_OK
-        || micros_user_address_space_validate(
-            fixture->processes[HANDOFF_GRANTEE]
-        ) != MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP
-    ) {
-        return false;
-    }
-    ((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owners[fixture->frame_index] = fixture->saved_owner;
-    ++((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owner_counts[MICROS_FRAME_OWNER_VM_WIRED];
-    --((struct micros_frame_ownership *)(uintptr_t)fixture->ledger)
-        ->owner_counts[MICROS_FRAME_OWNER_VM_TRANSFERABLE];
-
-
-    return true;
+    return reject_transferable_leaf(fixture);
 }
 
 static uint64_t selected_handoff_read_satp(void)

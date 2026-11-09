@@ -26,6 +26,9 @@ static struct micros_frame_allocator allocator_before;
 static struct micros_frame_ownership ownership;
 static struct micros_frame_ownership ownership_before;
 static uint64_t selected_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+#if !defined(MICROS_BOOTSTRAP_ALLOCATION_BASELINE)
+static struct micros_frame_selection selected_frames;
+#endif
 static uint64_t case_index;
 
 #if defined(MICROS_TEST_BOOTSTRAP_MEMORY_COUNTS)
@@ -427,12 +430,24 @@ static bool process_set_guard(void)
         REQUIRE(micros_frame_ownership_allocate(&ownership, owner, &address) == MICROS_FRAME_OWNERSHIP_OK);
     }
     memset(selected_bitmap, 0, sizeof(selected_bitmap));
+#if !defined(MICROS_BOOTSTRAP_ALLOCATION_BASELINE)
+    memset(&selected_frames, 0, sizeof(selected_frames));
+#endif
     for (index = 0; index < 3; ++index) {
         selected_bitmap[expected[index] / 64] |= UINT64_C(1) << (expected[index] % 64);
+#if !defined(MICROS_BOOTSTRAP_ALLOCATION_BASELINE)
+        REQUIRE(micros_frame_selection_add(&selected_frames, expected[index]));
+#endif
     }
+#if defined(MICROS_BOOTSTRAP_ALLOCATION_BASELINE)
     REQUIRE(micros_frame_ownership_release_process_set(
         &ownership, process, selected_bitmap, MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
     ) == MICROS_FRAME_OWNERSHIP_OK);
+#else
+    REQUIRE(micros_frame_ownership_release_process_set(
+        &ownership, process, &selected_frames
+    ) == MICROS_FRAME_OWNERSHIP_OK);
+#endif
     REQUIRE(search_state_is_valid());
     for (index = 0; index < 3; ++index) {
         REQUIRE(micros_frame_ownership_allocate(&ownership, owner, &address) == MICROS_FRAME_OWNERSHIP_OK);

@@ -48,6 +48,9 @@ micros_frame_ownership_vm_claim_preflight(
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
+    if (!micros_frame_ownership_index_can_remove(ownership, frame_index)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
     candidate.frame_index = frame_index;
     micros_frame_ownership_copy_bytes(plan, &candidate, sizeof(candidate));
     return MICROS_FRAME_OWNERSHIP_OK;

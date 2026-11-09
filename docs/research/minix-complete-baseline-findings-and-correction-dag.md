@@ -318,6 +318,12 @@ The 82-key partition and all runtime finding owners remain unchanged;
 MEM05 implementation restarts only after the separate design merge.
 Hosted CI and later MINIX/POSIX outcomes remain separately owned.
 
+That design is now separately merged as #235 after clean complete and
+Acceptance-only review. Journal-free committed/main authority and exact
+completed-ref cleanup passed. The fresh MEM05 implementation is the
+sole active outcome, with thirty candidate paths and the unchanged
+82-key partition. No archived execution closes a runtime finding.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and

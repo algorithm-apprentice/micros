@@ -84,21 +84,25 @@ void micros_frame_ownership_vm_freeze_commit_prevalidated(
         0,
     };
     size_t index;
+    uint64_t frame_index;
 
     for (index = 0; index < plan->data_frame_count; ++index) {
-        ownership->owners[plan->data_frame_indices[index]] = wired;
+        frame_index = plan->data_frame_indices[index];
+        ownership->owners[frame_index] = wired;
+        micros_frame_ownership_index_insert_prevalidated(ownership, frame_index);
     }
     for (
         index = 0;
         index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
         ++index
     ) {
-        uint64_t frame_index = plan->table_frame_indices[index];
+        frame_index = plan->table_frame_indices[index];
 
         micros_frame_ownership_allocator_mark_allocated(ownership->allocator, frame_index);
         ownership->owners[frame_index] = table;
         ownership->handoff_targets[frame_index] =
             MICROS_FRAME_HANDOFF_NONE;
+        micros_frame_ownership_index_insert_prevalidated(ownership, frame_index);
     }
     ownership->allocator->free_frame_count -=
         MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;

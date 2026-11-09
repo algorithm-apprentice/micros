@@ -4,6 +4,123 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static enum micros_frame_ownership_error validate_process_chain(
+    const struct micros_frame_ownership *ownership,
+    uint16_t slot,
+    uint32_t generation,
+    bool inspect_records,
+    uint64_t *count
+)
+{
+    struct micros_process_frame_index index;
+    struct micros_frame_owner_links links;
+    struct micros_frame_owner owner;
+    uint32_t node;
+    uint32_t previous = 0;
+    uint64_t visited;
+    uint64_t frame_index;
+    uint64_t matched = 0;
+    enum micros_frame_ownership_error error;
+
+    if (slot >= MICROS_PROCESS_CAPACITY) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    index = ownership->process_frames[slot];
+    if (
+        (index.head == 0) != (index.count == 0)
+        || index.count > ownership->managed_frame_count
+        || index.count > ownership->owned_frame_count
+    ) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    node = index.head;
+    for (visited = 0; node != 0; ++visited) {
+        if (visited >= index.count || node > ownership->managed_frame_count) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+        frame_index = node - 1;
+        links = ownership->owner_links[frame_index];
+        if (links.previous != previous || links.next == node) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+        if (inspect_records) {
+            error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
+            if (error != MICROS_FRAME_OWNERSHIP_OK) {
+                return error;
+            }
+        } else {
+            owner = ownership->owners[frame_index];
+        }
+        if (
+            !micros_frame_owner_is_valid(owner)
+            || !micros_frame_owner_kind_is_process_bound(owner.kind)
+            || owner.slot != slot
+        ) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+        if (generation == 0 || owner.generation == generation) {
+            ++matched;
+        }
+        previous = node;
+        node = links.next;
+    }
+    if (visited != index.count) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    *count = matched;
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
+static bool index_storage_is_valid(
+    const struct micros_frame_ownership *ownership,
+    uint64_t expected_owned,
+    bool complete
+)
+{
+    uint16_t slot;
+    uint64_t count;
+    uint64_t total = 0;
+    uint64_t frame_index;
+    struct micros_frame_owner_links links;
+    struct micros_frame_owner owner;
+
+    if (expected_owned > ownership->managed_frame_count) {
+        return false;
+    }
+    for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        if (
+            validate_process_chain(ownership, slot, 0, false, &count)
+                != MICROS_FRAME_OWNERSHIP_OK
+            || count > expected_owned - total
+        ) {
+            return false;
+        }
+        total += count;
+    }
+    if (total != expected_owned) {
+        return false;
+    }
+    for (frame_index = 0; frame_index < ownership->managed_frame_count; ++frame_index) {
+        links = ownership->owner_links[frame_index];
+        if (links.previous != 0 || links.next != 0) {
+            owner = ownership->owners[frame_index];
+            if (!micros_frame_owner_kind_is_process_bound(owner.kind)) {
+                return false;
+            }
+        }
+    }
+    if (complete) {
+        for (frame_index = ownership->managed_frame_count;
+             frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES; ++frame_index) {
+            links = ownership->owner_links[frame_index];
+            if (links.previous != 0 || links.next != 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 enum micros_frame_ownership_error micros_frame_ownership_lookup(
     const struct micros_frame_ownership *ownership,
     uint64_t physical_address,
@@ -38,8 +155,6 @@ micros_frame_ownership_count_process(
     uint64_t *count
 )
 {
-    uint64_t observed_count = 0;
-    uint64_t frame_index;
     enum micros_frame_ownership_error error;
 
     if (count == NULL) {
@@ -56,31 +171,7 @@ micros_frame_ownership_count_process(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    for (
-        frame_index = 0;
-        frame_index < ownership->managed_frame_count;
-        ++frame_index
-    ) {
-        struct micros_frame_owner owner =
-            ownership->owners[frame_index];
-
-        if (!micros_frame_owner_is_valid(owner)) {
-            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
-        }
-        if (
-            micros_frame_owner_kind_is_process_bound(owner.kind)
-            && owner.slot == process.slot
-            && owner.generation == process.generation
-        ) {
-            error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
-            if (error != MICROS_FRAME_OWNERSHIP_OK) {
-                return error;
-            }
-            ++observed_count;
-        }
-    }
-    *count = observed_count;
-    return MICROS_FRAME_OWNERSHIP_OK;
+    return validate_process_chain(ownership, process.slot, process.generation, true, count);
 }
 
 static enum micros_frame_ownership_error validate_active_frames(
@@ -301,6 +392,12 @@ enum micros_frame_ownership_error micros_frame_ownership_validate(
             return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
         }
     }
+    if (!index_storage_is_valid(ownership,
+        observed_counts[MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE]
+            + observed_counts[MICROS_FRAME_OWNER_PROCESS_USER]
+            + observed_counts[MICROS_FRAME_OWNER_VM_WIRED], true)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
@@ -477,6 +574,41 @@ static enum micros_frame_ownership_error resolve_vm_table_frames(
     return MICROS_FRAME_OWNERSHIP_OK;
 }
 
+static enum micros_frame_ownership_error vm_index_set_preflight(
+    const struct micros_frame_ownership *ownership,
+    struct micros_process_handle process,
+    const uint64_t *data_frame_indices,
+    size_t data_frame_count,
+    const uint64_t *table_frame_indices,
+    bool inserting
+)
+{
+    uint32_t total = (uint32_t)(data_frame_count + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT);
+    uint64_t frame_index;
+    size_t index;
+
+    if (!inserting && ownership->process_frames[process.slot].count < total) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    for (index = 0; index < data_frame_count; ++index) {
+        frame_index = data_frame_indices[index];
+        if (inserting
+            ? !micros_frame_ownership_index_can_insert(ownership, process.slot, frame_index, total)
+            : !micros_frame_ownership_index_can_remove(ownership, frame_index)) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+    for (index = 0; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+        frame_index = table_frame_indices[index];
+        if (inserting
+            ? !micros_frame_ownership_index_can_insert(ownership, process.slot, frame_index, total)
+            : !micros_frame_ownership_index_can_remove(ownership, frame_index)) {
+            return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+        }
+    }
+    return MICROS_FRAME_OWNERSHIP_OK;
+}
+
 enum micros_frame_ownership_error
 micros_frame_ownership_vm_process_set_preflight(
     const struct micros_frame_ownership *ownership,
@@ -532,7 +664,7 @@ micros_frame_ownership_vm_process_set_preflight(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    return resolve_vm_table_frames(
+    error = resolve_vm_table_frames(
         ownership,
         table_physical_addresses,
         table_owner_kind,
@@ -540,6 +672,13 @@ micros_frame_ownership_vm_process_set_preflight(
         data_frame_indices,
         data_physical_address_count,
         table_frame_indices
+    );
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    return vm_index_set_preflight(
+        ownership, process, data_frame_indices, data_physical_address_count,
+        table_frame_indices, data_owner_kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE
     );
 }
 
@@ -691,6 +830,12 @@ enum micros_frame_ownership_error micros_frame_ownership_validate_active(
         if (ownership->owner_counts[kind_index] != observed_counts[kind_index]) {
             return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
         }
+    }
+    if (!index_storage_is_valid(ownership,
+        observed_counts[MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE]
+            + observed_counts[MICROS_FRAME_OWNER_PROCESS_USER]
+            + observed_counts[MICROS_FRAME_OWNER_VM_WIRED], false)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
     return MICROS_FRAME_OWNERSHIP_OK;
 }

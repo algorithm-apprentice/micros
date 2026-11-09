@@ -16,27 +16,18 @@ static void clear_page(uint64_t physical_address)
     micros_user_address_space_clear_page(physical_address);
 }
 
-static void clear_release_bitmap(
-    const struct micros_user_address_space_scratch_lease *lease
-)
-{
-    micros_user_address_space_clear_bitmap(
-        lease->release_bitmap,
-        lease->word_count
-    );
-}
-
 static bool scratch_bitmap_add(
     const struct micros_user_address_space_scratch_lease *lease,
     uint64_t *bitmap,
     uint64_t frame_index
 )
 {
-    return micros_user_address_space_bitmap_add(
-        bitmap,
-        lease->word_count,
-        frame_index
-    );
+    if (!lease->active || lease->mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED
+        || lease->release_selection == NULL || bitmap != lease->release_bitmap
+        || bitmap != lease->release_selection->bitmap || frame_index >= lease->frame_count) {
+        return false;
+    }
+    return micros_frame_selection_add(lease->release_selection, frame_index);
 }
 
 static enum micros_user_address_space_error acquire_scratch(
@@ -44,7 +35,7 @@ static enum micros_user_address_space_error acquire_scratch(
     struct micros_user_address_space_scratch_lease *lease
 )
 {
-    return micros_user_address_space_acquire_scratch(view, lease);
+    return micros_user_address_space_acquire_selected_scratch(view, lease);
 }
 
 static void release_scratch(
@@ -62,6 +53,18 @@ static uint64_t active_root(void)
 static _Noreturn void panic_invariant(const char *reason)
 {
     micros_user_address_space_panic_invariant(reason);
+}
+
+static void clear_release_bitmap(
+    const struct micros_user_address_space_scratch_lease *lease
+)
+{
+    if (!lease->active || lease->mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED
+        || lease->release_selection == NULL
+        || lease->release_bitmap != lease->release_selection->bitmap
+        || !micros_frame_selection_clear(lease->release_selection)) {
+        panic_invariant("user-address-space-release-selection");
+    }
 }
 
 static enum micros_user_address_space_error
@@ -586,8 +589,7 @@ static enum micros_user_address_space_error release_page_frames(
     return map_ownership_error(
         micros_frame_ownership_runtime_release_process_set(
             release->process,
-            release->scratch->release_bitmap,
-            MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+            release->scratch->release_selection
         )
     );
 }
@@ -652,24 +654,16 @@ micros_user_address_space_release_page(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = micros_user_address_space_validate_locked(
-        &runtime,
-        &scratch,
-        process,
-        &resolved
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    if (active_root() == resolved->address_space_root) {
-        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
-        goto done_with_scratch;
-    }
     release.ledger = ledger;
     release.resolved = resolved;
     release.scratch = &scratch;
     release.process = process;
     error = inspect_page_release(&runtime, &release, virtual_address);
+    if ((error == MICROS_USER_ADDRESS_SPACE_OK || error == MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED)
+        && active_root() == resolved->address_space_root) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done_with_scratch;
+    }
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done_with_scratch;
     }

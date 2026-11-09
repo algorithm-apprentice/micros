@@ -82,13 +82,16 @@ micros_frame_ownership_prepare_handoff(
 enum micros_frame_ownership_error
 micros_frame_ownership_prepare_wired_process_user_set(
     struct micros_frame_ownership *ownership,
-    const uint64_t *selected_bitmap,
-    size_t selected_word_count
+    const struct micros_frame_selection *selection
 )
 {
     uint64_t selected_count = 0;
-    uint64_t process_user_count = 0;
+    struct micros_frame_owner owner;
     uint64_t frame_index;
+    uint64_t word;
+    size_t position;
+    size_t word_index;
+    unsigned bit_index;
     enum micros_frame_ownership_error error;
 
     error = micros_frame_ownership_require_initialized(ownership);
@@ -99,9 +102,11 @@ micros_frame_ownership_prepare_wired_process_user_set(
         return MICROS_FRAME_OWNERSHIP_ERROR_PHASE;
     }
     if (
-        selected_bitmap == NULL
-        || selected_word_count
-            != MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        selection == NULL
+        || selection->word_count > MICROS_FRAME_ALLOCATOR_BITMAP_WORDS
+        || selection->frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES
+        || (selection->word_count == 0) != (selection->frame_count == 0)
+        || selection->word_count > selection->frame_count
     ) {
         return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
     }
@@ -109,72 +114,45 @@ micros_frame_ownership_prepare_wired_process_user_set(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
+    error = micros_frame_ownership_check_selection(selection, ownership->managed_frame_count);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
 
-    for (
-        frame_index = 0;
-        frame_index < MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES;
-        ++frame_index
-    ) {
-        size_t word_index = (size_t)(frame_index / 64);
-        uint64_t bit = UINT64_C(1) << (frame_index % 64);
-        bool selected =
-            (selected_bitmap[word_index] & bit) != 0;
-        struct micros_frame_owner owner;
-
-        if (frame_index >= ownership->managed_frame_count) {
-            if (selected) {
-                return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;
+    for (position = 0; position < selection->word_count; ++position) {
+        word_index = selection->words[position];
+        word = selection->bitmap[word_index];
+        for (bit_index = 0; bit_index < 64; ++bit_index) {
+            if ((word & (UINT64_C(1) << bit_index)) == 0) {
+                continue;
             }
-            continue;
-        }
-        owner = ownership->owners[frame_index];
-        if (owner.kind == MICROS_FRAME_OWNER_PROCESS_USER) {
-            if (
-                process_user_count
-                    == ownership->managed_frame_count
-            ) {
-                return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+            frame_index = (uint64_t)word_index * 64 + bit_index;
+            owner = ownership->owners[frame_index];
+            if (owner.kind == MICROS_FRAME_OWNER_FREE) {
+                return MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED;
             }
-            ++process_user_count;
-            if (!selected) {
+            if (owner.kind != MICROS_FRAME_OWNER_PROCESS_USER) {
                 return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
             }
-            if (
-                ownership->handoff_targets[frame_index]
-                    != MICROS_FRAME_HANDOFF_NONE
-            ) {
+            if (ownership->handoff_targets[frame_index] != MICROS_FRAME_HANDOFF_NONE) {
                 return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
             }
             ++selected_count;
-            continue;
-        }
-        if (selected) {
-            return owner.kind == MICROS_FRAME_OWNER_FREE
-                ? MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED
-                : MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
         }
     }
-    if (
-        process_user_count
-            != ownership->owner_counts[
-                MICROS_FRAME_OWNER_PROCESS_USER
-            ]
-        || selected_count != process_user_count
-    ) {
-        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    if (selected_count != ownership->owner_counts[MICROS_FRAME_OWNER_PROCESS_USER]) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_WRONG_OWNER;
     }
 
-    for (
-        frame_index = 0;
-        frame_index < ownership->managed_frame_count;
-        ++frame_index
-    ) {
-        if (
-            ownership->owners[frame_index].kind
-                == MICROS_FRAME_OWNER_PROCESS_USER
-        ) {
-            ownership->handoff_targets[frame_index] =
-                MICROS_FRAME_HANDOFF_VM_WIRED;
+    for (position = 0; position < selection->word_count; ++position) {
+        word_index = selection->words[position];
+        word = selection->bitmap[word_index];
+        for (bit_index = 0; bit_index < 64; ++bit_index) {
+            if ((word & (UINT64_C(1) << bit_index)) == 0) {
+                continue;
+            }
+            frame_index = (uint64_t)word_index * 64 + bit_index;
+            ownership->handoff_targets[frame_index] = MICROS_FRAME_HANDOFF_VM_WIRED;
         }
     }
     return MICROS_FRAME_OWNERSHIP_OK;
@@ -248,6 +226,10 @@ micros_frame_ownership_complete_handoff(
         frame_index < ownership->managed_frame_count;
         ++frame_index
     ) {
+        if (micros_frame_owner_kind_is_process_bound(ownership->owners[frame_index].kind)
+            && ownership->handoff_targets[frame_index] == MICROS_FRAME_HANDOFF_VM_TRANSFERABLE) {
+            micros_frame_ownership_index_remove_prevalidated(ownership, frame_index);
+        }
         ownership->owners[frame_index] = resulting_owner(
             ownership->owners[frame_index],
             ownership->handoff_targets[frame_index]

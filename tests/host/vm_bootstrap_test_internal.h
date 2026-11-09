@@ -14,6 +14,7 @@ struct vm_bootstrap_test_context {
     struct micros_frame_allocator build_allocator;
     struct micros_frame_ownership build_ownership;
     uint64_t build_bitmap[MICROS_FRAME_ALLOCATOR_BITMAP_WORDS];
+    struct micros_frame_selection build_selection;
     uint64_t build_frames[8];
 };
 

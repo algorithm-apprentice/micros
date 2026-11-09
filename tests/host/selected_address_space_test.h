@@ -34,6 +34,10 @@ struct micros_vm_handoff_state *micros_as_native_vm_input(void);
 void micros_as_native_ipc_publish(void);
 const uint64_t *micros_as_native_scratch_bitmap(bool release);
 bool micros_as_native_scratch_busy(void);
+#if !defined(MICROS_SELECTED_ADDRESS_SPACE_BASELINE)
+const struct micros_frame_selection *micros_as_native_scratch_selection(bool release);
+uint8_t micros_as_native_scratch_mode(void);
+#endif
 
 uintptr_t micros_as_native_irq_save(void);
 void micros_as_native_irq_restore(uintptr_t status);

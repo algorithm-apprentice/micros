@@ -1,6 +1,6 @@
 import ast
 from collections import Counter
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import copy
 import dataclasses
 from functools import lru_cache
@@ -11,8 +11,10 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tarfile
 import tempfile
+from types import MappingProxyType, ModuleType
 import unittest
 from unittest.mock import patch
 
@@ -25,6 +27,98 @@ from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=1)
+def _historical_memory_files():
+    from tests.host.selected_release_handoff_source import RUNTIME_REFERENCE, RUNTIME_TREE
+
+    reference = RUNTIME_REFERENCE
+    tree = subprocess.check_output(
+        ("git", "rev-parse", reference + "^{tree}"), cwd=ROOT, text=True, timeout=30,
+    ).strip()
+    if tree != RUNTIME_TREE:
+        raise ValueError("historical memory policy lost its fixed #232 tree")
+    data = subprocess.check_output(
+        ("git", "-c", "tar.umask=022", "archive", reference), cwd=ROOT, timeout=30,
+    )
+    files = {}
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        for member in archive:
+            if member.isdir():
+                continue
+            if (
+                not member.isfile() or member.name in files or Path(member.name).is_absolute()
+                or ".." in Path(member.name).parts
+            ):
+                raise ValueError("historical memory archive has an unadmitted member")
+            files[member.name] = (archive.extractfile(member).read(), member.mode & 0o777)
+    return MappingProxyType(files)
+
+
+def historical_memory_text(path):
+    return _historical_memory_files()[path][0].decode()
+
+
+@contextmanager
+def historical_memory_policy():
+    """Keep #232 mutation probes separate from actual-current MEM05 authority."""
+    import tests.host as package
+    import tools
+    from tests.host import evidence_authority_scope as scope
+    from tools import stack_artifact_files
+
+    retired, claims = set(), []
+    for name in (
+        "runtime_memory", "diagnostic_history", "bootstrap_allocation",
+        "kernel_mapping", "selected_ownership", "selected_address_space",
+    ):
+        tree = ast.parse(historical_memory_text("tests/host/" + name + "_authority.py"))
+        claim = literal_value(single_assignment(tree, "COMPLETED_CLAIM").value)
+        claims.append(claim[1])
+        if name == "runtime_memory":
+            keys = (claim[2],)
+        else:
+            tree = ast.parse(historical_memory_text("tests/host/" + name + "_source.py"))
+            keys = literal_value(single_assignment(tree, "SOURCE_PROJECTION").value)["retirement_keys"]
+        if retired.intersection(keys):
+            raise ValueError("historical memory authority overlaps")
+        retired.update(keys)
+    if claims != ["COPY01", "PLAT01", "MEM01", "MEM02", "MEM03", "MEM04"] or len(retired) != 103:
+        raise ValueError("historical memory authority omitted a fixed claim or identity")
+
+    def identity(root, key):
+        if Path(root).resolve() != ROOT:
+            raise ValueError("historical memory authority used another source root")
+        return key not in retired
+
+    def read(path):
+        relative = Path(path).relative_to(ROOT).as_posix()
+        data, mode = _historical_memory_files()[relative]
+        return data, {"kind": "file", "mode": mode, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+    modules = {}
+    for name in (
+        "tests.host.selected_ownership_source", "tests.host.selected_address_space_source",
+        "tools.generate_selected_ownership_fixture", "tools.generate_selected_address_space_fixture",
+    ):
+        module = ModuleType(name)
+        module.__file__ = str(ROOT / (name.replace(".", "/") + ".py"))
+        module.__package__ = name.rsplit(".", 1)[0]
+        modules[name] = module
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(scope, "_active", None))
+        stack.enter_context(patch.object(scope, "identity_required", side_effect=identity))
+        stack.enter_context(patch.object(scope, "_providers", side_effect=AssertionError("historical probe used live authority")))
+        stack.enter_context(patch.object(stack_artifact_files, "read_regular", side_effect=read))
+        stack.enter_context(patch.dict(sys.modules, modules))
+        for name, module in modules.items():
+            owner = package if name.startswith("tests.host.") else tools
+            stack.enter_context(patch.object(owner, name.rsplit(".", 1)[1], module, create=True))
+        for name, module in modules.items():
+            text = historical_memory_text(name.replace(".", "/") + ".py")
+            exec(compile(text, module.__file__, "exec"), module.__dict__)
+        yield
 
 
 def relocated_binding_reference(root=ROOT):
@@ -927,8 +1021,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(22, len(inventory.families))
-        self.assertEqual(5379, len(inventory.facts))
+        self.assertEqual(23, len(inventory.families))
+        self.assertEqual(5387, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -2176,12 +2270,43 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
     def materialize(cls, root):
         return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
 
+    def test_actual_current_observations_keep_every_unselected_contract(self):
+        from tests.host import selected_ownership_source as source
+        from tests.host import selected_release_handoff_source as current
+        from tests.host.c_source_records import function_records
+        from tests.host.work_count_types import Stage
+
+        for path in sorted({row[1] for row in self.rows}):
+            with self.subTest(path=path):
+                original = (ROOT / path).read_text()
+                replaced = current.legacy_replaced_functions(ROOT, "MEM03", path, original, Stage.GREEN)
+                expected = {
+                    row[0].rsplit("/", 1)[1]: row[3]["sites"] for row in self.rows
+                    if row[1] == path and row[0].rsplit("/", 1)[1] not in replaced
+                }
+                bindings = source._observation_bindings(ROOT, path, original, Stage.GREEN, "aggregate")
+                self.assertEqual(expected, {
+                    name: tuple(site for site, _, _ in bindings if site[0] == name)
+                    for name in expected
+                })
+                observed = source.observe_source(ROOT, path, original, Stage.GREEN, "aggregate")
+                self.assertEqual(original, source.project_observations(ROOT, path, observed, Stage.GREEN, "aggregate"))
+        row = next(row for row in self.rows if row[3]["coverage"] == "loops-only" and not row[3]["sites"])
+        path, name = row[1], row[0].rsplit("/", 1)[1]
+        original = (ROOT / path).read_text()
+        record = function_records(original)[name]
+        fragment = record.signature + "{" + record.body + "}"
+        changed = original.replace(fragment, record.signature + "{\nwhile (false) {}\n" + record.body + "}", 1)
+        with self.assertRaisesRegex(ValueError, "missing, duplicated or undeclared primitive"):
+            source._validate_observation_coverage(ROOT, path, changed, Stage.GREEN)
+
+    @historical_memory_policy()
     def test_existing_observation_rejections_have_individual_inventory_keys(self):
         from tests.host import selected_ownership_source as source
         from tests.host.c_source_records import function_records
         from tests.host.work_count_types import Stage
 
-        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        keys = {fact.key for fact in self.inventory.facts}
         cases = (
             (
                 "kernel/memory/frame_ownership_bootstrap.c", "collect_process_release_summary",
@@ -2201,7 +2326,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         )
         for path, name, before, after, reason in cases:
             with self.subTest(path=path, function=name, mutation=before):
-                original = (ROOT / path).read_text()
+                original = historical_memory_text(path)
                 body = function_records(original)[name].body
                 self.assertEqual(1, original.count(body))
                 if before is None:
@@ -2228,7 +2353,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(120, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5379, 22), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5387, 23), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -2251,6 +2376,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         )
         self.assertTrue(all(row[2] == ("tests/host/selected_ownership_source.py",) for row in self.rows))
 
+    @historical_memory_policy()
     def test_empty_coverage_modes_and_current_observation_inverse_remain_distinct(self):
         from tests.host import selected_ownership_source as source
         from tests.host.c_source_records import function_records
@@ -2258,13 +2384,13 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
 
         for path in sorted({row[1] for row in self.rows}):
             with self.subTest(path=path):
-                original = (ROOT / path).read_text()
+                original = historical_memory_text(path)
                 observed = source.observe_source(ROOT, path, original, Stage.GREEN, "aggregate")
                 self.assertEqual(original, source.project_observations(ROOT, path, observed, Stage.GREEN, "aggregate"))
         for coverage in ("memory-fields-and-loops", "loops-only"):
             row = next(row for row in self.rows if row[3]["coverage"] == coverage and not row[3]["sites"])
             path, name = row[1], row[0].rsplit("/", 1)[1]
-            original = (ROOT / path).read_text()
+            original = historical_memory_text(path)
             record = function_records(original)[name]
             fragment = record.signature + "{" + record.body + "}"
             self.assertEqual(1, original.count(fragment))
@@ -2280,7 +2406,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
                 else:
                     source._validate_observation_coverage(ROOT, path, changed, Stage.GREEN)
         path = "kernel/memory/frame_ownership_bootstrap.c"
-        original = (ROOT / path).read_text()
+        original = historical_memory_text(path)
         changed = original.replace(
             "release_bitmap[word_index]", "release_bitmap [ word_index ]", 1,
         )
@@ -2472,12 +2598,37 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
     def materialize(cls, root):
         return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
 
+    def test_actual_current_source_keeps_all_unretired_observation_guards(self):
+        from tests.host import selected_address_space_source as source
+        from tests.host.work_count_types import Stage
+
+        rows = [row for row in self.rows if row[0].startswith("MEM04/observation/")]
+        for path in sorted({row[1] for row in rows}):
+            text = (ROOT / path).read_text()
+            source.validate_retained_source(ROOT, path, text, Stage.GREEN)
+            observed = source.observation_sites(ROOT, path, text, Stage.GREEN)
+            for row in rows:
+                if row[1] == path:
+                    with self.subTest(scope=row[0]):
+                        self.assertIn(row[0].rsplit("/", 1)[1], observed)
+        path = "kernel/memory/user_address_space_mapping.c"
+        original = (ROOT / path).read_text()
+        changed = original.replace(
+            "decode_pte(table->entries[index], &entry)",
+            "decode_pte(table->entries[(index)], &entry)", 1,
+        )
+        self.assertNotEqual(original, changed)
+        source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+        with self.assertRaisesRegex(ValueError, "frozen primitive/compound inventory"):
+            source.observation_sites(ROOT, path, changed, Stage.GREEN)
+
+    @historical_memory_policy()
     def test_existing_rejections_have_individual_inventory_keys(self):
         from tests.host.c_source_records import function_records
         from tests.host import selected_address_space_source as source
         from tests.host.work_count_types import Stage
 
-        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        keys = {fact.key for fact in self.inventory.facts}
         prefix = self.OWNER + ":native-source-admission:MEM04/"
         for kind, path, message in (
             ("native-input", "kernel/memory/user_address_space.c", "fixed or noncandidate"),
@@ -2485,14 +2636,14 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
             ("dependent-file", "kernel/memory/user_address_space_handoff.c", "two error assignments"),
         ):
             with self.subTest(kind=kind, path=path):
-                original = (ROOT / path).read_text()
+                original = historical_memory_text(path)
                 source.validate_retained_source(ROOT, path, original, Stage.GREEN)
                 with self.assertRaisesRegex(ValueError, message):
                     source.validate_retained_source(ROOT, path, original + "\n", Stage.GREEN)
                 key = prefix + kind + "/" + path
                 self.assertTrue(key in keys, "missing existing assertion identity: " + key)
         path = "kernel/memory/user_address_space_mutation.c"
-        original = (ROOT / path).read_text()
+        original = historical_memory_text(path)
         records = function_records(original)
         for name, message in (
             ("clear_release_bitmap", "retained diagnostic or unrelated body"),
@@ -2520,7 +2671,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
             self.assertTrue(key in keys, "missing existing assertion identity: " + key)
         path = "kernel/memory/user_address_space_mapping.c"
         with self.subTest(observation=path):
-            original = (ROOT / path).read_text()
+            original = historical_memory_text(path)
             before = "decode_pte(table->entries[index], &entry)"
             self.assertEqual(1, original.count(before))
             changed = original.replace(before, "decode_pte(table->entries[(index)], &entry)", 1)
@@ -2538,7 +2689,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(477, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5379, 22), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5387, 23), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -2560,6 +2711,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(5, sum(len(row["explicit"]) for row in observations))
         self.assertTrue(all(row[2] == ("tests/host/selected_address_space_source.py",) for row in self.rows))
 
+    @historical_memory_policy()
     def test_byte_and_compact_dependent_comparisons_keep_their_distinct_semantics(self):
         from tests.host.c_source_records import function_records
         from tests.host import selected_address_space_source as source
@@ -2573,12 +2725,12 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
             "kernel/memory/user_address_space_handoff.c",
             "kernel/memory/user_address_space.c",
         ):
-            original = (ROOT / path).read_text()
+            original = historical_memory_text(path)
             source.validate_retained_source(ROOT, path, original, Stage.GREEN)
             with self.subTest(path=path), self.assertRaises(ValueError):
                 source.validate_retained_source(ROOT, path, original + "\n ", Stage.GREEN)
         path = "kernel/memory/user_address_space_mutation.c"
-        original = (ROOT / path).read_text()
+        original = historical_memory_text(path)
         record = function_records(original)["micros_user_address_space_release_page"]
         fragment = record.signature + "{" + record.body + "}"
         changed = original.replace(fragment, record.signature + "{" + record.body + "\n }", 1)
@@ -2790,6 +2942,7 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
     def declaration_text(reference, rows):
         return "BINDING_REFERENCE = " + repr(reference) + "\nNATIVE_SOURCE_BINDINGS = " + repr(rows) + "\n"
 
+    @historical_memory_policy()
     def test_existing_current_rejections_have_individual_inventory_keys(self):
         from tests.host import selected_ownership_source as source
         from tests.host.c_source_records import compact, function_records
@@ -2797,7 +2950,7 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
         from tools import generate_selected_ownership_fixture as generator
 
         subject = "kernel/memory/user_address_space_validation.c"
-        current = (ROOT / subject).read_text()
+        current = historical_memory_text(subject)
         source.validate_retained_source(ROOT, subject, current, Stage.GREEN)
         name = "micros_user_address_space_validate"
         record = function_records(current)[name]
@@ -2829,7 +2982,7 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
             ), self.assertRaisesRegex(ValueError, "unadmitted native dependency"):
                 generator.source_bundle(ROOT, Stage.GREEN, "ordinary")
 
-        keys = {fact.key for fact in evidence_authority_inventory.current_inventory(ROOT).facts}
+        keys = {fact.key for fact in self.inventory.facts}
         required = (
             "MEM03/function/" + subject + "/" + name,
             "MEM03/definitions/" + subject,
@@ -2869,27 +3022,28 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
             Counter(len(row[2]) for row in self.rows if row[0].startswith("MEM03/native-input/")),
         )
 
+    @historical_memory_policy()
     def test_existing_admission_normalizations_and_consumers_remain_distinct(self):
         from tests.host import selected_ownership_source as source
         from tests.host.work_count_types import Stage
 
         for path in source.SOURCE_ROLES["production_paths"]:
             with self.subTest(positive=path):
-                source.validate_retained_source(ROOT, path, (ROOT / path).read_text(), Stage.GREEN)
+                source.validate_retained_source(ROOT, path, historical_memory_text(path), Stage.GREEN)
         header = "include/micros/frame_ownership.h"
-        current = (ROOT / header).read_text()
+        current = historical_memory_text(header)
         source.validate_retained_source(ROOT, header, current + "\n ", Stage.GREEN)
         fixed_c = next(
             row[1] for row in self.rows
             if row[0].startswith("MEM03/native-input/") and row[1].endswith(".c")
         )
-        current = (ROOT / fixed_c).read_text()
+        current = historical_memory_text(fixed_c)
         source.validate_retained_source(ROOT, fixed_c, current, Stage.GREEN)
         with self.assertRaisesRegex(ValueError, "fixed or noncandidate source changed"):
             source.validate_retained_source(ROOT, fixed_c, current + "\n ", Stage.GREEN)
         for path in ("include/micros/user_address_space.h", "kernel/memory/user_address_space_internal.h"):
             with self.subTest(header=path), self.assertRaisesRegex(ValueError, "no fixed source binding"):
-                source.validate_retained_source(ROOT, path, (ROOT / path).read_text(), Stage.GREEN)
+                source.validate_retained_source(ROOT, path, historical_memory_text(path), Stage.GREEN)
 
     def test_declaration_is_literal_only_and_cannot_execute_or_rebind(self):
         reference = "BINDING_REFERENCE = " + repr(self.reference) + "\n"
