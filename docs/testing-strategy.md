@@ -895,6 +895,22 @@ The original source/stack/machine guards and all historical expectations
 remain active. Complete current host/author acceptance and independent
 implementation review are still required.
 
+Those requirements are complete and EV01-C09 implementation #240 is
+independently reviewed and merged. The complete host selection passed
+165 cases; all fifty final commands passed fresh, including 45 CTests,
+1,650 Python cases in 727.215 seconds and full current target/stack
+coverage. Fresh committed/main authority is journal-free.
+
+The [Accepted OBJ01 contract](architecture/selected-object-and-hart-validation.md)
+requires actual fixed/current portable state and primitive-work evidence,
+including unchanged outputs on selected failures, regular and exceptional
+stack intervals, direct hart probing and malformed batch precedence.
+Its six-product orchestration remains in the complete tier. Existing
+models, real target scenarios, every stack budget and current acceptance
+remain mandatory. Its own source predicates receive individual identities
+from their first implementation rather than another unnamed coarse freeze.
+This design phase authors no executable fixture or prototype.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

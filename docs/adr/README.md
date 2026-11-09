@@ -134,3 +134,4 @@ to make the project appear more consistent than it was.
 | [0116](0116-handed-off-leaf-fixture-coherence.md) | Handed-off leaf fixture coherence | Accepted |
 | [0117](0117-granular-selected-release-handoff-native-source-authority.md) | Granular selected release/handoff native source authority | Accepted |
 | [0118](0118-precise-object-and-panic-source-authority.md) | Precise object and panic source authority | Accepted |
+| [0119](0119-selected-object-and-hart-validation.md) | Selected object and hart validation | Accepted |

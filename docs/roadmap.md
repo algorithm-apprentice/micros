@@ -506,6 +506,24 @@ changes only fifty old metadata tuples and adds eleven existing-policy
 names. Full current acceptance and independent implementation review
 remain required before its separate merge and OBJ01 design resumption.
 
+EV01-C09 implementation #240 has now completed those requirements and
+merged as `9b880468192e61177ffe57ec69079fe398160a42`, with identical
+reviewed, committed, remote, preview, squash and main tree
+`80b93b111b5a1387d812da87c539e56da042777b`.
+All fifty final commands passed fresh: 45 CTests, all 1,650 Python cases
+in 727.215 seconds, forty QEMU workflows, four standalone images and
+complete 44/113/ten-scope stack coverage. Same-run profiles, independent
+review, fresh journal-free committed/main authority and protected cleanup
+passed. The seven claims and 185 retirements are unchanged.
+
+The resumed [OBJ01 design](architecture/selected-object-and-hart-validation.md)
+and [fixed-source study](research/minix-selected-object-and-hart-validation.md)
+follow [Accepted ADR-0119](adr/0119-selected-object-and-hart-validation.md).
+They define selected scheduler preflight, direct hart/current identity,
+regular/exceptional stack proof and the exact ninety-four-key evidence
+transition. Only design is active. No runtime code, test, model or
+executable prototype precedes separate review, Acceptance and merge.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and
