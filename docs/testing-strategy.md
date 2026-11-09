@@ -870,6 +870,20 @@ claims remain separate from complete-current catalog validation.
 The two-module host suite and full current producer are still mandatory,
 not inferred from focused Green.
 
+Those gates have now passed and EV01-C08 implementation #238 is merged.
+The two-module suite ran 152 cases; all fifty final author commands
+passed fresh, including 1,643 Python cases in 715.852 seconds and complete
+current native/target/image/stack coverage. Independent review and fresh
+journal-free committed/main checks passed.
+
+The following [Accepted EV01-C09 contract](architecture/object-and-panic-source-authority.md)
+repairs fifty existing portable-object metadata bindings and names eleven
+existing panic projected-source policies. It preserves all original
+comparisons and machine/stack proof. Its checked historical metadata
+inverse follows complete current-catalog validation; it cannot conceal a
+bad new fact or authorize current source. No executable artifact precedes
+separate design merge, and unit, target and integration gates remain required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

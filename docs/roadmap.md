@@ -475,6 +475,25 @@ subcase failures and focused Green. The 5,840-record catalog preserves all
 implementation review remain required; OBJ01 design stays blocked until
 the separate metadata implementation merges.
 
+EV01-C08 implementation #238 has now passed those gates and merged as
+`89d3b85314754ae225f01fd16f257745bf19ce71`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`ce73f3875dd354ef6c8452808d53ab2b9e14d522`.
+All fifty final commands passed fresh: 45 CTests, all 1,643 Python cases
+in 715.852 seconds, forty QEMU workflows, four standalone images and
+complete 44/113/ten-scope stack coverage. Independent review, same-run
+receipts, fresh journal-free committed/main authority and protected
+completed-ref cleanup passed.
+
+Resumed OBJ01 research found the separate
+[object and panic source-authority gap](research/object-and-panic-source-authority-gap.md).
+[Accepted ADR-0118](adr/0118-precise-object-and-panic-source-authority.md)
+and [EV01-C09](architecture/object-and-panic-source-authority.md) define
+fifty precise object metadata repairs and eleven names for existing panic
+source comparisons. Only that documentation-only design is active.
+OBJ01 design is blocked until its separately reviewed prerequisite pair
+merges; no OBJ01 runtime algorithm, retirement or finding closure is claimed.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

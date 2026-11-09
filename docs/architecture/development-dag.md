@@ -200,6 +200,17 @@ is the sole active outcome. OBJ01 design remains blocked until complete
 current acceptance, independent review and that implementation merge.
 The runtime graph and finding ownership do not change.
 
+EV01-C08 implementation #238 has now completed full current acceptance,
+independent review, exact-tree publication and journal-free main checks.
+OBJ01 research resumed, then found the separate
+[object and panic source-authority gap](../research/object-and-panic-source-authority-gap.md).
+[Accepted ADR-0118](../adr/0118-precise-object-and-panic-source-authority.md)
+and [EV01-C09](object-and-panic-source-authority.md) define its bounded
+metadata prerequisite. Only that design is active; its implementation and
+OBJ01 implementation remain pending, and OBJ01 design is blocked until
+the prerequisite pair merges. No runtime node, edge, finding owner or
+hosted-CI acceptance changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

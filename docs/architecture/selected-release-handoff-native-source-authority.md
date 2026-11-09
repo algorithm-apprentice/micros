@@ -6,14 +6,22 @@ This is the Accepted EV01-C08 contract under
 [ADR-0117](../adr/0117-granular-selected-release-handoff-native-source-authority.md).
 The [fixed-source study](../research/selected-release-handoff-native-source-authority-gap.md)
 establishes missing names for existing MEM05 current-source comparisons.
-OBJ01 design is blocked; its implementation remains pending until this
-separate metadata implementation merges.
+At proposal, OBJ01 design was blocked on this separate metadata pair.
+That prerequisite is now complete; OBJ01 implementation remains pending
+its own separately reviewed design.
 
 Complete independent correction and Acceptance-only design reviews are
 clean. The separate documentation-only design #237 merged as
 `d047b387c54e53a7455596052c119ec82a3f2825`, with identical reviewed and
 squash tree `2f851fce3e990a047e198d5e8d0f8b4932f91df3`.
-The metadata implementation is now the sole active outcome.
+The metadata implementation has independently merged as #238,
+`89d3b85314754ae225f01fd16f257745bf19ce71`, tree
+`ce73f3875dd354ef6c8452808d53ab2b9e14d522`.
+Full current acceptance, clean independent review, exact publication trees
+and fresh journal-free committed/main authority passed.
+OBJ01 research resumed; its separately found
+[object/panic prerequisite](object-and-panic-source-authority.md) does not
+change this completed outcome.
 
 ```text
 policy commit: aba02c1f8a583866a85c3012d20c6007b9445a22
