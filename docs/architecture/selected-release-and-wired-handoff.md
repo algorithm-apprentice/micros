@@ -1675,3 +1675,27 @@ supplying B02/B05. Preparation/syntax checks and archived results cannot
 replace a genuine Red, Green or recertification event.
 Publication still requires full current acceptance, independent review,
 identical publication trees and journal-free authority.
+
+## Completed implementation
+
+Implementation #236 completed that acceptance and independently merged as
+`aba02c1f8a583866a85c3012d20c6007b9445a22`. Reviewed, committed, remote,
+merge-preview, squash and actual-main content all have tree
+`7609a9578e8010c735310923a90953833c93e3d5`.
+
+The final actual attempt passed genuine Red/Green and all thirteen
+recertification units. All fifty final author commands passed fresh,
+including 45 CTests, all 1,635 Python cases, forty QEMU workflows,
+four standalone images and the complete 44-configuration/113-ELF/
+ten-observed-scope stack gate. B13 remains explicitly blocked.
+Three same-run reusable profiles and clean independent review preceded
+publication. Fresh committed and actual-main checkouts preserve all
+5,387 facts, seven claims and 185 retired identities without author journals.
+Completed refs were removed without changing purposeful archives.
+
+This closes B02-F006/F007 only. The next preferred OBJ01 research found the
+separate [native-source authority gap](../research/selected-release-handoff-native-source-authority-gap.md).
+[Accepted EV01-C08](selected-release-handoff-native-source-authority.md)
+names those existing comparisons without changing this runtime contract,
+source admission or retirement. OBJ01 design resumes after that separate
+metadata prerequisite merges.

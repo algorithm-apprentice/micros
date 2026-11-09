@@ -100,6 +100,9 @@ This directory contains the design baseline for `micros`.
 - [Granular selected-ownership observation authority](architecture/selected-ownership-observation-authority.md)
   defines Accepted EV01-C07's complete function-local MEM03 primitive/coverage
   identities without changing a source or observation predicate.
+- [Granular selected release/handoff native source authority](architecture/selected-release-handoff-native-source-authority.md)
+  defines Accepted EV01-C08's precise names for existing MEM05 source comparisons,
+  preserving both fixed-input assertion owners before OBJ01 design resumes.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -131,8 +134,8 @@ This directory contains the design baseline for `micros`.
   defines MEM03's Accepted active-metadata/selected-record/whole-active boundaries,
   retained complete diagnostics and the Accepted precise-token authority amendment.
 - [Selected release and wired-handoff plans](architecture/selected-release-and-wired-handoff.md)
-  records the Accepted, independently reviewed MEM05 index, selected-set and
-  bootstrap-plan design; its separate merge still precedes implementation.
+  records the Accepted MEM05 index, selected-set and bootstrap-plan contract
+  and independently reviewed implementation #236.
 - [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
   records the blocked EV03 complete-ELF seed dependency and its narrow
   corrective-design prerequisite.
@@ -168,6 +171,9 @@ This directory contains the design baseline for `micros`.
 - [Selected-ownership observation authority gap](research/selected-ownership-observation-authority-gap.md)
   records distinct MEM03 primitive/coverage rejections and the closed
   120-function census found when MEM05 design resumed.
+- [Selected release/handoff native source authority gap](research/selected-release-handoff-native-source-authority-gap.md)
+  records the existing MEM05 comparisons and closed 453-clause census
+  that block OBJ01's granular source-replacement scope.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,

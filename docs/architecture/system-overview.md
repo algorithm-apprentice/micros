@@ -237,6 +237,18 @@ Design #235 is now separately merged. The fresh
 binds its corrected base and both immutable targets before renewed
 runtime evidence.
 
+MEM05 implementation #236 has now completed actual native/target
+Red/Green, thirteen-unit recertification, all fifty fresh author commands
+and clean independent review. Exact publication trees and fresh journal-free
+committed/main authority passed. The implemented index and selected plans
+close only B02-F006/F007.
+The next preferred OBJ01 design found missing individual names for
+MEM05's existing current-source comparisons.
+[Accepted EV01-C08](selected-release-handoff-native-source-authority.md)
+is a metadata-only prerequisite; it changes no object, hart, scheduler or
+memory behavior. OBJ01 design is blocked until that separately reviewed
+design/implementation pair merges.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A
