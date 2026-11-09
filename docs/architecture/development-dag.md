@@ -193,6 +193,13 @@ outcome; OBJ01 design is blocked and its implementation pending until that
 separate pair merges. No runtime edge, finding owner or hosted-CI
 acceptance changes.
 
+EV01-C08 design #237 has now separately merged after clean complete
+correction and Acceptance-only reviews. Its
+[metadata implementation](selected-release-handoff-native-source-authority.md#implementation-map)
+is the sole active outcome. OBJ01 design remains blocked until complete
+current acceptance, independent review and that implementation merge.
+The runtime graph and finding ownership do not change.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

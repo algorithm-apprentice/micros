@@ -6,12 +6,14 @@ This is the Accepted EV01-C08 contract under
 [ADR-0117](../adr/0117-granular-selected-release-handoff-native-source-authority.md).
 The [fixed-source study](../research/selected-release-handoff-native-source-authority-gap.md)
 establishes missing names for existing MEM05 current-source comparisons.
-Only this documentation prerequisite is active. OBJ01 design is blocked;
-its implementation remains pending.
+OBJ01 design is blocked; its implementation remains pending until this
+separate metadata implementation merges.
 
-Complete independent correction review is clean. This Accepted design
-remains documentation-only; its separate merge still precedes the metadata
-implementation.
+Complete independent correction and Acceptance-only design reviews are
+clean. The separate documentation-only design #237 merged as
+`d047b387c54e53a7455596052c119ec82a3f2825`, with identical reviewed and
+squash tree `2f851fce3e990a047e198d5e8d0f8b4932f91df3`.
+The metadata implementation is now the sole active outcome.
 
 ```text
 policy commit: aba02c1f8a583866a85c3012d20c6007b9445a22
@@ -383,3 +385,53 @@ Publish only identical reviewed/committed/remote/preview/squash content,
 verify fresh journal-free committed/main authority and remove only completed
 task refs. This metadata outcome closes no OBJ01 runtime finding. Resume
 OBJ01 design only after the separate implementation merge.
+
+## Implementation map
+
+The implementation starts from design #237's 1,529-file base. Before any
+declaration, extractor or test edit, the author independently froze all
+5,387 complete predecessor records, twenty-three fingerprints, seven claims,
+185 retirements and every one of the 453 expected rows/facts from the fixed
+#236 policy and #232 inputs.
+
+The [literal declaration](../../tests/host/selected_release_handoff_native_source_bindings.py)
+contains only its permitted docstring and two assignments. Its independent
+new-family fingerprint is:
+
+```text
+08a95d81ec96b31541097261f3be1e783856a14db2bc4d617c9f2c66abf240d8
+```
+
+The existing inventory owner checks the literal-only shape, exact
+reference/scope/subject/assertion ownership, typed comparison fields,
+primitive/region records, cardinalities, ordinary paths and complete
+fingerprint. The declaration is discovered through a type-checking-only
+reference, not executed or imported at runtime.
+
+Existing authority regressions independently reconstruct the complete
+expected facts from fixed Git policy and source. Eleven genuine
+missing-identity subcases followed the original guards' positive and
+negative controls before registration. They distinguish both fixed-input
+owners, raw signature/body checks, current primitive/callee/directive
+constraints, the exact idle body, definition sets, skeletons and headers.
+
+The original scaffold test uses the complete fixed forty-four-input view,
+passes its historical positive fixture and rejects all eight mutations at
+their intended boundaries. Separate current tests reject invalid catalog
+additions before historical selection, check raw/compact fidelity and
+ordinary-file ownership, and preserve real immutable/candidate overlap
+rejection. All seven committed claims work with author-journal access
+forbidden.
+
+The nine-case focused selection passed. A direct comparison with the
+pre-edit freeze preserves every complete predecessor record, fingerprint,
+claim and retirement, and matches all 453 new facts. The current catalog
+has 5,840 facts in twenty-four families. Only the four specified executable
+owners change; runtime, source guards, generator, authority owner, counters,
+stack, build and transition/view policy remain unchanged.
+
+The complete owned two-module host selection passed all 152 cases in
+337.974 seconds. The full current author producer and independent
+implementation review remain required before the first permanent
+implementation commit or publication. This implementation map does not
+claim those pending gates or close an OBJ01 runtime finding.

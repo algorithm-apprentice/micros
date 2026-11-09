@@ -14,8 +14,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from types import MappingProxyType, ModuleType
+from types import MappingProxyType, ModuleType, SimpleNamespace
+from typing import TYPE_CHECKING
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 from tests.host import evidence_authority
@@ -27,6 +29,10 @@ from tests.host.work_count_recipe import MODULE_PATH, render_native_recipe
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+if TYPE_CHECKING:
+    # Keep literal metadata discoverable without executing its declaration.
+    from tests.host import selected_release_handoff_native_source_bindings
 
 
 @lru_cache(maxsize=1)
@@ -910,6 +916,137 @@ def _selected_ownership_observation_reference(root, policy, policy_tree):
     return reference, rows, previous
 
 
+def selected_release_handoff_native_reference(root=ROOT):
+    contract = (root / "docs/architecture/selected-release-handoff-native-source-authority.md").read_text()
+    policy = re.search(r"^policy commit:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    tree = re.search(r"^policy tree:\s+([0-9a-f]{40})$", contract, re.MULTILINE).group(1)
+    return _selected_release_handoff_native_reference(root, policy, tree)
+
+
+@lru_cache(maxsize=4)
+def _selected_release_handoff_native_reference(root, reference_commit, reference_tree):
+    from tests.host.c_source_records import function_records
+
+    actual = subprocess.check_output(
+        ("git", "rev-parse", reference_commit + "^{tree}"), cwd=root, text=True, timeout=30,
+    ).strip()
+    if actual != reference_tree:
+        raise ValueError("fixed release/handoff policy commit/tree disagree")
+    raw = subprocess.check_output(
+        ("git", "-c", "tar.umask=022", "archive", reference_commit), cwd=root, timeout=30,
+    )
+    policy_files = {}
+    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+        for member in archive:
+            if member.isdir():
+                continue
+            if (
+                not member.isfile() or member.name in policy_files
+                or Path(member.name).is_absolute() or ".." in Path(member.name).parts
+            ):
+                raise ValueError("fixed release/handoff policy archive has an invalid member")
+            policy_files[member.name] = (archive.extractfile(member).read(), member.mode & 0o777)
+    owner = "tests/host/selected_release_handoff_source.py"
+    policy = ModuleType("tests.host._fixed_release_handoff_policy")
+    policy.__file__ = str(root / owner)
+    policy.__package__ = "tests.host"
+    # Execute reviewed policy helpers from fixed Git, never the candidate declaration.
+    exec(compile(policy_files[owner][0], reference_commit + ":" + owner, "exec"), policy.__dict__)
+    runtime = policy.RUNTIME_REFERENCE
+    actual = subprocess.check_output(
+        ("git", "rev-parse", runtime + "^{tree}"), cwd=root, text=True, timeout=30,
+    ).strip()
+    if actual != policy.RUNTIME_TREE:
+        raise ValueError("fixed release/handoff runtime commit/tree disagree")
+    members = set(filter(None, subprocess.check_output(
+        ("git", "ls-tree", "-r", "--name-only", "-z", runtime), cwd=root, timeout=30,
+    ).decode().split("\0")))
+    selected = {
+        path for path in members if path.endswith(".h") and path.startswith(("arch/", "include/", "kernel/"))
+    } | set(policy.RECIPE_ADMISSION["native_source_members"])
+    data = subprocess.check_output(
+        ("git", "archive", runtime, *sorted(selected)), cwd=root, timeout=30,
+    )
+    native = {}
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        for member in archive:
+            if member.isdir():
+                continue
+            if not member.isfile() or member.name not in selected or member.name in native:
+                raise ValueError("fixed release/handoff native archive has an invalid member")
+            native[member.name] = archive.extractfile(member).read()
+    if len(native) != 214 or set(native) != selected:
+        raise ValueError("fixed release/handoff native membership changed")
+    policy.fixed_source = lambda _, path: native[path]
+    reference = (("policy", reference_commit, reference_tree), ("MEM05", runtime))
+    contracts = policy.current_function_contracts(str(root))
+    rows = []
+
+    def append(kind, path, contract, name=""):
+        assertions = (owner, "tools/generate_selected_release_handoff_fixture.py") if kind == "native-input" else (owner,)
+        rows.append((
+            "MEM05/" + kind + "/" + path + ("/" + name if name else ""),
+            path, assertions, contract,
+        ))
+
+    production = set(policy.SOURCE_ROLES["production_paths"])
+    for path in sorted(path for path in production if path.endswith(".c")):
+        original = function_records(native[path].decode())
+        removed = set(policy.SOURCE_PROJECTION["removed_functions"].get(path, ()))
+        added = set(policy.SOURCE_PROJECTION["current_helpers"].get(path, ()))
+        mutable = set(policy.SOURCE_PROJECTION["mutable_functions"][path])
+        names = (set(original) - removed) | added
+        for name in sorted(names):
+            if name not in mutable | added:
+                record = original[name]
+                contract = {
+                    "comparison": "raw-function", "signature": record.signature,
+                    "guards": record.guards,
+                    "body_sha256": hashlib.sha256(record.body.encode()).hexdigest(),
+                }
+            else:
+                signature, guards, calls, primitives = contracts[path + "/" + name]
+                body_hash = ""
+                if name == "micros_user_address_space_require_idle":
+                    body = original[name].body
+                    if body.count("if (scratch_busy)") != 1:
+                        raise ValueError("fixed release/handoff idle clause lost its original predicate")
+                    body = body.replace(
+                        "if (scratch_busy)",
+                        "if (scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE)",
+                    )
+                    body_hash = hashlib.sha256(body.encode()).hexdigest()
+                contract = {
+                    "comparison": "current-function", "signature": signature,
+                    "guards": guards, "calls": calls, "primitives": primitives,
+                    "no_body_directives": 1 if name in added else 0,
+                    "body_sha256": body_hash,
+                }
+            append("function", path, contract, name)
+        append("definitions", path, {
+            "comparison": "definition-set", "expected": tuple(sorted(names)),
+        })
+        append("skeleton", path, {
+            "comparison": "compact-skeleton-sha256",
+            "expected": hashlib.sha256(policy.expected_skeleton(root, path).encode()).hexdigest(),
+        })
+    for path in policy.HEADER_PATHS:
+        expected = hashlib.sha256(policy.declared_header(root, path).encode()).hexdigest()
+        if expected != policy.SOURCE_PROJECTION["declared_header_sha256"][path]:
+            raise ValueError("fixed release/handoff header declaration changed")
+        append("header", path, {"comparison": "file-bytes-sha256", "expected": expected})
+    for path in sorted(set(native) - production):
+        append("native-input", path, {
+            "comparison": "file-bytes-sha256", "expected": hashlib.sha256(native[path]).hexdigest(),
+        })
+    rows = tuple(sorted(rows))
+    if len(rows) != len({row[0] for row in rows}) or len(rows) != 453:
+        raise ValueError("fixed release/handoff source-clause census changed")
+    inventory_tree = ast.parse(policy_files["tests/host/evidence_authority_inventory.py"][0].decode())
+    previous = literal_value(single_assignment(inventory_tree, "DECLARED_FAMILY_FACT_DIGESTS").value)
+    return reference, rows, previous, policy, MappingProxyType(policy_files)
+
+
 class InventoryTests(unittest.TestCase):
     def test_fatal_firmware_facts_remain_artifacts_not_runtime_baseline_oracles(self):
         inventory = evidence_authority_inventory.current_inventory(ROOT)
@@ -1021,8 +1158,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(23, len(inventory.families))
-        self.assertEqual(5387, len(inventory.facts))
+        self.assertEqual(24, len(inventory.families))
+        self.assertEqual(5840, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -2353,7 +2490,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(120, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5387, 23), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -2689,7 +2826,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(477, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5387, 23), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -3258,6 +3395,403 @@ class SelectedOwnershipNativeBindingTests(unittest.TestCase):
                         selected_ownership_authority.identity_required(ROOT, claim.claimed_identity_keys[0]),
                         claim.owner_task,
                     )
+
+
+class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
+    OWNER = "tests/host/selected_release_handoff_native_source_bindings.py"
+    FAMILY = "selected-release-handoff-native-admission"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.reference, cls.rows, cls.previous, cls.policy, cls.policy_files = selected_release_handoff_native_reference()
+        cls.inventory = evidence_authority_inventory.current_inventory(ROOT)
+        cls.facts = tuple(fact for fact in cls.inventory.facts if fact.family == cls.FAMILY)
+
+    @classmethod
+    def expected_facts(cls):
+        consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
+        return tuple(evidence_authority.Fact(
+            cls.OWNER + ":native-source-admission:" + scope, cls.FAMILY, cls.OWNER,
+            "native-source-admission", scope, evidence_authority.AuthorityClass.TRANSPORT_IDENTITY,
+            "B02", consumers, tuple(sorted({cls.OWNER, subject, *assertions})),
+            digest((cls.reference, scope, subject, assertions, contract)),
+        ) for scope, subject, assertions, contract in cls.rows)
+
+    @classmethod
+    def fixture(cls, directory):
+        root = Path(directory)
+        declaration = (ROOT / cls.OWNER).read_text()
+        for path in {value for fact in cls.expected_facts() for value in fact.payload_paths}:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(declaration if path == cls.OWNER else "")
+        return root
+
+    @classmethod
+    def materialize(cls, root):
+        return evidence_authority_inventory._facts_for_owner(root, cls.FAMILY, cls.OWNER)
+
+    def test_complete_bindings_preserve_fixed_policy_and_every_predecessor(self):
+        tree = ast.parse((ROOT / self.OWNER).read_text())
+        self.assertEqual(self.reference, literal_value(single_assignment(tree, "BINDING_REFERENCE").value))
+        self.assertEqual(self.rows, literal_value(single_assignment(tree, "NATIVE_SOURCE_BINDINGS").value))
+        self.assertEqual(self.expected_facts(), self.facts)
+        self.assertEqual(453, len(self.facts))
+        self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
+        self.assertEqual((5840, 24), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual(
+            fact_set_digest(self.expected_facts()),
+            dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
+        )
+        self.assertIn(self.OWNER, self.inventory.discovered_identity_modules)
+        self.assertEqual({3: 256, 4: 197}, Counter(len(fact.payload_paths) for fact in self.facts))
+        functions = [row[3] for row in self.rows if row[0].startswith("MEM05/function/")]
+        self.assertEqual({"raw-function": 171, "current-function": 55}, Counter(row["comparison"] for row in functions))
+        current = [row for row in functions if row["comparison"] == "current-function"]
+        self.assertEqual(23, sum(row["no_body_directives"] for row in current))
+        self.assertEqual(15, sum(not row["primitives"] for row in current))
+        self.assertEqual(1, sum(bool(row["body_sha256"]) for row in current))
+        retained = tuple(fact for fact in self.inventory.facts if fact.family in self.previous)
+        self.assertEqual((5387, 23), (len(retained), len(self.previous)))
+        for family, expected in self.previous.items():
+            with self.subTest(family=family):
+                self.assertEqual(expected, dict(self.inventory.declared_family_fact_digests)[family])
+                self.assertEqual(expected, fact_set_digest(fact for fact in retained if fact.family == family))
+
+    def test_literal_schema_and_consumer_drift_cannot_create_authority(self):
+        declaration = (ROOT / self.OWNER).read_text()
+
+        def encoded(reference, rows):
+            return "BINDING_REFERENCE = " + repr(reference) + "\nNATIVE_SOURCE_BINDINGS = " + repr(rows) + "\n"
+
+        variants = [
+            "", declaration + "\nimport os\n",
+            declaration + "\nraise RuntimeError('must not execute')\n",
+            declaration + "\ndef hidden():\n    BINDING_REFERENCE = 0\n",
+            declaration + "\nNATIVE_SOURCE_BINDINGS = ()\n",
+            encoded(self.reference, list(self.rows)),
+            encoded(self.reference, self.rows[:-1]),
+            encoded(self.reference, (self.rows[1], self.rows[0], *self.rows[2:])),
+            encoded(self.reference, (*self.rows[:-1], self.rows[0])),
+            encoded((("policy", "a" * 40, self.reference[0][2]), self.reference[1]), self.rows),
+        ]
+        native = next(index for index, row in enumerate(self.rows) if row[0].startswith("MEM05/native-input/"))
+        raw = next(index for index, row in enumerate(self.rows) if row[3]["comparison"] == "raw-function")
+        current = next(index for index, row in enumerate(self.rows) if row[3]["comparison"] == "current-function")
+        idle = next(index for index, row in enumerate(self.rows) if row[0].endswith("/micros_user_address_space_require_idle"))
+        empty = next(index for index, row in enumerate(self.rows) if row[3]["comparison"] == "current-function" and not row[3]["primitives"])
+        nonempty = next(row[3]["primitives"] for row in self.rows if row[3]["comparison"] == "current-function" and row[3]["primitives"])
+        mutations = (
+            (native, 0, "MEM05/unknown/" + self.rows[native][1]),
+            (native, 1, "../outside.h"),
+            (native, 2, self.rows[native][2][:1]),
+            (native, 2, tuple(reversed(self.rows[native][2]))),
+            (native, 3, {"comparison": "file-bytes-sha256", "expected": "0" * 64}),
+            (raw, 3, {**self.rows[raw][3], "signature": self.rows[raw][3]["signature"] + " "}),
+            (raw, 3, {**self.rows[raw][3], "body_sha256": ""}),
+            (current, 3, {**self.rows[current][3], "no_body_directives": True}),
+            (current, 3, {**self.rows[current][3], "no_body_directives": 2}),
+            (current, 3, {**self.rows[current][3], "body_sha256": None}),
+            (current, 3, {**self.rows[current][3], "calls": ("undeclared_callee",)}),
+            (empty, 3, {**self.rows[empty][3], "primitives": nonempty}),
+            (idle, 3, {**self.rows[idle][3], "body_sha256": ""}),
+        )
+        for index, field, value in mutations:
+            changed = list(self.rows)
+            row = list(changed[index])
+            row[field] = value
+            changed[index] = tuple(row)
+            variants.append(encoded(self.reference, tuple(changed)))
+        with tempfile.TemporaryDirectory(prefix="micros-release-native-schema-") as directory:
+            root = self.fixture(directory)
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            for index, text in enumerate(variants):
+                with self.subTest(mutation=index):
+                    (root / self.OWNER).write_text(text)
+                    with self.assertRaises(ValueError):
+                        self.materialize(root)
+
+    def test_payloads_bind_both_real_consumers_without_candidate_expectations(self):
+        selected = (
+            self.OWNER, "kernel/objects/kernel_object_hart.c", "include/micros/frame_ownership.h",
+            "tests/host/selected_release_handoff_source.py",
+            "tools/generate_selected_release_handoff_fixture.py",
+        )
+        with tempfile.TemporaryDirectory(prefix="micros-release-native-paths-") as directory:
+            root = self.fixture(directory)
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            (root / selected[1]).write_text("candidate bytes cannot supply a fixed expectation\n")
+            self.assertEqual(self.expected_facts(), self.materialize(root))
+            peer = root / "payload-peer"
+            peer.write_text("not an admitted source")
+            for relative in selected:
+                path = root / relative
+                saved = path.read_bytes()
+                for kind in ("missing", "symlink", "hardlink"):
+                    with self.subTest(path=relative, kind=kind):
+                        path.unlink()
+                        if kind == "symlink":
+                            path.symlink_to(peer)
+                        elif kind == "hardlink":
+                            os.link(peer, path)
+                        with self.assertRaises(ValueError):
+                            self.materialize(root)
+                        if path.exists() or path.is_symlink():
+                            path.unlink()
+                        path.write_bytes(saved)
+            parent = root / "kernel/objects"
+            moved = root / "saved-objects"
+            parent.rename(moved)
+            parent.symlink_to(moved, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                self.materialize(root)
+            parent.unlink()
+            moved.rename(parent)
+
+    def test_historical_catalog_checks_cannot_hide_invalid_current_records(self):
+        from tests.host import selected_release_handoff_authority as authority
+
+        historical = authority.historical_predecessor_records(ROOT, self.inventory)
+        self.assertEqual(5379, len(historical))
+        self.assertEqual(self.policy.SOURCE_PROJECTION["predecessor_facts_sha256"], fact_set_digest(historical))
+        fact = self.facts[0]
+        for changed in (
+            dataclasses.replace(self.inventory, facts=tuple(row for row in self.inventory.facts if row.key != fact.key)),
+            dataclasses.replace(self.inventory, facts=tuple(
+                dataclasses.replace(row, evidence_value="0" * 64) if row.key == fact.key else row
+                for row in self.inventory.facts
+            )),
+        ):
+            with self.subTest(count=len(changed.facts)), self.assertRaisesRegex(ValueError, "complete current inventory is invalid"):
+                authority.historical_predecessor_records(ROOT, changed)
+
+    def test_selected_clause_closure_keeps_shared_policy_disjoint_and_rejects_real_overlap(self):
+        scopes = {
+            "MEM05/native-input/kernel/objects/kernel_object_hart.c",
+            "MEM05/function/kernel/memory/user_address_space_runtime.c/micros_user_address_space_require_idle",
+            "MEM05/skeleton/kernel/memory/frame_ownership.c",
+            "MEM05/header/include/micros/frame_ownership.h",
+        }
+        facts = tuple(fact for fact in self.facts if fact.scope in scopes)
+        self.assertEqual(4, len(facts))
+        keys = tuple(fact.key for fact in facts)
+        units = facts[0].consumer_units
+        subjects = tuple(sorted({row[1] for row in self.rows if row[0] in scopes}))
+        paths = tuple(sorted({path for fact in facts for path in fact.payload_paths}))
+        plan = evidence_authority.synthetic_plan(evidence_authority.synthetic_inventory())
+        plan = dataclasses.replace(
+            plan, owner_unit="B02", finding_ids=("B02-F999",),
+            affected_identity_keys=keys, retained_identity_keys=(), planned_retirement_identity_keys=keys,
+            replacement_oracles=(dataclasses.replace(plan.replacement_oracles[0], replaces_identity_keys=keys),),
+            recertification_units=units,
+            unit_commands=tuple((unit, ("validate-" + unit.lower(),)) for unit in units),
+        )
+        authority = dataclasses.replace(
+            evidence_authority.synthetic_task_authorities(plan)[plan.owner_task],
+            command_input_paths=("tests/host/c_source_records.py", "tests/host/work_count_evidence.py", "tools/stack_bound_fatal.py"),
+            unit_input_paths=tuple((unit, subjects) for unit in units),
+        )
+        environment = evidence_authority.synthetic_environment(plan)
+        immutable = dict(environment.immutable_inputs)
+        del immutable["tools/command_registry.py"]
+        immutable.update((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in authority.command_input_paths)
+        candidate = tuple((path, hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths)
+        environment = dataclasses.replace(
+            environment, immutable_inputs=tuple(sorted(immutable.items())),
+            red_candidate_inputs=candidate, current_candidate_inputs=candidate,
+            unit_inputs=tuple((unit, tuple(row for row in candidate if row[0] in subjects)) for unit in units),
+        )
+        registry = evidence_authority.synthetic_transition_registry(plan)
+        result = evidence_authority.validate_transition(self.inventory, {plan.owner_task: authority}, registry, plan, (), environment)
+        self.assertTrue(result.ok, result)
+        self.assertIs(evidence_authority.TransitionState.REPLACEMENT_REGISTERED, result.state)
+        self.assertFalse(result.retired_identity_keys)
+        for overlap in (
+            subjects[0], self.OWNER, "tests/host/selected_release_handoff_source.py",
+            "tools/generate_selected_release_handoff_fixture.py",
+        ):
+            with self.subTest(overlap=overlap):
+                changed_authority = dataclasses.replace(authority, command_input_paths=(*authority.command_input_paths, overlap))
+                changed_environment = dataclasses.replace(
+                    environment, immutable_inputs=(*environment.immutable_inputs, (overlap, dict(candidate)[overlap])),
+                )
+                result = evidence_authority.validate_transition(
+                    self.inventory, {plan.owner_task: changed_authority}, registry, plan, (), changed_environment,
+                )
+                self.assertIs(evidence_authority.ErrorCode.PROJECTION, result.error)
+
+    def test_all_seven_committed_claims_remain_journal_free_with_the_complete_catalog(self):
+        from tests.host import (
+            bootstrap_allocation_authority, diagnostic_history_authority, kernel_mapping_authority,
+            runtime_memory_authority, selected_address_space_authority, selected_ownership_authority,
+            selected_release_handoff_authority,
+        )
+
+        with ExitStack() as stack:
+            for module in (
+                bootstrap_allocation_authority, diagnostic_history_authority,
+                kernel_mapping_authority, runtime_memory_authority,
+            ):
+                for name in ("read_current", "read_journal", "validate_journal"):
+                    stack.enter_context(patch.object(module, name, side_effect=AssertionError("ordinary authority must not use a journal")))
+            for module in (
+                selected_ownership_authority, selected_address_space_authority,
+                selected_release_handoff_authority,
+            ):
+                for name in ("read_selection", "read_phase_record", "read_verified_journal", "validate_journal", "capture_author_context"):
+                    stack.enter_context(patch.object(module, name, side_effect=AssertionError("committed authority must not use an author attempt")))
+            _, authorities, _, registry = selected_release_handoff_authority.task_definition(ROOT)
+            self.assertEqual(7, len(registry.claims))
+            retired = {key for claim in registry.claims for key in claim.claimed_identity_keys}
+            self.assertEqual(185, len(retired))
+            result = evidence_authority.validate_transition(self.inventory, authorities, registry, None, (), None)
+            self.assertTrue(result.ok, result)
+            self.assertEqual({fact.key for fact in self.inventory.facts} - retired, set(result.active_identity_keys))
+            self.assertFalse(retired & {fact.key for fact in self.facts})
+            for claim in registry.claims:
+                if claim.owner_task != "COPY01":
+                    self.assertFalse(selected_release_handoff_authority.identity_required(ROOT, claim.claimed_identity_keys[0]))
+
+    def test_raw_and_compact_function_clauses_keep_their_distinct_semantics(self):
+        from tests.host.c_source_records import compact, function_records
+        from tests.host.work_count_types import Stage
+
+        path = "kernel/memory/user_address_space_validation.c"
+        name = "micros_user_address_space_collect_bootstrap_handoff_locked"
+        original = self.policy_files[path][0].decode()
+        record = function_records(original)[name]
+        signature = record.signature.replace("(", " (", 1)
+        self.assertNotEqual(signature, record.signature)
+        self.assertEqual(compact(signature), compact(record.signature))
+        fragment = record.signature + "{" + record.body + "}"
+        self.assertEqual(1, original.count(fragment))
+        changed = original.replace(fragment, signature + "{" + record.body + "\n}", 1)
+        self.policy.validate_retained_source(ROOT, path, original, Stage.GREEN)
+        self.policy.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+        self.assertEqual(
+            self.policy.primitive_shape(path, name, record.body),
+            self.policy.primitive_shape(path, name, function_records(changed)[name].body),
+        )
+
+    def test_existing_source_predicates_have_individual_inventory_keys(self):
+        from tests.host.c_source_records import compact, function_records
+        from tests.host.work_count_types import Stage
+
+        source = self.policy
+        keys = {fact.key for fact in self.inventory.facts}
+        prefix = self.OWNER + ":native-source-admission:MEM05/"
+
+        def require_key(suffix):
+            key = prefix + suffix
+            self.assertTrue(key in keys, "missing existing assertion identity: " + key)
+
+        path = "kernel/objects/kernel_object_hart.c"
+        original = self.policy_files[path][0].decode()
+        with self.subTest(clause="native-input-source"):
+            source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+            with self.assertRaisesRegex(ValueError, "fixed or noncandidate"):
+                source.validate_retained_source(ROOT, path, original + "\n", Stage.GREEN)
+            require_key("native-input/" + path)
+        with self.subTest(clause="native-input-generator"):
+            generator = ast.parse(self.policy_files["tools/generate_selected_release_handoff_fixture.py"][0])
+            function, = (
+                node for node in generator.body
+                if isinstance(node, ast.FunctionDef) and node.name == "source_bundle"
+            )
+            admitted = mock.Mock()
+            reader = mock.Mock(return_value=(original.encode(), {"mode": 0o644}))
+            namespace = {
+                "Path": Path, "Stage": Stage, "hashlib": hashlib, "read_regular": reader,
+                "fixed_inputs": lambda _: {path: (original.encode(), 0o644)},
+                "native_source_members": lambda _: (),
+                "bind_native": lambda _, text, stage: text,
+                "source": SimpleNamespace(
+                    CHANNELS=("ordinary",), OBSERVED_HEADERS=(),
+                    SOURCE_ROLES=source.SOURCE_ROLES,
+                    validate_primitive_declarations=mock.Mock(),
+                    validate_retained_source=admitted,
+                ),
+            }
+            exec(compile(ast.Module(body=[function], type_ignores=[]), "fixed-MEM05-generator", "exec"), namespace)
+            inputs, outputs = namespace["source_bundle"](ROOT, Stage.GREEN, "ordinary")
+            self.assertEqual(original.encode(), outputs[path][0])
+            self.assertEqual(len(original.encode()), inputs[path]["size"])
+            admitted.assert_called_once()
+            admitted.reset_mock()
+            reader.return_value = (original.encode() + b"\n", {"mode": 0o644})
+            with self.assertRaisesRegex(ValueError, "unadmitted native input"):
+                namespace["source_bundle"](ROOT, Stage.GREEN, "ordinary")
+            admitted.assert_not_called()
+            require_key("native-input/" + path)
+        path = "kernel/memory/frame_ownership.c"
+        original = self.policy_files[path][0].decode()
+        record = function_records(original)["micros_frame_ownership_clear_bytes"]
+        fragment = record.signature + "{" + record.body + "}"
+        self.assertEqual(1, original.count(fragment))
+        for label, signature, body in (
+            ("raw-signature", record.signature.replace("(", " (", 1), record.body),
+            ("raw-body", record.signature, record.body + "\n"),
+        ):
+            with self.subTest(clause=label):
+                self.assertEqual(compact(record.signature), compact(signature))
+                source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+                changed = original.replace(fragment, signature + "{" + body + "}", 1)
+                with self.assertRaisesRegex(ValueError, "unrelated original function"):
+                    source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+                require_key("function/" + path + "/micros_frame_ownership_clear_bytes")
+        for kind, changed, message in (
+            ("definitions", original + "\nstatic void undeclared_definition(void) {}\n", "unadmitted definitions"),
+            ("skeleton", "#define UNDECLARED_STORAGE_POLICY 1\n" + original, "unadmitted source include"),
+        ):
+            with self.subTest(clause=kind):
+                source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+                with self.assertRaisesRegex(ValueError, message):
+                    source.validate_retained_source(ROOT, path, changed, Stage.GREEN)
+                require_key(kind + "/" + path)
+        path = "kernel/memory/user_address_space_validation.c"
+        name = "micros_user_address_space_collect_bootstrap_handoff_locked"
+        original = self.policy_files[path][0].decode()
+        record = function_records(original)[name]
+        fragment = record.signature + "{" + record.body + "}"
+        self.assertEqual(1, original.count(fragment))
+        self.assertEqual((), source.primitive_shape(path, name, record.body))
+        for label, addition in (
+            ("current-primitives", "\nfor (size_t probe = 0; probe < 1; ++probe) {}\n"),
+            ("current-callees", "\n(void)undeclared_callee();\n"),
+            ("helper-directives", "\n#define UNUSED_HELPER_DIRECTIVE 1\n"),
+        ):
+            with self.subTest(clause=label):
+                body = addition + record.body
+                if label != "current-primitives":
+                    self.assertEqual((), source.primitive_shape(path, name, body))
+                source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+                with self.assertRaisesRegex(ValueError, "declared signature/callees/primitive bindings"):
+                    source.validate_retained_source(
+                        ROOT, path, original.replace(fragment, record.signature + "{" + body + "}", 1), Stage.GREEN,
+                    )
+                require_key("function/" + path + "/" + name)
+        path = "kernel/memory/user_address_space_runtime.c"
+        name = "micros_user_address_space_require_idle"
+        original = self.policy_files[path][0].decode()
+        record = function_records(original)[name]
+        body = record.body.replace(
+            "scratch_mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE",
+            "scratch_mode == MICROS_USER_ADDRESS_SPACE_SCRATCH_IDLE",
+        )
+        with self.subTest(clause="exact-idle-body"):
+            self.assertNotEqual(record.body, body)
+            self.assertEqual(source.primitive_shape(path, name, record.body), source.primitive_shape(path, name, body))
+            source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+            with self.assertRaisesRegex(ValueError, "idle check changed"):
+                source.validate_retained_source(ROOT, path, original.replace(record.body, body, 1), Stage.GREEN)
+            require_key("function/" + path + "/" + name)
+        path = "include/micros/frame_ownership.h"
+        original = self.policy_files[path][0].decode()
+        with self.subTest(clause="complete-header"):
+            source.validate_retained_source(ROOT, path, original, Stage.GREEN)
+            with self.assertRaisesRegex(ValueError, "complete interface"):
+                source.validate_retained_source(ROOT, path, original + "\n", Stage.GREEN)
+            require_key("header/" + path)
 
 
 class TransitionTests(unittest.TestCase):
