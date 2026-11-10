@@ -544,6 +544,26 @@ records its new 1,538-file base, complete ninety-five-key partition,
 All runtime evidence must be renewed; this preparation closes no finding
 and does not substitute for the complete current author and review gates.
 
+OBJ01 implementation #243 has now passed those gates and merged as
+`34125516b60e9e0a9e5362ff2ee60555691adb99`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`1de53de9dcf5102dbef3e76d59b7f2fef28cee9e`.
+All thirteen recertification units and fifty final fresh commands passed;
+complete Python discovery ran 1,670 cases in 864.109 seconds.
+The [acceptance record](architecture/selected-object-and-hart-validation.md#implementation-acceptance)
+also retains complete current target/stack coverage, same-producer reuse,
+independent review, journal-free authority and protected cleanup.
+Only B03-F001/F003/F004 close. The next preferred
+[OBJ02 design study](research/minix-common-scheduler-return.md) is active;
+its implementation, IPC01, hosted CI and later MINIX/POSIX work remain open.
+
+[Accepted ADR-0121](adr/0121-bounded-common-scheduler-return.md) and its
+[common-return contract](architecture/common-scheduler-return.md) now specify
+that bounded outcome, including current-corruption scope, plan representation
+observations and exact context-proof lifetime. Complete independent design
+review is clean. This remains documentation-only until the separate design
+merge; implementation has not started.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

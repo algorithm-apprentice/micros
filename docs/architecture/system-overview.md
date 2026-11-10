@@ -296,6 +296,19 @@ binds both Accepted decisions, the independently frozen new base and all
 ninety-five identities. Complete renewed runtime, target and stack evidence
 and independent implementation review remain required before finding closure.
 
+Those gates have now passed and OBJ01 implementation #243 is independently
+reviewed and merged. Its [acceptance record](selected-object-and-hart-validation.md#implementation-acceptance)
+preserves complete diagnostics and the outside audit boundaries.
+The next preferred [common-return study](../research/minix-common-scheduler-return.md)
+owns only B03-F002/F005. Its design is active and independently reviewed;
+implementation remains pending the separate design merge.
+
+The [Accepted common-return contract](common-scheduler-return.md) under
+[ADR-0121](../adr/0121-bounded-common-scheduler-return.md) removes the remaining
+queue projection while retaining checked portable commit and the target's
+existing prevalidated apply. Same-thread context reuse is confined to one
+protected return; completion authority and memory APIs remain unchanged.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

@@ -931,6 +931,25 @@ regressions. Both affected fixture owners are immutable before renewed Red.
 No source guard or complete discovery requirement is waived; current
 native/target/stack acceptance and independent review remain mandatory.
 
+OBJ01 implementation #243 has now completed those requirements and merged.
+Its actual transaction passed all thirteen units, including 701 B14 cases.
+The final producer passed all fifty commands fresh, 46 CTests and all 1,670
+Python tests in 864.109 seconds, with full current target/image/stack coverage
+and three same-run receipts. Independent review, bounded actual reuse and
+journal-free committed/main authority passed.
+The next [OBJ02 study](research/minix-common-scheduler-return.md) must
+separate remaining queue-projection work from already corrected MEM04/OBJ01
+costs and explicitly account for current-versus-historical return fixtures
+before any new runtime evidence is authored.
+
+Its [Accepted contract](architecture/common-scheduler-return.md) requires
+actual constructor/checked-commit/apply work and real same-thread context
+validation evidence, retaining original target semantics and cleanup.
+The legacy plan's raw byte digest must remain distinct from its new ABI and
+defined-field effect observation; an output-format change cannot silently
+drop unrelated output checks. Design acceptance does not create these future
+tests, observers or commands.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

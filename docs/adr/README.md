@@ -136,3 +136,4 @@ to make the project appear more consistent than it was.
 | [0118](0118-precise-object-and-panic-source-authority.md) | Precise object and panic source authority | Accepted |
 | [0119](0119-selected-object-and-hart-validation.md) | Selected object and hart validation | Accepted |
 | [0120](0120-obj01-complete-source-authority.md) | Complete OBJ01 source-authority closure | Accepted |
+| [0121](0121-bounded-common-scheduler-return.md) | Bounded common scheduler return | Accepted |

@@ -244,6 +244,21 @@ its [implementation map](selected-object-and-hart-validation.md#implementation-a
 The archived attempt supplies no current author event. OBJ02 and later
 corrections remain pending; the runtime graph and finding owners are unchanged.
 
+OBJ01 implementation #243 has now completed current acceptance, independent
+review, exact-tree publication and journal-free committed/main authority.
+Only B03-F001/F003/F004 close. The next preferred
+[OBJ02 common-return study](../research/minix-common-scheduler-return.md)
+has both OBJ01 and MEM04 prerequisites merged. Only its documentation-first
+design is active; implementation remains pending its separate reviewed merge.
+No runtime-DAG edge or later finding owner changes.
+
+[Accepted ADR-0121](../adr/0121-bounded-common-scheduler-return.md) and the
+[common-return contract](common-scheduler-return.md) now define that design:
+bounded queue/link deltas and exact same-epoch outgoing-context reuse, with
+explicit historical/current fixture handling and a fifty-eight-key scope.
+Complete independent design review is clean; separate merge still precedes
+implementation.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

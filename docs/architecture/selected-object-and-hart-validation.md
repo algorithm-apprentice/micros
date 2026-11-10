@@ -9,8 +9,10 @@ Complete independent design review preceded its separate merge as #241.
 The first uncommitted implementation is archived. The separately reviewed
 [OBJ01-C01 source-authority correction](#obj01-c01-complete-source-authority)
 under [Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md)
-has now merged as #242. The fresh implementation is the sole active outcome
-and follows the [implementation map](#implementation-and-evidence-map).
+has now merged as #242. Its fresh implementation followed the
+[implementation map](#implementation-and-evidence-map), completed current
+acceptance and independent review, and separately merged as #243.
+The next common-return design remains a separate outcome.
 
 ```text
 task:       OBJ01
@@ -786,3 +788,28 @@ The restart must produce its own immutable Red, Green and thirteen-unit
 transaction, verify the real terminal view, then complete every final gate
 above before independent implementation review and publication. Archived
 source and execution records are reference evidence only.
+
+## Implementation acceptance
+
+Implementation #243 merged as
+`34125516b60e9e0a9e5362ff2ee60555691adb99`.
+The reviewed, committed, remote, merge-preview, squash and main trees all
+equal `1de53de9dcf5102dbef3e76d59b7f2fef28cee9e`.
+The fresh actual attempt completed Red, Green and all thirteen units.
+B14 executed 701 tests, including the three formerly omitted checks.
+Real terminal source-view opening and closing verified all ninety-five
+planned retirements.
+
+The final producer passed all fifty commands fresh: 46 CTests, all 1,670
+Python tests, forty QEMU workflows, four standalone images and complete
+44-configuration/113-ELF/ten-observed-scope stack coverage.
+Actual bounded reuse verified the three receipts from that same producer.
+Independent implementation review reported no substantive issue and ran no
+targeted reproduction or author-suite rerun.
+
+Fresh build-free committed-checkout and actual-main checks forbade
+author-journal access and preserved all 5,851 predecessor facts and
+twenty-five fingerprints. The complete catalog has 6,327 facts in
+twenty-seven families, eight claims and 280 retirements.
+Completed task refs and the temporary checkout were removed.
+This closes only B03-F001/F003/F004; OBJ02 and later outcomes remain separate.
