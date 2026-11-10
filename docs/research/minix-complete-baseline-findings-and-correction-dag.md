@@ -392,6 +392,22 @@ all ninety-five existing identities and complete affected-source coverage.
 Actual renewed acceptance and independent review still precede closure of
 B03-F001/F003/F004; no later finding or hosted-CI outcome is closed.
 
+OBJ01 implementation #243 has now passed complete current acceptance and
+independent review, then separately merged with exact reviewed/publication
+tree equality. Fresh journal-free committed/main authority and completed-ref
+cleanup passed. Only B03-F001/F003/F004 close.
+The preferred next [OBJ02 study](minix-common-scheduler-return.md) is active
+with OBJ01 and MEM04 merged. It owns only B03-F002/F005 and contains no
+executable implementation. Its new contract still requires separate design
+review, Acceptance and merge before implementation.
+
+The [Accepted OBJ02 contract](../architecture/common-scheduler-return.md)
+under [ADR-0121](../adr/0121-bounded-common-scheduler-return.md) now records
+the bounded delta, context-reuse and precise legacy-evidence boundaries.
+Its fifty-eight-key selection retains the existing finding owners and
+runtime prerequisites. Independent design review is clean; it retires
+nothing during design, and separate merge still precedes implementation.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
@@ -532,8 +548,8 @@ blocking queue.
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. Designs #215/#216 and validation prerequisite #218 are merged; the fresh restart retains the fixed runtime and adds checked-view/full-only evidence integration. | Actual active/inactive/bitmap/object work, failure-atomic selected transitions, complete diagnostics and the exact 40-key authority transition; no borrowed interrupted acceptance. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level lookup/translation/allocation-prefix walks and selected root/context/owner preparation instead of complete state validation. | Exact PTE-level, owner, activation, fault-path and allocation-compensation evidence. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Implementation #236 follows the Accepted [selected release/handoff contract](../architecture/selected-release-and-wired-handoff.md), with coherent owner indexing, selected-word sets and protected release/handoff plans. | Actual native/target Red-Green, exact 82-key transition, thirteen-unit recertification, full current acceptance and independent review complete. |
-| `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Accepted [selected object/hart runtime contract](../architecture/selected-object-and-hart-validation.md) and separately merged [OBJ01-C01 closure design](../architecture/selected-object-and-hart-validation.md#obj01-c01-complete-source-authority); fresh implementation follows its [evidence map](../architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map). | Actual object/hart/stack work, consumed-state failure atomicity, complete corruption diagnostics, corrected ninety-five-key transition, complete affected-source coverage and current target/stack acceptance. |
-| `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Retain one prevalidated return plan without rebuilding queues or repeating memory/context validation. | Queue-shift, zero-quantum, plan-compare, commit-store, and target return traces. |
+| `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Independently reviewed implementation #243 is merged; [acceptance and exact publication](../architecture/selected-object-and-hart-validation.md#implementation-acceptance) follow Accepted ADR-0119/0120. | Actual object/hart/stack work, consumed-state failure atomicity, complete diagnostics, ninety-five-key transition, all affected units and complete current acceptance passed; journal-free authority reaches 280 retirements. |
+| `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Independently reviewed Accepted [common-return contract](../architecture/common-scheduler-return.md) and [fixed-source study](minix-common-scheduler-return.md); bounded queue/link deltas and protected same-thread context reuse. | Queue-shift, zero-quantum, plan-compare, commit-store and actual target validation traces; fifty-eight-key transition and no implementation before separate reviewed design merge. |
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Use selected endpoint/object/completion plans and retained immutable authorization instead of nested global validation. | Per-operation endpoint/object/translation counts and failure-atomic completion cases. |
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Replace quadratic thread-capacity projection with the reference dependency-chain mechanism. | Hop/visit counts for chains, cycles, sparse slots, and maximum depth. |
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Bind reply tokens directly to their pending request/owner while preserving generation and close semantics. | Allocation, lookup, stale, close, and reuse probe counts. |

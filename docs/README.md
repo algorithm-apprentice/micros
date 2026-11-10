@@ -107,6 +107,7 @@ This directory contains the design baseline for `micros`.
   defines Accepted EV01-C09's exact portable-object payload repair and existing panic
   source-policy names, without changing runtime or stack admission.
 - [Selected object and hart validation](architecture/selected-object-and-hart-validation.md)
+- [Common scheduler return](architecture/common-scheduler-return.md)
   defines Accepted OBJ01's selected scheduler checks, direct current identity and
   regular/exceptional stack proof while retaining complete diagnostics.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
@@ -184,6 +185,7 @@ This directory contains the design baseline for `micros`.
   records fifty misbound object identities and eleven existing projected-file
   policies found when OBJ01 research resumed after #238.
 - [MINIX selected object and hart validation](research/minix-selected-object-and-hart-validation.md)
+- [MINIX common scheduler return](research/minix-common-scheduler-return.md)
   traces the fixed local mechanisms, forty-two actual audit calls, failure
   boundaries, stack geometry and OBJ01's ninety-four-key source closure.
 
