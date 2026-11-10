@@ -564,6 +564,16 @@ observations and exact context-proof lifetime. Complete independent design
 review is clean. This remains documentation-only until the separate design
 merge; implementation has not started.
 
+That design separately merged as #244. Its uncommitted implementation obtained
+actual native/target Green, but complete B14 recertification exposed three
+omitted historical test owners and existing adapter integration errors.
+The [observed conflicts](research/minix-common-scheduler-return.md#obj02-c01-observed-consumer-scope-conflicts)
+and preserved candidate are not final acceptance.
+[Accepted ADR-0122](adr/0122-obj02-evidence-consumer-scope.md) is the sole active
+correction; it retains the runtime and exact retirement scopes. A fresh OBJ02
+implementation follows its separately reviewed merge. The broader workflow
+simplification remains after OBJ02 rather than becoming parallel work.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

@@ -7,8 +7,11 @@ after independently merged OBJ01 #243. It owns only B03-F002 and B03-F005.
 MEM04 #228 and OBJ01 #243 satisfy its runtime prerequisites.
 The [Accepted contract](../architecture/common-scheduler-return.md) and
 [ADR-0121](../adr/0121-bounded-common-scheduler-return.md) record the current
-design. Complete independent design review is clean.
-Its implementation task remains pending the separate reviewed design merge.
+design. Complete independent design review is clean and design #244 is merged.
+The uncommitted implementation reached actual runtime Green but is archived
+after the consumer conflicts below. Its
+[Accepted corrective contract](../architecture/common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope)
+must separately merge before a fresh implementation.
 
 ```text
 micros:       34125516b60e9e0a9e5362ff2ee60555691adb99
@@ -331,6 +334,62 @@ logical work/storage envelope while retaining explicit failure-atomic
 adaptations. It does not import MINIX source, its broader deferred-work
 policy or its architecture-specific root shortcut.
 
+## OBJ02-C01 observed consumer scope conflicts
+
+The unaccepted implementation was based on separately merged #244,
+`015ec2d7920551caacbdcb753ecadedd7fd3deba`.
+Its independently declared native corpus contains 174 fixed records and
+180 current records; the additional six are checked/apply observations for
+the three already Accepted scoped successes. Actual execution measured:
+
+| Property | Fixed runtime | Unaccepted current runtime |
+| --- | ---: | ---: |
+| Plan bytes | 1,344 | 220 |
+| Static queue workspace bytes | 4,224 | 0 |
+| Maximum queue shifts in the corpus | 16,256 | 0 |
+| Maximum constructor copied/cleared bytes | 1,344 / 1,344 | 220 / 220 |
+| Same-thread / different-thread / captured context validations | 2 / 2 / 1 | 1 / 2 / 1 |
+
+Actual Red and Green were recorded in attempt
+`fd5dbd294d72408e814f5ef544c9e47b`.
+Red record `1a6f67fc6d6ebe480c835e2e4b10e37d46f83c53c7a9426299deecd399cdaec0`
+binds staged tree `aaf404695567884f43b2ab84ff34e74e0986debd`.
+Green record `393807a064a0ef5a5add1120c53b6f67db875ca1945071662b9efd3bba706a95`
+binds staged tree `d1ab57b7d4306291f8af8d53f32db97894855dd5`.
+The original object/scheduler models and scheduler/IPC-return/TTY-trap
+target markers passed. These are execution facts, not final acceptance.
+
+The same attempt's B14 recertification passed retained MEM01-MEM05 work
+and all six 171-case OBJ01 products. Its host selection then ran 695 of
+715 cases in 697.225 seconds, with seven failures, six errors and twenty
+not-run cases after scheduler-layout setup failed. It produced no terminal
+recertification event and no retirement.
+
+| Fixed/current consumer | Actual conflict | Required bounded correction |
+| --- | --- | --- |
+| `tests/host/qemu_transcript_source.py:112-128` | Its original CMake inverse explicitly accepts exactly two report tokens; the current scheduler needs a third, independently owned use. | Keep that shared helper unchanged. Check and remove the complete OBJ02 extension before entering its original historical boundary. |
+| `tests/host/test_selected_ownership.py:445-480` | The direct forward comparison calls the old transcript inverse on raw current CMake. | Add this previously omitted immutable test owner and project the new addition from the observed side only. Keep the fixed builder and expected recipe. |
+| `tests/host/test_qemu_transcript.py:183-197` | The original test directly requires two tokens in raw current CMake. | Add this omitted immutable test owner; retain its two-target historical assertions and malformed-input cases after the bounded projection. |
+| `tests/host/test_selected_release_handoff.py:390-421` | Its explicitly historical MEM05 fixture disables OBJ01 authority but can still borrow newer OBJ02 admission for old planner/apply/context source. | Add this omitted immutable test owner and extend only its cold historical context. Do not infer a historical stage inside current admission. |
+| `tests/host/stack_source_projection.py:174-189` | The new finish-report include displaced the existing exact second-line stack-observer include. | Correct the already owned finish adapter's include placement; do not change stack tooling or its invariant. |
+| Existing current-catalog assertions | Five checks still expected 27 families or 6,327 total current facts after the independently declared additions. | Update the already permitted current-count checks while preserving every complete predecessor record. |
+| Existing isolated OBJ01 replay model | The model's mocked products omitted the newly mandatory `plans` member. | Complete that already permitted protocol fixture explicitly; do not add a live fallback. |
+
+The original native/runtime contracts did not fail. The two recipe tests
+and historical MEM05 test are nevertheless real source consumers and are
+absent from ADR-0121's exact immutable-owner list. They cannot be silently
+edited or skipped. The
+[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) adds only those
+owners and the precise reporting/historical-view boundary, retaining the
+runtime, finding and 58-key/28-path scopes.
+
+The complete forty-file candidate is preserved in a verified local archive
+and stash `092de580edf54e72d3daa90dd68c8850d78e6f42`, whose tree is the Green
+tree above. No implementation PR or permanent implementation commit exists.
+The old working branch was abandoned after preservation. A fresh restart
+must use the separately merged correction and renew its own actual evidence.
+Broader workflow simplification remains a later user-requested outcome.
+
 ## References
 
 - [Current OBJ01 contract and implementation](../architecture/selected-object-and-hart-validation.md)
@@ -341,3 +400,4 @@ policy or its architecture-specific root shortcut.
 - [Return timer preparation](../adr/0027-return-boundary-timer-rearming.md)
 - [Selected user-address-space validation](../adr/0107-selected-user-address-space-validation.md)
 - [Exact current/historical fixture correction](../adr/0115-selected-count-generation-evidence-scope.md)
+- [Accepted OBJ02 consumer-scope correction](../adr/0122-obj02-evidence-consumer-scope.md)
