@@ -537,6 +537,13 @@ boundaries. It changes no runtime algorithm or candidate path. Only this
 documentation-only correction is active; OBJ01 restarts after its reviewed
 design merge. Hosted CI and later MINIX/POSIX outcomes remain open.
 
+Corrective design #242 has now separately merged after clean independent
+review. The fresh [OBJ01 implementation map](architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map)
+records its new 1,538-file base, complete ninety-five-key partition,
+468 native predicates and corrected immutable fixture/coverage inputs.
+All runtime evidence must be renewed; this preparation closes no finding
+and does not substitute for the complete current author and review gates.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

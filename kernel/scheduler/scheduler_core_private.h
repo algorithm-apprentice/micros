@@ -58,14 +58,12 @@ enum micros_kernel_object_error scheduler_core_queue_dequeue(
     struct micros_thread_handle thread_handle
 );
 
-enum micros_kernel_object_error scheduler_core_queue_enqueue_tail(
-    struct micros_kernel_objects *objects,
-    struct micros_hart *hart,
-    struct micros_thread_handle thread_handle
-);
 
-struct micros_thread_handle scheduler_core_queue_pick(
-    const struct micros_hart *hart
+
+enum micros_kernel_object_error scheduler_core_queue_pick(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_thread_handle *result
 );
 
 enum micros_kernel_object_error scheduler_core_preflight_tail_enqueue(
@@ -85,6 +83,41 @@ void scheduler_core_queue_enqueue_head_prevalidated(
     struct micros_kernel_objects *objects,
     struct micros_hart *hart,
     struct micros_thread_handle thread_handle
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_registry(
+    const struct micros_kernel_objects *objects
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_thread(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
+    const struct micros_thread **result
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_hart(
+    const struct micros_kernel_objects *objects,
+    struct micros_hart_handle handle,
+    const struct micros_hart **result
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_thread_operation(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_queue_record(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    uint8_t priority,
+    struct micros_thread_handle handle,
+    const struct micros_thread **result
+);
+
+enum micros_kernel_object_error scheduler_core_preflight_queue_endpoints(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    uint8_t priority
 );
 
 #endif

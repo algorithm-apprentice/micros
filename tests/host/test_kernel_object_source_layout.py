@@ -622,12 +622,16 @@ def owned_records(family, texts=None):
 
 
 def original_locations(family, texts=None):
+    from tests.host.object_hart_validation_source import object_phase_owners
+
     names = normal_names(family)
     locations = {}
     stack_owners = {
         phase[0]: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for phase in phases
     }
     stack_owners.update({name: CORE_SOURCES[8] for name in BASE_VALIDATION_SIGNATURES})
+    if family == 0:
+        stack_owners.update(object_phase_owners(ROOT))
     case_owners = {
         name: family_paths(1)[spec["owner"]] for spec in NATIVE_CASE_TASKS.values() for name in spec["phases"]
     }
@@ -1476,13 +1480,17 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
                         self.assertEqual(family_paths(family)[current], locations[name][0])
 
     def test_complete_original_bodies_and_all_parameter_types_remain_exact(self):
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         for family in ORIGINAL_FUNCTIONS:
             locations = original_locations(family)
             signatures = []
             for name, expected in BASELINE_BODIES[family].items():
                 with self.subTest(family=family, name=name):
                     _, record = locations[name]
-                    self.assertEqual(expected, original_body_digest(family, name, record), REVIEWED_BASE)
+                    key = "tests/host/test_kernel_object_source_layout.py:data-entry:BASELINE_BODIES/" + str(family) + "/" + name
+                    if historical_identity_required(ROOT, key):
+                        self.assertEqual(expected, original_body_digest(family, name, record), REVIEWED_BASE)
                     signatures.append((name, original_signature_tokens(family, name, record)))
             self.assertEqual(BASELINE_SIGNATURES[family], digest_tokens(signatures))
 
@@ -1495,7 +1503,10 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         self.assertEqual(set(LONG_FUNCTIONS) & set(FUNCTION_TASK_MIGRATION), actual)
 
     def test_portable_complete_byte_inverse_is_independent_and_rejects_changed_code(self):
+        from tests.host.object_hart_validation_source import object_inverse_fixture
+
         current = {path: source(path) for path in CORE_SOURCES if kernel_layout_source.is_file_path(ROOT / path)}
+        current = object_inverse_fixture(ROOT, current)
         restored = restored_kernel_objects_source(current)
         self.assertEqual(BASE_CORE_DIGEST, digest_bytes(restored.encode()))
         path, record = original_locations(0, current)["require_initialized"]
@@ -1555,6 +1566,8 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         )
 
     def test_portable_private_helpers_are_necessary_and_dependencies_stay_acyclic(self):
+        from tests.host.object_hart_validation_source import object_phase_owners
+
         current = owned_records(0)
         owners = {name: path for path, name in current}
         aliases = normal_names(0)
@@ -1565,6 +1578,7 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             name: CORE_SOURCES[owner] for owner, _, phases in STACK_CONFLICT_TASKS.values() for name, _, _ in phases
         })
         final.update({name: CORE_SOURCES[8] for name in BASE_VALIDATION_SIGNATURES})
+        final.update(object_phase_owners(ROOT))
         edges = set()
         projected = set()
         exports = set()
@@ -1595,12 +1609,17 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             self.assertEqual((), file_scope_objects(source(path)))
 
     def test_public_runtime_architecture_driver_and_neighbor_artifacts_are_byte_exact(self):
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         self.assertEqual(18, len(STABLE_HASHES))
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
                 from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
                 value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
+                key = "tests/host/test_kernel_object_source_layout.py:data-entry:STABLE_HASHES/" + path
+                if path == "kernel/scheduler_core_validate.c" and not historical_identity_required(ROOT, key):
+                    continue
                 if not diagnostic_identity_required(
                     ROOT, "tests/host/test_kernel_object_source_layout.py:data-entry:STABLE_HASHES/" + path,
                 ):
@@ -2038,8 +2057,10 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         )
 
     def test_base_validation_exposes_typed_passes_and_original_caller_witnesses(self):
+        from tests.host.object_hart_validation_source import object_validation_signatures
+
         records = function_records(source(CORE_SOURCES[8]))
-        for name, parameters in BASE_VALIDATION_SIGNATURES.items():
+        for name, parameters in object_validation_signatures(ROOT, BASE_VALIDATION_SIGNATURES).items():
             with self.subTest(phase=name):
                 self.assertIn(name, set(records))
                 self.assertEqual(
@@ -2325,7 +2346,10 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
         )
 
     def test_actual_base_inverse_rejects_changed_types_predicates_witnesses_and_peer_order(self):
+        from tests.host.object_hart_validation_source import object_inverse_fixture
+
         current = {path: source(path) for path in CORE_SOURCES}
+        current = object_inverse_fixture(ROOT, current)
         path = CORE_SOURCES[8]
         text = current[path]
         self.assertEqual(BASE_CORE_DIGEST, digest_bytes(restored_kernel_objects_source(current).encode()))

@@ -9,6 +9,8 @@ struct scheduler_ipc_transition_candidate {
     uint32_t resulting_flags;
 };
 
+_Static_assert(MICROS_THREAD_CAPACITY < UINT16_MAX, "IPC stamp sentinel must not name a thread slot");
+
 static bool ipc_transition_clear_flags_are_valid(uint32_t flags)
 {
     return (
@@ -69,6 +71,41 @@ static enum micros_kernel_object_error preflight_transition_shapes(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
+static enum micros_kernel_object_error preflight_transition_stamps(
+    const struct micros_scheduler_ipc_transition *requests,
+    size_t request_count,
+    struct scheduler_ipc_transition_candidate *transitions
+)
+{
+    size_t index;
+    struct micros_thread_handle handle;
+    struct micros_thread_handle *stamp;
+
+    for (index = 0; index < request_count; ++index) {
+        if (!ipc_transition_clear_flags_are_valid(requests[index].clear_flags)
+            || !ipc_transition_set_flags_are_valid(requests[index].set_flags)
+            || (requests[index].clear_flags & requests[index].set_flags) != 0) {
+            return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+        }
+        if (requests[index].handle.slot >= MICROS_THREAD_CAPACITY) {
+            return preflight_transition_shapes(requests, request_count);
+        }
+        transitions[requests[index].handle.slot].handle.slot = UINT16_MAX;
+    }
+    for (index = 0; index < request_count; ++index) {
+        handle = requests[index].handle;
+        stamp = &transitions[handle.slot].handle;
+        if (stamp->slot == UINT16_MAX) {
+            *stamp = handle;
+        } else if (scheduler_core_thread_handles_equal(*stamp, handle)) {
+            return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
+        } else {
+            return preflight_transition_shapes(requests, request_count);
+        }
+    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
 static enum micros_kernel_object_error preflight_transition_candidates(
     struct micros_kernel_objects *objects,
     const struct micros_scheduler_ipc_transition *requests,
@@ -85,6 +122,10 @@ static enum micros_kernel_object_error preflight_transition_candidates(
             requests[index].clear_flags;
         transitions[index].set_flags =
             requests[index].set_flags;
+        error = scheduler_core_preflight_thread_operation(objects, transitions[index].handle);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
         error = scheduler_core_resolve_thread_mutable(
             objects,
             transitions[index].handle,
@@ -180,11 +221,11 @@ enum micros_kernel_object_error micros_scheduler_commit_ipc_transitions(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = preflight_transition_shapes(requests, request_count);
+    error = preflight_transition_stamps(requests, request_count, transitions);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_registry(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -220,7 +261,7 @@ enum micros_kernel_object_error micros_scheduler_prepare_ipc_wake(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }

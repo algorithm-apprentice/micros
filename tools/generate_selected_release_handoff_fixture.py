@@ -193,8 +193,15 @@ def source_bundle(root, stage, channel):
         raw = original
         if stage is Stage.GREEN:
             raw, identity = read_regular(root / path)
-            if identity["mode"] != mode or path not in source.SOURCE_ROLES["production_paths"] and raw != original:
+            if identity["mode"] != mode:
                 raise ValueError("MEM05 changed an unadmitted native input or file mode: " + path)
+            if path not in source.SOURCE_ROLES["production_paths"] and raw != original:
+                from tests.host.object_hart_validation_source import native_assertion_admission
+
+                if "MEM05/native-input/" + path not in native_assertion_admission(
+                    root, "MEM05", path, raw.decode(), stage,
+                ):
+                    raise ValueError("MEM05 changed an unadmitted native input or file mode: " + path)
         source.validate_retained_source(root, path, raw.decode(), stage)
         inputs[path] = {
             "kind": "file", "mode": mode, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),

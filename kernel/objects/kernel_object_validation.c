@@ -2,6 +2,215 @@
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 
+struct kernel_object_stack_geometry {
+    uintptr_t bases[3];
+    size_t owners;
+    size_t exceptions;
+    bool seeded[3];
+};
+
+struct kernel_object_stack_cursor {
+    size_t slot;
+    uintptr_t bottom;
+    uintptr_t top;
+};
+
+_Static_assert(sizeof(struct kernel_object_stack_geometry) <= 48, "Stack geometry must remain constant-sized");
+_Static_assert(sizeof(struct kernel_object_stack_cursor) * 3 <= 72, "Stack cursors must remain constant-sized");
+
+static uintptr_t kernel_object_validation_stack_stride(size_t cohort)
+{
+    return cohort == 0 ? MICROS_THREAD_KERNEL_STACK_SIZE
+        : cohort == 1 ? MICROS_PRIMARY_TRAP_STACK_MIN_SIZE : MICROS_EMERGENCY_TRAP_STACK_MIN_SIZE;
+}
+
+static bool kernel_object_validation_stack_base(
+    size_t cohort,
+    size_t slot,
+    uintptr_t bottom,
+    uintptr_t top,
+    uintptr_t *base
+)
+{
+    uintptr_t stride = kernel_object_validation_stack_stride(cohort);
+
+    if (top - bottom != stride || slot > UINTPTR_MAX / stride || bottom < slot * stride) {
+        return false;
+    }
+    *base = bottom - slot * stride;
+    return true;
+}
+
+static void kernel_object_validation_stack_accumulate(
+    struct kernel_object_stack_geometry *geometry,
+    size_t cohort,
+    size_t slot,
+    uintptr_t bottom,
+    uintptr_t top
+)
+{
+    uintptr_t base;
+
+    ++geometry->owners;
+    if (kernel_object_validation_stack_base(cohort, slot, bottom, top, &base)) {
+        if (!geometry->seeded[cohort]) {
+            geometry->seeded[cohort] = true;
+            geometry->bases[cohort] = base;
+        } else if (base != geometry->bases[cohort]) {
+            ++geometry->exceptions;
+        }
+    } else {
+        ++geometry->exceptions;
+    }
+}
+
+static bool kernel_object_validation_stack_is_regular(
+    const struct kernel_object_stack_geometry *geometry,
+    size_t cohort,
+    size_t slot,
+    uintptr_t bottom,
+    uintptr_t top
+)
+{
+    uintptr_t base;
+
+    return geometry->seeded[cohort]
+        && kernel_object_validation_stack_base(cohort, slot, bottom, top, &base)
+        && base == geometry->bases[cohort];
+}
+
+static bool kernel_object_validation_stack_range_at(
+    const struct micros_kernel_objects *objects,
+    size_t cohort,
+    size_t slot,
+    uintptr_t *bottom,
+    uintptr_t *top
+)
+{
+    if (cohort == 0) {
+        const struct micros_thread *thread = &objects->threads[slot];
+
+        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE || !thread->context_attached) {
+            return false;
+        }
+        *bottom = thread->kernel_stack_bottom;
+        *top = thread->kernel_stack_top;
+    } else {
+        const struct micros_hart *hart = &objects->harts[slot];
+
+        if (hart->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE || !hart->trap_installed) {
+            return false;
+        }
+        *bottom = cohort == 1 ? hart->idle_primary_stack_bottom : hart->trap.emergency_stack_bottom;
+        *top = cohort == 1 ? hart->idle_primary_stack_top : hart->trap.emergency_stack_top;
+    }
+    return true;
+}
+
+static void kernel_object_validation_stack_next_regular(
+    const struct micros_kernel_objects *objects,
+    const struct kernel_object_stack_geometry *geometry,
+    size_t cohort,
+    struct kernel_object_stack_cursor *cursor
+)
+{
+    size_t limit = cohort == 0 ? MICROS_THREAD_CAPACITY : MICROS_HART_CAPACITY;
+
+    cursor->bottom = 0;
+    cursor->top = 0;
+    for (; cursor->slot < limit; ++cursor->slot) {
+        uintptr_t bottom;
+        uintptr_t top;
+
+        if (
+            kernel_object_validation_stack_range_at(objects, cohort, cursor->slot, &bottom, &top)
+            && kernel_object_validation_stack_is_regular(geometry, cohort, cursor->slot, bottom, top)
+        ) {
+            cursor->bottom = bottom;
+            cursor->top = top;
+            ++cursor->slot;
+            return;
+        }
+    }
+}
+
+static bool kernel_object_validation_stack_regulars_avoid(
+    const struct micros_kernel_objects *objects,
+    const struct kernel_object_stack_geometry *geometry
+)
+{
+    struct kernel_object_stack_cursor cursors[3];
+    uintptr_t previous_top = 0;
+    size_t cohort;
+
+    for (cohort = 0; cohort < 3; ++cohort) {
+        cursors[cohort].slot = 0;
+        kernel_object_validation_stack_next_regular(objects, geometry, cohort, &cursors[cohort]);
+    }
+    for (;;) {
+        size_t selected = 3;
+
+        for (cohort = 0; cohort < 3; ++cohort) {
+            if (cursors[cohort].top != 0
+                && (selected == 3 || cursors[cohort].bottom < cursors[selected].bottom)) {
+                selected = cohort;
+            }
+        }
+        if (selected == 3) {
+            return true;
+        }
+        if (cursors[selected].bottom < previous_top) {
+            return false;
+        }
+        previous_top = cursors[selected].top;
+        kernel_object_validation_stack_next_regular(objects, geometry, selected, &cursors[selected]);
+    }
+}
+
+static bool kernel_object_validation_stack_exceptions_avoid(
+    const struct micros_kernel_objects *objects,
+    const struct kernel_object_stack_geometry *geometry
+)
+{
+    size_t index;
+    size_t other;
+
+    for (index = 0; index < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY; ++index) {
+        size_t cohort = index < MICROS_THREAD_CAPACITY ? 0
+            : 1 + (index - MICROS_THREAD_CAPACITY) / MICROS_HART_CAPACITY;
+        size_t slot = index < MICROS_THREAD_CAPACITY ? index
+            : (index - MICROS_THREAD_CAPACITY) % MICROS_HART_CAPACITY;
+        uintptr_t bottom;
+        uintptr_t top;
+
+        if (
+            !kernel_object_validation_stack_range_at(objects, cohort, slot, &bottom, &top)
+            || kernel_object_validation_stack_is_regular(geometry, cohort, slot, bottom, top)
+        ) {
+            continue;
+        }
+        for (other = 0; other < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY; ++other) {
+            size_t other_cohort = other < MICROS_THREAD_CAPACITY ? 0
+                : 1 + (other - MICROS_THREAD_CAPACITY) / MICROS_HART_CAPACITY;
+            size_t other_slot = other < MICROS_THREAD_CAPACITY ? other
+                : (other - MICROS_THREAD_CAPACITY) % MICROS_HART_CAPACITY;
+            uintptr_t other_bottom;
+            uintptr_t other_top;
+
+            if (other == index) {
+                continue;
+            }
+            if (
+                kernel_object_validation_stack_range_at(objects, other_cohort, other_slot, &other_bottom, &other_top)
+                && kernel_object_ranges_overlap(bottom, top, other_bottom, other_top)
+            ) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 static bool kernel_object_validation_process_slots_match(
     const struct micros_kernel_objects *objects,
     size_t *observed_process_count
@@ -72,13 +281,11 @@ static bool kernel_object_validation_process_slots_match(
 }
 
 static bool kernel_object_validation_thread_context_matches(
-    const struct micros_kernel_objects *objects,
     const struct micros_thread *thread,
-    size_t index
+    size_t index,
+    struct kernel_object_stack_geometry *geometry
 )
 {
-    size_t other_index;
-
     if (thread->context_attached) {
         if (
             !kernel_object_stack_range_is_valid(
@@ -89,58 +296,9 @@ static bool kernel_object_validation_thread_context_matches(
         ) {
             return false;
         }
-        for (
-            other_index = 0;
-            other_index < index;
-            ++other_index
-        ) {
-            const struct micros_thread *other =
-                &objects->threads[other_index];
-
-            if (
-                other->slot_state
-                    == MICROS_KERNEL_OBJECT_SLOT_LIVE
-                && other->context_attached
-                && kernel_object_ranges_overlap(
-                    thread->kernel_stack_bottom,
-                    thread->kernel_stack_top,
-                    other->kernel_stack_bottom,
-                    other->kernel_stack_top
-                )
-            ) {
-                return false;
-            }
-        }
-        for (
-            other_index = 0;
-            other_index < MICROS_HART_CAPACITY;
-            ++other_index
-        ) {
-            const struct micros_hart *hart =
-                &objects->harts[other_index];
-
-            if (
-                hart->slot_state
-                    == MICROS_KERNEL_OBJECT_SLOT_LIVE
-                && hart->trap_installed
-                && (
-                    kernel_object_ranges_overlap(
-                        thread->kernel_stack_bottom,
-                        thread->kernel_stack_top,
-                        hart->idle_primary_stack_bottom,
-                        hart->idle_primary_stack_top
-                    )
-                    || kernel_object_ranges_overlap(
-                        thread->kernel_stack_bottom,
-                        thread->kernel_stack_top,
-                        hart->trap.emergency_stack_bottom,
-                        hart->trap.emergency_stack_top
-                    )
-                )
-            ) {
-                return false;
-            }
-        }
+        kernel_object_validation_stack_accumulate(
+            geometry, 0, index, thread->kernel_stack_bottom, thread->kernel_stack_top
+        );
     } else if (
         thread->kernel_stack_bottom != 0
         || thread->kernel_stack_top != 0
@@ -154,7 +312,8 @@ static bool kernel_object_validation_thread_context_matches(
 static bool kernel_object_validation_thread_slots_match(
     const struct micros_kernel_objects *objects,
     size_t process_thread_counts[MICROS_PROCESS_CAPACITY],
-    size_t *observed_thread_count
+    size_t *observed_thread_count,
+    struct kernel_object_stack_geometry *geometry
 )
 {
     size_t index;
@@ -212,7 +371,7 @@ static bool kernel_object_validation_thread_slots_match(
             ) {
                 return false;
             }
-            if (!kernel_object_validation_thread_context_matches(objects, thread, index)) {
+            if (!kernel_object_validation_thread_context_matches(thread, index, geometry)) {
                 return false;
             }
             ++process_thread_counts[thread->owner.slot];
@@ -312,77 +471,10 @@ static bool kernel_object_validation_free_hart_is_clear(
     return true;
 }
 
-static bool kernel_object_validation_hart_stacks_avoid_peers(
-    const struct micros_kernel_objects *objects,
-    const struct micros_hart *hart,
-    size_t index
-)
-{
-    size_t other_index;
-
-    for (other_index = 0; other_index < index; ++other_index) {
-        const struct micros_hart *other =
-            &objects->harts[other_index];
-
-        if (
-            other->slot_state
-                == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && other->trap_installed
-            && (
-                kernel_object_ranges_overlap(
-                    hart->trap.primary_stack_bottom,
-                    hart->trap.primary_stack_top,
-                    other->trap.primary_stack_bottom,
-                    other->trap.primary_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->trap.primary_stack_bottom,
-                    hart->trap.primary_stack_top,
-                    other->trap.emergency_stack_bottom,
-                    other->trap.emergency_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->trap.emergency_stack_bottom,
-                    hart->trap.emergency_stack_top,
-                    other->trap.primary_stack_bottom,
-                    other->trap.primary_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->trap.emergency_stack_bottom,
-                    hart->trap.emergency_stack_top,
-                    other->trap.emergency_stack_bottom,
-                    other->trap.emergency_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->idle_primary_stack_bottom,
-                    hart->idle_primary_stack_top,
-                    other->idle_primary_stack_bottom,
-                    other->idle_primary_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->idle_primary_stack_bottom,
-                    hart->idle_primary_stack_top,
-                    other->trap.emergency_stack_bottom,
-                    other->trap.emergency_stack_top
-                )
-                || kernel_object_ranges_overlap(
-                    hart->trap.emergency_stack_bottom,
-                    hart->trap.emergency_stack_top,
-                    other->idle_primary_stack_bottom,
-                    other->idle_primary_stack_top
-                )
-            )
-        ) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static bool kernel_object_validation_hart_stack_state_matches(
-    const struct micros_kernel_objects *objects,
     const struct micros_hart *hart,
-    size_t index
+    size_t index,
+    struct kernel_object_stack_geometry *geometry
 )
 {
     if (hart->trap_installed) {
@@ -405,9 +497,12 @@ static bool kernel_object_validation_hart_stack_state_matches(
         ) {
             return false;
         }
-        if (!kernel_object_validation_hart_stacks_avoid_peers(objects, hart, index)) {
-            return false;
-        }
+        kernel_object_validation_stack_accumulate(
+            geometry, 1, index, hart->idle_primary_stack_bottom, hart->idle_primary_stack_top
+        );
+        kernel_object_validation_stack_accumulate(
+            geometry, 2, index, hart->trap.emergency_stack_bottom, hart->trap.emergency_stack_top
+        );
     } else if (
         !kernel_object_trap_anchor_is_zero(&hart->trap)
         || hart->idle_primary_stack_bottom != 0
@@ -478,7 +573,8 @@ static bool kernel_object_validation_current_binding_matches(
 static bool kernel_object_validation_hart_slots_match(
     const struct micros_kernel_objects *objects,
     bool current_threads[MICROS_THREAD_CAPACITY],
-    size_t *observed_hart_count
+    size_t *observed_hart_count,
+    struct kernel_object_stack_geometry *geometry
 )
 {
     size_t index;
@@ -512,7 +608,7 @@ static bool kernel_object_validation_hart_slots_match(
                 return false;
             }
         }
-        if (!kernel_object_validation_hart_stack_state_matches(objects, hart, index)) {
+        if (!kernel_object_validation_hart_stack_state_matches(hart, index, geometry)) {
             return false;
         }
         if (!hart->timer.initialized) {
@@ -546,6 +642,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
     size_t observed_hart_count = 0;
     size_t process_thread_counts[MICROS_PROCESS_CAPACITY];
     bool current_threads[MICROS_THREAD_CAPACITY];
+    struct kernel_object_stack_geometry geometry = {0};
     enum micros_kernel_object_error error;
     size_t index;
 
@@ -572,7 +669,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
 
-    if (!kernel_object_validation_thread_slots_match(objects, process_thread_counts, &observed_thread_count)) {
+    if (!kernel_object_validation_thread_slots_match(objects, process_thread_counts, &observed_thread_count, &geometry)) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
 
@@ -580,7 +677,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
 
-    if (!kernel_object_validation_hart_slots_match(objects, current_threads, &observed_hart_count)) {
+    if (!kernel_object_validation_hart_slots_match(objects, current_threads, &observed_hart_count, &geometry)) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
 
@@ -589,6 +686,15 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
         || observed_thread_count != objects->live_thread_count
         || observed_hart_count != objects->registered_hart_count
         || observed_hart_count > objects->max_harts
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    if (
+        geometry.owners >= 2
+        && (
+            !kernel_object_validation_stack_regulars_avoid(objects, &geometry)
+            || (geometry.exceptions != 0 && !kernel_object_validation_stack_exceptions_avoid(objects, &geometry))
+        )
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }

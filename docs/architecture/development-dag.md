@@ -238,6 +238,12 @@ OBJ01 implementation stays blocked until that design's separate reviewed
 merge, then restarts from current `main`. No runtime node, edge, finding owner
 or hosted-CI acceptance changes.
 
+Corrective design #242 has now independently merged. OBJ01 implementation
+has restarted from that current `main` as the sole active outcome, following
+its [implementation map](selected-object-and-hart-validation.md#implementation-and-evidence-map).
+The archived attempt supplies no current author event. OBJ02 and later
+corrections remain pending; the runtime graph and finding owners are unchanged.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

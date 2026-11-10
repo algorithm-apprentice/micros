@@ -171,6 +171,41 @@ def compile_selected_mapping_fixture(
 
 
 class StackBoundEvidenceTest(unittest.TestCase):
+    def test_unsigned_stride_arithmetic_retains_rv64_and_unknown_operand_semantics(self):
+        from tools.stack_bound_fatal_effects import _prelude_arithmetic
+
+        cases = (
+            (7, 3, 0, 2, 1),
+            (2, 7, 0, 0, 2),
+            (-1, -1, -2, 1, 0),
+            (0x8000000000000000, 2, 1, 0x4000000000000000, 0),
+            (0, 0, 0, -1, 0),
+            (-1, 0, 0, -1, -1),
+        )
+        for operation, column in ((3, 2), (5, 3), (7, 4)):
+            instruction = 0x02000033 | (11 << 20) | (10 << 15) | (operation << 12) | (12 << 7)
+            for case in cases:
+                registers = [None] * 32
+                registers[10], registers[11] = ("scalar", case[0]), ("scalar", case[1])
+                with self.subTest(operation=operation, operands=case[:2]):
+                    self.assertEqual(("scalar", case[column]), _prelude_arithmetic(4, instruction, registers))
+            for unknown in (None, ("stack", 0), ("symbol", "foreign", 1, 0)):
+                for position in (10, 11):
+                    registers = [None] * 32
+                    registers[10], registers[11] = ("scalar", 7), ("scalar", 3)
+                    registers[position] = unknown
+                    with self.subTest(operation=operation, position=position, unknown=unknown):
+                        self.assertIsNone(_prelude_arithmetic(4, instruction, registers))
+        registers = [None] * 32
+        registers[10], registers[11] = ("scalar", 7), ("scalar", 3)
+        for instruction in (
+            0x02000033 | (11 << 20) | (10 << 15) | (1 << 12) | (12 << 7),
+            0x02000033 | (11 << 20) | (10 << 15) | (2 << 12) | (12 << 7),
+            0x0200003b | (11 << 20) | (10 << 15) | (5 << 12) | (12 << 7),
+        ):
+            with self.subTest(unadmitted=instruction):
+                self.assertIsNone(_prelude_arithmetic(4, instruction, registers))
+
     def test_nested_frames_add_but_sequential_callees_take_the_maximum(self):
         main, first, second, leaf = map(function, ("main", "first", "second", "leaf"))
         frames = tuple(Frame(key, size) for key, size in (

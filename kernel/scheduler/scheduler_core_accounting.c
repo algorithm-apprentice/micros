@@ -7,9 +7,10 @@ enum micros_kernel_object_error micros_scheduler_accounting_initialize(
 )
 {
     struct micros_hart *hart;
+    const struct micros_hart *checked;
     enum micros_kernel_object_error error;
 
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &checked);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -144,11 +145,12 @@ enum micros_kernel_object_error micros_scheduler_account_enter_thread(
 )
 {
     struct micros_hart *hart;
+    const struct micros_hart *checked;
     const struct micros_thread *thread;
     uint64_t delta;
     enum micros_kernel_object_error error;
 
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &checked);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -203,10 +205,11 @@ enum micros_kernel_object_error micros_scheduler_account_enter_idle(
 )
 {
     struct micros_hart *hart;
+    const struct micros_hart *checked;
     uint64_t delta;
     enum micros_kernel_object_error error;
 
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &checked);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }

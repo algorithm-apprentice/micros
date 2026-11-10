@@ -11,7 +11,7 @@ import subprocess
 from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
     panic_trace_source, selected_address_space_source, selected_ownership_source,
-    selected_release_handoff_source, terminal_failure_source,
+    selected_release_handoff_source, terminal_failure_source, object_hart_validation_source,
 )
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, portable_object_owners, regular_source, single_assignment,
@@ -152,10 +152,18 @@ FAMILY_OWNERS = {
     "panic-trace-source-admission": (
         "tests/host/panic_trace_source_bindings.py",
     ),
+    "object-hart-validation-baseline": (
+        "tests/host/object_hart_validation_authority.py",
+        "tests/host/object_hart_validation_source.py",
+    ),
+    "object-hart-native-admission": (
+        "tests/host/object_hart_native_source_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
 NON_IDENTITY_EXCEPTIONS = (
+    "tests/host/test_object_hart_validation.py",
     "tests/host/test_selected_ownership.py",
     "tests/host/test_selected_address_space.py",
     "tests/host/test_validation_execution.py",
@@ -289,6 +297,10 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "08a95d81ec96b31541097261f3be1e783856a14db2bc4d617c9f2c66abf240d8",
     "panic-trace-source-admission":
         "d4b71eb39f3ed6f8c383fe84734d167b6dbc399bb8f6c44cd7966180f56d4224",
+    "object-hart-validation-baseline":
+        "2339159782da8cce779aa5eec122b2dadbe3ba381f1c419d456e8988df82f15c",
+    "object-hart-native-admission":
+        "af0e61653478f58f80a644047822048f50440e1179df76cc636514a7c8d60fac",
 }
 
 _PANIC_SOURCE_ASSERTIONS = {
@@ -1658,6 +1670,10 @@ def historical_object_binding_facts(root, facts):
 
 
 def _facts_for_owner(root, family, relative, directory=None, object_inputs=None):
+    if family == object_hart_validation_source.NATIVE_FAMILY:
+        return object_hart_validation_source.native_binding_facts(root, family, relative)
+    if family == object_hart_validation_source.FAMILY:
+        return object_hart_validation_source.declaration_facts(root, relative)
     if family == "memory-native-admission":
         return _memory_native_binding_facts(root, family, relative)
     if family == "selected-ownership-native-admission":

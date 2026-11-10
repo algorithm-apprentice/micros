@@ -922,9 +922,14 @@ B14, with covered panic subsets replaced rather than duplicated.
 The added validator identity receives its own discriminating unsupported-
 current diagnostic witness in the direct-ownership oracle. Historical
 projection and actual compiled panic mutation controls remain explicit.
-The implementation is archived and blocked until separate design review,
-Acceptance and merge; no source guard or complete discovery requirement is
-waived by these observations.
+The first implementation is archived. Corrective design #242 has now
+separately merged, and the fresh
+[implementation map](architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map)
+records the full-only six-product recipe, independent 171-case corpus,
+complete native-source declarations and bounded Python protocol/launcher
+regressions. Both affected fixture owners are immutable before renewed Red.
+No source guard or complete discovery requirement is waived; current
+native/target/stack acceptance and independent review remain mandatory.
 
 ## POSIX conformance evidence
 

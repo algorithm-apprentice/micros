@@ -232,10 +232,7 @@ static enum micros_kernel_object_error validate_harts(
             }
             thread = &objects->threads[hart->current_thread.slot];
             if (!thread->scheduler_assigned) {
-                if (scheduler_core_hart_has_assigned_thread(objects, hart_handle)) {
-                    return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-                }
-                continue;
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
             }
             error = validate_current_binding(hart, hart_handle, thread, seen);
             if (error != MICROS_KERNEL_OBJECT_OK) {

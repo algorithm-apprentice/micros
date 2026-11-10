@@ -1736,6 +1736,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
 
     def test_all_original_owners_and_pending_bodies_are_frozen(self) -> None:
         from tests.host.evidence_authority_scope import identity_required
+        from tests.host.object_hart_validation_source import historical_identity_required
 
         pending = {(path, name): final for path, final, name in SYMBOL_OWNER_MIGRATION}
         for family, (original, owners) in enumerate(ORIGINAL_FUNCTIONS.items()):
@@ -1750,6 +1751,13 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                             if original_name(spelling, family) == name
                         ]
                         expected = original if (original, name) in pending else final
+                        key = "tests/host/test_scheduler_source_layout.py:function-body:FROZEN_FUNCTIONS/" + original + "/" + name
+                        if family == 0 and name == "queue_enqueue_tail" and not historical_identity_required(REPOSITORY_ROOT, key):
+                            self.assertEqual([], matches)
+                            self.assertNotRegex(
+                                self.texts[PRIVATE_HEADERS[0]], r"\bscheduler_core_queue_enqueue_tail\s*\(",
+                            )
+                            continue
                         self.assertEqual([expected], [path for path, _ in matches])
                         if len(matches) != 1:
                             continue
@@ -1800,8 +1808,13 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(expected, signature_shape(record.signature, record.name))
 
     def test_stable_artifacts_are_literal_reviewed_base_hashes(self) -> None:
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         for path, expected in STABLE_ARTIFACT_HASHES.items():
             with self.subTest(path=path):
+                key = "tests/host/test_scheduler_source_layout.py:data-entry:STABLE_ARTIFACT_HASHES/" + path
+                if path == "kernel/kernel_objects.c" and not historical_identity_required(REPOSITORY_ROOT, key):
+                    continue
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
                     else kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
@@ -2050,6 +2063,8 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                     self.assertNotIn("micros_scheduler_test_enter", {called for called, _, _, _ in call_sites(record.body)})
 
     def test_functions_stay_bounded_and_discharge_real_named_work(self) -> None:
+        from tests.host.object_hart_validation_source import historical_identity_required, object_failure_is_propagated
+
         for family, records in enumerate(self.records):
             original = ORIGINAL_SOURCES[family]
             frozen = frozen_functions(original)
@@ -2069,7 +2084,15 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 self.assertGreaterEqual(len({phase.name for phase in new}), 2, name)
                 names = " ".join(phase_call_names(root, family, records))
                 offset = 0
-                for role in PHASE_ROLES[name]:
+                roles = PHASE_ROLES[name]
+                key = "tests/host/test_scheduler_source_layout.py:data-table:FROZEN_FACTS/" + original + "/" + name
+                current_object_phase = (
+                    family == 0 and name in ("micros_scheduler_commit_ipc_transitions", "micros_scheduler_core_validate", "micros_hart_plan_user_return")
+                    and not historical_identity_required(REPOSITORY_ROOT, key)
+                )
+                if current_object_phase and name == "micros_scheduler_commit_ipc_transitions":
+                    roles = (r"stamp", r"registry", r"preflight|candidate", r"commit|apply")
+                for role in roles:
                     match = re.search(r"\b\w*(?:" + role + r")\w*\b", names[offset:])
                     self.assertIsNotNone(match, (name, "missing named domain phase", role))
                     if match:
@@ -2087,10 +2110,22 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                                 else "MICROS_SCHEDULER_TEST_CONTINUE" if "micros_scheduler_test_trap_action" in return_type
                                 else "MICROS_SCHEDULER_OK"
                             )
-                            require_error_propagation(normalized_body(phase, family, records), called, success)
+                            body = normalized_body(phase, family, records)
+                            if (
+                                current_object_phase
+                                and re.fullmatch(r"(?:static )?enum micros_kernel_object_error", signature_shape(phase.signature, phase.name)[0])
+                                and object_failure_is_propagated(body, called, success)
+                            ):
+                                continue
+                            require_error_propagation(body, called, success)
 
     def test_all_phase_source_facts_are_preserved_not_summarized(self) -> None:
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         for (original, name), expected in FROZEN_FACTS.items():
+            key = "tests/host/test_scheduler_source_layout.py:data-table:FROZEN_FACTS/" + original + "/" + name
+            if not historical_identity_required(REPOSITORY_ROOT, key):
+                continue
             family = ORIGINAL_SOURCES.index(original)
             root = find_original(self.records[family], family, name)
             actual = Counter()
@@ -2126,6 +2161,8 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         )
 
     def test_minimal_accounting_and_nonrecursive_validation(self) -> None:
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         for name, idle in (
             ("micros_scheduler_account_user_trap", False),
             ("micros_scheduler_account_idle_trap", True),
@@ -2136,12 +2173,23 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         self.assertNotIn("micros_kernel_objects_validate", {
             name for name, _, _, _ in call_sites(validate)
         })
-        require_all_record_preflight(self.phases(0, "micros_scheduler_commit_ipc_transitions"))
+        prefix = "tests/host/test_scheduler_source_layout.py:data-table:FROZEN_FACTS/kernel/scheduler_core.c/"
+        if historical_identity_required(REPOSITORY_ROOT, prefix + "micros_scheduler_commit_ipc_transitions"):
+            require_all_record_preflight(self.phases(0, "micros_scheduler_commit_ipc_transitions"))
+        else:
+            require_order(
+                self.original(0, "micros_scheduler_commit_ipc_transitions"),
+                "preflight_transition_stamps", "scheduler_core_preflight_registry",
+                "preflight_transition_candidates", "commit_transition_candidates",
+            )
         planner = self.phases(0, "micros_hart_plan_user_return")
         require_order(
             planner, "unsigned char *bytes = (unsigned char *)&candidate;",
             "index < sizeof(candidate)", "bytes[index] = 0;",
-            "micros_scheduler_core_validate", "scratch_load",
+            "micros_scheduler_core_validate" if historical_identity_required(
+                REPOSITORY_ROOT, prefix + "micros_hart_plan_user_return",
+            ) else "preflight_return_plan",
+            "scratch_load",
             "MICROS_THREAD_RTS_PREEMPTED", "++renew_count > MICROS_THREAD_CAPACITY",
             "candidate.ready_head", "unsigned char *destination = (unsigned char *)plan;",
             "const unsigned char *source = (const unsigned char *)&candidate;",

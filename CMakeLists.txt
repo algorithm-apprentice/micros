@@ -3910,6 +3910,259 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-release-handoff PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_release_handoff_aggregate_test selected_release_handoff_frames_test selected_release_handoff_plans_test selected_release_handoff_context_test selected_release_handoff_ordinary_test)
 
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM05_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+    )
+    set(OBJ01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/object-hart-validation")
+    set(OBJ01_NATIVE_INPUTS
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+    )
+    set(OBJ01_NATIVE_HEADERS
+        include/micros/ipc.h
+        include/micros/kernel_objects.h
+        include/micros/scheduler_core.h
+        include/micros/stack_observation.h
+        include/micros/user_context.h
+        kernel/objects/kernel_object_private.h
+        kernel/scheduler/scheduler_core_internal.h
+        kernel/scheduler/scheduler_core_private.h
+    )
+    set(OBJ01_NATIVE_OUTPUTS)
+    set(OBJ01_SOURCES_0)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_0 "${OBJ01_NATIVE_ROOT}/baseline/ordinary/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_0})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/ordinary/${obj01_header}")
+    endforeach()
+    set(OBJ01_SOURCES_1)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_1 "${OBJ01_NATIVE_ROOT}/baseline/aggregate/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_1})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/aggregate/${obj01_header}")
+    endforeach()
+    set(OBJ01_SOURCES_2)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_2 "${OBJ01_NATIVE_ROOT}/baseline/stack/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_2})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/stack/${obj01_header}")
+    endforeach()
+    set(OBJ01_SOURCES_3)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_3 "${OBJ01_NATIVE_ROOT}/current/aggregate/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_3})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/current/aggregate/${obj01_header}")
+    endforeach()
+    set(OBJ01_SOURCES_4)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_4 "${OBJ01_NATIVE_ROOT}/current/stack/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_4})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/current/stack/${obj01_header}")
+    endforeach()
+    set(OBJ01_SOURCES_5)
+    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
+        list(APPEND OBJ01_SOURCES_5 "${OBJ01_NATIVE_ROOT}/current/ordinary/${obj01_source}")
+    endforeach()
+    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_5})
+    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
+        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/current/ordinary/${obj01_header}")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${OBJ01_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_object_hart_validation_fixture.py"
+        DEPENDS ${OBJ01_NATIVE_INPUTS} ${OBJ01_NATIVE_HEADERS}
+            tests/host/object_hart_validation_test.c
+            tests/host/object_hart_validation_test.h
+            tests/host/object_hart_validation_source.py
+            tests/host/object_hart_validation_evidence.py
+            tests/host/object_hart_validation_authority.py
+            tests/host/object_hart_native_source_bindings.py
+            tests/host/test_object_hart_validation.py
+            tools/generate_object_hart_validation_fixture.py
+            tools/check_object_hart_validation.py
+            tests/host/evidence_authority_scope.py
+            tests/host/selected_release_handoff_source.py
+            tests/host/selected_ownership_source.py
+            tests/host/selected_address_space_source.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(object_hart_baseline_ordinary_test ${OBJ01_SOURCES_0}
+        tests/host/object_hart_validation_test.c
+    )
+    target_include_directories(object_hart_baseline_ordinary_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/baseline/ordinary" "${OBJ01_NATIVE_ROOT}/baseline/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_baseline_ordinary_test PRIVATE c_std_17)
+    target_compile_options(object_hart_baseline_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_baseline_ordinary_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_baseline_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_baseline_ordinary_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    add_executable(object_hart_baseline_aggregate_test ${OBJ01_SOURCES_1}
+        tests/host/object_hart_validation_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(object_hart_baseline_aggregate_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/baseline/aggregate" "${OBJ01_NATIVE_ROOT}/baseline/aggregate/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_baseline_aggregate_test PRIVATE c_std_17)
+    target_compile_options(object_hart_baseline_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_baseline_aggregate_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_baseline_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_baseline_aggregate_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(object_hart_baseline_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=0)
+    add_executable(object_hart_baseline_stack_test ${OBJ01_SOURCES_2}
+        tests/host/object_hart_validation_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(object_hart_baseline_stack_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/baseline/stack" "${OBJ01_NATIVE_ROOT}/baseline/stack/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_baseline_stack_test PRIVATE c_std_17)
+    target_compile_options(object_hart_baseline_stack_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_baseline_stack_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_baseline_stack_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_baseline_stack_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(object_hart_baseline_stack_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=1)
+    add_executable(object_hart_current_aggregate_test ${OBJ01_SOURCES_3}
+        tests/host/object_hart_validation_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(object_hart_current_aggregate_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/current/aggregate" "${OBJ01_NATIVE_ROOT}/current/aggregate/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_current_aggregate_test PRIVATE c_std_17)
+    target_compile_options(object_hart_current_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_current_aggregate_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_current_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_current_aggregate_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(object_hart_current_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=0)
+    add_executable(object_hart_current_stack_test ${OBJ01_SOURCES_4}
+        tests/host/object_hart_validation_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(object_hart_current_stack_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/current/stack" "${OBJ01_NATIVE_ROOT}/current/stack/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_current_stack_test PRIVATE c_std_17)
+    target_compile_options(object_hart_current_stack_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_current_stack_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_current_stack_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_current_stack_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(object_hart_current_stack_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=1)
+    add_executable(object_hart_current_ordinary_test ${OBJ01_SOURCES_5}
+        tests/host/object_hart_validation_test.c
+    )
+    target_include_directories(object_hart_current_ordinary_test PRIVATE
+        "${OBJ01_NATIVE_ROOT}/current/ordinary" "${OBJ01_NATIVE_ROOT}/current/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(object_hart_current_ordinary_test PRIVATE c_std_17)
+    target_compile_options(object_hart_current_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(object_hart_current_ordinary_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(object_hart_current_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(object_hart_current_ordinary_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(object_hart_current_ordinary_test PRIVATE
+        MICROS_OBJECT_HART_VALIDATION_LAUNCHER=1
+        "MICROS_OBJECT_HART_VALIDATION_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_OBJECT_HART_VALIDATION_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_object_hart_validation.py\""
+        "MICROS_OBJECT_HART_VALIDATION_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+    add_test(NAME object-hart-validation COMMAND object_hart_current_ordinary_test
+        "$<TARGET_FILE:object_hart_baseline_ordinary_test>"
+        "$<TARGET_FILE:object_hart_baseline_aggregate_test>"
+        "$<TARGET_FILE:object_hart_baseline_stack_test>"
+        "$<TARGET_FILE:object_hart_current_aggregate_test>"
+        "$<TARGET_FILE:object_hart_current_stack_test>"
+    )
+    set_tests_properties(object-hart-validation PROPERTIES LABELS slow)
+    add_dependencies(test-unit object_hart_baseline_ordinary_test object_hart_baseline_aggregate_test object_hart_baseline_stack_test object_hart_current_aggregate_test object_hart_current_stack_test object_hart_current_ordinary_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()

@@ -382,6 +382,16 @@ scheduler entry audits from twenty-six retained outside boundaries.
 Only design is active; implementation remains pending separate review,
 Acceptance and merge. The runtime graph and finding ownership do not change.
 
+OBJ01 design #241 separately merged, then full native acceptance exposed
+the [OBJ01-C01 closure gap](minix-selected-object-and-hart-validation.md#obj01-c01-complete-source-authority-gap).
+The uncommitted implementation was archived. The separately reviewed
+correction under Accepted ADR-0120 has now merged as #242.
+The fresh [implementation map](../architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map)
+retains the runtime scope and thirty-eight candidate paths while binding
+all ninety-five existing identities and complete affected-source coverage.
+Actual renewed acceptance and independent review still precede closure of
+B03-F001/F003/F004; no later finding or hosted-CI outcome is closed.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
@@ -522,7 +532,7 @@ blocking queue.
 | `MEM03` | Runtime correction | `B02-F002` | `MEM01` | Accepted [selected ownership contract](../architecture/selected-frame-ownership.md): metadata and selected/whole-active operation preflight, with explicit complete audit boundaries. Designs #215/#216 and validation prerequisite #218 are merged; the fresh restart retains the fixed runtime and adds checked-view/full-only evidence integration. | Actual active/inactive/bitmap/object work, failure-atomic selected transitions, complete diagnostics and the exact 40-key authority transition; no borrowed interrupted acceptance. |
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level lookup/translation/allocation-prefix walks and selected root/context/owner preparation instead of complete state validation. | Exact PTE-level, owner, activation, fault-path and allocation-compensation evidence. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Implementation #236 follows the Accepted [selected release/handoff contract](../architecture/selected-release-and-wired-handoff.md), with coherent owner indexing, selected-word sets and protected release/handoff plans. | Actual native/target Red-Green, exact 82-key transition, thirteen-unit recertification, full current acceptance and independent review complete. |
-| `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Accepted [selected object/hart runtime contract](../architecture/selected-object-and-hart-validation.md); implementation is archived and blocked on the separate [OBJ01-C01 closure design](../architecture/selected-object-and-hart-validation.md#obj01-c01-complete-source-authority). | Actual object/hart/stack work, consumed-state failure atomicity, complete corruption diagnostics, corrected ninety-five-key transition after C01 design merge, complete affected-source coverage and current target/stack acceptance. |
+| `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Accepted [selected object/hart runtime contract](../architecture/selected-object-and-hart-validation.md) and separately merged [OBJ01-C01 closure design](../architecture/selected-object-and-hart-validation.md#obj01-c01-complete-source-authority); fresh implementation follows its [evidence map](../architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map). | Actual object/hart/stack work, consumed-state failure atomicity, complete corruption diagnostics, corrected ninety-five-key transition, complete affected-source coverage and current target/stack acceptance. |
 | `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Retain one prevalidated return plan without rebuilding queues or repeating memory/context validation. | Queue-shift, zero-quantum, plan-compare, commit-store, and target return traces. |
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Use selected endpoint/object/completion plans and retained immutable authorization instead of nested global validation. | Per-operation endpoint/object/translation counts and failure-atomic completion cases. |
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Replace quadratic thread-capacity projection with the reference dependency-chain mechanism. | Hop/visit counts for chains, cycles, sparse slots, and maximum depth. |

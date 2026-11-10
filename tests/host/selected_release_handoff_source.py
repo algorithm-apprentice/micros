@@ -1408,6 +1408,11 @@ def _current_authority(root):
 
 
 def native_assertion_admission(root, family, path, text, stage):
+    from tests.host.object_hart_validation_source import native_assertion_admission as next_admission
+
+    admitted = next_admission(root, family, path, text, stage)
+    if admitted:
+        return admitted
     owners = {
         "MEM01": "tests/host/memory_native_source_bindings.py",
         "MEM02": "tests/host/memory_native_source_bindings.py",
@@ -1435,6 +1440,11 @@ def native_assertion_admission(root, family, path, text, stage):
 
 
 def legacy_replaced_functions(root, family, path, text, stage):
+    from tests.host.object_hart_validation_source import legacy_replaced_functions as next_admission
+
+    admitted = next_admission(root, family, path, text, stage)
+    if admitted:
+        return admitted
     if family not in ("MEM01", "MEM02", "MEM03", "MEM04") or stage not in (Stage.RED, Stage.GREEN):
         raise ValueError("MEM05 legacy observation has an unknown family or stage")
     if stage is Stage.RED or path not in SOURCE_PROJECTION["mutable_functions"] or not _current_authority(root):
@@ -1735,6 +1745,11 @@ def validate_primitive_declarations(root):
 
 
 def validate_retained_source(root, path, text, stage):
+    from tests.host.object_hart_validation_source import native_assertion_admission as next_admission
+
+    admitted = next_admission(root, "MEM05", path, text, stage)
+    if admitted:
+        return
     from tests.host.c_source_records import compact
     from tests.host.selected_address_space_source import _function_calls, _source_skeleton
     from tools.generate_selected_release_handoff_fixture import fixed_inputs
@@ -1864,6 +1879,11 @@ def _render_body(body, sites):
 
 
 def observe_source(root, path, text, channel, stage):
+    from tests.host.object_hart_validation_source import legacy_observe_source as next_admission
+
+    admitted = next_admission(root, "MEM05", path, text, stage, channel)
+    if admitted is not None:
+        return admitted
     if stage not in (Stage.RED, Stage.GREEN) or channel not in CHANNELS:
         raise ValueError("MEM05 observation has an unadmitted stage or channel")
     validate_retained_source(root, path, text, stage)
@@ -1970,6 +1990,11 @@ def _legacy_retained_sites(root, family, path, text, channel):
 
 
 def legacy_observe_source(root, family, path, text, stage, channel="aggregate"):
+    from tests.host.object_hart_validation_source import legacy_observe_source as next_admission
+
+    admitted = next_admission(root, family, path, text, stage, channel)
+    if admitted is not None:
+        return admitted
     from collections import Counter
 
     backend = _legacy_backend(family)
@@ -2015,6 +2040,11 @@ def legacy_observe_source(root, family, path, text, stage, channel="aggregate"):
 
 
 def project_legacy_observations(root, family, path, text, stage, channel="aggregate"):
+    from tests.host.object_hart_validation_source import project_legacy_observations as next_admission
+
+    admitted = next_admission(root, family, path, text, stage, channel)
+    if admitted is not None:
+        return admitted
     if stage is Stage.RED or path not in SOURCE_PROJECTION["mutable_functions"] or not _current_authority(root):
         return None
     original = regular_source(Path(root), path).read_text()
@@ -2078,6 +2108,9 @@ def legacy_expected_audits(root):
 
 
 def project_include_transports(root, logical, raw, transports, required):
+    from tests.host.object_hart_validation_source import project_include_transports as project_next
+
+    transports = project_next(root, logical, raw, transports, required)
     if type(required) is not bool:
         raise AssertionError("MEM05 include transport requires checked source authority")
     if logical not in ("kernel/user_address_space.c", "kernel/user_address_space_runtime.c") or required or not _current_authority(root):
@@ -2428,6 +2461,9 @@ def extend_legacy_adapter(root, path, text):
 
 
 def project_legacy_adapter(root, path, text):
+    from tests.host.object_hart_validation_source import project_legacy_adapter as project_next
+
+    text = project_next(root, path, text)
     if (
         path not in (*SOURCE_ROLES["fixed_adapters"], "tests/host/test_kernel_address_space_source_layout.py")
         or path.startswith("kernel/tests/")
@@ -2887,6 +2923,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.object_hart_validation_source import project_cmake as project_next
+
+    text = project_next(text)
     if not any(marker in text for marker in ("MEM05_NATIVE", "selected_release_handoff", "selected-release-handoff")):
         return text
     addition = native_recipe()

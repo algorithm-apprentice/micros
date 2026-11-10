@@ -22,29 +22,22 @@ micros_thread_scheduler_admit_preflight(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_POLICY;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread(objects, thread_handle, &thread);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = micros_thread_resolve(objects, thread_handle, &thread);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    error = micros_hart_resolve(objects, hart_handle, &hart);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
     if (
-        (
-            !scheduler_core_thread_handle_is_null(hart->current_thread)
-            && !objects->threads[
-                hart->current_thread.slot
-            ].scheduler_assigned
-        )
-        || thread->scheduler_assigned
+        thread->scheduler_assigned
         || !thread->context_attached
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
-        || scheduler_core_thread_is_current(objects, thread_handle)
+        || (
+            !scheduler_core_thread_handle_is_null(hart->current_thread)
+            && scheduler_core_thread_is_current(objects, thread_handle)
+        )
         || !micros_thread_ipc_state_is_clear(thread)
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
@@ -100,7 +93,8 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
     thread->quantum_counter_ticks = quantum_counter_ticks;
     thread->remaining_counter_ticks = quantum_counter_ticks;
     thread->runtime_flags = 0;
-    return scheduler_core_queue_enqueue_tail(objects, hart, thread_handle);
+    scheduler_core_queue_enqueue_tail_prevalidated(objects, hart, thread_handle);
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 enum micros_kernel_object_error micros_thread_scheduler_hold(
@@ -112,7 +106,7 @@ enum micros_kernel_object_error micros_thread_scheduler_hold(
     struct micros_hart *hart;
     enum micros_kernel_object_error error;
 
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -162,7 +156,7 @@ enum micros_kernel_object_error micros_thread_scheduler_remove(
     struct micros_thread *thread;
     enum micros_kernel_object_error error;
 
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -208,7 +202,7 @@ enum micros_kernel_object_error micros_thread_runtime_flags_set(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -266,7 +260,7 @@ enum micros_kernel_object_error micros_thread_runtime_flags_unset(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -308,7 +302,7 @@ enum micros_kernel_object_error micros_thread_runtime_flags_unset(
     }
     thread->runtime_flags = resulting_flags;
     if (resulting_flags == 0) {
-        return scheduler_core_queue_enqueue_tail(objects, hart, thread_handle);
+        scheduler_core_queue_enqueue_tail_prevalidated(objects, hart, thread_handle);
     }
     return MICROS_KERNEL_OBJECT_OK;
 }
@@ -331,7 +325,7 @@ enum micros_kernel_object_error micros_thread_install_policy(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_POLICY;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_thread_operation(objects, thread_handle);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -377,7 +371,7 @@ enum micros_kernel_object_error micros_thread_install_policy(
     thread->remaining_counter_ticks = quantum_counter_ticks;
     thread->runtime_flags = resulting_flags;
     if (resulting_flags == 0) {
-        return scheduler_core_queue_enqueue_tail(objects, hart, thread_handle);
+        scheduler_core_queue_enqueue_tail_prevalidated(objects, hart, thread_handle);
     }
     return MICROS_KERNEL_OBJECT_OK;
 }
@@ -395,17 +389,13 @@ enum micros_kernel_object_error micros_hart_pick_ready(
     if (thread == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = micros_hart_resolve(objects, hart_handle, &hart);
+    error = scheduler_core_queue_pick(objects, hart, &selected);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
-    }
-    selected = scheduler_core_queue_pick(hart);
-    if (scheduler_core_thread_handle_is_null(selected)) {
-        return MICROS_KERNEL_OBJECT_ERROR_EMPTY;
     }
     *thread = selected;
     return MICROS_KERNEL_OBJECT_OK;
