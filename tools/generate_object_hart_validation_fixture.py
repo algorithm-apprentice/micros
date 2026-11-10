@@ -50,6 +50,11 @@ def source_bundle(root, stage, channel, *, current_sources=None):
             text = observe_source(root, path, text, channel, stage)
             if project_observations(root, path, text, channel, stage, original=raw.decode()).encode() != raw:
                 raise ValueError("OBJ01 observation changed its admitted source")
+        if stage == "current" and path == "include/micros/scheduler_core.h":
+            from tests.host.common_scheduler_return_source import legacy_native_admission
+
+            if "OBJ01/current-input/" + path in legacy_native_admission(root, "OBJ01", path, text, stage):
+                text = "#define MICROS_OBJ02_LEGACY_PLAN 1\n" + text
         outputs[path] = text.encode()
     return inputs, outputs
 

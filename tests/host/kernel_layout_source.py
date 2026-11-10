@@ -15859,6 +15859,9 @@ def _restored_kernel_bytes(root: Path, logical: str) -> bytes:
         raw = restore_frame_validation_hot_path(
             raw.decode("utf-8")
         ).encode()
+    from tests.host.common_scheduler_return_source import project_directory_source
+
+    raw = project_directory_source(root, logical, raw)
     required = diagnostic_identity_required(
         root, "tests/host/kernel_layout_source.py:data-entry:KERNEL_FILE_FACTS/" + logical + "/2",
     )

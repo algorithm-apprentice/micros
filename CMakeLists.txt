@@ -4163,6 +4163,208 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(object-hart-validation PROPERTIES LABELS slow)
     add_dependencies(test-unit object_hart_baseline_ordinary_test object_hart_baseline_aggregate_test object_hart_baseline_stack_test object_hart_current_aggregate_test object_hart_current_stack_test object_hart_current_ordinary_test)
 
+    add_custom_command(
+        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    add_custom_command(
+        OUTPUT ${MEM05_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    add_custom_command(
+        OUTPUT ${OBJ01_NATIVE_OUTPUTS} APPEND
+        DEPENDS tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/evidence_authority_scope.py
+    )
+    set(OBJ02_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/common-scheduler-return")
+    set(OBJ02_NATIVE_INPUTS
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_state.c
+        kernel/objects/kernel_object_identity.c
+        kernel/objects/kernel_object_stack.c
+        kernel/objects/kernel_object_process.c
+        kernel/objects/kernel_object_thread.c
+        kernel/objects/kernel_object_context.c
+        kernel/objects/kernel_object_hart.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core.c
+        kernel/scheduler/scheduler_core_queue.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/scheduler/scheduler_core_policy.c
+        kernel/scheduler/scheduler_core_ipc.c
+        kernel/scheduler/scheduler_core_ipc_transition.c
+        kernel/scheduler/scheduler_core_return_plan.c
+        kernel/scheduler/scheduler_core_return.c
+        kernel/scheduler/scheduler_core_accounting.c
+    )
+    set(OBJ02_NATIVE_HEADERS
+        include/micros/ipc.h
+        include/micros/kernel_objects.h
+        include/micros/scheduler_core.h
+        include/micros/stack_observation.h
+        include/micros/user_context.h
+        kernel/objects/kernel_object_private.h
+        kernel/scheduler/scheduler_core_internal.h
+        kernel/scheduler/scheduler_core_private.h
+    )
+    set(OBJ02_NATIVE_OUTPUTS)
+    set(OBJ02_SOURCES_0)
+    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
+        list(APPEND OBJ02_SOURCES_0 "${OBJ02_NATIVE_ROOT}/baseline/ordinary/${obj02_source}")
+    endforeach()
+    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_0})
+    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
+        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/baseline/ordinary/${obj02_header}")
+    endforeach()
+    set(OBJ02_SOURCES_1)
+    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
+        list(APPEND OBJ02_SOURCES_1 "${OBJ02_NATIVE_ROOT}/baseline/work/${obj02_source}")
+    endforeach()
+    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_1})
+    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
+        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/baseline/work/${obj02_header}")
+    endforeach()
+    set(OBJ02_SOURCES_2)
+    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
+        list(APPEND OBJ02_SOURCES_2 "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_source}")
+    endforeach()
+    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_2})
+    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
+        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_header}")
+    endforeach()
+    set(OBJ02_SOURCES_3)
+    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
+        list(APPEND OBJ02_SOURCES_3 "${OBJ02_NATIVE_ROOT}/current/work/${obj02_source}")
+    endforeach()
+    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_3})
+    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
+        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/current/work/${obj02_header}")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${OBJ02_NATIVE_OUTPUTS}
+        JOB_POOL mem03_source_proof
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_common_scheduler_return_fixture.py"
+        DEPENDS ${OBJ02_NATIVE_INPUTS} ${OBJ02_NATIVE_HEADERS}
+            tests/host/common_scheduler_return_test.c
+            tests/host/common_scheduler_return_test.h
+            tests/host/common_scheduler_return_source.py
+            tests/host/common_scheduler_return_evidence.py
+            tests/host/common_scheduler_return_authority.py
+            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/test_common_scheduler_return.py
+            tests/qemu/common_scheduler_return_work.c
+            tests/qemu/common_scheduler_return_work.h
+            tools/generate_common_scheduler_return_fixture.py
+            tools/check_common_scheduler_return.py
+            tests/host/object_hart_validation_source.py
+            tests/host/evidence_authority_scope.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tools/validation_context.py
+            tools/validation_inputs.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(common_scheduler_return_baseline_ordinary ${OBJ02_SOURCES_0}
+        tests/host/common_scheduler_return_test.c
+    )
+    target_include_directories(common_scheduler_return_baseline_ordinary PRIVATE
+        "${OBJ02_NATIVE_ROOT}/baseline/ordinary" "${OBJ02_NATIVE_ROOT}/baseline/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(common_scheduler_return_baseline_ordinary PRIVATE c_std_17)
+    target_compile_options(common_scheduler_return_baseline_ordinary PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(common_scheduler_return_baseline_ordinary PRIVATE MICROS_OBJ02_NATIVE_STAGE=0)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(common_scheduler_return_baseline_ordinary PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(common_scheduler_return_baseline_ordinary PRIVATE -fsanitize=address,undefined)
+    endif()
+    add_executable(common_scheduler_return_baseline_work ${OBJ02_SOURCES_1}
+        tests/host/common_scheduler_return_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(common_scheduler_return_baseline_work PRIVATE
+        "${OBJ02_NATIVE_ROOT}/baseline/work" "${OBJ02_NATIVE_ROOT}/baseline/work/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(common_scheduler_return_baseline_work PRIVATE c_std_17)
+    target_compile_options(common_scheduler_return_baseline_work PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(common_scheduler_return_baseline_work PRIVATE MICROS_OBJ02_NATIVE_STAGE=0)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(common_scheduler_return_baseline_work PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(common_scheduler_return_baseline_work PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(common_scheduler_return_baseline_work PRIVATE MICROS_TEST_WORK_COUNTS=1)
+    add_executable(common_scheduler_return_current_ordinary ${OBJ02_SOURCES_2}
+        tests/host/common_scheduler_return_test.c
+    )
+    target_include_directories(common_scheduler_return_current_ordinary PRIVATE
+        "${OBJ02_NATIVE_ROOT}/current/ordinary" "${OBJ02_NATIVE_ROOT}/current/ordinary/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(common_scheduler_return_current_ordinary PRIVATE c_std_17)
+    target_compile_options(common_scheduler_return_current_ordinary PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(common_scheduler_return_current_ordinary PRIVATE MICROS_OBJ02_NATIVE_STAGE=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(common_scheduler_return_current_ordinary PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(common_scheduler_return_current_ordinary PRIVATE -fsanitize=address,undefined)
+    endif()
+    add_executable(common_scheduler_return_test ${OBJ02_SOURCES_3}
+        tests/host/common_scheduler_return_test.c
+        tests/work/work_counts.c
+    )
+    target_include_directories(common_scheduler_return_test PRIVATE
+        "${OBJ02_NATIVE_ROOT}/current/work" "${OBJ02_NATIVE_ROOT}/current/work/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(common_scheduler_return_test PRIVATE c_std_17)
+    target_compile_options(common_scheduler_return_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+    target_compile_definitions(common_scheduler_return_test PRIVATE MICROS_OBJ02_NATIVE_STAGE=1)
+    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(common_scheduler_return_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+        target_link_options(common_scheduler_return_test PRIVATE -fsanitize=address,undefined)
+    endif()
+    target_compile_definitions(common_scheduler_return_test PRIVATE MICROS_TEST_WORK_COUNTS=1)
+    target_compile_definitions(common_scheduler_return_test PRIVATE
+        MICROS_COMMON_SCHEDULER_RETURN_LAUNCHER=1
+        "MICROS_COMMON_SCHEDULER_RETURN_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_COMMON_SCHEDULER_RETURN_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_common_scheduler_return.py\""
+        "MICROS_COMMON_SCHEDULER_RETURN_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+    add_test(NAME common-scheduler-return COMMAND common_scheduler_return_test
+        "$<TARGET_FILE:common_scheduler_return_baseline_ordinary>"
+        "$<TARGET_FILE:common_scheduler_return_baseline_work>"
+        "$<TARGET_FILE:common_scheduler_return_current_ordinary>"
+    )
+    set_tests_properties(common-scheduler-return PROPERTIES LABELS slow)
+    add_dependencies(test-unit common_scheduler_return_baseline_ordinary common_scheduler_return_baseline_work common_scheduler_return_current_ordinary common_scheduler_return_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()
@@ -6776,6 +6978,7 @@ if(MICROS_BUILD_SCHEDULER_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --report-transcript
             --qemu
             "${MICROS_QEMU}"
             --kernel
@@ -7022,6 +7225,14 @@ if(MICROS_BUILD_SCHEDULER_TEST)
         PRIVATE
             arch/riscv64/scheduler_test.S
             ${MICROS_SCHEDULER_QEMU_TEST_SOURCES}
+    )
+    target_sources(micros PRIVATE
+        tests/qemu/common_scheduler_return_work.c
+        tests/work/work_counts.c
+    )
+    set_source_files_properties(
+        tests/qemu/common_scheduler_return_work.c tests/work/work_counts.c
+        PROPERTIES COMPILE_DEFINITIONS MICROS_TEST_WORK_COUNTS=1
     )
 endif()
 

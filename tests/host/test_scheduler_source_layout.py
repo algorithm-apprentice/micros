@@ -1735,6 +1735,8 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 self.assertEqual(0, len(values[0].elts if hasattr(values[0], "elts") else values[0].keys))
 
     def test_all_original_owners_and_pending_bodies_are_frozen(self) -> None:
+        from tests.host.common_scheduler_return_source import current_delta_active
+
         from tests.host.evidence_authority_scope import identity_required
         from tests.host.object_hart_validation_source import historical_identity_required
 
@@ -1752,6 +1754,12 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                         ]
                         expected = original if (original, name) in pending else final
                         key = "tests/host/test_scheduler_source_layout.py:function-body:FROZEN_FUNCTIONS/" + original + "/" + name
+                        if family == 0 and name == "scratch_load" and current_delta_active(REPOSITORY_ROOT):
+                            self.assertEqual([], matches)
+                            continue
+                        if family == 0 and name in ("scratch_remove", "scratch_head", "scratch_tail", "scratch_pick") and not historical_identity_required(REPOSITORY_ROOT, key):
+                            self.assertEqual([], matches)
+                            continue
                         if family == 0 and name == "queue_enqueue_tail" and not historical_identity_required(REPOSITORY_ROOT, key):
                             self.assertEqual([], matches)
                             self.assertNotRegex(
@@ -1813,7 +1821,7 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
         for path, expected in STABLE_ARTIFACT_HASHES.items():
             with self.subTest(path=path):
                 key = "tests/host/test_scheduler_source_layout.py:data-entry:STABLE_ARTIFACT_HASHES/" + path
-                if path == "kernel/kernel_objects.c" and not historical_identity_required(REPOSITORY_ROOT, key):
+                if path in ("kernel/kernel_objects.c", "include/micros/scheduler_core.h") and not historical_identity_required(REPOSITORY_ROOT, key):
                     continue
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
@@ -1944,6 +1952,12 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 if not re.search(r"\bconst\b", declaration)
             ]
             if family == 0:
+                from tests.host.common_scheduler_return_source import current_delta_active
+
+                if current_delta_active(REPOSITORY_ROOT):
+                    self.assertEqual([], declarations)
+                    self.assertNotRegex("\n".join(self.texts.get(path, "") for path in paths), r"\b(?:plan_scratch|scheduler_plan_scratch)\b")
+                    continue
                 workspace = [(path, text) for path, text in declarations if re.search(r"\bplan_scratch\b", text)]
                 self.assertEqual(1, len(workspace))
                 expected_owner = (
@@ -2092,6 +2106,10 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 )
                 if current_object_phase and name == "micros_scheduler_commit_ipc_transitions":
                     roles = (r"stamp", r"registry", r"preflight|candidate", r"commit|apply")
+                from tests.host.common_scheduler_return_source import current_delta_active
+
+                if name == "micros_hart_plan_user_return" and current_delta_active(REPOSITORY_ROOT):
+                    roles = (r"preflight", r"repair", r"select|renew", r"finish|patch", r"publish")
                 for role in roles:
                     match = re.search(r"\b\w*(?:" + role + r")\w*\b", names[offset:])
                     self.assertIsNotNone(match, (name, "missing named domain phase", role))
@@ -2182,19 +2200,28 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
                 "preflight_transition_stamps", "scheduler_core_preflight_registry",
                 "preflight_transition_candidates", "commit_transition_candidates",
             )
-        planner = self.phases(0, "micros_hart_plan_user_return")
-        require_order(
-            planner, "unsigned char *bytes = (unsigned char *)&candidate;",
-            "index < sizeof(candidate)", "bytes[index] = 0;",
-            "micros_scheduler_core_validate" if historical_identity_required(
-                REPOSITORY_ROOT, prefix + "micros_hart_plan_user_return",
-            ) else "preflight_return_plan",
-            "scratch_load",
-            "MICROS_THREAD_RTS_PREEMPTED", "++renew_count > MICROS_THREAD_CAPACITY",
-            "candidate.ready_head", "unsigned char *destination = (unsigned char *)plan;",
-            "const unsigned char *source = (const unsigned char *)&candidate;",
-            "destination[index] = source[index];", "return MICROS_KERNEL_OBJECT_OK;",
-        )
+        from tests.host.common_scheduler_return_source import current_delta_active
+
+        if current_delta_active(REPOSITORY_ROOT):
+            require_order(
+                self.original(0, "micros_hart_plan_user_return"),
+                "clear_return_candidate", "preflight_return_plan", "repair_preempted_candidate",
+                "select_and_renew_candidate", "finish_return_queue", "publish_return_candidate",
+            )
+        else:
+            planner = self.phases(0, "micros_hart_plan_user_return")
+            require_order(
+                planner, "unsigned char *bytes = (unsigned char *)&candidate;",
+                "index < sizeof(candidate)", "bytes[index] = 0;",
+                "micros_scheduler_core_validate" if historical_identity_required(
+                    REPOSITORY_ROOT, prefix + "micros_hart_plan_user_return",
+                ) else "preflight_return_plan",
+                "scratch_load",
+                "MICROS_THREAD_RTS_PREEMPTED", "++renew_count > MICROS_THREAD_CAPACITY",
+                "candidate.ready_head", "unsigned char *destination = (unsigned char *)plan;",
+                "const unsigned char *source = (const unsigned char *)&candidate;",
+                "destination[index] = source[index];", "return MICROS_KERNEL_OBJECT_OK;",
+            )
         require_order(
             self.original(0, "micros_hart_commit_user_return"),
             "micros_hart_plan_user_return", "plans_equal", "micros_scheduler_apply_return_plan",

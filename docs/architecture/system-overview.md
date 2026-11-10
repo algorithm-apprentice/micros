@@ -316,6 +316,11 @@ the [evidence-consumer scope](common-scheduler-return.md#obj02-c01-complete-evid
 No runtime finding closes before its separate design merge, fresh
 implementation acceptance and independent review.
 
+That corrective design separately merged as #245. The fresh
+[implementation map](common-scheduler-return.md#implementation-and-evidence-map)
+binds its actual new base and exact historical-consumer owners before renewed
+runtime evidence. The archived Green does not supply current acceptance.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

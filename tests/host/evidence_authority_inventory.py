@@ -12,6 +12,7 @@ from tests.host import (
     bootstrap_allocation_source, diagnostic_history_source, evidence_authority_packed, kernel_mapping_source,
     panic_trace_source, selected_address_space_source, selected_ownership_source,
     selected_release_handoff_source, terminal_failure_source, object_hart_validation_source,
+    common_scheduler_return_source,
 )
 from tests.host.evidence_authority_source import (
     kernel_directory, kernel_sources, literal_value, portable_object_owners, regular_source, single_assignment,
@@ -159,6 +160,13 @@ FAMILY_OWNERS = {
     "object-hart-native-admission": (
         "tests/host/object_hart_native_source_bindings.py",
     ),
+    "common-scheduler-return-baseline": (
+        "tests/host/common_scheduler_return_authority.py",
+        "tests/host/common_scheduler_return_source.py",
+    ),
+    "common-scheduler-return-native-admission": (
+        "tests/host/common_scheduler_return_native_source_bindings.py",
+    ),
 }
 
 # These regressions exercise registered declarations, not additional identities.
@@ -301,6 +309,10 @@ DECLARED_FAMILY_FACT_DIGESTS = {
         "2339159782da8cce779aa5eec122b2dadbe3ba381f1c419d456e8988df82f15c",
     "object-hart-native-admission":
         "af0e61653478f58f80a644047822048f50440e1179df76cc636514a7c8d60fac",
+    "common-scheduler-return-baseline":
+        "5e48ade00a3e8a5beab13d977a986ac43c1d8154318d4378ef7d64a543b5c6bd",
+    "common-scheduler-return-native-admission":
+        "f9a5423e61cdad76b3b77b94be5f5bfbbcacce017df002b1cee6d4d674dbfbc8",
 }
 
 _PANIC_SOURCE_ASSERTIONS = {
@@ -1674,6 +1686,10 @@ def _facts_for_owner(root, family, relative, directory=None, object_inputs=None)
         return object_hart_validation_source.native_binding_facts(root, family, relative)
     if family == object_hart_validation_source.FAMILY:
         return object_hart_validation_source.declaration_facts(root, relative)
+    if family == common_scheduler_return_source.NATIVE_FAMILY:
+        return common_scheduler_return_source.native_binding_facts(root, family, relative)
+    if family == common_scheduler_return_source.FAMILY:
+        return common_scheduler_return_source.declaration_facts(root, relative)
     if family == "memory-native-admission":
         return _memory_native_binding_facts(root, family, relative)
     if family == "selected-ownership-native-admission":

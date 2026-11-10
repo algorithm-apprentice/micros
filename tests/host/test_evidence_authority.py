@@ -1160,8 +1160,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(27, len(inventory.families))
-        self.assertEqual(6327, len(inventory.facts))
+        self.assertEqual(29, len(inventory.families))
+        self.assertEqual(6789, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -2498,7 +2498,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(120, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6789, 29), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -2836,7 +2836,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(477, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6789, 29), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -3452,7 +3452,7 @@ class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(453, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6789, 29), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -4069,7 +4069,7 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
         tree = ast.parse((ROOT / owner).read_text())
         self.assertEqual(self.reference, literal_value(single_assignment(tree, "BINDING_REFERENCE").value))
         self.assertEqual(self.rows, literal_value(single_assignment(tree, "SOURCE_BINDINGS").value))
-        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6789, 29), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
         actual = tuple(fact for fact in self.inventory.facts if fact.family == "panic-trace-source-admission")
         self.assertEqual(self.expected_facts, actual)

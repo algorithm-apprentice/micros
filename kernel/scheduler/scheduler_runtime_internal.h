@@ -15,6 +15,11 @@ struct scheduler_runtime_context {
     uint64_t scheduler_kernel_root;
 };
 
+struct scheduler_outgoing_context {
+    struct micros_thread_handle thread;
+    struct micros_user_context context;
+};
+
 struct scheduler_accounting_commit {
     uint64_t counter;
     uint64_t kernel_total;

@@ -8,9 +8,10 @@ This is the Accepted OBJ02 contract under
 Complete independent design review is clean.
 Design #244 is separately merged. Its uncommitted implementation is archived
 after B14 exposed incomplete historical-consumer bindings.
-[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) owns the sole
-active correction below; implementation is blocked until its separate reviewed
-merge. The Accepted runtime contract remains unchanged.
+[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) owns the
+correction below and separately merged as #245 after clean independent review.
+The fresh implementation is now the sole active outcome. The Accepted runtime
+contract remains unchanged.
 
 ```text
 task:       OBJ02
@@ -623,3 +624,56 @@ Keep all thirteen units and the complete affected-source B14 set, including
 the existing reporting and historical-fixture modules. The current native,
 target, integration, source-view, fifty-command, same-run-profile, stack,
 independent-review and exact-publication requirements above remain unchanged.
+
+## Implementation and evidence map
+
+The fresh implementation begins after corrective design #245,
+`cc6e0eee984ea1731eca9fc02bc4132ead1d2e2c`, tree
+`5d2a9d6022b08b20cba75b6b1c33da5f6df4db09`.
+Before any code preparation, independent inspection froze the actual
+1,551-member base with membership digest
+`1b7023162ed02ad1a6557ee9ec3c4d44a6f3591a0afa5631dc7d61d3f1ca76bb`.
+All 6,327 predecessor records, twenty-seven fingerprints, eight claims and
+280 retirements remain unchanged. The fixed #243 runtime and the
+58-record/28-path selection above remain the reference, not the archived
+edited runtime.
+
+The independent pre-Red declarations retain thirteen prospective portable
+function contracts and 455 granular source predicates. Seven outcome
+declarations bring the current catalog to 6,789 facts in twenty-nine
+families. The new implementation binds both Accepted ADR-0121 and ADR-0122
+and freezes the thirteen exact noncandidate adapters before its actual Red.
+Registration alone does not grant retirement.
+
+The four full-only native products use 174 baseline and 180 current records.
+The additional six records are checked/apply observations for the three
+already Accepted scoped successes. Constructors, checked commit and apply
+are measured separately against an independent linked-queue state model.
+The original OBJ01 fixture retains all 171 cases and raw output values while
+adding complete plan side-records and isolated defined-state apply effects.
+
+The scheduler observer stores three complete first-success snapshots and
+reports them only after the existing semantic and cleanup checks. The
+recipe uses ADR-0108's existing single-run reporting option; the task-owned
+inverse removes its exact extension before the old two-token consumers.
+The MEM03 historical forward builder, shared reporting inverse and
+stack-observer second-line slot remain unchanged.
+
+The ordinary selected-context loading phase chooses the retained image inside
+`select_user_return`, after root and completion preflight. The existing
+two-argument `scheduler_runtime_load_selected_context` remains the fresh
+validation entry for nonmatching selection, start, idle and the unchanged
+bootstrap test callers. No persistent state or private-call arity change is
+needed to reuse the caller-owned proof.
+
+Focused source, protocol and consumer iteration uses:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_common_scheduler_return tests.host.test_object_hart_validation.ObjectHartNativeProtocolTest tests.host.test_qemu_transcript tests.host.test_python_host_runtime
+```
+
+The earlier implementation's code, measurements and failures are reference
+material only. Renewed native/target Red and Green, all thirteen units,
+terminal source-view construction, full current author/stack acceptance and
+independent implementation review still precede publication and finding
+closure. No workflow simplification starts in this outcome.

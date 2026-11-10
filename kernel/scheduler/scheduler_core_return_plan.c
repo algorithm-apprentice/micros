@@ -1,117 +1,13 @@
 #include "kernel/scheduler/scheduler_core_private.h"
 
-struct scheduler_plan_scratch {
-    uint16_t slots[
-        MICROS_SCHEDULER_PRIORITY_COUNT
-    ][MICROS_THREAD_CAPACITY];
-    size_t counts[MICROS_SCHEDULER_PRIORITY_COUNT];
+struct scheduler_return_cursor {
+    struct micros_scheduler_return_queue *queue;
+    struct micros_thread_handle initial_head;
+    struct micros_thread_handle initial_tail;
+    struct micros_thread_handle rotated_last;
+    bool tail_reached;
+    bool wrapped;
 };
-
-static struct scheduler_plan_scratch plan_scratch;
-
-static enum micros_kernel_object_error scratch_load(
-    const struct micros_kernel_objects *objects,
-    const struct micros_hart *hart,
-    struct micros_scheduler_return_plan *candidate
-)
-{
-    size_t priority;
-    enum micros_kernel_object_error error;
-
-    for (
-        priority = 0;
-        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
-        ++priority
-    ) {
-        struct micros_thread_handle cursor =
-            hart->ready_head[priority];
-        struct micros_thread_handle last = scheduler_core_null_thread_handle();
-        size_t count = 0;
-
-        error = scheduler_core_preflight_queue_endpoints(objects, hart, (uint8_t)priority);
-        if (error != MICROS_KERNEL_OBJECT_OK) {
-            return error;
-        }
-        while (!scheduler_core_thread_handle_is_null(cursor)) {
-            const struct micros_thread *thread;
-
-            if (
-                count >= MICROS_THREAD_CAPACITY
-                || cursor.slot >= MICROS_THREAD_CAPACITY
-                || scheduler_core_bitmap_test(candidate->ready_bitmap, cursor.slot)
-            ) {
-                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-            }
-            error = scheduler_core_preflight_queue_record(objects, hart, (uint8_t)priority, cursor, &thread);
-            if (error != MICROS_KERNEL_OBJECT_OK) {
-                return error;
-            }
-            scheduler_core_bitmap_set(candidate->ready_bitmap, cursor.slot);
-            plan_scratch.slots[priority][count++] =
-                cursor.slot;
-            last = cursor;
-            cursor = thread->ready_next;
-        }
-        if (!scheduler_core_thread_handles_equal(last, hart->ready_tail[priority])) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-        }
-        plan_scratch.counts[priority] = count;
-    }
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-static void scratch_remove(uint8_t priority, uint16_t slot)
-{
-    size_t index;
-    size_t count = plan_scratch.counts[priority];
-
-    for (index = 0; index < count; ++index) {
-        if (plan_scratch.slots[priority][index] == slot) {
-            for (; index + 1 < count; ++index) {
-                plan_scratch.slots[priority][index] =
-                    plan_scratch.slots[priority][index + 1];
-            }
-            --plan_scratch.counts[priority];
-            return;
-        }
-    }
-}
-
-static void scratch_head(uint8_t priority, uint16_t slot)
-{
-    size_t count = plan_scratch.counts[priority];
-    size_t index;
-
-    for (index = count; index != 0; --index) {
-        plan_scratch.slots[priority][index] =
-            plan_scratch.slots[priority][index - 1];
-    }
-    plan_scratch.slots[priority][0] = slot;
-    ++plan_scratch.counts[priority];
-}
-
-static void scratch_tail(uint8_t priority, uint16_t slot)
-{
-    plan_scratch.slots[priority][
-        plan_scratch.counts[priority]++
-    ] = slot;
-}
-
-static size_t scratch_pick(void)
-{
-    size_t priority;
-
-    for (
-        priority = 0;
-        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
-        ++priority
-    ) {
-        if (plan_scratch.counts[priority] != 0) {
-            return plan_scratch.slots[priority][0];
-        }
-    }
-    return MICROS_THREAD_CAPACITY;
-}
 
 static void clear_return_candidate(
     struct micros_scheduler_return_plan *candidate
@@ -150,176 +46,339 @@ static enum micros_kernel_object_error preflight_return_plan(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
-static enum micros_kernel_object_error preflight_return_threads(
-    const struct micros_kernel_objects *objects,
-    const struct micros_hart *hart,
-    struct micros_hart_handle hart_handle,
-    const struct micros_scheduler_return_plan *candidate
+static struct scheduler_return_cursor *return_queue_at_priority(
+    const struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor cursors[2],
+    uint8_t priority
 )
 {
-    bool assigned = false;
-    size_t index;
-    const struct micros_thread *checked;
+    if (candidate->queue_count > 0 && candidate->queues[0].priority == priority) {
+        return &cursors[0];
+    }
+    if (candidate->queue_count > 1 && candidate->queues[1].priority == priority) {
+        return &cursors[1];
+    }
+    return NULL;
+}
+
+static enum micros_kernel_object_error prepare_return_queue(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    uint8_t priority,
+    struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor cursors[2],
+    struct scheduler_return_cursor **result
+)
+{
+    struct scheduler_return_cursor *cursor = return_queue_at_priority(candidate, cursors, priority);
+    struct micros_scheduler_return_queue *queue;
     enum micros_kernel_object_error error;
 
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-        bool ready;
-
-        if (
-            !thread->scheduler_assigned
-            || !scheduler_core_hart_handles_equal(thread->scheduler_hart, hart_handle)
-        ) {
-            continue;
-        }
-        error = scheduler_core_preflight_thread(
-            objects, (struct micros_thread_handle){(uint16_t)index, thread->generation}, &checked
-        );
-        if (error != MICROS_KERNEL_OBJECT_OK) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-        }
-        ready = scheduler_core_bitmap_test(candidate->ready_bitmap, index);
-        if (thread->ready_linked != ready || (thread->runtime_flags == 0) != ready) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-        }
-        assigned = true;
+    if (cursor != NULL) {
+        *result = cursor;
+        return MICROS_KERNEL_OBJECT_OK;
     }
-    if (hart->reschedule_pending && !assigned) {
+    if (candidate->queue_count >= 2) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
+    error = scheduler_core_preflight_queue_endpoints(objects, hart, priority);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    cursor = &cursors[candidate->queue_count];
+    queue = &candidate->queues[candidate->queue_count];
+    queue->priority = priority;
+    queue->before_head = hart->ready_head[priority];
+    queue->before_tail = hart->ready_tail[priority];
+    queue->after_head = queue->before_head;
+    queue->after_tail = queue->before_tail;
+    cursor->queue = queue;
+    cursor->initial_head = queue->before_head;
+    cursor->initial_tail = queue->before_tail;
+    cursor->rotated_last = scheduler_core_null_thread_handle();
+    cursor->tail_reached = scheduler_core_thread_handle_is_null(queue->before_head);
+    cursor->wrapped = false;
+    ++candidate->queue_count;
+    *result = cursor;
     return MICROS_KERNEL_OBJECT_OK;
 }
 
-static void repair_preempted_candidate(
+static enum micros_kernel_object_error pick_return_queue(
     const struct micros_kernel_objects *objects,
     const struct micros_hart *hart,
-    struct micros_scheduler_return_plan *candidate
+    struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor cursors[2],
+    struct scheduler_return_cursor **result
 )
 {
-    if (!scheduler_core_thread_handle_is_null(hart->current_thread)) {
-        const struct micros_thread *current =
-            &objects->threads[hart->current_thread.slot];
+    size_t priority;
+    enum micros_kernel_object_error error;
 
-        if (
-            (current->runtime_flags
-                & MICROS_THREAD_RTS_PREEMPTED) != 0
-        ) {
-            uint32_t resulting =
-                current->runtime_flags
-                & ~MICROS_THREAD_RTS_PREEMPTED;
+    for (priority = 0; priority < MICROS_SCHEDULER_PRIORITY_COUNT; ++priority) {
+        struct scheduler_return_cursor *cursor =
+            return_queue_at_priority(candidate, cursors, (uint8_t)priority);
+        struct micros_thread_handle head;
 
-            candidate->repair_preempted = true;
-            if (resulting == 0) {
-                if (current->remaining_counter_ticks == 0) {
-                    scratch_tail(
-                        current->scheduler_priority,
-                        hart->current_thread.slot
-                    );
-                } else {
-                    scratch_head(
-                        current->scheduler_priority,
-                        hart->current_thread.slot
-                    );
+        if (cursor != NULL) {
+            head = cursor->queue->after_head;
+        } else {
+            error = scheduler_core_preflight_queue_endpoints(objects, hart, (uint8_t)priority);
+            if (error != MICROS_KERNEL_OBJECT_OK) {
+                return error;
+            }
+            head = hart->ready_head[priority];
+        }
+        if (head.generation != 0) {
+            return prepare_return_queue(objects, hart, (uint8_t)priority, candidate, cursors, result);
+        }
+    }
+    *result = NULL;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+static enum micros_kernel_object_error repair_preempted_candidate(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor cursors[2]
+)
+{
+    const struct micros_thread *current;
+    struct scheduler_return_cursor *cursor;
+    struct micros_scheduler_return_queue *queue;
+    enum micros_kernel_object_error error;
+    uint32_t resulting;
+
+    if (scheduler_core_thread_handle_is_null(candidate->outgoing)) {
+        return MICROS_KERNEL_OBJECT_OK;
+    }
+    current = &objects->threads[candidate->outgoing.slot];
+    candidate->repair_preempted = (current->runtime_flags & MICROS_THREAD_RTS_PREEMPTED) != 0;
+    resulting = current->runtime_flags & ~MICROS_THREAD_RTS_PREEMPTED;
+    if (resulting != 0) {
+        return MICROS_KERNEL_OBJECT_OK;
+    }
+    error = prepare_return_queue(objects, hart, current->scheduler_priority, candidate, cursors, &cursor);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    if (!candidate->repair_preempted) {
+        return MICROS_KERNEL_OBJECT_OK;
+    }
+    candidate->publish_current = true;
+    queue = cursor->queue;
+    if (scheduler_core_thread_handle_is_null(queue->before_head)) {
+        queue->after_head = candidate->outgoing;
+        queue->after_tail = candidate->outgoing;
+    } else if (current->remaining_counter_ticks == 0) {
+        queue->after_tail = candidate->outgoing;
+    } else {
+        queue->after_head = candidate->outgoing;
+    }
+    cursor->initial_head = queue->after_head;
+    cursor->initial_tail = queue->after_tail;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+static enum micros_kernel_object_error rotate_return_head(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    const struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor *cursor,
+    struct micros_thread_handle selected,
+    const struct micros_thread *thread
+)
+{
+    struct micros_scheduler_return_queue *queue = cursor->queue;
+    struct micros_thread_handle next;
+    const struct micros_thread *successor;
+    enum micros_kernel_object_error error;
+    bool inserted = candidate->publish_current
+        && scheduler_core_thread_handles_equal(selected, candidate->outgoing);
+
+    if (!scheduler_core_thread_handles_equal(selected, queue->after_head)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    if (inserted) {
+        next = thread->remaining_counter_ticks == 0
+            ? scheduler_core_null_thread_handle() : queue->before_head;
+    } else {
+        next = thread->ready_next;
+        if (scheduler_core_thread_handles_equal(selected, queue->before_tail)) {
+            if (!scheduler_core_thread_handle_is_null(next)) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+            cursor->tail_reached = true;
+            if (candidate->publish_current) {
+                const struct micros_thread *outgoing = &objects->threads[candidate->outgoing.slot];
+
+                if (outgoing->scheduler_priority == queue->priority
+                    && outgoing->remaining_counter_ticks == 0) {
+                    next = candidate->outgoing;
                 }
+            }
+        } else {
+            if (scheduler_core_thread_handle_is_null(next)
+                || scheduler_core_thread_handles_equal(next, selected)
+                || scheduler_core_thread_handles_equal(next, candidate->outgoing)) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
+            error = scheduler_core_preflight_queue_record(objects, hart, queue->priority, next, &successor);
+            if (error != MICROS_KERNEL_OBJECT_OK) {
+                return error;
             }
         }
     }
+    if (scheduler_core_thread_handle_is_null(next)) {
+        if (!cursor->tail_reached) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        next = cursor->initial_head;
+        cursor->wrapped = true;
+    }
+    queue->after_head = next;
+    queue->after_tail = selected;
+    cursor->rotated_last = selected;
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 static enum micros_kernel_object_error select_and_renew_candidate(
     const struct micros_kernel_objects *objects,
     const struct micros_hart *hart,
     struct micros_scheduler_return_plan *candidate,
-    size_t *selected_slot_out
+    struct scheduler_return_cursor cursors[2]
 )
 {
-    size_t selected_slot;
+    struct scheduler_return_cursor *cursor = NULL;
     size_t renew_count = 0;
+    enum micros_kernel_object_error error;
 
-    selected_slot = (
-        !scheduler_core_thread_handle_is_null(hart->current_thread)
-        && objects->threads[
-            hart->current_thread.slot
-        ].runtime_flags == 0
-    ) ? hart->current_thread.slot : scratch_pick();
+    if (!scheduler_core_thread_handle_is_null(candidate->outgoing)
+        && objects->threads[candidate->outgoing.slot].runtime_flags == 0) {
+        cursor = return_queue_at_priority(
+            candidate, cursors, objects->threads[candidate->outgoing.slot].scheduler_priority
+        );
+    } else {
+        error = pick_return_queue(objects, hart, candidate, cursors, &cursor);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+    }
+    while (cursor != NULL) {
+        struct micros_scheduler_return_queue *queue = cursor->queue;
+        struct micros_thread_handle selected = queue->after_head;
+        const struct micros_thread *thread;
+        bool current = scheduler_core_thread_handles_equal(selected, candidate->outgoing);
 
-    for (;;) {
-        const struct micros_thread *selected;
-
-        if (selected_slot == MICROS_THREAD_CAPACITY) {
+        if (current) {
+            thread = &objects->threads[selected.slot];
+        } else {
+            error = scheduler_core_preflight_queue_record(objects, hart, queue->priority, selected, &thread);
+            if (error != MICROS_KERNEL_OBJECT_OK) {
+                return error;
+            }
+        }
+        if (thread->remaining_counter_ticks != 0) {
             break;
         }
-        selected = &objects->threads[selected_slot];
-        if (
-            selected->remaining_counter_ticks != 0
-            || scheduler_core_bitmap_test(
-                candidate->renew_bitmap,
-                selected_slot
-            )
-        ) {
+        if ((current && candidate->renew_current)
+            || (queue->renew_count != 0 && scheduler_core_thread_handles_equal(selected, queue->renew_first))) {
+            if (!cursor->wrapped) {
+                return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+            }
             break;
         }
         if (++renew_count > MICROS_THREAD_CAPACITY) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
-        scheduler_core_bitmap_set(candidate->renew_bitmap, selected_slot);
+        if (current) {
+            candidate->renew_current = true;
+        } else {
+            if (queue->renew_count == 0) {
+                queue->renew_first = selected;
+            }
+            ++queue->renew_count;
+        }
         candidate->renew_quantum = true;
-        if (!selected->scheduler_preemptible) {
+        if (!thread->scheduler_preemptible) {
             break;
         }
-        scratch_remove(
-            selected->scheduler_priority,
-            (uint16_t)selected_slot
-        );
-        scratch_tail(
-            selected->scheduler_priority,
-            (uint16_t)selected_slot
-        );
-        selected_slot = scratch_pick();
+        error = rotate_return_head(objects, hart, candidate, cursor, selected, thread);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+        error = pick_return_queue(objects, hart, candidate, cursors, &cursor);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
     }
-    *selected_slot_out = selected_slot;
+    candidate->selected = cursor == NULL ? scheduler_core_null_thread_handle() : cursor->queue->after_head;
     return MICROS_KERNEL_OBJECT_OK;
 }
 
-static void project_candidate_queues(
-    const struct micros_kernel_objects *objects,
-    struct micros_scheduler_return_plan *candidate
+static enum micros_kernel_object_error set_return_patch(
+    struct micros_scheduler_return_queue *queue,
+    struct micros_thread_handle thread,
+    struct micros_thread_handle next
 )
 {
     size_t index;
-    size_t priority;
 
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        candidate->ready_next[index] = scheduler_core_null_thread_handle();
-    }
-    for (
-        priority = 0;
-        priority < MICROS_SCHEDULER_PRIORITY_COUNT;
-        ++priority
-    ) {
-        size_t count = plan_scratch.counts[priority];
-
-        candidate->ready_head[priority] = scheduler_core_null_thread_handle();
-        candidate->ready_tail[priority] = scheduler_core_null_thread_handle();
-        for (index = 0; index < count; ++index) {
-            uint16_t slot = plan_scratch.slots[priority][index];
-            struct micros_thread_handle handle = {
-                slot,
-                objects->threads[slot].generation,
-            };
-
-            scheduler_core_bitmap_set(candidate->ready_bitmap, slot);
-            if (index == 0) {
-                candidate->ready_head[priority] = handle;
-            } else {
-                uint16_t previous_slot =
-                    plan_scratch.slots[priority][index - 1];
-
-                candidate->ready_next[previous_slot] = handle;
-            }
-            candidate->ready_tail[priority] = handle;
+    for (index = 0; index < queue->patch_count; ++index) {
+        if (scheduler_core_thread_handles_equal(queue->patches[index].thread, thread)) {
+            queue->patches[index].next = next;
+            return MICROS_KERNEL_OBJECT_OK;
         }
     }
+    if (queue->patch_count >= 3) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    queue->patches[queue->patch_count].thread = thread;
+    queue->patches[queue->patch_count].next = next;
+    ++queue->patch_count;
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
+static enum micros_kernel_object_error finish_return_queue(
+    const struct micros_kernel_objects *objects,
+    const struct micros_scheduler_return_plan *candidate,
+    struct scheduler_return_cursor *cursor
+)
+{
+    struct micros_scheduler_return_queue *queue = cursor->queue;
+    enum micros_kernel_object_error error;
+
+    if (candidate->publish_current) {
+        const struct micros_thread *current = &objects->threads[candidate->outgoing.slot];
+
+        if (current->scheduler_priority == queue->priority) {
+            if (current->remaining_counter_ticks == 0
+                && !scheduler_core_thread_handle_is_null(queue->before_head)) {
+                error = set_return_patch(queue, queue->before_tail, candidate->outgoing);
+                if (error != MICROS_KERNEL_OBJECT_OK) {
+                    return error;
+                }
+            }
+            error = set_return_patch(
+                queue, candidate->outgoing, current->remaining_counter_ticks == 0
+                    ? scheduler_core_null_thread_handle() : queue->before_head
+            );
+            if (error != MICROS_KERNEL_OBJECT_OK) {
+                return error;
+            }
+        }
+    }
+    if (!scheduler_core_thread_handle_is_null(cursor->rotated_last)) {
+        error = set_return_patch(queue, cursor->initial_tail, cursor->initial_head);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+        error = set_return_patch(queue, cursor->rotated_last, scheduler_core_null_thread_handle());
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+    }
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 static void publish_return_candidate(
@@ -345,7 +404,8 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
 {
     const struct micros_hart *hart;
     struct micros_scheduler_return_plan candidate;
-    size_t selected_slot;
+    struct scheduler_return_cursor cursors[2];
+    size_t index;
     enum micros_kernel_object_error error;
 
     if (plan == NULL) {
@@ -356,44 +416,26 @@ enum micros_kernel_object_error micros_hart_plan_user_return(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    error = scratch_load(objects, hart, &candidate);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    error = preflight_return_threads(objects, hart, hart_handle, &candidate);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
     candidate.hart = hart_handle;
     candidate.outgoing = hart->current_thread;
-    scheduler_core_bitmap_clear(candidate.renew_bitmap);
-    scheduler_core_bitmap_clear(candidate.ready_bitmap);
-    repair_preempted_candidate(objects, hart, &candidate);
-    error = select_and_renew_candidate(
-        objects,
-        hart,
-        &candidate,
-        &selected_slot
-    );
+    error = repair_preempted_candidate(objects, hart, &candidate, cursors);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (selected_slot == MICROS_THREAD_CAPACITY) {
-        candidate.action = MICROS_SCHEDULER_RETURN_ENTER_IDLE;
-        candidate.selected = scheduler_core_null_thread_handle();
-    } else {
-        candidate.selected = (struct micros_thread_handle){
-            (uint16_t)selected_slot,
-            objects->threads[selected_slot].generation,
-        };
-        candidate.action = scheduler_core_thread_handles_equal(
-            candidate.selected,
-            hart->current_thread
-        )
-            ? MICROS_SCHEDULER_RETURN_KEEP_CURRENT
-            : MICROS_SCHEDULER_RETURN_SELECT_THREAD;
+    error = select_and_renew_candidate(objects, hart, &candidate, cursors);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
     }
-    project_candidate_queues(objects, &candidate);
+    for (index = 0; index < candidate.queue_count; ++index) {
+        error = finish_return_queue(objects, &candidate, &cursors[index]);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
+    }
+    candidate.action = scheduler_core_thread_handle_is_null(candidate.selected)
+        ? MICROS_SCHEDULER_RETURN_ENTER_IDLE
+        : scheduler_core_thread_handles_equal(candidate.selected, candidate.outgoing)
+            ? MICROS_SCHEDULER_RETURN_KEEP_CURRENT : MICROS_SCHEDULER_RETURN_SELECT_THREAD;
     publish_return_candidate(plan, &candidate);
     return MICROS_KERNEL_OBJECT_OK;
 }

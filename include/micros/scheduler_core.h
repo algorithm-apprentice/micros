@@ -11,6 +11,23 @@ enum micros_scheduler_return_action {
     MICROS_SCHEDULER_RETURN_ENTER_IDLE,
 };
 
+struct micros_scheduler_return_patch {
+    struct micros_thread_handle thread;
+    struct micros_thread_handle next;
+};
+
+struct micros_scheduler_return_queue {
+    uint8_t priority;
+    uint8_t patch_count;
+    uint16_t renew_count;
+    struct micros_thread_handle before_head;
+    struct micros_thread_handle before_tail;
+    struct micros_thread_handle after_head;
+    struct micros_thread_handle after_tail;
+    struct micros_thread_handle renew_first;
+    struct micros_scheduler_return_patch patches[3];
+};
+
 struct micros_scheduler_return_plan {
     struct micros_hart_handle hart;
     struct micros_thread_handle outgoing;
@@ -18,18 +35,13 @@ struct micros_scheduler_return_plan {
     enum micros_scheduler_return_action action;
     bool repair_preempted;
     bool renew_quantum;
-    uint64_t renew_bitmap[
-        (MICROS_THREAD_CAPACITY + 63) / 64
-    ];
-    uint64_t ready_bitmap[
-        (MICROS_THREAD_CAPACITY + 63) / 64
-    ];
-    struct micros_thread_handle
-        ready_head[MICROS_SCHEDULER_PRIORITY_COUNT];
-    struct micros_thread_handle
-        ready_tail[MICROS_SCHEDULER_PRIORITY_COUNT];
-    struct micros_thread_handle ready_next[MICROS_THREAD_CAPACITY];
+    bool renew_current;
+    bool publish_current;
+    uint8_t queue_count;
+    struct micros_scheduler_return_queue queues[2];
 };
+
+_Static_assert(sizeof(struct micros_scheduler_return_plan) <= 320, "bounded return plan");
 
 struct micros_scheduler_current_ipc_guard {
     bool active;

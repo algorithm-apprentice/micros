@@ -1,5 +1,30 @@
 #include "kernel/scheduler/scheduler_core_private.h"
 
+static bool queue_deltas_equal(
+    const struct micros_scheduler_return_queue *left,
+    const struct micros_scheduler_return_queue *right
+)
+{
+    size_t index;
+
+    if (left->priority != right->priority || left->patch_count != right->patch_count
+        || left->renew_count != right->renew_count
+        || !scheduler_core_thread_handles_equal(left->before_head, right->before_head)
+        || !scheduler_core_thread_handles_equal(left->before_tail, right->before_tail)
+        || !scheduler_core_thread_handles_equal(left->after_head, right->after_head)
+        || !scheduler_core_thread_handles_equal(left->after_tail, right->after_tail)
+        || !scheduler_core_thread_handles_equal(left->renew_first, right->renew_first)) {
+        return false;
+    }
+    for (index = 0; index < 3; ++index) {
+        if (!scheduler_core_thread_handles_equal(left->patches[index].thread, right->patches[index].thread)
+            || !scheduler_core_thread_handles_equal(left->patches[index].next, right->patches[index].next)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool plans_equal(
     const struct micros_scheduler_return_plan *left,
     const struct micros_scheduler_return_plan *right
@@ -7,49 +32,17 @@ static bool plans_equal(
 {
     size_t index;
 
-    if (
-        !scheduler_core_hart_handles_equal(left->hart, right->hart)
+    if (!scheduler_core_hart_handles_equal(left->hart, right->hart)
         || !scheduler_core_thread_handles_equal(left->outgoing, right->outgoing)
         || !scheduler_core_thread_handles_equal(left->selected, right->selected)
-        || left->action != right->action
-        || left->repair_preempted != right->repair_preempted
-        || left->renew_quantum != right->renew_quantum
-    ) {
+        || left->action != right->action || left->repair_preempted != right->repair_preempted
+        || left->renew_quantum != right->renew_quantum || left->renew_current != right->renew_current
+        || left->publish_current != right->publish_current
+        || left->queue_count != right->queue_count || left->queue_count > 2) {
         return false;
     }
-    for (
-        index = 0;
-        index < (MICROS_THREAD_CAPACITY + 63) / 64;
-        ++index
-    ) {
-        if (
-            left->renew_bitmap[index] != right->renew_bitmap[index]
-            || left->ready_bitmap[index] != right->ready_bitmap[index]
-        ) {
-            return false;
-        }
-    }
-    for (index = 0; index < MICROS_SCHEDULER_PRIORITY_COUNT; ++index) {
-        if (
-            !scheduler_core_thread_handles_equal(
-                left->ready_head[index],
-                right->ready_head[index]
-            )
-            || !scheduler_core_thread_handles_equal(
-                left->ready_tail[index],
-                right->ready_tail[index]
-            )
-        ) {
-            return false;
-        }
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        if (
-            !scheduler_core_thread_handles_equal(
-                left->ready_next[index],
-                right->ready_next[index]
-            )
-        ) {
+    for (index = 0; index < 2; ++index) {
+        if (!queue_deltas_equal(&left->queues[index], &right->queues[index])) {
             return false;
         }
     }
@@ -82,6 +75,13 @@ enum micros_kernel_object_error micros_hart_commit_user_return(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
+static void renew_return_thread(struct micros_thread *thread)
+{
+    thread->runtime_flags |= MICROS_THREAD_RTS_NO_QUANTUM;
+    thread->remaining_counter_ticks = thread->quantum_counter_ticks;
+    thread->runtime_flags &= ~MICROS_THREAD_RTS_NO_QUANTUM;
+}
+
 void micros_scheduler_apply_return_plan(
     struct micros_kernel_objects *objects,
     const struct micros_scheduler_return_plan *plan
@@ -91,53 +91,47 @@ void micros_scheduler_apply_return_plan(
     size_t index;
 
     if (plan->repair_preempted) {
-        struct micros_thread *outgoing =
-            &objects->threads[plan->outgoing.slot];
+        struct micros_thread *outgoing = &objects->threads[plan->outgoing.slot];
 
-        outgoing->runtime_flags &=
-            ~MICROS_THREAD_RTS_PREEMPTED;
+        outgoing->runtime_flags &= ~MICROS_THREAD_RTS_PREEMPTED;
     }
+    if (plan->renew_current) {
+        renew_return_thread(&objects->threads[plan->outgoing.slot]);
+    }
+    for (index = 0; index < plan->queue_count; ++index) {
+        const struct micros_scheduler_return_queue *queue = &plan->queues[index];
+        struct micros_thread_handle cursor = queue->renew_first;
+        size_t renewed;
 
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        struct micros_thread *thread = &objects->threads[index];
+        for (renewed = 0; renewed < queue->renew_count; ++renewed) {
+            struct micros_thread *thread = &objects->threads[cursor.slot];
 
-        if (scheduler_core_bitmap_test(plan->renew_bitmap, index)) {
-            thread->runtime_flags |= MICROS_THREAD_RTS_NO_QUANTUM;
-            thread->remaining_counter_ticks =
-                thread->quantum_counter_ticks;
-            thread->runtime_flags &= ~MICROS_THREAD_RTS_NO_QUANTUM;
-        }
-        if (
-            thread->scheduler_assigned
-            && scheduler_core_hart_handles_equal(
-                thread->scheduler_hart,
-                plan->hart
-            )
-        ) {
-            thread->ready_linked =
-                scheduler_core_bitmap_test(plan->ready_bitmap, index);
-            thread->ready_next = plan->ready_next[index];
+            cursor = thread->ready_next;
+            renew_return_thread(thread);
         }
     }
-    for (index = 0; index < MICROS_SCHEDULER_PRIORITY_COUNT; ++index) {
-        hart->ready_head[index] = plan->ready_head[index];
-        hart->ready_tail[index] = plan->ready_tail[index];
+    if (plan->publish_current) {
+        objects->threads[plan->outgoing.slot].ready_linked = true;
     }
+    for (index = 0; index < plan->queue_count; ++index) {
+        const struct micros_scheduler_return_queue *queue = &plan->queues[index];
+        size_t patch;
 
+        for (patch = 0; patch < queue->patch_count; ++patch) {
+            objects->threads[queue->patches[patch].thread.slot].ready_next = queue->patches[patch].next;
+        }
+        hart->ready_head[queue->priority] = queue->after_head;
+        hart->ready_tail[queue->priority] = queue->after_tail;
+    }
     hart->current_thread = plan->selected;
     hart->reschedule_pending = false;
     if (scheduler_core_thread_handle_is_null(plan->selected)) {
-        hart->trap.primary_stack_bottom =
-            hart->idle_primary_stack_bottom;
-        hart->trap.primary_stack_top =
-            hart->idle_primary_stack_top;
+        hart->trap.primary_stack_bottom = hart->idle_primary_stack_bottom;
+        hart->trap.primary_stack_top = hart->idle_primary_stack_top;
     } else {
-        const struct micros_thread *selected =
-            &objects->threads[plan->selected.slot];
+        const struct micros_thread *selected = &objects->threads[plan->selected.slot];
 
-        hart->trap.primary_stack_bottom =
-            selected->kernel_stack_bottom;
-        hart->trap.primary_stack_top =
-            selected->kernel_stack_top;
+        hart->trap.primary_stack_bottom = selected->kernel_stack_bottom;
+        hart->trap.primary_stack_top = selected->kernel_stack_top;
     }
 }

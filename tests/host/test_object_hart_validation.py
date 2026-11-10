@@ -198,7 +198,8 @@ class ObjectHartCurrentContractTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     source.legacy_observe_source(ROOT, "MEM03", path, changed, Stage.GREEN)
 
-    def test_independent_current_contracts_reject_the_fixed_predecessor(self):
+    @patch("tests.host.common_scheduler_return_source._current_authority", return_value=False)
+    def test_independent_current_contracts_reject_the_fixed_predecessor(self, _common_authority):
         contracts = current_function_contracts(str(ROOT))
         expected = {
             path + "/" + name
@@ -248,6 +249,8 @@ class ObjectHartCurrentContractTest(unittest.TestCase):
             validate_observation_contract(ROOT, path, name, changed, "baseline")
 
     def test_exact_legacy_adapters_recover_fixed_policy_without_accepting_other_edits(self):
+        from tests.host.common_scheduler_return_source import project_legacy_adapter as project_common
+
         for path in (
             "tests/host/selected_ownership_source.py",
             "tests/host/selected_release_handoff_source.py",
@@ -261,17 +264,18 @@ class ObjectHartCurrentContractTest(unittest.TestCase):
             with self.subTest(path=path):
                 original = baseline_adapter_source(str(ROOT), path)
                 expected = extend_legacy_adapter(ROOT, path, original)
-                self.assertEqual(expected, (ROOT / path).read_text())
+                self.assertEqual(expected, project_common(ROOT, path, (ROOT / path).read_text()))
                 self.assertEqual(original, project_legacy_adapter(ROOT, path, expected))
                 with self.assertRaises(ValueError):
                     project_legacy_adapter(ROOT, path, expected + "\n# unrelated source mutation\n")
 
     def test_six_product_recipe_is_full_only_and_preserves_every_previous_byte(self):
+        from tests.host.common_scheduler_return_source import project_cmake as project_common
         from tests.host.work_count_recipe import project_host_test_commands
 
         original = baseline_adapter_source(str(ROOT), "CMakeLists.txt")
         expected = extend_cmake(original)
-        self.assertTrue(expected == (ROOT / "CMakeLists.txt").read_text(), "OBJ01 exact six-product recipe is absent or altered")
+        self.assertTrue(expected == project_common((ROOT / "CMakeLists.txt").read_text()), "OBJ01 exact six-product recipe is absent or altered")
         self.assertEqual(original, project_cmake(expected))
         self.assertEqual(project_host_test_commands(original), project_cmake(project_host_test_commands(expected)))
         recipe = native_recipe()
@@ -314,7 +318,9 @@ class ObjectHartNativeProtocolTest(unittest.TestCase):
 
     def test_partial_or_misattributed_work_cannot_supply_a_complete_native_product(self):
         output = self.work_output
-        parse_native_output(output, "aggregate")
+        parse_native_output(output, "aggregate", historical=True)
+        with self.assertRaises(ValueError):
+            parse_native_output(output, "aggregate")
         lines = output.splitlines(keepends=True)
         work_index = next(index for index, line in enumerate(lines) if line.startswith("MICROS_OBJ01_WORK "))
         original = json.loads(lines[work_index].removeprefix("MICROS_OBJ01_WORK "))
@@ -330,7 +336,7 @@ class ObjectHartNativeProtocolTest(unittest.TestCase):
                 changed = list(lines)
                 changed[work_index] = "MICROS_OBJ01_WORK " + json.dumps(mutated) + "\n"
                 with self.assertRaises(ValueError):
-                    parse_native_output("".join(changed), "aggregate")
+                    parse_native_output("".join(changed), "aggregate", historical=True)
         for changed in (
             "".join(lines[:work_index] + lines[work_index + 1:]),
             "".join(lines[:work_index] + [lines[work_index]] + lines[work_index:]),
@@ -338,7 +344,7 @@ class ObjectHartNativeProtocolTest(unittest.TestCase):
             self.ordinary_output,
         ):
             with self.assertRaises(ValueError):
-                parse_native_output(changed, "aggregate")
+                parse_native_output(changed, "aggregate", historical=True)
 
     def test_baseline_projection_rejects_source_or_observation_relocation(self):
         path = "kernel/objects/kernel_object_hart.c"
@@ -447,7 +453,7 @@ class ObjectHartRetainedWorkTest(unittest.TestCase):
             audits = source.measure_audit_boundaries(
                 root, "current", current_sources={name: bound[name] for name in audit_paths},
             )
-            products = {channel: {"records": [], "work": []} for channel in ("ordinary", "aggregate", "stack")}
+            products = {channel: {"records": [], "work": [], "plans": []} for channel in ("ordinary", "aggregate", "stack")}
             attempt = "a" * 32
             replay = {
                 "version": 1, "phase": "green", "attempt": attempt,

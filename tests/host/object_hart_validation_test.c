@@ -39,6 +39,7 @@ enum object_operation {
 struct object_fixture {
     struct micros_kernel_objects objects;
     struct micros_kernel_objects before;
+    struct micros_kernel_objects effect;
     struct micros_process_handle process;
     struct micros_thread_handle threads[MICROS_THREAD_CAPACITY];
     struct micros_hart_handle harts[MICROS_HART_CAPACITY];
@@ -350,6 +351,7 @@ static bool check_declared_success(enum object_operation operation, const char *
         hart->ready_tail[fixture.priority] = fixture.threads[fixture.selected_thread];
         REQUIRE(memcmp(&fixture.objects, &fixture.before, sizeof(fixture.objects)) == 0);
     } else if (operation == OP_RETURN_PLAN && strcmp(variant, "unselected-hart-queue") == 0) {
+#if !defined(MICROS_OBJ02_LEGACY_PLAN)
         memset(&fixture.plan_before, 0, sizeof(fixture.plan_before));
         fixture.plan_before.hart = fixture.harts[0];
         fixture.plan_before.selected = fixture.threads[0];
@@ -358,7 +360,89 @@ static bool check_declared_success(enum object_operation operation, const char *
         fixture.plan_before.ready_head[7] = fixture.threads[0];
         fixture.plan_before.ready_tail[7] = fixture.threads[0];
         REQUIRE(memcmp(&fixture.plan, &fixture.plan_before, sizeof(fixture.plan)) == 0);
+#else
+        REQUIRE(fixture.plan.action == MICROS_SCHEDULER_RETURN_SELECT_THREAD);
+        REQUIRE(fixture.plan.selected.slot == fixture.threads[0].slot);
+        REQUIRE(fixture.plan.selected.generation == fixture.threads[0].generation);
+#endif
     }
+    return true;
+}
+
+static uint64_t mix_effect_value(uint64_t digest, uint64_t value)
+{
+    for (size_t index = 0; index < sizeof(value); ++index) {
+        digest ^= value & UINT64_C(255);
+        digest *= UINT64_C(1099511628211);
+        value >>= 8;
+    }
+    return digest;
+}
+
+static uint64_t mix_effect_handle(uint64_t digest, struct micros_thread_handle handle)
+{
+    return mix_effect_value(mix_effect_value(digest, handle.slot), handle.generation);
+}
+
+static bool observe_return_effect(const char *variant, uint64_t *result)
+{
+    uint64_t digest = UINT64_C(14695981039346656037);
+    bool empty = strcmp(variant, "nonlive-assigned-record") == 0
+        || strcmp(variant, "reschedule-without-assignment") == 0;
+    bool singleton = strcmp(variant, "unreachable-assigned-ready") == 0
+        || strcmp(variant, "unselected-hart-queue") == 0;
+
+    fixture.effect = fixture.objects;
+    micros_scheduler_apply_return_plan(&fixture.effect, &fixture.plan);
+    if (empty || singleton) {
+        struct micros_hart *expected;
+
+        fixture.before = fixture.objects;
+        expected = &fixture.before.harts[0];
+        expected->current_thread = empty ? (struct micros_thread_handle){0, 0} : fixture.threads[0];
+        expected->reschedule_pending = false;
+        expected->trap.primary_stack_bottom = empty
+            ? expected->idle_primary_stack_bottom : fixture.before.threads[0].kernel_stack_bottom;
+        expected->trap.primary_stack_top = empty
+            ? expected->idle_primary_stack_top : fixture.before.threads[0].kernel_stack_top;
+        REQUIRE(memcmp(&fixture.effect, &fixture.before, sizeof(fixture.effect)) == 0);
+        fixture.before = fixture.objects;
+    }
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        struct micros_thread *after = &fixture.effect.threads[index];
+        const struct micros_thread *before = &fixture.objects.threads[index];
+
+        digest = mix_effect_value(digest, after->runtime_flags);
+        digest = mix_effect_value(digest, after->quantum_counter_ticks);
+        digest = mix_effect_value(digest, after->remaining_counter_ticks);
+        digest = mix_effect_value(digest, after->ready_linked);
+        digest = mix_effect_handle(digest, after->ready_next);
+        after->runtime_flags = before->runtime_flags;
+        after->remaining_counter_ticks = before->remaining_counter_ticks;
+        after->ready_linked = before->ready_linked;
+        after->ready_next = before->ready_next;
+    }
+    for (size_t index = 0; index < MICROS_HART_CAPACITY; ++index) {
+        struct micros_hart *after = &fixture.effect.harts[index];
+        const struct micros_hart *before = &fixture.objects.harts[index];
+
+        for (size_t priority = 0; priority < MICROS_SCHEDULER_PRIORITY_COUNT; ++priority) {
+            digest = mix_effect_handle(digest, after->ready_head[priority]);
+            digest = mix_effect_handle(digest, after->ready_tail[priority]);
+            after->ready_head[priority] = before->ready_head[priority];
+            after->ready_tail[priority] = before->ready_tail[priority];
+        }
+        digest = mix_effect_handle(digest, after->current_thread);
+        digest = mix_effect_value(digest, after->reschedule_pending);
+        digest = mix_effect_value(digest, after->trap.primary_stack_bottom);
+        digest = mix_effect_value(digest, after->trap.primary_stack_top);
+        after->current_thread = before->current_thread;
+        after->reschedule_pending = before->reschedule_pending;
+        after->trap.primary_stack_bottom = before->trap.primary_stack_bottom;
+        after->trap.primary_stack_top = before->trap.primary_stack_top;
+    }
+    REQUIRE(memcmp(&fixture.effect, &fixture.objects, sizeof(fixture.effect)) == 0);
+    *result = digest;
     return true;
 }
 
@@ -370,6 +454,9 @@ static bool measure_operation(enum object_operation operation, const char *varia
     bool outputs_preserved;
     uint64_t before_output;
     uint64_t before_state;
+    uint64_t before_plan;
+    uint64_t effect = 0;
+    bool has_effect;
 
     memset(&fixture.plan, 0xa5, sizeof(fixture.plan));
     memset(&fixture.wake, 0x5a, sizeof(fixture.wake));
@@ -383,6 +470,7 @@ static bool measure_operation(enum object_operation operation, const char *varia
     fixture.value = UINT64_MAX;
     before_output = output_digest();
     before_state = bytes_digest(&fixture.before, sizeof(fixture.before));
+    before_plan = bytes_digest(&fixture.plan, sizeof(fixture.plan));
     ++capture_label;
 #if defined(MICROS_TEST_WORK_COUNTS)
     REQUIRE(
@@ -422,6 +510,10 @@ static bool measure_operation(enum object_operation operation, const char *varia
     } else {
         REQUIRE(check_declared_success(operation, variant));
     }
+    has_effect = operation == OP_RETURN_PLAN && result == MICROS_KERNEL_OBJECT_OK;
+    if (has_effect) {
+        REQUIRE(observe_return_effect(variant, &effect));
+    }
     printf(
         "MICROS_OBJ01_CASE {\"version\":1,\"case\":%" PRIu64
         ",\"operation\":\"%s\",\"variant\":\"%s\",\"threads\":%zu,"
@@ -439,6 +531,13 @@ static bool measure_operation(enum object_operation operation, const char *varia
         (unsigned int)outputs_preserved, before_state,
         bytes_digest(&fixture.objects, sizeof(fixture.objects)),
         before_output, output_digest(), fixture.value
+    );
+    printf(
+        "MICROS_OBJ01_PLAN {\"version\":1,\"case\":%" PRIu64
+        ",\"bytes\":%zu,\"before\":%" PRIu64 ",\"after\":%" PRIu64
+        ",\"has_effect\":%u,\"effect\":%" PRIu64 "}\n",
+        capture_label, sizeof(fixture.plan), before_plan,
+        bytes_digest(&fixture.plan, sizeof(fixture.plan)), (unsigned int)has_effect, effect
     );
     print_work();
     return true;
