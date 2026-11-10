@@ -5,8 +5,12 @@
 This Accepted OBJ01 contract follows
 [ADR-0119](../adr/0119-selected-object-and-hart-validation.md) and its
 [fixed-source study](../research/minix-selected-object-and-hart-validation.md).
-Complete independent design review is clean. Only design is active until
-its separate merge; implementation remains pending.
+Complete independent design review preceded its separate merge as #241.
+The uncommitted implementation is archived and blocked by the
+[OBJ01-C01 source-authority correction](#obj01-c01-complete-source-authority).
+[Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md) is the
+sole active design; no implementation resumes before its separate review,
+Acceptance and merge.
 
 ```text
 task:       OBJ01
@@ -379,7 +383,9 @@ remain independent and unchanged.
 
 ## Exact transport selection
 
-Select only the fixed ninety-four active records with digest:
+ADR-0119's initial selection contains the following fixed ninety-four active
+records. The separately reviewed OBJ01-C01 correction below adds one omitted
+active assertion; the original decision remains historical evidence.
 
 ```text
 3cd5b0132a30b6525df53e59daa282e6cbc781dc2cc4612baf8b37a73164936d
@@ -517,6 +523,106 @@ All 5,851 old complete records and twenty-five old fingerprints remain
 unchanged. Actual Green and recertification may retire only the specified
 ninety-four keys, adding one claim and reaching 279 retirements.
 Every prior claim remains valid without author journals.
+
+## OBJ01-C01 complete source-authority
+
+This correction is Accepted under
+[ADR-0120](../adr/0120-obj01-complete-source-authority.md).
+Only after its separate design merge does it supersede the
+ninety-four-key selection and derived 279-retirement total above.
+All runtime, complexity, storage, failure and ownership requirements remain
+unchanged.
+
+The [fixed-source investigation](../research/minix-selected-object-and-hart-validation.md#obj01-c01-complete-source-authority-gap)
+identifies exactly one omitted active record:
+
+| Field | Fixed value |
+| --- | --- |
+| Key | `tests/host/test_kernel_object_source_layout.py:data-entry:STABLE_HASHES/kernel/scheduler_core_validate.c` |
+| Family/class | `kernel-structure` / `TRANSPORT_IDENTITY` |
+| Subject | `kernel/scheduler/scheduler_core_validate.c` |
+| Assertion owner | `tests/host/test_kernel_object_source_layout.py` |
+| Units | Primary B03; consumers B03 and B14 |
+| Historical value | `73bd02fdac06a05c0bdc33130258132e3fe90cfe8c2204f5502e054d5021f38c` |
+
+The corrected selection is exactly the original ninety-four records plus
+this record, with complete-record digest:
+
+```text
+df04235e5286127c14a13ce42fdba7eda52bbe8835bb6e72090eccfe62b40c41
+```
+
+The subject and assertion owner are already candidates, so the direct domain
+remains exactly thirty-eight paths. Preserve the existing complete record,
+all 5,851 predecessor facts and twenty-five fingerprints, and all seven
+journal-free claims with 185 retirements. No new inventory identity is needed.
+Only the current outcome's independently declared metadata may change.
+
+The oracle partition becomes 68 local-work, eleven stack-work and sixteen
+direct-current keys. Assign this added record only to
+`obj01-direct-current-ownership`. That oracle must retain its one/two/three
+probe bounds and independently discriminate the unsupported-current diagnostic:
+an otherwise coherent exact live process/thread/hart fixture has an attached
+thread context, matching selected primary stack, unscheduled INACTIVE/zero
+scheduler metadata and no assigned thread. Use zeroed NONE accounting,
+no accounted thread and no reschedule request; preserve valid disjoint
+thread/idle/emergency ownership and all other base-object invariants.
+Its current handle names that unscheduled thread. First require complete
+base-object validation to pass. Fixed #240 complete scheduler validation returns `OK`;
+the accepted current diagnostic must return `INVARIANT`, and context capture
+must reject it with `STATE`, with unchanged registry/output state.
+Record the actual baseline diagnostic mismatch as a covering Red witness,
+not merely another failure in the same oracle's probe-count cases.
+
+Before legitimate retirement, retain the original complete neighbor-byte
+comparison after its existing directory/include projection.
+After retirement, the exact new key selects qualified actual current source,
+not a regenerated hash or historical file substituted for execution.
+All other seventeen neighbor assertions retain their existing policy.
+The validator changes only within the runtime contract already accepted in
+ADR-0119; this record is not authority for another diagnostic rewrite.
+
+B14's finite host selection must retain all original cases and include the
+complete modules:
+
+```text
+test_kernel_object_source_layout
+test_panic_trace
+test_stack_source_projection
+```
+
+The complete panic module replaces its already selected authority and
+execution-scope subsets; do not execute duplicate test identities.
+Require explicit discovery of at least these formerly omitted checks:
+
+```text
+test_kernel_object_source_layout.KernelObjectSourceLayoutTest.test_public_runtime_architecture_driver_and_neighbor_artifacts_are_byte_exact
+test_panic_trace.PanicTraceMachineTest.test_real_fault_dispatch_preserves_the_latch_and_exact_context_output
+test_stack_source_projection.StackSourceProjectionTest.test_historical_kernel_oracle_keeps_its_original_hash_after_exact_projection
+```
+
+Freeze the two existing fixture owners
+`tests/host/test_panic_trace.py` and
+`tests/host/test_stack_source_projection.py` as noncandidate immutable inputs.
+The panic mutation locates the actual named resolver and its unique output
+store; it still compiles and rejects a wrong returned hart, preserving all
+other fault-prefix mutations and complete machine effects.
+The stack fixture compares its historical projection to the independently
+fixed reference rather than the live current body. Keep current source
+qualification separate, and retain every misplaced-hook, byte-passivity and
+visible-runtime-mutation negative.
+
+These are fixture-input adaptations, not exemptions in production or shared
+source/stack tools. The shared parser, collector, transition validator and
+profile admission remain unchanged.
+
+The implementation is blocked and its old branch is abandoned. After this
+design merges, start a fresh branch from current `main`; independently freeze
+the actual base, corrected plan, current predicates and every immutable input.
+Renew Red, Green and all thirteen units before retiring exactly ninety-five
+keys, adding one claim and reaching 280 retirements. Verify actual terminal
+source-view construction, then complete every native/target/image/stack gate
+and same-run profile below. Archived source and results are non-authoritative.
 
 ## Legacy and machine evidence adapters
 

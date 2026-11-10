@@ -11,8 +11,9 @@ MINIX tree:           80db89de58d5ecaf31efe48b4d1d98c7e285e81f
 
 The fixed `micros` source is independently reviewed EV01-C09 #240.
 Its catalog has 5,851 facts, twenty-five families, seven committed claims
-and 185 retired identities. OBJ01 is design-only and owns
-B03-F001/F003/F004. MEM04 is its actual runtime prerequisite; MEM05 and
+and 185 retired identities. OBJ01 owns B03-F001/F003/F004. Its original
+design #241 is merged, but the unaccepted implementation is archived for the
+OBJ01-C01 correction below. MEM04 is its actual runtime prerequisite; MEM05 and
 the C08/C09 authority prerequisites are also merged.
 
 The [Accepted contract](../architecture/selected-object-and-hart-validation.md)
@@ -195,7 +196,7 @@ does not remove their `O(hcap*hcap)` and possible `O(hcap*tcap)` terms.
 ## Fixed evidence dependencies
 
 EV01-C09 supplies the object body/whole-source bindings and individual
-panic source policies. The prospective active selection is ninety-four
+panic source policies. The original #241 active selection is ninety-four
 keys with digest:
 
 ```text
@@ -234,6 +235,114 @@ constant-stride lookup may produce. It also does not currently bind a
 selected hart generation read. The exact qualification extension belongs
 in the pre-Red immutable adapter set, not in a late waiver or larger
 instruction/stack budget.
+
+## OBJ01-C01 complete source-authority gap
+
+### Observed boundary and preserved candidate
+
+Design #241 merged as `a803c2d9e2692b148b7c8d74d02e8304406ce89f`,
+tree `99736be3086b80f6a08a5223b4ef74bd1fc9e213`.
+The uncommitted candidate at tree
+`13cfcd48998ddfe85db8d2b04766214a9f59e72d` recorded actual fixed-source
+Red, current Green and all thirteen declared units. Its B14 subset ran
+600 cases. Its real terminal source view also verified the declared
+ninety-four retirements without recursive proof construction.
+
+The complete native workflow then passed 46 CTests in 804.85 seconds but
+failed three of 1,667 host cases in 869.579 seconds. The complete fifty-command
+producer remained unexecuted after its earlier readiness barrier; no complete
+current stack certificate, implementation review, commit or merge followed.
+These durations diagnose the run, not algorithmic or acceptance thresholds.
+
+The exact unaccepted worktree and index are preserved in local archive
+`e6f2c3dc05ca8fbcb04451f40abeeb06a968efd5`; both trees equal the candidate
+above. The additional non-authoritative patch
+`obj01-abandoned-implementation.patch` has SHA-256
+`df45bfe3b3d52cd99a487820725750640c35cf61581e14112e50fe6e060925e9`.
+The implementation branch is abandoned. None of these artifacts supplies
+authority for a corrected transition.
+
+### One existing identity was omitted
+
+At fixed #240, `tests/host/test_kernel_object_source_layout.py:550-568`
+contains eighteen stable neighbor hashes. Its
+`STABLE_HASHES/kernel/scheduler_core_validate.c` entry has value
+`73bd02fdac06a05c0bdc33130258132e3fe90cfe8c2204f5502e054d5021f38c`.
+The corresponding complete-catalog record is already a
+`TRANSPORT_IDENTITY` in `kernel-structure`, with the assertion module and
+`kernel/scheduler/scheduler_core_validate.c` as its exact payloads,
+primary unit B03 and consumers B03/B14.
+
+The assertion
+`KernelObjectSourceLayoutTest.test_public_runtime_architecture_driver_and_neighbor_artifacts_are_byte_exact`
+compares the complete bytes returned by the existing
+`kernel_layout_source.read_bytes_path` directory/include projection, not an
+unprojected physical-file hash. The record belongs neither to the original
+ninety-four-key plan nor any previous retirement. Retiring the directory
+identity or another scheduler body identity does not retire it.
+
+The same fixed C source's `validate_harts`, lines 234-238, accepts an
+unscheduled current thread when the hart has no assigned thread.
+ADR-0119 already requires removing that unsupported diagnostic exception.
+The candidate therefore changed the guarded source, and the complete host
+run correctly rejected its old stable-neighbor equality.
+This is a missing authority selection, not a bad historical hash or
+permission to remove complete diagnostics.
+
+An independent query of the fixed 5,851 records reproduced the original
+ninety-four-record digest, then added only this existing record:
+
+| Quantity | Original | Accepted correction |
+| --- | --- | --- |
+| Selected complete records | 94 | 95 |
+| Direct candidate paths | 38 | 38 |
+| Local/stack/direct oracle partition | 68 / 11 / 15 | 68 / 11 / 16 |
+| Prior claims/retirements | 7 / 185 | 7 / 185 |
+| Eventual claims/retirements | 8 / 279 | 8 / 280 |
+
+The corrected complete-record digest is
+`df04235e5286127c14a13ce42fdba7eda52bbe8835bb6e72090eccfe62b40c41`.
+The complete predecessor digest remains
+`2406b1b080963f2e5adc920fc78ea29c1fd8743dd38f25218003bd994a8e2646`.
+The runtime/MINIX pins, data structures, mutation rules and complexity
+ledger above do not change.
+
+### Why the declared B14 pass did not catch it
+
+The attempted driver inherited the literal `retained_checks` selection from
+fixed `tools/check_selected_address_space.py` and added the MEM05/OBJ01
+modules. That memory-oriented selection does not include the complete
+object source-layout module or `test_stack_source_projection`.
+It selects only `PanicTraceAuthorityTest` and `PanicTraceExecutionScopeTest`,
+not `PanicTraceMachineTest`. The actual B14 log therefore contains no
+execution of the three failed full-suite checks.
+
+The correction requires their complete owning modules in B14, preserving
+all inherited cases without duplicate selection. This changes neither the
+thirteen-unit set nor the mandatory full-discovery gate.
+
+### Two fixtures confuse historical and current source
+
+`PanicTraceMachineTest.test_real_fault_dispatch_preserves_the_latch_and_exact_context_output`
+first compiles actual current fault-prefix sources successfully, then
+searches for the old loop-indented output assignment. Direct hart lookup
+returns outside that old loop, so the mutation fails before exercising the
+machine negative. Select the unique store within the actual named
+`micros_hart_resolve_context` definition and retain its wrong-output
+compiled negative; do not weaken source/machine admission.
+
+`StackSourceProjectionTest.test_historical_kernel_oracle_keeps_its_original_hash_after_exact_projection`
+constructs its temporary input from the fixed historical context source,
+but takes its expected bytes from the live current source.
+OBJ01 legitimately changes context capture. The fixture must use fixed
+historical expected bytes and exact historical projection, while current
+source qualification stays independent.
+
+These are bounded immutable fixture adaptations under
+[Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md).
+They add no production permission, source-parser behavior, stack budget or
+runtime algorithm. Implementation remains blocked until that separate
+design separately merges after its clean independent review.
 
 ## Classification
 

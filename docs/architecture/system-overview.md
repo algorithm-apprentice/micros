@@ -281,6 +281,15 @@ selected checks, direct current identity and a geometric complete stack
 proof, while retaining the other twenty-six direct audit boundaries.
 No OBJ01 implementation begins before its own review, Acceptance and merge.
 
+That design separately merged as #241. The uncommitted implementation is now
+archived after full native acceptance found an omitted active validator-file
+identity and historical/current fixture conflicts.
+[Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md) defines the
+sole active [OBJ01-C01 correction](selected-object-and-hart-validation.md#obj01-c01-complete-source-authority).
+Its accepted ninety-five-key selection retains the same runtime contract and
+thirty-eight-path domain. Implementation stays blocked until separate review,
+Acceptance and merge; no OBJ01 runtime finding or hosted-CI result closes here.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A
