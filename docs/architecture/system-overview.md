@@ -309,6 +309,13 @@ queue projection while retaining checked portable commit and the target's
 existing prevalidated apply. Same-thread context reuse is confined to one
 protected return; completion authority and memory APIs remain unchanged.
 
+Design #244 is separately merged. Its uncommitted implementation reached
+actual runtime Green but is archived after historical-consumer failures in
+B14. [Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) fixes only
+the [evidence-consumer scope](common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope).
+No runtime finding closes before its separate design merge, fresh
+implementation acceptance and independent review.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

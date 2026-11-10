@@ -6,8 +6,11 @@ This is the Accepted OBJ02 contract under
 [ADR-0121](../adr/0121-bounded-common-scheduler-return.md), following the
 [fixed-source study](../research/minix-common-scheduler-return.md).
 Complete independent design review is clean.
-Only design is active; implementation remains pending the separate design
-merge.
+Design #244 is separately merged. Its uncommitted implementation is archived
+after B14 exposed incomplete historical-consumer bindings.
+[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) owns the sole
+active correction below; implementation is blocked until its separate reviewed
+merge. The Accepted runtime contract remains unchanged.
 
 ```text
 task:       OBJ02
@@ -443,7 +446,9 @@ and their required project headers; target scope additionally binds the
 actual scheduler component, observer and linked source/artifact identities.
 No final new-family count is guessed during design.
 
-Existing noncandidate adaptations are limited to:
+The following noncandidate list incorporates the three Accepted OBJ02-C01
+additions below. Independent design review is clean; ADR-0122's separate
+merge still precedes implementation:
 
 ```text
 CMakeLists.txt
@@ -455,6 +460,9 @@ tests/host/test_python_host_runtime.py
 tests/host/object_hart_validation_evidence.py
 tests/host/object_hart_validation_test.c
 tests/host/test_object_hart_validation.py
+tests/host/test_selected_ownership.py
+tests/host/test_qemu_transcript.py
+tests/host/test_selected_release_handoff.py
 tools/generate_object_hart_validation_fixture.py
 ```
 
@@ -534,3 +542,84 @@ squash content, fresh journal-free committed/main authority and protected
 completed-ref cleanup.
 This design authors no executable test, model, fixture, observer, harness,
 build scaffold or reusable prototype.
+
+## OBJ02-C01 complete evidence consumer scope
+
+This correction is Accepted under
+[ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md), after the
+[observed B14 conflicts](../research/minix-common-scheduler-return.md#obj02-c01-observed-consumer-scope-conflicts).
+The existing runtime contract and exact 58-key/28-path selection remain
+unchanged. Complete independent design review is clean. Only this design is
+active; its code does not precede the separate design merge.
+
+### Exact historical-consumer additions
+
+| Additional immutable owner | Only authorized adaptation |
+| --- | --- |
+| `tests/host/test_selected_ownership.py` | Project the independently validated OBJ02 recipe addition from the observed current CMake before the old direct forward comparison and original two-recipe transcript inverse; retain the fixed expected recipe, original forward builder and all malformed-input checks. |
+| `tests/host/test_qemu_transcript.py` | Apply that same bounded current-to-historical recipe projection before the original exact-two reporting checks; preserve both old targets, token positions, values, malformed cases and shared helper behavior. |
+| `tests/host/test_selected_release_handoff.py` | Extend only the existing MEM05 historical fixture's explicit cold context to exclude newer OBJ02 authority; preserve original source bytes, complete site sets and observation round trips. |
+
+These are immutable noncandidate adapters. They do not enlarge the direct
+candidate closure, select another old identity or require changing the shared
+`qemu_transcript_source.py`, stack projection, runner or collector.
+The fresh implementation freezes them with the original immutable inputs
+before genuine Red.
+
+### Exact current reporting and inverse
+
+The existing scheduler recipe adds `--report-transcript` immediately after
+the existing runner path, using its one default memory size. Its sole guest
+execution still satisfies all original scheduler, IPC-return and TTY-trap
+requirements. Reporting exposes that same accepted result; no extra run,
+wrapper, deadline extension or aggregate-only substitute is permitted.
+
+The task-owned CMake forward declaration derives from fixed source and
+independently specified additions. Its inverse accepts only the complete
+exact native extension, target backend enrollment and scheduler report token
+at their declared locations, then preserves all outside bytes. Missing,
+extra, duplicated, moved or changed task additions reject.
+Current tests separately require the new scheduler option and the actual
+complete target transcript; historical projection alone is not current
+acceptance.
+
+Run the original MEM03 direct forward comparison against its unchanged fixed
+builder and expected recipe after projecting only the current OBJ02 addition.
+Do not make that historical builder reproduce the new task. Keep the shared
+two-token transcript inverse unchanged and call it only after the new
+task's exact addition has been checked and removed.
+
+### Retained stack and protocol obligations
+
+Keep the existing `micros/stack_observation.h` include at line two of the
+scheduler finish owner and preserve its original report hook and primitive.
+The new reporting include follows that fixed slot. The final work report
+still follows semantic/cleanup checks and precedes original pass reporting.
+Do not change stack projection, source admission, machine edges or budgets
+to accommodate a moved include.
+
+Existing permitted `test_evidence_authority.py` changes update only complete
+current-catalog expectations from the independently declared additions;
+all old record values and fingerprints stay fixed. Existing permitted
+`test_object_hart_validation.py` changes explicitly complete the isolated
+replay product schema with plan observations. Live parsing has no silent
+old-record fallback.
+
+The explicit MEM05 historical context remains confined to that fixture.
+It cannot suppress current source verification elsewhere, change a real
+reported stage, grant retirement or turn archived execution into a new
+author event. Preserve current rejection of old code in all ordinary
+current-source paths.
+
+### Restart and completion
+
+The unaccepted candidate has no implementation commit or retirement.
+After the corrective design merge, start a fresh branch from current `main`,
+freeze its actual base independently and renew every canonical author phase.
+The earlier actual runtime Green and retained memory/object passes remain
+historical evidence, not acceptance for the new source/tool envelope.
+
+Keep all thirteen units and the complete affected-source B14 set, including
+the existing reporting and historical-fixture modules. The current native,
+target, integration, source-view, fifty-command, same-run-profile, stack,
+independent-review and exact-publication requirements above remain unchanged.

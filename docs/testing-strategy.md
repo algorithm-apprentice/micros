@@ -950,6 +950,19 @@ defined-field effect observation; an output-format change cannot silently
 drop unrelated output checks. Design acceptance does not create these future
 tests, observers or commands.
 
+Design #244 is separately merged. The uncommitted implementation measured the
+required native work and actual context-validation counts, then its B14
+gate rejected historical recipe/source consumers. The
+[recorded failures](research/minix-common-scheduler-return.md#obj02-c01-observed-consumer-scope-conflicts)
+are not runtime acceptance.
+[Accepted ADR-0122](adr/0122-obj02-evidence-consumer-scope.md) adds only three
+exact immutable test owners, preserves the existing stack-hook placement and
+requires explicit historical contexts and complete protocol models.
+The shared two-token reporting inverse remains unchanged; only the new
+task's independently checked addition is removed before that historical
+boundary. Fresh actual Red/Green and the complete original gates remain
+required after the separate corrective design merge.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

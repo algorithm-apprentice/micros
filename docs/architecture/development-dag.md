@@ -259,6 +259,15 @@ explicit historical/current fixture handling and a fifty-eight-key scope.
 Complete independent design review is clean; separate merge still precedes
 implementation.
 
+Design #244 has now separately merged. Its uncommitted implementation reached
+actual native/target Green, but B14 rejected omitted historical consumers.
+The candidate is archived without acceptance or retirement.
+[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) and
+[OBJ02-C01](common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope)
+are the sole active corrective design. The same runtime contract, 58-key/
+28-path selection and DAG edges remain; implementation restarts only after
+the correction's separate reviewed merge.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

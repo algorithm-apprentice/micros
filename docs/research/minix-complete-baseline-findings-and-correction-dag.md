@@ -408,6 +408,16 @@ Its fifty-eight-key selection retains the existing finding owners and
 runtime prerequisites. Independent design review is clean; it retires
 nothing during design, and separate merge still precedes implementation.
 
+The uncommitted OBJ02 implementation subsequently reached actual native/target
+Green but failed complete B14 consumer closure. It is archived without final
+acceptance or retirement.
+[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) and
+[OBJ02-C01](../architecture/common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope)
+are the sole active corrective design. They add three exact immutable test
+owners while preserving the runtime contract, 58 selected identities,
+28 candidate paths, finding ownership and graph edges. OBJ02 implementation
+restarts after the correction's separate reviewed merge.
+
 ## Consolidation invariants
 
 - All 80 B01-B14 finding records appear exactly once in the register and
