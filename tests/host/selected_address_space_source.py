@@ -1002,6 +1002,9 @@ def extend_handoff_preflight(original):
 
 
 def validate_retained_source(root, path, text, stage):
+    from tests.host.common_scheduler_return_source import legacy_source_projection
+
+    text = legacy_source_projection(root, "MEM04", path, text, stage)
     from tests.host.c_source_records import compact
     from tests.host.selected_release_handoff_source import native_assertion_admission as next_admission
 

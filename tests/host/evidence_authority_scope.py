@@ -95,6 +95,7 @@ def _providers():
         selected_address_space_authority,
         selected_release_handoff_authority,
         object_hart_validation_authority,
+        common_scheduler_return_authority,
     )
 
     return (
@@ -103,6 +104,7 @@ def _providers():
         selected_ownership_authority, selected_address_space_authority,
         selected_release_handoff_authority,
         object_hart_validation_authority,
+        common_scheduler_return_authority,
     )
 
 
@@ -176,6 +178,7 @@ def _check_author_inputs(provider, context, journal, inputs):
         "tests.host.selected_ownership_authority", "tests.host.selected_address_space_authority",
         "tests.host.selected_release_handoff_authority",
         "tests.host.object_hart_validation_authority",
+        "tests.host.common_scheduler_return_authority",
     ):
         changed = (
             len(observed) != 3 or observed[0] != context.native_compiler

@@ -1609,6 +1609,8 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
             self.assertEqual((), file_scope_objects(source(path)))
 
     def test_public_runtime_architecture_driver_and_neighbor_artifacts_are_byte_exact(self):
+        from tests.host.common_scheduler_return_source import historical_identity_required as common_required
+
         from tests.host.object_hart_validation_source import historical_identity_required
 
         self.assertEqual(18, len(STABLE_HASHES))
@@ -1618,6 +1620,8 @@ class KernelObjectSourceLayoutTest(unittest.TestCase):
 
                 value = restored_runner_source().encode() if path == "tools/run_qemu_smoke.py" else kernel_layout_source.read_bytes_path(ROOT / path)
                 key = "tests/host/test_kernel_object_source_layout.py:data-entry:STABLE_HASHES/" + path
+                if common_required(ROOT, key) is False:
+                    continue
                 if path == "kernel/scheduler_core_validate.c" and not historical_identity_required(ROOT, key):
                     continue
                 if not diagnostic_identity_required(

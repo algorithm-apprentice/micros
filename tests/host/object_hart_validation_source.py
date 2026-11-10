@@ -859,6 +859,9 @@ def expected_skeleton(root, path):
 
 
 def validate_retained_source(root, path, text, stage):
+    from tests.host.common_scheduler_return_source import CURRENT_BODIES, legacy_native_admission
+
+    retired = legacy_native_admission(root, "OBJ01", path, text, stage)
     from tests.host.object_hart_validation_evidence import NATIVE_HEADERS, NATIVE_SOURCES
     from tests.host.selected_address_space_source import _function_calls, _source_skeleton
 
@@ -866,6 +869,8 @@ def validate_retained_source(root, path, text, stage):
         raise ValueError("OBJ01 source admission has an unknown stage or subject")
     original = fixed_source(root, path)
     if stage == "baseline" or path not in (*MUTABLE_FUNCTIONS, "kernel/scheduler/scheduler_core_private.h"):
+        if "OBJ01/current-input/" + path in retired:
+            return
         if text != original:
             raise ValueError("OBJ01 fixed native input changed: " + path)
         return
@@ -875,11 +880,13 @@ def validate_retained_source(root, path, text, stage):
         return
     before, after = function_records(original), function_records(text)
     expected_names = set(before).difference(REMOVED_FUNCTIONS.get(path, ())) | set(CURRENT_HELPERS.get(path, ()))
-    if set(after) != expected_names:
+    if "OBJ01/definitions/" + path not in retired and set(after) != expected_names:
         raise ValueError("OBJ01 current source has a missing or undeclared function: " + path)
     contracts = current_function_contracts(str(Path(root).resolve()))
     for name, record in after.items():
         key = path + "/" + name
+        if "OBJ01/function/" + path + "/" + name in retired or retired and name in CURRENT_BODIES.get(path, {}):
+            continue
         if key not in contracts:
             previous = before[name]
             if (record.signature, record.guards, record.body) != (previous.signature, previous.guards, previous.body):
@@ -894,7 +901,7 @@ def validate_retained_source(root, path, text, stage):
         ):
             raise ValueError("OBJ01 function escaped its signature, guards or callees: " + key)
         validate_observation_contract(root, path, name, record.body, stage)
-    if _source_skeleton(text) != expected_skeleton(root, path):
+    if "OBJ01/skeleton/" + path not in retired and _source_skeleton(text) != expected_skeleton(root, path):
         raise ValueError("OBJ01 changed an unadmitted include, type or storage owner: " + path)
 
 
@@ -916,6 +923,10 @@ def observation_contracts(root, path, stage):
 
 
 def validate_observation_contract(root, path, name, body, stage):
+    from tests.host.common_scheduler_return_source import legacy_observation_contract
+
+    if legacy_observation_contract(root, path, name, body, stage):
+        return
     contracts = observation_contracts(str(Path(root).resolve()), path, stage)
     if name not in contracts or primitive_shape(path, name, body) != contracts[name]:
         raise ValueError("OBJ01 function has changed or undeclared primitive coverage: " + path + "/" + name)
@@ -1248,6 +1259,11 @@ def primitive_shape(path, name, body):
 
 
 def observe_source(root, path, text, channel, stage):
+    from tests.host.common_scheduler_return_source import legacy_observe_source
+
+    observed = legacy_observe_source(root, "OBJ01", path, text, stage, channel)
+    if observed is not None:
+        return observed
     from tests.host.object_hart_validation_evidence import NATIVE_SOURCES
 
     if channel not in CHANNELS or path not in NATIVE_SOURCES or type(text) is not str:
@@ -1298,6 +1314,11 @@ def _current_authority(root):
 
 
 def native_assertion_admission(root, family, path, text, stage):
+    from tests.host.common_scheduler_return_source import legacy_native_admission as common_admission
+
+    admitted = common_admission(root, family, path, text, stage)
+    if admitted:
+        return admitted
     from tests.host.work_count_types import Stage
 
     owners = {
@@ -1318,6 +1339,11 @@ def native_assertion_admission(root, family, path, text, stage):
 
 
 def legacy_replaced_functions(root, family, path, text, stage):
+    from tests.host.common_scheduler_return_source import legacy_replaced_functions as common_admission
+
+    admitted = common_admission(root, family, path, text, stage)
+    if admitted:
+        return admitted
     from tests.host import selected_ownership_source as ownership
     from tests.host.work_count_types import Stage
 
@@ -1346,6 +1372,11 @@ LEGACY_VALUE_PREFIX = (
 
 
 def legacy_observe_source(root, family, path, text, stage, channel="aggregate"):
+    from tests.host.common_scheduler_return_source import legacy_observe_source as common_admission
+
+    observed = common_admission(root, family, path, text, stage, channel)
+    if observed is not None:
+        return observed
     from collections import Counter
     from tests.host import selected_release_handoff_source as previous
     from tests.host.work_count_types import Stage
@@ -1410,6 +1441,11 @@ def legacy_observe_source(root, family, path, text, stage, channel="aggregate"):
 
 
 def project_legacy_observations(root, family, path, text, stage, channel="aggregate"):
+    from tests.host.common_scheduler_return_source import project_legacy_observations as common_admission
+
+    observed = common_admission(root, family, path, text, stage, channel)
+    if observed is not None:
+        return observed
     from tests.host.evidence_authority_scope import source_bytes
     from tests.host.work_count_types import Stage
 
@@ -1505,6 +1541,11 @@ def object_inverse_fixture(root, current):
 
 
 def historical_identity_required(root, key):
+    from tests.host.common_scheduler_return_source import historical_identity_required as common_required
+
+    common = common_required(root, key)
+    if common is not None:
+        return common
     from tests.host.evidence_authority_scope import identity_required, source_bytes
 
     if identity_required(root, key):
@@ -1896,6 +1937,9 @@ def extend_legacy_adapter(root, path, text):
 
 
 def project_legacy_adapter(root, path, text):
+    from tests.host.common_scheduler_return_source import project_legacy_adapter as project_common
+
+    text = project_common(root, path, text)
     if path not in SOURCE_ROLES["fixed_adapters"] or "tests.host.object_hart_validation_source" not in text:
         return text
     original = baseline_adapter_source(str(Path(root).resolve()), path)
@@ -2026,6 +2070,9 @@ def extend_cmake(text):
 
 
 def project_cmake(text):
+    from tests.host.common_scheduler_return_source import project_cmake as project_common
+
+    text = project_common(text)
     if not any(marker in text for marker in ("OBJ01_NATIVE", "object_hart_", "object-hart-validation")):
         return text
     addition = native_recipe()

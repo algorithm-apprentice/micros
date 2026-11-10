@@ -1,5 +1,6 @@
 #include "kernel/tests/scheduler/scheduler_test_internal.h"
 #include "micros/stack_observation.h"
+#include "tests/qemu/common_scheduler_return_work.h"
 #include "arch/riscv64/interrupt.h"
 #include "arch/riscv64/platform.h"
 #include "micros/frame_ownership_runtime.h"
@@ -178,6 +179,9 @@ _Noreturn void scheduler_test_finish_test(struct scheduler_test_context *fixture
         }
     }
     if (!cleanup_balance_matches(fixture, ledger, objects)) {
+        goto failure;
+    }
+    if (!micros_obj02_return_report()) {
         goto failure;
     }
     report_scheduler_success();

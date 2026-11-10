@@ -1,3 +1,4 @@
+#include "tests/qemu/common_scheduler_return_work.h"
 #include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "micros/kernel_object_runtime.h"
@@ -67,6 +68,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
     micros_scheduler_test_note_selector_entry();
 #endif
     preflight_idle_selection(objects, hart);
+    MICROS_OBJ02_RETURN_BEGIN(MICROS_OBJ02_RETURN_IDLE, hart->current_thread);
     micros_diagnostic_notify_pending(hart, NULL);
     error = micros_hart_plan_user_return(
         objects,
@@ -77,6 +79,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
         micros_scheduler_idle_accounting_panic(hart);
     }
     if (plan.action == MICROS_SCHEDULER_RETURN_ENTER_IDLE) {
+        MICROS_OBJ02_RETURN_END(plan.selected);
         prepare_idle_timer_accounting(runtime, hart, &accounting);
         micros_scheduler_apply_return_plan(objects, &plan);
         commit_idle_accounting(hart, &accounting);
@@ -104,6 +107,7 @@ void micros_scheduler_idle_select(struct micros_hart *hart)
     ) {
         micros_scheduler_idle_accounting_panic(hart);
     }
+    MICROS_OBJ02_RETURN_END(plan.selected);
     prepare_idle_timer_accounting(runtime, hart, &accounting);
     scheduler_runtime_commit_completion_or_panic(runtime, &completion, hart, NULL);
     micros_scheduler_apply_return_plan(objects, &plan);

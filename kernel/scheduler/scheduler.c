@@ -1,3 +1,4 @@
+#include "tests/qemu/common_scheduler_return_work.h"
 #include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "arch/riscv64/interrupt.h"
@@ -227,6 +228,7 @@ enum micros_scheduler_error micros_scheduler_start(void)
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         return scheduler_error;
     }
+    MICROS_OBJ02_RETURN_BEGIN(MICROS_OBJ02_RETURN_START, hart->current_thread);
     error = micros_hart_plan_user_return(
         objects,
         hart_handle,
@@ -236,6 +238,7 @@ enum micros_scheduler_error micros_scheduler_start(void)
         error != MICROS_KERNEL_OBJECT_OK
         || plan.action == MICROS_SCHEDULER_RETURN_ENTER_IDLE
     ) {
+        MICROS_OBJ02_RETURN_CANCEL();
         riscv_irq_restore(saved_status);
         return error == MICROS_KERNEL_OBJECT_OK
             ? MICROS_SCHEDULER_ERROR_EMPTY
@@ -247,6 +250,7 @@ enum micros_scheduler_error micros_scheduler_start(void)
         plan.selected
     );
     if (scheduler_error != MICROS_SCHEDULER_OK) {
+        MICROS_OBJ02_RETURN_CANCEL();
         riscv_irq_restore(saved_status);
         return scheduler_error;
     }
@@ -259,9 +263,11 @@ enum micros_scheduler_error micros_scheduler_start(void)
     );
     scheduler_error = scheduler_runtime_load_selected_context(runtime, plan.selected);
     if (scheduler_error != MICROS_SCHEDULER_OK) {
+        MICROS_OBJ02_RETURN_CANCEL();
         riscv_irq_restore(saved_status);
         return scheduler_error;
     }
+    MICROS_OBJ02_RETURN_END(plan.selected);
     scheduler_error = scheduler_runtime_preflight_kernel_interval(hart, &accounting);
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         riscv_irq_restore(saved_status);

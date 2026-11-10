@@ -343,6 +343,7 @@ class AuthorViewInputsTest(unittest.TestCase):
             "tests.host.selected_address_space_authority",
             "tests.host.selected_release_handoff_authority",
             "tests.host.object_hart_validation_authority",
+            "tests.host.common_scheduler_return_authority",
         ):
             self.provider.read_verified_journal.reset_mock()
             self.provider.__name__ = provider_name

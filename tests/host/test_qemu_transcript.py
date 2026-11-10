@@ -181,7 +181,9 @@ class QemuTranscriptProjectionTest(unittest.TestCase):
                 qemu_transcript_source.project_transcript_options(changed)
 
     def test_current_recipes_enable_only_the_two_exact_runner_options(self):
-        current = (ROOT / "CMakeLists.txt").read_text()
+        from tests.host.common_scheduler_return_source import project_cmake as project_common
+
+        current = project_common((ROOT / "CMakeLists.txt").read_text())
         flag = "            --report-transcript\n"
         self.assertEqual(2, current.count(flag))
         original = qemu_transcript_source.project_transcript_cmake(current)

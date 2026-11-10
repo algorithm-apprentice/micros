@@ -192,8 +192,11 @@ def expected_cases(stage):
     return tuple(cases)
 
 
-def check_semantics(records, stage):
+def check_semantics(records, stage, *, historical=False):
+    from tests.host.common_scheduler_return_source import STATE_WORK_CONTRACT, _current_authority
+
     expected = expected_cases(stage)
+    common_return = stage == "current" and not historical and _current_authority(Path(__file__).resolve().parents[2])
     if len(records) != len(expected):
         raise ValueError("OBJ01 semantic corpus is incomplete")
     readonly = {
@@ -201,6 +204,8 @@ def check_semantics(records, stage):
         "ipc-preflight", "ipc-wake", "return-plan",
     }
     for row, wanted in zip(records, expected):
+        if common_return and wanted["operation"] == "return-plan" and wanted["variant"] in STATE_WORK_CONTRACT["legacy_scoped_cases"]:
+            wanted = {**wanted, "result": 0}
         if {key: row[key] for key in wanted} != wanted:
             raise ValueError("OBJ01 case differs from the independent " + stage + " contract: " + repr(row))
         if row["operation"] in readonly or row["result"] != 0:
@@ -246,6 +251,8 @@ def _local_work_limits(row):
 
 
 def work_failures(products, stage):
+    from tests.host.common_scheduler_return_evidence import validate_plan_observations
+
     if type(products) is not dict or set(products) != {"ordinary", "aggregate", "stack"}:
         raise ValueError("OBJ01 work evidence lacks its exact three-product source stage")
     records = products["ordinary"]["records"]
@@ -255,8 +262,12 @@ def work_failures(products, stage):
     if products["ordinary"]["work"]:
         raise ValueError("OBJ01 ordinary product contains observations")
     for channel in ("aggregate", "stack"):
-        if products[channel]["records"] != records or len(products[channel]["work"]) != len(records):
+        if (
+            products[channel]["records"] != records or len(products[channel]["work"]) != len(records)
+            or products[channel]["plans"] != products["ordinary"]["plans"]
+        ):
             raise ValueError("OBJ01 observation changed behavior or omitted a capture")
+    validate_plan_observations(records, products["ordinary"]["plans"])
     failures = {name: [] for name in WORK_ORACLES}
     for index, row in enumerate(records):
         counts = {
@@ -373,14 +384,25 @@ def _fixed_native_inputs(root, reference, tree):
     return MappingProxyType(result)
 
 
-def parse_native_output(output, channel, stage="baseline"):
+def parse_native_output(output, channel, stage="baseline", *, historical=False):
+    from tests.host.common_scheduler_return_evidence import validate_plan_observations
+
     if type(output) is not str or not output.endswith("\n"):
         raise ValueError("OBJ01 native transcript is not complete text")
     if stage not in ("baseline", "current") or channel not in ("ordinary", "aggregate", "stack"):
         raise ValueError("OBJ01 native transcript has an unknown source stage or channel")
-    records, work = [], []
+    records, work, plans = [], [], []
     lines = output.splitlines()
     for line in lines[:-1]:
+        if line.startswith("MICROS_OBJ01_PLAN "):
+            row = json.loads(line.removeprefix("MICROS_OBJ01_PLAN "), object_pairs_hook=json_pairs)
+            if (
+                historical or type(row) is not dict or row.get("case") != len(records)
+                or len(plans) + 1 != len(records) or len(work) >= len(records) and channel != "ordinary"
+            ):
+                raise ValueError("OBJ01 plan observation has a borrowed or duplicate case")
+            plans.append(row)
+            continue
         if line.startswith("MICROS_OBJ01_WORK "):
             row = json.loads(line.removeprefix("MICROS_OBJ01_WORK "), object_pairs_hook=json_pairs)
             if (
@@ -389,6 +411,7 @@ def parse_native_output(output, channel, stage="baseline"):
                 or row["version"] != 1 or row["reserved0"] != 0 or row["reserved1"] != 0
                 or row["producer"] != producer_label(stage, channel)
                 or row["case"] != len(records) or len(work) + 1 != len(records)
+                or not historical and len(plans) != len(records)
                 or row["owner_mask"] != (24 if channel == "aggregate" else 8)
                 or any(type(row[key]) is not int for key in row if key != "counts")
                 or type(row["counts"]) is not list or len(row["counts"]) != len(Owner)
@@ -407,6 +430,8 @@ def parse_native_output(output, channel, stage="baseline"):
             continue
         if not line.startswith("MICROS_OBJ01_CASE "):
             raise ValueError("OBJ01 ordinary transcript contains an unknown record")
+        if not historical and len(plans) != len(records):
+            raise ValueError("OBJ01 native transcript omitted a plan observation")
         row = json.loads(line.removeprefix("MICROS_OBJ01_CASE "), object_pairs_hook=json_pairs)
         if (
             type(row) is not dict or set(row) != CASE_FIELDS
@@ -426,7 +451,9 @@ def parse_native_output(output, channel, stage="baseline"):
         or channel != "ordinary" and len(work) != len(records)
     ):
         raise ValueError("OBJ01 native transcript lacks its exact complete case count")
-    return tuple(records), tuple(work)
+    if not historical:
+        validate_plan_observations(records, plans)
+    return tuple(records), tuple(work), tuple(plans)
 
 
 def native_command(root, compiler, generated, executable, stage, channel):
@@ -496,11 +523,11 @@ def measure_native_channel(root, stage, channel):
             or stage == "current" and {path: read_regular(root / path)[1] for path in source_inputs} != source_inputs
         ):
             raise ValueError("OBJ01 source or native artifacts changed during execution")
-        records, work = parse_native_output(result.stdout, channel, stage)
+        records, work, plans = parse_native_output(result.stdout, channel, stage)
         measured = {
             "version": 1, "stage": stage, "command": command, "compiler": compiler, "nm": nm,
             "fixtures": fixtures, "source_inputs": source_inputs, "generated_inputs": generated_inputs,
-            "output": result.stdout, "records": records, "work": work, "channel": channel,
+            "output": result.stdout, "records": records, "work": work, "plans": plans, "channel": channel,
             "executable": executable_identity,
             "build_stdout": build.stdout, "build_stderr": build.stderr, "build_exit": build.returncode,
             "execution_exit": result.returncode, "execution_stderr": result.stderr,
@@ -556,14 +583,12 @@ def _require_discriminating_red(products, failures):
 
 
 def compare_source_stages(baseline, current):
+    from tests.host.common_scheduler_return_evidence import compare_plan_observations
+
     old, new = baseline["ordinary"]["records"], current["ordinary"]["records"]
     check_semantics(old, "baseline")
     check_semantics(new, "current")
-    for before, after in zip(old, new):
-        if before["before_state"] != after["before_state"] or before["before_output"] != after["before_output"]:
-            raise ValueError("OBJ01 current execution changed its independent case setup")
-        if before["result"] == after["result"] and before["diagnostic"] == after["diagnostic"] and before != after:
-            raise ValueError("OBJ01 changed valid-state or retained failure semantics: " + repr(before))
+    compare_plan_observations(old, new, baseline["ordinary"]["plans"], current["ordinary"]["plans"])
 
 
 class ObjectHartValidationOracles(unittest.TestCase):
@@ -604,6 +629,7 @@ def run_oracles(root, measured, audits, phase, reference=None, *, current_source
             if (
                 digest(prior[channel]["records"]) != digest(measured["baseline"][channel]["records"])
                 or digest(prior[channel]["work"]) != digest(measured["baseline"][channel]["work"])
+                or digest(prior[channel]["plans"]) != digest(measured["baseline"][channel]["plans"])
             ):
                 raise ValueError("OBJ01 fixed controls changed between Red and current execution")
         compare_source_stages(measured["baseline"], measured["current"])
@@ -659,7 +685,7 @@ def _validate_native_replay(context, products, stage, *, current_sources=None):
     for channel, native in products.items():
         record_fields(native, (
             "version", "stage", "command", "compiler", "nm", "fixtures", "source_inputs", "generated_inputs",
-            "output", "records", "work", "channel", "executable", "build_stdout", "build_stderr", "build_exit",
+            "output", "records", "work", "plans", "channel", "executable", "build_stdout", "build_stderr", "build_exit",
             "execution_exit", "execution_stderr", "nm_command", "nm_output", "arguments", "nm_exit", "output_sha256",
         ))
         if (
@@ -716,8 +742,11 @@ def _validate_native_replay(context, products, stage, *, current_sources=None):
             or type(artifact["sha256"]) is not str or re.fullmatch(r"[a-f0-9]{64}", artifact["sha256"]) is None
         ):
             raise ValueError("OBJ01 replay lacks a complete executable artifact identity")
-        records, work = parse_native_output(native["output"], channel, stage)
-        if digest(records) != digest(native["records"]) or digest(work) != digest(native["work"]):
+        records, work, plans = parse_native_output(native["output"], channel, stage)
+        if (
+            digest(records) != digest(native["records"]) or digest(work) != digest(native["work"])
+            or digest(plans) != digest(native["plans"])
+        ):
             raise ValueError("OBJ01 replay changed the observations from its actual output")
     return work_failures(products, stage)
 
@@ -799,8 +828,8 @@ def check_native_products(root, executable_paths):
         )
         if completed.returncode or completed.stderr:
             raise ValueError("OBJ01 actual native product failed:\n" + completed.stdout + completed.stderr)
-        records, work = parse_native_output(completed.stdout, channel, stage)
-        measured[stage][channel] = {"stage": stage, "channel": channel, "records": records, "work": work}
+        records, work, plans = parse_native_output(completed.stdout, channel, stage)
+        measured[stage][channel] = {"stage": stage, "channel": channel, "records": records, "work": work, "plans": plans}
         print(f"MICROS_OBJ01_NATIVE_ACCEPTED stage={stage} channel={channel} cases={len(records)}", flush=True)
     if (
         {path: read_regular(path)[1] for path in expected} != before

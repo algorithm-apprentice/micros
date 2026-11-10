@@ -443,6 +443,7 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
         self.assertNotRegex(recipe, r"JOB_POOL_(?:COMPILE|LINK)\s+mem03_source_proof")
 
     def test_scaffold_restores_exact_legacy_adapters_and_the_complete_previous_recipe(self):
+        from tests.host.common_scheduler_return_source import project_cmake as project_common
         from tests.host.selected_address_space_source import project_legacy_adapter as project_next
 
         source.validate_scaffold(ROOT)
@@ -474,7 +475,7 @@ class SelectedOwnershipIntegrationTest(unittest.TestCase):
         current = (ROOT / "CMakeLists.txt").read_text()
         from tests.host.qemu_transcript_source import project_transcript_cmake
 
-        self.assertEqual(source.extend_cmake(original), project_transcript_cmake(current))
+        self.assertEqual(source.extend_cmake(original), project_transcript_cmake(project_common(current)))
         self.assertEqual(original, source.project_cmake(current))
         with self.assertRaises(ValueError):
             source.project_cmake(current.replace("MICROS_SELECTED_OWNERSHIP_LAUNCHER=1", "MICROS_SELECTED_OWNERSHIP_LAUNCHER=0", 1))

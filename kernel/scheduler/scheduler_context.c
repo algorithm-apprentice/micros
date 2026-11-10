@@ -1,3 +1,4 @@
+#include "tests/qemu/common_scheduler_return_work.h"
 #include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "arch/riscv64/mmu.h"
@@ -113,7 +114,7 @@ enum micros_scheduler_error scheduler_runtime_load_selected_context(
             thread,
             &runtime->selected_context
         ) == MICROS_USER_EXECUTION_OK
-        && micros_user_execution_validate_context(
+        && MICROS_OBJ02_VALIDATE_CONTEXT(
             thread,
             &runtime->selected_context
         ) == MICROS_USER_EXECUTION_OK

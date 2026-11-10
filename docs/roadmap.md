@@ -574,6 +574,15 @@ correction; it retains the runtime and exact retirement scopes. A fresh OBJ02
 implementation follows its separately reviewed merge. The broader workflow
 simplification remains after OBJ02 rather than becoming parallel work.
 
+Corrective design #245 has now independently merged as
+`cc6e0eee984ea1731eca9fc02bc4132ead1d2e2c`, with identical reviewed,
+committed, remote, preview, squash and main tree
+`5d2a9d6022b08b20cba75b6b1c33da5f6df4db09`.
+Journal-free committed/main authority and completed-ref cleanup passed.
+The fresh [implementation map](architecture/common-scheduler-return.md#implementation-and-evidence-map)
+freezes the actual 1,551-member base and corrected consumer inputs.
+No prior execution is borrowed; complete renewed acceptance remains required.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

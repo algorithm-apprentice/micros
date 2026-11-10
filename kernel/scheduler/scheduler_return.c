@@ -1,3 +1,4 @@
+#include "tests/qemu/common_scheduler_return_work.h"
 #include "kernel/scheduler/scheduler_runtime_internal.h"
 
 #include "micros/kernel_object_runtime.h"
@@ -40,12 +41,13 @@ static enum micros_scheduler_error capture_outgoing_custody(
     struct micros_hart_handle hart_handle,
     struct micros_hart *hart,
     struct micros_trap_frame *frame,
-    bool store_outgoing
+    bool store_outgoing,
+    struct scheduler_outgoing_context *outgoing
 )
 {
-    struct micros_user_context outgoing;
     struct micros_thread_handle current = {0, 0};
 
+    outgoing->thread = (struct micros_thread_handle){0, 0};
     if (store_outgoing) {
         if (
             micros_hart_current_thread(
@@ -57,17 +59,17 @@ static enum micros_scheduler_error capture_outgoing_custody(
             return MICROS_SCHEDULER_ERROR_STATE;
         }
         scheduler_runtime_copy_user_context(
-            &outgoing,
+            &outgoing->context,
             (const struct micros_user_context *)frame
         );
         if (
-            micros_user_execution_validate_context(current, &outgoing)
+            MICROS_OBJ02_VALIDATE_CONTEXT(current, &outgoing->context)
                 != MICROS_USER_EXECUTION_OK
         ) {
             panic_invalid_context(hart, frame, true);
         }
         if (
-            micros_user_execution_store_context(current, &outgoing)
+            micros_user_execution_store_context(current, &outgoing->context)
                 != MICROS_USER_EXECUTION_OK
         ) {
             scheduler_runtime_panic_scheduler_invariant(
@@ -76,6 +78,7 @@ static enum micros_scheduler_error capture_outgoing_custody(
                 frame
             );
         }
+        outgoing->thread = current;
     } else if (
         hart->current_thread.slot != 0
         || hart->current_thread.generation != 0
@@ -141,6 +144,7 @@ static enum micros_scheduler_error select_user_return(
     struct micros_scheduler_return_plan plan;
     struct scheduler_accounting_commit accounting;
     struct scheduler_completion_commit completion;
+    struct scheduler_outgoing_context outgoing;
     enum micros_kernel_object_error error;
     enum micros_scheduler_error scheduler_error;
 
@@ -153,10 +157,15 @@ static enum micros_scheduler_error select_user_return(
     ) {
         return MICROS_SCHEDULER_ERROR_STATE;
     }
+    MICROS_OBJ02_RETURN_BEGIN(
+        store_outgoing ? MICROS_OBJ02_RETURN_USER : MICROS_OBJ02_RETURN_CAPTURED,
+        hart->current_thread
+    );
     scheduler_error = capture_outgoing_custody(
-        objects, hart_handle, hart, frame, store_outgoing
+        objects, hart_handle, hart, frame, store_outgoing, &outgoing
     );
     if (scheduler_error != MICROS_SCHEDULER_OK) {
+        MICROS_OBJ02_RETURN_CANCEL();
         return scheduler_error;
     }
     micros_diagnostic_notify_pending(hart, frame);
@@ -166,9 +175,11 @@ static enum micros_scheduler_error select_user_return(
         &plan
     );
     if (error != MICROS_KERNEL_OBJECT_OK) {
+        MICROS_OBJ02_RETURN_CANCEL();
         return scheduler_runtime_map_object_error(error);
     }
     if (plan.action == MICROS_SCHEDULER_RETURN_ENTER_IDLE) {
+        MICROS_OBJ02_RETURN_END(plan.selected);
         scheduler_error = prepare_timer_accounting(runtime, hart, &accounting);
         if (scheduler_error != MICROS_SCHEDULER_OK) {
             return scheduler_error;
@@ -192,10 +203,17 @@ static enum micros_scheduler_error select_user_return(
         hart,
         frame
     );
-    scheduler_error = scheduler_runtime_load_selected_context(runtime, plan.selected);
-    if (scheduler_error != MICROS_SCHEDULER_OK) {
-        panic_invalid_context(hart, frame, false);
+    if (outgoing.thread.generation != 0
+        && plan.selected.slot == outgoing.thread.slot
+        && plan.selected.generation == outgoing.thread.generation) {
+        scheduler_runtime_copy_user_context(&runtime->selected_context, &outgoing.context);
+    } else {
+        scheduler_error = scheduler_runtime_load_selected_context(runtime, plan.selected);
+        if (scheduler_error != MICROS_SCHEDULER_OK) {
+            panic_invalid_context(hart, frame, false);
+        }
     }
+    MICROS_OBJ02_RETURN_END(plan.selected);
     scheduler_error = prepare_timer_accounting(runtime, hart, &accounting);
     if (scheduler_error != MICROS_SCHEDULER_OK) {
         return scheduler_error;

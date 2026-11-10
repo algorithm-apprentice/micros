@@ -963,6 +963,14 @@ task's independently checked addition is removed before that historical
 boundary. Fresh actual Red/Green and the complete original gates remain
 required after the separate corrective design merge.
 
+That correction is now separately merged as #245. The fresh
+[OBJ02 implementation map](architecture/common-scheduler-return.md#implementation-and-evidence-map)
+records the four full-only native products, complete target captures and exact
+historical-test adapters. Focused consumer regressions retain the old expected
+recipes and source/site sets; no current acceptance falls back to historical
+records. The original complete native, QEMU, integration and stack gates
+remain required.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081

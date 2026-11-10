@@ -388,7 +388,7 @@ class SelectedReleaseHandoffDeclarationTest(unittest.TestCase):
 
 class SelectedReleaseHandoffSourceTest(unittest.TestCase):
     def test_historical_unchanged_subjects_keep_their_complete_fixed_bindings(self):
-        from tests.host import object_hart_validation_source
+        from tests.host import common_scheduler_return_source, object_hart_validation_source
 
         paths = (
             *(path for path in source.RECIPE_ADMISSION["native_source_members"]
@@ -402,9 +402,10 @@ class SelectedReleaseHandoffSourceTest(unittest.TestCase):
                 target = fixture / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(source.fixed_source(str(ROOT), path))
-            # This is MEM05's fixed boundary, not the current OBJ01 runtime.
+            # This is MEM05's fixed boundary, not the newer object/return runtime.
             with (
                 mock.patch.object(object_hart_validation_source, "_current_authority", return_value=False),
+                mock.patch.object(common_scheduler_return_source, "_current_authority", return_value=False),
                 mock.patch.object(source, "regular_source", side_effect=lambda root, path: fixture / path if path in paths else read(root, path)),
             ):
                 for path in paths:

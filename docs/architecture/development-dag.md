@@ -268,6 +268,12 @@ are the sole active corrective design. The same runtime contract, 58-key/
 28-path selection and DAG edges remain; implementation restarts only after
 the correction's separate reviewed merge.
 
+Corrective design #245 has now separately merged after clean complete and
+Acceptance-only independent review. The fresh OBJ02 implementation follows
+its [implementation map](common-scheduler-return.md#implementation-and-evidence-map)
+as the sole active outcome. The archived attempt supplies no current author
+event; no runtime edge, later finding or hosted-CI status changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may
