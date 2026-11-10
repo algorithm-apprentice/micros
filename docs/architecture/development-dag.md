@@ -227,6 +227,17 @@ It owns only B03-F001/F003/F004; OBJ02, IPC01 and later corrections remain
 separate. The design is the sole active outcome and its implementation is
 pending separate review, Acceptance and merge. No runtime edge changes.
 
+OBJ01 design #241 has now separately merged. Its uncommitted implementation
+is archived after complete native acceptance found an active validator-file
+identity missing from the ninety-four-key plan and two historical/current
+fixture conflicts. [Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md)
+and [OBJ01-C01](selected-object-and-hart-validation.md#obj01-c01-complete-source-authority)
+are the sole active corrective design. The accepted ninety-five-key closure
+keeps the same thirty-eight candidate paths and runtime contract.
+OBJ01 implementation stays blocked until that design's separate reviewed
+merge, then restarts from current `main`. No runtime node, edge, finding owner
+or hosted-CI acceptance changes.
+
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
 overlap. After separate design merge, that one phase-lifetime edit may

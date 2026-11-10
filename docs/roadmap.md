@@ -524,6 +524,19 @@ regular/exceptional stack proof and the exact ninety-four-key evidence
 transition. Only design is active. No runtime code, test, model or
 executable prototype precedes separate review, Acceptance and merge.
 
+That design separately merged as #241. The uncommitted implementation
+reached its declared native/target transaction, but the full native gate
+found one active scheduler-validator neighbor hash missing from that plan.
+Its inherited B14 subset also omitted the complete object-layout and two
+affected fixture owners. The candidate is archived without implementation
+review, permanent commit or full author acceptance.
+[Accepted ADR-0120](adr/0120-obj01-complete-source-authority.md) and
+[OBJ01-C01](architecture/selected-object-and-hart-validation.md#obj01-c01-complete-source-authority)
+define the separate ninety-five-key correction and exact fixture/coverage
+boundaries. It changes no runtime algorithm or candidate path. Only this
+documentation-only correction is active; OBJ01 restarts after its reviewed
+design merge. Hosted CI and later MINIX/POSIX outcomes remain open.
+
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and
 generation-safe process/thread/hart identity tables with per-hart trap and

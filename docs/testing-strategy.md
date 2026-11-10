@@ -911,6 +911,21 @@ remain mandatory. Its own source predicates receive individual identities
 from their first implementation rather than another unnamed coarse freeze.
 This design phase authors no executable fixture or prototype.
 
+The separately merged OBJ01 design #241 subsequently exposed the
+[OBJ01-C01 closure gap](research/minix-selected-object-and-hart-validation.md#obj01-c01-complete-source-authority-gap)
+during full native acceptance. Forty-six CTests passed, but three full-host
+checks rejected a missing active identity and historical/current fixture
+mixing. The smaller B14 selection had not executed those cases.
+[Accepted ADR-0120](adr/0120-obj01-complete-source-authority.md) requires the
+complete object-layout, panic-trace and stack-source projection modules in
+B14, with covered panic subsets replaced rather than duplicated.
+The added validator identity receives its own discriminating unsupported-
+current diagnostic witness in the direct-ownership oracle. Historical
+projection and actual compiled panic mutation controls remain explicit.
+The implementation is archived and blocked until separate design review,
+Acceptance and merge; no source guard or complete discovery requirement is
+waived by these observations.
+
 ## POSIX conformance evidence
 
 The shell milestone does not imply complete compatibility. Accepted ADR-0081
