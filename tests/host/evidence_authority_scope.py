@@ -94,6 +94,7 @@ def _providers():
         selected_ownership_authority,
         selected_address_space_authority,
         selected_release_handoff_authority,
+        object_hart_validation_authority,
     )
 
     return (
@@ -101,6 +102,7 @@ def _providers():
         bootstrap_allocation_authority, kernel_mapping_authority,
         selected_ownership_authority, selected_address_space_authority,
         selected_release_handoff_authority,
+        object_hart_validation_authority,
     )
 
 
@@ -173,6 +175,7 @@ def _check_author_inputs(provider, context, journal, inputs):
     if provider.__name__ in (
         "tests.host.selected_ownership_authority", "tests.host.selected_address_space_authority",
         "tests.host.selected_release_handoff_authority",
+        "tests.host.object_hart_validation_authority",
     ):
         changed = (
             len(observed) != 3 or observed[0] != context.native_compiler

@@ -387,25 +387,39 @@ class SelectedReleaseHandoffDeclarationTest(unittest.TestCase):
 
 
 class SelectedReleaseHandoffSourceTest(unittest.TestCase):
-    def test_current_unchanged_subjects_keep_their_complete_fixed_bindings(self):
+    def test_historical_unchanged_subjects_keep_their_complete_fixed_bindings(self):
+        from tests.host import object_hart_validation_source
+
         paths = (
             *(path for path in source.RECIPE_ADMISSION["native_source_members"]
               if path not in source.SOURCE_ROLES["production_paths"]),
             *source.OBSERVED_HEADERS,
         )
-        for path in paths:
-            with self.subTest(path=path):
-                original = source.fixed_source(str(ROOT), path).decode()
-                before = source.baseline_observations(str(ROOT), path)
-                current = source._current_observations(ROOT, path, original)
-                self.assertEqual(set(before), set(current))
-                for name, sites in before.items():
-                    self.assertEqual(
-                        tuple(site[1:] for site in sorted(sites, key=lambda row: row[5])),
-                        tuple(site[1:] for site in current[name]),
-                    )
-                observed = source.observe_source(ROOT, path, original, "aggregate", Stage.GREEN)
-                self.assertEqual(original, source.project_observations(ROOT, path, observed, "aggregate", Stage.GREEN))
+        read = source.regular_source
+        with tempfile.TemporaryDirectory(prefix="micros-mem05-historical-") as directory:
+            fixture = Path(directory)
+            for path in paths:
+                target = fixture / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(source.fixed_source(str(ROOT), path))
+            # This is MEM05's fixed boundary, not the current OBJ01 runtime.
+            with (
+                mock.patch.object(object_hart_validation_source, "_current_authority", return_value=False),
+                mock.patch.object(source, "regular_source", side_effect=lambda root, path: fixture / path if path in paths else read(root, path)),
+            ):
+                for path in paths:
+                    with self.subTest(path=path):
+                        original = (fixture / path).read_text()
+                        before = source.baseline_observations(str(ROOT), path)
+                        current = source._current_observations(ROOT, path, original)
+                        self.assertEqual(set(before), set(current))
+                        for name, sites in before.items():
+                            self.assertEqual(
+                                tuple(site[1:] for site in sorted(sites, key=lambda row: row[5])),
+                                tuple(site[1:] for site in current[name]),
+                            )
+                        observed = source.observe_source(ROOT, path, original, "aggregate", Stage.GREEN)
+                        self.assertEqual(original, source.project_observations(ROOT, path, observed, "aggregate", Stage.GREEN))
 
     def test_source_stage_admission_cannot_substitute_old_code_or_unowned_inputs(self):
         path = "kernel/memory/frame_ownership.c"
@@ -555,6 +569,8 @@ class SelectedReleaseHandoffLegacyTest(unittest.TestCase):
                     source.project_include_transports(ROOT, logical, b"unit source", (), False)
 
     def test_exact_legacy_adapters_preserve_all_predecessor_bytes(self):
+        from tests.host.object_hart_validation_source import project_legacy_adapter as project_next
+
         paths = (
             *(path for path in source.SOURCE_ROLES["fixed_adapters"] if path.endswith(".py")),
             "tests/host/test_kernel_address_space_source_layout.py",
@@ -563,7 +579,7 @@ class SelectedReleaseHandoffLegacyTest(unittest.TestCase):
             with self.subTest(path=path):
                 original = source.baseline_adapter_source(str(ROOT), path)
                 expected = source.extend_legacy_adapter(ROOT, path, original)
-                current = (ROOT / path).read_text()
+                current = project_next(ROOT, path, (ROOT / path).read_text())
                 self.assertEqual(expected, current)
                 self.assertEqual(original, source.project_legacy_adapter(ROOT, path, current))
                 with self.assertRaises(ValueError):

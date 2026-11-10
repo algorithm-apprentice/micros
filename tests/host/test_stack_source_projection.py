@@ -71,12 +71,14 @@ class StackSourceProjectionTest(unittest.TestCase):
 
         logical = "kernel/kernel_object_context.c"
         physical = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[logical]
-        expected = kernel_layout_source.read_logical_bytes(ROOT, logical)
+        fixed = reference_source(str(ROOT), physical)
         with tempfile.TemporaryDirectory(prefix="micros-stack-kernel-oracle-") as temporary:
             root = Path(temporary)
             path = root / physical
             path.parent.mkdir(parents=True)
-            path.write_text(instrument_source(physical, reference_source(str(ROOT), physical)))
+            path.write_text(fixed)
+            expected = kernel_layout_source.read_logical_bytes(root, logical)
+            path.write_text(instrument_source(physical, fixed))
             self.assertEqual(expected, kernel_layout_source.read_logical_bytes(root, logical))
 
 

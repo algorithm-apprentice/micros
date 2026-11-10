@@ -248,6 +248,14 @@ def source_bundle(root, stage, *, observed=True):
             if project_observations(root, name, annotated, stage) != text:
                 raise ValueError("MEM02 observations do not recover their exact selected source")
             text = annotated
+        if observed:
+            from tests.host.object_hart_validation_source import legacy_observe_source, project_legacy_observations
+
+            current = legacy_observe_source(root, "MEM02", name, text, stage)
+            if current is not None:
+                if project_legacy_observations(root, "MEM02", name, current, stage) != text:
+                    raise ValueError("MEM02 current object observations changed their qualified source")
+                text = current
         if name == "kernel/memory/bootstrap_memory.c":
             text = _bootstrap_unit(text, observed)
         elif name == "kernel/memory/address_space.c":

@@ -1453,6 +1453,7 @@ def native_recipe():
 def extend_cmake(text):
     from tests.host.selected_address_space_source import native_recipe as selected_address_space_recipe
     from tests.host.selected_release_handoff_source import native_recipe as selected_release_handoff_recipe
+    from tests.host.object_hart_validation_source import native_recipe as object_hart_recipe
 
     anchor = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
     if hashlib.sha256(text.encode()).hexdigest() != RECIPE_ADMISSION["base_cmake_sha256"] or text.count(anchor) != 1:
@@ -1462,7 +1463,7 @@ def extend_cmake(text):
         if text.count(output) != 1:
             raise ValueError("MEM03 source-proof pool lacks its exact predecessor generator")
         text = text.replace(output, output + "        JOB_POOL mem03_source_proof\n", 1)
-    return text.replace(anchor, native_recipe() + selected_address_space_recipe() + selected_release_handoff_recipe() + anchor, 1)
+    return text.replace(anchor, native_recipe() + selected_address_space_recipe() + selected_release_handoff_recipe() + object_hart_recipe() + anchor, 1)
 
 
 def project_cmake(text):
@@ -1692,7 +1693,10 @@ def extend_legacy_adapter(path, text):
 def project_legacy_adapter(path, text):
     from tests.host.selected_address_space_source import project_legacy_adapter as project_next
 
-    if "tests.host.selected_address_space_source" in text:
+    if (
+        "tests.host.selected_address_space_source" in text
+        or "tests.host.object_hart_validation_source" in text
+    ):
         text = project_next(Path(__file__).resolve().parents[2], path, text)
     if path == "tests/host/test_kernel_bootstrap_source_layout.py":
         if "micros_frame_ownership_runtime_validate_metadata" not in text:

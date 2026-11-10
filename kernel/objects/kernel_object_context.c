@@ -145,9 +145,9 @@ micros_thread_capture_execution_context(
 )
 {
     struct micros_thread *thread;
+    struct micros_process *process;
+    struct micros_hart *hart;
     enum micros_kernel_object_error error;
-    size_t current_count = 0;
-    size_t index;
 
     if (objects == NULL || context == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
@@ -164,26 +164,32 @@ micros_thread_capture_execution_context(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    if (!thread->context_attached) {
+    if (!thread->context_attached || !thread->scheduler_assigned) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
-        const struct micros_hart *hart = &objects->harts[index];
-
-        if (
-            hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && kernel_object_thread_handles_equal(
-                hart->current_thread,
-                thread_handle
-            )
-        ) {
-            ++current_count;
-        }
+    if (
+        kernel_object_resolve_process_mutable(objects, thread->owner, &process)
+            != MICROS_KERNEL_OBJECT_OK
+        || process->live_thread_count == 0
+        || process->live_thread_count > objects->max_threads_per_process
+        || kernel_object_resolve_hart_mutable(objects, thread->scheduler_hart, &hart)
+            != MICROS_KERNEL_OBJECT_OK
+        || !kernel_object_stack_range_is_valid(
+            thread->kernel_stack_bottom,
+            thread->kernel_stack_top,
+            MICROS_THREAD_KERNEL_STACK_SIZE
+        )
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
-    if (current_count == 0) {
+    if (!kernel_object_thread_handles_equal(hart->current_thread, thread_handle)) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    if (current_count > 1) {
+    if (
+        !hart->trap_installed
+        || hart->trap.primary_stack_bottom != thread->kernel_stack_bottom
+        || hart->trap.primary_stack_top != thread->kernel_stack_top
+    ) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
     kernel_object_copy_user_context(&thread->user_context, context);

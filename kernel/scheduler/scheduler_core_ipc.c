@@ -57,11 +57,7 @@ micros_scheduler_preflight_current_ipc(
     if (objects == NULL) {
         return MICROS_KERNEL_OBJECT_ERROR_ARGUMENT;
     }
-    error = micros_scheduler_core_validate(objects);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    error = micros_hart_resolve(objects, hart_handle, &hart);
+    error = scheduler_core_preflight_hart(objects, hart_handle, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
@@ -158,18 +154,24 @@ enum micros_kernel_object_error micros_scheduler_rollback_current_ipc(
 {
     struct micros_hart *hart;
     struct micros_thread *thread;
+    const struct micros_hart *checked_hart;
+    const struct micros_thread *checked_thread;
     enum micros_kernel_object_error error;
 
     if (objects == NULL || guard == NULL || !guard->active) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, guard->hart, &checked_hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
     error = scheduler_core_resolve_hart_mutable(objects, guard->hart, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
+    }
+    error = scheduler_core_preflight_thread(objects, guard->thread, &checked_thread);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error == MICROS_KERNEL_OBJECT_ERROR_STALE ? MICROS_KERNEL_OBJECT_ERROR_STATE : error;
     }
     error = scheduler_core_resolve_thread_mutable(objects, guard->thread, &thread);
     if (
@@ -194,6 +196,11 @@ enum micros_kernel_object_error micros_scheduler_rollback_current_ipc(
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
 
+    error = scheduler_core_preflight_queue_endpoints(objects, hart, guard->priority);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+
     thread->runtime_flags = 0;
     scheduler_core_queue_enqueue_head_prevalidated(
         objects,
@@ -216,18 +223,24 @@ enum micros_kernel_object_error micros_scheduler_commit_current_ipc(
 {
     struct micros_hart *hart;
     struct micros_thread *thread;
+    const struct micros_hart *checked_hart;
+    const struct micros_thread *checked_thread;
     enum micros_kernel_object_error error;
 
     if (objects == NULL || guard == NULL || !guard->active) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
-    error = micros_scheduler_core_validate(objects);
+    error = scheduler_core_preflight_hart(objects, guard->hart, &checked_hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
     error = scheduler_core_resolve_hart_mutable(objects, guard->hart, &hart);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
+    }
+    error = scheduler_core_preflight_thread(objects, guard->thread, &checked_thread);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error == MICROS_KERNEL_OBJECT_ERROR_STALE ? MICROS_KERNEL_OBJECT_ERROR_STATE : error;
     }
     error = scheduler_core_resolve_thread_mutable(objects, guard->thread, &thread);
     if (

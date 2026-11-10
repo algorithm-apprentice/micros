@@ -1,44 +1,90 @@
 #include "kernel/scheduler/scheduler_core_private.h"
 
+static enum micros_kernel_object_error preflight_dequeue_successor(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_thread_handle handle,
+    const struct micros_thread *thread,
+    size_t steps
+)
+{
+    struct micros_thread_handle next = thread->ready_next;
+    struct micros_thread_handle cursor;
+    const struct micros_thread *successor;
+    enum micros_kernel_object_error error;
+    size_t index;
+
+    if (scheduler_core_thread_handles_equal(hart->ready_tail[thread->scheduler_priority], handle)) {
+        return scheduler_core_thread_handle_is_null(next)
+            ? MICROS_KERNEL_OBJECT_OK : MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    if (
+        scheduler_core_thread_handle_is_null(next)
+        || scheduler_core_thread_handles_equal(next, handle)
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    error = scheduler_core_preflight_queue_record(objects, hart, thread->scheduler_priority, next, &successor);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    cursor = hart->ready_head[thread->scheduler_priority];
+    for (index = 1; index < steps; ++index) {
+        if (scheduler_core_thread_handles_equal(cursor, next)) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
+        cursor = objects->threads[cursor.slot].ready_next;
+    }
+    return MICROS_KERNEL_OBJECT_OK;
+}
+
 enum micros_kernel_object_error scheduler_core_queue_dequeue(
     struct micros_kernel_objects *objects,
     struct micros_hart *hart,
     struct micros_thread_handle thread_handle
 )
 {
-    struct micros_thread *thread =
-        &objects->threads[thread_handle.slot];
+    struct micros_thread *thread;
+    const struct micros_thread *checked;
     struct micros_thread_handle cursor;
     struct micros_thread_handle previous =
         scheduler_core_null_thread_handle();
-    uint8_t priority = thread->scheduler_priority;
+    uint8_t priority;
     size_t steps = 0;
+    enum micros_kernel_object_error error;
 
+    error = scheduler_core_preflight_thread(objects, thread_handle, &checked);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    thread = &objects->threads[thread_handle.slot];
+    priority = thread->scheduler_priority;
     if (
         priority >= MICROS_SCHEDULER_PRIORITY_COUNT
         || !thread->ready_linked
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
+    error = scheduler_core_preflight_queue_endpoints(objects, hart, priority);
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
     cursor = hart->ready_head[priority];
     while (!scheduler_core_thread_handle_is_null(cursor)) {
-        struct micros_thread *candidate;
+        const struct micros_thread *candidate;
 
-        if (
-            ++steps > MICROS_THREAD_CAPACITY
-            || cursor.slot >= MICROS_THREAD_CAPACITY
-        ) {
+        if (++steps > MICROS_THREAD_CAPACITY) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
-        candidate = &objects->threads[cursor.slot];
-        if (
-            candidate->slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || candidate->generation != cursor.generation
-        ) {
-            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        error = scheduler_core_preflight_queue_record(objects, hart, priority, cursor, &candidate);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
         }
         if (scheduler_core_thread_handles_equal(cursor, thread_handle)) {
+            error = preflight_dequeue_successor(objects, hart, thread_handle, candidate, steps);
+            if (error != MICROS_KERNEL_OBJECT_OK) {
+                return error;
+            }
             if (scheduler_core_thread_handle_is_null(previous)) {
                 hart->ready_head[priority] =
                     candidate->ready_next;
@@ -91,64 +137,30 @@ static void queue_enqueue_tail_raw(
     hart->ready_tail[priority] = thread_handle;
 }
 
-enum micros_kernel_object_error scheduler_core_queue_enqueue_tail(
-    struct micros_kernel_objects *objects,
-    struct micros_hart *hart,
-    struct micros_thread_handle thread_handle
-)
-{
-    struct micros_thread *thread =
-        &objects->threads[thread_handle.slot];
-
-    queue_enqueue_tail_raw(objects, hart, thread_handle);
-    if (!scheduler_core_thread_handle_is_null(hart->current_thread)) {
-        struct micros_thread *current =
-            &objects->threads[hart->current_thread.slot];
-
-        if (
-            !scheduler_core_thread_handles_equal(
-                hart->current_thread,
-                thread_handle
-            )
-            && current->scheduler_assigned
-            && current->runtime_flags == 0
-            && current->scheduler_preemptible
-            && current->scheduler_priority
-                > thread->scheduler_priority
-        ) {
-            enum micros_kernel_object_error error =
-                scheduler_core_queue_dequeue(
-                    objects,
-                    hart,
-                    hart->current_thread
-                );
-
-            if (error != MICROS_KERNEL_OBJECT_OK) {
-                return error;
-            }
-            current->runtime_flags |=
-                MICROS_THREAD_RTS_PREEMPTED;
-        }
-    }
-    return MICROS_KERNEL_OBJECT_OK;
-}
-
-struct micros_thread_handle scheduler_core_queue_pick(
-    const struct micros_hart *hart
+enum micros_kernel_object_error scheduler_core_queue_pick(
+    const struct micros_kernel_objects *objects,
+    const struct micros_hart *hart,
+    struct micros_thread_handle *result
 )
 {
     size_t priority;
+    enum micros_kernel_object_error error;
 
     for (
         priority = 0;
         priority < MICROS_SCHEDULER_PRIORITY_COUNT;
         ++priority
     ) {
+        error = scheduler_core_preflight_queue_endpoints(objects, hart, (uint8_t)priority);
+        if (error != MICROS_KERNEL_OBJECT_OK) {
+            return error;
+        }
         if (!scheduler_core_thread_handle_is_null(hart->ready_head[priority])) {
-            return hart->ready_head[priority];
+            *result = hart->ready_head[priority];
+            return MICROS_KERNEL_OBJECT_OK;
         }
     }
-    return scheduler_core_null_thread_handle();
+    return MICROS_KERNEL_OBJECT_ERROR_EMPTY;
 }
 
 enum micros_kernel_object_error scheduler_core_preflight_tail_enqueue(
@@ -159,24 +171,25 @@ enum micros_kernel_object_error scheduler_core_preflight_tail_enqueue(
 )
 {
     const struct micros_thread *current;
+    enum micros_kernel_object_error error = scheduler_core_preflight_queue_endpoints(objects, hart, priority);
 
-    if (scheduler_core_thread_handle_is_null(hart->current_thread)) {
-        return MICROS_KERNEL_OBJECT_OK;
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
     }
-    current = &objects->threads[hart->current_thread.slot];
-    if (
-        !scheduler_core_thread_handles_equal(
-            hart->current_thread,
-            thread_handle
-        )
-        && current->scheduler_assigned
-        && current->runtime_flags == 0
-        && current->scheduler_preemptible
-        && current->scheduler_priority > priority
-        && hart->accounting_owner
-            == MICROS_SCHEDULER_ACCOUNTING_THREAD
-    ) {
-        return MICROS_KERNEL_OBJECT_ERROR_STATE;
+    if (!scheduler_core_thread_handle_is_null(hart->current_thread)) {
+        current = &objects->threads[hart->current_thread.slot];
+        if (
+            !scheduler_core_thread_handles_equal(hart->current_thread, thread_handle)
+            && current->scheduler_assigned
+            && current->runtime_flags == 0
+            && current->scheduler_preemptible
+            && current->scheduler_priority > priority
+        ) {
+            if (hart->accounting_owner == MICROS_SCHEDULER_ACCOUNTING_THREAD) {
+                return MICROS_KERNEL_OBJECT_ERROR_STATE;
+            }
+            return scheduler_core_preflight_queue_endpoints(objects, hart, current->scheduler_priority);
+        }
     }
     return MICROS_KERNEL_OBJECT_OK;
 }

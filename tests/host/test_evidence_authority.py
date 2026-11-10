@@ -1160,8 +1160,8 @@ class InventoryTests(unittest.TestCase):
         result = evidence_authority.validate_inventory(inventory)
 
         self.assertTrue(result.ok, result)
-        self.assertEqual(25, len(inventory.families))
-        self.assertEqual(5851, len(inventory.facts))
+        self.assertEqual(27, len(inventory.families))
+        self.assertEqual(6327, len(inventory.facts))
         self.assertTrue(any(
             fact.authority_class
             is evidence_authority.AuthorityClass.ARTIFACT_CONTRACT
@@ -2498,7 +2498,7 @@ class SelectedOwnershipObservationBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(120, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -2836,7 +2836,7 @@ class SelectedAddressSpaceNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(477, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -3452,7 +3452,7 @@ class SelectedReleaseHandoffNativeBindingTests(unittest.TestCase):
         self.assertEqual(self.expected_facts(), self.facts)
         self.assertEqual(453, len(self.facts))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
-        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertEqual(
             fact_set_digest(self.expected_facts()),
             dict(self.inventory.declared_family_fact_digests)[self.FAMILY],
@@ -3915,6 +3915,7 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
 
     def test_existing_object_assertions_bind_their_actual_sources(self):
         from tests.host import test_kernel_object_source_layout as gate
+        from tests.host.object_hart_validation_source import historical_identity_required, validate_retained_source
 
         case = gate.KernelObjectSourceLayoutTest()
         case.test_complete_original_bodies_and_all_parameter_types_remain_exact()
@@ -3922,14 +3923,24 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
         read = gate.source
         subject = "kernel/kernel_object_hart.c"
         original = read(subject)
+        key = "tests/host/test_kernel_object_source_layout.py:data-entry:BASELINE_BODIES/0/micros_hart_resolve_context"
+        current = not historical_identity_required(ROOT, key)
+        before, after = (
+            ("candidate = &objects->harts[index];", "candidate = &objects->harts[index + 1];")
+            if current else ("(uintptr_t)candidate == hart_context", "(uintptr_t)candidate != hart_context")
+        )
         for changed in (
-            original.replace("(uintptr_t)candidate == hart_context", "(uintptr_t)candidate != hart_context", 1),
+            original.replace(before, after, 1),
             original.replace("uintptr_t hart_context,", "uint64_t hart_context,", 1),
         ):
             self.assertNotEqual(original, changed)
-            with patch.object(gate, "source", side_effect=lambda path: changed if path == subject else read(path)):
-                with self.assertRaises(AssertionError):
-                    case.test_complete_original_bodies_and_all_parameter_types_remain_exact()
+            if current:
+                with self.assertRaises(ValueError):
+                    validate_retained_source(ROOT, "kernel/objects/kernel_object_hart.c", changed, "current")
+            else:
+                with patch.object(gate, "source", side_effect=lambda path: changed if path == subject else read(path)):
+                    with self.assertRaises(AssertionError):
+                        case.test_complete_original_bodies_and_all_parameter_types_remain_exact()
         self.assertEqual(50, len(self.changes))
         for key, (_, expected) in self.changes.items():
             with self.subTest(key=key):
@@ -3983,6 +3994,7 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
         self.assertEqual(tuple(row[0] for row in accepted), keys)
 
     def test_existing_panic_assertions_have_individual_names(self):
+        from tests.host.object_hart_validation_source import historical_identity_required
         from tools import stack_bound_fatal as fatal
         from tools.stack_bound_types import FunctionKey, SourceOrigin, StackEvidenceError
 
@@ -4005,6 +4017,16 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
         for scope, subject, _, contract in self.rows:
             # Reach the file equality rather than failing the stricter overlay inverse first.
             projected = fatal.project_trace_runtime(subject, read(ROOT / subject)[0].decode()).encode()
+            current_hart = subject == "kernel/objects/kernel_object_hart.c" and not historical_identity_required(
+                ROOT, "tests/host/panic_trace_source_bindings.py:source-admission:" + scope,
+            )
+            if current_hart:
+                changed = projected.replace(
+                    b"candidate = &objects->harts[index];", b"candidate = &objects->harts[index + 1];", 1,
+                )
+                self.assertNotEqual(projected, changed)
+            else:
+                changed = projected + b"\n"
 
             def projected_read(path):
                 data, identity = read(path)
@@ -4012,7 +4034,7 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
 
             def changed_read(path):
                 data, identity = projected_read(path)
-                return (data + b"\n" if path == ROOT / subject else data), identity
+                return (changed if path == ROOT / subject else data), identity
 
             for consumer in contract["assertions"]:
                 check, message = {
@@ -4020,6 +4042,8 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
                     "trace_fault_artifacts": (self.check_fault_sources, "fault prefix borrowed"),
                     "checked_source_record": (check_getters, "getter changed its fixed provider"),
                 }[consumer]
+                if current_hart:
+                    message = "OBJ01 function has changed or undeclared primitive coverage"
                 for getter in getter_keys if consumer == "checked_source_record" else (None,):
                     with patch.object(fatal, "read_regular", side_effect=projected_read):
                         if getter is not None:
@@ -4045,7 +4069,7 @@ class ObjectPanicSourceBindingTests(unittest.TestCase):
         tree = ast.parse((ROOT / owner).read_text())
         self.assertEqual(self.reference, literal_value(single_assignment(tree, "BINDING_REFERENCE").value))
         self.assertEqual(self.rows, literal_value(single_assignment(tree, "SOURCE_BINDINGS").value))
-        self.assertEqual((5851, 25), (len(self.inventory.facts), len(self.inventory.families)))
+        self.assertEqual((6327, 27), (len(self.inventory.facts), len(self.inventory.families)))
         self.assertTrue(evidence_authority.validate_inventory(self.inventory).ok)
         actual = tuple(fact for fact in self.inventory.facts if fact.family == "panic-trace-source-admission")
         self.assertEqual(self.expected_facts, actual)

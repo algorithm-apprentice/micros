@@ -1766,6 +1766,7 @@ def trace_fault_prefix_effects(objects, sections, layout, primary_top):
             (registry, 8): layout["magic"], (ready, 1): 1,
             (frame + 248, 8): 0x100, (frame + 264, 8): 13, (frame + 280, 8): hart,
             (hart + layout["hart_trap_installed"], 1): 1, (hart + layout["hart_hardware_id"], 8): 0,
+            (hart + layout["hart_generation"], 4): 1,
             (hart + layout["hart_primary_bottom"], 8): primary_top - 16384,
             (hart + layout["hart_primary_top"], 8): primary_top,
             **{(registry + layout["hart_table"] + index * layout["hart_bytes"] + layout["hart_state"], 4):
@@ -2449,11 +2450,21 @@ OBSERVER_CALLS = {
 
 
 def _prelude_arithmetic(width, word, registers):
-    if width == 4 and word & 0xfe00707f == 0x02000033:
+    if width == 4 and word & 0xfe00007f == 0x02000033 and word >> 12 & 7 in (0, 3, 5, 7):
         left, right = registers[word >> 15 & 31], registers[word >> 20 & 31]
-        if left is not None and right is not None and left[0] == right[0] == "scalar":
+        if left is None or right is None or left[0] != "scalar" or right[0] != "scalar":
+            return None
+        operation = word >> 12 & 7
+        if operation == 0:
             return "scalar", signed(left[1] * right[1], 64)
-        return None
+        left, right = left[1] & 0xffffffffffffffff, right[1] & 0xffffffffffffffff
+        if operation == 3:
+            value = (left * right) >> 64
+        elif operation == 5:
+            value = left // right if right else 0xffffffffffffffff
+        else:
+            value = left % right if right else left
+        return "scalar", signed(value, 64)
     if width == 2 and word & 3 == 2 and word >> 13 == 0:
         value = registers[word >> 7 & 31]
         shift = (word >> 12 & 1) << 5 | (word >> 2 & 31)

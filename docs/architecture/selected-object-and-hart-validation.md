@@ -6,11 +6,11 @@ This Accepted OBJ01 contract follows
 [ADR-0119](../adr/0119-selected-object-and-hart-validation.md) and its
 [fixed-source study](../research/minix-selected-object-and-hart-validation.md).
 Complete independent design review preceded its separate merge as #241.
-The uncommitted implementation is archived and blocked by the
-[OBJ01-C01 source-authority correction](#obj01-c01-complete-source-authority).
-[Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md) is the
-sole active design; no implementation resumes before its separate review,
-Acceptance and merge.
+The first uncommitted implementation is archived. The separately reviewed
+[OBJ01-C01 source-authority correction](#obj01-c01-complete-source-authority)
+under [Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md)
+has now merged as #242. The fresh implementation is the sole active outcome
+and follows the [implementation map](#implementation-and-evidence-map).
 
 ```text
 task:       OBJ01
@@ -520,15 +520,16 @@ Use existing literal/identity/projection machinery, not a new registry
 framework. No final fact count is inferred before that independent freeze.
 
 All 5,851 old complete records and twenty-five old fingerprints remain
-unchanged. Actual Green and recertification may retire only the specified
-ninety-four keys, adding one claim and reaching 279 retirements.
-Every prior claim remains valid without author journals.
+unchanged. The original ADR-0119 plan specified ninety-four retirements,
+one added claim and 279 total retirements. The separately merged correction
+below governs the current selection and total. Every prior claim remains
+valid without author journals.
 
 ## OBJ01-C01 complete source-authority
 
 This correction is Accepted under
 [ADR-0120](../adr/0120-obj01-complete-source-authority.md).
-Only after its separate design merge does it supersede the
+Its separate design merge as #242 supersedes the
 ninety-four-key selection and derived 279-retirement total above.
 All runtime, complexity, storage, failure and ownership requirements remain
 unchanged.
@@ -616,8 +617,8 @@ These are fixture-input adaptations, not exemptions in production or shared
 source/stack tools. The shared parser, collector, transition validator and
 profile admission remain unchanged.
 
-The implementation is blocked and its old branch is abandoned. After this
-design merges, start a fresh branch from current `main`; independently freeze
+The earlier implementation was blocked and its old branch abandoned.
+The fresh implementation starts from #242 on `main` and independently freezes
 the actual base, corrected plan, current predicates and every immutable input.
 Renew Red, Green and all thirteen units before retiring exactly ninety-five
 keys, adding one claim and reaching 280 retirements. Verify actual terminal
@@ -658,7 +659,7 @@ machine-test owners cover these new cases before actual target proof.
 After separate design merge, the implementation adds one task-specific
 native fixture/header, source/authority/evidence owners, a literal native
 binding declaration, focused regressions, fixture generator and driver.
-The canonical future author intents are:
+The canonical author intents are:
 
 ```bash
 "${MICROS_PYTHON}" -E -S -B tools/check_object_hart_validation.py --red
@@ -666,8 +667,8 @@ The canonical future author intents are:
 "${MICROS_PYTHON}" -E -S -B tools/check_object_hart_validation.py --recertify
 ```
 
-These are specified interfaces, not existing commands in this design.
-The real fixed-source Red must distinguish all three oracles and cover
+The task-specific driver implements these interfaces. Its real fixed-source
+Red must distinguish all three oracles and cover
 every planned retirement. Green uses actual current production.
 An immutable-input change invalidates the attempt; synthetic journals
 never provide author events.
@@ -710,3 +711,78 @@ committed/main authority and clean only completed task refs.
 
 Only this outcome closes B03-F001/F003/F004. OBJ02, IPC01, hosted CI and
 the remaining MINIX/POSIX roadmap retain their separate owners.
+
+## Implementation and evidence map
+
+The fresh implementation base is corrective design #242,
+`6d43a88f98c978ecdb4c1ec2ba31db3eca4d8c91`, tree
+`9b547572ba25ff479c9f8f5b17f62a99d44c33e7`.
+Both Accepted ADR-0119 and ADR-0120 are bound as immutable design inputs;
+the original ADR-0119 bytes are also checked against #241.
+Runtime expectations still derive from fixed #240 and the independently
+declared accepted adaptations, never from edited production bodies.
+
+Before any repository scaffold was added, the restart froze its complete
+1,538-member base, 5,851 predecessor records, twenty-five fingerprints,
+seven claims, 185 retirements, corrected ninety-five-key selection and
+eighteen-C/eight-header native input set. The base membership digest is:
+
+```text
+3d66ad157e198d998eaea7a85ff526ef56cbd039121fb36316e424b71cba1a66
+```
+
+The new source owner declares 53 current function contracts, including
+32 changed existing functions and 21 helpers, plus two removed functions.
+The literal native admission owner names all 468 actual input, function,
+definition, skeleton, header and observation comparisons. Eight normal
+task records bring the complete catalog to 6,327 facts without changing
+any predecessor record. The exact oracle partition is 68 / 11 / 16.
+Twelve candidate adapters are derived from fixed #242 plus explicit edits;
+six predecessor literal-binding files remain byte-identical.
+
+The native fixture and its generator build ordinary, aggregate and
+stack-only products for both fixed and current source. Each executes the
+same independently declared 171-case corpus, with stage-specific corrupted
+state results and actual primitive counts. The unsupported-current case
+first proves complete base-object validity, then measures the complete
+scheduler result separately from capture. The direct oracle requires that
+specific diagnostic Red witness in addition to its probe-count failures.
+Compilation, malformed output or an unrelated work failure cannot replace it.
+
+The full-only CTest owns the six-product execution. Focused Python tests
+exercise bounded declaration, protocol, replay and launcher controls rather
+than recompiling that entire corpus during every discovery. Direct iteration
+uses the existing commands:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_object_hart_validation
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_panic_trace.PanicTraceMachineTest.test_real_fault_dispatch_preserves_the_latch_and_exact_context_output tests.host.test_stack_source_projection
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_stack_bound_evidence.StackBoundEvidenceTest.test_unsigned_stride_arithmetic_retains_rv64_and_unknown_operand_semantics
+cmake --build build/host-debug --target kernel_objects_test scheduler_test
+ctest --test-dir build/host-debug --output-on-failure -R '^(kernel-objects|scheduler-core)$'
+```
+
+B14 retains the fixed memory-task selection, replaces its two partial panic
+selectors with the complete module, and adds the complete object-layout and
+stack-projection modules plus MEM05 and OBJ01. Discovery rejects duplicate
+test identities. The named resolver-store mutation and fixed historical
+projection are immutable fixture inputs; they do not weaken actual current
+source or compiled-machine qualification.
+
+Retained memory-native generation owns one checked source view and closes it
+before the external model commands and separately owned host runner.
+MEM03's PM object/scheduler equality and every unchanged observation contract,
+including empty contracts, remain exact. Qualified current scheduler phase
+guards retain direct failure propagation; the original generic checker and
+unrelated roots remain unchanged.
+
+Terminal journal replay uses complete source snapshots checked against its
+captured author-context identities, including both independent audit-census
+comparisons. It cannot authorize itself through an opening source view.
+Ordinary generation still consumes the invocation-owned checked view.
+
+These declarations and preparation controls do not retire source identities.
+The restart must produce its own immutable Red, Green and thirteen-unit
+transaction, verify the real terminal view, then complete every final gate
+above before independent implementation review and publication. Archived
+source and execution records are reference evidence only.

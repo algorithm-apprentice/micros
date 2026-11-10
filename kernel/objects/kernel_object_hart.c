@@ -94,7 +94,10 @@ enum micros_kernel_object_error micros_hart_resolve_context(
     const struct micros_hart **hart
 )
 {
+    const struct micros_hart *candidate;
     enum micros_kernel_object_error error;
+    uintptr_t base;
+    uintptr_t offset;
     size_t index;
 
     if (objects == NULL || hart == NULL) {
@@ -104,20 +107,27 @@ enum micros_kernel_object_error micros_hart_resolve_context(
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;
     }
-    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
-        const struct micros_hart *candidate =
-            &objects->harts[index];
-
-        if (
-            candidate->slot_state
-                == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && (uintptr_t)candidate == hart_context
-        ) {
-            *hart = candidate;
-            return MICROS_KERNEL_OBJECT_OK;
-        }
+    base = (uintptr_t)objects->harts;
+    if (hart_context < base) {
+        return MICROS_KERNEL_OBJECT_ERROR_STALE;
     }
-    return MICROS_KERNEL_OBJECT_ERROR_STALE;
+    offset = hart_context - base;
+    if (
+        offset >= sizeof(objects->harts)
+        || offset % sizeof(*candidate) != 0
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_STALE;
+    }
+    index = offset / sizeof(*candidate);
+    candidate = &objects->harts[index];
+    if (candidate->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
+        return MICROS_KERNEL_OBJECT_ERROR_STALE;
+    }
+    if (candidate->generation == 0) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
+    *hart = candidate;
+    return MICROS_KERNEL_OBJECT_OK;
 }
 
 static bool kernel_object_hart_stacks_avoid_harts(

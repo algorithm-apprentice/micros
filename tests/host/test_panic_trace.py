@@ -1299,6 +1299,7 @@ class PanicTraceTransportTest(unittest.TestCase):
 class PanicTraceMachineTest(unittest.TestCase):
     def test_real_fault_dispatch_preserves_the_latch_and_exact_context_output(self):
         from tests.host.test_stack_bound_evidence import compile_fixture
+        from tests.host.work_count_lexical import function_spans
         from tools.stack_bound_fatal_effects import TRACE_FAULT_FUNCTIONS, trace_fault_prefix_effects, trace_object_layout
         from tools.stack_bound_objects import load_object
         from tools.stack_bound_types import StackEvidenceError
@@ -1318,8 +1319,7 @@ class PanicTraceMachineTest(unittest.TestCase):
                 }
             trace_fault_prefix_effects(objects, sections, layout, 0x83004000)
             for index, (unit, before, after) in enumerate((
-                ("kernel/objects/kernel_object_hart.c", "*hart = candidate;\n            return MICROS_KERNEL_OBJECT_OK;",
-                 "*hart = candidate + 1;\n            return MICROS_KERNEL_OBJECT_OK;"),
+                ("kernel/objects/kernel_object_hart.c", "*hart = candidate;", "*hart = candidate + 1;"),
                 ("kernel/trap/trap_context.c", "    return hart;\n",
                  "    *(volatile uint32_t *)0x10000000 = 0;\n    return hart;\n"),
                 ("kernel/trap/trap.c", "if ((frame->sstatus & MICROS_RISCV_SSTATUS_SPP) == 0)",
@@ -1327,9 +1327,16 @@ class PanicTraceMachineTest(unittest.TestCase):
             )):
                 source = (ROOT / unit).read_text()
                 self.assertIn(before, source)
+                if unit == "kernel/objects/kernel_object_hart.c":
+                    span = function_spans(source)["micros_hart_resolve_context"]
+                    body = source[span.body_start:span.body_end]
+                    self.assertEqual(1, body.count(before))
+                    changed_source = source[:span.body_start] + body.replace(before, after, 1) + source[span.body_end:]
+                else:
+                    changed_source = source.replace(before, after, 1)
                 selected = Path(directory) / ("mutation-" + str(index))
                 selected.mkdir()
-                _, path = compile_fixture(selected, "#define MICROS_BUILD_PANIC_TRACE_TEST 1\n" + source.replace(before, after, 1))
+                _, path = compile_fixture(selected, "#define MICROS_BUILD_PANIC_TRACE_TEST 1\n" + changed_source)
                 changed = load_object(path)
                 mapped = {section.index: 0x6600000000000000 + section.index * 0x1000000
                           for section in changed.sections if section.flags & 3 == 3}

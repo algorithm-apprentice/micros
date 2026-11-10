@@ -290,6 +290,12 @@ Its accepted ninety-five-key selection retains the same runtime contract and
 thirty-eight-path domain. Implementation stays blocked until separate review,
 Acceptance and merge; no OBJ01 runtime finding or hosted-CI result closes here.
 
+Corrective design #242 has now separately merged after clean independent
+review. The fresh OBJ01 [implementation map](selected-object-and-hart-validation.md#implementation-and-evidence-map)
+binds both Accepted decisions, the independently frozen new base and all
+ninety-five identities. Complete renewed runtime, target and stack evidence
+and independent implementation review remain required before finding closure.
+
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
 zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A

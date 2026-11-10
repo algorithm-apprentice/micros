@@ -1477,10 +1477,15 @@ class EndpointSourceLayoutTest(unittest.TestCase):
         self.assertEqual({}, c_function_definitions(header))
 
     def test_public_runtime_driver_and_neighbor_artifacts_remain_byte_exact(self):
+        from tests.host.object_hart_validation_source import historical_identity_required
+
         for path, expected in STABLE_HASHES.items():
             with self.subTest(path=path):
                 from tests.host.test_qemu_runner_source_layout import restored_runner_source
 
+                key = "tests/host/test_endpoint_source_layout.py:data-entry:STABLE_HASHES/" + path
+                if path == "kernel/kernel_objects.c" and not historical_identity_required(ROOT, key):
+                    continue
                 value = (
                     restored_kernel_objects_source().encode() if path == "kernel/kernel_objects.c"
                     else restored_runner_source().encode() if path == "tools/run_qemu_smoke.py"
