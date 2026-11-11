@@ -1,25 +1,18 @@
 """MEM04 actual native and target semantic capture."""
 
-from dataclasses import asdict
 import hashlib
-import io
 import json
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
-import unittest
 
-from tests.host.runtime_memory_evidence import native_compiler
 from tests.host.selected_address_space_source import (
-    CHANNELS, NATIVE_SOURCE_MEMBERS, OWNER_MASK, RECIPE_ADMISSION, SOURCE_ROLES,
-    STATE_WORK_CONTRACT, extended_header, validate_retained_source,
+    CHANNELS, OWNER_MASK, RECIPE_ADMISSION, STATE_WORK_CONTRACT,
 )
-from tests.host.evidence_authority_types import digest
 from tests.host.work_count_evidence import Capture, Kind, Owner, Snapshot, Stage, Status, compose_snapshots
-from tools.generate_selected_address_space_fixture import prepare_sources, source_bundle
+from tools.generate_selected_address_space_fixture import source_bundle
 from tools.stack_artifact_files import read_regular
 from tools.validation_inputs import _file_identity
 
@@ -29,7 +22,15 @@ FIXTURE_PATHS = (
     "tests/host/selected_address_space_test.h",
     "tests/host/selected_address_space_source.py",
     "tests/host/selected_address_space_evidence.py",
-    "tests/host/selected_address_space_authority.py",
+    "tests/host/native_observations.py",
+    "tests/host/native_observations.json",
+    "tests/host/source_snapshot.py",
+    "tests/host/selected_release_handoff_source.py",
+    "tests/host/c_source_records.py",
+    "tests/host/work_count_lexical.py",
+    "tests/host/work_count_projection.py",
+    "tests/host/work_count_types.py",
+    "tests/host/work_count_snapshots.py",
     "tests/host/test_selected_address_space.py",
     "tools/check_selected_address_space.py",
     "tools/generate_selected_address_space_fixture.py",
@@ -427,25 +428,6 @@ def query_failures(queries, *, baseline=False):
     return tuple(failures)
 
 
-def native_command(root, compiler, generated, executable, stage, channel):
-    observed = channel != "ordinary"
-    return (
-        compiler["path"], "-std=c17", "-Wall", "-Wextra", "-Werror", "-Wpedantic",
-        "-Wmissing-prototypes", "-Wstrict-prototypes", "-fno-builtin",
-        "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g",
-        "-DMICROS_BUILD_USER_ADDRESS_SPACE_TEST=1",
-        *(("-DMICROS_SELECTED_ADDRESS_SPACE_BASELINE=1",) if stage is Stage.RED else ()),
-        *(("-DMICROS_TEST_WORK_COUNTS=1", "-DMICROS_AS_NATIVE_CHANNEL=" + str(CHANNELS.index(channel)))
-          if observed else ()),
-        "-I", str(generated), "-I", str(generated / "include"),
-        "-I", str(root), "-I", str(root / "include"),
-        *(str(generated / path) for path in NATIVE_SOURCE_MEMBERS),
-        str(root / "tests/host/selected_address_space_test.c"),
-        *((str(root / "tests/work/work_counts.c"),) if observed else ()),
-        "-o", str(executable),
-    )
-
-
 def native_symbols_tool():
     selected = shutil.which("nm")
     if selected is None:
@@ -454,93 +436,6 @@ def native_symbols_tool():
         selected = subprocess.check_output(("/usr/bin/xcrun", "--find", "nm"), text=True, timeout=30).strip()
     selected = Path(selected).resolve(strict=True)
     return {"path": str(selected), "identity": _file_identity(selected)}
-
-
-def measure_semantics(root, stage, channel="ordinary"):
-    if stage not in (Stage.RED, Stage.GREEN) or channel not in CHANNELS:
-        raise ValueError("MEM04 native execution has an unknown stage")
-    root = Path(root).resolve()
-    compiler = native_compiler(root)
-    nm = native_symbols_tool()
-    fixtures = {path: read_regular(root / path)[1] for path in FIXTURE_PATHS}
-    with tempfile.TemporaryDirectory(prefix="micros-mem04-semantic-") as directory:
-        directory = Path(directory)
-        generated, executable = directory / "source", directory / "semantic"
-        inputs, outputs = prepare_sources(root, generated, stage, channel)
-        command = native_command(root, compiler, generated, executable, stage, channel)
-        build = subprocess.run(command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
-        if build.returncode or build.stderr:
-            raise ValueError("MEM04 native compilation failed:\n" + build.stdout + build.stderr)
-        nm_command = (nm["path"], "-a", str(executable))
-        symbols = subprocess.run(nm_command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-        if symbols.returncode or symbols.stderr:
-            raise ValueError("MEM04 native symbol observation failed:\n" + symbols.stdout + symbols.stderr)
-        if channel == "ordinary" and re.search(r"\b_?micros_test_work_", symbols.stdout):
-            raise ValueError("MEM04 ordinary product contains observation support")
-        execution_command = (str(executable), stage.value, channel)
-        execution = subprocess.run(
-            execution_command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
-        )
-        if execution.returncode or execution.stderr:
-            raise ValueError("MEM04 native capture failed:\n" + execution.stdout + execution.stderr)
-        rows = parse_native_output(execution.stdout, stage, channel)
-        current_inputs, _ = source_bundle(root, stage, channel)
-        if (
-            {path: read_regular(generated / path)[1] for path in outputs} != outputs
-            or {path: read_regular(root / path)[1] for path in FIXTURE_PATHS} != fixtures
-            or native_compiler(root) != compiler or native_symbols_tool() != nm or current_inputs != inputs
-        ):
-            raise ValueError("MEM04 native source/compiler/fixture changed during capture")
-        return {
-            "version": 1, "stage": stage.value, "channel": channel, "compiler": compiler, "command": command,
-            "compile_exit_code": build.returncode, "build_output": build.stdout,
-            "execution_command": execution_command,
-            "exit_code": execution.returncode, "output": execution.stdout,
-            "source_inputs": inputs, "generated_sources": outputs, "fixture_inputs": fixtures,
-            "executable": read_regular(executable)[1],
-            "native_nm": nm, "nm_command": nm_command, "nm_exit_code": symbols.returncode,
-            "nm_output": symbols.stdout,
-            "semantic_results": semantic_results(rows["semantics"]),
-            "query_failures": query_failures(rows["queries"]),
-            "binding_failures": binding_failures(rows["bindings"]), "rows": rows,
-        }
-
-
-def encoded_capture(capture):
-    return json.dumps(capture, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-
-
-def check_current_fixture_syntax(root):
-    root = Path(root).resolve()
-    compiler = native_compiler(root)
-    fixtures = {path: read_regular(root / path)[1] for path in FIXTURE_PATHS}
-    with tempfile.TemporaryDirectory(prefix="micros-mem04-fixture-syntax-") as directory:
-        generated = Path(directory)
-        prepare_sources(root, generated, Stage.RED)
-        for path in SOURCE_ROLES["production_paths"]:
-            if not path.endswith(".h"):
-                continue
-            target = generated / path
-            text = extended_header(path, target.read_text())
-            validate_retained_source(root, path, text, Stage.GREEN)
-            target.write_text(text)
-        command = native_command(root, compiler, generated, generated / "unused", Stage.GREEN, "ordinary")
-        prefix = command[:command.index(str(generated / NATIVE_SOURCE_MEMBERS[0]))]
-        command = (
-            *prefix, "-DMICROS_SELECTED_ADDRESS_SPACE_LAUNCHER=1",
-            '-DMICROS_SELECTED_ADDRESS_SPACE_PYTHON="' + sys.executable + '"',
-            '-DMICROS_SELECTED_ADDRESS_SPACE_DRIVER="' + str(root / RECIPE_ADMISSION["driver"]) + '"',
-            '-DMICROS_SELECTED_ADDRESS_SPACE_ROOT="' + str(root) + '"',
-            "-fsyntax-only", str(root / "tests/host/selected_address_space_test.c"),
-        )
-        result = subprocess.run(
-            command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode or result.stdout or result.stderr:
-            raise ValueError("MEM04 current fixture does not compile against its declared interfaces:\n" + result.stdout + result.stderr)
-        if {path: read_regular(root / path)[1] for path in FIXTURE_PATHS} != fixtures or native_compiler(root) != compiler:
-            raise ValueError("MEM04 fixture syntax inputs changed during compilation")
-        return command
 
 
 def _normalized_semantics(rows):
@@ -557,59 +452,6 @@ def _normalized_semantics(rows):
             row["before_satp"] = before >> 44
         result.append((name, row))
     return tuple(result)
-
-
-def _validate_baseline_semantics(rows):
-    cursor = rows[0][1]
-    if cursor != {
-        "version": 1, "observed": 8, "before": 64, "after": 128,
-        "other_state_unchanged": 1, "output_unchanged": 1, "allocator_unchanged": 0,
-    }:
-        raise ValueError("MEM04 original execution did not reproduce the exact cursor regression")
-    for _, row in _normalized_semantics(rows)[1:]:
-        if any(row[key] != value for key, value in {
-            "diagnostic": 12, "lookup": 12, "physical": 0xFEEDFACEFEEDFACE, "mapped": 4,
-            "permissions": (1 << 32) - 1, "absent": 12, "absent_outputs_unchanged": 1,
-            "activation": 12, "before_satp": 8 << 16, "after_satp": 0,
-            "expected_satp": 1, "restored_satp": 0, "state_unchanged": 1,
-        }.items()):
-            raise ValueError("MEM04 original execution lost a scoped-result/state control")
-
-
-def validate_measurements(measured):
-    if type(measured) is not dict or set(measured) != set(CHANNELS):
-        raise ValueError("MEM04 native execution omitted or added a product")
-    stages = {native["stage"] for native in measured.values()}
-    if len(stages) != 1 or next(iter(stages)) not in ("red", "green"):
-        raise ValueError("MEM04 native products mix source stages")
-    stage = Stage(next(iter(stages)))
-    parsed = {}
-    for channel, native in measured.items():
-        if (
-            native["channel"] != channel or type(native["compile_exit_code"]) is not int
-            or native["compile_exit_code"] != 0 or type(native["exit_code"]) is not int or native["exit_code"] != 0
-            or type(native["nm_exit_code"]) is not int or native["nm_exit_code"] != 0
-            or type(native["nm_output"]) is not str or not native["nm_output"]
-        ):
-            raise ValueError("MEM04 native capture is not one complete actual successful execution")
-        rows = parse_native_output(native["output"], stage, channel)
-        if (
-            digest(rows) != digest(native["rows"])
-            or native["semantic_results"] != semantic_results(rows["semantics"])
-            or digest(native["query_failures"]) != digest(query_failures(rows["queries"]))
-            or digest(native["binding_failures"]) != digest(binding_failures(rows["bindings"]))
-        ):
-            raise ValueError("MEM04 native derived results differ from the actual output")
-        if channel == "ordinary" and re.search(r"\b_?micros_test_work_", native["nm_output"]):
-            raise ValueError("MEM04 ordinary product contains observation support")
-        if stage is Stage.RED:
-            _validate_baseline_semantics(rows["semantics"])
-            failures = query_failures(rows["queries"], baseline=True)
-            if failures:
-                raise ValueError("MEM04 baseline lost an independent semantic control: " + repr(failures[:8]))
-        parsed[channel] = rows
-    _validate_composition(parsed)
-    return stage
 
 
 def _validate_composition(parsed):
@@ -639,11 +481,6 @@ def _slot_count(row):
     return int(
         scenario in (*range(20, 32), *range(40, 52), 53, 54, 136, 137)
     )
-
-
-def work_failures(measured):
-    validate_measurements(measured)
-    return _work_failures({channel: value["rows"] for channel, value in measured.items()})
 
 
 def _work_failures(measured):
@@ -699,16 +536,6 @@ def _work_failures(measured):
                 failures[category].append((row["case"], "independent-frame-and-leaf-scaling", 1, 0))
             pairs.setdefault(key, aggregate)
     return {key: tuple(value) for key, value in failures.items()}
-
-
-def measure_native(root, stage):
-    measured = {}
-    for channel in CHANNELS:
-        print("MICROS_MEM04_NATIVE_BEGIN " + channel, flush=True)
-        measured[channel] = measure_semantics(root, stage, channel)
-        print("MICROS_MEM04_NATIVE_CAPTURED " + channel, flush=True)
-    validate_measurements(measured)
-    return measured
 
 
 TARGET_FIELDS = {
@@ -794,262 +621,9 @@ def target_failures(rows, *, baseline=False):
     return tuple(failures)
 
 
-def _target_paths(workflow):
-    if workflow not in STATE_WORK_CONTRACT["target_workflows"]:
-        raise ValueError("MEM04 target path belongs to an undeclared workflow")
-    name = workflow.removeprefix("test-qemu-")
-    return "build/riscv64-" + name + "-test/kernel/micros.elf"
-
-
-def _target_inputs(root):
-    paths = (*SOURCE_ROLES["production_paths"], *(
-        path for path in SOURCE_ROLES["fixed_adapters"] if path.startswith("kernel/tests/")
-    ))
-    return {path: read_regular(Path(root) / path)[1] for path in paths}
-
-
-def measure_targets(root, stage):
-    root = Path(root).resolve()
-    result = {}
-    for workflow in STATE_WORK_CONTRACT["target_workflows"]:
-        inputs = _target_inputs(root)
-        command = ("cmake", "--workflow", "--preset", workflow)
-        print("MICROS_MEM04_TARGET_BEGIN " + workflow, flush=True)
-        completed = subprocess.run(
-            command, cwd=root, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=600,
-        )
-        try:
-            rows = parse_target_output(completed.stdout, workflow, stage, completed.returncode)
-            if stage is Stage.RED and target_failures(rows, baseline=True):
-                raise ValueError("MEM04 baseline target lost an independent semantic/state control")
-            kernel = _target_paths(workflow)
-            result[workflow] = {
-                "version": 1, "stage": stage.value, "command": command, "exit_code": completed.returncode,
-                "output": completed.stdout, "source_inputs": inputs, "kernel_path": kernel,
-                "kernel": read_regular(root / kernel)[1],
-                "rows": rows, "failures": target_failures(rows),
-            }
-            if _target_inputs(root) != inputs:
-                raise ValueError("MEM04 target inputs changed during actual execution")
-        except (OSError, ValueError):
-            sys.stderr.write(completed.stdout)
-            raise
-        print("MICROS_MEM04_TARGET_CAPTURED " + workflow, flush=True)
-    return result
-
-
-def validate_targets(targets, stage):
-    if type(targets) is not dict or set(targets) != set(STATE_WORK_CONTRACT["target_workflows"]):
-        raise ValueError("MEM04 target execution omitted or added a workflow")
-    for workflow, value in targets.items():
-        if (
-            value["version"] != 1 or value["stage"] != stage.value
-            or tuple(value["command"]) != ("cmake", "--workflow", "--preset", workflow)
-            or value["kernel_path"] != _target_paths(workflow)
-        ):
-            raise ValueError("MEM04 target evidence substituted its source stage or command")
-        rows = parse_target_output(value["output"], workflow, stage, value["exit_code"])
-        if digest(value["rows"]) != digest(rows) or digest(value["failures"]) != digest(target_failures(rows)):
-            raise ValueError("MEM04 target derived results differ from the actual output")
-        if stage is Stage.RED and target_failures(rows, baseline=True):
-            raise ValueError("MEM04 target failure is not its declared original divergence")
-    return targets
-
-
-class SelectedAddressSpaceOracles(unittest.TestCase):
-    def test_selected_path(self):
-        self.assertTrue(self.semantics["selected"], "selected result/cursor compensation contract failed")
-        self.assertFalse(self.work["selected"], repr(self.work["selected"][:10]))
-        self.assertFalse(self.selected_semantics, repr(self.selected_semantics[:10]))
-        self.assertFalse(self.bindings, repr(self.bindings[:10]))
-        self.assertFalse(self.audits["migrated"])
-
-    def test_root_activation(self):
-        self.assertTrue(self.semantics["activation"], "bounded root activation contract failed")
-        self.assertFalse(self.work["root"], repr(self.work["root"][:10]))
-        self.assertFalse(self.root_semantics, repr(self.root_semantics[:10]))
-        self.assertFalse(self.targets["test-qemu-user-address-space"]["failures"])
-        self.assertFalse(self.bindings, repr(self.bindings[:10]))
-
-    def test_scoped_diagnostic(self):
-        self.assertTrue(self.semantics["scoped-diagnostic"], "scoped absence did not remain separate from diagnosis")
-        self.assertFalse(self.targets["test-qemu-address-space-handoff"]["failures"])
-        self.assertFalse(self.diagnostic_semantics, repr(self.diagnostic_semantics[:10]))
-        self.assertFalse(self.bindings, repr(self.bindings[:10]))
-
-
-def run_oracles(root, measured, targets, audits, reference=None):
-    from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
-    from tests.host.selected_address_space_authority import ORACLE_RULES
-    from tests.host.selected_address_space_source import declared_audit_boundaries, measure_audit_boundaries
-
-    stage = validate_measurements(measured)
-    validate_targets(targets, stage)
-    if stage is Stage.GREEN:
-        if reference is None or validate_measurements(reference) is not Stage.RED:
-            raise ValueError("MEM04 current execution lacks its same-attempt actual baseline")
-    elif reference is not None:
-        raise ValueError("MEM04 baseline execution cannot borrow another reference")
-    expected = declared_audit_boundaries(root)
-    if digest(audits) != digest(measure_audit_boundaries(root, stage)) or digest(audits["retained"]) != digest(expected["retained"]):
-        raise ValueError("MEM04 changed a retained diagnostic caller or substituted its source census")
-    work = _work_failures({channel: value["rows"] for channel, value in measured.items()})
-    if stage is Stage.RED and (not work["selected"] or not work["root"]):
-        raise ValueError("MEM04 original work measurements did not discriminate both selected and root costs")
-    rows = measured["ordinary"]["rows"]
-    failures = query_failures(rows["queries"])
-    outcomes, output = [], io.StringIO()
-    for identifier, test, property_name, _, _, _ in ORACLE_RULES:
-        case = SelectedAddressSpaceOracles(test.rsplit(".", 1)[1])
-        case.semantics, case.work, case.targets, case.audits = semantic_results(rows["semantics"]), work, targets, audits
-        case.bindings = binding_failures(rows["bindings"])
-        case.selected_semantics = tuple(row for row in failures if rows["queries"][row[0] - 1]["operation"] in (0, 1, 4))
-        case.root_semantics = tuple(row for row in failures if rows["queries"][row[0] - 1]["operation"] in (2, 5, 6))
-        case.diagnostic_semantics = tuple(row for row in failures if rows["queries"][row[0] - 1]["operation"] == 3)
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(unittest.TestSuite((case,)))
-        if result.testsRun != 1 or result.errors or result.skipped:
-            raise ValueError("MEM04 oracle was skipped or failed outside its measured assertion")
-        if stage is Stage.RED:
-            if result.wasSuccessful():
-                raise ValueError("MEM04 original execution did not expose every declared divergence")
-            observed = ObservedResult.EXPECTED_FAILURE
-        else:
-            observed = ObservedResult.PASS if result.wasSuccessful() else ObservedResult.FAIL
-        outcomes.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    return tuple(outcomes), output.getvalue()
-
-
-def execution_log(measured, targets, audits, results, oracle_output, *, phase, attempt):
-    return json.loads(json.dumps({
-        "version": 1, "phase": phase, "attempt": attempt, "native": measured,
-        "targets": targets, "audits": audits, "results": [asdict(result) for result in results],
-        "oracle_output": oracle_output,
-    }, allow_nan=False))
-
-
-def _validate_artifact_identity(identity):
-    from tests.host.diagnostic_history_authority import record_fields
-
-    record_fields(identity, ("kind", "mode", "size", "sha256"))
-    if (
-        identity["kind"] != "file" or type(identity["mode"]) is not int
-        or not 0 < identity["mode"] <= 0o777
-        or type(identity["size"]) is not int or identity["size"] <= 0
-        or type(identity["sha256"]) is not str or re.fullmatch(r"[a-f0-9]{64}", identity["sha256"]) is None
-    ):
-        raise ValueError("MEM04 execution lacks a complete ordinary artifact identity")
-
-
-def _validate_native_replay(context, measured, stage):
-    from tests.host.diagnostic_history_authority import record_fields, record_strings
-
-    if type(measured) is not dict or set(measured) != set(CHANNELS):
-        raise ValueError("MEM04 native replay omitted a product")
-    directories = set()
-    for channel, native in measured.items():
-        record_fields(native, (
-            "version", "stage", "channel", "compiler", "command", "compile_exit_code",
-            "build_output", "execution_command", "exit_code", "output", "source_inputs",
-            "generated_sources", "fixture_inputs", "executable", "native_nm", "nm_command",
-            "nm_exit_code", "nm_output", "semantic_results", "query_failures", "binding_failures", "rows",
-        ))
-        if (
-            native["version"] != 1 or native["stage"] != stage.value or native["channel"] != channel
-            or native["compiler"] != context.native_compiler or native["native_nm"] != context.native_nm
-        ):
-            raise ValueError("MEM04 native replay borrowed another source stage or tool")
-        execution = record_strings(native["execution_command"])
-        if len(execution) != 3 or execution[1:] != (stage.value, channel):
-            raise ValueError("MEM04 native replay changed its execution stage/channel")
-        executable = Path(execution[0])
-        directory = executable.parent
-        if (
-            not executable.is_absolute() or executable.name != "semantic"
-            or not directory.name.startswith("micros-mem04-semantic-") or directory in directories
-            or directory.parent.resolve() != Path(tempfile.gettempdir()).resolve()
-        ):
-            raise ValueError("MEM04 native replay names a borrowed or unowned execution")
-        directories.add(directory)
-        if record_strings(native["command"]) != native_command(
-            context.root, context.native_compiler, directory / "source", executable, stage, channel,
-        ) or record_strings(native["nm_command"]) != (context.native_nm["path"], "-a", str(executable)):
-            raise ValueError("MEM04 native replay changed its exact compile/link/symbol command")
-        inputs, outputs = source_bundle(context.root, stage, channel)
-        generated = {
-            path: {"kind": "file", "mode": mode, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-            for path, (data, mode) in outputs.items()
-        }
-        if (
-            native["source_inputs"] != inputs or native["generated_sources"] != generated
-            or native["fixture_inputs"] != {path: context.files[path] for path in FIXTURE_PATHS}
-            or type(native["build_output"]) is not str
-        ):
-            raise ValueError("MEM04 native replay substituted a source/header/observation/fixture input")
-        _validate_artifact_identity(native["executable"])
-        if not native["executable"]["mode"] & 0o100:
-            raise ValueError("MEM04 native replay artifact is not executable")
-
-
-def _validate_target_replay(context, targets, stage):
-    from tests.host.diagnostic_history_authority import record_fields
-    from tests.host.selected_address_space_source import fixed_source
-
-    validate_targets(targets, stage)
-    expected = {path: context.files[path] for path in _target_inputs(context.root)}
-    if stage is Stage.RED:
-        for path in SOURCE_ROLES["production_paths"]:
-            raw = fixed_source(str(context.root), path)
-            expected[path] = {
-                "kind": "file", "mode": context.files[path]["mode"], "size": len(raw),
-                "sha256": hashlib.sha256(raw).hexdigest(),
-            }
-    for value in targets.values():
-        record_fields(value, (
-            "version", "stage", "command", "exit_code", "output",
-            "source_inputs", "kernel_path", "kernel", "rows", "failures",
-        ))
-        if value["source_inputs"] != expected:
-            raise ValueError("MEM04 target replay substituted its actual production/fixture source")
-        _validate_artifact_identity(value["kernel"])
-        if stage is Stage.GREEN and read_regular(context.root / value["kernel_path"])[1] != value["kernel"]:
-            raise ValueError("MEM04 current target artifact changed after its actual execution")
-
-
-def validate_execution_log(context, replay, *, phase, attempt, reference=None):
-    from tests.host.diagnostic_history_authority import record_fields
-    from tests.host.selected_address_space_source import measure_audit_boundaries
-
-    if phase not in ("red", "green", "recertify") or type(attempt) is not str or re.fullmatch(r"[a-f0-9]{32}", attempt) is None:
-        raise ValueError("MEM04 replay has an unadmitted phase or attempt")
-    record_fields(replay, ("version", "phase", "attempt", "native", "targets", "audits", "results", "oracle_output"))
-    if (
-        type(replay["version"]) is not int or replay["version"] != 1
-        or replay["phase"] != phase or replay["attempt"] != attempt
-        or type(replay["oracle_output"]) is not str or not replay["oracle_output"]
-    ):
-        raise ValueError("MEM04 replay belongs to a different phase or attempt")
-    stage = Stage.RED if phase == "red" else Stage.GREEN
-    _validate_native_replay(context, replay["native"], stage)
-    _validate_target_replay(context, replay["targets"], stage)
-    if stage is Stage.GREEN:
-        if reference is None:
-            raise ValueError("MEM04 current replay lacks its same-attempt original execution")
-        _validate_native_replay(context, reference, Stage.RED)
-    elif reference is not None:
-        raise ValueError("MEM04 original replay cannot borrow a different reference")
-    audits = measure_audit_boundaries(context.root, stage)
-    if digest(replay["audits"]) != digest(audits):
-        raise ValueError("MEM04 replay substituted its complete current caller ledger")
-    results, _ = run_oracles(context.root, replay["native"], replay["targets"], audits, reference)
-    if replay["results"] != json.loads(json.dumps([asdict(result) for result in results])):
-        raise ValueError("MEM04 replay outcomes do not follow the actual complete executions")
-    return results
-
-
 def check_native_products(root, executable_paths):
-    from tests.host.selected_address_space_source import measure_audit_boundaries
-    from tests.host.selected_release_handoff_source import legacy_expected_audits
+    from tests.host.selected_release_handoff_source import measure_audit_boundaries
+    from tests.host.native_observations import validate_source
 
     root = Path(root).resolve()
     expected = tuple(root / "build/host-debug" / name for name in RECIPE_ADMISSION["native_targets"])
@@ -1058,9 +632,9 @@ def check_native_products(root, executable_paths):
     identities = {str(path): read_regular(path)[1] for path in expected}
     fixtures = {path: read_regular(root / path)[1] for path in FIXTURE_PATHS}
     dependencies = {}
-    for path in SOURCE_ROLES["dependent_production_paths"]:
+    for path in ("kernel/memory/user_address_space_handoff.c",):
         data, identity = read_regular(root / path)
-        validate_retained_source(root, path, data.decode(), Stage.GREEN)
+        validate_source(root, path, data.decode())
         dependencies[path] = identity
     nm = native_symbols_tool()
     measured, generated, inputs = {}, {}, {}
@@ -1092,11 +666,10 @@ def check_native_products(root, executable_paths):
     _validate_composition(measured)
     failures = _work_failures(measured)
     ordinary = measured["ordinary"]
-    audits = measure_audit_boundaries(root, Stage.GREEN)
+    measure_audit_boundaries(root, Stage.GREEN)
     if (
         any(failures.values()) or not all(semantic_results(ordinary["semantics"]).values())
         or query_failures(ordinary["queries"]) or binding_failures(ordinary["bindings"])
-        or audits["migrated"] or audits["retained"] != legacy_expected_audits(root)
     ):
         raise ValueError("MEM04 CTest failed selected semantics, work or diagnostic boundaries: " + json.dumps(failures))
     if (
@@ -1107,8 +680,7 @@ def check_native_products(root, executable_paths):
         raise ValueError("MEM04 CTest inputs/products changed during execution")
     for channel in CHANNELS:
         directory = root / RECIPE_ADMISSION["generator_output"] / channel
-        current, _ = source_bundle(root, Stage.GREEN, channel)
-        if current != inputs[channel] or {
+        if {path: read_regular(root / path)[1] for path in inputs[channel]} != inputs[channel] or {
             path: read_regular(directory / path)[1] for path in generated[channel]
         } != generated[channel]:
             raise ValueError("MEM04 CTest source or generated inputs changed during execution")

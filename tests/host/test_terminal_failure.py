@@ -13,127 +13,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from tests.host.evidence_authority_inventory import current_inventory
-from tests.host.evidence_authority_types import AuthorityClass, fact_set_digest
-from tests.host.test_evidence_authority import prior_standalone_binding_facts
-
-
 ROOT = Path(__file__).resolve().parents[2]
-
-
-class TerminalAuthorityTest(unittest.TestCase):
-    def test_exact_nine_authorities_exist_without_a_new_retirement_claim(self):
-        source = "tests/host/terminal_failure_source.py"
-        evidence = "tests/host/terminal_failure_evidence.py"
-        expected = {
-            evidence + ":design-anchor:PLAT02": AuthorityClass.TRANSPORT_IDENTITY,
-            source + ":source-membership:PLAT02": AuthorityClass.PERMANENT_INVARIANT,
-            source + ":artifact-contract:PLAT02-recipes": AuthorityClass.ARTIFACT_CONTRACT,
-            source + ":effect-contract:PLAT02-fatal": AuthorityClass.PERMANENT_INVARIANT,
-            source + ":source-projection:PLAT02": AuthorityClass.TRANSPORT_IDENTITY,
-        }
-        for name in (
-            "terminal-transmit-bound", "terminal-drain-bound",
-            "terminal-entry-reset-ownership", "terminal-console-repair",
-        ):
-            expected[evidence + ":baseline-oracle:" + name] = AuthorityClass.BASELINE_ORACLE
-        actual = {
-            fact.key: fact.authority_class
-            for fact in current_inventory(ROOT).facts
-            if fact.family == "terminal-failure-baseline"
-        }
-        self.assertEqual(expected, actual)
-        from tests.host.diagnostic_history_authority import task_definition
-
-        _, _, _, registry = task_definition(ROOT)
-        self.assertEqual(
-            {"COPY01-runtime-memory", "PLAT01-diagnostic-history"},
-            {claim.transition_id for claim in registry.claims},
-        )
-
-    def test_every_committed_family_and_complete_fact_fingerprint_is_preserved(self):
-        from tests.host.terminal_failure_evidence import DESIGN_PINS
-
-        source = subprocess.check_output(
-            ("git", "show", DESIGN_PINS["design_commit"] + ":tests/host/evidence_authority_inventory.py"),
-            cwd=ROOT, text=True, timeout=30,
-        )
-        declaration, = (
-            node for node in ast.parse(source).body
-            if isinstance(node, ast.Assign) and any(
-                isinstance(target, ast.Name) and target.id == "DECLARED_FAMILY_FACT_DIGESTS"
-                for target in node.targets
-            )
-        )
-        expected = ast.literal_eval(declaration.value)
-        inventory = current_inventory(ROOT)
-        self.assertEqual(12, len(expected))
-        self.assertEqual(3920, sum(fact.family in expected for fact in inventory.facts))
-        from tests.host.evidence_authority_inventory import historical_object_binding_facts
-
-        historical = historical_object_binding_facts(ROOT, prior_standalone_binding_facts(inventory.facts))
-        for family, fingerprint in expected.items():
-            self.assertEqual(
-                fingerprint, fact_set_digest(fact for fact in historical if fact.family == family),
-                family,
-            )
-
-    def test_oracles_reject_duplicate_test_ownership_missing_cases_and_boolean_ids(self):
-        from tests.host.terminal_failure_evidence import ORACLE_RULES
-        from tests.host.terminal_failure_source import checked_oracle_rules
-
-        self.assertEqual(ORACLE_RULES, checked_oracle_rules(ORACLE_RULES))
-        for replacement in (
-            (*ORACLE_RULES[0][:1], ORACLE_RULES[1][1], *ORACLE_RULES[0][2:]),
-            (*ORACLE_RULES[0][:5], (1, 2, 5)),
-            (*ORACLE_RULES[0][:5], (True, 2, 5, 7)),
-        ):
-            with self.subTest(rule=replacement), self.assertRaises(ValueError):
-                checked_oracle_rules((replacement, *ORACLE_RULES[1:]))
-
-    def test_literal_roles_reject_duplicate_assignments_keys_and_overlapping_inputs(self):
-        from tests.host.terminal_failure_source import EVIDENCE_PATH, SOURCE_PATH, declaration_facts
-
-        with tempfile.TemporaryDirectory(prefix="micros-plat02-declarations-") as directory:
-            root = Path(directory)
-            for name in (SOURCE_PATH, EVIDENCE_PATH):
-                path = root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes((ROOT / name).read_bytes())
-            path = root / SOURCE_PATH
-            source = path.read_text()
-            for changed in (
-                source + "\nSOURCE_ROLES = {}\n",
-                source.replace('    "candidate_paths": (\n', '    "candidate_paths": (),\n    "candidate_paths": (\n', 1),
-                source.replace('"arch/riscv64/uart.c"', '"tests/host/panic_control_test.c"', 1),
-            ):
-                path.write_text(changed)
-                with self.assertRaises(ValueError):
-                    declaration_facts(root, SOURCE_PATH)
-            with self.assertRaises(ValueError):
-                declaration_facts(ROOT, "tests/host/test_terminal_failure.py")
-
-    def test_no_preclaim_boolean_cannot_be_coerced_or_admitted_in_another_field(self):
-        from tests.host.terminal_failure_source import SOURCE_PATH, literal_declaration
-
-        source = (ROOT / SOURCE_PATH).read_text()
-        with tempfile.TemporaryDirectory(prefix="micros-plat02-boolean-") as directory:
-            root = Path(directory)
-            path = root / SOURCE_PATH
-            path.parent.mkdir(parents=True)
-            path.write_text(source)
-            self.assertIs(
-                False, literal_declaration(root, SOURCE_PATH, "FATAL_EFFECT_CONTRACT")["reset"]["caller_preclaim"],
-            )
-            for changed in (
-                source.replace('"caller_preclaim": False', '"caller_preclaim": 0', 1),
-                source.replace('"caller_preclaim": False', '"caller_preclaim": True', 1),
-                source.replace('"caller_preclaim": False', '"caller_preclaim": False, "caller_preclaim": False', 1),
-                source.replace('"poll_limit": 100000', '"poll_limit": False', 1),
-            ):
-                path.write_text(changed)
-                with self.assertRaises(ValueError):
-                    literal_declaration(root, SOURCE_PATH, "FATAL_EFFECT_CONTRACT")
 
 
 class TerminalObservationTest(unittest.TestCase):
@@ -196,41 +76,7 @@ class TerminalObservationTest(unittest.TestCase):
 
 
 class TerminalSourceTest(unittest.TestCase):
-    def test_historical_workflow_view_removes_only_the_exact_ordered_addition(self):
-        from tests.host.terminal_failure_source import fixed_source, project_terminal_workflows
-        from tools import validation_plan
 
-        statement, = (
-            node for node in ast.parse(fixed_source("tools/validation_plan.py")).body
-            if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "QEMU_WORKFLOWS" for target in node.targets)
-        )
-        original = ast.literal_eval(statement.value)
-        self.assertEqual(original, project_terminal_workflows(validation_plan.QEMU_WORKFLOWS))
-        extra = "test-qemu-terminal-failure"
-        for invalid in ((*validation_plan.QEMU_WORKFLOWS, extra), (extra, *original)):
-            with self.assertRaises(ValueError):
-                project_terminal_workflows(invalid)
-        self.assertIn("test-qemu-unreviewed", project_terminal_workflows((*validation_plan.QEMU_WORKFLOWS, "test-qemu-unreviewed")))
-
-    def test_planner_extension_preserves_the_complete_original_selection_algorithm(self):
-        from tests.host.terminal_failure_source import fixed_source, project_terminal_planner, project_terminal_plan
-        from tests.host.panic_trace_source import project_trace_plan
-        from tools import validation_plan
-
-        source = (ROOT / "tools/validation_plan.py").read_text()
-        self.assertEqual(fixed_source("tools/validation_plan.py"), project_terminal_planner(source))
-        plan = project_trace_plan(validation_plan.plan([], "full"))
-        projected = project_terminal_plan(plan)
-        self.assertEqual(49, len(plan))
-        self.assertEqual(48, len(projected))
-        self.assertEqual(plan[-3:], projected[-3:])
-        extra = ("cmake", "--workflow", "--preset", "test-qemu-terminal-failure")
-        self.assertNotIn(extra, projected)
-        for invalid in ((source.replace('"test-qemu-terminal-failure"', '"test-qemu-foreign"', 1)),):
-            with self.assertRaises(ValueError):
-                project_terminal_planner(invalid)
-        with self.assertRaises(ValueError):
-            project_terminal_plan([*plan, extra])
 
     def test_new_private_kernel_members_reject_missing_code_and_an_adapter_in_the_portable_core(self):
         from tests.host.terminal_failure_source import CONTROL_SOURCES, terminal_kernel_members
@@ -250,12 +96,6 @@ class TerminalSourceTest(unittest.TestCase):
             path.unlink()
             self.assertTrue(terminal_kernel_members(root)[1])
 
-    def test_current_build_wires_exactly_the_declared_native_and_target_extensions(self):
-        from tests.host.terminal_failure_source import extend_cmake, extend_presets, fixed_source
-        from tests.host.panic_trace_source import project_trace_cmake, project_trace_presets
-
-        self.assertEqual(extend_cmake(fixed_source("CMakeLists.txt")), project_trace_cmake((ROOT / "CMakeLists.txt").read_text()))
-        self.assertEqual(extend_presets(fixed_source("CMakePresets.json")), project_trace_presets((ROOT / "CMakePresets.json").read_text()))
 
     def test_terminal_runtime_inverse_preserves_every_original_operation_and_fixed_bound(self):
         from tests.host.terminal_failure_source import (
@@ -311,38 +151,15 @@ class TerminalSourceTest(unittest.TestCase):
                     [(index, line) for index, line in enumerate(observed.splitlines(), 1) if "MICROS_PANIC(" in line],
                 )
 
-    def test_recipe_and_preset_additions_recover_complete_fixed_inputs(self):
-        from tests.host.terminal_failure_evidence import DESIGN_PINS
-        from tests.host.terminal_failure_source import (
-            extend_cmake, extend_presets, project_terminal_cmake, project_terminal_presets,
-        )
-
-        for path, extend, project in (
-            ("CMakeLists.txt", extend_cmake, project_terminal_cmake),
-            ("CMakePresets.json", extend_presets, project_terminal_presets),
-        ):
-            original = subprocess.check_output(
-                ("git", "show", DESIGN_PINS["runtime_reference"] + ":" + path),
-                cwd=ROOT, text=True, timeout=30,
-            )
-            current = extend(original)
-            self.assertEqual(original, project(current))
-            with self.assertRaises(ValueError):
-                extend(current)
-            with self.assertRaises(ValueError):
-                project(current.replace("test-qemu-terminal-failure", "test-qemu-foreign", 1))
-            with self.assertRaises(ValueError):
-                project(current + "\n# unexpected recipe input\n")
-
 
 class TerminalRemoteTest(unittest.TestCase):
-    def test_cli_rejects_external_debug_inputs_and_reserves_baseline_exit_one(self):
+    def test_cli_rejects_external_debug_inputs_and_preserves_execution_failure(self):
         from tools import check_terminal_failures as controller
 
         with patch.object(controller, "execute", side_effect=RuntimeError("execution failure")):
             errors = io.StringIO()
             with redirect_stderr(errors):
-                self.assertEqual(2, controller.main(["--baseline"]))
+                self.assertEqual(2, controller.main([]))
             self.assertIn("MICROS_PLAT02_EXECUTION_ERROR", errors.getvalue())
         with patch.object(controller, "execute") as execute:
             for option in ("--source", "--kernel", "--qemu", "--timeout", "--scenario", "--address", "--command"):
@@ -385,7 +202,7 @@ class TerminalRemoteTest(unittest.TestCase):
 
         binding = ImageBinding(
             "fixture", (("micros_terminal_test_scenario", 0x8000, 4),),
-            (("kernel_main", 0x9000, 4),), (0xa000, 0xe000), False,
+            (("kernel_main", 0x9000, 4),), (0xa000, 0xe000), True,
         )
         connection = Connection(b"+" + encode_packet(b"OK"))
         remote = Remote(connection, binding, 1, time.monotonic() + 8)
@@ -428,7 +245,7 @@ class TerminalRemoteTest(unittest.TestCase):
             def recv(self, size):
                 return self.reply
 
-        binding = ImageBinding("fixture", (), (), (0xa000, 0xe000), False)
+        binding = ImageBinding("fixture", (), (), (0xa000, 0xe000), True)
         for reply in (b"", b"-", b"$"):
             with self.subTest(reply=reply), self.assertRaises(ValueError):
                 Remote(Connection(reply), binding, 1, time.monotonic() + 8).exchange(b"?")
@@ -438,27 +255,27 @@ class TerminalRemoteTest(unittest.TestCase):
 
 class TerminalCaptureTest(unittest.TestCase):
     @staticmethod
-    def early_failure(*, baseline=False, reads=None):
+    def early_failure(*, overrun=False, reads=None):
         from tests.host.terminal_failure_evidence import GuestState, TerminalCapture
 
-        reads = (100001 if baseline else 100000) if reads is None else reads
+        reads = (100001 if overrun else 100000) if reads is None else reads
         armed = struct.pack("<IIII9QIIII", 1, 5, 1, 0, *([0] * 9), 0xffffffff, 0, 0, 0)
         final = struct.pack(
-            "<IIII9QIIII", 1, 5, 3 if baseline else 2, 0,
-            reads, 0, 0, 0, 0, 0 if baseline else 1, 0, 0, 0,
-            0, 0, 0 if baseline else 1, 0,
+            "<IIII9QIIII", 1, 5, 3 if overrun else 2, 0,
+            reads, 0, 0, 0, 0, 0 if overrun else 1, 0, 0, 0,
+            0, 0, 0 if overrun else 1, 0,
         )
         counts = [0] * (27 * 14)
         counts[14] = reads
         work = struct.pack("<IIQQII378Q", 1, 0, 0x504C415430320005, 1, 2, 0, *counts)
         initial = GuestState(
             armed, bytes(12012), struct.pack("<QIB3x", 0x554152544F574E52, 1, 0), bytes(8),
-            None if baseline else bytes(4), bytes(3056), None, 0xc000,
+            None if overrun else bytes(4), bytes(3056), None, 0xc000,
         )
         stopped = replace(initial, observation=final, work=work,
-                          control=None if baseline else struct.pack("<I", 2), sp=0xb000)
+                          control=None if overrun else struct.pack("<I", 2), sp=0xb000)
         return TerminalCapture(
-            5, "overrun" if baseline else "reset", initial, stopped,
+            5, "overrun" if overrun else "reset", initial, stopped,
             ((2, 0xb000), (10, 0), (11, 1), (16, 0), (17, 0x53525354), (32, 0x9000)),
             (0xa000, 0xe000), 0x9000,
         )
@@ -467,7 +284,7 @@ class TerminalCaptureTest(unittest.TestCase):
         from tests.host.terminal_failure_evidence import validate_capture
 
         capture = self.early_failure()
-        validate_capture(capture, baseline=False)
+        validate_capture(capture)
         for invalid in (
             replace(capture, final=replace(capture.final, control=None)),
             replace(capture, final=replace(capture.final, control=bytes(4))),
@@ -478,52 +295,17 @@ class TerminalCaptureTest(unittest.TestCase):
             replace(capture, checkpoint="timeout"),
         ):
             with self.subTest(capture=invalid.checkpoint), self.assertRaises(ValueError):
-                validate_capture(invalid, baseline=False)
+                validate_capture(invalid)
 
-    def test_baseline_red_is_only_the_actual_100001st_observation_with_typed_absence(self):
+    def test_overrun_or_wrong_attempt_count_is_not_current_terminal_success(self):
         from tests.host.terminal_failure_evidence import validate_capture
 
-        capture = self.early_failure(baseline=True)
-        validate_capture(capture, baseline=True)
-        with self.assertRaises(ValueError):
-            validate_capture(capture, baseline=False)
-        with self.assertRaises(ValueError):
-            validate_capture(self.early_failure(baseline=True, reads=99999), baseline=True)
-        with self.assertRaises(ValueError):
-            validate_capture(replace(capture, final=replace(capture.final, control=bytes(4))), baseline=True)
-
-
-class TerminalArchiveTest(unittest.TestCase):
-    def test_fixed_archive_keeps_real_original_bodies_and_no_substitute_control(self):
-        from tools.check_terminal_failures import prepare_baseline, validate_baseline
-        from tests.host.terminal_failure_evidence import DESIGN_PINS
-        from tests.host.terminal_failure_source import fixed_source
-
-        with tempfile.TemporaryDirectory(prefix="pt2-archive-", dir=ROOT / "build") as temporary:
-            source = prepare_baseline(Path(temporary))
-            validate_baseline(source)
-            protected = source / "kernel/boot/boot_foundation.c"
-            original = subprocess.check_output(
-                ("git", "show", DESIGN_PINS["runtime_reference"] + ":kernel/boot/boot_foundation.c"),
-                cwd=ROOT, timeout=30,
-            )
-            self.assertEqual(original, protected.read_bytes())
-            self.assertIn("while ((uart0[UART_LSR]", fixed_source("arch/riscv64/uart.c"))
-            for name in ("panic_control.c", "panic_control_core.c", "panic_control.h", "panic_control_core.h"):
-                self.assertFalse((source / "kernel/diagnostic" / name).exists())
-            for path, changed in (
-                (protected, original + b"\n"),
-                (source / "tests/qemu/terminal_failure_kernel.c", b"/* borrowed fixture */\n"),
-            ):
-                previous = path.read_bytes()
-                path.write_bytes(changed)
-                with self.assertRaises(ValueError):
-                    validate_baseline(source)
-                path.write_bytes(previous)
-            substitute = source / "kernel/diagnostic/panic_control_core.c"
-            substitute.write_text("int fake_control;\n")
-            with self.assertRaises(ValueError):
-                validate_baseline(source)
+        for capture in (
+            self.early_failure(overrun=True), self.early_failure(reads=99999),
+            self.early_failure(reads=100001),
+        ):
+            with self.subTest(stop=capture.checkpoint), self.assertRaises(ValueError):
+                validate_capture(capture)
 
 
 class TerminalImageBindingTest(unittest.TestCase):

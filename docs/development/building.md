@@ -312,9 +312,11 @@ It also rejects the superseded standalone `micros_trap_hart_id` and
 The fast target runs nonslow native CTests and the closed, small Python unit
 set defined by [bounded validation feedback](../architecture/validation-feedback.md).
 The full target retains every CTest/model and complete Python discovery.
-Source-heavy checks share one checked immutable view instead of reconstructing
-the same authority for each file read. Final success follows the complete
-view-close checks; this is not unchecked or cross-invocation caching.
+Source-heavy checks share one invocation-owned snapshot of actual current
+bytes. Opening it does not reconstruct historical authority. Final success
+follows complete namespace/input closing checks; this is not unchecked or
+cross-invocation caching. See the
+[current-contract validation map](../architecture/current-contract-validation.md).
 
 Run the fast native development loop with:
 
@@ -342,15 +344,15 @@ The host portion is also directly available from the repository root:
 ```bash
 "${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier fast
 "${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier full
-"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_kernel_address_space_source_layout.KernelAddressSpaceSourceLayoutTest.test_scratch_storage_has_one_configured_owner
+"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_kernel_address_space_source_layout.KernelAddressSpaceSourceLayoutTest.test_current_scratch_storage_has_one_owner
 "${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --tier full --list
 ```
 
 Focused selection may repeat `--test`; it does not establish PR coverage.
 Listing executes no test or source proof. The runner reports each selected
 test's start, outcome and duration, then the slowest ten. Workflow execution
-forwards those records live while retaining the exact raw log and ordinary
-postflight/receipt requirements.
+forwards those records live while retaining exact raw logs and source-drift
+checks. Only explicit receipt modes collect reusable profiles.
 
 Direct `python -m unittest` remains available for isolated proof-engine tests
 and cold-path diagnosis. Use the owned runner for a source-heavy selected
@@ -387,7 +389,7 @@ tier. Explicit paths are unioned with repository changes, and execution
 requires every untracked file to be staged first.
 
 Fresh execution is still the default. These explicit forms never reuse prior
-command results:
+command results, collect reusable profiles or publish new receipts:
 
 ```bash
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr --execute --fresh
@@ -440,6 +442,12 @@ preparation automatically. A ready producer executes the complete plan fresh
 and succeeds only when every selected reusable workflow publishes a receipt
 under the invocation's one run ID.
 
+Before that explicit producer, build all native products with
+`cmake --build build/host-debug` until Ninja reports no work. Generated fixture
+headers are validation inputs; a later generation/relink would invalidate
+receipt identity. Ordinary runtime work does not require a separate producer/
+reuse ceremony unless it changes that feature or explicitly needs receipts.
+
 The opt-in local ledger follows
 [ADR-0064](../adr/0064-fail-closed-validation-evidence-reuse.md),
 [ADR-0065](../adr/0065-closed-tool-default-configuration-for-validation.md)
@@ -482,6 +490,39 @@ The ignored ledger and complete logs live in `build/validation-evidence/v1/`.
 current candidate. Producer reports additionally contain the ordered readiness
 records, barrier result, shared run ID, complete-publication result, and fixed
 failure code defined by ADR-0074. Non-producer reports omit that object.
+
+For validation-tooling changes only, after a complete producer succeeds,
+this focused exercise verifies its three actual reusable profiles without
+executing the other workflows again. It calls the same strict consumption
+path as `--reuse`, fails on any miss, and is **not final author validation**:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+from pathlib import Path
+from tools.validation_context import PROFILES, capture_candidate
+from tools.validation_evidence import EvidenceStore
+from tools.validation_execution import _profile, _reuse
+
+root = Path.cwd()
+candidate = capture_candidate(root)
+assert candidate.clean
+producers = set()
+with EvidenceStore(root, PROFILES) as store:
+    for name in PROFILES:
+        profile, error = _profile(root, name, candidate)
+        assert profile is not None, (name, error)
+        entry = {}
+        reused, reason = _reuse(root, name, candidate, profile, store, entry)
+        assert reused and entry["status"] == "REUSED", (name, reason)
+        producers.add(entry["producer"]["run_id"])
+assert len(producers) == 1
+assert capture_candidate(root) == candidate
+print("REUSE-ONLY: three profiles; verify this run ID against the complete producer report")
+PY
+```
+
+The reported producer ID must equal the successful full report's ID.
+No current runtime task needs this extra exercise merely to merge.
 
 One exact canonical workflow can also be executed and recorded fresh:
 
@@ -1091,9 +1132,12 @@ MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 r
 
 ## Runtime memory work and authority evidence
 
-COPY01 uses normal Python native discovery and the existing host-debug
-compiler cache. It requires the merged design's Git objects, not a shallow
-checkout that omits its source authority. On the supported Homebrew setup:
+The current native checks compile the actual runtime implementation and retain
+semantic, boundary, canary, typed-object, protected-page, work and compiler/IR
+evidence. Historical byte-loop execution and the COPY01 author journal are
+retired by [ADR-0123](../adr/0123-current-contract-validation.md).
+
+Use the supported explicit environment and the existing native compiler cache:
 
 ```bash
 export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15
@@ -1105,300 +1149,129 @@ export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang
 export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld
 cmake --preset host-debug
 "${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_runtime_memory
+cmake --workflow --preset test-qemu-user-runtime
 ```
 
-The normal suite exercises original-byte-loop negative controls, actual
-current semantic/work/access behavior, compiler/IR artifacts and authority
-failure boundaries. It does not create an author transition or retire an
-identity by itself.
-
-The first implementation author executes these intents separately, from the
-repository root, under that same environment:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --red
-"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --green
-"${MICROS_PYTHON}" -E -S -B tools/check_runtime_memory.py --recertify
-```
-
-Finalize and stage the complete oracle, driver, ownership and documentation
-inputs before Red. Its exit 1 denotes the two recorded expected work
-failures, not a broken compiler or skipped case; authority/harness failures
-exit 2. Do not join the three phases with `&&`. Between Red and Green, only
-the two candidate paths in the
-[accepted contract](../architecture/runtime-memory-primitives.md#closed-input-and-declaration-binding)
-may change; stage them before Green. Changed immutable inputs or any change
-after recorded Green require a new explicit Red attempt.
-
-Recertification reruns Green, then the actual fixed B05-B12 QEMU commands and
-B14's in-process retained structural/authority suite and linked-runtime
-proof. Logs and strict chained records live below
-`build/evidence-transitions/COPY01/`; a failed or interrupted transaction
-provides no terminal retirement.
-
-After terminal success, run the unchanged complete fresh author plan:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier full --execute --fresh
-```
-
-The first permanent commit still requires clean independent implementation
-review of that exact staged tree and journal. Later ordinary checkouts use
-the reviewed HEAD registry and do not manufacture new author receipts or
-require the original temporary logs.
+The user-runtime workflow also proves the actual linked memory object,
+ELF/map/recipe identity and non-stack wide transfers. It uses its existing
+guest result, not a second guest. The current evidence ownership and retained
+finite source/machine bindings are documented in
+[current-contract validation](../architecture/current-contract-validation.md).
 
 ## Bootstrap allocation work and authority evidence
 
-MEM01 follows separately merged
-[ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
-[bootstrap allocation contract](../architecture/bootstrap-allocation.md).
-Use the explicit supported compiler/Python environment above, configure the
-native profile, and stage the complete source, recipe, fixture and
-documentation inputs before recording evidence:
+MEM01's current native fixture uses actual current source and retains its
+semantic, rollback, work-bound and ordinary/observed agreement checks.
+The [Accepted allocation contract](../architecture/bootstrap-allocation.md)
+still owns lowest-address selection, range safety and cursor coherence.
+There is no historical-source build, author selector or retirement journal.
 
 ```bash
 cmake --preset host-debug
-"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --red
-"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --green
-"${MICROS_PYTHON}" -E -S -B tools/check_bootstrap_allocation.py --recertify
-```
-
-Do not join the phases with `&&`: successful Red exits one only after all
-three actual old-runtime work oracles fail as expected while their original
-semantic execution succeeds. Build, malformed capture, source, tool or
-authority failures exit two. Green and recertification succeed with exit
-zero. No caller-supplied source, command, expected result or snapshot
-authorizes a transaction.
-
-An external compiler or linker upgrade invalidates the attempt even when
-every unit has passed. Prefer existing versioned executable paths over mutable
-package-manager aliases for a long transaction. Before renewing Red, configure
-the native profile and every selected target configure preset with
-`cmake --fresh --preset <configure-preset>` under the same new explicit tool
-environment. This replaces cached compiler selections; it does not waive
-any execution, artifact identity or recertification requirement.
-
-Focused portable and generated-native execution uses:
-
-```bash
 cmake --build build/host-debug --target frame_allocator_test frame_ownership_test bootstrap_allocation_test
 ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^(frame-allocator|frame-ownership|bootstrap-allocation)$'
 "${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_bootstrap_allocation
+cmake --workflow --preset test-qemu-frame-allocator
 ```
 
-The native fixture compiles fixed #208 source/headers for Red and actual
-current source/headers for Green. Generated native translations add only
-exact, reversible primitive observations. The baseline has no fabricated
-cursor; ordinary builds contain no MEM01 observations. The one
-`bootstrap-allocation` CTest complements, not replaces, independent work
-oracles and the original frame allocator/ownership cases.
-
-Between recorded Red and Green, only the contract's six production files
-and two assertion adapters may change. Stage those changes before Green.
-Every other tracked source, native recipe, test mapping, oracle and tool
-input remains immutable. Any immutable-input change requires renewed Red
-and Green; any change after Green prevents borrowing that result.
-
-Recertification replays Green, then records actual B01-B12 workflows and
-B14's in-process retained authority/source/oracle checks. The provisional
-scope is bound to the exact root, PID, plan and candidate, covers only the
-six declared assertions, and clears on every exit. Strict hash-chained
-records live under `build/evidence-transitions/MEM01/`. An incomplete
-transaction provides no retirement.
-
-After terminal success, run the complete fresh author plan and obtain
-independent implementation review before the first permanent commit.
-Only the exact reviewed committed declaration supports ordinary checks
-without the original author's journal.
+Generated observations remain test-only, primitive-bound and reversible.
+Ordinary products contain no collector. Source, generated inputs, executables
+and tools are checked before and after the current execution.
 
 ## Kernel mapping work and authority evidence
 
-MEM02 follows separately merged design #211,
-[ADR-0101](../adr/0101-minix-kernel-mapping-topology.md) and its
-[kernel-map contract](../architecture/kernel-mapping-topology.md).
-Stage the complete native/target fixtures, source/recipe bindings and
-documentation before recording an attempt:
+MEM02 retains largest legal leaves, checked table identities, independent
+native work/semantic oracles and real 128/256 MiB MMU evidence under its
+[Accepted contract](../architecture/kernel-mapping-topology.md).
+The ordinary MMU workflow now owns its required mapping records and actual
+ELF/load-probe proof, including the original faults and clean shutdown.
 
 ```bash
 cmake --preset host-debug
 cmake --build build/host-debug --target kernel_mapping_test
-"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --red
-"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --green
-"${MICROS_PYTHON}" -E -S -B tools/check_kernel_mapping.py --recertify
-```
-
-Successful Red exits one only after both actual native oracles and the actual
-128/256 MiB target oracle fail for their named old-runtime divergences.
-Original MMU/TTY faults, real large-alias loads, misalignment faults,
-resource restoration and clean shutdown must still pass. Compile, schema,
-timeout, source/tool drift and authority errors exit two, never runtime Red.
-Green and complete recertification exit zero.
-
-The native fixture uses fixed #210 source/headers for Red and actual current
-source/headers for Green. Seventeen inputs provide 85 complete observations;
-ordinary native execution has no collector state. The target baseline is the
-complete fixed Git source with only the exact immutable MMU C/assembly
-extensions. Its original recipe is retained; the current MMU workflow adds
-the new records and both memory sizes without changing its eight-second
-per-guest budget. Neither source path uses a fake CSR or hardware result.
-
-Focused iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping
 ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^kernel-mapping$'
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping
 cmake --workflow --preset test-qemu-mmu
 ```
 
-Only the three production map owners and two narrow assertion adapters may
-change within an attempt. Other input changes require a fresh actual Red and
-Green; post-Green drift blocks recertification. Records live under
-`build/evidence-transitions/MEM02/`, with actual target build/source/artifact
-records under `build/kernel-mapping/`. An incomplete journal and an uncommitted
-completion declaration cannot retire an assertion.
-
-Recertification replays all native/target Green evidence and runs the exact
-B01-B12/B14 command set under the PID/root/plan-bound three-key provisional
-scope. Full fresh author acceptance and independent implementation review
-remain required before the first permanent commit. Ordinary committed
-authority does not require the original author's journal.
+The current native product is not paired with an ancestor implementation.
+Required current cases, ordinary collector absence, primitive coverage,
+work bounds and input/product drift rejection remain.
 
 ## Selected ownership work and authority evidence
 
-MEM03 follows separately merged designs #215/#216 and the
-[selected ownership contract](../architecture/selected-frame-ownership.md).
-The fresh restart also binds the reviewed validation prerequisite #218 while
-retaining fixed #214 runtime source and independent work expectations.
-Configure the native profile and stage the complete source, recipe, fixture,
-adapter and documentation inputs before observing actual Red:
+The five selected-memory/object/return orchestrators retain their complete
+current cases and channels:
+
+| CTest | Current executions |
+| --- | --- |
+| `selected-ownership` | Five observation slices and one ordinary control |
+| `selected-address-space` | Three observation slices and one ordinary control |
+| `selected-release-handoff` | Four observation slices and one ordinary control |
+| `object-hart-validation` | Two observation channels and one ordinary control; 171 cases |
+| `common-scheduler-return` | Work and ordinary controls; 180 records |
+
+Build the native graph before selecting them:
 
 ```bash
 cmake --preset host-debug
-"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --red
-"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --green
-"${MICROS_PYTHON}" -E -S -B tools/check_selected_ownership.py --recertify
+cmake --build build/host-debug
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^(selected-ownership|selected-address-space|selected-release-handoff|object-hart-validation|common-scheduler-return)$'
 ```
 
-Red exits one only after all three actual fixed-source work oracles fail for
-their declared divergences while semantic and complete-diagnostic guards
-pass. Compile, schema, source/tool, scope and incomplete-run failures exit
-two; they are not runtime Red. Green and complete recertification exit zero.
-Do not build the current six-product fixture before the runtime correction
-provides its new interfaces; the Red driver compiles the fixed source stage.
+These are full-tier evidence, not additions to the fast loop. They execute
+actual current products and preserve semantic/error, output-preservation,
+complete-audit, work/storage, collector-linkage and composition checks.
+Independent fixed-reference fields retain their provenance without compiling
+old implementations or replaying predecessor claims.
 
-The six native products execute one 99-case corpus: five passive observation
-slices and one ordinary control. One `selected-ownership` CTest is labeled
-`slow` and belongs only to `test-unit`; the fast target does not depend on
-these six products. The small pre-exec launcher regression remains directly
-runnable:
+The corresponding user-address-space, address-space-handoff and scheduler
+workflows validate the required current witnesses from their existing guest
+results. The scheduler retains its exact 1/2/1 context-validation counts.
+The pre-exec Python-launcher regression remains directly runnable:
 
 ```bash
 "${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_selected_ownership.SelectedOwnershipNativeTest.test_launcher_rejects_consumed_environment_before_interpreter_exec
 ```
 
-Only the twenty declared production subjects may change within an attempt.
-All six adapters, source-view integration, recipes, fixture/model code and
-documentation are frozen before Red. The current native `nm` is a distinct
-external input, not inferred from compiler identity.
-
-Recertification executes the exact B01-B12/B14 command set under its
-PID/root/plan-bound forty-key provisional scope. B14 uses the owned host
-runner for live per-test feedback and one checked source proof. No view
-opens an author transaction or makes an incomplete selector terminal.
-Records remain under `build/evidence-transitions/MEM03/`.
-
-After terminal success, warm all native products, require a no-work build,
-and run the complete fresh author producer. That gate retains 43 CTests,
-complete Python discovery, all target/image/stack coverage and blocked B13.
-Independent review still precedes the first permanent commit. No archived
-acceptance or prerequisite timing replaces the restarted real author run.
+Actual Red and focused Green still precede one sufficient final planner run.
+Do not invoke the retired `--red`, `--green` or `--recertify` interfaces or run
+a second B01-B12/B14 transaction for evidence already supplied by that plan.
 
 ## Terminal-failure baseline and current evidence
 
-The PLAT02 driver follows the
-[Accepted terminal contract](../architecture/terminal-failure.md).
-Stage the complete test, controller, source/effect and documentation inputs
-before the first real baseline observation:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B tools/check_terminal_failures.py --baseline
-```
-
-Exit one requires all twelve actual VMs: four positive controls and eight
-exact audited divergences. An execution, compiler, protocol, closure or
-timeout error exits two and is not Red. The baseline uses the fixed
-pre-correction Git archive with only reversible observations/build
-extensions; the new production control files are genuinely absent.
-
-After the runtime correction, run the focused native ownership test and
-the current target gate:
+The [Accepted terminal contract](../architecture/terminal-failure.md) retains
+all twelve current QEMU cases and four named oracles. Historical baseline
+execution and its paired author report are retired; current evidence uses:
 
 ```bash
 cmake --preset host-debug
 cmake --build build/host-debug --target panic_control_test
 ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^panic-control$'
+"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_terminal_failure
 cmake --workflow --preset test-qemu-terminal-failure
 ```
 
-The controller makes a fresh private configure and clean-first kernel
-build, even when the workflow's ordinary kernel dependency is already
-built. This binds the guest to current source bytes rather than relying
-on timestamps or an older artifact. Each of the twelve owned QEMU
-processes has one eight-second deadline; only the fixed four-byte selector
-can be written through its private debugger connection.
+The controller performs a fresh private configure and clean-first kernel
+build. Every VM has one absolute eight-second deadline; the private debugger
+may write only the fixed four-byte scenario selector. Exact polling bounds,
+first-entry/reset ownership, console repair, history preservation, work
+snapshots, real reset registers and natural firmware termination remain
+mandatory. An overrun, missing control object or host termination is failure.
 
-Raw observations, register/object bindings, commands, actual artifacts and
-source/tool/firmware input manifests remain below `build/terminal-failure/`.
-Successful current execution publishes `current.json`; the exact audited
-baseline publishes `baseline.json`. For the first implementation author,
-their immutable inputs must agree:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B - <<'PY'
-import json
-from pathlib import Path
-root = Path("build/terminal-failure")
-baseline = json.loads((root / "baseline.json").read_text())
-current = json.loads((root / "current.json").read_text())
-assert baseline["baseline"] is True and current["baseline"] is False
-assert baseline["input_manifest"]["immutable"] == current["input_manifest"]["immutable"]
-print("terminal baseline/current immutable inputs match")
-PY
-```
-
-Changed immutable inputs require a new baseline observation and current
-execution. These reports neither retire an identity nor create a reuse
-receipt. Later ordinary current execution does not require the old local
-baseline report. The complete fresh author plan and independent review
-remain separate requirements.
+Complete current source/tool/firmware and artifact identities are checked
+through execution and atomic publication. Raw captures, commands, packets
+and transcripts remain under `build/terminal-failure/`; only a completed
+current run publishes `current.json`. There is no baseline flag, historical
+archive, source-role partition or dependency on an earlier author's files.
+The complete final plan and independent review remain required.
 
 ## Panic-trace baseline and current evidence
 
-The PLAT03 driver follows the
-[bounded trace contract](../architecture/panic-stack-trace.md) and
-[Accepted link-precedence clarification](../adr/0097-panic-trace-link-rejection-precedence.md).
-Stage the complete native/guest fixtures, independent models, source/effect
-declarations, controller and documentation before observing the old runtime:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B tools/check_panic_traces.py --baseline
-```
-
-Exit one requires all eighteen actual VMs to retain their original
-panic/trap/history and natural-reset behavior, the ordinary-reset positive
-control, and four separately executed expected trace-property failures.
-Compile, protocol, observer, timeout, closure and unexpected-result failures
-exit two. Missing trace output alone is not qualifying Red.
-
-The baseline archive is fixed at PLAT02 #201. Exact inverse checks admit
-only the three immutable guest files and declared observation/build overlays;
-the new production trace owners remain absent. The baseline does not enable
-the current-only trace-count flag or reference the absent injected-load
-symbol. In the current fixture, the reset observer checks the actual
-load-page-fault cause, zero fault address and exact linked instruction PC.
-The stuck-output fixture rejects any THR store after its trace header.
-
-Focused implementation iteration and current target execution use:
+The [bounded trace contract](../architecture/panic-stack-trace.md) and
+[link-precedence clarification](../adr/0097-panic-trace-link-rejection-precedence.md)
+retain all eighteen actual cases and four named current oracles. The old
+baseline archive and expected-failure author mode are retired.
 
 ```bash
 "${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_panic_trace
@@ -1408,33 +1281,20 @@ ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^pani
 cmake --workflow --preset test-qemu-panic-trace
 ```
 
-Each mode performs a fresh private configure and clean-first kernel build.
-Each VM has one absolute eight-second deadline, including debugger startup.
-The controller accepts no arbitrary image, source, address, case or timeout.
-Complete captures, raw transcripts, actual helper/caller bindings, build
-artifacts and input manifests remain below `build/panic-trace/`. Only a
-completed run atomically publishes `baseline.json` or `current.json`.
-Current success exits zero; it requires all eighteen cases and four oracles.
+Execution uses a fresh private configure and clean-first build. Each VM has
+one absolute eight-second deadline, including debugger startup. The controller
+accepts no arbitrary image, source, address, case or timeout. Missing trace
+helpers or ownership/capture evidence fail; an ordinary reset remains the
+explicit no-trace case.
 
-The first implementation author compares the complete immutable inputs:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B - <<'PY'
-import json
-from pathlib import Path
-root = Path("build/panic-trace")
-baseline = json.loads((root / "baseline.json").read_text())
-current = json.loads((root / "current.json").read_text())
-assert baseline["baseline"] is True and current["baseline"] is False
-assert baseline["input_manifest"]["immutable"] == current["input_manifest"]["immutable"]
-print("panic trace baseline/current immutable inputs match")
-PY
-```
-
-Any immutable-input change requires renewed baseline and current evidence.
-These records do not retire an identity or replace the complete fresh author
-plan, complete stack evidence, or independent implementation review.
-Later current execution does not require the author's local baseline report.
+The independent captured-stack walk, exact frame/read/link counts, real
+caller return sites, trace/history ordering, recursive-entry captures,
+injected fault instruction/cause and stuck-output store rejection remain.
+All eighteen cases require natural firmware exit. Complete current
+source/tool/firmware inputs and artifacts are checked before success.
+Raw evidence remains under `build/panic-trace/`; only a complete successful
+run atomically publishes `current.json`. These reports are not reusable
+receipts or substitutes for the full stack gate and independent review.
 
 For development of the finite source/object/linked proof, the existing
 dispatcher can check one fresh ordinary/metadata boot-image pair:

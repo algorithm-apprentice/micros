@@ -12,112 +12,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from tests.host.evidence_authority_inventory import current_inventory
-from tests.host.evidence_authority_types import AuthorityClass, fact_set_digest
-from tests.host.test_evidence_authority import prior_standalone_binding_facts
-
-
 ROOT = Path(__file__).resolve().parents[2]
-
-
-class PanicTraceAuthorityTest(unittest.TestCase):
-    def test_exact_nine_authorities_preserve_the_two_prior_claims(self):
-        source = "tests/host/panic_trace_source.py"
-        evidence = "tests/host/panic_trace_evidence.py"
-        expected = {
-            evidence + ":design-anchor:PLAT03": AuthorityClass.TRANSPORT_IDENTITY,
-            source + ":source-membership:PLAT03": AuthorityClass.PERMANENT_INVARIANT,
-            source + ":artifact-contract:PLAT03-recipes": AuthorityClass.ARTIFACT_CONTRACT,
-            source + ":effect-contract:PLAT03-fatal": AuthorityClass.PERMANENT_INVARIANT,
-            source + ":source-projection:PLAT03": AuthorityClass.TRANSPORT_IDENTITY,
-        }
-        for name in (
-            "panic-trace-current-chain", "panic-trace-owned-epoch",
-            "panic-trace-frame-work", "panic-trace-terminal-precedence",
-        ):
-            expected[evidence + ":baseline-oracle:" + name] = AuthorityClass.BASELINE_ORACLE
-        actual = {
-            fact.key: fact.authority_class
-            for fact in current_inventory(ROOT).facts
-            if fact.family == "panic-trace-baseline"
-        }
-        self.assertEqual(expected, actual)
-
-        from tests.host.diagnostic_history_authority import task_definition
-
-        _, _, _, registry = task_definition(ROOT)
-        self.assertEqual(
-            {"COPY01-runtime-memory", "PLAT01-diagnostic-history"},
-            {claim.transition_id for claim in registry.claims},
-        )
-
-    def test_all_prior_complete_records_and_family_fingerprints_are_preserved(self):
-        from tests.host.panic_trace_evidence import DESIGN_PINS
-
-        source = subprocess.check_output(
-            ("git", "show", DESIGN_PINS["design_commit"] + ":tests/host/evidence_authority_inventory.py"),
-            cwd=ROOT, text=True, timeout=30,
-        )
-        declaration, = (
-            node for node in ast.parse(source).body
-            if isinstance(node, ast.Assign) and any(
-                isinstance(target, ast.Name) and target.id == "DECLARED_FAMILY_FACT_DIGESTS"
-                for target in node.targets
-            )
-        )
-        expected = ast.literal_eval(declaration.value)
-        inventory = current_inventory(ROOT)
-        self.assertEqual(13, len(expected))
-        self.assertEqual(3929, sum(fact.family in expected for fact in inventory.facts))
-        from tests.host.evidence_authority_inventory import historical_object_binding_facts
-
-        historical = historical_object_binding_facts(ROOT, prior_standalone_binding_facts(inventory.facts))
-        for family, fingerprint in expected.items():
-            self.assertEqual(
-                fingerprint, fact_set_digest(fact for fact in historical if fact.family == family),
-                family,
-            )
-
-    def test_oracle_properties_may_share_cases_but_not_test_or_identity_ownership(self):
-        from tests.host.panic_trace_evidence import ORACLE_RULES
-        from tests.host.panic_trace_source import checked_oracle_rules
-
-        self.assertEqual(ORACLE_RULES, checked_oracle_rules(ORACLE_RULES))
-        for index, replacement in (
-            (0, (ORACLE_RULES[1][0], *ORACLE_RULES[0][1:])),
-            (0, (ORACLE_RULES[0][0], ORACLE_RULES[1][1], *ORACLE_RULES[0][2:])),
-            (0, (*ORACLE_RULES[0][:5], (True, 2, 6, 18))),
-            (0, (*ORACLE_RULES[0][:5], (1, 1, 2, 6, 18))),
-            (2, (*ORACLE_RULES[2][:5], (6, 7, 8, 9, 10, 11))),
-        ):
-            rules = list(ORACLE_RULES)
-            rules[index] = replacement
-            with self.subTest(rule=replacement), self.assertRaises(ValueError):
-                checked_oracle_rules(tuple(rules))
-
-    def test_declarations_reject_duplicate_binding_keys_and_candidate_fixture_overlap(self):
-        from tests.host.panic_trace_source import EVIDENCE_PATH, SOURCE_PATH, declaration_facts
-
-        with tempfile.TemporaryDirectory(prefix="micros-plat03-declarations-") as directory:
-            root = Path(directory)
-            for name in (SOURCE_PATH, EVIDENCE_PATH):
-                path = root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes((ROOT / name).read_bytes())
-            path = root / SOURCE_PATH
-            source = path.read_text()
-            for changed in (
-                source + "\nSOURCE_ROLES = {}\n",
-                source.replace('    "candidate_paths": (\n', '    "candidate_paths": (),\n    "candidate_paths": (\n', 1),
-                source.replace('"kernel/diagnostic/panic.c"', '"tests/host/panic_trace_test.c"', 1),
-                source.replace('"pc_bytes_before_cfa": 8', '"pc_bytes_before_cfa": False', 1),
-                source.replace('"pc_bytes_before_cfa": 8', '"pc_bytes_before_cfa": -8', 1),
-            ):
-                path.write_text(changed)
-                with self.assertRaises(ValueError):
-                    declaration_facts(root, SOURCE_PATH)
-            with self.assertRaises(ValueError):
-                declaration_facts(ROOT, "tests/host/test_panic_trace.py")
 
 
 class PanicTraceReferenceTest(unittest.TestCase):
@@ -291,49 +186,6 @@ class PanicTraceObservationTest(unittest.TestCase):
             decode_trace(header + "MICROS_TRACE_END count=", complete=False)
 
 
-class PanicTraceRecipeTest(unittest.TestCase):
-    def test_baseline_and_current_recipe_extensions_recover_the_complete_fixed_input(self):
-        from tests.host.panic_trace_source import extend_cmake, fixed_source, project_trace_cmake
-
-        source = fixed_source("CMakeLists.txt")
-        for production in (False, True):
-            with self.subTest(production=production):
-                current = extend_cmake(source, production=production)
-                self.assertEqual(source, project_trace_cmake(current, production=production))
-                self.assertIn("tests/qemu/panic_trace_kernel.S", current)
-                self.assertEqual(production, "kernel/diagnostic/panic_trace_core.c" in current)
-                self.assertEqual(production, "-fno-optimize-sibling-calls" in current)
-                for changed in (
-                    current.replace('tools/check_panic_traces.py"', 'tools/check_panic_traces.py" --arbitrary'),
-                    current.replace(" -Werror", " -Wno-error", 1),
-                    current + '\nset(MICROS_EXTRA_UNREVIEWED ON)\n',
-                ):
-                    with self.assertRaises(ValueError):
-                        project_trace_cmake(changed, production=production)
-                with self.assertRaises(ValueError):
-                    project_trace_cmake(current, production=not production)
-        with self.assertRaises(ValueError):
-            extend_cmake(source, production=1)
-
-    def test_preset_additions_preserve_every_original_workflow_and_reject_duplicate_ownership(self):
-        from tests.host.panic_trace_source import extend_presets, fixed_source, project_trace_presets
-
-        source = fixed_source("CMakePresets.json")
-        current = extend_presets(source)
-        self.assertEqual(source, project_trace_presets(current))
-        before, after = json.loads(source), json.loads(current)
-        for field in ("configurePresets", "buildPresets", "workflowPresets"):
-            self.assertEqual(before[field], after[field][:-1])
-        self.assertEqual("test-qemu-panic-trace", after["workflowPresets"][-1]["name"])
-        for changed in (
-            current.replace('"MICROS_BUILD_PANIC_TRACE_TEST": "ON"', '"MICROS_BUILD_PANIC_TRACE_TEST": "OFF"'),
-            current.replace('"name": "test-qemu-smoke"', '"name": "test-qemu-omitted"', 1),
-            current.replace('"targets": [\n        "test-qemu-panic-trace"', '"targets": [\n        "test-qemu-panic-trace",\n        "test-qemu-panic-trace"'),
-        ):
-            with self.assertRaises(ValueError):
-                project_trace_presets(changed)
-
-
 class PanicTraceSourceTest(unittest.TestCase):
     def test_every_observation_overlay_recovers_the_complete_original_source(self):
         from tests.host.panic_trace_source import (
@@ -383,7 +235,7 @@ class PanicTraceRemoteTest(unittest.TestCase):
             return value
 
     @staticmethod
-    def binding(*, baseline=False):
+    def binding():
         from tools.check_panic_traces import ImageBinding
 
         return ImageBinding(
@@ -403,7 +255,7 @@ class PanicTraceRemoteTest(unittest.TestCase):
                 ("boot", 0x81000000, 0x81004000), ("primary", 0x81004000, 0x81008000),
                 ("thread", 0x81204000, 0x81208000), ("emergency", 0x81008000, 0x81009000),
             ),
-            (0x80200000, 0x80300000), not baseline,
+            (0x80200000, 0x80300000), True,
         )
 
     def test_selector_is_once_at_kernel_main_even_through_the_raw_exchange(self):
@@ -425,16 +277,19 @@ class PanicTraceRemoteTest(unittest.TestCase):
         self.assertEqual(2, len(connection.sent))
 
     def test_only_the_selected_case_can_arm_trace_and_reentry_breakpoints(self):
+        from dataclasses import replace
         from tools.check_panic_traces import Remote, encode_packet
 
-        for scenario, baseline, stop in (
-            (18, False, "started"), (14, False, "reentry"), (16, True, "reentry"),
+        for scenario, stop in (
+            (18, "started"), (14, "reentry"),
         ):
             connection = self.Connection()
-            remote = Remote(connection, self.binding(baseline=baseline), scenario, time.monotonic() + 8)
-            with self.subTest(case=scenario, baseline=baseline), self.assertRaises(ValueError):
+            remote = Remote(connection, self.binding(), scenario, time.monotonic() + 8)
+            with self.subTest(case=scenario), self.assertRaises(ValueError):
                 remote.breakpoint(stop, True)
             self.assertEqual([], connection.sent)
+        with self.assertRaises(ValueError):
+            Remote(self.Connection(), replace(self.binding(), trace_present=False), 16, time.monotonic() + 8)
         connection = self.Connection(b"+" + encode_packet(b"OK"))
         remote = Remote(connection, self.binding(), 16, time.monotonic() + 8)
         remote.breakpoint("reentry", True)
@@ -493,40 +348,6 @@ class PanicTraceRemoteTest(unittest.TestCase):
             with self.subTest(request=request, reply=reply), self.assertRaises(ValueError):
                 remote.exchange(request, reply=reply)
             self.assertEqual([], connection.sent)
-
-
-class PanicTraceArchiveTest(unittest.TestCase):
-    def test_baseline_archive_has_only_exact_originals_and_immutable_guest_overlays(self):
-        from tests.host.panic_trace_source import SOURCE_PROJECTION, fixed_source
-        from tools.check_panic_traces import prepare_baseline, validate_baseline
-
-        with tempfile.TemporaryDirectory(prefix="micros-plat03-external-") as directory:
-            with self.assertRaises(ValueError):
-                prepare_baseline(Path(directory))
-            self.assertFalse((Path(directory) / "source").exists())
-        (ROOT / "build").mkdir(exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="micros-plat03-archive-", dir=ROOT / "build") as directory:
-            source = prepare_baseline(Path(directory))
-            validate_baseline(source)
-            for name in (*SOURCE_PROJECTION["new_kernel_members"], *SOURCE_PROJECTION["new_arch_members"]):
-                self.assertFalse((source / name).exists(), name)
-            protected = source / "kernel/boot/boot_foundation.c"
-            self.assertEqual(fixed_source("kernel/boot/boot_foundation.c"), protected.read_text())
-            panic = source / "kernel/diagnostic/panic.c"
-            saved = panic.read_bytes()
-            panic.write_bytes(saved + b"\nint unreviewed_state;\n")
-            with self.assertRaises(ValueError):
-                validate_baseline(source)
-            panic.write_bytes(saved)
-            stub = source / "kernel/diagnostic/panic_trace_core.c"
-            stub.write_text("void synthetic_trace(void) {}\n")
-            with self.assertRaises(ValueError):
-                validate_baseline(source)
-            stub.unlink()
-            fixture = source / "tests/qemu/panic_trace_kernel.c"
-            fixture.write_text("void synthetic_fixture(void) {}\n")
-            with self.assertRaises(ValueError):
-                validate_baseline(source)
 
 
 class PanicTraceImageTest(unittest.TestCase):
@@ -608,7 +429,7 @@ micros_panic_trace_test_load_fault:
         self.assertEqual(0, result.returncode, result.stderr)
         return output
 
-    def test_actual_elf_binding_requires_all_typed_objects_real_stops_and_exact_trace_absence(self):
+    def test_actual_elf_binding_requires_all_typed_objects_real_stops_and_current_trace(self):
         from dataclasses import replace
         from tools import check_panic_traces as controller
         from tools.user_elf_parse import load_elf
@@ -619,12 +440,14 @@ micros_panic_trace_test_load_fault:
                 selected = root / str(int(trace))
                 selected.mkdir()
                 path = self.build_image(selected, trace=trace)
-                binding = controller.bind_image(path, baseline=not trace)
-                self.assertEqual(trace, binding.trace_present)
+                if not trace:
+                    with self.assertRaises(ValueError):
+                        controller.bind_image(path)
+                    continue
+                binding = controller.bind_image(path)
+                self.assertTrue(binding.trace_present)
                 self.assertEqual({"boot", "primary", "emergency", "thread"}, {row[0] for row in binding.stacks})
                 self.assertEqual(192, next(size for name, _, size in binding.objects if name.endswith("_observation")))
-                with self.assertRaises(ValueError):
-                    controller.bind_image(path, baseline=trace)
                 image = load_elf(path)
                 observation, = (symbol for symbol in image.symbols if symbol.name == "micros_panic_trace_test_observation")
                 for changed in (
@@ -634,7 +457,7 @@ micros_panic_trace_test_load_fault:
                 ):
                     altered = replace(image, symbols=tuple(changed if symbol == observation else symbol for symbol in image.symbols))
                     with patch.object(controller, "load_elf", return_value=altered), self.assertRaises(ValueError):
-                        controller.bind_image(path, baseline=not trace)
+                        controller.bind_image(path)
 
     def test_required_callers_bind_actual_linked_return_sites_not_just_function_names(self):
         from tools import check_panic_traces as controller
@@ -662,7 +485,7 @@ micros_panic_trace_test_load_fault:
         with tempfile.TemporaryDirectory(prefix="micros-plat03-load-") as directory:
             path = self.build_image(Path(directory), trace=True)
             image = load_elf(path)
-            controller.bind_image(path, baseline=False)
+            controller.bind_image(path)
             for name, instruction, replacement in (
                 ("micros_panic_trace_frame_pointer", 0, 0x00048513),
                 ("micros_panic_trace_frame_pointer", 0, 0xff010113),
@@ -676,12 +499,12 @@ micros_panic_trace_test_load_fault:
                 struct.pack_into("<I", data, section.offset + symbol.value - section.address + 4 * instruction, replacement)
                 path.write_bytes(data)
                 with self.subTest(helper=name, instruction=instruction), self.assertRaises(ValueError):
-                    controller.bind_image(path, baseline=False)
+                    controller.bind_image(path)
 
 
 class PanicTraceCaptureTest(unittest.TestCase):
     @staticmethod
-    def case(*, baseline=False):
+    def case(*, missing_trace=False):
         from tests.host.panic_trace_evidence import GuestState, TraceCapture, TraceCase
 
         bottom, top, sp, fp = 0x81000000, 0x81004000, 0x81000200, 0x81000400
@@ -693,26 +516,26 @@ class PanicTraceCaptureTest(unittest.TestCase):
         struct.pack_into("<3Q", started, 16, 1, 1, 1)
         struct.pack_into("<5Q", started, 72, 0x81001000, sp, fp, bottom, top)
         struct.pack_into("<I", started, 112, 1)
-        final = bytearray(armed if baseline else started)
+        final = bytearray(armed if missing_trace else started)
         struct.pack_into("<2I", final, 8, 3, 0)
         struct.pack_into("<2Q", final, 16, 1, 1)
         struct.pack_into("<Q", final, 64, 1)
         struct.pack_into("<Q", final, 72, 0x81001000)
         struct.pack_into("<2I", final, 176, 0, 1)
-        if not baseline:
+        if not missing_trace:
             struct.pack_into("<2Q", final, 40, 1, 2)
             struct.pack_into("<2I", final, 116, 5, 1)
         counts = [0] * (27 * 14)
         counts[14] = 1000
-        counts[15] = 0 if baseline else 2
+        counts[15] = 0 if missing_trace else 2
         work = struct.pack("<IIQQII378Q", 1, 0, 0x504C415430330007, 1, 2, 0, *counts)
         stack = bytearray(16384)
         struct.pack_into("<QQ", stack, fp - bottom - 16, fp + 1, pc)
         first = GuestState(bytes(armed), bytes(3056), bytes(4), 0x81002000, 0x81002100)
-        entry = None if baseline else GuestState(bytes(started), bytes(3056), struct.pack("<I", 1), sp, fp)
+        entry = None if missing_trace else GuestState(bytes(started), bytes(3056), struct.pack("<I", 1), sp, fp)
         last = GuestState(bytes(final), work, struct.pack("<I", 2), 0x81000800, 0x81000900)
         capture = TraceCapture(
-            7, first, entry, last, bytes(12012), None if baseline else bytes(stack),
+            7, first, entry, last, bytes(12012), None if missing_trace else bytes(stack),
             ((2, last.sp), (8, last.fp), (10, 0), (11, 1), (16, 0), (17, 0x53525354), (32, 0x80200080)),
             None,
             (("boot", bottom, top), ("primary", 0x82000000, 0x82004000),
@@ -727,7 +550,7 @@ class PanicTraceCaptureTest(unittest.TestCase):
             "MICROS_PANIC_MACHINE sstatus=0x0000000000000000 scause=0x0000000000000000 "
             "stval=0x0000000000000000 sepc=0x0000000000000000 ra=0x0000000080200020 sp=0x0000000081001000\r\n"
         )
-        if not baseline:
+        if not missing_trace:
             output += (
                 "MICROS_TRACE_BEGIN version=1 owner=boot limit=0x0000000000000020\r\n"
                 "MICROS_TRACE_FRAME index=0x0000000000000000 pc=0x0000000080200010 fp=0x0000000081000400\r\n"
@@ -741,7 +564,7 @@ class PanicTraceCaptureTest(unittest.TestCase):
         from tests.host.panic_trace_evidence import validate_case
 
         case = self.case()
-        validate_case(case, baseline=False)
+        validate_case(case)
         changed_count = bytearray(case.capture.final.observation)
         struct.pack_into("<Q", changed_count, 48, 3)
         for invalid in (
@@ -756,24 +579,23 @@ class PanicTraceCaptureTest(unittest.TestCase):
             ))),
         ):
             with self.subTest(case=invalid.exit_code), self.assertRaises(ValueError):
-                validate_case(invalid, baseline=False)
+                validate_case(invalid)
 
-    def test_genuine_baseline_absence_cannot_be_a_current_trace_or_an_invented_start(self):
+    def test_absent_trace_cannot_be_current_success_or_borrow_an_invented_start(self):
         from dataclasses import replace
         from tests.host.panic_trace_evidence import validate_case
 
-        baseline = self.case(baseline=True)
-        validate_case(baseline, baseline=True)
+        absent = self.case(missing_trace=True)
         with self.assertRaises(ValueError):
-            validate_case(baseline, baseline=False)
+            validate_case(absent)
         with self.assertRaises(ValueError):
-            validate_case(replace(baseline, capture=replace(baseline.capture, started=self.case().capture.started)), baseline=True)
+            validate_case(replace(absent, capture=replace(absent.capture, started=self.case().capture.started)))
 
     def test_existing_history_decoder_accepts_only_one_complete_trace_without_weakening_legacy_records(self):
         from tools.qemu_smoke_faults import _diagnostic_history_payload, _has_complete_panic_report
 
-        baseline, current = self.case(baseline=True).output, self.case().output
-        self.assertEqual(b"", _diagnostic_history_payload(baseline))
+        plain, current = self.case(missing_trace=True).output, self.case().output
+        self.assertEqual(b"", _diagnostic_history_payload(plain))
         self.assertTrue(_has_complete_panic_report(current))
         self.assertEqual(b"", _diagnostic_history_payload(current))
         for changed in (
@@ -792,94 +614,50 @@ class PanicTraceCaptureTest(unittest.TestCase):
 
 class PanicTraceOracleTest(unittest.TestCase):
     @staticmethod
-    def baseline_cases():
+    def dispatch_cases():
         from dataclasses import replace
 
-        original = PanicTraceCaptureTest.case(baseline=True)
-        regions = {name: (bottom, top) for name, bottom, top in original.capture.stacks}
-        owners = (
-            "boot", "boot", "primary", "thread", "emergency", "boot",
-            "boot", "boot", "boot", "boot", "boot", "boot",
-            "thread", "thread", "boot", "boot", "boot", "boot",
-        )
-        cases = []
-        for scenario, owner in enumerate(owners, 1):
-            bottom, _ = regions[owner]
-            reporting = int(scenario != 18)
-            armed = bytearray(original.capture.armed.observation)
-            final = bytearray(original.capture.final.observation)
-            struct.pack_into("<I", armed, 4, scenario)
-            struct.pack_into("<I", final, 4, scenario)
-            struct.pack_into("<2Q", final, 16, reporting, reporting)
-            struct.pack_into("<Q", final, 72, bottom + 0x900 if reporting else 0)
-            struct.pack_into("<I", final, 180, reporting)
-            work = bytearray(original.capture.final.work)
-            struct.pack_into("<Q", work, 8, 0x504C415430330000 | scenario)
-            if not reporting:
-                work[32:] = bytes(27 * 14 * 8)
-            last = replace(
-                original.capture.final, observation=bytes(final), work=bytes(work),
-                control=struct.pack("<I", 2 if reporting else 0), sp=bottom + 0x400, fp=bottom + 0x500,
-            )
-            reason = (
-                "unexpected-exception" if scenario in (3, 4, 13, 14)
-                else "nested-trap" if scenario == 5 else "panic-trace-test"
-            )
-            output = original.output.replace("panic-trace-test", reason).replace(
-                "sp=0x0000000081001000", f"sp=0x{bottom + 0x900:016x}",
-            )
-            if scenario in (3, 4, 13, 14):
-                trap = (
-                    "MICROS_TRAP_CONTEXT origin=S sstatus=0x0000000000000100 scause=0x0000000000000002 "
-                    "stval=0x0000000000000000 sepc=0x0000000080200010 ra=0x0000000080200020 "
-                    "sp=0x0000000081002000\r\n"
-                )
-                output = output.replace("MICROS_DIAGNOSTIC_HISTORY ", trap + "MICROS_DIAGNOSTIC_HISTORY ")
-            cases.append(replace(
-                original, output=output if reporting else "",
-                capture=replace(
-                    original.capture, scenario=scenario,
-                    armed=replace(original.capture.armed, observation=bytes(armed)), final=last,
-                    registers=tuple(
-                        (number, {2: last.sp, 8: last.fp, 11: reporting}.get(number, value))
-                        for number, value in original.capture.registers
-                    ),
-                    return_sites=(0x80200010, 0x80200020, 0x80200030) if scenario in (1, 2) else (),
-                ),
-            ))
-        return tuple(cases)
+        original = PanicTraceCaptureTest.case()
+        # Dispatch specimens are not target witnesses; capture validation is tested separately.
+        return tuple(replace(original, capture=replace(original.capture, scenario=scenario)) for scenario in range(1, 19))
 
-    def test_all_four_oracles_discriminate_complete_real_shaped_baseline_absence(self):
+    def test_current_oracles_require_all_cases_and_complete_success(self):
         from tests.host.panic_trace_evidence import ORACLE_RULES, run_oracles
 
-        cases = self.baseline_cases()
-        results, output = run_oracles(cases, baseline=True)
-        self.assertEqual(tuple((row[0], "EXPECTED_FAILURE") for row in ORACLE_RULES), results)
-        self.assertIn("Ran 4 tests", output)
-        for invalid in (cases[:-1], (*cases[:-1], cases[0]), tuple(reversed(cases))):
+        cases = self.dispatch_cases()
+        with patch("tests.host.panic_trace_evidence.validate_case") as validate:
+            results, output = run_oracles(cases)
+            self.assertEqual(tuple((row[0], "PASS") for row in ORACLE_RULES), results)
+            self.assertEqual(set(range(1, 19)), {call.args[0].capture.scenario for call in validate.call_args_list})
+            self.assertIn("Ran 4 tests", output)
+            for invalid in (cases[:-1], (*cases[:-1], cases[0]), tuple(reversed(cases))):
+                with self.assertRaises(ValueError):
+                    run_oracles(invalid)
+        with patch("tests.host.panic_trace_evidence.validate_case", side_effect=ValueError("incomplete capture")):
             with self.assertRaises(ValueError):
-                run_oracles(invalid, baseline=True)
-        with self.assertRaises(ValueError):
-            run_oracles(cases, baseline=False)
+                run_oracles(cases)
 
-    def test_missing_property_failure_or_skipped_oracle_cannot_qualify_as_baseline_red(self):
+    def test_skipped_errored_or_failed_oracle_cannot_publish_current_pass(self):
         from tests.host.panic_trace_evidence import PanicTraceOracles, run_oracles
-
-        cases = self.baseline_cases()
-        for replacement in (lambda self: None, unittest.skip("missing measurement")(lambda self: None)):
-            with patch.object(PanicTraceOracles, "test_owned_epoch", replacement), self.assertRaises(ValueError):
-                run_oracles(cases, baseline=True)
 
         def broken_observation(self):
             raise RuntimeError("broken observation")
 
-        with patch.object(PanicTraceOracles, "test_owned_epoch", broken_observation):
-            with self.assertRaises(ValueError):
-                run_oracles(cases, baseline=True)
+        for replacement in (
+            lambda self: self.fail("failed observation"),
+            unittest.skip("missing measurement")(lambda self: None),
+            broken_observation,
+        ):
+            with (
+                patch("tests.host.panic_trace_evidence.validate_case"),
+                patch.object(PanicTraceOracles, "test_owned_epoch", replacement),
+                self.assertRaises(ValueError),
+            ):
+                run_oracles(self.dispatch_cases())
 
 
 class PanicTraceControllerTest(unittest.TestCase):
-    def test_cli_has_only_current_and_fixed_baseline_and_never_promotes_execution_errors(self):
+    def test_cli_has_only_current_execution_and_never_promotes_errors(self):
         from contextlib import redirect_stderr
         import io
         from tools import check_panic_traces as controller
@@ -887,25 +665,22 @@ class PanicTraceControllerTest(unittest.TestCase):
 
         with patch.object(controller, "execute", return_value=0) as execute:
             self.assertEqual(0, main([]))
-            execute.assert_called_once_with(False)
-        with patch.object(controller, "execute", return_value=1) as execute:
-            self.assertEqual(1, main(["--baseline"]))
-            execute.assert_called_once_with(True)
+            execute.assert_called_once_with()
         with redirect_stderr(io.StringIO()), patch.object(controller, "execute") as execute:
-            for arguments in (["--base"], ["--case", "1"], ["--timeout", "60"], ["--kernel", "other.elf"]):
+            for arguments in (["--baseline"], ["--base"], ["--case", "1"], ["--timeout", "60"], ["--kernel", "other.elf"]):
                 with self.assertRaises(SystemExit) as result:
                     main(arguments)
                 self.assertEqual(2, result.exception.code)
             execute.assert_not_called()
         errors = io.StringIO()
         with redirect_stderr(errors), patch.object(controller, "execute", side_effect=ValueError("broken target")):
-            self.assertEqual(2, main(["--baseline"]))
+            self.assertEqual(2, main([]))
         self.assertIn("MICROS_PLAT03_EXECUTION_ERROR", errors.getvalue())
 
     def test_record_preserves_complete_optional_stack_and_all_raw_observation_objects(self):
         from tools.check_panic_traces import case_record
 
-        for case in (PanicTraceCaptureTest.case(), PanicTraceCaptureTest.case(baseline=True)):
+        for case in (PanicTraceCaptureTest.case(), PanicTraceCaptureTest.case(missing_trace=True)):
             record = json.loads(json.dumps(case_record(case)))
             self.assertEqual(case.output, record["output"])
             self.assertEqual(case.capture.history, bytes.fromhex(record["capture"]["history"]))
@@ -922,10 +697,11 @@ class PanicTraceControllerTest(unittest.TestCase):
     def test_executor_runs_every_case_once_and_propagates_a_missing_execution(self):
         from contextlib import redirect_stdout
         import io
+        from types import SimpleNamespace
         from tools import check_panic_traces as controller
         from tools.check_panic_traces import run_cases
 
-        cases = PanicTraceOracleTest.baseline_cases()
+        cases = tuple(SimpleNamespace(exit_code=0, scenario=scenario) for scenario in range(1, 19))
         binding = object()
         with (
             redirect_stdout(io.StringIO()),
@@ -933,7 +709,7 @@ class PanicTraceControllerTest(unittest.TestCase):
             patch.object(controller.shutil, "which", return_value="/fixed/qemu"),
             patch.object(controller, "run_case", side_effect=tuple((case, {}) for case in cases)) as run,
         ):
-            actual_binding, actual_cases, records = run_cases(Path("fixed.elf"), baseline=True)
+            actual_binding, actual_cases, records = run_cases(Path("fixed.elf"))
             self.assertIs(binding, actual_binding)
             self.assertEqual(cases, actual_cases)
             self.assertEqual(18, len(records))
@@ -945,13 +721,13 @@ class PanicTraceControllerTest(unittest.TestCase):
             patch.object(controller, "run_case", side_effect=[(cases[0], {}), TimeoutError("no second case")]) as run,
         ):
             with self.assertRaises(TimeoutError):
-                run_cases(Path("fixed.elf"), baseline=True)
+                run_cases(Path("fixed.elf"))
             self.assertEqual(2, run.call_count)
 
 
 class PanicTraceExecutionScopeTest(unittest.TestCase):
     @contextmanager
-    def execution(self, *, baseline=False):
+    def execution(self):
         from contextlib import ExitStack, redirect_stdout
         import io
         from types import SimpleNamespace
@@ -959,30 +735,31 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
         from tools.validation_context import Candidate
 
         with tempfile.TemporaryDirectory(prefix="micros-trace-scope-") as directory, ExitStack() as stack:
-            root = Path(directory)
+            root = Path(directory).resolve()
             state = SimpleNamespace(
-                controller=controller, root=root, untracked=b"",
+                controller=controller, root=root, untracked=b"", ignored=b"",
                 candidate=Candidate({}, {"head": "1" * 40}, True),
                 tools={"compiler": "fixed"}, firmware={"image": "fixed"},
-                members=set(controller.SOURCE_ROLES["candidate_paths"])
-                | set(controller.SOURCE_ROLES["immutable_additions"])
-                | {"CMakeLists.txt", "CMakePresets.json", "docs/later-design.md"},
-                scope_check=controller.require_source_scope,
+                members={"CMakeLists.txt", "CMakePresets.json", "docs/later-design.md",
+                         "kernel/diagnostic/panic_trace.c", "tests/qemu/panic_trace_kernel.c"},
             )
             for name in state.members:
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes((ROOT / name).read_bytes() if name in (
-                    "CMakeLists.txt", "CMakePresets.json",
-                ) else name.encode())
+                path.write_bytes(name.encode())
 
-            def git(*arguments):
-                if arguments == ("ls-files", "--others", "--exclude-standard", "-z"):
+            def git(arguments, *, cwd):
+                self.assertEqual(root, cwd)
+                if arguments == ("git", "ls-files", "--others", "--exclude-standard", "-z"):
                     return state.untracked
-                self.assertEqual(("ls-files", "-z"), arguments)
+                if arguments[:5] == ("git", "ls-files", "--others", "-z", "--"):
+                    self.assertEqual({Path(name).parts[0] for name in state.members}, set(arguments[5:]))
+                    return state.ignored
+                self.assertEqual(("git", "ls-files", "-z"), arguments)
                 return b"".join(name.encode() + b"\0" for name in sorted(state.members))
 
             def build(source, workspace):
+                self.assertEqual(root, source)
                 target = workspace / "target"
                 state.image = target / "kernel/micros.elf"
                 state.image.parent.mkdir(parents=True)
@@ -991,7 +768,7 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
 
             stack.enter_context(redirect_stdout(io.StringIO()))
             stack.enter_context(patch.object(controller, "ROOT", root))
-            stack.enter_context(patch.object(controller, "git", side_effect=git))
+            stack.enter_context(patch("tests.host.diagnostic_history_evidence._run", side_effect=git))
             stack.enter_context(patch(
                 "tools.validation_context.capture_candidate", side_effect=lambda _: state.candidate,
             ))
@@ -1006,13 +783,10 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
             stack.enter_context(patch(
                 "tests.host.diagnostic_history_evidence.build_artifacts", return_value=("kernel/micros.elf",),
             ))
-            state.scope = stack.enter_context(patch.object(controller, "require_source_scope"))
-            stack.enter_context(patch.object(controller, "prepare_baseline", return_value=root))
-            stack.enter_context(patch.object(controller, "validate_baseline"))
             state.build = stack.enter_context(patch.object(controller, "build_target", side_effect=build))
-            stack.enter_context(patch.object(controller, "run_cases", return_value=(
-                controller.ImageBinding("0" * 64, (), (), (), (), not baseline),
-                (PanicTraceCaptureTest.case(baseline=baseline),), (),
+            state.cases = stack.enter_context(patch.object(controller, "run_cases", return_value=(
+                controller.ImageBinding("0" * 64, (), (), (), (), True),
+                (PanicTraceCaptureTest.case(),), (),
             )))
             state.oracles = stack.enter_context(patch.object(controller, "run_oracles", return_value=({}, "")))
             state.publish = stack.enter_context(patch.object(controller, "publish_json", wraps=controller.publish_json))
@@ -1029,69 +803,47 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
             patch.object(controller, "build_target") as build,
             patch.object(controller, "publish_json") as publish,
         ):
-            with self.assertRaises(Exception) as result:
-                controller.execute(False)
-            self.assertIsInstance(result.exception, ManifestReached)
+            with self.assertRaises(ManifestReached):
+                controller.execute()
             build.assert_not_called()
             publish.assert_not_called()
 
-    def test_current_manifest_keeps_every_input_and_rejects_dirty_or_incomplete_ownership(self):
+    def test_current_manifest_keeps_every_input_and_rejects_dirty_missing_or_extra_files(self):
         from dataclasses import replace
 
         with self.execution() as state:
             manifest = state.controller.source_manifest()
-            self.assertEqual(state.members, set(manifest["subjects"]) | set(manifest["immutable"]["files"]))
-            self.assertIn("docs/later-design.md", manifest["immutable"]["files"])
+            self.assertEqual(state.members, set(manifest["files"]))
+            self.assertIn("docs/later-design.md", manifest["files"])
             state.candidate = replace(state.candidate, clean=False)
             with self.assertRaises(ValueError):
                 state.controller.source_manifest()
             state.candidate = replace(state.candidate, clean=True)
-            state.untracked = b"untracked-input\0"
-            with self.assertRaises(ValueError):
-                state.controller.source_manifest()
-            state.untracked = b""
-            for name in state.controller.SOURCE_ROLES["immutable_additions"]:
-                state.members.remove(name)
-                with self.subTest(missing=name), self.assertRaises(ValueError):
+            for field in ("untracked", "ignored"):
+                setattr(state, field, b"foreign-input\0")
+                with self.subTest(field=field), self.assertRaises(ValueError):
                     state.controller.source_manifest()
-                state.members.add(name)
-
-    def test_current_execution_requires_every_subject_and_exact_boolean_modes(self):
-        from tools.check_panic_traces import SOURCE_ROLES
-
-        for name in SOURCE_ROLES["candidate_paths"]:
-            with self.subTest(missing=name), self.execution() as state:
-                state.members.remove(name)
-                (state.root / name).unlink()
-                with self.assertRaises(ValueError):
-                    state.controller.execute(False)
-                state.build.assert_not_called()
-                state.publish.assert_not_called()
-        for mode in (0, 1, None, "current"):
-            with self.subTest(mode=mode), self.execution() as state:
-                state.scope.side_effect = state.scope_check
-                with self.assertRaises(ValueError):
-                    state.controller.execute(mode)
-                state.build.assert_not_called()
-                state.publish.assert_not_called()
+                setattr(state, field, b"")
+            for name in state.members:
+                path = state.root / name
+                original = path.read_bytes()
+                path.unlink()
+                with self.subTest(missing=name), self.assertRaises((ValueError, OSError)):
+                    state.controller.source_manifest()
+                path.write_bytes(original)
 
     def test_current_run_preserves_complete_inputs_and_rejects_each_kind_of_drift(self):
         with self.execution() as state:
-            self.assertEqual(0, state.controller.execute(False))
-            state.scope.assert_not_called()
+            self.assertEqual(0, state.controller.execute())
             record = json.loads((state.root / "build/panic-trace/current.json").read_text())
-            self.assertEqual(
-                state.members,
-                set(record["input_manifest"]["subjects"]) | set(record["input_manifest"]["immutable"]["files"]),
-            )
-        for change in ("subject", "other-source", "membership", "tool", "firmware", "artifact"):
+            self.assertEqual(state.members, set(record["input_manifest"]["files"]))
+            self.assertEqual(state.tools, record["input_manifest"]["tools"])
+            self.assertEqual(state.firmware, record["input_manifest"]["firmware"])
+        for change in ("runtime", "other-source", "membership", "tool", "firmware", "artifact"):
             with self.subTest(change=change), self.execution() as state:
-                def drift(cases, *, baseline):
-                    if change in ("subject", "other-source"):
-                        name = (
-                            state.controller.SOURCE_ROLES["candidate_paths"][0]
-                            if change == "subject" else "docs/later-design.md"
-                        )
+                def drift(cases):
+                    if change in ("runtime", "other-source"):
+                        name = "kernel/diagnostic/panic_trace.c" if change == "runtime" else "docs/later-design.md"
                         (state.root / name).write_bytes(b"changed input")
                     elif change == "membership":
                         name = "docs/another-later-design.md"
@@ -1107,114 +859,24 @@ class PanicTraceExecutionScopeTest(unittest.TestCase):
 
                 state.oracles.side_effect = drift
                 with self.assertRaisesRegex(ValueError, "changed during execution"):
-                    state.controller.execute(False)
+                    state.controller.execute()
                 state.publish.assert_not_called()
 
-    def test_baseline_checks_both_boundaries_and_failures_never_publish_success(self):
-        from contextlib import redirect_stderr
-        from dataclasses import replace
-        import io
-
-        with self.execution(baseline=True) as state:
-            self.assertEqual(1, state.controller.execute(True))
-            self.assertEqual(
-                [{"baseline": True}, {"baseline": True}],
-                [entry.kwargs for entry in state.scope.call_args_list],
-            )
-        for failure in ("scope-before", "scope-after", "capture", "build", "oracles"):
-            baseline = failure.startswith("scope-")
-            with self.subTest(failure=failure), self.execution(baseline=baseline) as state:
-                old_report = state.root / "build/panic-trace" / ("baseline.json" if baseline else "current.json")
-                old_report.parent.mkdir(parents=True)
-                old_report.write_bytes(b"old report is not current acceptance")
-                if failure.startswith("scope-"):
-                    state.scope.side_effect = (
-                        [ValueError("scope rejected")] if failure == "scope-before"
-                        else [None, ValueError("scope rejected")]
-                    )
-                elif failure == "capture":
-                    state.candidate = replace(state.candidate, clean=False)
-                else:
-                    getattr(state, failure).side_effect = ValueError("execution rejected")
-                with redirect_stderr(io.StringIO()):
-                    self.assertEqual(2, state.controller.main(["--baseline"] if baseline else []))
+    def test_execution_failures_leave_the_previous_report_unchanged(self):
+        for failure in ("build", "case", "oracle"):
+            with self.subTest(failure=failure), self.execution() as state:
+                report = state.root / "build/panic-trace/current.json"
+                report.parent.mkdir(parents=True)
+                report.write_bytes(b"prior report")
+                selected = {"build": state.build, "case": state.cases, "oracle": state.oracles}[failure]
+                selected.side_effect = ValueError("execution rejected")
+                with self.assertRaisesRegex(ValueError, "execution rejected"):
+                    state.controller.execute()
                 state.publish.assert_not_called()
-                self.assertEqual(b"old report is not current acceptance", old_report.read_bytes())
-
-    def test_historical_scope_still_rejects_new_members_and_nontrace_production(self):
-        from functools import lru_cache
-        from tools import check_panic_traces as controller
-
-        git_before = controller.git
-        base = set(filter(None, git_before(
-            "ls-tree", "-r", "--name-only", "-z", controller.DESIGN_PINS["design_commit"],
-        ).decode().split("\0")))
-        allowed = base | set(controller.SOURCE_ROLES["candidate_paths"]) | set(
-            controller.SOURCE_ROLES["immutable_additions"],
-        )
-        present = allowed | {"docs/later-design.md"}
-
-        def git(*arguments):
-            if arguments == ("ls-files", "-z"):
-                return b"".join(name.encode() + b"\0" for name in sorted(present))
-            return git_before(*arguments)
-
-        fixed_inputs = {
-            ROOT / name: (mode, identity)
-            for name, mode, identity in controller.baseline_members()
-        }
-        selected = ROOT / "kernel/memory/frame_allocator.c"
-
-        @lru_cache(maxsize=None)
-        def historical(path):
-            mode, identity = fixed_inputs[path]
-            data = git_before("cat-file", "blob", identity)
-            name = path.relative_to(ROOT).as_posix()
-            if name in controller.SOURCE_OVERLAYS:
-                data = controller.observe_source(name, data.decode()).encode()
-            return data, {"mode": mode}
-
-        def changed(path):
-            data, identity = historical(path)
-            return (data + b"\nint unreviewed_state;\n", identity) if path == selected else (data, identity)
-
-        with (
-            patch.object(controller, "git", side_effect=git),
-            patch.object(controller, "read_regular", side_effect=historical),
-        ):
-            with self.assertRaisesRegex(ValueError, "membership escaped"):
-                controller.require_source_scope(baseline=True)
-            present = allowed
-            controller.require_source_scope(baseline=True)
-            with patch.object(controller, "read_regular", side_effect=changed):
-                with self.assertRaisesRegex(ValueError, "production outside"):
-                    controller.require_source_scope(baseline=True)
+                self.assertEqual(b"prior report", report.read_bytes())
 
 
 class PanicTraceIntegrationTest(unittest.TestCase):
-    def test_current_recipes_and_test_only_overlays_restore_the_complete_fixed_inputs(self):
-        from tests.host.bootstrap_allocation_source import project_cmake
-        from tests.host.panic_trace_source import (
-            SOURCE_OVERLAYS, TEST_HEADER, extend_cmake, extend_presets, fixed_source, observe_source,
-            project_trace_runtime,
-        )
-
-        self.assertTrue(
-            project_cmake((ROOT / "CMakeLists.txt").read_text()) == extend_cmake(fixed_source("CMakeLists.txt")),
-            "current CMake does not contain the exact independently specified trace integration",
-        )
-        self.assertTrue(
-            (ROOT / "CMakePresets.json").read_text() == extend_presets(fixed_source("CMakePresets.json")),
-            "current presets do not preserve the complete predecessor plus the one trace workflow",
-        )
-        for name in SOURCE_OVERLAYS:
-            with self.subTest(path=name):
-                actual = (ROOT / name).read_text()
-                if name == "kernel/diagnostic/panic.c":
-                    self.assertIn(TEST_HEADER, actual)
-                    self.assertEqual(fixed_source(name), project_trace_runtime(name, actual))
-                else:
-                    self.assertEqual(observe_source(name, fixed_source(name)), actual)
 
     def test_trace_workflow_extends_every_coverage_inventory_without_replacing_an_old_gate(self):
         from tools import validation_plan
@@ -1270,30 +932,6 @@ class PanicTraceTransportTest(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 project_trace_runtime(name, changed)
-
-    def test_planner_projection_preserves_every_original_rule_and_rejects_reordered_new_work(self):
-        from tests.host.panic_trace_source import (
-            fixed_source, project_trace_plan, project_trace_planner, project_trace_workflows,
-        )
-        from tools import validation_plan
-
-        source = (ROOT / "tools/validation_plan.py").read_text()
-        self.assertEqual(fixed_source("tools/validation_plan.py"), project_trace_planner(source))
-        plan = validation_plan.plan([], "full")
-        self.assertEqual((50, 49), (len(plan), len(project_trace_plan(plan))))
-        self.assertEqual(plan[-3:], project_trace_plan(plan)[-3:])
-        workflow = "test-qemu-panic-trace"
-        self.assertNotIn(workflow, project_trace_workflows(validation_plan.QEMU_WORKFLOWS))
-        for changed in (
-            source.replace('"test-qemu-panic-trace"', '"test-qemu-undeclared"', 1),
-            source.replace("def plan(", "def undeclared_plan("),
-        ):
-            with self.assertRaises(ValueError):
-                project_trace_planner(changed)
-        with self.assertRaises(ValueError):
-            project_trace_plan([*plan, ("cmake", "--workflow", "--preset", workflow)])
-        with self.assertRaises(ValueError):
-            project_trace_workflows((workflow, *validation_plan.QEMU_WORKFLOWS))
 
 
 class PanicTraceMachineTest(unittest.TestCase):

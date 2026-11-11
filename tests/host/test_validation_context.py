@@ -100,6 +100,40 @@ class ValidationContextTests(unittest.TestCase):
             expected[name] = hashlib.sha256(raw).hexdigest()
         return expected
 
+    def test_current_runner_profile_does_not_restore_historical_source(self):
+        expected = self.qemu_family_fixture()
+        with (
+            mock.patch.object(validation_context, "QEMU_RUNNER_SOURCE_DIGESTS", expected),
+            mock.patch.object(
+                validation_context, "projected_runner_digest",
+                side_effect=AssertionError("current profile restored historical source"),
+                create=True,
+            ),
+        ):
+            validation_context._validate_qemu_runner_family(self.root)
+
+    def test_native_work_declarations_do_not_reconstruct_the_root_recipe(self):
+        (self.root / "CMakeLists.txt").write_text(
+            '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")\n'
+        )
+        module = self.root / "tests/work/WorkCounts.cmake"
+        module.parent.mkdir(parents=True)
+        module.write_bytes((ROOT / "tests/work/WorkCounts.cmake").read_bytes())
+        directory = self.root / "build"
+        directory.mkdir()
+        tests = []
+        for name, executable in (
+            ("work-counts", "work_counts_test"),
+            ("work-observation-disabled", "work_observation_disabled_test"),
+        ):
+            path = directory / executable
+            path.write_bytes(b"native fixture")
+            tests.append({"name": name, "command": [str(path)]})
+        outputs = validation_build_manifest.native_outputs(
+            self.root, directory, {"tests": tests},
+        )
+        self.assertEqual(tuple(sorted(directory.iterdir())), outputs)
+
     def test_qemu_source_family_refuses_package_shadowing_before_metadata(self):
         expected = self.qemu_family_fixture()
         shadow = self.root / "tools/qemu_smoke_command"

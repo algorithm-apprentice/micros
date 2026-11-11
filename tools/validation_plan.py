@@ -1444,7 +1444,6 @@ HOST_UNIT_ONLY_INPUTS = ('tests/host/test_qemu_runner_source_layout.py',
  'tests/host/test_kernel_pm_control_source_layout.py',
  'tests/host/test_vm_service_source_layout.py',
  'tests/host/test_pm_service_source_layout.py',
- 'tests/host/kernel_layout_source.py',
  'tests/host/test_kernel_directory_layout.py')
 
 

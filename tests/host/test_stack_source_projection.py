@@ -65,21 +65,6 @@ class StackSourceProjectionTest(unittest.TestCase):
             _, after = compile_fixture(annotated, instrument_source(unit, source))
             self.assertEqual(allocatable_object_bytes(before), allocatable_object_bytes(after))
 
-    def test_historical_kernel_oracle_keeps_its_original_hash_after_exact_projection(self):
-        from tests.host import kernel_layout_source
-        from tests.host.stack_source_projection import instrument_source
-
-        logical = "kernel/kernel_object_context.c"
-        physical = kernel_layout_source.KERNEL_LOGICAL_TO_PHYSICAL[logical]
-        fixed = reference_source(str(ROOT), physical)
-        with tempfile.TemporaryDirectory(prefix="micros-stack-kernel-oracle-") as temporary:
-            root = Path(temporary)
-            path = root / physical
-            path.parent.mkdir(parents=True)
-            path.write_text(fixed)
-            expected = kernel_layout_source.read_logical_bytes(root, logical)
-            path.write_text(instrument_source(physical, fixed))
-            self.assertEqual(expected, kernel_layout_source.read_logical_bytes(root, logical))
 
 
 if __name__ == "__main__":

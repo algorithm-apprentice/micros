@@ -274,9 +274,9 @@ completed its [acceptance](common-scheduler-return.md#implementation-acceptance)
 and independently merged. Only B03-F002/F005 close.
 
 The user-prioritized
-[current-contract validation design](current-contract-validation.md) is now
-the sole active outcome. Its implementation depends on its separate reviewed
-design merge; IPC01 and later runtime corrections do not start in parallel.
+[current-contract validation design](current-contract-validation.md) separately
+merged as #247. Its dependent tooling implementation is the sole active
+outcome; IPC01 and later runtime corrections do not start in parallel.
 This tooling prerequisite changes no runtime edge, later finding owner or
 hosted-CI status.
 

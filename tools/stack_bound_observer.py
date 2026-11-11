@@ -244,16 +244,13 @@ def runtime_call_inventory(obj, symbol):
 
 
 def qemu_recipe_arguments(root, directory, target):
-    from tests.host.stack_recipe import project_root_recipe, validate_stack_recipe
+    from tests.host.stack_recipe import validate_stack_recipe
 
     root, directory = Path(root), Path(directory)
     try:
         validate_stack_recipe(root)
-        source = project_root_recipe(read_regular(root / "CMakeLists.txt")[0].decode())
     except (AssertionError, OSError) as error:
         raise StackEvidenceError(f"unbound stack recipe extension: {error}") from error
-    if source != reference_source(str(root), "CMakeLists.txt"):
-        raise StackEvidenceError("legacy QEMU recipe changed from its fixed source stage")
     content = _run((ninja_path(directory), "-C", directory, "-t", "commands", target)).decode()
     runner = str(root / "tools/run_qemu_smoke.py")
     found = []

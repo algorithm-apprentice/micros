@@ -1,5 +1,7 @@
 import sys
+from pathlib import Path
 
+from tools.stack_artifact_files import read_regular
 from tools.qemu_smoke_records import (
     SmokeOutcome,
 )
@@ -28,6 +30,50 @@ from tools.qemu_smoke_outcome import (
 from tools.qemu_smoke_arguments import (
     parse_arguments,
 )
+
+
+def _validate_current_evidence(scope, result, kernel):
+    if result.return_code != 0 or result.timed_out:
+        raise ValueError("current guest did not complete successfully")
+    if scope == "kernel-mapping":
+        from tests.host.kernel_mapping_evidence import bind_target_image, decode_target_output
+
+        measured = decode_target_output(result, bind_target_image(kernel))
+        if not measured["largest"]:
+            raise ValueError("kernel mapping did not retain the required largest-leaf topology")
+        return
+    if scope == "runtime-memory":
+        from tests.host.runtime_memory_evidence import prove_linked_runtime
+
+        kernel = Path(kernel).resolve()
+        if kernel.name != "micros.elf" or kernel.parent.name != "kernel":
+            raise ValueError("runtime memory evidence requires its configured kernel image")
+        prove_linked_runtime(Path(__file__).resolve().parents[1], directory=kernel.parent.parent)
+        return
+    if scope == "diagnostic-history":
+        from tests.host.diagnostic_history_evidence import validate_history_storage
+        from tools.qemu_smoke_faults import _has_diagnostic_history
+
+        validate_history_storage(kernel)
+        if not _has_diagnostic_history(result.output, "seeded"):
+            raise ValueError("diagnostic history lacks its complete seeded panic witness")
+        return
+    reported = "".join("# " + line for line in result.output.splitlines(keepends=True))
+    if scope == "scheduler-return":
+        from tests.host.common_scheduler_return_evidence import parse_target_output, target_failures
+
+        failures = target_failures(parse_target_output(reported, "current", result.return_code))
+    elif scope in ("user-address-space", "address-space-handoff"):
+        from tests.host.selected_release_handoff_evidence import parse_target_output, target_failures
+        from tests.host.work_count_types import Stage
+
+        failures = target_failures(parse_target_output(
+            reported, "test-qemu-" + scope, Stage.GREEN, result.return_code,
+        ))
+    else:
+        raise ValueError("unknown current target evidence scope")
+    if failures:
+        raise ValueError("current semantic/work witnesses failed: " + repr(failures))
 
 
 def _matches_observed_run(
@@ -148,6 +194,13 @@ def main(argv=None):
             kernel=str(arguments.kernel.resolve()),
             memory=memory,
         )
+        kernel_identity = None
+        if arguments.require_current_evidence is not None:
+            try:
+                kernel_identity = read_regular(arguments.kernel)[1]
+            except (OSError, ValueError) as error:
+                print("current target evidence: " + str(error), file=sys.stderr)
+                return 2
         try:
             result = run_qemu(
                 command,
@@ -181,6 +234,16 @@ def main(argv=None):
                 or result.serial_input_sent
             )
         )
+        if accepted and arguments.require_current_evidence is not None:
+            try:
+                if read_regular(arguments.kernel)[1] != kernel_identity:
+                    raise ValueError("executed kernel image changed")
+                _validate_current_evidence(arguments.require_current_evidence, result, arguments.kernel)
+                if read_regular(arguments.kernel)[1] != kernel_identity:
+                    raise ValueError("kernel image changed during witness validation")
+            except (OSError, ValueError, AssertionError) as error:
+                print("current target evidence: " + str(error), file=sys.stderr)
+                accepted = False
         if not accepted:
             return print_tap_result(
                 outcome,

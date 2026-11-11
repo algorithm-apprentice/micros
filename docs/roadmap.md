@@ -585,10 +585,11 @@ No prior execution is borrowed. Implementation #246 has now completed the
 [renewed acceptance](architecture/common-scheduler-return.md#implementation-acceptance),
 independent review and exact-tree publication, closing B03-F002/F005.
 The next separate
-[Accepted current-contract validation design](architecture/current-contract-validation.md)
+[current-contract validation outcome](architecture/current-contract-validation.md)
 addresses the user-prioritized historical-freeze, metadata-prerequisite and
-duplicate-execution costs. Its implementation remains pending the separate
-design merge; it does not advance another runtime correction or hosted CI.
+duplicate-execution costs after separately merged design #247. Its
+implementation/evidence map records the current owners and removed-case
+disposition; it does not advance another runtime correction or hosted CI.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

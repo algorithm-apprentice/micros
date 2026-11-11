@@ -314,6 +314,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
         for relative in (
             "tests/host/user_elf_cli_cases.py",
             "tests/host/test_check_application_elf.py",
+            "tests/host/source_snapshot.py",
             "tests/host/qemu_smoke_execution_cases.py",
             "tests/host/test_qemu_runner_source_layout.py",
             "tests/host/test_validation_context.py",
@@ -325,11 +326,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
     def test_python_process_construction_has_one_reviewed_owner_inventory(self):
         expected = {
             "tools/canonicalize_stack_metadata_elf.py",
-            "tools/check_bootstrap_allocation.py",
-            "tools/check_diagnostic_history.py",
-            "tools/check_kernel_mapping.py",
             "tools/check_panic_traces.py",
-            "tools/check_runtime_memory.py",
             "tools/check_selected_ownership.py",
             "tools/check_selected_address_space.py",
             "tools/check_selected_release_handoff.py",
@@ -350,20 +347,12 @@ class PythonHostRuntimeTests(unittest.TestCase):
             "tools/validation_execution.py",
             "tools/validation_plan.py",
             "tools/run_host_tests.py",
-            "tests/host/bootstrap_allocation_authority.py",
-            "tests/host/diagnostic_history_authority.py",
-            "tests/host/evidence_authority_scope.py",
-            "tests/host/kernel_mapping_authority.py",
-            "tests/host/runtime_memory_authority.py",
-            "tests/host/selected_ownership_authority.py",
-            "tests/host/selected_address_space_authority.py",
-            "tests/host/selected_release_handoff_authority.py",
-            "tests/host/object_hart_validation_authority.py",
-            "tests/host/common_scheduler_return_authority.py",
+            "tests/host/source_snapshot.py",
             "tests/host/qemu_smoke_execution_cases.py",
             "tests/host/test_check_application_elf.py",
             "tests/host/test_qemu_runner_source_layout.py",
             "tests/host/test_validation_execution.py",
+            "tests/host/test_work_count_evidence.py",
             "tests/host/user_elf_cli_cases.py",
         }
         observed = set()

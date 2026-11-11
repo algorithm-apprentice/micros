@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 import re
 import unittest
@@ -12,37 +11,45 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_if_blocks,
     static_definition_paths,
 )
-from tests.host import kernel_layout_source
+from tests.host.source_snapshot import source_bytes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CMAKE_PATH = REPOSITORY_ROOT / "CMakeLists.txt"
-FUNCTION_REVIEW_LINE_LIMIT = 120
+PUBLIC_HEADERS = (
+    "kernel/vm/vm_handoff_core.h", "kernel/vm/vm_handoff_syscall.h",
+    "kernel/vm/vm_snapshot.h", "kernel/tests/memory/address_space_handoff_test.h",
+)
+
+
+def current_text(path, encoding="utf-8"):
+    return source_bytes(REPOSITORY_ROOT, path).decode(encoding)
+
 
 SOURCE_SETS = {
     "MICROS_VM_HANDOFF_CORE_SOURCES": (
-        "kernel/vm_handoff_core.c",
-        "kernel/vm_handoff_abi.c",
-        "kernel/vm_handoff_boot.c",
-        "kernel/vm_handoff_load.c",
-        "kernel/vm_handoff_scratch.c",
-        "kernel/vm_handoff_freeze.c",
-        "kernel/vm_handoff_commit.c",
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_core.c",
+        "kernel/vm/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_load.c",
+        "kernel/vm/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_freeze.c",
+        "kernel/vm/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_release.c",
     ),
     "MICROS_VM_HANDOFF_SYSCALL_SOURCES": (
-        "kernel/vm_handoff_syscall.c",
-        "kernel/vm_handoff_syscall_runtime.c",
-        "kernel/vm_handoff_syscall_memory.c",
-        "kernel/vm_handoff_syscall_boot.c",
-        "kernel/vm_handoff_syscall_load.c",
-        "kernel/vm_handoff_syscall_scratch.c",
-        "kernel/vm_handoff_syscall_freeze.c",
-        "kernel/vm_handoff_syscall_release.c",
+        "kernel/vm/vm_handoff_syscall.c",
+        "kernel/vm/vm_handoff_syscall_runtime.c",
+        "kernel/vm/vm_handoff_syscall_memory.c",
+        "kernel/vm/vm_handoff_syscall_boot.c",
+        "kernel/vm/vm_handoff_syscall_load.c",
+        "kernel/vm/vm_handoff_syscall_scratch.c",
+        "kernel/vm/vm_handoff_syscall_freeze.c",
+        "kernel/vm/vm_handoff_syscall_release.c",
     ),
     "MICROS_VM_SNAPSHOT_SOURCES": (
-        "kernel/vm_snapshot.c",
-        "kernel/vm_snapshot_validation.c",
+        "kernel/vm/vm_snapshot.c",
+        "kernel/vm/vm_snapshot_validation.c",
     ),
     "MICROS_VM_HANDOFF_CORE_HOST_TEST_SOURCES": (
         "tests/host/vm_handoff_test.c",
@@ -67,100 +74,90 @@ SOURCE_SETS = {
         "tests/host/vm_handoff_syscall_test_load_backend.c",
     ),
     "MICROS_ADDRESS_SPACE_HANDOFF_QEMU_TEST_SOURCES": (
-        "kernel/address_space_handoff_test.c",
-        "kernel/address_space_handoff_test_fixture.c",
-        "kernel/address_space_handoff_test_setup.c",
-        "kernel/address_space_handoff_test_snapshot.c",
-        "kernel/address_space_handoff_test_handoff.c",
-        "kernel/address_space_handoff_test_runtime.c",
-        "kernel/address_space_handoff_test_syscall.c",
-        "kernel/address_space_handoff_test_tty.c",
-        "kernel/address_space_handoff_test_trap.c",
+        "kernel/tests/memory/address_space_handoff_test.c",
+        "kernel/tests/memory/address_space_handoff_test_fixture.c",
+        "kernel/tests/memory/address_space_handoff_test_setup.c",
+        "kernel/tests/memory/address_space_handoff_test_snapshot.c",
+        "kernel/tests/memory/address_space_handoff_test_handoff.c",
+        "kernel/tests/memory/address_space_handoff_test_runtime.c",
+        "kernel/tests/memory/address_space_handoff_test_syscall.c",
+        "kernel/tests/memory/address_space_handoff_test_tty.c",
+        "kernel/tests/memory/address_space_handoff_test_trap.c",
     ),
 }
 
 PRIVATE_HEADERS = (
-    "kernel/vm_handoff_internal.h",
-    "kernel/vm_handoff_syscall_internal.h",
-    "kernel/vm_snapshot_internal.h",
+    "kernel/vm/vm_handoff_internal.h",
+    "kernel/vm/vm_handoff_syscall_internal.h",
+    "kernel/vm/vm_snapshot_internal.h",
     "tests/host/vm_handoff_test_internal.h",
     "tests/host/vm_bootstrap_test_internal.h",
     "tests/host/vm_handoff_syscall_test_internal.h",
-    "kernel/address_space_handoff_test_internal.h",
+    "kernel/tests/memory/address_space_handoff_test_internal.h",
 )
 
 UNAFFECTED_FAMILY_PATHS = (
-    "kernel/vm_handoff_runtime.c",
-    "kernel/vm_handoff_runtime.h",
-    "kernel/vm_handoff_test.c",
-    "kernel/vm_handoff_test.h",
-    "kernel/vm_handoff_test_fixture.h",
+    "kernel/vm/vm_handoff_runtime.c",
+    "kernel/vm/vm_handoff_runtime.h",
+    "kernel/tests/vm/vm_handoff_test.c",
+    "kernel/tests/vm/vm_handoff_test.h",
+    "kernel/tests/vm/vm_handoff_test_fixture.h",
 )
 
 TEST_PRIVATE_HEADERS = (
     "tests/host/vm_handoff_test_internal.h",
     "tests/host/vm_bootstrap_test_internal.h",
     "tests/host/vm_handoff_syscall_test_internal.h",
-    "kernel/address_space_handoff_test_internal.h",
+    "kernel/tests/memory/address_space_handoff_test_internal.h",
 )
 
-STABLE_HEADER_HASHES = {
-    "kernel/vm_handoff_core.h":
-        "0fa181de7f323a18a84be941a5b2b96d76998b607fc719216b737b235d63fdd2",
-    "kernel/vm_handoff_syscall.h":
-        "65cd9aa2c3089f495a6f8d0219eed2ba44a2dc57fd2b7d170bd5d3c17e05791b",
-    "kernel/vm_snapshot.h":
-        "d2bddf7d46addb5ee768a92ca356f4cd552e756a871b861131c002dd54792942",
-    "kernel/address_space_handoff_test.h":
-        "a228b45fb43b9516f279e9fecbc675f98b4c29eb2e285faa58d52d82e844cc84",
-}
 
 VM_PATH_CLASSIFICATION_EQUIVALENTS = (
     (
-        "kernel/vm_handoff_core.c",
+        "kernel/vm/vm_handoff_core.c",
         (
-            "kernel/vm_handoff_abi.c",
-            "kernel/vm_handoff_boot.c",
-            "kernel/vm_handoff_load.c",
-            "kernel/vm_handoff_scratch.c",
-            "kernel/vm_handoff_freeze.c",
-            "kernel/vm_handoff_commit.c",
-            "kernel/vm_handoff_release.c",
-            "kernel/vm_handoff_internal.h",
+            "kernel/vm/vm_handoff_abi.c",
+            "kernel/vm/vm_handoff_boot.c",
+            "kernel/vm/vm_handoff_load.c",
+            "kernel/vm/vm_handoff_scratch.c",
+            "kernel/vm/vm_handoff_freeze.c",
+            "kernel/vm/vm_handoff_commit.c",
+            "kernel/vm/vm_handoff_release.c",
+            "kernel/vm/vm_handoff_internal.h",
         ),
     ),
     (
-        "kernel/vm_handoff_syscall.c",
+        "kernel/vm/vm_handoff_syscall.c",
         (
-            "kernel/vm_handoff_syscall_runtime.c",
-            "kernel/vm_handoff_syscall_memory.c",
-            "kernel/vm_handoff_syscall_boot.c",
-            "kernel/vm_handoff_syscall_load.c",
-            "kernel/vm_handoff_syscall_scratch.c",
-            "kernel/vm_handoff_syscall_freeze.c",
-            "kernel/vm_handoff_syscall_release.c",
-            "kernel/vm_handoff_syscall_internal.h",
+            "kernel/vm/vm_handoff_syscall_runtime.c",
+            "kernel/vm/vm_handoff_syscall_memory.c",
+            "kernel/vm/vm_handoff_syscall_boot.c",
+            "kernel/vm/vm_handoff_syscall_load.c",
+            "kernel/vm/vm_handoff_syscall_scratch.c",
+            "kernel/vm/vm_handoff_syscall_freeze.c",
+            "kernel/vm/vm_handoff_syscall_release.c",
+            "kernel/vm/vm_handoff_syscall_internal.h",
         ),
     ),
     (
-        "kernel/vm_snapshot.c",
+        "kernel/vm/vm_snapshot.c",
         (
-            "kernel/vm_snapshot_validation.c",
-            "kernel/vm_snapshot_internal.h",
+            "kernel/vm/vm_snapshot_validation.c",
+            "kernel/vm/vm_snapshot_internal.h",
         ),
     ),
     (
-        "kernel/address_space_handoff_test.c",
+        "kernel/tests/memory/address_space_handoff_test.c",
         (
-            "kernel/address_space_handoff_test_fixture.c",
-            "kernel/address_space_handoff_test_setup.c",
-            "kernel/address_space_handoff_test_snapshot.c",
-            "kernel/address_space_handoff_test_handoff.c",
-            "kernel/address_space_handoff_test_runtime.c",
-            "kernel/address_space_handoff_test_syscall.c",
-            "kernel/address_space_handoff_test_tty.c",
-            "kernel/address_space_handoff_test_trap.c",
-            "kernel/address_space_handoff_test_internal.h",
+            "kernel/tests/memory/address_space_handoff_test_fixture.c",
+            "kernel/tests/memory/address_space_handoff_test_setup.c",
+            "kernel/tests/memory/address_space_handoff_test_snapshot.c",
+            "kernel/tests/memory/address_space_handoff_test_handoff.c",
+            "kernel/tests/memory/address_space_handoff_test_runtime.c",
+            "kernel/tests/memory/address_space_handoff_test_syscall.c",
+            "kernel/tests/memory/address_space_handoff_test_tty.c",
+            "kernel/tests/memory/address_space_handoff_test_trap.c",
+            "kernel/tests/memory/address_space_handoff_test_internal.h",
         ),
     ),
     (
@@ -198,79 +195,79 @@ VM_PATH_CLASSIFICATION_EQUIVALENTS = (
 
 PORTABLE_FINAL_OWNERS = {
     "micros_vm_handoff_state_validate":
-        "kernel/vm_handoff_core.c",
+        "kernel/vm/vm_handoff_core.c",
     "micros_vm_load_page_plan_digest":
-        "kernel/vm_handoff_core.c",
+        "kernel/vm/vm_handoff_core.c",
     "micros_vm_handoff_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_handoff_decode_command":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_handoff_decode_tty_mapping":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_load_begin_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_scratch_map_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_scratch_commit_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_load_freeze_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_load_abort_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_load_commit_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_exit_release_decode":
-        "kernel/vm_handoff_abi.c",
+        "kernel/vm/vm_handoff_abi.c",
     "micros_vm_tty_mapping_matches":
-        "kernel/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_boot.c",
     "micros_vm_handoff_state_prepare":
-        "kernel/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_boot.c",
     "micros_vm_handoff_summary_matches":
-        "kernel/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_boot.c",
     "micros_vm_handoff_commit_prevalidated":
-        "kernel/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_boot.c",
     "micros_vm_self_fault_classify":
-        "kernel/vm_handoff_boot.c",
+        "kernel/vm/vm_handoff_boot.c",
     "micros_vm_load_begin_preflight":
-        "kernel/vm_handoff_load.c",
+        "kernel/vm/vm_handoff_load.c",
     "micros_vm_load_begin_commit_prevalidated":
-        "kernel/vm_handoff_load.c",
+        "kernel/vm/vm_handoff_load.c",
     "micros_vm_scratch_map_preflight":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_scratch_map_commit_prevalidated":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_scratch_map_bind_prevalidated":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_scratch_map_finish_prevalidated":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_scratch_commit_preflight":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_scratch_commit_commit_prevalidated":
-        "kernel/vm_handoff_scratch.c",
+        "kernel/vm/vm_handoff_scratch.c",
     "micros_vm_load_freeze_preflight":
-        "kernel/vm_handoff_freeze.c",
+        "kernel/vm/vm_handoff_freeze.c",
     "micros_vm_load_freeze_commit_prevalidated":
-        "kernel/vm_handoff_freeze.c",
+        "kernel/vm/vm_handoff_freeze.c",
     "micros_vm_load_mark_prepared":
-        "kernel/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_commit.c",
     "micros_vm_load_mark_unprepared":
-        "kernel/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_commit.c",
     "micros_vm_load_mark_activated":
-        "kernel/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_commit.c",
     "micros_vm_load_commit_preflight":
-        "kernel/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_commit.c",
     "micros_vm_load_commit_commit_prevalidated":
-        "kernel/vm_handoff_commit.c",
+        "kernel/vm/vm_handoff_commit.c",
     "micros_vm_load_abort_preflight":
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_release.c",
     "micros_vm_load_abort_commit_prevalidated":
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_release.c",
     "micros_vm_load_mark_exit_detached":
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_release.c",
     "micros_vm_exit_release_preflight":
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_release.c",
     "micros_vm_exit_release_commit_prevalidated":
-        "kernel/vm_handoff_release.c",
+        "kernel/vm/vm_handoff_release.c",
 }
 
 RUNTIME_BACKEND_SYMBOLS = (
@@ -336,23 +333,23 @@ LOAD_BACKEND_SYMBOLS = (
 FINAL_SYMBOL_OWNERS = {
     **PORTABLE_FINAL_OWNERS,
     "micros_vm_handoff_handle_captured_user_ecall":
-        "kernel/vm_handoff_syscall.c",
+        "kernel/vm/vm_handoff_syscall.c",
     "micros_vm_snapshot_prepare":
-        "kernel/vm_snapshot.c",
+        "kernel/vm/vm_snapshot.c",
     "micros_vm_snapshot_validate_current":
-        "kernel/vm_snapshot_validation.c",
+        "kernel/vm/vm_snapshot_validation.c",
     "micros_address_space_handoff_runtime_run_self_test":
-        "kernel/address_space_handoff_test.c",
+        "kernel/tests/memory/address_space_handoff_test.c",
     "micros_address_space_handoff_test_before_ecall":
-        "kernel/address_space_handoff_test_syscall.c",
+        "kernel/tests/memory/address_space_handoff_test_syscall.c",
     "micros_address_space_handoff_test_after_dispatch":
-        "kernel/address_space_handoff_test_syscall.c",
+        "kernel/tests/memory/address_space_handoff_test_syscall.c",
     "micros_address_space_handoff_test_after_return":
-        "kernel/address_space_handoff_test_syscall.c",
+        "kernel/tests/memory/address_space_handoff_test_syscall.c",
     "micros_address_space_handoff_test_enter_production":
-        "kernel/address_space_handoff_test_trap.c",
+        "kernel/tests/memory/address_space_handoff_test_trap.c",
     "micros_address_space_handoff_test_handle_trap":
-        "kernel/address_space_handoff_test_trap.c",
+        "kernel/tests/memory/address_space_handoff_test_trap.c",
     "micros_vm_handoff_test_run":
         "tests/host/vm_handoff_test.c",
     **{
@@ -369,166 +366,10 @@ FINAL_SYMBOL_OWNERS = {
     },
 }
 
-CURRENT_SYMBOL_OWNERS = {
-    **{
-        symbol: "kernel/vm_handoff_core.c"
-        for symbol in PORTABLE_FINAL_OWNERS
-    },
-    "micros_vm_handoff_handle_captured_user_ecall":
-        "kernel/vm_handoff_syscall.c",
-    "micros_vm_snapshot_prepare":
-        "kernel/vm_snapshot.c",
-    "micros_vm_snapshot_validate_current":
-        "kernel/vm_snapshot.c",
-    "micros_address_space_handoff_runtime_run_self_test":
-        "kernel/address_space_handoff_test.c",
-    "micros_address_space_handoff_test_before_ecall":
-        "kernel/address_space_handoff_test.c",
-    "micros_address_space_handoff_test_after_dispatch":
-        "kernel/address_space_handoff_test.c",
-    "micros_address_space_handoff_test_after_return":
-        "kernel/address_space_handoff_test.c",
-    "micros_address_space_handoff_test_enter_production":
-        "kernel/address_space_handoff_test.c",
-    "micros_address_space_handoff_test_handle_trap":
-        "kernel/address_space_handoff_test.c",
-    "micros_vm_handoff_test_run":
-        "tests/host/vm_handoff_test.c",
-    **{
-        symbol: "tests/host/vm_handoff_syscall_test.c"
-        for symbol in (
-            *RUNTIME_BACKEND_SYMBOLS,
-            *BOOT_BACKEND_SYMBOLS,
-            *LOAD_BACKEND_SYMBOLS,
-        )
-    },
-}
 
-INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
-    (
-        CURRENT_SYMBOL_OWNERS[symbol],
-        final_owner,
-        symbol,
-    )
-    for symbol, final_owner in FINAL_SYMBOL_OWNERS.items()
-    if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
-)
 
-SYMBOL_OWNER_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_SYMBOL_OWNER_MIGRATION
-    if migration[1] not in {
-        "kernel/vm_handoff_abi.c",
-        "kernel/vm_handoff_boot.c",
-        "kernel/vm_handoff_load.c",
-        "kernel/vm_handoff_scratch.c",
-        "kernel/vm_handoff_freeze.c",
-        "kernel/vm_handoff_commit.c",
-        "kernel/vm_handoff_release.c",
-        "kernel/vm_snapshot_validation.c",
-        "tests/host/vm_handoff_syscall_test_runtime_backend.c",
-        "tests/host/vm_handoff_syscall_test_boot_backend.c",
-        "tests/host/vm_handoff_syscall_test_load_backend.c",
-        "kernel/address_space_handoff_test_syscall.c",
-        "kernel/address_space_handoff_test_trap.c",
-    }
-)
 
-INITIAL_LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/vm_handoff_core.c",
-        "micros_vm_handoff_state_validate",
-    ),
-    (
-        "kernel/vm_handoff_syscall.c",
-        "handle_tty_mapping_command",
-    ),
-    (
-        "kernel/vm_handoff_syscall.c",
-        "handle_load_freeze_command",
-    ),
-    (
-        "kernel/vm_handoff_syscall.c",
-        "handle_load_abort_command",
-    ),
-    (
-        "kernel/vm_handoff_syscall.c",
-        "micros_vm_handoff_handle_captured_user_ecall",
-    ),
-    ("kernel/vm_snapshot.c", "micros_vm_snapshot_prepare"),
-    ("kernel/address_space_handoff_test.c", "arm_handoff_syscall"),
-    (
-        "kernel/address_space_handoff_test.c",
-        "transition_handoff_syscall",
-    ),
-    (
-        "kernel/address_space_handoff_test.c",
-        "micros_address_space_handoff_runtime_run_self_test",
-    ),
-    ("tests/host/vm_handoff_syscall_test.c", "reset_fixture"),
-    ("tests/host/vm_handoff_test.c", "test_decodes_load_commands"),
-    ("tests/host/vm_bootstrap_test.c", "initialize_build_fixture"),
-    (
-        "tests/host/vm_bootstrap_test.c",
-        "test_build_failure_clears_candidate",
-    ),
-)
 
-LONG_FUNCTION_MIGRATION = tuple(
-    migration
-    for migration in INITIAL_LONG_FUNCTION_MIGRATION
-    if migration not in {
-        (
-            "kernel/vm_handoff_core.c",
-            "micros_vm_handoff_state_validate",
-        ),
-        (
-            "tests/host/vm_handoff_test.c",
-            "test_decodes_load_commands",
-        ),
-        ("kernel/vm_snapshot.c", "micros_vm_snapshot_prepare"),
-        (
-            "tests/host/vm_bootstrap_test.c",
-            "initialize_build_fixture",
-        ),
-        (
-            "tests/host/vm_bootstrap_test.c",
-            "test_build_failure_clears_candidate",
-        ),
-        (
-            "kernel/vm_handoff_syscall.c",
-            "handle_tty_mapping_command",
-        ),
-        (
-            "kernel/vm_handoff_syscall.c",
-            "handle_load_freeze_command",
-        ),
-        (
-            "kernel/vm_handoff_syscall.c",
-            "handle_load_abort_command",
-        ),
-        (
-            "kernel/vm_handoff_syscall.c",
-            "micros_vm_handoff_handle_captured_user_ecall",
-        ),
-        (
-            "tests/host/vm_handoff_syscall_test.c",
-            "reset_fixture",
-        ),
-        (
-            "kernel/address_space_handoff_test.c",
-            "arm_handoff_syscall",
-        ),
-        (
-            "kernel/address_space_handoff_test.c",
-            "transition_handoff_syscall",
-        ),
-        (
-            "kernel/address_space_handoff_test.c",
-            "micros_address_space_handoff_runtime_run_self_test",
-        ),
-    }
-)
 STRUCTURAL_TEST_PATH = "tests/host/test_kernel_vm_handoff_source_layout.py"
 
 VM_HANDOFF_CASE_ORDER = (
@@ -602,7 +443,7 @@ def accepted_family_paths() -> tuple[str, ...]:
             (
                 *all_source_set_paths(),
                 *PRIVATE_HEADERS,
-                *STABLE_HEADER_HASHES,
+                *PUBLIC_HEADERS,
                 *UNAFFECTED_FAMILY_PATHS,
             )
         )
@@ -611,12 +452,14 @@ def accepted_family_paths() -> tuple[str, ...]:
 
 def discovered_family_paths() -> tuple[str, ...]:
     patterns = (
-        "kernel/vm_handoff*.c",
-        "kernel/vm_handoff*.h",
-        "kernel/vm_snapshot*.c",
-        "kernel/vm_snapshot*.h",
-        "kernel/address_space_handoff_test*.c",
-        "kernel/address_space_handoff_test*.h",
+        "kernel/tests/vm/vm_handoff*.c",
+        "kernel/tests/vm/vm_handoff*.h",
+        "kernel/vm/vm_handoff*.c",
+        "kernel/vm/vm_handoff*.h",
+        "kernel/vm/vm_snapshot*.c",
+        "kernel/vm/vm_snapshot*.h",
+        "kernel/tests/memory/address_space_handoff_test*.c",
+        "kernel/tests/memory/address_space_handoff_test*.h",
         "tests/host/vm_handoff*.c",
         "tests/host/vm_handoff*.h",
         "tests/host/vm_bootstrap*.c",
@@ -627,7 +470,7 @@ def discovered_family_paths() -> tuple[str, ...]:
             {
                 str(path.relative_to(REPOSITORY_ROOT))
                 for pattern in patterns
-                for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
+                for path in REPOSITORY_ROOT.glob(pattern)
             }
         )
     )
@@ -643,7 +486,7 @@ def resolve_local_include(
         REPOSITORY_ROOT / "include" / include,
     )
     for candidate in candidates:
-        if kernel_layout_source.is_file_path(candidate):
+        if (candidate).is_file():
             return candidate.resolve()
     return None
 
@@ -665,7 +508,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            kernel_layout_source.read_path(path, encoding="utf-8")
+            current_text(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -685,7 +528,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in (*all_source_set_paths(), *PRIVATE_HEADERS)
-            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
+            if not (REPOSITORY_ROOT / path).is_file()
         ]
         self.assertEqual([], missing)
 
@@ -695,24 +538,9 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
             discovered_family_paths(),
         )
 
-    def test_stable_headers_are_byte_exact(self) -> None:
-        from tests.host.evidence_authority_scope import identity_required
-
-        expected = {
-            path: value for path, value in STABLE_HEADER_HASHES.items()
-            if identity_required(REPOSITORY_ROOT,
-                "tests/host/test_kernel_vm_handoff_source_layout.py:data-entry:STABLE_HEADER_HASHES/" + path)
-        }
-        observed = {
-            path: hashlib.sha256(
-                kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
-            ).hexdigest()
-            for path in expected
-        }
-        self.assertEqual(expected, observed)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
 
         for name, expected in SOURCE_SETS.items():
             with self.subTest(source_set=name):
@@ -720,18 +548,14 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                 listed = tuple(
                     re.findall(
                         r"(?:kernel|tests/host)/"
-                        r"[A-Za-z0-9_]+\.c",
+                        r"[A-Za-z0-9_/]+\.c",
                         source_set,
                     )
                 )
                 self.assertEqual(expected, listed)
-        for source in all_source_set_paths():
-            self.assertEqual(1, cmake.count(source), source)
-        self.assertEqual(1, cmake.count("kernel/vm_handoff_runtime.c"))
-        self.assertEqual(1, cmake.count("kernel/vm_handoff_test.c"))
 
     def test_consumers_do_not_list_split_sources_directly(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
         blocks = (
             cmake_command(cmake, "add_executable", "vm_bootstrap_test"),
             cmake_command(cmake, "add_executable", "pm_test"),
@@ -757,7 +581,7 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         self.assertEqual([], direct)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
         consumers = {
             "vm-bootstrap": (
                 cmake_command(cmake, "add_executable", "vm_bootstrap_test"),
@@ -817,10 +641,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         definitions = {}
         for relative in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
             selected = c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
+                current_text(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative] = selected
@@ -835,46 +659,31 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
 
         for relative in (*all_source_set_paths(), *PRIVATE_HEADERS):
             path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
-            text = kernel_layout_source.read_path(path, encoding="utf-8")
+            text = current_text(path, encoding="utf-8")
             if c_include.search(text):
                 c_violations.append(relative)
             if relative in production_sources():
                 for private in TEST_PRIVATE_HEADERS:
                     if Path(private).name in text:
                         private_violations.append((relative, private))
+            if relative in SOURCE_SETS["MICROS_VM_HANDOFF_CORE_SOURCES"]:
+                for private in ("vm_handoff_syscall_internal.h", "vm_snapshot_internal.h"):
+                    if private in text:
+                        private_violations.append((relative, private))
         self.assertEqual([], c_violations)
         self.assertEqual([], private_violations)
 
-    def test_symbol_owners_follow_exact_migration_map(self) -> None:
-        initial = set(INITIAL_SYMBOL_OWNER_MIGRATION)
-        migration = set(SYMBOL_OWNER_MIGRATION)
-        expected_current = {}
+
+    def test_public_and_backend_symbols_have_one_responsible_owner(self):
         definitions = {}
-
-        self.assertEqual(92, len(INITIAL_SYMBOL_OWNER_MIGRATION))
-        self.assertEqual(len(migration), len(SYMBOL_OWNER_MIGRATION))
-        self.assertTrue(migration <= initial)
-        for current, final, symbol in migration:
-            self.assertEqual(FINAL_SYMBOL_OWNERS[symbol], final)
-            expected_current[symbol] = current
-
         for relative in symbol_scan_sources():
-            path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
-                continue
-            for symbol in c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
-            ):
-                definitions.setdefault(symbol, []).append(relative)
-
-        for symbol, final in FINAL_SYMBOL_OWNERS.items():
-            with self.subTest(symbol=symbol):
-                self.assertEqual(
-                    [expected_current.get(symbol, final)],
-                    definitions.get(symbol, []),
-                )
+            for name in c_function_definitions(current_text(REPOSITORY_ROOT / relative)):
+                definitions.setdefault(name, []).append(relative)
+        for name, owner in FINAL_SYMBOL_OWNERS.items():
+            with self.subTest(symbol=name):
+                self.assertEqual([owner], definitions.get(name))
 
     def test_mutable_context_and_snapshot_owners_are_unique(self) -> None:
         context_definitions = []
@@ -884,17 +693,17 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         )
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
             for context_type in generic_context.findall(
-                kernel_layout_source.read_path(path, encoding="utf-8")
+                current_text(path, encoding="utf-8")
             ):
                 context_definitions.append((relative, context_type))
         self.assertEqual(
             sorted(
                 (
                     (
-                        "kernel/address_space_handoff_test_fixture.c",
+                        "kernel/tests/memory/address_space_handoff_test_fixture.c",
                         "micros_address_space_handoff_test_context",
                     ),
                     (
@@ -918,11 +727,11 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
         for relative in SOURCE_SETS["MICROS_VM_SNAPSHOT_SOURCES"]:
             path = REPOSITORY_ROOT / relative
             if (
-                kernel_layout_source.is_file_path(path)
-                and snapshot_pattern.search(kernel_layout_source.read_path(path, encoding="utf-8"))
+                (path).is_file()
+                and snapshot_pattern.search(current_text(path, encoding="utf-8"))
             ):
                 snapshot_owners.append(relative)
-        self.assertEqual(["kernel/vm_snapshot.c"], snapshot_owners)
+        self.assertEqual(["kernel/vm/vm_snapshot.c"], snapshot_owners)
 
         representative_state = (
             (
@@ -952,10 +761,10 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                 )
 
     def test_evidence_identities_and_case_order_remain_stable(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
-        core_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_handoff_test.c", encoding="utf-8")
-        bootstrap_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_bootstrap_test.c", encoding="utf-8")
-        syscall_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/vm_handoff_syscall_test.c", encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
+        core_entry = current_text(REPOSITORY_ROOT / "tests/host/vm_handoff_test.c", encoding="utf-8")
+        bootstrap_entry = current_text(REPOSITORY_ROOT / "tests/host/vm_bootstrap_test.c", encoding="utf-8")
+        syscall_entry = current_text(REPOSITORY_ROOT / "tests/host/vm_handoff_syscall_test.c", encoding="utf-8")
         markers = {
             (
                 "MICROS_VM_HANDOFF_TEST_PASS "
@@ -1020,23 +829,13 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
             syscall_body.count(VM_SYSCALL_CASE_ORDER[-1]),
         )
 
-    def test_validation_plan_inherits_path_classification(self) -> None:
-        baselines = {
-            baseline
-            for baseline, _ in VM_PATH_CLASSIFICATION_EQUIVALENTS
-        }
-        observed = tuple(
-            item
-            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
-            if item[0] in baselines
-        )
-        self.assertEqual(VM_PATH_CLASSIFICATION_EQUIVALENTS, observed)
-        for baseline, equivalents in VM_PATH_CLASSIFICATION_EQUIVALENTS:
-            for equivalent in equivalents:
+    def test_current_paths_keep_broad_validation_classification(self) -> None:
+        for paths in SOURCE_SETS.values():
+            for equivalent in paths[1:]:
                 for tier in ("fast", "pr"):
                     self.assertEqual(
                         validation_plan.plan(
-                            [baseline],
+                            [paths[0]],
                             tier,
                             "main",
                         ),
@@ -1049,27 +848,9 @@ class KernelVmHandoffSourceLayoutTest(unittest.TestCase):
                     )
         self.assertIn(
             STRUCTURAL_TEST_PATH,
-            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
+            validation_plan.HOST_UNIT_ONLY_INPUTS,
         )
 
-    def test_long_function_migration_matches_review_signal(self) -> None:
-        initial = set(INITIAL_LONG_FUNCTION_MIGRATION)
-        migration = set(LONG_FUNCTION_MIGRATION)
-        oversized = {}
-
-        self.assertEqual(13, len(INITIAL_LONG_FUNCTION_MIGRATION))
-        self.assertEqual(len(migration), len(LONG_FUNCTION_MIGRATION))
-        self.assertTrue(migration <= initial)
-        for relative in compiled_source_header_closure():
-            path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
-                continue
-            for name, line_count in c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
-            ).items():
-                if line_count > FUNCTION_REVIEW_LINE_LIMIT:
-                    oversized[(relative, name)] = line_count
-        self.assertEqual(migration, set(oversized), oversized)
 
 
 if __name__ == "__main__":

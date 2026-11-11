@@ -9,14 +9,14 @@ import unittest
 from unittest import mock
 from types import SimpleNamespace
 
-from tests.host.test_kernel_address_space_source_layout import cmake_command
+from tests.host.build_source_records import cmake_command
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FAST_MODULES = (
     "test_check_docs", "test_check_elf_sections", "test_embed_ramfs_seed",
     "test_python_host_runtime", "test_stack_reports", "test_stack_observer_state",
-    "test_validation_evidence", "test_evidence_authority_scope", "test_host_test_runner",
+    "test_validation_evidence", "test_source_snapshot", "test_host_test_runner",
 )
 
 
@@ -50,30 +50,11 @@ class NativeTierSelectionTest(unittest.TestCase):
             *selections, "fast and full must not both execute complete Python discovery",
         )
 
-    def test_exact_native_inverse_keeps_historical_discovery_without_admitting_it_as_current(self):
-        from tests.host.work_count_recipe import project_host_test_commands, project_root_recipe
-        from tools.validation_context import RECIPE_DIGESTS
-        import hashlib
-
-        source = (ROOT / "CMakeLists.txt").read_text()
-        restored = project_host_test_commands(source, require_current=True)
-        self.assertNotIn("tools/run_host_tests.py", restored)
-        self.assertEqual(2, restored.count(
-            "            -m\n            unittest\n            discover\n"
-            "            -s\n            tests/host\n            -p\n"
-            '            "test_*.py"\n'
-        ))
-        self.assertEqual(
-            RECIPE_DIGESTS["CMakeLists.txt"],
-            hashlib.sha256(project_root_recipe(source).encode()).hexdigest(),
-        )
-        with self.assertRaises(AssertionError):
-            project_host_test_commands(restored, require_current=True)
-
     def test_partial_mixed_or_changed_native_invocations_are_rejected(self):
-        from tests.host.work_count_recipe import project_host_test_commands
+        from tests.host.work_count_recipe import validate_host_test_commands
 
         source = (ROOT / "CMakeLists.txt").read_text()
+        validate_host_test_commands(source)
         mutations = (
             source.replace("tools/run_host_tests.py", "tools/other.py", 1),
             source.replace("--tier\n            fast", "--tier\n            full", 1),
@@ -82,7 +63,7 @@ class NativeTierSelectionTest(unittest.TestCase):
         )
         for changed in mutations:
             with self.subTest(source=changed[-60:]), self.assertRaises(AssertionError):
-                project_host_test_commands(changed, require_current=True)
+                validate_host_test_commands(changed)
 
 
 class HostTestRunnerTest(unittest.TestCase):
@@ -110,6 +91,21 @@ class HostTestRunnerTest(unittest.TestCase):
                 example_case(name + ".Case.test_one"),
             ])),
         )
+
+    def test_actual_runner_owns_current_bytes_without_a_retirement_view(self):
+        from tests.host import source_snapshot
+
+        def body():
+            self.assertIsNotNone(source_snapshot._active, "runner did not own a current source snapshot")
+            self.assertEqual(
+                (ROOT / "README.md").read_bytes(),
+                source_snapshot.source_bytes(ROOT, ROOT / "README.md"),
+            )
+
+        output = io.StringIO()
+        with source_snapshot.isolated_source_view():
+            status = self.runner.run_suite(unittest.TestSuite([example_case("current_source", body)]), ROOT, stream=output)
+        self.assertEqual(0, status, output.getvalue())
 
     def test_fast_loads_only_the_closed_unit_modules(self):
         loader = self.loader([])

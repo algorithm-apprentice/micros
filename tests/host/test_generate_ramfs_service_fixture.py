@@ -5,15 +5,6 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_ramfs_service_fixture
-from tests.host import kernel_layout_source
-
-GENERATOR_PATH = "tools/generate_ramfs_service_fixture.py"
-
-def _render_fixture(*args, **kwargs):
-    return kernel_layout_source.restore_generated_fixture(
-        GENERATOR_PATH,
-        generate_ramfs_service_fixture.render_fixture(*args, **kwargs),
-    )
 
 
 def vfs_image():
@@ -82,7 +73,7 @@ class RamfsServiceFixtureGeneratorTest(unittest.TestCase):
     def render(self, ramfs=None):
         if ramfs is None:
             ramfs = bootstrap_image()
-        return _render_fixture(
+        return generate_ramfs_service_fixture.render_fixture(
             bootstrap_image(),
             vm_image(),
             bootstrap_image(),
@@ -120,7 +111,7 @@ class RamfsServiceFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "report symbol",
         ):
-            _render_fixture(
+            generate_ramfs_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -151,7 +142,7 @@ class RamfsServiceFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "non-VM image",
         ):
-            _render_fixture(
+            generate_ramfs_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -177,7 +168,7 @@ class RamfsServiceFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_ramfs_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -224,7 +215,7 @@ class RamfsServiceFixtureGeneratorTest(unittest.TestCase):
             check_user_elf.ElfFormatError,
             "aggregate user page limit",
         ):
-            _render_fixture(
+            generate_ramfs_service_fixture.render_fixture(
                 launcher,
                 vm,
                 pm,

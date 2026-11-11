@@ -1,9 +1,8 @@
 """Real prefixed memory execution and independently defined work properties."""
 
 from collections import deque
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 import hashlib
-import io
 import json
 import os
 from pathlib import Path
@@ -11,16 +10,14 @@ import re
 import shlex
 import subprocess
 import tempfile
-import unittest
 
-from tests.host.runtime_memory_authority import (
-    MEMORY_PATH, ORACLE_DECLARATIONS, baseline_memory, record_fields, record_strings,
-    red_translation_unit, validate_green_source,
-)
-from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
+from tests.host.evidence_records import record_fields
+from tests.host.source_snapshot import source_bytes
+from tests.host.work_count_projection import project_observed_source
 from tests.host.work_count_snapshots import compose_snapshots
 from tests.host.work_count_types import (
-    Capture, Kind, Owner, Snapshot, Stage, Status,
+    Capture, Kind, ObservationSite, Owner, Placement, Primitive, Region,
+    Snapshot, SourceAdmission, Stage, Status,
 )
 from tools.stack_artifact_files import read_regular
 from tools.stack_artifact_build import ninja_path
@@ -35,6 +32,47 @@ from tools.user_elf_parse import load_elf
 from tools.user_elf_instructions import _instruction_destination
 from tools.validation_context import compiler_version, target_compiler, validate_environment
 from tools.validation_inputs import _file_identity, _run
+
+
+MEMORY_PATH = "lib/runtime/memory.c"
+
+
+def green_admission():
+    copy = "micros_runtime_memcpy"
+    fill = "micros_runtime_memset"
+    copy_byte = "*(volatile unsigned char *)target = *(const volatile unsigned char *)input;"
+    fill_byte = "*(volatile unsigned char *)target = value;"
+    copy_word = (
+        "__builtin_memcpy_inline((uint64_t *)__builtin_assume_aligned(target, 8), "
+        "(const uint64_t *)__builtin_assume_aligned(input, 8), 8);"
+    )
+    fill_word = "__builtin_memcpy_inline((uint32_t *)__builtin_assume_aligned(target, 4), &pattern, 4);"
+    layout = (
+        (copy, "copy-unaligned", copy_byte, 1, (
+            "if (((uintptr_t)target & 7U) != ((uintptr_t)input & 7U)) {",
+            "while (remaining != 0) {",
+        )),
+        (copy, "copy-prefix", copy_byte, 1, ("while (remaining != 0 && ((uintptr_t)target & 7U) != 0) {",)),
+        (copy, "copy-word", copy_word, 8, ("while (remaining >= 8) {",)),
+        (copy, "copy-tail", copy_byte, 1, ("while (remaining != 0) {",)),
+        (fill, "fill-short", fill_byte, 1, ("if (remaining < 12) {", "while (remaining != 0) {")),
+        (fill, "fill-prefix", fill_byte, 1, ("while (((uintptr_t)target & 3U) != 0) {",)),
+        (fill, "fill-word", fill_word, 4, ("while (remaining >= 4) {",)),
+        (fill, "fill-tail", fill_byte, 1, ("while (remaining != 0) {",)),
+    )
+    sites = []
+    for function, prefix, primitive, size, regions in layout:
+        kinds = (Kind.COPY_UNIT, Kind.COPIED_BYTE) if function == copy else (Kind.CLEAR_UNIT, Kind.CLEARED_BYTE)
+        for suffix, kind, units in (("unit", kinds[0], 1), ("byte", kinds[1], size)):
+            sites.append(ObservationSite(
+                function, prefix + "-" + suffix, Owner.RUNTIME, kind, Placement.AFTER,
+                tuple(Region(region) for region in regions), Primitive(primitive), units,
+            ))
+    return SourceAdmission(MEMORY_PATH, Stage.GREEN, tuple(sites), include_header=True)
+
+
+def validate_green_source(source):
+    return project_observed_source(MEMORY_PATH, source, green_admission(), stage=Stage.GREEN)
 
 
 @dataclass(frozen=True)
@@ -172,13 +210,12 @@ def native_command(root, compiler, unit, executable, observed):
 
 
 def execute_fixture(root, stage, observed, *, access=False):
-    if stage not in (Stage.RED, Stage.GREEN) or type(observed) is not bool:
+    if stage is not Stage.GREEN or type(observed) is not bool:
         raise ValueError("unknown runtime memory evidence stage/mode")
     root = Path(root).resolve()
-    original = baseline_memory(root) if stage is Stage.RED else read_regular(root / MEMORY_PATH)[0]
-    source = red_translation_unit(root) if stage is Stage.RED else original.decode("utf-8")
-    if stage is Stage.GREEN:
-        validate_green_source(source)
+    original = source_bytes(root, root / MEMORY_PATH)
+    source = original.decode("utf-8")
+    validate_green_source(source)
     compiler = native_compiler(root)
     input_paths = (
         "lib/runtime/memory.h", "include/micros/work_observation.h",
@@ -208,7 +245,7 @@ def execute_fixture(root, stage, observed, *, access=False):
         if read_regular(translation_unit)[1] != unit_identity:
             raise ValueError("runtime memory translation unit changed during execution")
     if native_compiler(root) != compiler or (
-        stage is Stage.GREEN and read_regular(root / MEMORY_PATH)[0] != original
+        read_regular(root / MEMORY_PATH)[0] != original
     ) or inputs != {path: read_regular(root / path)[1] for path in input_paths}:
         raise ValueError("runtime memory source/compiler changed during measurement")
     return NativeRun(
@@ -282,116 +319,6 @@ def assert_geometry_work(measured):
                 f"destination={row.destination_offset} source={row.source_offset} "
                 f"expected={expected} observed={actual}"
             )
-
-
-def run_oracles(measured):
-    outcomes = []
-    output = io.StringIO()
-    for (identifier, test_id, property_name), operation in zip(ORACLE_DECLARATIONS, ("copy", "fill")):
-        suite = unittest.defaultTestLoader.loadTestsFromName(test_id)
-        if suite.countTestCases() != 1:
-            raise ValueError("COPY01 replacement oracle has ambiguous test ownership")
-        case, = suite
-        case.supplied_measurement = measured
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(suite)
-        expected = 8 if operation == "copy" else 16
-        discriminating = (
-            measured.stage is Stage.RED and result.testsRun == 1
-            and len(result.failures) == 1 and not result.errors
-            and f"{operation} aligned word work: expected {expected} units, observed 64" in result.failures[0][1]
-        )
-        observed = (
-            ObservedResult.EXPECTED_FAILURE if discriminating
-            else ObservedResult.PASS if result.wasSuccessful() and result.testsRun == 1
-            else ObservedResult.FAIL
-        )
-        status = RunStatus.SKIPPED if result.skipped else RunStatus.RUN
-        outcomes.append(OracleResult(identifier, status, observed, property_name))
-    expected_result = ObservedResult.EXPECTED_FAILURE if measured.stage is Stage.RED else ObservedResult.PASS
-    if any(row.status is not RunStatus.RUN or row.observed is not expected_result for row in outcomes):
-        raise ValueError("COPY01 actual replacement execution was not the required result:\n" + output.getvalue())
-    return tuple(outcomes), output.getvalue()
-
-
-def native_log(measured, results, oracle_output):
-    return {
-        "version": 1, "stage": measured.stage.value, "source_sha256": measured.source_sha256,
-        "compiler": measured.compiler, "command": list(measured.command), "output": measured.output,
-        "translation_unit": measured.translation_unit, "executable": measured.executable,
-        "execution_command": list(measured.execution_command), "build_output": measured.build_output,
-        "build_exit": 0, "execution_exit": 0,
-        "oracle_results": [asdict(row) for row in results], "oracle_output": oracle_output,
-    }
-
-
-def validate_native_log(root, value, stage, compiler):
-    record_fields(value, (
-        "version", "stage", "source_sha256", "compiler", "command", "output", "translation_unit",
-        "executable", "execution_command", "build_output", "build_exit", "execution_exit",
-        "oracle_results", "oracle_output",
-    ))
-    if (
-        type(value["version"]) is not int or value["version"] != 1 or value["stage"] != stage.value
-        or value["compiler"] != compiler
-        or any(type(value[name]) is not int or value[name] != 0 for name in ("build_exit", "execution_exit"))
-        or any(type(value[name]) is not str for name in ("build_output", "output", "oracle_output"))
-        or any(test not in value["oracle_output"] for _, test, _ in ORACLE_DECLARATIONS)
-    ):
-        raise ValueError("COPY01 native log has an unbound execution")
-    root = Path(root)
-    original = baseline_memory(root) if stage is Stage.RED else read_regular(root / MEMORY_PATH)[0]
-    source = red_translation_unit(root).encode() if stage is Stage.RED else original
-    if stage is Stage.GREEN:
-        validate_green_source(source.decode())
-    if value["source_sha256"] != hashlib.sha256(original).hexdigest():
-        raise ValueError("COPY01 native log executed a different source stage")
-    for name in ("translation_unit", "executable"):
-        identity = value[name]
-        record_fields(identity, ("kind", "mode", "size", "sha256"))
-        if (
-            identity["kind"] != "file" or type(identity["mode"]) is not int
-            or not 0 <= identity["mode"] <= 0o777 or type(identity["size"]) is not int
-            or identity["size"] <= 0 or type(identity["sha256"]) is not str
-            or re.fullmatch(r"[a-f0-9]{64}", identity["sha256"]) is None
-        ):
-            raise ValueError("COPY01 native log has an incomplete compiled artifact")
-    if (
-        value["translation_unit"]["size"] != len(source)
-        or value["translation_unit"]["sha256"] != hashlib.sha256(source).hexdigest()
-    ):
-        raise ValueError("COPY01 native translation unit differs from its admitted stage")
-    execution = record_strings(value["execution_command"])
-    executable = Path(execution[0])
-    if (
-        len(execution) != 1 or not executable.is_absolute() or executable.name != "fixture"
-        or not executable.parent.name.startswith("micros-runtime-memory-")
-        or record_strings(value["command"]) != native_command(
-            root, compiler, executable.parent / "memory.c", executable, True,
-        )
-    ):
-        raise ValueError("COPY01 native log has a foreign compile/execution command")
-    measured = NativeRun(
-        stage, decode_measurements(value["output"], observed=True), value["source_sha256"],
-        compiler, tuple(value["command"]), value["output"], value["translation_unit"],
-        value["executable"], execution, value["build_output"],
-    )
-    if stage is Stage.GREEN:
-        assert_geometry_work(measured)
-    expected = []
-    for (identifier, _, property_name), operation in zip(ORACLE_DECLARATIONS, ("copy", "fill")):
-        if stage is Stage.RED:
-            row = probe(measured, operation, 64, 0, 0)
-            kind = Kind.COPY_UNIT if operation == "copy" else Kind.CLEAR_UNIT
-            if row.capture.snapshot.counts[Owner.RUNTIME][kind] != 64:
-                raise ValueError("COPY01 recorded Red is not the measured byte-loop divergence")
-            observed = ObservedResult.EXPECTED_FAILURE
-        else:
-            assert_aligned_work(measured, operation)
-            observed = ObservedResult.PASS
-        expected.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    if value["oracle_results"] != json.loads(json.dumps([asdict(row) for row in expected])):
-        raise ValueError("COPY01 recorded oracle outcomes contradict their actual captures")
-    return tuple(expected)
 
 
 def memory_arithmetic(width, word, registers):
@@ -557,7 +484,7 @@ def validate_primitive_ir(content, name, size):
 
 
 def target_transfer_proofs(root, stage, *, fixture=False):
-    if stage not in (Stage.RED, Stage.GREEN) or type(fixture) is not bool:
+    if stage is not Stage.GREEN or type(fixture) is not bool:
         raise ValueError("unknown runtime memory artifact scope")
     root = Path(root).resolve()
     validate_environment(dict(os.environ), target=True)
@@ -565,9 +492,9 @@ def target_transfer_proofs(root, stage, *, fixture=False):
     identity = _file_identity(compiler.resolve())
     source = (
         read_regular(root / "tests/host/runtime_memory_fixture.c")[0] if fixture
-        else baseline_memory(root) if stage is Stage.RED else read_regular(root / MEMORY_PATH)[0]
+        else source_bytes(root, root / MEMORY_PATH)
     )
-    if stage is Stage.GREEN and not fixture:
+    if not fixture:
         validate_green_source(source.decode("utf-8"))
     prefix = "memory_artifact_" if fixture else "micros_runtime_mem"
     names = {"copy": prefix + ("copy" if fixture else "cpy"), "fill": prefix + ("fill" if fixture else "set")}
@@ -620,7 +547,7 @@ def target_transfer_proofs(root, stage, *, fixture=False):
             results[mode] = {**proofs["ordinary"], "variants": proofs}
     current_source = (
         read_regular(root / "tests/host/runtime_memory_fixture.c")[0] if fixture
-        else baseline_memory(root) if stage is Stage.RED else read_regular(root / MEMORY_PATH)[0]
+        else read_regular(root / MEMORY_PATH)[0]
     )
     if _file_identity(compiler.resolve()) != identity or current_source != source:
         raise ValueError("runtime memory artifact compiler/source changed")
@@ -642,9 +569,13 @@ def runtime_compile_commands(directory):
     return rows
 
 
-def prove_linked_runtime(root):
+def prove_linked_runtime(root, *, directory=None):
     root = Path(root).resolve()
-    directory = root / "build/riscv64-user-runtime-test"
+    directory = (
+        root / "build/riscv64-user-runtime-test" if directory is None else Path(directory).resolve()
+    )
+    if not directory.is_relative_to(root / "build"):
+        raise ValueError("runtime memory evidence is outside its owned build tree")
     relative_image = "user-runtime/micros-user-runtime-service.elf"
     image_data, image_identity = read_regular(directory / relative_image)
     image = load_elf(directory / relative_image)

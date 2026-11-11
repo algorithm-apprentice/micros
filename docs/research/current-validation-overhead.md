@@ -193,7 +193,7 @@ snapshot capture and expected dictionary lookup cost
 `O(s + n log n + q)`, with `O(s + n)` host storage. No target stack or
 runtime data structure changes are needed.
 
-## Conclusion and limit
+## Original design conclusion and limit
 
 Keep behavior, ownership, observation, artifact, hardware, integration and
 stack evidence. End completed source-transport ceremonies, remove their
@@ -205,3 +205,66 @@ The [Accepted contract](../architecture/current-contract-validation.md)
 defines that replacement and its loss-prevention tests. This research has
 not changed a runner, reduced a test set, executed a replacement prototype
 or demonstrated a speedup.
+
+## Implementation measurements
+
+The dependent implementation after design #247 removes the live catalog,
+predecessor/author chains, historical native products and broad source
+transport. It preserves current native cases/channels, target scenarios and
+finite source/machine obligations; the
+[implementation map and case disposition](../architecture/current-contract-validation.md#implementation-and-retained-evidence-map)
+identify their owners.
+
+One development selection executed all seven affected native CTests:
+
+| CTest group | Fixed #246 seconds | Current development seconds |
+| --- | ---: | ---: |
+| `selected-ownership` | 232.06 | 29.45 |
+| `selected-address-space` | 193.93 | 19.03 |
+| `selected-release-handoff` | 205.32 | 36.68 |
+| `object-hart-validation` | 160.60 | 5.05 |
+| `common-scheduler-return` | 158.81 | 3.35 |
+| Those five orchestrators | 950.72 | 93.56 |
+
+That seven-test selection, including bootstrap allocation and kernel mapping,
+passed in 94.72 seconds. Its retained log is
+`validation-simplification-seven-current-native-v1.log`. This is not a
+measurement of all 47 CTests or of build time.
+
+At implementation tree `4bcf3aa8c3f7f658c6221b240e6e3193876071cc`,
+`tools/run_host_tests.py --tier full` passed all 1,058 remaining Python cases
+in 83.253 seconds, with zero skipped or unexecuted cases. The fixed #246
+discovery had 1,686 cases and took 944.539 seconds. The reduced count is
+explicitly explained: old transport/author-protocol cases were removed or
+consolidated, while current ownership, behavior, artifact and failure controls
+remain. The retained current log is
+`validation-simplification-current-full-host-green.log`.
+
+These are approximately 90% lower five-orchestrator time and 91% lower
+full-host time, not an equivalent percentage reduction in total acceptance.
+The actual current `riscv64-debug` ordinary/metadata proof also passed,
+including real callback, assembly, fatal, stack and image-passivity checks.
+It is a development check, not the complete final stack certificate.
+
+Fast-loop and build costs were measured separately at implementation tree
+`d8347467ccda293d1bf331c353008f3fa8a1c6b5`:
+
+| Operation | Measured seconds |
+| --- | ---: |
+| `cmake --preset host-debug` | 0.37 |
+| Native preparation build, 1,314 Ninja actions | 25.28 |
+| Subsequent `cmake --build build/host-debug`, explicitly no work | 0.03 |
+| Complete `test-unit-fast` workflow | 22.63 |
+| Its 37 CTests | 18.08 |
+| Its 89 Python cases | 3.999 |
+
+These are not a cold-build benchmark or a six-second fast-loop claim.
+There is no matching fixed-#246 fast/build timing in this measurement set,
+so no improvement percentage is inferred for those rows. The native
+preparation finished before receipt production, keeping generated inputs
+stable.
+
+The final implementation PR supplies the exact final producer,
+complete native/target/image/stack coverage, explicit-profile reuse and
+independent review rather than treating these development measurements as
+final acceptance.

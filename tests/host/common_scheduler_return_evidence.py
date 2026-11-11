@@ -1,17 +1,12 @@
-"""Independent OBJ02 observations and cross-ABI legacy plan comparisons."""
+"""Current scheduler observations and strict plan/capture protocols."""
 
-import hashlib
-import io
 import json
-from dataclasses import asdict
 from pathlib import Path
 import re
 import subprocess
-import tempfile
-import unittest
 
-from tests.host.diagnostic_history_authority import record_fields
-from tests.host.runtime_memory_evidence import json_pairs, native_compiler
+from tests.host.evidence_records import record_fields
+from tests.host.runtime_memory_evidence import json_pairs
 from tests.host.selected_address_space_evidence import native_symbols_tool
 from tests.host.work_count_types import Capture, Kind, Owner, Snapshot, Status
 from tests.host.work_count_snapshots import compose_snapshots
@@ -26,17 +21,6 @@ CASE_FIELDS = (
     "mode", "nonpreemptible", "two_priorities", "fault", "result", "renewed",
     "current_slot", "current_generation", "plan_bytes", "workspace_bytes",
     "before_state", "after_state", "logical_state", "plan_preserved",
-)
-FIXTURE_PATHS = (
-    "tests/host/common_scheduler_return_test.c",
-    "tests/host/common_scheduler_return_test.h",
-    "tests/host/common_scheduler_return_source.py",
-    "tests/host/common_scheduler_return_evidence.py",
-    "tools/generate_common_scheduler_return_fixture.py",
-    "tests/work/work_counts.c", "tests/work/work_counts.h",
-    "include/micros/work_observation.h",
-    "tests/host/common_scheduler_return_authority.py",
-    "tests/host/common_scheduler_return_native_source_bindings.py",
 )
 PRODUCER_BASE = 0x4f424a3032000001
 TARGET_COUNT_FIELDS = (
@@ -288,81 +272,6 @@ def parse_native_output(output, channel, stage):
     return tuple(records), tuple(work)
 
 
-def native_command(root, compiler, generated, executable, stage, channel):
-    from tests.host.common_scheduler_return_source import NATIVE_SOURCES
-
-    return (
-        compiler["path"], "-std=c17", "-Wall", "-Wextra", "-Werror", "-Wpedantic",
-        "-Wmissing-prototypes", "-Wstrict-prototypes", "-fno-builtin",
-        "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g",
-        "-DMICROS_OBJ02_NATIVE_STAGE=" + str(int(stage == "current")),
-        *(("-DMICROS_TEST_WORK_COUNTS=1",) if channel == "work" else ()),
-        "-I", str(generated), "-I", str(generated / "include"),
-        "-I", str(root), "-I", str(root / "include"),
-        *(str(generated / path) for path in NATIVE_SOURCES),
-        str(root / FIXTURE_PATHS[0]),
-        *((str(root / "tests/work/work_counts.c"),) if channel == "work" else ()),
-        "-o", str(executable),
-    )
-
-
-def measure_native_channel(root, stage, channel):
-    from tests.host.object_hart_validation_evidence import observation_symbols
-    from tools.generate_common_scheduler_return_fixture import prepare_sources
-
-    if stage not in ("baseline", "current") or channel not in ("ordinary", "work"):
-        raise ValueError("OBJ02 native execution has an unknown source stage or channel")
-    root = Path(root).resolve()
-    compiler, nm = native_compiler(root), native_symbols_tool()
-    fixtures = {path: read_regular(root / path)[1] for path in FIXTURE_PATHS}
-    with tempfile.TemporaryDirectory(prefix="micros-obj02-" + stage + "-" + channel + "-") as temporary:
-        directory = Path(temporary).resolve()
-        generated, executable = directory / "source", directory / "native"
-        inputs, generated_inputs = prepare_sources(root, generated, stage, channel)
-        command = native_command(root, compiler, generated, executable, stage, channel)
-        build = subprocess.run(
-            command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180,
-        )
-        if build.returncode or build.stderr:
-            raise ValueError("OBJ02 native compilation failed:\n" + build.stdout + build.stderr)
-        executable_identity = read_regular(executable)[1]
-        symbols = subprocess.check_output((nm["path"], "-a", str(executable)), cwd=root, text=True, timeout=30)
-        expected_symbols = set() if channel == "ordinary" else {
-            "micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record",
-        }
-        if observation_symbols(symbols) != expected_symbols:
-            raise ValueError("OBJ02 native product has the wrong observation linkage")
-        arguments = (str(executable), stage, channel)
-        result = subprocess.run(
-            arguments, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode or result.stderr:
-            raise ValueError("OBJ02 native semantic controls failed:\n" + result.stdout + result.stderr)
-        records, work = parse_native_output(result.stdout, channel, stage)
-        if (
-            read_regular(executable)[1] != executable_identity
-            or {path: read_regular(generated / path)[1] for path in generated_inputs} != generated_inputs
-            or stage == "current" and {path: read_regular(root / path)[1] for path in inputs} != inputs
-        ):
-            raise ValueError("OBJ02 source or native artifacts changed during execution")
-        measured = {
-            "version": 1, "stage": stage, "channel": channel, "compiler": compiler, "nm": nm,
-            "command": command, "arguments": arguments, "fixtures": fixtures,
-            "source_inputs": inputs, "generated_inputs": generated_inputs, "executable": executable_identity,
-            "output": result.stdout, "records": records, "work": work,
-            "build_stdout": build.stdout, "build_stderr": build.stderr, "build_exit": build.returncode,
-            "execution_exit": result.returncode, "execution_stderr": result.stderr,
-            "nm_command": (nm["path"], "-a", str(executable)), "nm_output": symbols, "nm_exit": 0,
-            "output_sha256": hashlib.sha256(result.stdout.encode()).hexdigest(),
-        }
-    if (
-        {path: read_regular(root / path)[1] for path in fixtures} != fixtures
-        or native_compiler(root) != compiler or native_symbols_tool() != nm
-    ):
-        raise ValueError("OBJ02 fixtures or native tools changed during execution")
-    return measured
-
-
 def target_failures(captures):
     return tuple(
         (row["class"], row["counts"][Owner.KERNEL_EXECUTION][Kind.COMPLETE_VALIDATOR_CALL], wanted)
@@ -448,20 +357,6 @@ def parse_target_output(output, stage, exit_code):
     return tuple(captures)
 
 
-def measure_native(root, phase):
-    if phase not in ("red", "green", "recertify"):
-        raise ValueError("OBJ02 native measurement has an unknown phase")
-    measured = {}
-    for stage in (("baseline",) if phase == "red" else ("baseline", "current")):
-        measured[stage] = {}
-        for channel in ("ordinary", "work"):
-            print(f"MICROS_OBJ02_NATIVE_BEGIN stage={stage} channel={channel}", flush=True)
-            measured[stage][channel] = measure_native_channel(root, stage, channel)
-            count = len(measured[stage][channel]["records"])
-            print(f"MICROS_OBJ02_NATIVE_COMPLETE stage={stage} channel={channel} cases={count}", flush=True)
-    return measured
-
-
 def check_native_stage(products, stage):
     if type(products) is not dict or set(products) != {"ordinary", "work"}:
         raise ValueError("OBJ02 native stage lacks its exact ordinary/observed pair")
@@ -485,284 +380,6 @@ def check_native_stage(products, stage):
     return failures
 
 
-def compare_native_stages(baseline, current):
-    def key(row):
-        return tuple(row[name] for name in (
-            "name", "operation", "threads", "exhausted", "priority", "mode", "nonpreemptible", "two_priorities", "fault",
-        ))
-
-    before = {key(row): row for row in baseline["ordinary"]["records"]}
-    after = {key(row): row for row in current["ordinary"]["records"]}
-    if len(before) != len(baseline["ordinary"]["records"]) or len(after) != len(current["ordinary"]["records"]):
-        raise ValueError("OBJ02 stages have duplicate independent cases")
-    extra = set(after) - set(before)
-    if len(extra) != 6 or any(item[0] not in ("unused-assignment", "empty-reschedule", "unreachable-ready") for item in extra):
-        raise ValueError("OBJ02 stages changed their exact current-only scoped cases")
-    if set(before) - set(after):
-        raise ValueError("OBJ02 current stage omitted a fixed reference case")
-    for identity, old in before.items():
-        new = after[identity]
-        if old["before_state"] != new["before_state"]:
-            raise ValueError("OBJ02 current stage changed an independent input")
-        if old["result"] != new["result"]:
-            if identity[0] not in ("unused-assignment", "empty-reschedule", "unreachable-ready"):
-                raise ValueError("OBJ02 current stage changed an unowned error boundary")
-            continue
-        retained = ("result", "renewed", "current_slot", "current_generation", "logical_state", "plan_preserved")
-        if any(old[name] != new[name] for name in retained):
-            raise ValueError("OBJ02 current stage changed its fixed logical result")
-        if identity[0] not in ("permitted-null", "permitted-null-rotation") and old["after_state"] != new["after_state"]:
-            raise ValueError("OBJ02 current stage changed retained full registry state")
-
-
-def target_inputs(root, stage):
-    from tests.host.common_scheduler_return_source import (
-        SOURCE_ROLES, TARGET_PATHS, extend_target_observations, fixed_source,
-    )
-
-    if stage not in ("baseline", "current"):
-        raise ValueError("OBJ02 target input set has an unknown stage")
-    paths = (
-        *SOURCE_ROLES["production_paths"], *SOURCE_ROLES["unchanged_candidates"][:3],
-        "kernel/tests/scheduler/scheduler_test_finish.c", "CMakeLists.txt",
-        "tests/qemu/common_scheduler_return_work.c", "tests/qemu/common_scheduler_return_work.h",
-        "tests/work/work_counts.c", "tests/work/work_counts.h", "include/micros/work_observation.h",
-    )
-    inputs = {}
-    for path in paths:
-        if stage == "baseline" and path in SOURCE_ROLES["production_paths"]:
-            text = fixed_source(str(Path(root).resolve()), path)
-            if path in TARGET_PATHS:
-                text = extend_target_observations(path, text)
-            raw = text.encode()
-            inputs[path] = {"kind": "file", "mode": 0o644, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-        else:
-            inputs[path] = read_regular(Path(root) / path)[1]
-    return inputs
-
-
-def measure_target(root, stage):
-    from tests.host.common_scheduler_return_source import STATE_WORK_CONTRACT
-
-    root = Path(root).resolve()
-    inputs = target_inputs(root, stage)
-    if any(read_regular(root / path)[1] != identity for path, identity in inputs.items()):
-        raise ValueError("OBJ02 target execution does not contain its exact actual source stage")
-    command = ("cmake", "--workflow", "--preset", STATE_WORK_CONTRACT["target_workflow"])
-    print("MICROS_OBJ02_TARGET_BEGIN " + stage, flush=True)
-    completed = subprocess.run(
-        command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True, timeout=600,
-    )
-    try:
-        captures = parse_target_output(completed.stdout, stage, completed.returncode)
-        kernel = STATE_WORK_CONTRACT["target_kernel"]
-        result = {
-            "version": 1, "stage": stage, "command": command, "exit_code": completed.returncode,
-            "output": completed.stdout, "source_inputs": inputs, "kernel_path": kernel,
-            "kernel": read_regular(root / kernel)[1], "captures": captures, "failures": target_failures(captures),
-        }
-        if any(read_regular(root / path)[1] != identity for path, identity in inputs.items()):
-            raise ValueError("OBJ02 target source changed during execution")
-    except (OSError, ValueError):
-        print(completed.stdout, flush=True)
-        raise
-    print("MICROS_OBJ02_TARGET_CAPTURED " + stage, flush=True)
-    return result
-
-
-class CommonSchedulerReturnOracles(unittest.TestCase):
-    def test_bounded_return_delta(self):
-        self.assertFalse(self.native_failures, repr(self.native_failures[:16]))
-
-    def test_protected_context_reuse(self):
-        self.assertFalse(self.context_failures, repr(self.context_failures))
-
-
-def run_oracles(native, target, phase, reference=None):
-    from tests.host.common_scheduler_return_authority import ORACLE_RULES
-    from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus, digest
-
-    if phase not in ("red", "green", "recertify"):
-        raise ValueError("OBJ02 oracle phase is unknown")
-    if type(native) is not dict or set(native) != ({"baseline"} if phase == "red" else {"baseline", "current"}):
-        raise ValueError("OBJ02 oracle phase lacks complete actual native products")
-    baseline_failures = check_native_stage(native["baseline"], "baseline")
-    stage = "baseline" if phase == "red" else "current"
-    if phase == "red":
-        if reference is not None:
-            raise ValueError("OBJ02 Red cannot borrow an earlier attempt")
-        failures = baseline_failures
-    else:
-        if type(reference) is not dict or reference.get("phase") != "red" or set(reference.get("native", {})) != {"baseline"}:
-            raise ValueError("OBJ02 current evidence lacks its same-attempt actual Red")
-        for channel in ("ordinary", "work"):
-            for field in ("records", "work"):
-                if digest(native["baseline"][channel][field]) != digest(reference["native"]["baseline"][channel][field]):
-                    raise ValueError("OBJ02 fixed native witnesses changed between phases")
-        compare_native_stages(native["baseline"], native["current"])
-        failures = check_native_stage(native["current"], "current")
-        previous = parse_target_output(
-            reference["target"]["output"], "baseline", reference["target"]["exit_code"],
-        )
-        if target_failures(previous) != ((0, 2, 1),):
-            raise ValueError("OBJ02 current evidence lost its actual fixed target divergence")
-    if target["stage"] != stage:
-        raise ValueError("OBJ02 target is not the actual requested source stage")
-    captures = parse_target_output(target["output"], stage, target["exit_code"])
-    if digest(captures) != digest(target["captures"]) or digest(target_failures(captures)) != digest(target["failures"]):
-        raise ValueError("OBJ02 target derived observations changed their raw witness")
-    output = io.StringIO()
-    results = []
-    expected = ObservedResult.EXPECTED_FAILURE if phase == "red" else ObservedResult.PASS
-    for declaration in ORACLE_RULES:
-        identifier, test_id, property_name, _, _ = declaration
-        case = CommonSchedulerReturnOracles(test_id.rsplit(".", 1)[1])
-        case.native_failures = failures
-        case.context_failures = target_failures(captures)
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(unittest.TestSuite((case,)))
-        if result.testsRun != 1 or result.errors or result.skipped:
-            raise ValueError("OBJ02 oracle did not execute its exact complete case")
-        observed = ObservedResult.PASS if result.wasSuccessful() else ObservedResult.EXPECTED_FAILURE
-        if observed is not expected:
-            raise ValueError("OBJ02 oracle did not produce its declared phase outcome:\n" + output.getvalue())
-        results.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    return tuple(results), output.getvalue()
-
-
-def execution_log(native, target, results, output, *, phase, attempt):
-    return json.loads(json.dumps({
-        "version": 1, "phase": phase, "attempt": attempt, "native": native, "target": target,
-        "results": [asdict(result) for result in results], "oracle_output": output,
-    }, allow_nan=False))
-
-
-def _validate_native_replay(context, products, stage, *, current_sources=None):
-    from tests.host.diagnostic_history_authority import record_strings
-    from tests.host.evidence_authority_types import digest
-    from tests.host.object_hart_validation_evidence import observation_symbols
-    from tests.host.selected_address_space_evidence import _validate_artifact_identity
-    from tools.generate_common_scheduler_return_fixture import source_bundle
-
-    if type(products) is not dict or set(products) != {"ordinary", "work"}:
-        raise ValueError("OBJ02 replay lacks its complete native pair")
-    directories = set()
-    for channel, native in products.items():
-        record_fields(native, (
-            "version", "stage", "channel", "compiler", "nm", "command", "arguments", "fixtures",
-            "source_inputs", "generated_inputs", "executable", "output", "records", "work",
-            "build_stdout", "build_stderr", "build_exit", "execution_exit", "execution_stderr",
-            "nm_command", "nm_output", "nm_exit", "output_sha256",
-        ))
-        arguments = record_strings(native["arguments"])
-        if (
-            type(native["version"]) is not int or native["version"] != 1
-            or native["stage"] != stage or native["channel"] != channel
-            or native["compiler"] != context.native_compiler or native["nm"] != context.native_nm
-            or len(arguments) != 3 or arguments[1:] != (stage, channel)
-        ):
-            raise ValueError("OBJ02 native replay borrowed a source stage, tool or invocation")
-        executable = Path(arguments[0])
-        directory = executable.parent
-        if (
-            not executable.is_absolute() or executable.name != "native" or directory in directories
-            or not directory.name.startswith("micros-obj02-" + stage + "-" + channel + "-")
-            or directory.parent.resolve() != Path(tempfile.gettempdir()).resolve()
-        ):
-            raise ValueError("OBJ02 native replay borrowed an execution directory")
-        directories.add(directory)
-        if (
-            record_strings(native["command"]) != native_command(
-                context.root, context.native_compiler, directory / "source", executable, stage, channel,
-            )
-            or record_strings(native["nm_command"]) != (context.native_nm["path"], "-a", str(executable))
-        ):
-            raise ValueError("OBJ02 replay changed its compile/link/symbol command")
-        inputs, outputs = source_bundle(context.root, stage, channel, current_sources=current_sources)
-        generated = {
-            path: {"kind": "file", "mode": 0o644, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-            for path, raw in outputs.items()
-        }
-        if (
-            native["source_inputs"] != inputs or native["generated_inputs"] != generated
-            or native["fixtures"] != {path: context.files[path] for path in FIXTURE_PATHS}
-            or type(native["build_stdout"]) is not str
-            or any(type(native[name]) is not int or native[name] != 0 for name in ("build_exit", "execution_exit", "nm_exit"))
-            or native["build_stderr"] != "" or native["execution_stderr"] != ""
-            or type(native["nm_output"]) is not str or not native["nm_output"]
-            or type(native["output"]) is not str
-            or hashlib.sha256(native["output"].encode()).hexdigest() != native["output_sha256"]
-        ):
-            raise ValueError("OBJ02 replay substituted inputs or lacks a complete successful native execution")
-        expected_symbols = frozenset() if channel == "ordinary" else frozenset((
-            "micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record",
-        ))
-        if observation_symbols(native["nm_output"]) != expected_symbols:
-            raise ValueError("OBJ02 replay changed its actual observation linkage")
-        _validate_artifact_identity(native["executable"])
-        records, work = parse_native_output(native["output"], channel, stage)
-        if digest(records) != digest(native["records"]) or digest(work) != digest(native["work"]):
-            raise ValueError("OBJ02 replay changed observations from its actual output")
-    return check_native_stage(products, stage)
-
-
-def _validate_target_replay(context, target, stage):
-    from tests.host.common_scheduler_return_source import STATE_WORK_CONTRACT
-    from tests.host.diagnostic_history_authority import record_strings
-    from tests.host.evidence_authority_types import digest
-    from tests.host.selected_address_space_evidence import _validate_artifact_identity
-
-    record_fields(target, (
-        "version", "stage", "command", "exit_code", "output", "source_inputs",
-        "kernel_path", "kernel", "captures", "failures",
-    ))
-    if (
-        type(target["version"]) is not int or target["version"] != 1 or target["stage"] != stage
-        or record_strings(target["command"]) != ("cmake", "--workflow", "--preset", STATE_WORK_CONTRACT["target_workflow"])
-        or target["kernel_path"] != STATE_WORK_CONTRACT["target_kernel"]
-        or target["source_inputs"] != target_inputs(context.root, stage)
-    ):
-        raise ValueError("OBJ02 target replay changed its source stage, inputs, artifact or command")
-    _validate_artifact_identity(target["kernel"])
-    captures = parse_target_output(target["output"], stage, target["exit_code"])
-    if digest(captures) != digest(target["captures"]) or digest(target_failures(captures)) != digest(target["failures"]):
-        raise ValueError("OBJ02 target replay changed its actual complete captures")
-
-
-def validate_execution_log(context, replay, *, phase, attempt, reference=None):
-    from tests.host.common_scheduler_return_source import fixed_native_inputs
-    from tests.host.evidence_authority_types import digest
-    from tests.host.object_hart_validation_evidence import _replay_sources
-
-    if phase not in ("red", "green", "recertify") or type(attempt) is not str or re.fullmatch(r"[a-f0-9]{32}", attempt) is None:
-        raise ValueError("OBJ02 replay has an unadmitted phase or attempt")
-    record_fields(replay, ("version", "phase", "attempt", "native", "target", "results", "oracle_output"))
-    stages = ("baseline",) if phase == "red" else ("baseline", "current")
-    if (
-        type(replay["version"]) is not int or replay["version"] != 1
-        or replay["phase"] != phase or replay["attempt"] != attempt
-        or type(replay["oracle_output"]) is not str or not replay["oracle_output"]
-        or type(replay["native"]) is not dict or set(replay["native"]) != set(stages)
-    ):
-        raise ValueError("OBJ02 replay changed its phase, attempt or complete native membership")
-    current = None if phase == "red" else _replay_sources(context, tuple(fixed_native_inputs(context.root)))
-    for stage in stages:
-        _validate_native_replay(context, replay["native"][stage], stage,
-                                current_sources=current if stage == "current" else None)
-    _validate_target_replay(context, replay["target"], stages[-1])
-    if phase != "red":
-        if type(reference) is not dict or reference.get("phase") != "red" or reference.get("attempt") != attempt:
-            raise ValueError("OBJ02 current replay borrowed another attempt's Red")
-        _validate_native_replay(context, reference["native"]["baseline"], "baseline")
-        _validate_target_replay(context, reference["target"], "baseline")
-    elif reference is not None:
-        raise ValueError("OBJ02 initial replay cannot borrow a predecessor")
-    results, _ = run_oracles(replay["native"], replay["target"], phase, reference)
-    if digest(replay["results"]) != digest([asdict(result) for result in results]):
-        raise ValueError("OBJ02 replay results do not follow the actual complete executions")
-    return results
-
-
 def check_native_products(root, executable_paths):
     from tests.host.common_scheduler_return_source import RECIPE_ADMISSION, native_products
     from tests.host.object_hart_validation_evidence import observation_symbols
@@ -772,10 +389,10 @@ def check_native_products(root, executable_paths):
     build = root / "build/host-debug"
     expected = tuple(str(build / name) for name in RECIPE_ADMISSION["native_targets"])
     if tuple(executable_paths) != expected:
-        raise ValueError("OBJ02 native orchestration requires its exact four owned executables")
+        raise ValueError("current return orchestration requires its two owned executables")
     before = {path: read_regular(path)[1] for path in expected}
     nm = native_symbols_tool()
-    measured = {"baseline": {}, "current": {}}
+    measured = {}
     generated_inputs = {}
     for (stage, channel), path in zip(native_products(), expected, strict=True):
         _, outputs = source_bundle(root, stage, channel)
@@ -798,7 +415,7 @@ def check_native_products(root, executable_paths):
         if completed.returncode or completed.stderr:
             raise ValueError("OBJ02 compiled native product failed:\n" + completed.stdout + completed.stderr)
         records, work = parse_native_output(completed.stdout, channel, stage)
-        measured[stage][channel] = {"stage": stage, "channel": channel, "records": records, "work": work}
+        measured[channel] = {"stage": stage, "channel": channel, "records": records, "work": work}
         print(f"MICROS_OBJ02_NATIVE_ACCEPTED stage={stage} channel={channel} cases={len(records)}", flush=True)
     if (
         {path: read_regular(path)[1] for path in expected} != before
@@ -806,9 +423,7 @@ def check_native_products(root, executable_paths):
         or native_symbols_tool() != nm
     ):
         raise ValueError("OBJ02 compiled products or native tools changed during execution")
-    check_native_stage(measured["baseline"], "baseline")
-    compare_native_stages(measured["baseline"], measured["current"])
-    failures = check_native_stage(measured["current"], "current")
+    failures = check_native_stage(measured, "current")
     if failures:
         raise ValueError("OBJ02 current native code exceeds the independent work/storage bounds: " + repr(failures[:16]))
     return measured

@@ -15,7 +15,7 @@ from tests.host.diagnostic_history_source import (
     THR_OBSERVATION, THR_OBSERVATION_HEADER,
 )
 from tests.host.terminal_failure_source import CONTROL_SOURCES, extend_terminal_runtime_source, observe_source
-from tests.host.panic_trace_source import FATAL_EFFECT_CONTRACT, SOURCE_ROLES, fixed_source
+from tests.host.panic_trace_source import FATAL_EFFECT_CONTRACT, fixed_source
 
 
 ORIGINAL_UNITS = (
@@ -49,6 +49,11 @@ PRELUDE_HEADERS = (
     "kernel/platform/plic.h", "kernel/platform/plic_core.h",
     "kernel/tty/tty_handoff_runtime.h", "kernel/tty/tty_handoff_runtime_internal.h",
     "kernel/tty/tty_handoff_core.h",
+)
+TRACE_SOURCES = (
+    "kernel/diagnostic/panic_trace_core.h", "kernel/diagnostic/panic_trace_core.c",
+    "kernel/diagnostic/panic_trace.h", "kernel/diagnostic/panic_trace.c",
+    "arch/riscv64/panic_trace.S",
 )
 
 
@@ -119,7 +124,7 @@ def install_diagnostic_fixture(source_root):
 
 
 def install_trace_fixture(root, source_root):
-    private = tuple(name for name in SOURCE_ROLES["candidate_paths"] if name != "kernel/diagnostic/panic.c")
+    private = TRACE_SOURCES
     selected = tuple(sorted({unit for unit, _ in FATAL_EFFECT_CONTRACT["selected_resolvers"]}))
     sources = []
     pending = [*private, *selected, "kernel/objects/kernel_object_private.h"]
@@ -131,7 +136,7 @@ def install_trace_fixture(root, source_root):
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(
-                (root / unit).read_bytes() if unit in (*private, *SOURCE_ROLES["immutable_additions"])
+                (root / unit).read_bytes() if unit in (*private, "tests/qemu/panic_trace_kernel.h")
                 else fixed_source(unit).encode()
             )
         sources.append(unit)

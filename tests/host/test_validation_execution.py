@@ -122,7 +122,7 @@ class ValidationExecutionTests(unittest.TestCase):
             validation_plan.DOCS,
             *validation_plan.diff_commands("base"),
         ]
-        first_status, first, _ = self.execute(commands)
+        first_status, first, _ = self.execute(commands, producer=True)
         count = len(self.calls)
         second_status, second, output = self.execute(commands, reuse=True)
         self.assertEqual((0, 0), (first_status, second_status))
@@ -142,11 +142,40 @@ class ValidationExecutionTests(unittest.TestCase):
 
     def test_default_fresh_mode_does_not_consult_existing_success(self):
         commands = [workflow("test-unit")]
-        self.execute(commands)
+        self.execute(commands, producer=True)
+        self.assertTrue((self.root / "build/validation-evidence/v1/test-unit.json").is_file())
         _, report, _ = self.execute(commands)
         self.assertEqual(commands * 2, self.calls)
         self.assertEqual("FRESH", report["commands"][0]["status"])
         self.assertNotIn("producer", report)
+
+    def test_fresh_execution_does_not_collect_profiles_or_publish_receipts(self):
+        self.collect.side_effect = AssertionError("fresh execution collected an optional profile")
+        command = workflow("test-unit")
+        status, report, _ = self.execute([command])
+        self.assertEqual(0, status)
+        self.assertEqual([command], self.calls)
+        self.collect.assert_not_called()
+        self.assertTrue(report["final_candidate"])
+        self.assertEqual("FRESH", report["commands"][0]["status"])
+        self.assertFalse((self.root / "build/validation-evidence/v1/test-unit.json").exists())
+        log = self.root / "build/validation-evidence/v1" / report["commands"][0]["log"]["path"]
+        self.assertEqual(b"actual fixture subprocess output\n", log.read_bytes())
+
+    def test_fresh_attempt_invalidates_older_receipt_without_replacing_it(self):
+        command = workflow("test-unit")
+        status, _, _ = self.execute([command], producer=True)
+        self.assertEqual(0, status)
+        receipt = self.root / "build/validation-evidence/v1/test-unit.json"
+        self.assertTrue(receipt.is_file())
+        self.collect.reset_mock()
+        self.collect.side_effect = AssertionError("fresh rerun collected an optional profile")
+        status, report, _ = self.execute([command])
+        self.assertEqual(0, status)
+        self.collect.assert_not_called()
+        self.assertEqual([command, command], self.calls)
+        self.assertEqual("FRESH", report["commands"][0]["status"])
+        self.assertFalse(receipt.exists())
 
     def test_workflow_progress_is_visible_before_child_completion_and_not_replayed(self):
         visible_before_exit = []
@@ -533,7 +562,7 @@ class ValidationExecutionTests(unittest.TestCase):
 
     def test_changed_environment_or_artifact_forces_fresh(self):
         commands = [workflow("test-unit")]
-        self.execute(commands)
+        self.execute(commands, producer=True)
         for field in ("context", "artifact"):
             self.state[field] += "-changed"
             before = len(self.calls)
@@ -597,7 +626,8 @@ class ValidationExecutionTests(unittest.TestCase):
 
     def test_failed_fresh_rerun_invalidates_success_and_stops_remaining_commands(self):
         command = workflow("test-unit")
-        self.execute([command])
+        self.execute([command], producer=True)
+        self.assertTrue((self.root / "build/validation-evidence/v1/test-unit.json").is_file())
         self.state["exit_code"] = 7
         status, report, _ = self.execute([command, workflow("test-qemu-smoke")])
         self.assertNotEqual(0, status)
@@ -609,8 +639,9 @@ class ValidationExecutionTests(unittest.TestCase):
 
     def test_old_success_is_gone_before_fresh_subprocess_launch(self):
         command = workflow("test-unit")
-        self.execute([command])
+        self.execute([command], producer=True)
         receipt = self.root / "build/validation-evidence/v1/test-unit.json"
+        self.assertTrue(receipt.is_file())
         runner = self.subprocess
 
         def checked(command, **options):
@@ -640,7 +671,7 @@ class ValidationExecutionTests(unittest.TestCase):
             (self.root / "build/validation-evidence/v1/test-unit.json").exists()
         )
 
-    def test_context_mutation_during_execution_is_not_a_fresh_success_receipt(self):
+    def test_context_mutation_during_explicit_recording_cannot_publish_success(self):
         runner = self.subprocess
 
         def changed(command, **options):
@@ -649,14 +680,15 @@ class ValidationExecutionTests(unittest.TestCase):
             return result
 
         self.run.side_effect = changed
-        status, report, output = self.execute([workflow("test-unit")])
+        status, report, output = self.execute([workflow("test-unit")], gate_only=True)
         self.assertNotEqual(0, status)
         self.assertEqual("FAILED", report["commands"][0]["status"])
         self.assertIn("context", output.lower())
 
     def test_interrupted_fresh_attempt_does_not_resurrect_an_older_success(self):
         command = workflow("test-unit")
-        self.execute([command])
+        self.execute([command], producer=True)
+        self.assertTrue((self.root / "build/validation-evidence/v1/test-unit.json").is_file())
         self.run.side_effect = KeyboardInterrupt()
         status, report, _ = self.execute([command])
         self.assertNotEqual(0, status)
@@ -682,7 +714,7 @@ class ValidationExecutionTests(unittest.TestCase):
             **self.manifest(self.root, "test-unit"),
             "candidate": {"head": "unreviewed"},
         }
-        status, report, output = self.execute([workflow("test-unit")])
+        status, report, output = self.execute([workflow("test-unit")], reuse=True)
         self.assertNotEqual(0, status)
         self.assertEqual("NOT_RUN", report["commands"][0]["status"])
         self.assertIn("profile", output.lower())
@@ -720,7 +752,7 @@ class ValidationExecutionTests(unittest.TestCase):
             return result
 
         self.run.side_effect = produced
-        self.execute([workflow("test-unit")])
+        self.execute([workflow("test-unit")], gate_only=True)
         status, report, _ = self.execute([workflow("test-unit")], reuse=True)
         self.assertEqual(0, status)
         self.assertEqual(1, len(self.calls))
@@ -1153,27 +1185,6 @@ class WorkflowCancellationTests(unittest.TestCase):
                     if process.poll() is None:
                         process.kill()
                     process.communicate(timeout=5)
-
-
-class ExecutionSourceTransportTests(unittest.TestCase):
-    def test_streaming_admission_preserves_the_original_execution_identity(self):
-        import hashlib
-        from tests.host import kernel_layout_source
-
-        source = (Path(__file__).resolve().parents[2] / "tools/validation_execution.py").read_text()
-        self.assertIn("from tools.validation_stream import stream_workflow\n", source)
-        restored = kernel_layout_source.restore_validation_execution_source(source)
-        self.assertEqual(
-            kernel_layout_source.BASE_VALIDATION_EXECUTION_SHA256,
-            hashlib.sha256(restored.encode()).hexdigest(),
-        )
-        for changed in (
-            source.replace("cwd=root, log=attempt.log", "cwd=root, log=unowned"),
-            source.replace("from tools.validation_stream import stream_workflow\n", ""),
-            source + "\n# unreviewed outside edit\n",
-        ):
-            with self.subTest(source=changed[-50:]), self.assertRaises(AssertionError):
-                kernel_layout_source.restore_validation_execution_source(changed)
 
 
 class ValidationExecutionArgumentsTests(unittest.TestCase):

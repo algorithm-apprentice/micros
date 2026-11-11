@@ -6,7 +6,7 @@ from unittest import mock
 
 from tools import qemu_smoke_arguments, qemu_smoke_cli
 from tools.qemu_smoke_records import QemuResult
-from tests.host import qemu_transcript_source
+from tests.host.build_source_records import cmake_command
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -141,59 +141,12 @@ class QemuTranscriptTest(unittest.TestCase):
         self.assertNotIn("# MICROS_TRANSCRIPT_OBSERVATION", output)
 
 
-class QemuTranscriptProjectionTest(unittest.TestCase):
-    def test_source_inverse_rejects_partial_moved_and_changed_additions(self):
-        mutations = (
-            ("tools/qemu_smoke_arguments.py", qemu_transcript_source.OPTION, ""),
-            ("tools/qemu_smoke_arguments.py", "len(arguments.memory) != 1", "len(arguments.memory) > 2"),
-            ("tools/qemu_smoke_outcome.py", "keepends=True", "keepends=False"),
-            ("tools/qemu_smoke_cli.py", "print_transcript(result.output)", "print_transcript(result.output.rstrip())"),
-            ("tools/qemu_smoke_cli.py", "    print_transcript,\n", ""),
-        )
-        for path, before, after in mutations:
-            current = (ROOT / path).read_text()
-            original = qemu_transcript_source.project_transcript_source(path, current)
-            self.assertNotEqual(current, original)
-            self.assertEqual(original, qemu_transcript_source.project_transcript_source(path, original))
-            self.assertEqual(1, current.count(before))
-            with self.subTest(path=path, before=before), self.assertRaises(AssertionError):
-                qemu_transcript_source.project_transcript_source(path, current.replace(before, after, 1))
-        path = "tools/qemu_smoke_outcome.py"
-        current = (ROOT / path).read_text()
-        moved = qemu_transcript_source.PRINTER.lstrip() + current.removesuffix(qemu_transcript_source.PRINTER)
-        with self.assertRaises(AssertionError):
-            qemu_transcript_source.project_transcript_source(path, moved)
-        with self.assertRaises(AssertionError):
-            qemu_transcript_source.project_transcript_source(path, current + qemu_transcript_source.PRINTER)
-
-    def test_observed_option_keeps_its_position_and_parser(self):
-        before = ((7, "--expect"), (7, "--require-fdt-events"))
-        current = (before[0], (7, "--report-transcript"), before[1])
-        self.assertEqual(before, qemu_transcript_source.project_transcript_options(current))
-        self.assertEqual(before, qemu_transcript_source.project_transcript_options(before))
-        for changed in (
-            (*current, current[1]),
-            (current[1], current[0], current[2]),
-            (current[0], (8, "--report-transcript"), current[2]),
-            (*current[:2],),
+class QemuTranscriptRecipeTest(unittest.TestCase):
+    def test_current_semantic_workflows_publish_their_owned_transcript(self):
+        source = (ROOT / "CMakeLists.txt").read_text()
+        for target in (
+            "test-qemu-user-address-space", "test-qemu-address-space-handoff", "test-qemu-scheduler",
         ):
-            with self.subTest(changed=changed), self.assertRaises(AssertionError):
-                qemu_transcript_source.project_transcript_options(changed)
-
-    def test_current_recipes_enable_only_the_two_exact_runner_options(self):
-        from tests.host.common_scheduler_return_source import project_cmake as project_common
-
-        current = project_common((ROOT / "CMakeLists.txt").read_text())
-        flag = "            --report-transcript\n"
-        self.assertEqual(2, current.count(flag))
-        original = qemu_transcript_source.project_transcript_cmake(current)
-        self.assertEqual(current.replace(flag, ""), original)
-        self.assertEqual(original, qemu_transcript_source.project_transcript_cmake(original))
-        for changed in (
-            current.replace(flag, "", 1),
-            current.replace(flag, flag * 2, 1),
-            current.replace(flag + "            --qemu\n", "            --qemu\n" + flag, 1),
-            current.replace("        test-qemu-user-address-space\n", "        test-qemu-smoke\n", 1),
-        ):
-            with self.subTest(changed=changed[:100]), self.assertRaises(ValueError):
-                qemu_transcript_source.project_transcript_cmake(changed)
+            with self.subTest(target=target):
+                command = cmake_command(source, "add_custom_target", target)
+                self.assertEqual(1, command.count("--report-transcript"))

@@ -5,9 +5,10 @@ from functools import lru_cache
 from pathlib import Path
 import re
 
-from tests.host.c_source_records import c_lexical_text, compact, function_records, tokens
+from tests.host.c_source_records import c_declaration_text, c_lexical_text, compact, function_records, tokens
+from tests.host.evidence_records import regular_source
 from tests.host.stack_source_projection import project_stack_source
-from tests.host.diagnostic_history_source import diagnostic_no_callback_scope, project_diagnostic_callback_source
+from tests.host.diagnostic_history_source import project_diagnostic_callback_source
 from tools.stack_bound_callback_contracts import GROUPS
 from tools.stack_bound_callbacks import require_callback_argument
 from tools.stack_bound_objects import call_instructions, function_symbols, load_object
@@ -114,96 +115,60 @@ def source_callback_occurrences(record, group):
     return tuple(result)
 
 
+def proof_header_tokens(source, protected):
+    """Keep types, macros, storage and proof APIs, not unrelated prototypes."""
+    lexical = c_declaration_text(source)
+    ordinary = re.compile(
+        r"[A-Za-z_][A-Za-z0-9_\s*]*\b[A-Za-z_][A-Za-z0-9_]*\s*"
+        r"\([^(){};]*\)\s*;"
+    )
+    removed = []
+    for match in ordinary.finditer(lexical):
+        declaration = tokens(match[0])
+        if (
+            lexical.count("{", 0, match.start()) != lexical.count("}", 0, match.start())
+            or set(declaration) & {"typedef", "_Noreturn", *protected}
+            or re.search(r"(?m)^\s*#", source[match.start():match.end()])
+        ):
+            continue
+        removed.append((match.start(), match.end()))
+    for start, end in reversed(removed):
+        source = source[:start] + source[end:]
+    return tokens(source)
+
+
 def require_callback_type_scope(root, group, units):
-    header = Path(root) / group.header
-    if header.is_symlink() or not header.is_file():
-        raise StackEvidenceError(f"{group.identifier} callback header contract changed")
-    reference = reference_source(str(root), group.header)
-    actual_tokens = tokens(header.read_text())
-    admitted = actual_tokens == tokens(reference)
-    if not admitted and group in GROUPS and group.identifier == "kernel-visitor":
-        prefix, terminator, suffix = reference.rpartition("\n#endif")
-        declaration = (
-            "enum micros_user_address_space_error micros_user_address_space_prepare_activation("
-            "struct micros_process_handle process, uint64_t *root_physical_address);"
-        )
-        admitted = bool(terminator) and not suffix.strip() and actual_tokens == tokens(
-            prefix + "\n" + declaration + terminator + suffix,
-        )
-    if not admitted:
-        raise StackEvidenceError(f"{group.identifier} callback header contract changed")
+    if group not in GROUPS:
+        raise StackEvidenceError("unknown callback header contract")
+    try:
+        header = regular_source(root, group.header)
+        reference = reference_source(str(root), group.header)
+        if proof_header_tokens(header.read_text(), group.types) != proof_header_tokens(reference, group.types):
+            raise StackEvidenceError(f"{group.identifier} callback header contract changed")
+    except (ValueError, AssertionError, OSError) as error:
+        raise StackEvidenceError(f"{group.identifier} callback header contract: {error}") from error
     expression = r"\b(?:" + "|".join(map(re.escape, group.types)) + r")\b"
     callback_free = set()
     for unit in units:
         if not unit.startswith(group.source_prefix):
             continue
         try:
-            if diagnostic_no_callback_scope(root, unit, group.types):
-                callback_free.add(unit)
-                continue
+            actual = function_records(regular_source(root, unit).read_text())
         except (AssertionError, ValueError, OSError) as error:
-            raise StackEvidenceError(f"{group.identifier} diagnostic callback scope: {error}") from error
-        actual = function_records((Path(root) / unit).read_text())
-        expected = function_records(reference_source(str(root), unit))
+            raise StackEvidenceError(f"{group.identifier} callback source scope: {error}") from error
         selected = {
             name for name, record in actual.items()
             if re.search(expression, record.signature + record.body)
-        } | {
-            name for name, record in expected.items()
-            if re.search(expression, record.signature + record.body)
+            or source_callback_occurrences(record, group)
         }
+        if not selected:
+            callback_free.add(unit)
         for name in selected:
             try:
                 anchored_function(root, FunctionKey("source", "source.elf", unit, name))
             except StackEvidenceError as error:
                 raise StackEvidenceError(f"{group.identifier} callback type/argument scope: {error}") from error
     return frozenset(callback_free)
-
-
-def selected_mapping_no_callback_scope(root, group, key, origin):
-    unit = "kernel/memory/user_address_space_mapping.c"
-    if group not in GROUPS or group.identifier != "kernel-visitor" or key.translation_unit != unit:
-        return False
-    signatures = {
-        "selected_slot_is_required": (
-            "static bool selected_slot_is_required("
-            "const struct micros_user_address_space_bindings *bindings, "
-            "struct micros_process_handle process, uint64_t root, uint64_t virtual_address)"
-        ),
-        "selected_table_is_distinct": (
-            "static bool selected_table_is_distinct("
-            "const struct micros_user_address_space_path *path, uint64_t physical_address, unsigned int depth)"
-        ),
-        "micros_user_address_space_select_path": (
-            "enum micros_user_address_space_error micros_user_address_space_select_path("
-            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
-            "uint64_t virtual_address, const struct micros_user_address_space_bindings *bindings, "
-            "struct micros_user_address_space_path *path)"
-        ),
-        "prepare_selected_path": (
-            "static enum micros_user_address_space_error prepare_selected_path("
-            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
-            "uint64_t virtual_address, struct micros_user_address_space_path *path)"
-        ),
-        "read_selected_leaf": (
-            "static enum micros_user_address_space_error read_selected_leaf("
-            "struct micros_user_address_space_runtime_view *runtime, struct micros_process_handle process, "
-            "uint64_t virtual_address, struct micros_sv39_decoded_pte *leaf)"
-        ),
-    }
-    if key.symbol not in signatures:
-        return False
-    source = Path(root) / unit
-    if origin != unit or source.is_symlink() or not source.is_file():
-        raise StackEvidenceError("kernel-visitor callback-free function has a foreign source origin")
-    record = function_records(source.read_text()).get(key.symbol)
-    if (
-        record is None or record.guards
-        or tokens(record.signature) != tokens(signatures[key.symbol])
-        or source_callback_occurrences(record, group)
-    ):
-        raise StackEvidenceError("kernel-visitor callback-free function signature or scope changed")
-    return True
 
 
 def configured_callback_flags(directory):
@@ -230,7 +195,7 @@ def bind_current_callbacks(root, directory, catalog):
     for call in catalog.pending:
         if call.target_symbol is None:
             grouped.setdefault(call.caller, []).append(call)
-    result, claimed = [], set()
+    result, claimed, sources, machine, loaded = [], set(), {}, {}, {}
     for group in GROUPS:
         candidates = [
             frame.function for frame in catalog.frames
@@ -238,50 +203,54 @@ def bind_current_callbacks(root, directory, catalog):
         ]
         if not candidates:
             continue
-        callback_free = require_callback_type_scope(root, group, {key.translation_unit for key in candidates})
+        require_callback_type_scope(root, group, {key.translation_unit for key in candidates})
         for key in candidates:
-            diagnostic_wrapper = (
-                key.translation_unit == "servers/tty/tty_control.c"
-                and key.symbol in (
-                    "micros_tty_control_diagnostic_register", "micros_tty_control_diagnostic_read",
-                )
-            )
-            selected_mapping = selected_mapping_no_callback_scope(root, group, key, origins[key])
-            if key.translation_unit in callback_free or diagnostic_wrapper or selected_mapping:
-                scope = "kernel-visitor" if selected_mapping else "diagnostic"
-                if origins[key] != key.translation_unit:
-                    raise StackEvidenceError(f"{scope} callback-free function borrowed another source origin")
-                obj = load_object(Path(directory) / objects[key])
-                symbol = function_symbols(obj).get(key.symbol)
-                if symbol is None or grouped.get(key) or any(
-                    call.target_symbol is None
+            origin = origins[key]
+            if not group.source_prefix.endswith("/") and key.translation_unit != group.source_prefix:
+                raise StackEvidenceError("callback source is outside its qualified translation unit")
+            try:
+                if origin not in sources:
+                    sources[origin] = function_records(regular_source(root, origin).read_text())
+                record = sources[origin].get(key.symbol)
+            except (AssertionError, ValueError, OSError) as error:
+                raise StackEvidenceError(f"callback source origin: {error}") from error
+            if record is None:
+                raise StackEvidenceError("callback catalog has no actual source function")
+            if origin != key.translation_unit:
+                anchored_function(root, key, origin)
+            if key not in machine:
+                path = objects[key]
+                if path not in loaded:
+                    obj = load_object(Path(directory) / path)
+                    loaded[path] = obj, function_symbols(obj)
+                obj, symbols = loaded[path]
+                symbol = symbols.get(key.symbol)
+                if symbol is None:
+                    raise StackEvidenceError("callback catalog has no actual machine symbol")
+                calls = tuple(sorted(grouped.get(key, ()), key=lambda call: call.offset))
+                actual = tuple(
+                    call
                     for call in call_instructions(obj, symbol, key, switch_jumps(obj, symbol))
-                ):
-                    raise StackEvidenceError(f"{scope} callback-free source has an actual indirect call")
-                continue
-            reference = function_records(reference_source(str(root), origins[key])).get(key.symbol)
-            if reference is None:
-                if (
-                    key.translation_unit == origins[key] == "servers/vm/vm_load.c"
-                    and key.symbol == "vm_load_prepare_transaction"
-                ):
-                    from tools.stack_bound_vm_lifetime import require_vm_prepare_lifetime
+                    if call.target_symbol is None
+                )
+                if calls != actual:
+                    raise StackEvidenceError("callback machine-indirect occurrence inventory is incomplete")
+                machine[key] = obj, symbol, calls
+            obj, symbol, calls = machine[key]
+            if key.translation_unit == origin == "servers/vm/vm_load.c" and key.symbol == "vm_load_prepare_transaction":
+                from tools.stack_bound_vm_lifetime import require_vm_prepare_lifetime
 
-                    require_vm_prepare_lifetime(root, load_object(Path(directory) / objects[key]))
-                    continue
-                raise StackEvidenceError("callback function is outside its immutable source stage")
-            expected = source_callback_occurrences(reference, group)
+                require_vm_prepare_lifetime(root, obj)
+            expected = source_callback_occurrences(record, group)
             if not expected:
+                if calls and not any(
+                    source_callback_occurrences(record, other)
+                    for other in GROUPS if key.translation_unit.startswith(other.source_prefix)
+                ):
+                    raise StackEvidenceError("callback-free source has an actual unbound indirect call")
                 continue
-            record = anchored_function(root, key, origins[key])
-            calls = tuple(sorted(grouped.get(key, ()), key=lambda call: call.offset))
-            obj = load_object(Path(directory) / objects[key])
-            symbol = function_symbols(obj)[key.symbol]
-            actual = tuple(
-                call for call in call_instructions(obj, symbol, key, switch_jumps(obj, symbol))
-                if call.target_symbol is None
-            )
-            if calls != actual or len(calls) != len(expected):
+            record = anchored_function(root, key, origin)
+            if len(calls) != len(expected):
                 raise StackEvidenceError(f"{group.identifier} source/machine occurrence inventory is incomplete")
             targets = group_provider_targets(root, group, key, definitions, flags)
             parameters = parameter_names(record.signature)

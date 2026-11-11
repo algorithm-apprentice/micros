@@ -1,5 +1,11 @@
 # Bounded Validation Feedback
 
+The cumulative provider/catalog portion of this historical ADR-0105 contract
+is superseded by [current-contract validation](current-contract-validation.md).
+The current implementation uses `source_snapshot.py`; fast/full selection,
+live progress, input consistency and failure principles remain. Do not follow
+the old provider or author-journal requirements below as current prerequisites.
+
 ## Status and outcome
 
 This is the Accepted contract for

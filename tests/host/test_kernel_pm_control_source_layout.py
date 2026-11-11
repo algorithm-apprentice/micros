@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 import re
 import unittest
@@ -12,36 +11,41 @@ from tests.host.test_frame_ownership_source_layout import (
     cmake_command,
     static_definition_paths,
 )
-from tests.host import kernel_layout_source
+from tests.host.source_snapshot import isolated_source_view, source_bytes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CMAKE_PATH = REPOSITORY_ROOT / "CMakeLists.txt"
-FUNCTION_REVIEW_LINE_LIMIT = 120
+
+
+def current_text(path, encoding="utf-8"):
+    return source_bytes(REPOSITORY_ROOT, path).decode(encoding)
+
+
 STRUCTURAL_TEST_PATH = (
     "tests/host/test_kernel_pm_control_source_layout.py"
 )
 
 SOURCE_SETS = {
     "MICROS_PM_CONTROL_CORE_SOURCES": (
-        "kernel/pm_control_core.c",
-        "kernel/pm_control_abi.c",
-        "kernel/pm_control_validation.c",
-        "kernel/pm_control_reservation.c",
-        "kernel/pm_control_execution.c",
-        "kernel/pm_control_activation.c",
-        "kernel/pm_control_exit.c",
-        "kernel/pm_control_runtime_core.c",
-        "kernel/pm_control_syscall_core.c",
+        'kernel/pm/pm_control_core.c',
+        'kernel/pm/pm_control_abi.c',
+        'kernel/pm/pm_control_validation.c',
+        'kernel/pm/pm_control_reservation.c',
+        'kernel/pm/pm_control_execution.c',
+        'kernel/pm/pm_control_activation.c',
+        'kernel/pm/pm_control_exit.c',
+        'kernel/pm/pm_control_runtime_core.c',
+        'kernel/pm/pm_control_syscall_core.c',
     ),
     "MICROS_PM_CONTROL_TARGET_SOURCES": (
-        "kernel/pm_control_runtime.c",
-        "kernel/pm_control_syscall.c",
-        "kernel/pm_control_syscall_runtime.c",
-        "kernel/pm_control_syscall_reservation.c",
-        "kernel/pm_control_syscall_execution.c",
-        "kernel/pm_control_syscall_activation.c",
-        "kernel/pm_control_syscall_exit.c",
+        'kernel/pm/pm_control_runtime.c',
+        'kernel/pm/pm_control_syscall.c',
+        'kernel/pm/pm_control_syscall_runtime.c',
+        'kernel/pm/pm_control_syscall_reservation.c',
+        'kernel/pm/pm_control_syscall_execution.c',
+        'kernel/pm/pm_control_syscall_activation.c',
+        'kernel/pm/pm_control_syscall_exit.c',
     ),
     "MICROS_PM_CONTROL_HOST_TEST_SOURCES": (
         "tests/host/pm_control_test.c",
@@ -61,8 +65,8 @@ SOURCE_SETS = {
 }
 
 PRIVATE_HEADERS = (
-    "kernel/pm_control_internal.h",
-    "kernel/pm_control_syscall_internal.h",
+    'kernel/pm/pm_control_internal.h',
+    'kernel/pm/pm_control_syscall_internal.h',
     "tests/host/pm_control_test_internal.h",
     "tests/host/pm_control_execution_test_internal.h",
 )
@@ -72,109 +76,55 @@ TEST_PRIVATE_HEADERS = (
     "tests/host/pm_control_execution_test_internal.h",
 )
 
-STABLE_HEADER_HASHES = {
-    "include/micros/pm.h":
-        "03d4c85565fa859046fcc48140331affc8da4ca453e7f6972d448287b037240c",
-    "kernel/pm_control_core.h":
-        "a9a402c6b68fc1cdb43ac2eb4964f9e2e9a92855334774c7d863fc1e4b870a9e",
-    "kernel/pm_control_runtime.h":
-        "24fe6f840c55c5bbe6bf2d6fca216ad780fe5ffb054f6d50548c178490e444c0",
-    "kernel/pm_control_runtime_core.h":
-        "5ea8d15732689c728f21774161caa21f90e8d3c529066e3b4f2a33daefdb30a6",
-    "kernel/pm_control_syscall.h":
-        "e2f8bf689879dfc15887e796542e7ec2d9898c3f8809518052e9567d07af820f",
-    "kernel/pm_control_syscall_core.h":
-        "0f12e8eece367052bba8da14bcce990261cb91619114567388f1adfb647aef82",
-}
+PUBLIC_HEADERS = ('include/micros/pm.h',
+ 'kernel/pm/pm_control_core.h',
+ 'kernel/pm/pm_control_runtime.h',
+ 'kernel/pm/pm_control_runtime_core.h',
+ 'kernel/pm/pm_control_syscall.h',
+ 'kernel/pm/pm_control_syscall_core.h')
 
-PM_PATH_CLASSIFICATION_EQUIVALENTS = (
-    (
-        "kernel/pm_control_core.c",
-        (
-            "kernel/pm_control_abi.c",
-            "kernel/pm_control_validation.c",
-            "kernel/pm_control_reservation.c",
-            "kernel/pm_control_execution.c",
-            "kernel/pm_control_activation.c",
-            "kernel/pm_control_exit.c",
-            "kernel/pm_control_internal.h",
-        ),
-    ),
-    (
-        "kernel/pm_control_syscall.c",
-        (
-            "kernel/pm_control_syscall_runtime.c",
-            "kernel/pm_control_syscall_reservation.c",
-            "kernel/pm_control_syscall_execution.c",
-            "kernel/pm_control_syscall_activation.c",
-            "kernel/pm_control_syscall_exit.c",
-            "kernel/pm_control_syscall_internal.h",
-        ),
-    ),
-    (
-        "tests/host/pm_control_test.c",
-        (
-            "tests/host/pm_control_test_fixture.c",
-            "tests/host/pm_control_abi_test.c",
-            "tests/host/pm_control_syscall_test.c",
-            "tests/host/pm_control_reservation_test.c",
-            "tests/host/pm_control_runtime_test.c",
-            "tests/host/pm_control_test_internal.h",
-        ),
-    ),
-    (
-        "tests/host/pm_control_execution_test.c",
-        (
-            "tests/host/pm_control_execution_test_fixture.c",
-            "tests/host/pm_control_execution_prepare_test.c",
-            "tests/host/pm_control_execution_token_test.c",
-            "tests/host/pm_control_execution_exit_test.c",
-            "tests/host/pm_control_execution_test_internal.h",
-        ),
-    ),
-)
 
 PORTABLE_FINAL_OWNERS = {
     "micros_pm_control_state_prepare":
-        "kernel/pm_control_core.c",
+        'kernel/pm/pm_control_core.c',
     "micros_pm_control_decode":
-        "kernel/pm_control_abi.c",
+        'kernel/pm/pm_control_abi.c',
     "micros_pm_control_state_validate":
-        "kernel/pm_control_validation.c",
+        'kernel/pm/pm_control_validation.c',
     "micros_pm_control_state_validate_objects":
-        "kernel/pm_control_validation.c",
+        'kernel/pm/pm_control_validation.c',
     "micros_pm_control_reserve_preflight":
-        "kernel/pm_control_reservation.c",
+        'kernel/pm/pm_control_reservation.c',
     "micros_pm_control_reserve_commit_prevalidated":
-        "kernel/pm_control_reservation.c",
+        'kernel/pm/pm_control_reservation.c',
     "micros_pm_control_abort_preflight":
-        "kernel/pm_control_reservation.c",
+        'kernel/pm/pm_control_reservation.c',
     "micros_pm_control_abort_commit_prevalidated":
-        "kernel/pm_control_reservation.c",
+        'kernel/pm/pm_control_reservation.c',
     "micros_pm_control_prepare_preflight":
-        "kernel/pm_control_execution.c",
+        'kernel/pm/pm_control_execution.c',
     "micros_pm_control_prepare_commit_prevalidated":
-        "kernel/pm_control_execution.c",
+        'kernel/pm/pm_control_execution.c',
     "micros_pm_control_abort_prepared_preflight":
-        "kernel/pm_control_execution.c",
+        'kernel/pm/pm_control_execution.c',
     "micros_pm_control_abort_prepared_commit_prevalidated":
-        "kernel/pm_control_execution.c",
+        'kernel/pm/pm_control_execution.c',
     "micros_pm_control_activate_preflight":
-        "kernel/pm_control_activation.c",
+        'kernel/pm/pm_control_activation.c',
     "micros_pm_control_activate_commit_prevalidated":
-        "kernel/pm_control_activation.c",
+        'kernel/pm/pm_control_activation.c',
     "micros_pm_control_exit_begin_preflight":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
     "micros_pm_control_exit_begin_commit_prevalidated":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
     "micros_pm_control_exit_detach_preflight":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
     "micros_pm_control_exit_detach_commit_prevalidated":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
     "micros_pm_control_release_exited_preflight":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
     "micros_pm_control_release_exited_commit_prevalidated":
-        "kernel/pm_control_exit.c",
+        'kernel/pm/pm_control_exit.c',
 }
 
 TEST_FINAL_OWNERS = {
@@ -213,15 +163,15 @@ TEST_FINAL_OWNERS = {
 FINAL_SYMBOL_OWNERS = {
     **PORTABLE_FINAL_OWNERS,
     "micros_pm_control_handle_captured_user_ecall":
-        "kernel/pm_control_syscall.c",
+        'kernel/pm/pm_control_syscall.c',
     **TEST_FINAL_OWNERS,
 }
 
 PORTABLE_TRANSITION_OWNERS = (
-    "kernel/pm_control_reservation.c",
-    "kernel/pm_control_execution.c",
-    "kernel/pm_control_activation.c",
-    "kernel/pm_control_exit.c",
+    'kernel/pm/pm_control_reservation.c',
+    'kernel/pm/pm_control_execution.c',
+    'kernel/pm/pm_control_activation.c',
+    'kernel/pm/pm_control_exit.c',
 )
 
 PORTABLE_TRANSITION_SYMBOLS = {
@@ -235,192 +185,97 @@ PORTABLE_TRANSITION_SYMBOLS = {
 
 SYSCALL_ADAPTER_ENTRY_OWNERS = {
     "micros_pm_control_syscall_handle_reservation":
-        "kernel/pm_control_syscall_reservation.c",
+        'kernel/pm/pm_control_syscall_reservation.c',
     "micros_pm_control_syscall_handle_execution":
-        "kernel/pm_control_syscall_execution.c",
+        'kernel/pm/pm_control_syscall_execution.c',
     "micros_pm_control_syscall_handle_activation":
-        "kernel/pm_control_syscall_activation.c",
+        'kernel/pm/pm_control_syscall_activation.c',
     "micros_pm_control_syscall_handle_exit":
-        "kernel/pm_control_syscall_exit.c",
+        'kernel/pm/pm_control_syscall_exit.c',
 }
 
 SYSCALL_PORTABLE_OWNER = {
-    "kernel/pm_control_syscall_reservation.c":
-        "kernel/pm_control_reservation.c",
-    "kernel/pm_control_syscall_execution.c":
-        "kernel/pm_control_execution.c",
-    "kernel/pm_control_syscall_activation.c":
-        "kernel/pm_control_activation.c",
-    "kernel/pm_control_syscall_exit.c":
-        "kernel/pm_control_exit.c",
+    'kernel/pm/pm_control_syscall_reservation.c':
+        'kernel/pm/pm_control_reservation.c',
+    'kernel/pm/pm_control_syscall_execution.c':
+        'kernel/pm/pm_control_execution.c',
+    'kernel/pm/pm_control_syscall_activation.c':
+        'kernel/pm/pm_control_activation.c',
+    'kernel/pm/pm_control_syscall_exit.c':
+        'kernel/pm/pm_control_exit.c',
 }
 
 EXPECTED_PM_INCLUDES = {
-    "kernel/pm_control_internal.h": (
-        "kernel/pm_control_core.h",
+    'kernel/pm/pm_control_internal.h': (
+        'kernel/pm/pm_control_core.h',
     ),
-    "kernel/pm_control_syscall_internal.h": (
-        "kernel/pm_control_runtime.h",
-        "kernel/pm_control_syscall.h",
-        "kernel/pm_control_syscall_core.h",
+    'kernel/pm/pm_control_syscall_internal.h': (
+        'kernel/pm/pm_control_runtime.h',
+        'kernel/pm/pm_control_syscall.h',
+        'kernel/pm/pm_control_syscall_core.h',
     ),
     "tests/host/pm_control_test_internal.h": (
-        "kernel/pm_control_core.h",
-        "kernel/pm_control_syscall_core.h",
+        'kernel/pm/pm_control_core.h',
+        'kernel/pm/pm_control_syscall_core.h',
     ),
     "tests/host/pm_control_execution_test_internal.h": (
-        "kernel/pm_control_core.h",
+        'kernel/pm/pm_control_core.h',
     ),
-    "kernel/pm_control_core.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_core.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_abi.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_abi.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_validation.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_validation.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_reservation.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_reservation.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_execution.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_execution.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_activation.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_activation.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_exit.c": (
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_exit.c': (
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_runtime_core.c": (
-        "kernel/pm_control_runtime_core.h",
+    'kernel/pm/pm_control_runtime_core.c': (
+        'kernel/pm/pm_control_runtime_core.h',
     ),
-    "kernel/pm_control_syscall_core.c": (
-        "kernel/pm_control_syscall_core.h",
+    'kernel/pm/pm_control_syscall_core.c': (
+        'kernel/pm/pm_control_syscall_core.h',
     ),
-    "kernel/pm_control_runtime.c": (
-        "kernel/pm_control_runtime.h",
-        "kernel/pm_control_runtime_core.h",
+    'kernel/pm/pm_control_runtime.c': (
+        'kernel/pm/pm_control_runtime.h',
+        'kernel/pm/pm_control_runtime_core.h',
     ),
-    "kernel/pm_control_syscall.c": (
-        "kernel/pm_control_syscall.h",
-        "kernel/pm_control_runtime.h",
-        "kernel/pm_control_syscall_internal.h",
+    'kernel/pm/pm_control_syscall.c': (
+        'kernel/pm/pm_control_syscall.h',
+        'kernel/pm/pm_control_runtime.h',
+        'kernel/pm/pm_control_syscall_internal.h',
     ),
-    "kernel/pm_control_syscall_runtime.c": (
-        "kernel/pm_control_syscall_internal.h",
+    'kernel/pm/pm_control_syscall_runtime.c': (
+        'kernel/pm/pm_control_syscall_internal.h',
     ),
-    "kernel/pm_control_syscall_reservation.c": (
-        "kernel/pm_control_syscall_internal.h",
-        "kernel/pm_control_runtime_core.h",
+    'kernel/pm/pm_control_syscall_reservation.c': (
+        'kernel/pm/pm_control_syscall_internal.h',
+        'kernel/pm/pm_control_runtime_core.h',
     ),
-    "kernel/pm_control_syscall_execution.c": (
-        "kernel/pm_control_syscall_internal.h",
-        "kernel/pm_control_internal.h",
+    'kernel/pm/pm_control_syscall_execution.c': (
+        'kernel/pm/pm_control_syscall_internal.h',
+        'kernel/pm/pm_control_internal.h',
     ),
-    "kernel/pm_control_syscall_activation.c": (
-        "kernel/pm_control_syscall_internal.h",
+    'kernel/pm/pm_control_syscall_activation.c': (
+        'kernel/pm/pm_control_syscall_internal.h',
     ),
-    "kernel/pm_control_syscall_exit.c": (
-        "kernel/pm_control_syscall_internal.h",
+    'kernel/pm/pm_control_syscall_exit.c': (
+        'kernel/pm/pm_control_syscall_internal.h',
     ),
 }
 
-CURRENT_SYMBOL_OWNERS = {
-    **{
-        symbol: "kernel/pm_control_core.c"
-        for symbol in PORTABLE_FINAL_OWNERS
-    },
-    "micros_pm_control_handle_captured_user_ecall":
-        "kernel/pm_control_syscall.c",
-    **{
-        symbol: "tests/host/pm_control_test.c"
-        for symbol in (
-            "micros_pm_control_test_run",
-            "test_contract_and_decode",
-            "test_syscall_authority",
-            "test_syscall_authority_resolution",
-            "test_syscall_phase_and_retained_output",
-            "test_state_preparation",
-            "test_reserve_abort_lifecycle",
-            "test_capacity_and_quarantine",
-            "test_invariant_rejection",
-            "test_runtime_accepts_exact_frozen_vm_reservation",
-        )
-    },
-    **{
-        symbol: "tests/host/pm_control_execution_test.c"
-        for symbol in (
-            "micros_pm_control_execution_test_run",
-            "test_prepare_abort_activate",
-            "test_prepared_corruption_is_invariant",
-            "test_token_exhaustion_is_invariant",
-            "test_exit_begin_detach_release",
-        )
-    },
-}
-
-INITIAL_SYMBOL_OWNER_MIGRATION = tuple(
-    (
-        CURRENT_SYMBOL_OWNERS[symbol],
-        final_owner,
-        symbol,
-    )
-    for symbol, final_owner in FINAL_SYMBOL_OWNERS.items()
-    if CURRENT_SYMBOL_OWNERS[symbol] != final_owner
-)
-
-SYMBOL_OWNER_MIGRATION = ()
-
-INITIAL_LONG_FUNCTION_MIGRATION = (
-    (
-        "kernel/pm_control_core.c",
-        "micros_pm_control_state_validate_objects",
-    ),
-    ("kernel/pm_control_core.c", "micros_pm_control_decode"),
-    (
-        "kernel/pm_control_core.c",
-        "micros_pm_control_prepare_preflight",
-    ),
-    ("kernel/pm_control_core.c", "running_application_resolve"),
-    (
-        "kernel/pm_control_syscall.c",
-        "micros_pm_control_handle_captured_user_ecall",
-    ),
-    ("tests/host/pm_control_test.c", "test_contract_and_decode"),
-    ("tests/host/pm_control_test.c", "test_syscall_authority"),
-    (
-        "tests/host/pm_control_test.c",
-        "test_syscall_authority_resolution",
-    ),
-    (
-        "tests/host/pm_control_test.c",
-        "test_syscall_phase_and_retained_output",
-    ),
-    (
-        "tests/host/pm_control_test.c",
-        "test_reserve_abort_lifecycle",
-    ),
-    (
-        "tests/host/pm_control_test.c",
-        "test_runtime_accepts_exact_frozen_vm_reservation",
-    ),
-    ("tests/host/pm_control_execution_test.c", "freeze_child"),
-    (
-        "tests/host/pm_control_execution_test.c",
-        "initialize_fixture",
-    ),
-    (
-        "tests/host/pm_control_execution_test.c",
-        "test_prepare_abort_activate",
-    ),
-    (
-        "tests/host/pm_control_execution_test.c",
-        "test_exit_begin_detach_release",
-    ),
-)
-
-LONG_FUNCTION_MIGRATION = ()
 
 PM_CONTROL_CASE_ORDER = (
     "test_contract_and_decode",
@@ -465,7 +320,7 @@ def accepted_family_paths() -> tuple[str, ...]:
             (
                 *all_source_set_paths(),
                 *PRIVATE_HEADERS,
-                *STABLE_HEADER_HASHES,
+                *PUBLIC_HEADERS,
             )
         )
     )
@@ -473,15 +328,15 @@ def accepted_family_paths() -> tuple[str, ...]:
 
 def discovered_family_paths() -> tuple[str, ...]:
     patterns = (
-        "kernel/pm_control*.c",
-        "kernel/pm_control*.h",
+        'kernel/pm/pm_control*.c',
+        'kernel/pm/pm_control*.h',
         "tests/host/pm_control*.c",
         "tests/host/pm_control*.h",
     )
     discovered = {
         str(path.relative_to(REPOSITORY_ROOT))
         for pattern in patterns
-        for path in kernel_layout_source.glob_paths(REPOSITORY_ROOT, pattern)
+        for path in (REPOSITORY_ROOT).glob(pattern)
     }
     discovered.add("include/micros/pm.h")
     return tuple(sorted(discovered))
@@ -497,7 +352,7 @@ def resolve_local_include(
         REPOSITORY_ROOT / "include" / include,
     )
     for candidate in candidates:
-        if kernel_layout_source.is_file_path(candidate):
+        if (candidate).is_file():
             return candidate.resolve()
     return None
 
@@ -506,7 +361,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
     pending = [
         (REPOSITORY_ROOT / relative).resolve()
         for relative in accepted_family_paths()
-        if kernel_layout_source.is_file_path(REPOSITORY_ROOT / relative)
+        if (REPOSITORY_ROOT / relative).is_file()
     ]
     observed = set()
     include_pattern = re.compile(
@@ -519,7 +374,7 @@ def compiled_source_header_closure() -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            kernel_layout_source.read_path(path, encoding="utf-8")
+            current_text(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -546,7 +401,7 @@ def local_include_closure(relative: str) -> tuple[str, ...]:
             continue
         observed.add(path)
         for include in include_pattern.findall(
-            kernel_layout_source.read_path(path, encoding="utf-8")
+            current_text(path, encoding="utf-8")
         ):
             resolved = resolve_local_include(path, include)
             if (
@@ -581,13 +436,13 @@ def macro_definition_text(text: str) -> str:
 
 def owner_dependency_text(relative: str) -> str:
     declaration_only = {
-        "kernel/pm_control_core.h",
-        "kernel/pm_control_syscall_internal.h",
+        'kernel/pm/pm_control_core.h',
+        'kernel/pm/pm_control_syscall_internal.h',
     }
     selected = []
 
     for dependency in local_include_closure(relative):
-        text = kernel_layout_source.read_path(REPOSITORY_ROOT / dependency,
+        text = current_text(REPOSITORY_ROOT / dependency,
             encoding="utf-8"
         )
         if dependency in declaration_only and dependency != relative:
@@ -652,7 +507,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in (*all_source_set_paths(), *PRIVATE_HEADERS)
-            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
+            if not (REPOSITORY_ROOT / path).is_file()
         ]
         self.assertEqual([], missing)
 
@@ -662,17 +517,9 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             discovered_family_paths(),
         )
 
-    def test_stable_headers_are_byte_exact(self) -> None:
-        observed = {
-            path: hashlib.sha256(
-                kernel_layout_source.read_bytes_path(REPOSITORY_ROOT / path)
-            ).hexdigest()
-            for path in STABLE_HEADER_HASHES
-        }
-        self.assertEqual(STABLE_HEADER_HASHES, observed)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
 
         for name, expected in SOURCE_SETS.items():
             with self.subTest(source_set=name):
@@ -680,16 +527,14 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
                 listed = tuple(
                     re.findall(
                         r"(?:kernel|tests/host)/"
-                        r"[A-Za-z0-9_]+\.c",
+                        r"[A-Za-z0-9_/]+\.c",
                         source_set,
                     )
                 )
                 self.assertEqual(expected, listed)
-        for source in all_source_set_paths():
-            self.assertEqual(1, cmake.count(source), source)
 
     def test_consumers_expand_exact_source_sets_once(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
         consumers = {
             "pm-test": (
                 cmake_command(cmake, "add_executable", "pm_test"),
@@ -728,9 +573,9 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
 
         for relative in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
-            text = kernel_layout_source.read_path(path, encoding="utf-8")
+            text = current_text(path, encoding="utf-8")
             selected = c_function_definitions(text)
             objects = private_header_object_definitions(text)
             static = re.findall(
@@ -757,9 +602,9 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
 
         for relative in (*all_source_set_paths(), *PRIVATE_HEADERS):
             path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
-            text = kernel_layout_source.read_path(path, encoding="utf-8")
+            text = current_text(path, encoding="utf-8")
             if c_include.search(text):
                 c_violations.append(relative)
             if relative in production_sources():
@@ -781,7 +626,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         adapter_symbols = set(SYSCALL_ADAPTER_ENTRY_OWNERS)
 
         for relative, expected in EXPECTED_PM_INCLUDES.items():
-            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative,
+            text = current_text(REPOSITORY_ROOT / relative,
                 encoding="utf-8"
             )
             with self.subTest(source=relative, dependency="include"):
@@ -821,7 +666,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             }
             allowed_adapters = (
                 adapter_symbols
-                if relative == "kernel/pm_control_syscall.c"
+                if relative == 'kernel/pm/pm_control_syscall.c'
                 else {
                     symbol
                     for symbol, owner
@@ -844,34 +689,13 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
                     observed_adapters,
                 )
 
-    def test_symbol_owners_follow_exact_migration_map(self) -> None:
-        initial = set(INITIAL_SYMBOL_OWNER_MIGRATION)
-        migration = set(SYMBOL_OWNER_MIGRATION)
-        expected_current = {}
+    def test_supported_entries_have_one_responsible_owner(self):
         definitions = {}
-
-        self.assertEqual(32, len(INITIAL_SYMBOL_OWNER_MIGRATION))
-        self.assertEqual(len(migration), len(SYMBOL_OWNER_MIGRATION))
-        self.assertTrue(migration <= initial)
-        for current, final, symbol in migration:
-            self.assertEqual(FINAL_SYMBOL_OWNERS[symbol], final)
-            expected_current[symbol] = current
-
-        for relative in all_source_set_paths():
-            path = REPOSITORY_ROOT / relative
-            if not kernel_layout_source.is_file_path(path):
-                continue
-            for symbol in c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
-            ):
-                definitions.setdefault(symbol, []).append(relative)
-
-        for symbol, final in FINAL_SYMBOL_OWNERS.items():
-            with self.subTest(symbol=symbol):
-                self.assertEqual(
-                    [expected_current.get(symbol, final)],
-                    definitions.get(symbol, []),
-                )
+        for path in all_source_set_paths():
+            for name in c_function_definitions(current_text(REPOSITORY_ROOT / path)):
+                definitions.setdefault(name, []).append(path)
+        for name, owner in FINAL_SYMBOL_OWNERS.items():
+            self.assertEqual([owner], definitions.get(name), name)
 
     def test_mutable_state_owners_are_exact(self) -> None:
         sources = all_source_set_paths()
@@ -895,7 +719,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             lexical = c_lexical_text(
-                kernel_layout_source.read_path(path, encoding="utf-8")
+                current_text(path, encoding="utf-8")
             )
             for _ in static_state.finditer(lexical):
                 state_definitions.append(relative)
@@ -904,7 +728,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             for _ in state_alias.finditer(lexical):
                 aliases.append(relative)
         self.assertEqual(
-            ["kernel/pm_control_runtime.c"],
+            ['kernel/pm/pm_control_runtime.c'],
             state_definitions,
         )
         self.assertEqual([], nonstatic_globals)
@@ -926,7 +750,7 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         for relative in compiled_source_header_closure():
             path = REPOSITORY_ROOT / relative
             for context_type in context_pattern.findall(
-                kernel_layout_source.read_path(path, encoding="utf-8")
+                current_text(path, encoding="utf-8")
             ):
                 context_definitions.append((relative, context_type))
         self.assertEqual(
@@ -947,11 +771,11 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
         )
 
     def test_evidence_identities_and_case_order_remain_stable(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
-        state_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_control_test.c", encoding="utf-8")
-        execution_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_control_execution_test.c", encoding="utf-8")
-        pm_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "tests/host/pm_test.c", encoding="utf-8")
-        qemu_entry = kernel_layout_source.read_path(REPOSITORY_ROOT / "kernel/pm_service_test_report.c", encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
+        state_entry = current_text(REPOSITORY_ROOT / "tests/host/pm_control_test.c", encoding="utf-8")
+        execution_entry = current_text(REPOSITORY_ROOT / "tests/host/pm_control_execution_test.c", encoding="utf-8")
+        pm_entry = current_text(REPOSITORY_ROOT / "tests/host/pm_test.c", encoding="utf-8")
+        qemu_entry = current_text(REPOSITORY_ROOT / 'kernel/tests/pm/pm_service_test_report.c', encoding="utf-8")
         marker = (
             "MICROS_PM_SERVICE_TEST_PASS "
             "handoff=complete readiness=acknowledged protocol=stable "
@@ -1018,54 +842,20 @@ class KernelPmControlSourceLayoutTest(unittest.TestCase):
             main_body.index("micros_pm_control_execution_test_run"),
         )
 
-    def test_validation_plan_inherits_path_classification(self) -> None:
-        baselines = {
-            baseline
-            for baseline, _ in PM_PATH_CLASSIFICATION_EQUIVALENTS
-        }
-        observed = tuple(
-            item
-            for item in kernel_layout_source.original_path_classification_equivalents(validation_plan.PATH_CLASSIFICATION_EQUIVALENTS)
-            if item[0] in baselines
-        )
-        self.assertEqual(PM_PATH_CLASSIFICATION_EQUIVALENTS, observed)
-        for baseline, equivalents in PM_PATH_CLASSIFICATION_EQUIVALENTS:
-            for equivalent in equivalents:
+    def test_current_paths_keep_broad_validation_classification(self):
+        for sources in SOURCE_SETS.values():
+            for path in sources[1:]:
                 for tier in ("fast", "pr"):
-                    self.assertEqual(
-                        validation_plan.plan(
-                            [baseline],
-                            tier,
-                            "main",
-                        ),
-                        validation_plan.plan(
-                            [equivalent],
-                            tier,
-                            "main",
-                        ),
-                        equivalent,
-                    )
-        self.assertIn(
-            STRUCTURAL_TEST_PATH,
-            kernel_layout_source.original_host_unit_only_inputs(validation_plan.HOST_UNIT_ONLY_INPUTS),
-        )
-
-    def test_long_function_migration_matches_review_signal(self) -> None:
-        initial = set(INITIAL_LONG_FUNCTION_MIGRATION)
-        migration = set(LONG_FUNCTION_MIGRATION)
-        oversized = {}
-
-        self.assertEqual(15, len(INITIAL_LONG_FUNCTION_MIGRATION))
-        self.assertEqual(len(migration), len(LONG_FUNCTION_MIGRATION))
-        self.assertTrue(migration <= initial)
-        for relative in compiled_source_header_closure():
-            path = REPOSITORY_ROOT / relative
-            for name, line_count in c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
-            ).items():
-                if line_count > FUNCTION_REVIEW_LINE_LIMIT:
-                    oversized[(relative, name)] = line_count
-        self.assertEqual(migration, set(oversized), oversized)
+                    with self.subTest(path=path, tier=tier):
+                        baseline = (
+                            "unclassified-input"
+                            if path == "kernel/pm/pm_control_runtime_core.c" else sources[0]
+                        )
+                        self.assertEqual(
+                            validation_plan.plan([baseline], tier, "main"),
+                            validation_plan.plan([path], tier, "main"),
+                        )
+        self.assertIn(STRUCTURAL_TEST_PATH, validation_plan.HOST_UNIT_ONLY_INPUTS)
 
 
 if __name__ == "__main__":

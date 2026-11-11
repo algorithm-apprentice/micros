@@ -50,13 +50,14 @@ correction's actual source and execution evidence.
 Unit tests remain the primary portable feedback; QEMU components and focused
 cross-service integration remain necessary at their actual boundaries.
 
-After completed OBJ02 #246, the separate
-[current-contract validation design](architecture/current-contract-validation.md)
-under [Accepted ADR-0123](adr/0123-current-contract-validation.md) addresses
-the remaining historical source/admission and repeated-execution costs.
-It preserves current behavior, observation, artifact, hardware, integration
-and stack obligations. This documentation-only design does not remove a
-test or change a command; its phase barriers govern the later implementation.
+After completed OBJ02 #246 and separately merged design #247,
+[current-contract validation](architecture/current-contract-validation.md)
+under [Accepted ADR-0123](adr/0123-current-contract-validation.md) replaces
+historical source admission with current behavior, ownership, observation,
+artifact, hardware, integration and stack checks. Current native generators
+compile actual current source; ordinary validation needs no retirement
+catalog or author journal. The implementation map records retained owners
+and the disposition of removed Python cases.
 
 ## Structural and algorithmic baseline evidence
 
@@ -76,12 +77,26 @@ uses a fixed-capacity array. A wall-clock threshold cannot prove asymptotic
 parity. A complete behavior or QEMU gate cannot waive a known structural or
 algorithmic divergence.
 
-Historical source/body/AST identities prove behavior-preserving transport,
-not MINIX baseline correctness. A correction that changes one of those
-identities follows [ADR-0082](adr/0082-evidence-authority-transition.md):
-register an independent MINIX-derived replacement oracle, demonstrate its
-Red failure, make it Green with the correction, and retire only the exact
-invalidated transport identity while preserving unrelated invariants.
+Historical source/body/AST identities record completed transport, not current
+correctness. ADR-0123 retires their ordinary admission role. Actual Red,
+independent expected results, current ownership, primitive placement and
+finite source/machine proofs remain required. Test metadata changes belong
+with their owning outcome rather than a separate naming prerequisite.
+
+Use one sufficient current planner run for final acceptance. Its actual
+native/target results also satisfy the affected audit units; do not execute
+them again to populate a retirement transaction. Ordinary fresh execution
+does not collect reusable profiles or publish receipts. Explicit producer,
+reuse and recording modes retain their closed failure rules.
+
+### Historical foundation and correction records
+
+The chronological records below explain earlier outcomes. Their source
+catalogs, author drivers, baseline modes and recertification ceremonies are
+historical, not commands or prerequisites for the current tree. Runtime,
+hardware, integration and finite observation/stack contracts remain in force
+as refined by ADR-0123. Current commands are in the
+[build guide](development/building.md) and the test-layer sections below.
 
 The Accepted EV02 design
 [operation-count contract](architecture/operation-count-evidence.md) and
@@ -250,7 +265,7 @@ and later complete transfer. Ordinary consumer errors, all legacy target
 assertions, host timeouts and full author gates remain unchanged.
 
 The restarted author harness is
-[`tools/check_diagnostic_history.py`](../tools/check_diagnostic_history.py).
+[`tools/check_diagnostic_history.py` at #246](https://github.com/algorithm-apprentice/micros/blob/f31c3654c5ede2837dad8e89ba90e8c4c0e37e12/tools/check_diagnostic_history.py).
 Its three documented intents compile and execute the fixed original
 decoder/target images for Red, the current native/target subjects for
 Green, and the complete named affected-unit commands for recertification.
@@ -1724,12 +1739,13 @@ Performance budgets are:
 
 Budgets are review signals, not reasons to hide necessary coverage.
 
-The initial bounded-feedback fast run contains 37 nonslow native CTests and
-90 Python unit cases. Its measured incremental execution was 10.84 seconds
-for CTest plus 5.182 seconds for Python, excluding configure/build work.
+The current fast run contains 37 nonslow native CTests and 89 Python cases.
+The current-contract implementation measured 18.08 seconds for CTest,
+3.999 seconds for Python and 22.63 seconds for the complete workflow.
 That remains above the six-second review signal; it is not reported as a
-six-second pass. Complete native discovery, models and target/integration
-coverage remain required at their existing gates.
+six-second pass. These timings are diagnostic, not portable correctness
+thresholds. Complete native discovery, models and target/integration
+coverage remain required.
 
 The native validation tiers are `test-unit-fast`, `test-ipc-model`,
 `test-tty-model`, `test-ramfs-model`, `test-vfs-model`,

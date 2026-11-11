@@ -1,20 +1,12 @@
 """Actual MEM05 work, semantic and target evidence."""
 
-from dataclasses import asdict
 import hashlib
-import io
 import json
 from pathlib import Path
 import re
 import subprocess
-import sys
-import tempfile
-import unittest
 
-from tests.host.runtime_memory_evidence import native_compiler
-from tests.host.evidence_authority_types import digest
 from tests.host.selected_address_space_evidence import native_symbols_tool
-from tests.host.selected_release_handoff_source import SOURCE_ROLES
 from tests.host.work_count_evidence import Capture, Kind, Owner, Snapshot, Stage, Status, compose_snapshots
 from tools.stack_artifact_files import read_regular
 
@@ -29,9 +21,15 @@ OPERATIONS = frozenset((
     "destroy", "prepare-handoff", "complete-handoff", "release-scope",
 ))
 NATIVE_FIXTURE_PATHS = (
-    *SOURCE_ROLES["immutable_additions"], "tests/work/work_counts.c", "tests/work/work_counts.h",
-    "tests/host/selected_address_space_source.py", "tests/host/selected_ownership_source.py",
+    "tests/host/selected_release_handoff_test.c", "tests/host/selected_release_handoff_test.h",
+    "tests/host/selected_release_handoff_source.py", "tests/host/selected_release_handoff_evidence.py",
+    "tests/host/native_observations.py", "tests/host/native_observations.json",
+    "tests/host/source_snapshot.py", "tests/work/work_counts.c", "tests/work/work_counts.h",
+    "tools/generate_selected_release_handoff_fixture.py", "tools/check_selected_release_handoff.py",
+    "tests/host/selected_address_space_source.py",
     "tests/host/c_source_records.py", "tests/host/work_count_lexical.py",
+    "tests/host/work_count_projection.py", "tests/host/work_count_types.py",
+    "tests/host/work_count_snapshots.py",
 )
 
 SELECTION_SHAPE_CASES = (
@@ -538,192 +536,6 @@ def parse_native_output(output, stage, channel):
     return {"rows": tuple(rows), "observations": tuple(observations), "guards": tuple(guarded)}
 
 
-def native_command(root, compiler, generated, executable, stage, channel):
-    from tools.generate_selected_release_handoff_fixture import native_source_members
-
-    channels = ("aggregate", *WORK_CHANNELS, "ordinary")
-    if type(stage) is not Stage or channel not in channels:
-        raise ValueError("MEM05 native command has an unknown stage/channel")
-    return (
-        compiler["path"], "-std=c17", "-Wall", "-Wextra", "-Werror", "-Wpedantic",
-        "-Wmissing-prototypes", "-Wstrict-prototypes", "-fno-builtin",
-        "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g",
-        "-DMICROS_BUILD_USER_ADDRESS_SPACE_TEST=1",
-        *(("-DMICROS_SELECTED_RELEASE_HANDOFF_BASELINE=1",) if stage is Stage.RED else ()),
-        *(("-DMICROS_TEST_WORK_COUNTS=1", "-DMICROS_MEM05_NATIVE_CHANNEL=" + str(channels.index(channel)))
-          if channel != "ordinary" else ()),
-        "-I", str(generated), "-I", str(generated / "include"),
-        "-I", str(root), "-I", str(root / "include"),
-        *(str(generated / path) for path in native_source_members(str(root))),
-        str(root / "tests/host/selected_release_handoff_test.c"),
-        *((str(root / "tests/work/work_counts.c"),) if channel != "ordinary" else ()),
-        "-o", str(executable),
-    )
-
-
-def _validate_fixture_syntax(root, sources, observation_modes):
-    from tests.host import selected_release_handoff_source as source
-    from tools.generate_selected_release_handoff_fixture import fixed_inputs
-
-    root = Path(root).resolve()
-    fixtures = (
-        *sources, "tests/host/selected_release_handoff_test.h",
-        "tests/host/bootstrap_allocation_test.h", "tests/host/frame_ownership_test_internal.h",
-        "tests/host/selected_address_space_test.h", "tests/host/vm_bootstrap_test_internal.h",
-        source.SOURCE_PATH, "tests/host/selected_release_handoff_evidence.py",
-        "tools/generate_selected_release_handoff_fixture.py",
-    )
-    before = {path: read_regular(root / path)[1] for path in fixtures}
-    compiler = native_compiler(root)
-    interfaces = {path: source.declared_header(root, path).encode() for path in source.HEADER_PATHS}
-    commands = []
-    with tempfile.TemporaryDirectory(prefix="micros-mem05-interface-") as temporary:
-        directory = Path(temporary).resolve()
-        for path, (raw, _) in fixed_inputs(str(root)).items():
-            if not path.endswith(".h"):
-                continue
-            target = directory / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(interfaces.get(path, raw))
-        for observed in observation_modes:
-            launcher = sources == ("tests/host/selected_release_handoff_test.c",) and not observed
-            command = (
-                compiler["path"], "-std=c17", "-Wall", "-Wextra", "-Werror", "-Wpedantic",
-                "-Wmissing-prototypes", "-Wstrict-prototypes", "-fsyntax-only",
-                "-DMICROS_BUILD_USER_ADDRESS_SPACE_TEST=1",
-                *(("-DMICROS_TEST_WORK_COUNTS=1", "-DMICROS_MEM05_NATIVE_CHANNEL=0") if observed else ()),
-                *((
-                    "-DMICROS_SELECTED_RELEASE_HANDOFF_LAUNCHER=1",
-                    '-DMICROS_SELECTED_RELEASE_HANDOFF_PYTHON="' + sys.executable + '"',
-                    '-DMICROS_SELECTED_RELEASE_HANDOFF_DRIVER="' + str(root / "tools/check_selected_release_handoff.py") + '"',
-                    '-DMICROS_SELECTED_RELEASE_HANDOFF_ROOT="' + str(root) + '"',
-                ) if launcher else ()),
-                "-I", str(directory), "-I", str(directory / "include"),
-                "-I", str(root), "-I", str(root / "include"),
-                *(str(root / path) for path in sources),
-            )
-            result = subprocess.run(
-                command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
-            )
-            if result.returncode or result.stdout or result.stderr:
-                raise ValueError("MEM05 declared-interface syntax failed:\n" + result.stdout + result.stderr)
-            commands.append(command)
-    if {path: read_regular(root / path)[1] for path in fixtures} != before or native_compiler(root) != compiler:
-        raise ValueError("MEM05 declared-interface inputs changed during syntax validation")
-    return {
-        "commands": tuple(commands), "compiler": compiler, "fixtures": before,
-        "interfaces": {path: hashlib.sha256(raw).hexdigest() for path, raw in interfaces.items()},
-    }
-
-
-def validate_current_fixture_syntax(root):
-    return _validate_fixture_syntax(
-        root, ("tests/host/selected_release_handoff_test.c",), (False, True),
-    )
-
-
-def validate_legacy_fixture_syntax(root):
-    return _validate_fixture_syntax(root, (
-        "tests/host/bootstrap_allocation_test.c",
-        "tests/host/frame_ownership_test_fixture.c",
-        "tests/host/frame_ownership_test_bootstrap.c",
-        "tests/host/frame_ownership_test_handoff.c",
-        "tests/host/frame_ownership_test_model.c",
-        "tests/host/frame_ownership_test_validation.c",
-        "tests/host/vm_bootstrap_test_fixture.c",
-        "tests/host/selected_address_space_test.c",
-    ), (False,))
-
-
-def measure_native_channel(root, stage, channel):
-    from tools.generate_selected_release_handoff_fixture import prepare_sources, source_bundle
-
-    root = Path(root).resolve()
-    fixtures = NATIVE_FIXTURE_PATHS
-    fixture_inputs = {path: read_regular(root / path)[1] for path in fixtures}
-    compiler, nm = native_compiler(root), native_symbols_tool()
-    with tempfile.TemporaryDirectory(prefix="micros-mem05-native-") as temporary:
-        directory = Path(temporary).resolve()
-        generated, executable = directory / "source", directory / "native"
-        inputs, outputs = prepare_sources(root, generated, stage, channel)
-        command = native_command(root, compiler, generated, executable, stage, channel)
-        build = subprocess.run(
-            command, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180,
-        )
-        if build.returncode or build.stderr:
-            raise ValueError("MEM05 native compilation failed:\n" + build.stdout + build.stderr)
-        executable_identity = read_regular(executable)[1]
-        nm_command = (nm["path"], "-a", str(executable))
-        symbols = subprocess.check_output(nm_command, cwd=root, text=True, timeout=30)
-        observation_symbols = tuple(sorted({
-            line.split()[-1].lstrip("_") for line in symbols.splitlines()
-            if line.split() and "micros_test_work_" in line.split()[-1]
-        }))
-        expected_symbols = () if channel == "ordinary" else (
-            "micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record",
-        )
-        if observation_symbols != expected_symbols:
-            raise ValueError("MEM05 executable has incorrect collector linkage")
-        arguments = (str(executable), stage.value, channel)
-        completed = subprocess.run(
-            arguments, cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
-        )
-        if completed.returncode or completed.stderr:
-            raise ValueError("MEM05 native semantic capture failed:\n" + completed.stdout + completed.stderr)
-        parsed = parse_native_output(completed.stdout, stage, channel)
-        if (
-            {path: read_regular(root / path)[1] for path in fixtures} != fixture_inputs
-            or native_compiler(root) != compiler or native_symbols_tool() != nm
-            or read_regular(executable)[1] != executable_identity
-            or source_bundle(root, stage, channel)[0] != inputs
-            or {path: read_regular(generated / path)[1] for path in outputs} != outputs
-        ):
-            raise ValueError("MEM05 native source, fixture, tool or artifact changed during execution")
-        return {
-            "version": 1, "stage": stage.value, "channel": channel,
-            "source_inputs": inputs, "generated_inputs": outputs, "fixture_inputs": fixture_inputs,
-            "compiler": compiler, "nm": nm, "command": command, "arguments": arguments,
-            "executable": executable_identity, "build_stdout": build.stdout, "build_stderr": build.stderr,
-            "build_exit": build.returncode, "execution_exit": completed.returncode,
-            "nm_command": nm_command, "nm_output": symbols, "nm_exit": 0,
-            "stdout": completed.stdout, "stderr": completed.stderr,
-            "output_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
-            "observation_symbols": observation_symbols, **parsed,
-        }
-
-
-def replacement_failures(measured):
-    channels = ("aggregate", *WORK_CHANNELS, "ordinary")
-    if type(measured) is not dict or set(measured) != set(channels):
-        raise ValueError("MEM05 replacement evidence lacks an actual native product")
-    ordinary = measured["ordinary"]
-    if type(ordinary["stage"]) is not str or ordinary["stage"] not in ("red", "green"):
-        raise ValueError("MEM05 replacement evidence has an unknown source stage")
-    validated = {}
-    for channel, result in measured.items():
-        if result["channel"] != channel or any(
-            result[key] != ordinary[key]
-            for key in ("stage", "source_inputs", "fixture_inputs", "compiler", "nm", "rows", "guards")
-        ):
-            raise ValueError("MEM05 slices differ in source, tools, fixtures or actual semantics")
-        if (
-            any(type(result[name]) is not int or result[name] != 0 for name in ("build_exit", "execution_exit"))
-            or result["build_stderr"] != "" or result["stderr"] != ""
-            or hashlib.sha256(result["stdout"].encode()).hexdigest() != result["output_sha256"]
-        ):
-            raise ValueError("MEM05 slice lacks its actual successful compilation/execution")
-        parsed = parse_native_output(result["stdout"], Stage(ordinary["stage"]), channel)
-        if any(digest(parsed[key]) != digest(result[key]) for key in ("rows", "observations", "guards")):
-            raise ValueError("MEM05 derived capture does not match its actual channel output")
-        validated[channel] = parsed
-        count = 0 if channel == "ordinary" else 128
-        if len(result["observations"]) != count:
-            raise ValueError("MEM05 native slice omitted a capture")
-    if len(ordinary["rows"]) != 128:
-        raise ValueError("MEM05 replacement evidence omitted a semantic case")
-    return _parsed_failures(validated, Stage(ordinary["stage"]))
-
-
 def _parsed_failures(validated, stage):
     channels = ("aggregate", *WORK_CHANNELS, "ordinary")
     if type(stage) is not Stage or set(validated) != set(channels):
@@ -763,319 +575,9 @@ def _parsed_failures(validated, stage):
     return {key: tuple(value) for key, value in failures.items()}
 
 
-def measure_native(root, stage):
-    channels = ("aggregate", *WORK_CHANNELS, "ordinary")
-    measured = {channel: measure_native_channel(root, stage, channel) for channel in channels}
-    replacement_failures(measured)
-    return measured
-
-
-def _target_paths(workflow):
-    from tests.host.selected_release_handoff_source import STATE_WORK_CONTRACT
-
-    if workflow not in STATE_WORK_CONTRACT["target_workflows"]:
-        raise ValueError("MEM05 target path belongs to an undeclared workflow")
-    return "build/riscv64-" + workflow.removeprefix("test-qemu-") + "-test/kernel/micros.elf"
-
-
-def _target_inputs(root):
-    from tests.host.selected_release_handoff_source import SOURCE_ROLES
-
-    return {
-        path: read_regular(Path(root) / path)[1]
-        for path in (*SOURCE_ROLES["production_paths"], *SOURCE_ROLES["dependent_target_paths"])
-    }
-
-
-def measure_targets(root, stage):
-    from tests.host.selected_release_handoff_source import STATE_WORK_CONTRACT
-
-    if stage not in (Stage.RED, Stage.GREEN):
-        raise ValueError("MEM05 target execution has an unknown stage")
-    root = Path(root).resolve()
-    result = {}
-    for workflow in STATE_WORK_CONTRACT["target_workflows"]:
-        inputs = _target_inputs(root)
-        command = ("cmake", "--workflow", "--preset", workflow)
-        print("MICROS_MEM05_TARGET_BEGIN " + workflow, flush=True)
-        completed = subprocess.run(
-            command, cwd=root, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=600,
-        )
-        try:
-            rows = parse_target_output(completed.stdout, workflow, stage, completed.returncode)
-            if stage is Stage.RED and target_failures(rows, baseline=True):
-                raise ValueError("MEM05 baseline target lost an independent preservation control")
-            kernel = _target_paths(workflow)
-            result[workflow] = {
-                "version": 1, "stage": stage.value, "command": command, "exit_code": completed.returncode,
-                "output": completed.stdout, "source_inputs": inputs, "kernel_path": kernel,
-                "kernel": read_regular(root / kernel)[1],
-                "rows": rows, "failures": target_failures(rows),
-            }
-            if _target_inputs(root) != inputs:
-                raise ValueError("MEM05 target inputs changed during actual execution")
-        except (OSError, ValueError):
-            sys.stderr.write(completed.stdout)
-            raise
-        print("MICROS_MEM05_TARGET_CAPTURED " + workflow, flush=True)
-    return result
-
-
-def validate_targets(targets, stage):
-    from tests.host.diagnostic_history_authority import record_fields
-    from tests.host.selected_release_handoff_source import STATE_WORK_CONTRACT
-
-    if type(stage) is not Stage or type(targets) is not dict or set(targets) != set(STATE_WORK_CONTRACT["target_workflows"]):
-        raise ValueError("MEM05 target execution omitted or added a workflow")
-    for workflow, value in targets.items():
-        record_fields(value, (
-            "version", "stage", "command", "exit_code", "output", "source_inputs",
-            "kernel_path", "kernel", "rows", "failures",
-        ))
-        if (
-            type(value["version"]) is not int or value["version"] != 1
-            or value["stage"] != stage.value
-            or tuple(value["command"]) != ("cmake", "--workflow", "--preset", workflow)
-            or value["kernel_path"] != _target_paths(workflow)
-        ):
-            raise ValueError("MEM05 target evidence substituted its source stage or command")
-        rows = parse_target_output(value["output"], workflow, stage, value["exit_code"])
-        if digest(value["rows"]) != digest(rows) or digest(value["failures"]) != digest(target_failures(rows)):
-            raise ValueError("MEM05 target derived results differ from the actual output")
-        if stage is Stage.RED and target_failures(rows, baseline=True):
-            raise ValueError("MEM05 target failure is not its declared original divergence")
-    return targets
-
-
-def _require_discriminating_red(measured, failures):
-    cases = expected_cases()
-
-    def witnessed(group, operation, metric, predicate):
-        return any(
-            row[1] == metric and cases[row[0] - 1]["operation"] == operation and predicate(cases[row[0] - 1])
-            for row in failures[group]
-        )
-
-    controls = (
-        witnessed("owner-index", "release-set", "bitmap-word-loads", lambda case: case["selected"] == 0),
-        witnessed("owner-index", "count-process", "owner-record-visits",
-                  lambda case: case["frames"] == 262144 and case["indexed"] <= 16),
-        witnessed("selected-release", "destroy", "owner-record-visits",
-                  lambda case: case["frames"] == 262144 and case["pattern"] == "one"),
-        witnessed("selected-release", "release-scope", "selected-semantics",
-                  lambda case: case["pattern"] == "absent-orphan"),
-        witnessed("wired-handoff", "prepare-handoff", "owner-record-visits", lambda case: case["roots"] >= 16),
-        witnessed("wired-handoff", "prepare-handoff", "process-thread-record-visits", lambda case: case["roots"] == 64),
-    )
-    if measured["ordinary"]["stage"] != "red" or not all(controls):
-        raise ValueError("MEM05 actual fixed work did not expose every declared release/count/destruction/handoff divergence")
-
-
-class SelectedReleaseHandoffOracles(unittest.TestCase):
-    def test_owner_index(self):
-        self.assertFalse(self.work["owner-index"], repr(self.work["owner-index"][:12]))
-
-    def test_selected_release(self):
-        self.assertFalse(self.work["selected-release"], repr(self.work["selected-release"][:12]))
-        self.assertFalse(self.targets["test-qemu-user-address-space"]["failures"])
-        self.assertFalse(self.audits["migrated"])
-
-    def test_wired_handoff(self):
-        self.assertFalse(self.work["wired-handoff"], repr(self.work["wired-handoff"][:12]))
-        self.assertFalse(self.targets["test-qemu-address-space-handoff"]["failures"])
-        self.assertFalse(self.audits["migrated"])
-
-
-def run_oracles(root, measured, targets, audits, reference=None):
-    from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
-    from tests.host.selected_release_handoff_authority import ORACLE_RULES
-    from tests.host.selected_release_handoff_source import measure_audit_boundaries
-
-    failures = replacement_failures(measured)
-    stage = Stage(measured["ordinary"]["stage"])
-    validate_targets(targets, stage)
-    if stage is Stage.GREEN:
-        if reference is None:
-            raise ValueError("MEM05 current execution lacks its same-attempt actual baseline")
-        _require_discriminating_red(reference, replacement_failures(reference))
-    else:
-        if reference is not None:
-            raise ValueError("MEM05 baseline execution cannot borrow another reference")
-        _require_discriminating_red(measured, failures)
-        if tuple(map(tuple, targets["test-qemu-user-address-space"]["failures"])) != (
-            ("MEM05_RELEASE", 3, "release", 11, 10),
-        ):
-            raise ValueError("MEM05 baseline target did not witness only the owned selected-release mismatch")
-    if digest(audits) != digest(measure_audit_boundaries(root, stage)):
-        raise ValueError("MEM05 execution substituted its complete retained/migrated/plan caller census")
-    outcomes, output = [], io.StringIO()
-    for identifier, test, property_name, _, _, _ in ORACLE_RULES:
-        case = SelectedReleaseHandoffOracles(test.rsplit(".", 1)[1])
-        case.work, case.targets, case.audits = failures, targets, audits
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(unittest.TestSuite((case,)))
-        if result.testsRun != 1 or result.errors or result.skipped:
-            raise ValueError("MEM05 oracle was skipped or failed outside its measured assertion")
-        if stage is Stage.RED:
-            if result.wasSuccessful():
-                raise ValueError("MEM05 fixed execution did not expose every owned divergence")
-            observed = ObservedResult.EXPECTED_FAILURE
-        else:
-            observed = ObservedResult.PASS if result.wasSuccessful() else ObservedResult.FAIL
-        outcomes.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    return tuple(outcomes), output.getvalue()
-
-
-def execution_log(measured, targets, audits, results, oracle_output, *, phase, attempt):
-    return json.loads(json.dumps({
-        "version": 1, "phase": phase, "attempt": attempt, "native": measured,
-        "targets": targets, "audits": audits, "results": [asdict(result) for result in results],
-        "oracle_output": oracle_output,
-    }, allow_nan=False))
-
-
-def _validate_artifact_identity(identity):
-    from tests.host.diagnostic_history_authority import record_fields
-
-    record_fields(identity, ("kind", "mode", "size", "sha256"))
-    if (
-        identity["kind"] != "file" or type(identity["mode"]) is not int
-        or not 0 < identity["mode"] <= 0o777
-        or type(identity["size"]) is not int or identity["size"] <= 0
-        or type(identity["sha256"]) is not str or re.fullmatch(r"[a-f0-9]{64}", identity["sha256"]) is None
-    ):
-        raise ValueError("MEM05 execution lacks a complete ordinary artifact identity")
-
-
-def _validate_native_replay(context, measured, stage):
-    from tests.host.diagnostic_history_authority import record_fields, record_strings
-    from tools.generate_selected_release_handoff_fixture import source_bundle
-
-    channels = ("aggregate", *WORK_CHANNELS, "ordinary")
-    if type(measured) is not dict or set(measured) != set(channels):
-        raise ValueError("MEM05 native replay omitted a product")
-    directories = set()
-    for channel, native in measured.items():
-        record_fields(native, (
-            "version", "stage", "channel", "source_inputs", "generated_inputs", "fixture_inputs",
-            "compiler", "nm", "command", "arguments", "executable",
-            "build_stdout", "build_stderr", "build_exit", "execution_exit",
-            "nm_command", "nm_output", "nm_exit", "stdout", "stderr", "output_sha256",
-            "observation_symbols", "rows", "observations", "guards",
-        ))
-        if (
-            type(native["version"]) is not int or native["version"] != 1
-            or native["stage"] != stage.value or native["channel"] != channel
-            or native["compiler"] != context.native_compiler or native["nm"] != context.native_nm
-        ):
-            raise ValueError("MEM05 native replay borrowed another source stage or tool")
-        arguments = record_strings(native["arguments"])
-        if len(arguments) != 3 or arguments[1:] != (stage.value, channel):
-            raise ValueError("MEM05 native replay changed its execution stage/channel")
-        executable = Path(arguments[0])
-        directory = executable.parent
-        if (
-            not executable.is_absolute() or executable.name != "native"
-            or not directory.name.startswith("micros-mem05-native-") or directory in directories
-            or directory.parent.resolve() != Path(tempfile.gettempdir()).resolve()
-        ):
-            raise ValueError("MEM05 native replay names a borrowed or unowned execution")
-        directories.add(directory)
-        if (
-            record_strings(native["command"]) != native_command(
-                context.root, context.native_compiler, directory / "source", executable, stage, channel,
-            )
-            or record_strings(native["nm_command"]) != (context.native_nm["path"], "-a", str(executable))
-        ):
-            raise ValueError("MEM05 native replay changed its exact compile/link/symbol command")
-        inputs, outputs = source_bundle(context.root, stage, channel)
-        generated = {
-            path: {"kind": "file", "mode": mode, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-            for path, (data, mode) in outputs.items()
-        }
-        if (
-            native["source_inputs"] != inputs or native["generated_inputs"] != generated
-            or native["fixture_inputs"] != {path: context.files[path] for path in NATIVE_FIXTURE_PATHS}
-            or type(native["build_stdout"]) is not str
-            or type(native["nm_output"]) is not str or not native["nm_output"]
-            or type(native["nm_exit"]) is not int or native["nm_exit"] != 0
-        ):
-            raise ValueError("MEM05 native replay substituted a source/header/observation/fixture/symbol input")
-        symbols = tuple(sorted({
-            line.split()[-1].lstrip("_") for line in native["nm_output"].splitlines()
-            if line.split() and "micros_test_work_" in line.split()[-1]
-        }))
-        wanted = () if channel == "ordinary" else (
-            "micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record",
-        )
-        if symbols != wanted or record_strings(native["observation_symbols"], empty=channel == "ordinary") != wanted:
-            raise ValueError("MEM05 native replay changed its actual collector linkage")
-        _validate_artifact_identity(native["executable"])
-        if not native["executable"]["mode"] & 0o100:
-            raise ValueError("MEM05 native replay artifact is not executable")
-    return replacement_failures(measured)
-
-
-def _validate_target_replay(context, targets, stage):
-    from tests.host.diagnostic_history_authority import record_fields
-    from tests.host.selected_release_handoff_source import fixed_source
-
-    validate_targets(targets, stage)
-    paths = (*SOURCE_ROLES["production_paths"], *SOURCE_ROLES["dependent_target_paths"])
-    expected = {path: context.files[path] for path in paths}
-    if stage is Stage.RED:
-        for path in SOURCE_ROLES["production_paths"]:
-            raw = fixed_source(str(context.root), path)
-            expected[path] = {
-                "kind": "file", "mode": context.files[path]["mode"], "size": len(raw),
-                "sha256": hashlib.sha256(raw).hexdigest(),
-            }
-    for value in targets.values():
-        record_fields(value, (
-            "version", "stage", "command", "exit_code", "output", "source_inputs",
-            "kernel_path", "kernel", "rows", "failures",
-        ))
-        if value["source_inputs"] != expected:
-            raise ValueError("MEM05 target replay substituted its actual production/fixture source")
-        _validate_artifact_identity(value["kernel"])
-        if stage is Stage.GREEN and read_regular(context.root / value["kernel_path"])[1] != value["kernel"]:
-            raise ValueError("MEM05 current target artifact changed after actual execution")
-
-
-def validate_execution_log(context, replay, *, phase, attempt, reference=None):
-    from tests.host.diagnostic_history_authority import record_fields
-    from tests.host.selected_release_handoff_source import measure_audit_boundaries
-
-    if phase not in ("red", "green", "recertify") or type(attempt) is not str or re.fullmatch(r"[a-f0-9]{32}", attempt) is None:
-        raise ValueError("MEM05 replay has an unadmitted phase or attempt")
-    record_fields(replay, ("version", "phase", "attempt", "native", "targets", "audits", "results", "oracle_output"))
-    if (
-        type(replay["version"]) is not int or replay["version"] != 1
-        or replay["phase"] != phase or replay["attempt"] != attempt
-        or type(replay["oracle_output"]) is not str or not replay["oracle_output"]
-    ):
-        raise ValueError("MEM05 replay belongs to a different phase or attempt")
-    stage = Stage.RED if phase == "red" else Stage.GREEN
-    _validate_native_replay(context, replay["native"], stage)
-    _validate_target_replay(context, replay["targets"], stage)
-    if stage is Stage.GREEN:
-        if reference is None:
-            raise ValueError("MEM05 current replay lacks its same-attempt fixed execution")
-        _validate_native_replay(context, reference, Stage.RED)
-    elif reference is not None:
-        raise ValueError("MEM05 original replay cannot borrow a different reference")
-    audits = measure_audit_boundaries(context.root, stage)
-    if digest(replay["audits"]) != digest(audits):
-        raise ValueError("MEM05 replay substituted its current retained/migrated/plan ledger")
-    results, _ = run_oracles(context.root, replay["native"], replay["targets"], audits, reference)
-    if replay["results"] != json.loads(json.dumps([asdict(result) for result in results])):
-        raise ValueError("MEM05 replay outcomes do not follow the actual complete executions")
-    return results
-
-
 def check_native_products(root, executable_paths):
     from tests.host.selected_release_handoff_source import (
-        CHANNELS, RECIPE_ADMISSION, declared_audit_boundaries, measure_audit_boundaries,
+        CHANNELS, RECIPE_ADMISSION, measure_audit_boundaries,
     )
     from tools.generate_selected_release_handoff_fixture import source_bundle
 
@@ -1113,11 +615,8 @@ def check_native_products(root, executable_paths):
             raise ValueError("MEM05 CTest product failed its semantic capture:\n" + completed.stdout + completed.stderr)
         measured[channel] = parse_native_output(completed.stdout, Stage.GREEN, channel)
     failures = _parsed_failures(measured, Stage.GREEN)
-    audits = measure_audit_boundaries(root, Stage.GREEN)
-    if (
-        any(failures.values()) or audits["migrated"]
-        or audits["retained"] != declared_audit_boundaries(str(root))["retained"]
-    ):
+    measure_audit_boundaries(root, Stage.GREEN)
+    if any(failures.values()):
         raise ValueError("MEM05 CTest failed semantics/work or retained diagnostics: " + json.dumps(failures))
     if (
         {path: read_regular(root / path)[1] for path in NATIVE_FIXTURE_PATHS} != fixtures
@@ -1126,8 +625,7 @@ def check_native_products(root, executable_paths):
         raise ValueError("MEM05 CTest source, fixture, tool or product changed during execution")
     for channel in CHANNELS:
         directory = root / RECIPE_ADMISSION["generator_output"] / channel
-        current, _ = source_bundle(root, Stage.GREEN, channel)
-        if current != inputs[channel] or {
+        if {path: read_regular(root / path)[1] for path in inputs[channel]} != inputs[channel] or {
             path: read_regular(directory / path)[1] for path in generated[channel]
         } != generated[channel]:
             raise ValueError("MEM05 CTest source or generated inputs changed during execution")

@@ -1,3 +1,4 @@
+# Golden output was captured from independently reviewed OBJ02 #246, before consumer changes.
 from dataclasses import replace
 import hashlib
 import unittest
@@ -7,15 +8,6 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_tty_service_fixture
-from tests.host import kernel_layout_source
-
-GENERATOR_PATH = "tools/generate_tty_service_fixture.py"
-
-def _render_fixture(*args, **kwargs):
-    return kernel_layout_source.restore_generated_fixture(
-        GENERATOR_PATH,
-        generate_tty_service_fixture.render_fixture(*args, **kwargs),
-    )
 
 
 def vfs_image():
@@ -32,22 +24,22 @@ def vfs_image():
 
 
 class TtyServiceFixtureGeneratorTest(unittest.TestCase):
-    def test_retains_complete_original_fixture_utf8_bytes(self):
-        output = _render_fixture(
+    def test_retains_complete_current_fixture_utf8_bytes(self):
+        output = generate_tty_service_fixture.render_fixture(
             bootstrap_image(), vm_image(), bootstrap_image(),
             bootstrap_image(), vfs_image(),
         ).encode("utf-8")
 
-        self.assertEqual(271768, len(output))
+        self.assertEqual(271778, len(output))
         self.assertEqual(
-            "0c3cc187b1affd99259d2eae58a546e38949568ad236e371a31095205cd1f0b9",
+            "567b9d582b639908fef65b41efbfe10496a5e2c02edc28af02fa8b9b2d99cee1",
             hashlib.sha256(output).hexdigest(),
         )
 
     def test_retains_descriptor_validation_order_before_metadata_checks(self):
         owner = generate_tty_service_fixture.generate_bootstrap_fixture
         with patch.object(owner, "_validated_descriptor", wraps=owner._validated_descriptor) as validated:
-            _render_fixture(
+            generate_tty_service_fixture.render_fixture(
                 bootstrap_image(), vm_image(), bootstrap_image(),
                 bootstrap_image(), vfs_image(),
             )
@@ -69,28 +61,28 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
 
         with patch.object(owner, "_validated_descriptor", side_effect=with_tty_bound_overlap):
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "VM image has no boot-information object"):
-                _render_fixture(
+                generate_tty_service_fixture.render_fixture(
                     bootstrap_image(), bootstrap_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "non-VM image has VM boot-information metadata"):
-                _render_fixture(
+                generate_tty_service_fixture.render_fixture(
                     vm_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "missing TTY service report symbol"):
-                _render_fixture(
+                generate_tty_service_fixture.render_fixture(
                     bootstrap_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), bootstrap_image(),
                 )
             with self.assertRaisesRegex(check_user_elf.ElfFormatError, "TTY image overlaps its fixed UART mapping"):
-                _render_fixture(
+                generate_tty_service_fixture.render_fixture(
                     bootstrap_image(), vm_image(), bootstrap_image(),
                     bootstrap_image(), vfs_image(),
                 )
 
     def test_renders_tty_topology_mapping_and_report(self):
-        output = _render_fixture(
+        output = generate_tty_service_fixture.render_fixture(
             bootstrap_image(),
             vm_image(),
             bootstrap_image(),
@@ -106,7 +98,7 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_vfs_without_report_symbol(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_tty_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
@@ -131,7 +123,7 @@ class TtyServiceFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_tty_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),

@@ -1,8 +1,7 @@
 """Actual native MEM01 execution and independent work envelopes."""
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 import hashlib
-import io
 import json
 from pathlib import Path
 import shutil
@@ -10,9 +9,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests.host.bootstrap_allocation_authority import ORACLE_RULES
 from tests.host.bootstrap_allocation_source import RECIPE_ADMISSION, STATE_WORK_CONTRACT
-from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
 from tests.host.runtime_memory_evidence import native_compiler
 from tests.host.work_count_snapshots import compose_snapshots
 from tests.host.work_count_types import Capture, Kind, Owner, Snapshot, Stage, Status
@@ -52,7 +49,11 @@ class NativeRun:
 FIXTURE_PATHS = (
     "tests/host/bootstrap_allocation_test.c", "tests/host/bootstrap_allocation_test.h",
     "tests/host/bootstrap_allocation_source.py", "tests/host/bootstrap_allocation_evidence.py",
-    "tests/host/bootstrap_allocation_authority.py", "tools/generate_bootstrap_allocation_fixture.py",
+    "tests/host/native_observations.py", "tests/host/native_observations.json",
+    "tests/host/source_snapshot.py", "tools/generate_bootstrap_allocation_fixture.py",
+    "tests/host/c_source_records.py", "tests/host/work_count_lexical.py",
+    "tests/host/work_count_projection.py", "tests/host/work_count_types.py",
+    "tests/host/work_count_snapshots.py",
     "tests/work/work_counts.c", "tests/work/work_counts.h",
 )
 
@@ -85,7 +86,7 @@ def case_inventory():
 
 
 def decode_measurements(output, stage, *, observed):
-    if stage not in (Stage.RED, Stage.GREEN) or type(observed) is not bool:
+    if stage is not Stage.GREEN or type(observed) is not bool:
         raise ValueError("MEM01 measurements have an unknown stage/mode")
     lines = output.splitlines()
     expected = case_inventory()
@@ -247,103 +248,3 @@ class BootstrapAllocationOracles(unittest.TestCase):
                 self.assertLessEqual(counts[Kind.INDEX_PROBE], 64 * case.allocations)
                 self.assertLessEqual(counts[Kind.RANGE_VISIT], case.allocations * (192 + 2 * case.managed_ranges))
                 self.assertLessEqual(counts[Kind.RECORD_VISIT], case.allocations * (96 + case.managed_ranges))
-
-
-def run_oracles(measured):
-    if type(measured) is not NativeRun or not measured.observed:
-        raise ValueError("MEM01 work oracles require one complete actual observed execution")
-    outcomes = []
-    output = io.StringIO()
-    for identifier, test, property_name, _, _, _ in ORACLE_RULES:
-        case = BootstrapAllocationOracles(test.rsplit(".", 1)[1])
-        case.measured = measured
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(unittest.TestSuite((case,)))
-        if result.testsRun != 1 or result.errors or result.skipped:
-            raise ValueError("MEM01 oracle was skipped or failed outside its measured assertion")
-        passed = result.wasSuccessful()
-        if measured.stage is Stage.RED:
-            if passed:
-                raise ValueError("MEM01 baseline did not demonstrate every required work divergence")
-            observed = ObservedResult.EXPECTED_FAILURE
-        else:
-            observed = ObservedResult.PASS if passed else ObservedResult.FAIL
-        outcomes.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    return tuple(outcomes), output.getvalue()
-
-
-def native_log(measured, results, oracle_output, *, phase, attempt):
-    value = asdict(measured)
-    del value["records"]
-    value["stage"] = measured.stage.value
-    return json.loads(json.dumps({
-        "version": 1, "phase": phase, "attempt": attempt, "native": value,
-        "results": [asdict(result) for result in results], "oracle_output": oracle_output,
-    }, allow_nan=False))
-
-
-def validate_execution_log(context, replay, *, phase, attempt):
-    from tests.host.diagnostic_history_authority import record_fields, record_strings
-
-    record_fields(replay, ("version", "phase", "attempt", "native", "results", "oracle_output"))
-    if type(replay["version"]) is not int or replay["version"] != 1 or replay["phase"] != phase or replay["attempt"] != attempt:
-        raise ValueError("MEM01 replay belongs to a different phase or attempt")
-    native = replay["native"]
-    record_fields(native, (
-        "stage", "observed", "compiler", "command", "execution_command", "source_inputs",
-        "fixture_inputs", "generated_sources", "executable", "output", "build_output", "observation_symbols",
-    ))
-    stage = Stage.RED if phase == "red" else Stage.GREEN
-    if (
-        native["stage"] != stage.value or native["observed"] is not True
-        or native["compiler"] != context.native_compiler
-        or type(native["output"]) is not str or type(native["build_output"]) is not str
-        or type(replay["oracle_output"]) is not str
-    ):
-        raise ValueError("MEM01 replay has a borrowed source stage, compiler or incomplete output")
-    execution = record_strings(native["execution_command"])
-    if len(execution) != 1:
-        raise ValueError("MEM01 replay lacks its exact executed native image")
-    executable = Path(execution[0])
-    directory = executable.parent
-    if (
-        not executable.is_absolute() or executable.name != "bootstrap-allocation"
-        or not directory.name.startswith("micros-mem01-native-")
-        or directory.parent.resolve() != Path(tempfile.gettempdir()).resolve()
-    ):
-        raise ValueError("MEM01 replay names an unowned native execution")
-    command = record_strings(native["command"])
-    if command != native_command(context.root, context.native_compiler, directory / "source", executable, stage, True):
-        raise ValueError("MEM01 replay changed its exact compile/link command")
-    inputs, outputs = source_bundle(context.root, stage)
-    generated = {
-        name: {"kind": "file", "mode": mode, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-        for name, (data, mode) in outputs.items()
-    }
-    if (
-        native["source_inputs"] != inputs or native["generated_sources"] != generated
-        or native["fixture_inputs"] != {name: context.files[name] for name in FIXTURE_PATHS}
-    ):
-        raise ValueError("MEM01 replay substituted a source/header/observation/fixture input")
-    identity = native["executable"]
-    record_fields(identity, ("kind", "mode", "size", "sha256"))
-    if (
-        identity["kind"] != "file" or type(identity["mode"]) is not int
-        or not 0 < identity["mode"] <= 0o777 or not identity["mode"] & 0o100
-        or type(identity["size"]) is not int or identity["size"] <= 0
-        or type(identity["sha256"]) is not str or len(identity["sha256"]) != 64
-        or any(character not in "0123456789abcdef" for character in identity["sha256"])
-    ):
-        raise ValueError("MEM01 replay has no complete actual executable identity")
-    symbols = record_strings(native["observation_symbols"])
-    if set(symbols) != {"micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record"}:
-        raise ValueError("MEM01 replay omitted its actual linked observation owners")
-    measured = NativeRun(
-        stage, True, decode_measurements(native["output"], stage, observed=True),
-        context.native_compiler, command, execution, inputs, native["fixture_inputs"],
-        generated, identity, native["output"], native["build_output"], symbols,
-    )
-    results, _ = run_oracles(measured)
-    expected = json.loads(json.dumps([asdict(result) for result in results]))
-    if replay["results"] != expected:
-        raise ValueError("MEM01 replay result does not follow its actual complete measurements")
-    return results

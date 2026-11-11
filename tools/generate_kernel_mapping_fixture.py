@@ -1,26 +1,20 @@
 #!/usr/bin/env -S python3.15 -E -S -B
 
-"""Materialize actual MEM02 subjects with closed native-only environment bindings."""
+"""Materialize current kernel-mapping subjects and native environment bindings."""
 
 import argparse
-from functools import lru_cache
 import hashlib
-import io
 from pathlib import Path
 import subprocess
 import sys
-import tarfile
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tests.host.c_source_records import function_records
-from tests.host.evidence_authority_source import regular_source
-from tests.host.evidence_authority_scope import checked_source_view
-from tests.host.kernel_mapping_source import (
-    OBSERVATION_PREFIX, RECIPE_ADMISSION, SOURCE_PROJECTION,
-    current_function_names, observe_source, project_observations, validate_retained_source,
-)
+from tests.host.source_snapshot import checked_source_view, source_bytes
+from tests.host import native_observations
+from tests.host.kernel_mapping_source import RECIPE_ADMISSION
 from tests.host.work_count_types import Stage
 from tools.stack_artifact_files import read_regular
 from tools.stack_bound_manifest import owned_artifact
@@ -29,53 +23,9 @@ from tools.stack_bound_manifest import owned_artifact
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@lru_cache(maxsize=4)
-def fixed_inputs(root):
-    root = Path(root)
-    reference = SOURCE_PROJECTION["source_reference"]
-    entries = subprocess.check_output(
-        ("git", "ls-tree", "-r", "-z", reference), cwd=root, timeout=30,
-    ).decode().split("\0")
-    members = {}
-    for entry in filter(None, entries):
-        metadata, separator, name = entry.partition("\t")
-        fields = metadata.split()
-        if not separator or len(fields) != 3 or fields[1] != "blob" or name in members:
-            raise ValueError("MEM02 fixed native Git membership is malformed")
-        members[name] = (fields[0], fields[2])
-    selected = {
-        name for name in members
-        if name.endswith(".h") and name.startswith(("include/", "arch/", "kernel/"))
-    } | set(RECIPE_ADMISSION["native_source_members"])
-    if any(members[name][0] not in ("100644", "100755") for name in selected):
-        raise ValueError("MEM02 fixed native input is not an ordinary Git blob")
-    data = subprocess.check_output(
-        ("git", "-c", "tar.umask=022", "archive", reference, *sorted(selected)), cwd=root, timeout=30,
-    )
-    result = {}
-    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-        for member in archive:
-            if member.isdir():
-                continue
-            if (
-                not member.isfile() or member.name not in selected or member.name in result
-                or member.mode & 0o777 != int(members[member.name][0], 8) & 0o777
-            ):
-                raise ValueError("MEM02 native archive has an unadmitted member")
-            body = archive.extractfile(member).read()
-            oid = hashlib.sha1(b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest()
-            if oid != members[member.name][1]:
-                raise ValueError("MEM02 native archive differs from its fixed Git bytes")
-            result[member.name] = (body, member.mode & 0o777)
-    if set(result) != selected:
-        raise ValueError("MEM02 native archive omitted a fixed input")
-    return result
-
-
 def _prefix(observed):
     return (
-        (OBSERVATION_PREFIX if observed else "")
-        + '#include "tests/host/kernel_mapping_test.h"\n'
+        '#include "tests/host/kernel_mapping_test.h"\n'
         '#include "arch/riscv64/platform.h"\n'
         "#include <stddef.h>\n#include <stdint.h>\n#include <string.h>\n"
         '_Static_assert(sizeof(uintptr_t) == sizeof(uint64_t), "MEM02 requires native LP64");\n'
@@ -112,17 +62,15 @@ def _definitions(text, names, *, bind_tables=False):
     return prototypes + "".join(bodies)
 
 
-def _bootstrap_unit(text, observed):
-    from tests.host.selected_release_handoff_source import legacy_binding_prefix
-
+def _bootstrap_unit(root, text, observed):
     return (
-        _prefix(observed) + legacy_binding_prefix(text)
+        _prefix(observed)
         + "static struct micros_frame_allocator bootstrap_allocator;\n"
         "static struct micros_frame_ownership bootstrap_ownership;\n"
         "static bool ownership_runtime_ready;\n"
         "static bool native_irq_enabled;\n"
         "#define riscv_irq_is_enabled micros_kernel_mapping_native_irq_enabled\n"
-        + _definitions(text, SOURCE_PROJECTION["bootstrap_closure"])
+        + _definitions(text, native_observations.declarations(root)["families"]["MEM02"]["subsets"]["kernel/memory/bootstrap_memory.c"])
         + "struct micros_frame_allocator *micros_kernel_mapping_native_allocator(void)\n"
         "{ return &bootstrap_allocator; }\n"
         "struct micros_frame_ownership *micros_kernel_mapping_native_ownership(void)\n"
@@ -173,13 +121,7 @@ def _constructor_adapters():
 
 
 def _constructor_unit(root, text, observed, stage):
-    names = (
-        ("table_at", *SOURCE_PROJECTION["baseline_constructor_closure"])
-        if stage is Stage.RED else tuple(
-            name for name in current_function_names(root, "kernel/memory/address_space.c")
-            if name != "micros_kernel_address_space_initialize"
-        )
-    )
+    names = native_observations.declarations(root)["families"]["MEM02"]["subsets"]["kernel/memory/address_space.c"]
     return (
         _prefix(observed) + _linker_bindings()
         + "static struct micros_kernel_address_space_private_state kernel_address_space;\n"
@@ -190,10 +132,7 @@ def _constructor_unit(root, text, observed, stage):
 
 
 def _validator_unit(root, text, observed, stage):
-    names = (
-        SOURCE_PROJECTION["baseline_validator_closure"] if stage is Stage.RED
-        else current_function_names(root, "kernel/memory/address_space_validation.c")
-    )
+    names = tuple(sorted(function_records(text)))
     return (
         _prefix(observed) + _linker_bindings()
         + _definitions(text, names, bind_tables=True)
@@ -216,52 +155,29 @@ def _validator_unit(root, text, observed, stage):
 
 def source_bundle(root, stage, *, observed=True):
     root = Path(root).resolve()
-    if stage not in (Stage.RED, Stage.GREEN) or type(observed) is not bool:
+    if stage is not Stage.GREEN or type(observed) is not bool:
         raise ValueError("MEM02 native source generation has an unknown stage/mode")
     inputs, outputs = {}, {}
-    for name, (original, mode) in sorted(fixed_inputs(str(root)).items()):
-        data = original
-        if stage is Stage.GREEN:
-            data, identity = read_regular(regular_source(root, name))
-            mode = identity["mode"]
-            if data != original and name not in (
-                "kernel/memory/address_space.c", "kernel/memory/address_space_validation.c",
-                "kernel/memory/address_space_internal.h",
-            ):
-                from tests.host.selected_ownership_source import native_assertion_admission
-                if "MEM02/native-input/" + name not in native_assertion_admission(
-                    root, "MEM02", name, data.decode("utf-8"), stage,
-                ):
-                    raise ValueError("MEM02 corrected native input remains pending its actual pre-production Red")
+    for name in native_observations.native_inputs(root, "MEM02"):
+        data = source_bytes(root, root / name)
+        mode = read_regular(root / name)[1]["mode"]
+        if mode != 0o644:
+            raise ValueError("MEM02 native input has an unadmitted mode: " + name)
         inputs[name] = {
             "kind": "file", "mode": mode, "size": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),
         }
         text = data.decode("utf-8")
-        if name in (
-            "kernel/memory/address_space.c", "kernel/memory/address_space_validation.c",
-            "kernel/memory/address_space_internal.h",
-        ):
-            validate_retained_source(root, name, text, stage)
-        if observed and name in RECIPE_ADMISSION["generated_subjects"]:
-            annotated = observe_source(root, name, text, stage)
-            if project_observations(root, name, annotated, stage) != text:
-                raise ValueError("MEM02 observations do not recover their exact selected source")
-            text = annotated
-        if observed:
-            from tests.host.object_hart_validation_source import legacy_observe_source, project_legacy_observations
-
-            current = legacy_observe_source(root, "MEM02", name, text, stage)
-            if current is not None:
-                if project_legacy_observations(root, "MEM02", name, current, stage) != text:
-                    raise ValueError("MEM02 current object observations changed their qualified source")
-                text = current
+        if name.endswith(".c"):
+            text = native_observations.observe_source(root, "MEM02", name, text, "aggregate" if observed else "ordinary")
         if name == "kernel/memory/bootstrap_memory.c":
-            text = _bootstrap_unit(text, observed)
+            text = _bootstrap_unit(root, text, observed)
         elif name == "kernel/memory/address_space.c":
             text = _constructor_unit(root, text, observed, stage)
         elif name == "kernel/memory/address_space_validation.c":
             text = _validator_unit(root, text, observed, stage)
+        if name.endswith(".c") and observed:
+            text = native_observations.PREFIX + text
         outputs[name] = (text.encode(), mode)
     return inputs, outputs
 

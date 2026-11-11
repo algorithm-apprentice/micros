@@ -1,6 +1,6 @@
 #!/usr/bin/env -S python3.15 -E -S -B
 
-"""Materialize OBJ01's closed fixed/current portable native inputs."""
+"""Materialize current object/hart inputs and their passive observations."""
 
 import argparse
 import hashlib
@@ -11,9 +11,10 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tests.host.evidence_authority_scope import checked_source_view, source_bytes
-from tests.host.object_hart_validation_evidence import NATIVE_SOURCES, fixed_native_inputs
-from tests.host.object_hart_validation_source import observe_source, project_observations, validate_retained_source
+from tests.host.source_snapshot import checked_source_view, source_bytes
+from tests.host.object_hart_validation_evidence import NATIVE_HEADERS, NATIVE_SOURCES
+from tests.host import native_observations
+from tests.host.common_scheduler_return_source import validate_current_native_source
 from tools.stack_artifact_files import read_regular
 from tools.stack_bound_manifest import owned_artifact
 
@@ -21,40 +22,24 @@ from tools.stack_bound_manifest import owned_artifact
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def source_bundle(root, stage, channel, *, current_sources=None):
-    from collections.abc import Mapping
-
+def source_bundle(root, stage, channel):
     root = Path(root).resolve()
-    if stage not in ("baseline", "current") or channel not in ("ordinary", "aggregate", "stack"):
+    if stage != "current" or channel not in ("ordinary", "aggregate", "stack"):
         raise ValueError("OBJ01 source materialization has an unknown stage or channel")
-    fixed_sources = fixed_native_inputs(root)
-    if current_sources is not None and (
-        stage != "current" or not isinstance(current_sources, Mapping)
-        or set(current_sources) != set(fixed_sources)
-        or any(type(raw) is not bytes for raw in current_sources.values())
-    ):
-        raise ValueError("OBJ01 current materialization snapshot is incomplete or untyped")
     inputs, outputs = {}, {}
-    for path, fixed in sorted(fixed_sources.items()):
-        raw = fixed
-        if stage == "current":
-            raw = source_bytes(root, root / path) if current_sources is None else current_sources[path]
-        if stage == "current" and read_regular(root / path)[1]["mode"] != 0o644:
+    for path in sorted((*NATIVE_SOURCES, *NATIVE_HEADERS)):
+        raw = source_bytes(root, root / path)
+        if read_regular(root / path)[1]["mode"] != 0o644:
             raise ValueError("OBJ01 current native input changed file mode: " + path)
         text = raw.decode()
-        validate_retained_source(root, path, text, stage)
+        validate_current_native_source(path, text, root=root)
         inputs[path] = {
             "kind": "file", "mode": 0o644, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
         }
         if path in NATIVE_SOURCES:
-            text = observe_source(root, path, text, channel, stage)
-            if project_observations(root, path, text, channel, stage, original=raw.decode()).encode() != raw:
-                raise ValueError("OBJ01 observation changed its admitted source")
-        if stage == "current" and path == "include/micros/scheduler_core.h":
-            from tests.host.common_scheduler_return_source import legacy_native_admission
-
-            if "OBJ01/current-input/" + path in legacy_native_admission(root, "OBJ01", path, text, stage):
-                text = "#define MICROS_OBJ02_LEGACY_PLAN 1\n" + text
+            text = native_observations.observe_source(root, "OBJ01", path, text, channel)
+            if channel != "ordinary":
+                text = native_observations.PREFIX + text
         outputs[path] = text.encode()
     return inputs, outputs
 
@@ -86,9 +71,8 @@ def main(argv=None):
     if Path.cwd().resolve() != ROOT:
         raise ValueError("OBJ01 generation requires the project root")
     directory = owned_artifact(ROOT, "build/host-debug/object-hart-validation")
-    for stage in ("baseline", "current"):
-        for channel in ("ordinary", "aggregate", "stack"):
-            prepare_sources(ROOT, directory / stage / channel, stage, channel)
+    for channel in ("ordinary", "aggregate", "stack"):
+        prepare_sources(ROOT, directory / "current" / channel, "current", channel)
     return 0
 
 

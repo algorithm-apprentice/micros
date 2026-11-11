@@ -1,29 +1,22 @@
-import ast
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stdout
 import io
 import os
 from pathlib import Path
-import re
 import subprocess
 import tempfile
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
 from tests.host.selected_address_space_evidence import (
     parse_semantics, parse_target_output, semantic_results, target_failures,
 )
-from tests.host.selected_address_space_source import (
-    FAMILY, SOURCE_PROJECTION, SOURCE_ROLES, extended_header, fixed_source,
-    observe_source, project_observations, validate_retained_source,
-)
+from tests.host import native_observations
+from tests.host.work_count_lexical import function_spans
 from tests.host.work_count_types import Stage
-from tests.host.test_evidence_authority import historical_memory_policy
 
 
 ROOT = Path(__file__).resolve().parents[2]
-FROZEN_PREDECESSOR_SHA256 = "2904605d09065ca72937f26aaf2b42861872ba09363438739c817b63450aeb37"
-FROZEN_AFFECTED_SHA256 = "6ab74a18b41e7441592cad398f6cd18d41e2b5aab48007c73a110682a012eaa5"
 
 
 def semantic_records(corrected):
@@ -48,22 +41,14 @@ def semantic_records(corrected):
 
 
 class SelectedAddressSpaceCaptureTest(unittest.TestCase):
-    def test_failed_target_capture_reports_its_owned_output_without_another_run(self):
-        from tests.host import selected_address_space_evidence as evidence
+    def test_current_native_generation_does_not_restore_an_ancestor(self):
+        from tools import generate_selected_address_space_fixture as generator
 
-        diagnostic = "MICROS_TEST_FAILURE handoff-stage=0x0000000000000005\n"
-        result = subprocess.CompletedProcess((), 2, diagnostic, "")
-        errors = io.StringIO()
-        with (
-            mock.patch.object(evidence, "_target_inputs", return_value={}),
-            mock.patch.object(evidence.subprocess, "run", return_value=result) as execute,
-            redirect_stdout(io.StringIO()),
-            redirect_stderr(errors),
-            self.assertRaises(ValueError),
-        ):
-            evidence.measure_targets(ROOT, Stage.GREEN)
-        execute.assert_called_once()
-        self.assertEqual(diagnostic, errors.getvalue())
+        with mock.patch.object(generator, "fixed_inputs", side_effect=AssertionError("historical native inputs"), create=True):
+            inputs, outputs = generator.source_bundle(ROOT, Stage.GREEN, "ordinary")
+        self.assertIn("kernel/memory/user_address_space_runtime.c", inputs)
+        self.assertEqual(set(inputs), set(outputs))
+
 
     def test_kernel_semantic_mismatch_is_not_a_capture_error(self):
         observed = parse_semantics(semantic_records(False))
@@ -94,24 +79,24 @@ class SelectedAddressSpaceCaptureTest(unittest.TestCase):
             with self.subTest(value=value[:100]), self.assertRaises(ValueError):
                 parse_semantics(value)
 
-    def test_actual_primitive_projection_rejects_relocation_and_source_changes(self):
+    def test_current_primitive_bindings_reject_relocation_and_source_changes(self):
         path = "kernel/memory/user_address_space_runtime.c"
-        original = fixed_source(str(ROOT), path).decode()
-        observed = observe_source(ROOT, path, original, "aggregate")
-        self.assertEqual(original, project_observations(ROOT, path, observed, "aggregate"))
-        match = re.search(r'MICROS_TEST_WORK_HIT\("mem04-[^"]+",[^;]+;', observed)
-        self.assertIsNotNone(match)
-        call = match[0]
-        changed = (
-            observed.replace(call, "", 1),
-            observed.replace(call, call + call, 1),
-            observed.replace(call, "", 1) + call,
-            observed.replace(call, call.replace(", 1);", ", 2);"), 1),
-            observed.replace("bitmap[index] = 0;", "bitmap[index] = 1;", 1),
-        )
-        for text in changed:
-            with self.subTest(text=text[-80:]), self.assertRaises(ValueError):
-                project_observations(ROOT, path, text, "aggregate")
+        original = (ROOT / path).read_text()
+        native_observations.observe_source(ROOT, "MEM04", path, original, "aggregate")
+        span = function_spans(original)["clear_scratch_bitmap"]
+        body = original[span.body_start:span.body_end]
+        store = "bitmap[index] = 0;"
+        self.assertIn(store, body)
+        for changed in (
+            body.replace(store, ""),
+            body.replace(store, store + store),
+            body.replace(store, "") + store,
+            body.replace(store, "bitmap[index] = 1;"),
+        ):
+            with self.subTest(body=changed), self.assertRaises(ValueError):
+                native_observations.observe_source(
+                    ROOT, "MEM04", path, original[:span.body_start] + changed + original[span.body_end:], "aggregate",
+                )
 
     def test_target_protocol_requires_exact_witnesses_and_the_owned_failure_path(self):
         before, selected = (8 << 60) | 0x1234, (8 << 60) | 0x1235
@@ -202,8 +187,8 @@ class SelectedAddressSpaceCaptureTest(unittest.TestCase):
                         result.stdout.splitlines(),
                     )
 
-    def test_legacy_native_orchestrator_owns_one_checked_view(self):
-        from tests.host import evidence_authority_scope as scope
+    def test_native_orchestrator_owns_one_current_snapshot(self):
+        from tests.host import source_snapshot as scope
         from tools import check_selected_ownership as checker
 
         def observed(root, products):
@@ -213,7 +198,7 @@ class SelectedAddressSpaceCaptureTest(unittest.TestCase):
             self.assertEqual(["fixture"] * 6, products)
 
         with (
-            mock.patch.object(scope, "_active", None),
+            scope.isolated_source_view(),
             mock.patch.object(checker, "require_current_runtime", return_value={}),
             mock.patch.object(checker, "check_native_products", side_effect=observed) as execute,
             redirect_stdout(io.StringIO()),
@@ -223,29 +208,7 @@ class SelectedAddressSpaceCaptureTest(unittest.TestCase):
             self.assertIsNone(scope._active)
 
 
-class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
-    @historical_memory_policy()
-    def test_private_include_projection_retains_the_added_edge_and_declarations(self):
-        from tests.host import kernel_layout_source
-        from tests.host.selected_address_space_source import project_include_transports
-
-        logical = "kernel/user_address_space_internal.h"
-        path = "kernel/memory/user_address_space_internal.h"
-        original = fixed_source(str(ROOT), path).decode()
-        current = extended_header(path, original).encode()
-        _, _, checksum, before = kernel_layout_source.KERNEL_FILE_FACTS[logical]
-        after = project_include_transports(ROOT, logical, current, before, False)
-        restored = kernel_layout_source._restored_include_bytes(
-            logical, current, checksum, after, required=False,
-        )
-        self.assertIn(b'#include "kernel/tty_handoff_core.h"\n', restored)
-        self.assertIn(b'#include "kernel/vm_handoff_core.h"\n', restored)
-        self.assertIn(b"struct micros_user_address_space_path", restored)
-        self.assertEqual(before, project_include_transports(ROOT, logical, current, before, True))
-        with self.assertRaises(AssertionError):
-            kernel_layout_source._restored_include_bytes(logical, current, checksum, before)
-        with self.assertRaises(ValueError):
-            project_include_transports(ROOT, logical, current + b"\n", before, False)
+class SelectedAddressSpaceDependencyTest(unittest.TestCase):
 
     def test_tty_owner_direction_distinguishes_tags_from_function_references(self):
         from types import SimpleNamespace
@@ -271,210 +234,3 @@ class SelectedAddressSpaceAuthorityTest(unittest.TestCase):
                 records[tty.RUNTIME_SOURCES[2]] = {"inspect": SimpleNamespace(body=body)}
                 with self.subTest(body=body), self.assertRaises(AssertionError):
                     case.test_runtime_state_leaf_keeps_actual_owner_directions_acyclic()
-
-    @historical_memory_policy()
-    def test_handoff_dependency_admits_only_the_two_owned_error_assignments(self):
-        from tests.host import selected_ownership_source as previous
-        from tests.host.selected_address_space_source import extend_handoff_preflight, validate_retained_source
-
-        path = "kernel/memory/user_address_space_handoff.c"
-        original = fixed_source(str(ROOT), path).decode()
-        current = extend_handoff_preflight(original)
-        statement = "            error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;\n"
-        self.assertEqual(2, current.count(statement) - original.count(statement))
-        validate_retained_source(ROOT, path, original, Stage.RED)
-        validate_retained_source(ROOT, path, current, Stage.GREEN)
-        previous.validate_retained_source(ROOT, path, current, Stage.GREEN)
-        for changed in (
-            original, current.replace(statement, "", 1),
-            current.replace(statement, statement.replace("_STATE", "_OWNERSHIP"), 1),
-            current.replace("return count == 1;", "return count == 0;", 1),
-            current + "\n",
-        ):
-            with self.subTest(changed=changed[-60:]), self.assertRaises(ValueError):
-                validate_retained_source(ROOT, path, changed, Stage.GREEN)
-
-    def test_dependency_declaration_is_not_an_extra_path_allowance(self):
-        from tests.host.selected_address_space_source import read_declarations, validate_declarations
-
-        values = read_declarations(ROOT)
-        for dependencies in (
-            (), ("kernel/memory/user_address_space_mapping.c",),
-            (*SOURCE_ROLES["dependent_production_paths"], "kernel/memory/user_address_space_mapping.c"),
-        ):
-            changed = {**values, "SOURCE_ROLES": {**values["SOURCE_ROLES"], "dependent_production_paths": dependencies}}
-            with self.subTest(dependencies=dependencies), self.assertRaises(ValueError):
-                validate_declarations(changed)
-
-    def test_stack_admission_owners_are_exact_immutable_inputs_not_production(self):
-        from tests.host.selected_address_space_source import read_declarations, validate_declarations
-
-        values = read_declarations(ROOT)
-        expected = (
-            "tools/stack_bound_bindings.py", "tools/stack_bound_fatal.py",
-            "tests/host/test_stack_bound_evidence.py",
-        )
-        roles = values["SOURCE_ROLES"]
-        self.assertEqual(expected, roles.get("stack_admission_inputs", ()))
-        self.assertFalse(set(expected).intersection(roles["production_paths"]))
-        for paths in ((), expected[:1], (expected[0], expected[0]), (*expected, "kernel/memory/user_address_space_mapping.c")):
-            changed = {**values, "SOURCE_ROLES": {**roles, "stack_admission_inputs": paths}}
-            with self.subTest(paths=paths), self.assertRaises(ValueError):
-                validate_declarations(changed)
-
-    def test_changed_stack_admission_scaffold_cannot_reuse_runtime_evidence(self):
-        from tests.host.selected_address_space_authority import git
-
-        reference = "8bd33e58a8e661cff78a8e4aad9d6cbc6a406120"
-        policy_path = "tests/host/selected_address_space_source.py"
-        source = ModuleType("historical_mem04_scaffold")
-        source.__file__ = str(ROOT / policy_path)
-        exec(compile(git(ROOT, "show", reference + ":" + policy_path), source.__file__, "exec"), source.__dict__)
-        paths = {
-            "CMakeLists.txt", source.AUTHORITY_PATH, source.SOURCE_PATH,
-            *source.SOURCE_ROLES["fixed_adapters"], *source.SOURCE_ROLES["unchanged_candidates"],
-            *source.SOURCE_ROLES["immutable_additions"], *source.SOURCE_ROLES["dependent_production_paths"],
-            *source.SOURCE_ROLES["stack_admission_inputs"], *source.SOURCE_PROJECTION["registration_paths"],
-        }
-        historical = {
-            path: git(ROOT, "show", reference + ":" + path) for path in sorted(paths)
-        }
-
-        def historical_read(root, path):
-            if Path(root).resolve() != ROOT or path not in historical:
-                raise ValueError("historical MEM04 scaffold attempted an undeclared current read")
-            return historical[path]
-
-        def historical_regular(root, path):
-            raw = historical_read(root, path)
-            return SimpleNamespace(read_text=lambda encoding="utf-8": raw.decode(encoding))
-
-        with mock.patch.object(source, "regular_source", side_effect=historical_regular):
-            with mock.patch.object(source, "read_regular_source", side_effect=historical_read):
-                source.validate_scaffold(ROOT)
-            for changed in (
-                "tools/stack_bound_bindings.py", "tools/stack_bound_fatal.py",
-                "tests/host/test_stack_bound_evidence.py",
-            ):
-                def read_changed(root, path):
-                    return historical_read(root, path) + (b"\n" if path == changed else b"")
-
-                with self.subTest(changed=changed), mock.patch.object(source, "read_regular_source", side_effect=read_changed):
-                    with self.assertRaisesRegex(ValueError, "frozen stack admission scaffold changed: " + changed):
-                        source.validate_scaffold(ROOT)
-
-    def test_complete_predecessor_records_and_fingerprints_are_conserved(self):
-        from tests.host.evidence_authority_inventory import current_inventory
-        from tests.host.evidence_authority_source import literal_value, single_assignment
-        from tests.host.evidence_authority_types import fact_set_digest
-        from tests.host.evidence_authority_validation import validate_inventory
-        from tests.host.selected_address_space_authority import historical_predecessor_records
-
-        inventory = current_inventory(ROOT)
-        self.assertTrue(validate_inventory(inventory).ok)
-        prior = historical_predecessor_records(ROOT, inventory)
-        affected = tuple(fact for fact in inventory.facts if fact.key in SOURCE_PROJECTION["retirement_keys"])
-        self.assertEqual(FROZEN_PREDECESSOR_SHA256, fact_set_digest(prior))
-        self.assertEqual(FROZEN_AFFECTED_SHA256, fact_set_digest(affected))
-        original = ast.parse(fixed_source(str(ROOT), "tests/host/evidence_authority_inventory.py").decode())
-        fingerprints = literal_value(single_assignment(original, "DECLARED_FAMILY_FACT_DIGESTS").value)
-        self.assertEqual(
-            fingerprints, {
-                name: fact_set_digest(fact for fact in prior if fact.family == name)
-                for name in {fact.family for fact in prior}
-            },
-        )
-        self.assertEqual(8, sum(fact.family == FAMILY for fact in inventory.facts))
-
-    def test_historical_view_cannot_hide_invalid_current_records_or_rebaseline_predecessors(self):
-        from dataclasses import replace
-        from tests.host import evidence_authority_inventory as current
-        from tests.host.evidence_authority_types import fact_set_digest
-        from tests.host.selected_address_space_authority import declared_scope
-
-        inventory = current.current_inventory(ROOT)
-        new = next(fact for fact in inventory.facts if fact.family == "selected-address-space-native-admission")
-        old = next(fact for fact in inventory.facts if fact.family == "selected-ownership-native-admission")
-        changed_old = tuple(replace(fact, evidence_value="0" * 64) if fact == old else fact for fact in inventory.facts)
-        rebaselined = tuple(
-            (name, fact_set_digest(fact for fact in changed_old if fact.family == name)) if name == old.family
-            else (name, value) for name, value in inventory.declared_family_fact_digests
-        )
-        cases = (
-            replace(inventory, facts=tuple(fact for fact in inventory.facts if fact != new)),
-            replace(inventory, facts=tuple(replace(fact, evidence_value="0" * 64) if fact == new else fact for fact in inventory.facts)),
-            replace(inventory, facts=(*inventory.facts, replace(new, key="unknown", family="unregistered"))),
-            replace(inventory, facts=changed_old, declared_family_fact_digests=rebaselined),
-        )
-        declared_scope(ROOT)
-        for index, changed in enumerate(cases):
-            with self.subTest(case=index), mock.patch.object(current, "current_inventory", return_value=changed):
-                with self.assertRaisesRegex(ValueError, "inventory|historical|predecessor"):
-                    declared_scope(ROOT)
-
-    def test_uncommitted_declaration_without_terminal_execution_retires_nothing(self):
-        from tests.host import selected_address_space_authority as authority
-
-        with (
-            mock.patch.object(authority, "committed_claim", return_value=None),
-            mock.patch.object(authority, "read_selection", return_value=(None, "")),
-            mock.patch.object(authority, "_provisional", None),
-        ):
-            self.assertEqual(frozenset(), authority.retired_identity_keys(ROOT))
-
-    @historical_memory_policy()
-    def test_current_header_admission_is_byte_exact_and_does_not_authorize_legacy_retirement(self):
-        from tests.host import selected_ownership_source as previous
-        from tests.host.selected_address_space_source import validate_retained_source
-
-        for path in SOURCE_ROLES["production_paths"]:
-            if not path.endswith(".h"):
-                continue
-            original = fixed_source(str(ROOT), path).decode()
-            current = extended_header(path, original)
-            validate_retained_source(ROOT, path, current, Stage.GREEN)
-            for text in (current + "\n", current.replace("\n#endif\n", "\n#endif /* changed */\n")):
-                with self.subTest(path=path, text=text[-45:]), self.assertRaises(ValueError):
-                    validate_retained_source(ROOT, path, text, Stage.GREEN)
-            with self.subTest(path=path), self.assertRaises(ValueError):
-                validate_retained_source(ROOT, path, current, Stage.RED)
-            with mock.patch(
-                "tests.host.evidence_authority_scope.identity_required", return_value=True,
-            ), self.assertRaises(ValueError):
-                previous.validate_retained_source(ROOT, path, current, Stage.GREEN)
-
-    def test_exact_frozen_adapters_reject_a_partial_or_unrelated_change(self):
-        from tests.host.selected_address_space_source import extend_legacy_adapter, project_legacy_adapter
-
-        for path in (
-            "tests/host/kernel_layout_source.py",
-            "tests/host/selected_ownership_source.py",
-            "tests/host/test_kernel_vm_handoff_source_layout.py",
-            "tests/host/test_scheduler_source_layout.py",
-            "tests/host/test_tty_source_layout.py",
-            "tools/generate_selected_ownership_fixture.py",
-        ):
-            original = fixed_source(str(ROOT), path).decode()
-            current = extend_legacy_adapter(path, original)
-            self.assertEqual(original, project_legacy_adapter(ROOT, path, current))
-            with self.subTest(path=path), self.assertRaises(ValueError):
-                project_legacy_adapter(ROOT, path, current + "\n")
-
-    def test_native_recipe_inverse_keeps_full_only_coverage_and_original_bytes(self):
-        from tests.host.selected_address_space_source import extend_cmake, native_recipe, project_cmake
-        from tests.host.work_count_recipe import project_host_test_commands
-
-        original = fixed_source(str(ROOT), "CMakeLists.txt").decode()
-        current = extend_cmake(original)
-        self.assertEqual(original, project_cmake(current))
-        self.assertEqual(project_host_test_commands(original), project_cmake(project_host_test_commands(current)))
-        addition = native_recipe()
-        self.assertNotIn("add_dependencies(test-unit-fast", addition)
-        for changed in (
-            current.replace(addition, addition.replace("LABELS slow", "LABELS fast"), 1),
-            current.replace(addition, addition.replace("JOB_POOL mem03_source_proof", ""), 1),
-            current.replace(addition, addition + addition, 1),
-            current + "\n",
-        ):
-            with self.subTest(changed=changed[-60:]), self.assertRaises(ValueError):
-                project_cmake(changed)

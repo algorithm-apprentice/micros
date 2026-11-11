@@ -1,25 +1,20 @@
 #!/usr/bin/env -S python3.15 -E -S -B
 
-"""Materialize MEM05's fixed native source and finite platform bindings."""
+"""Materialize current release/handoff sources and finite native platform bindings."""
 
 import argparse
-import ast
-from functools import lru_cache
 import hashlib
-import io
 from pathlib import Path
 import subprocess
 import sys
-import tarfile
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tests.host import selected_address_space_source as previous
 from tests.host import selected_release_handoff_source as source
-from tests.host.evidence_authority_source import literal_value, single_assignment
-from tests.host.evidence_authority_scope import checked_source_view
-from tests.host.evidence_authority_types import digest
+from tests.host import native_observations
+from tests.host.source_snapshot import checked_source_view, source_bytes
 from tests.host.work_count_types import Stage
 from tools.stack_artifact_files import read_regular
 from tools.stack_bound_manifest import owned_artifact
@@ -35,80 +30,8 @@ EXECUTION_FUNCTIONS = (
 )
 
 
-@lru_cache(maxsize=4)
 def native_source_members(root):
-    text = subprocess.check_output(
-        ("git", "show", source.RUNTIME_REFERENCE + ":tests/host/selected_address_space_source.py"),
-        cwd=root, timeout=30,
-    )
-    recipe = literal_value(single_assignment(ast.parse(text.decode()), "RECIPE_ADMISSION").value)
-    members = (
-        *recipe["native_source_members"],
-        "kernel/memory/user_address_space_handoff.c",
-        "kernel/execution/user_execution_validation.c",
-    )
-    if len(members) != 58 or len(set(members)) != 58:
-        raise ValueError("MEM05 fixed native C membership changed")
-    return members
-
-
-@lru_cache(maxsize=4)
-def fixed_inputs(root):
-    root = Path(root).resolve()
-    tree = subprocess.check_output(
-        ("git", "rev-parse", source.RUNTIME_REFERENCE + "^{tree}"), cwd=root, timeout=30,
-    ).decode().strip()
-    if tree != source.RUNTIME_TREE:
-        raise ValueError("MEM05 fixed native commit/tree changed")
-    members = {}
-    for entry in subprocess.check_output(
-        ("git", "ls-tree", "-r", "-z", source.RUNTIME_REFERENCE), cwd=root, timeout=30,
-    ).split(b"\0"):
-        if not entry:
-            continue
-        metadata, separator, path = entry.partition(b"\t")
-        fields = metadata.decode().split()
-        name = path.decode()
-        if (
-            not separator or len(fields) != 3 or fields[1] != "blob" or name in members
-            or Path(name).is_absolute() or ".." in Path(name).parts or "\\" in name
-        ):
-            raise ValueError("MEM05 fixed native Git membership is malformed")
-        members[name] = fields
-    headers = tuple(sorted(
-        name for name in members
-        if name.endswith(".h") and name.startswith(("arch/", "include/", "kernel/"))
-    ))
-    if (
-        len(headers) != 156
-        or digest(headers) != "f6d999c1bb6b9f5fc57e097211f88ac72beb51577b964e6e4a24a777f057e3c2"
-    ):
-        raise ValueError("MEM05 fixed native header membership changed")
-    selected = set(headers) | set(native_source_members(str(root)))
-    if len(selected) != 214 or any(members[name][0] not in ("100644", "100755") for name in selected):
-        raise ValueError("MEM05 native inputs are not its closed ordinary-file set")
-    raw = subprocess.check_output(
-        ("git", "-c", "tar.umask=022", "archive", source.RUNTIME_REFERENCE, *sorted(selected)),
-        cwd=root, timeout=30,
-    )
-    result = {}
-    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
-        for item in archive:
-            if item.isdir():
-                continue
-            if (
-                not item.isfile() or item.name not in selected or item.name in result
-                or item.mode & 0o777 != int(members[item.name][0], 8) & 0o777
-            ):
-                raise ValueError("MEM05 native archive has an unadmitted member")
-            data = archive.extractfile(item).read()
-            oid = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
-            if oid != members[item.name][2]:
-                raise ValueError("MEM05 native archive differs from fixed Git bytes")
-            result[item.name] = (data, item.mode & 0o777)
-    if set(result) != selected:
-        raise ValueError("MEM05 native archive omitted a fixed input")
-    return result
+    return native_observations.declarations(Path(root))["families"]["MEM05"]["native_sources"]
 
 
 def _bootstrap_binding(text):
@@ -138,17 +61,6 @@ def _scratch_binding(text, stage):
     text = PREFIX + '#include <string.h>\n' + previous.replace_body(
         text, "read_satp", "    return micros_as_native_read_satp();",
     )
-    if stage is Stage.RED:
-        return text + (
-            "\nconst uint64_t *micros_as_native_scratch_bitmap(bool release)\n"
-            "{ return release ? release_bitmap : reachable_bitmap; }\n"
-            "bool micros_as_native_scratch_busy(void)\n"
-            "{ return scratch_busy; }\n"
-            "void micros_mem05_native_scratch_reset(void)\n{\n"
-            "    memset(reachable_bitmap, 0, sizeof(reachable_bitmap));\n"
-            "    memset(release_bitmap, 0, sizeof(release_bitmap));\n"
-            "    scratch_busy = false;\n}\n"
-        )
     return text + (
         "\nconst uint64_t *micros_as_native_scratch_bitmap(bool release)\n"
         "{ return release ? release_selection.bitmap : reachable_selection.bitmap; }\n"
@@ -168,7 +80,7 @@ def _scratch_binding(text, stage):
 
 
 def bind_native(path, text, stage):
-    if stage not in (Stage.RED, Stage.GREEN):
+    if stage is not Stage.GREEN:
         raise ValueError("MEM05 native binding has an unknown source stage")
     if path == "kernel/memory/bootstrap_memory.c":
         return _bootstrap_binding(text)
@@ -185,33 +97,25 @@ def bind_native(path, text, stage):
 
 def source_bundle(root, stage, channel):
     root = Path(root).resolve()
-    if stage not in (Stage.RED, Stage.GREEN) or channel not in source.CHANNELS:
+    if stage is not Stage.GREEN or channel not in source.CHANNELS:
         raise ValueError("MEM05 source materialization has an unadmitted stage or channel")
-    source.validate_primitive_declarations(root)
     inputs, outputs = {}, {}
-    for path, (original, mode) in sorted(fixed_inputs(str(root)).items()):
-        raw = original
-        if stage is Stage.GREEN:
-            raw, identity = read_regular(root / path)
-            if identity["mode"] != mode:
-                raise ValueError("MEM05 changed an unadmitted native input or file mode: " + path)
-            if path not in source.SOURCE_ROLES["production_paths"] and raw != original:
-                from tests.host.object_hart_validation_source import native_assertion_admission
-
-                if "MEM05/native-input/" + path not in native_assertion_admission(
-                    root, "MEM05", path, raw.decode(), stage,
-                ):
-                    raise ValueError("MEM05 changed an unadmitted native input or file mode: " + path)
-        source.validate_retained_source(root, path, raw.decode(), stage)
+    measured = {*native_source_members(root), *source.OBSERVED_HEADERS}
+    for path in native_observations.native_inputs(root, "MEM05"):
+        raw = source_bytes(root, root / path)
+        mode = read_regular(root / path)[1]["mode"]
+        if mode != 0o644:
+            raise ValueError("MEM05 native input has an unadmitted mode: " + path)
         inputs[path] = {
             "kind": "file", "mode": mode, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
         }
         text = raw.decode()
-        if path in (*native_source_members(str(root)), *source.OBSERVED_HEADERS):
-            text = source.observe_source(root, path, text, channel, stage)
-            if source.project_observations(root, path, text, channel, stage).encode() != raw:
-                raise ValueError("MEM05 native observation did not preserve its fixed source")
-        outputs[path] = (bind_native(path, text, stage).encode(), mode)
+        if path in measured:
+            text = native_observations.observe_source(root, "MEM05", path, text, channel)
+        text = bind_native(path, text, stage)
+        if path in measured and channel != "ordinary":
+            text = native_observations.PREFIX + text
+        outputs[path] = (text.encode(), mode)
     return inputs, outputs
 
 

@@ -15,14 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tests.host.evidence_authority_scope import checked_source_view
+from tests.host.source_snapshot import checked_source_view
 from tools.python_host_runtime import require_current_runtime
 
 
 FAST_MODULES = (
     "test_check_docs", "test_check_elf_sections", "test_embed_ramfs_seed",
     "test_python_host_runtime", "test_stack_reports", "test_stack_observer_state",
-    "test_validation_evidence", "test_evidence_authority_scope", "test_host_test_runner",
+    "test_validation_evidence", "test_source_snapshot", "test_host_test_runner",
 )
 
 

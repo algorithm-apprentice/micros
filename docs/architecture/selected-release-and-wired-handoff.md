@@ -1665,8 +1665,9 @@ transferable-leaf rejection and complete cleanup through existing
 interfaces. The same fixture compiles against fixed and current layouts;
 it has no new index-field dependency or compatibility macro.
 
-The [phase controller](../../tools/check_selected_release_handoff.py) and
-[authority owner](../../tests/host/selected_release_handoff_authority.py)
+The historical
+[phase controller at #236](https://github.com/algorithm-apprentice/micros/blob/aba02c1f8a583866a85c3012d20c6007b9445a22/tools/check_selected_release_handoff.py) and
+[authority owner at #236](https://github.com/algorithm-apprentice/micros/blob/aba02c1f8a583866a85c3012d20c6007b9445a22/tests/host/selected_release_handoff_authority.py)
 bind the exact staged membership, thirty candidate paths, thirteen frozen
 candidate inputs and all remaining immutable source/tool inputs.
 Each native product and target executes once per phase. B14 precedes
@@ -1675,6 +1676,11 @@ supplying B02/B05. Preparation/syntax checks and archived results cannot
 replace a genuine Red, Green or recertification event.
 Publication still requires full current acceptance, independent review,
 identical publication trees and journal-free authority.
+
+These author ceremonies describe #236, not current prerequisites.
+[ADR-0123's implementation map](current-contract-validation.md#implementation-and-retained-evidence-map)
+retains the current five-product native evidence and ordinary handoff witnesses
+without historical products, catalogs or journals.
 
 ## Completed implementation
 

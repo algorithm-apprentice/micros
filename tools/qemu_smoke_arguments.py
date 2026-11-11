@@ -79,6 +79,14 @@ def _add_execution_arguments(
         action="store_true",
         help="Print the accepted single-run decoded transcript as TAP diagnostics",
     )
+    parser.add_argument(
+        "--require-current-evidence",
+        choices=(
+            "kernel-mapping", "user-address-space", "address-space-handoff", "scheduler-return",
+            "runtime-memory", "diagnostic-history",
+        ),
+        help="Require the current semantic/work witnesses from this same guest execution",
+    )
 
 
 def _add_platform_report_arguments(
@@ -407,4 +415,12 @@ def parse_arguments(argv):
     )
     if arguments.report_transcript and len(arguments.memory) != 1:
         parser.error("--report-transcript requires exactly one memory size")
+    if arguments.require_current_evidence == "diagnostic-history":
+        if (
+            arguments.expect != "panic" or not arguments.require_panic_report
+            or arguments.require_diagnostic_history != "seeded"
+        ):
+            parser.error("diagnostic-history evidence requires a complete seeded panic report")
+    elif arguments.require_current_evidence is not None and arguments.expect != "pass":
+        parser.error("--require-current-evidence requires --expect pass")
     return arguments
